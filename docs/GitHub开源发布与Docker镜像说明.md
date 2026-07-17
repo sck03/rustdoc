@@ -39,10 +39,16 @@ pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
 - `public-source-guard.yml`：`main/master` 推送或手工运行时检查公开边界。
 - `cross-platform-validation.yml`：只手工运行，检查 Windows、Linux、macOS 的 .NET/Web/Tauri 契约。
 - `container-images.yml`：只手工运行；启动时填写版本号并选择是否更新 `latest`，随后构建 `linux/amd64`、`linux/arm64` 的 API/Web 镜像并发布到 GHCR。
+- `windows-desktop-package.yml`：只手工运行；选择版本和 Document/Sales/Full，构建 Windows x64 NSIS 安装包。
+- `linux-desktop-package.yml`：只手工运行；选择版本和产品版本，构建 Linux x64 deb/AppImage。
+- `macos-desktop-package.yml`：只手工运行；选择版本、Apple Silicon ARM64/Intel x64 和产品版本，构建 macOS dmg；两种架构都内置 Chrome for Testing 官方 Headless Shell。
+- `desktop-package-reusable.yml`：上述三个桌面入口共用的内部编排，不会单独出现在手工运行列表中。
 
-公开源码守卫仍在主分支推送时自动运行；两个重型工作流只在仓库 Actions 页面点击 “Run workflow” 后执行。项目当前不启用 Dependabot 自动版本 PR，避免多个依赖生态同时创建分支并放大 Actions 数量；依赖升级由维护者集中检查 package/lock 文件后人工提交。
+公开源码守卫仍在主分支推送时自动运行；跨平台验证、容器发布和三个桌面打包入口都只在仓库 Actions 页面点击 “Run workflow” 后执行。项目当前不启用 Dependabot 自动版本 PR，避免多个依赖生态同时创建分支并放大 Actions 数量；依赖升级由维护者集中检查 package/lock 文件后人工提交。
 
 手工发布 Docker 镜像时：进入 Actions → Build and publish container images → Run workflow，填写 `version`，例如 `0.1.2` 或 `0.1.2-beta.1`；`publish_latest=true` 时同时覆盖 `latest`。工作流会在临时 runner 中同步 `.NET/Web/Tauri/Rust` 内部版本，不会反向修改或提交仓库源码。最终镜像同时带版本标签和 `sha-*` 标签。
+
+手工生成桌面包时，进入对应的 `Build Windows/Linux/macOS desktop package` → `Run workflow`，填写版本并选择产品版；macOS 还可选择 ARM64 或 x64。默认结果位于该次运行的 Artifacts，保留 14 天；只有把 `publish_release` 改为 `true` 才会上传到 `v<版本>` GitHub Release。三个入口都会自动下载当前平台的 Chrome Headless Shell，并在打包前后验证浏览器可执行文件已经进入 Tauri 资源目录，因此最终安装包不要求普通用户另行下载浏览器。源码仓库仍不保存这些大体积二进制。Chrome for Testing 当前官方 Headless Shell 平台为 `linux64 / mac-arm64 / mac-x64 / win32 / win64`，所以 macOS ARM64 已开放正式手工打包；Linux ARM64 和 Windows ARM64 没有对应官方包，仍只保留应用编译契约，不能把 x64 浏览器伪装成 ARM64 交付。桌面包当前未签名，正式分发前仍需完成代码签名、公证、安装启动、更新和卸载验收。
 
 镜像名称为：
 

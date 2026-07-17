@@ -34,6 +34,10 @@ jobs:
     env:
       NUGET_PACKAGES: ${{ github.workspace }}/artifacts/nuget-packages
       CARGO_TARGET_DIR: ${{ github.workspace }}/artifacts/cargo-target-exportdoc
+      # Public source intentionally excludes large Chrome Headless Shell
+      # binaries.  Cross-platform validation checks the shell and path
+      # contracts; release workflows provision the renderer explicitly.
+      EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER: true
 
     steps:
       - name: Checkout
@@ -73,16 +77,26 @@ jobs:
       - name: Build cross-platform backend layers
         run: dotnet build src/ExportDocManager.Api/ExportDocManager.Api.csproj --no-restore -c Release -v minimal
 
+      # A solution restore without --runtime creates only the portable
+      # net8.0 asset graph.  The contract builds below target two different
+      # RIDs, so restore the complete project-reference graph explicitly for
+      # each RID before using --no-restore.  This avoids project.assets.json
+      # failures in Domain/Application/Infrastructure on hosted runners.
+      - name: Restore x64 backend runtime graph
+        run: dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -r ${{ matrix.x64_rid }}
+
       - name: Validate x64 backend contract
-        run: dotnet build src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -c Release -r ${{ matrix.x64_rid }} -v minimal
+        run: dotnet build src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj --no-restore -c Release -r ${{ matrix.x64_rid }} -v minimal
+
+      - name: Restore ARM64 backend runtime graph
+        run: dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -r ${{ matrix.arm64_rid }}
 
       - name: Validate ARM64 backend contract
-        run: dotnet build src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -c Release -r ${{ matrix.arm64_rid }} -v minimal
+        run: dotnet build src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj --no-restore -c Release -r ${{ matrix.arm64_rid }} -v minimal
 
       - name: Test portable runtime path contracts
         run: >-
           dotnet test tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj
-          --no-restore
           -c Release
           -m:1
           -p:BuildInParallel=false
@@ -90,6 +104,9 @@ jobs:
 
       - name: Build shared React frontend
         run: npm --prefix apps/export-doc-web run build
+
+      - name: Fetch native Rust dependencies
+        run: cargo fetch --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml
 
       - name: Prepare native Tauri sidecar and resources
         run: npm --prefix apps/export-doc-tauri run prepare:bundle

@@ -1,0 +1,42 @@
+name: Build Windows desktop package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '程序版本（例如 0.1.2，可输入 v0.1.2）'
+        required: true
+        type: string
+      edition:
+        description: '产品功能版本'
+        required: true
+        default: Full
+        type: choice
+        options:
+          - Full
+          - Document
+          - Sales
+      publish_release:
+        description: '同时上传到对应版本的 GitHub Release'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    uses: ./.github/workflows/desktop-package-reusable.yml
+    with:
+      platform: windows
+      runner: windows-latest
+      runtime_identifier: win-x64
+      rust_target: x86_64-pc-windows-msvc
+      chrome_platform: win64
+      bundle_targets: nsis
+      version: ${{ inputs.version }}
+      architecture: x64
+      edition: ${{ inputs.edition }}
+      include_browser: true
+      publish_release: ${{ inputs.publish_release }}

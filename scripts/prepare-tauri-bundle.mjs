@@ -23,6 +23,7 @@ const runtimeDataDirectories = ["Database", "Files", "Exports", "SingleWindow", 
 const rid = process.env.EXPORTDOCMANAGER_TAURI_RID || detectRuntimeIdentifier();
 const selfContained = (process.env.EXPORTDOCMANAGER_TAURI_SELF_CONTAINED || "true").toLowerCase() !== "false";
 const productEdition = normalizeProductEdition(process.env.EXPORTDOCMANAGER_PRODUCT_EDITION);
+const allowMissingBrowser = (process.env.EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER || "").toLowerCase() === "true";
 
 run("node", [path.join(repoRoot, "scripts", "sync-version.mjs")], process.env);
 
@@ -466,7 +467,17 @@ async function copyBrowserRuntimeResources(sourceRoot, destinationRoot) {
 
   await copyIfExists(path.join(sourceRoot, "README.md"), path.join(destinationRoot, "README.md"));
 
-  const platform = chromeForTestingPlatform();
+  let platform;
+  try {
+    platform = chromeForTestingPlatform();
+  } catch (error) {
+    if (!allowMissingBrowser) {
+      throw error;
+    }
+
+    console.warn(`${error.message} Continuing without a bundled browser because EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER=true.`);
+    return;
+  }
   const platformSource = path.join(sourceRoot, "ChromeForTesting", platform);
   const platformDestination = path.join(destinationRoot, "ChromeForTesting", platform);
   const headlessShellSource = path.join(platformSource, "ChromeHeadlessShell");
@@ -494,6 +505,13 @@ async function copyBrowserRuntimeResources(sourceRoot, destinationRoot) {
     const directRoot = relative.includes(path.sep) ? relative.split(path.sep)[0] : relative;
     const directSource = path.join(sourceRoot, directRoot);
     await cp(directSource, path.join(destinationRoot, directRoot), { recursive: true, force: true });
+    return;
+  }
+
+  if (allowMissingBrowser) {
+    console.warn(
+      `Chrome Headless Shell for ${platform} was not found under ${sourceRoot}; continuing with an empty optional browser resource directory because EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER=true.`,
+    );
     return;
   }
 

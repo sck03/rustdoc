@@ -84,6 +84,7 @@ function Invoke-Main {
     if ([string]::IsNullOrWhiteSpace($executablePath)) {
         throw "$($productInfo.DisplayName) executable was not found after extraction under '$installRoot'."
     }
+    Set-UnixExecutablePermission -Path $executablePath
 
     $manifest = [ordered]@{
         product = $Product
@@ -297,6 +298,27 @@ function Find-ChromeExecutable {
     }
 
     return $null
+}
+
+function Set-UnixExecutablePermission {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if ([Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([Runtime.InteropServices.OSPlatform]::Windows)) {
+        return
+    }
+
+    $chmod = Get-Command chmod -ErrorAction SilentlyContinue
+    if ($null -eq $chmod) {
+        throw "chmod was not found; cannot make the bundled browser executable: $Path"
+    }
+
+    & $chmod.Source "+x" "--" $Path
+    if ($LASTEXITCODE -ne 0) {
+        throw "chmod failed for the bundled browser executable: $Path"
+    }
 }
 
 function Assert-InRepoPath {

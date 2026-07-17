@@ -1,0 +1,247 @@
+name: Reusable desktop package build
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+      runtime_identifier:
+        required: true
+        type: string
+      rust_target:
+        required: true
+        type: string
+      chrome_platform:
+        required: true
+        type: string
+      bundle_targets:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      architecture:
+        required: true
+        type: string
+      edition:
+        required: true
+        type: string
+      include_browser:
+        required: true
+        type: boolean
+      publish_release:
+        required: true
+        type: boolean
+
+concurrency:
+  group: desktop-${{ inputs.platform }}-${{ inputs.architecture }}-${{ inputs.version }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: ${{ inputs.platform }} ${{ inputs.architecture }} package
+    runs-on: ${{ inputs.runner }}
+    env:
+      DOTNET_CLI_HOME: ${{ github.workspace }}/.codex-runtime/dotnet-cli
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+      NUGET_PACKAGES: ${{ github.workspace }}/.codex-runtime/nuget-packages
+      NUGET_HTTP_CACHE_PATH: ${{ github.workspace }}/.codex-runtime/nuget-http-cache
+      npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
+      CARGO_HOME: ${{ github.workspace }}/.codex-runtime/cargo-home
+      CARGO_TARGET_DIR: ${{ github.workspace }}/artifacts/cargo-target-exportdoc
+      EXPORTDOCMANAGER_TAURI_RID: ${{ inputs.runtime_identifier }}
+      EXPORTDOCMANAGER_PRODUCT_EDITION: ${{ inputs.edition }}
+      EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER: ${{ inputs.include_browser && 'false' || 'true' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Verify public repository boundary
+        shell: pwsh
+        run: ./scripts/github/verify-public-source.ps1
+
+      - name: Install Linux desktop packaging dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            apps/export-doc-web/package-lock.json
+            apps/export-doc-tauri/package-lock.json
+
+      - name: Set up Rust target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ inputs.rust_target }}
+
+      - name: Initialize workspace build directories
+        shell: pwsh
+        run: |
+          @(
+            $env:DOTNET_CLI_HOME,
+            $env:NUGET_PACKAGES,
+            $env:NUGET_HTTP_CACHE_PATH,
+            $env:npm_config_cache,
+            $env:CARGO_HOME,
+            $env:CARGO_TARGET_DIR
+          ) | ForEach-Object { New-Item -ItemType Directory -Path $_ -Force | Out-Null }
+
+      - name: Install frontend dependencies
+        shell: pwsh
+        run: |
+          npm ci --prefix apps/export-doc-web
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm ci --prefix apps/export-doc-tauri
+          exit $LASTEXITCODE
+
+      - name: Validate and apply requested version
+        id: version
+        shell: pwsh
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          $version = $env:REQUESTED_VERSION.Trim()
+          if ($version.StartsWith("v", [System.StringComparison]::OrdinalIgnoreCase)) {
+            $version = $version.Substring(1)
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "版本格式无效：$($env:REQUESTED_VERSION)。请使用 0.1.2 或 0.1.2-beta.1。"
+          }
+          "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          node scripts/sync-version.mjs $version
+          exit $LASTEXITCODE
+
+      - name: Fetch Rust dependencies
+        shell: pwsh
+        run: cargo fetch --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --target ${{ inputs.rust_target }}
+
+      - name: Provision Chrome Headless Shell
+        if: inputs.include_browser
+        shell: pwsh
+        run: >-
+          ./scripts/provision-chrome-for-testing.ps1
+          -Product ChromeHeadlessShell
+          -Platform ${{ inputs.chrome_platform }}
+
+      - name: Verify staged Chrome Headless Shell
+        if: inputs.include_browser
+        shell: pwsh
+        run: |
+          $browserRoot = Join-Path $env:GITHUB_WORKSPACE "Browsers/ChromeForTesting/${{ inputs.chrome_platform }}"
+          $browser = Get-ChildItem -LiteralPath $browserRoot -File -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome-headless-shell") } |
+            Select-Object -First 1
+          if ($null -eq $browser) {
+            throw "Chrome Headless Shell was not staged under '$browserRoot'."
+          }
+          if ($env:RUNNER_OS -ne "Windows") {
+            & /usr/bin/test -x $browser.FullName
+            if ($LASTEXITCODE -ne 0) {
+              throw "Chrome Headless Shell is not executable: $($browser.FullName)"
+            }
+          }
+          Write-Host "Chrome Headless Shell staged at $($browser.FullName)"
+
+      - name: Build unsigned desktop package
+        shell: pwsh
+        run: |
+          npm --prefix apps/export-doc-tauri run build -- --target ${{ inputs.rust_target }} --bundles ${{ inputs.bundle_targets }} --no-sign
+          exit $LASTEXITCODE
+
+      - name: Verify bundled Chrome Headless Shell resource
+        if: inputs.include_browser
+        shell: pwsh
+        run: |
+          $resourceRoot = Join-Path $env:GITHUB_WORKSPACE "artifacts/tauri-bundle/resources/Browsers"
+          $browser = Get-ChildItem -LiteralPath $resourceRoot -File -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome-headless-shell") } |
+            Select-Object -First 1
+          if ($null -eq $browser) {
+            throw "Chrome Headless Shell did not enter the Tauri resource staging directory '$resourceRoot'."
+          }
+          if ($env:RUNNER_OS -ne "Windows") {
+            & /usr/bin/test -x $browser.FullName
+            if ($LASTEXITCODE -ne 0) {
+              throw "Bundled Chrome Headless Shell is not executable: $($browser.FullName)"
+            }
+          }
+          Write-Host "Chrome Headless Shell bundled from $($browser.FullName)"
+
+      - name: Upload desktop package artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: export-doc-manager-${{ inputs.platform }}-${{ inputs.architecture }}-${{ inputs.edition }}-${{ steps.version.outputs.value }}
+          path: artifacts/cargo-target-exportdoc/**/release/bundle/**
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Publish package files to GitHub Release
+        if: inputs.publish_release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          $tag = "v$($env:RELEASE_VERSION)"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            $createArgs = @("release", "create", $tag, "--title", "ExportDocManager $($env:RELEASE_VERSION)", "--notes", "ExportDocManager 手工构建的未签名桌面安装包与容器版本。")
+            if ($env:RELEASE_VERSION.Contains("-")) {
+              $createArgs += "--prerelease"
+            }
+            & gh @createArgs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+          $extensions = switch ("${{ inputs.platform }}") {
+            "windows" { @(".exe", ".msi") }
+            "linux" { @(".deb", ".rpm", ".appimage") }
+            "macos" { @(".dmg", ".pkg", ".zip") }
+            default { @() }
+          }
+          $assets = @(
+            Get-ChildItem -Path $env:CARGO_TARGET_DIR -File -Recurse |
+              Where-Object { $_.FullName -match '[\\/]release[\\/]bundle[\\/]' -and $_.Extension.ToLowerInvariant() -in $extensions }
+          )
+          if ($assets.Count -eq 0) {
+            throw "没有找到可发布的 ${{ inputs.platform }} 安装包文件。"
+          }
+          & gh release upload $tag @($assets.FullName) --clobber
+          exit $LASTEXITCODE
+
+      - name: Write package summary
+        shell: pwsh
+        run: |
+          @"
+          ## ExportDocManager 桌面包
+          - 平台：`${{ inputs.platform }}`
+          - 架构：`${{ inputs.architecture }}`
+          - 版本：`${{ steps.version.outputs.value }}`
+          - 产品版：`${{ inputs.edition }}`
+          - 内置报表浏览器：`${{ inputs.include_browser }}`
+          - 发布到 GitHub Release：`${{ inputs.publish_release }}`
+          - 签名状态：未签名，仅用于测试和人工验收
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
