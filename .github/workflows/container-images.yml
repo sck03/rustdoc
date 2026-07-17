@@ -1,16 +1,20 @@
 name: Build and publish container images
 
 on:
-  push:
-    branches: [main, master]
-    tags: ['v*']
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
   workflow_dispatch:
+    inputs:
+      version:
+        description: '镜像与程序版本（例如 0.1.2，可输入 v0.1.2）'
+        required: true
+        type: string
+      publish_latest:
+        description: '同时更新 latest 标签'
+        required: true
+        default: true
+        type: boolean
 
 concurrency:
-  group: container-images-${{ github.ref }}
+  group: container-images-${{ inputs.version }}
   cancel-in-progress: true
 
 permissions:
@@ -37,6 +41,25 @@ jobs:
         shell: pwsh
         run: ./scripts/github/verify-public-source.ps1
 
+      - name: Set up Node.js for version synchronization
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate and apply requested version
+        id: version
+        shell: bash
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="${REQUESTED_VERSION#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "版本格式无效：$REQUESTED_VERSION。请使用 0.1.2 或 0.1.2-beta.1。" >&2
+            exit 1
+          fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          node scripts/sync-version.mjs "$VERSION"
+
       - name: Set image name
         id: image
         shell: bash
@@ -61,11 +84,11 @@ jobs:
         with:
           images: ${{ steps.image.outputs.name }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.version.outputs.value }}
+            type=raw,value=latest,enable=${{ inputs.publish_latest }}
             type=sha,prefix=sha-
-            type=ref,event=tag
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.version=${{ steps.version.outputs.value }}
 
       - name: Build and optionally publish
         uses: docker/build-push-action@v6
@@ -80,3 +103,12 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
           provenance: true
           sbom: true
+
+      - name: Write release summary
+        shell: bash
+        run: |
+          echo "## ExportDocManager Docker 镜像" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 版本：\`${{ steps.version.outputs.value }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 组件：\`${{ matrix.component }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 架构：\`linux/amd64, linux/arm64\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- latest：\`${{ inputs.publish_latest }}\`" >> "$GITHUB_STEP_SUMMARY"

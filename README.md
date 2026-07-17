@@ -17,7 +17,7 @@ npm --prefix apps/export-doc-web run build
 
 ## Docker
 
-本地源码构建说明见 [deploy/container/README.md](deploy/container/README.md)。推送到 GitHub 后，`container-images.yml` 会免费使用 GitHub Actions 构建多架构 API/Web 镜像并发布到 GitHub Container Registry（GHCR）。GitHub 负责构建和保存镜像，不负责长期免费运行数据库与容器；实际运行仍需要自己的 Docker 主机或第三方容器平台。
+本地源码构建说明见 [deploy/container/README.md](deploy/container/README.md)。在 GitHub Actions 中手工运行 `container-images.yml`、填写发布版本后，会构建多架构 API/Web 镜像并发布到 GitHub Container Registry（GHCR）。GitHub 负责构建和保存镜像，不负责长期免费运行数据库与容器；实际运行仍需要自己的 Docker 主机或第三方容器平台。
 
 ## 安全边界
 

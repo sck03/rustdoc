@@ -5,9 +5,21 @@ import { fileURLToPath } from "node:url";
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
 const versionConfig = JSON.parse(await readText("version.json"));
-const version = requireSemver(versionConfig.version);
-const assemblyVersion = requireAssemblyVersion(versionConfig.assemblyVersion || toAssemblyVersion(version));
-const fileVersion = requireAssemblyVersion(versionConfig.fileVersion || assemblyVersion);
+const requestedVersion = String(process.argv[2] || "").trim();
+const version = requireSemver(requestedVersion || versionConfig.version);
+const assemblyVersion = requestedVersion
+  ? toAssemblyVersion(version)
+  : requireAssemblyVersion(versionConfig.assemblyVersion || toAssemblyVersion(version));
+const fileVersion = requestedVersion
+  ? assemblyVersion
+  : requireAssemblyVersion(versionConfig.fileVersion || assemblyVersion);
+
+if (requestedVersion) {
+  versionConfig.version = version;
+  versionConfig.assemblyVersion = assemblyVersion;
+  versionConfig.fileVersion = fileVersion;
+  await writeIfChanged("version.json", `${JSON.stringify(versionConfig, null, 2)}\n`);
+}
 
 await writeDirectoryBuildProps();
 

@@ -1,15 +1,10 @@
 name: Cross-platform validation
 
 on:
-  push:
-    branches: [main, master]
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
   workflow_dispatch:
 
 concurrency:
-  group: cross-platform-validation-${{ github.ref }}
+  group: cross-platform-validation
   cancel-in-progress: true
 
 permissions:
