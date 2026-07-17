@@ -18,6 +18,8 @@
 
 公开仓库不提交 Chromium 二进制。`run-tests.ps1` 找不到程序根 Chromium 或 `EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE` 时，会明确跳过两个真实 PDF 浏览器测试；正式发布验收使用 `-RequireBrowserPdfTests`，缺少渲染器即失败。测试默认执行 restore，只有确认依赖已还原时才使用 `-NoRestore`。
 
+当前不使用 `.github/dependabot.yml` 自动创建依赖更新 PR。NuGet、npm、Cargo、Docker 和 Actions 版本由维护者集中审查后人工升级，避免一次更新触发大量分支和云端构建。
+
 双击 `.cmd` 后窗口会一直保留，最后明确显示成功或失败及退出码，按任意键关闭。构建环境有问题时，错误信息不会一闪而过。
 
 正式构建前可先在终端运行只读预检：

@@ -36,9 +36,11 @@ pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
 
 ## 3. GitHub Actions 与 GHCR
 
-- `public-source-guard.yml`：每次 push/PR 检查公开边界。
-- `cross-platform-validation.yml`：Windows、Linux、macOS 的 .NET/Web/Tauri 路径与构建契约。
-- `container-images.yml`：构建 `linux/amd64`、`linux/arm64` 的 API/Web 镜像，并在非 PR 事件发布到 GHCR。
+- `public-source-guard.yml`：`main/master` 推送或手工运行时检查公开边界。
+- `cross-platform-validation.yml`：主分支代码推送或手工运行时检查 Windows、Linux、macOS 的 .NET/Web/Tauri 契约；纯文档变更不运行。
+- `container-images.yml`：主分支/版本标签推送或手工运行时构建 `linux/amd64`、`linux/arm64` 的 API/Web 镜像并发布到 GHCR；纯文档变更不运行。
+
+三个工作流都启用同分支并发取消，新提交会取消旧的未完成运行。项目当前不启用 Dependabot 自动版本 PR，避免多个依赖生态同时创建分支并放大 Actions 数量；依赖升级由维护者集中检查 package/lock 文件后人工提交。
 
 镜像名称为：
 
