@@ -29,6 +29,6 @@
     "tauri:bundle:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/run-tauri-local.ps1 build"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.0.0"
+    "@tauri-apps/cli": "^2.11.4"
   }
 }
