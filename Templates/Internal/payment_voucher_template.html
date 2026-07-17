@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+    body {
+        font-family: 'SimSun', '宋体', serif;
+        font-size: 12px;
+        margin: 0;
+        padding: 15px;
+    }
+    .wrapper {
+        position: relative;
+        padding-right: 45px;
+    }
+    .company-title {
+        font-family: 'SimHei', '黑体', sans-serif;
+        font-size: 26px;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 5px;
+    }
+    .sub-title {
+        font-family: 'SimHei', '黑体', sans-serif;
+        font-size: 18px;
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    .header-info {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        padding: 0 2px;
+    }
+    .main-table {
+        width: 100%;
+        border-collapse: collapse;
+        border-left: 1px solid #474747;  
+        border-top: 1px solid #474747;
+        border-right: 1px solid #474747;      
+    }
+    .vertical-text-left {
+        width: 25px;
+        text-align: center;
+        writing-mode: vertical-rl;
+        letter-spacing: 5px;
+        font-weight: bold;      
+        border-bottom: 1px solid #474747;        
+        padding: 8px 4px;
+    }
+    .vertical-text-right {
+        position: absolute;
+        right: 5px;
+        top: 55%;
+        transform: translateY(-50%);
+        writing-mode: vertical-rl;
+        letter-spacing: 5px;
+        font-weight: bold;
+        font-size: 14px;
+    }
+    .content-cell {
+        padding: 0;
+        vertical-align: top;
+    }
+    .inner-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .inner-table > tbody > tr > td {
+        border: 1px solid #474747;
+        border-right: none; 
+        border-top: none; 
+        padding: 8px;
+        vertical-align: top;
+    }
+    .inner-table tr.double-height > td {
+        height: 40px; /* 增加行高 */
+        vertical-align: middle; /* 垂直居中 */
+    }
+    .label {
+        text-align: center;
+        vertical-align: middle;
+    }
+    .payee-cell {
+        line-height: 1.9;
+        border-bottom: none;
+    }
+    .method-notes-cell {
+        padding: 0;
+        vertical-align: top;
+        border-left: 1px solid black;
+        border-bottom: none;
+    }
+    .method-notes-table {
+        width: 100%;
+        height: 100%;
+        border-collapse: collapse;
+    }
+    .method-notes-table td {
+        border: none;
+        border-bottom: 1px solid #474747;
+        padding: 8px;
+        vertical-align: middle;
+    }
+    .checkbox-group span {
+        margin-right: 10px;
+    }
+    .checkbox {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 1px solid #474747;
+        margin-right: 4px;
+        vertical-align: middle;
+    }
+    .footer {
+        margin-top: 25px;
+        display: flex;
+        justify-content: flex-start; /* 左对齐 */
+    }
+    .footer span {
+        margin-right: 150px; /* 增加间距 */
+    }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+    <div class="company-title">{{ Payment.PayerName }}</div>
+    <div class="sub-title">付款单（费用支付专用）</div>
+
+    <div class="header-info">
+        <span>部门: {{ Payment.Department }}</span>
+        <span></span>
+    </div>
+
+    <table class="main-table">
+        <tr>
+            <td class="vertical-text-left">用款事项</td>
+            <td class="content-cell">
+                <table class="inner-table">
+                    <colgroup>
+                        <col style="width: 10%;">
+                        <col style="width: 18%;">
+                        <col style="width: 15%;">
+                        <col style="width: 27%;">
+                        <col style="width: 12%;">
+                        <col style="width: 18%;">
+                    </colgroup>
+                    <!-- Row 1 -->
+                    <tr class="double-height">
+                        <td class="label">项目</td>
+                        <td>{{ Payment.Project }}</td>
+                        <td class="label">出口发票号码</td>
+                        <td>{{ Payment.InvoiceNo }}</td>
+                        <td class="label">出货日期</td>
+                        <td>{{ Payment.ShipmentDate | date.to_string "%Y年%m月%d日" }}</td>
+                    </tr>
+                    <!-- Row 2 -->
+                    <tr class="double-height">
+                        <td class="label">美元</td>
+                        {{ if Payment.USDAmount > 0 }}
+                        <td>USD {{ Payment.USDAmount | math.format 'F2' }}</td>
+                        {{ else }}
+                        <td></td>
+                        {{ end }}
+                        <td class="label">人民币(大写)</td>
+                        <td colspan="1">{{ cny_amount_upper }}</td>
+                        <td class="label">(小写)</td>
+                        <td>￥{{ Payment.CNYAmount | math.format 'F2' }}</td>
+                    </tr>
+                    <!-- Row 3 -->
+                    <tr>
+                        <td class="payee-cell" colspan="3">
+                            支付单位<br>
+                            名称： {{ Payment.PayeeName }} <br>
+                            开户行： {{ Payment.BankName }} <br>
+                            帐号： {{ Payment.AccountNo }}
+                        </td>
+                        <td class="method-notes-cell" colspan="3">
+                            <table class="method-notes-table">
+                                <tr>
+                                    <td class="label" style="width: 90px;">支付方式</td>
+                                    <td class="checkbox-group">
+                                        <span><span class="checkbox">{{ if Payment.PaymentMethod == "支票" }}&#10003;{{ else }}&nbsp;{{ end }}</span>支票</span>
+                                        <span><span class="checkbox">{{ if Payment.PaymentMethod == "电汇" }}&#10003;{{ else }}&nbsp;{{ end }}</span>电汇</span>
+                                        <span><span class="checkbox">{{ if Payment.PaymentMethod == "预付" }}&#10003;{{ else }}&nbsp;{{ end }}</span>预付</span>
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom: none;">
+                                    <td class="label" style="border-bottom: none;">备注</td>
+                                    <td style="height: 100%; border-bottom: none;">{{ Payment.Notes }}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+    <div class="vertical-text-right">②付款联</div>
+</div>
+
+<div class="footer">
+    <span>业务经理签字:</span>
+    <span>审批:</span>
+    <span>复核:</span>
+</div>
+
+</body>
+</html>
+

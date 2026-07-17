@@ -1,0 +1,50 @@
+name: export-doc-manager
+
+services:
+  postgres:
+    image: postgres:18-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-exportdoc}
+      POSTGRES_USER: ${POSTGRES_USER:-exportdoc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale-provider=builtin --builtin-locale=PG_UNICODE_FAST"
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - ${EXPORTDOCMANAGER_RUNTIME_ROOT:-./runtime}/postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/container/Dockerfile.api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:5188
+      EXPORTDOCMANAGER_NETWORK_MODE: "true"
+      EXPORTDOCMANAGER_PRODUCT_EDITION: Full
+      EXPORTDOCMANAGER_DATA_ROOT: /runtime-data
+      EXPORTDOCMANAGER_ALLOWED_ORIGINS: ${EXPORTDOCMANAGER_ALLOWED_ORIGINS:-}
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - ${EXPORTDOCMANAGER_RUNTIME_ROOT:-./runtime}/api-data:/runtime-data
+      - ${EXPORTDOCMANAGER_RUNTIME_ROOT:-./runtime}/config/appsettings.json:/app/appsettings.json
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "5188"
+
+  web:
+    build:
+      context: ../..
+      dockerfile: deploy/container/Dockerfile.web
+    restart: unless-stopped
+    ports:
+      - "${EXPORTDOCMANAGER_WEB_PORT:-8080}:8080"
+    depends_on:
+      - api

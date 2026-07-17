@@ -1,0 +1,33 @@
+[[permission]]
+identifier = "allow-desktop-bridge"
+description = "Allow the main desktop window to call ExportDocManager Tauri bridge commands."
+commands.allow = [
+  "select_single_window_package_file",
+  "select_invoice_transfer_package_file",
+  "select_receipt_file",
+  "select_receipt_files",
+  "select_pdf_files",
+  "select_email_attachment_files",
+  "select_customs_coo_attachment_files",
+  "select_letter_of_credit_file",
+  "select_ocr_image_file",
+  "select_exporter_seal_image_file",
+  "read_ocr_image_file_as_data_url",
+  "select_excel_file",
+  "select_directory",
+  "select_report_template_package_file",
+  "select_report_template_file",
+  "select_save_package_path",
+  "select_save_invoice_transfer_package_path",
+  "select_save_report_template_package_path",
+  "select_save_pdf_path",
+  "save_pdf_file",
+  "select_save_zip_path",
+  "select_save_excel_path",
+  "open_path",
+  "log_frontend_error",
+  "request_app_exit",
+  "check_tauri_update",
+  "install_tauri_update",
+  "get_desktop_runtime_context",
+]

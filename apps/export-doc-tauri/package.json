@@ -1,0 +1,34 @@
+{
+  "name": "export-doc-tauri",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:web": "npm --prefix ../export-doc-web run build",
+    "prepare:bundle": "node ../../scripts/prepare-tauri-bundle.mjs && npm --prefix ../export-doc-web run build",
+    "tauri": "tauri",
+    "tauri:info:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/run-tauri-local.ps1 info",
+    "tauri:check:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/run-tauri-local.ps1 cargo-check",
+    "tauri:check:editions:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/check-tauri-editions.ps1",
+    "tauri:compile:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/run-tauri-local.ps1 build -BuildDebug -NoBundle",
+    "tauri:smoke:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/smoke-tauri-desktop.ps1",
+    "tauri:smoke:runtime-config:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/smoke-tauri-desktop.ps1 -UseRuntimePathsConfig",
+    "tauri:smoke:web:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/smoke-tauri-desktop.ps1 -VerifyWebDiagnostics",
+    "tauri:smoke:backup-restore:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/smoke-tauri-desktop.ps1 -VerifyBackupRestore",
+    "tauri:smoke:reports:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/smoke-tauri-desktop.ps1 -VerifyWebReports",
+    "tauri:smoke:sales:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/smoke-tauri-desktop.ps1 -VerifySalesWorkspace",
+    "tauri:build:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/run-tauri-local.ps1 build -NoBundle",
+    "tauri:build:windows-editions": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/build-windows-editions.ps1 -NoPause",
+    "tauri:verify:windows-editions": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/verify-windows-editions.ps1",
+    "tauri:build:windows-installers": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/build-windows-installers.ps1 -NoPause",
+    "tauri:verify:windows-installers": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/verify-windows-installers.ps1",
+    "tauri:dev:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/run-tauri-local.ps1 dev",
+    "tauri:bundle:nsis:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/run-tauri-local.ps1 build -Bundles nsis -NoSign",
+    "tauri:bundle:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/run-tauri-local.ps1 build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

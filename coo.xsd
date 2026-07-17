@@ -1,0 +1,1413 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- edited with XMLSpy v2013 (http://www.altova.com) by  () -->
+<!-- 被2013 sp1 () 使用XMLSpy v编辑的 (http://www.altova.com) by -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="http://www.w3.org/2000/09/xmldsig#" targetNamespace="http://www.w3.org/2000/09/xmldsig#" elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<xs:element name="Certificate">
+		<xs:annotation>
+			<xs:documentation>原产地证书</xs:documentation>
+		</xs:annotation>
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="CertificateHead">
+					<xs:annotation>
+						<xs:documentation>原产地证书表头</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="CertNo">
+								<xs:annotation>
+									<xs:documentation>原产地证编号
+                                        （证书类型+2位年份+组织机构代码+四位流水号）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="20"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ApplyType">
+								<xs:annotation>
+									<xs:documentation>申请类型
+                                        0：暂存
+                                        1：申报</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="1"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="CertStatus">
+								<xs:annotation>
+									<xs:documentation>证书状态
+                                        0：新证
+                                        1：更改证
+                                        2：重发证</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="1"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="CertType">
+								<xs:annotation>
+									<xs:documentation>原产地证书类型
+                                        （C：一般产地证
+                                        B:亚太证书
+                                        G：普惠证书
+                                        E：东盟证书
+                                        F：智利证书
+                                        M：欧盟蘑菇证书
+                                        P：中巴证书
+                                        T：烟草证书
+                                        N：新西兰证书
+                                        X：新加坡证书
+                                        R：秘鲁
+                                        H：海峡
+                                        L：哥斯达黎加
+                                        I：冰岛
+                                        S：瑞士
+                                        PR：加工装配证书
+                                        TR：转口证书
+                                        A：澳大利亚
+                                        K：中韩
+                                        AD：输往墨西哥瓷砖价格承诺原产地证书
+                                        AP：输往巴基斯坦瓷砖价格承诺原产地证书
+                                        GE：格鲁吉亚
+
+CA:中柬证书
+
+RC: RCEP证书
+                                        ）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="2"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="EntMgrNo">
+								<xs:annotation>
+									<xs:documentation>货主企业备案号</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="19"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="CiqRegNo">
+								<xs:annotation>
+									<xs:documentation>出口商代码</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="18"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="AplRegNo">
+								<xs:annotation>
+									<xs:documentation>录入企业代码</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="18"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="EtpsName">
+								<xs:annotation>
+									<xs:documentation>企业名称（中文）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="400"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ApplName" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>申报员姓名
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="20"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="Applicant" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>申报员ID，申报员身份证号
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="18"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ApplTel" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>申报员联系电话</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="30"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="OrgCode" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>签证机构代码</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="20"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="FetchPlace" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>领证机构
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="20"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="AplAdd" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>申请地址</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="30"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="InvDate" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>发票日期
+                                        “YYYY-MM-DD”
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="10"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="InvNo" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>发票号
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="50"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="AplDate" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>申请日期
+                                        “YYYY-MM-DD”
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="10"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="DestCountry" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>目的国
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="80"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="DestCountryCode" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>目的国家/地区编码</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="4"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="DestCountryName" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>目的国家/地区名称</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="50"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="Exporter" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>出口商
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="400"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="Consignee" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>进口商
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="400"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="GoodsSpecClause" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>特殊条款（商品描述）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="2000"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="Mark" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>唛头
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="2000"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="LoadPort" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>启运港</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="50"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="UnloadPort" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>卸货港</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="50"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="TransMeans" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>运输方式（运输工具）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="100"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="TransName" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>运输工具船名/航次</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="100"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="TransCountryCode" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>中转国/地区编码</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="4"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="TransCountryName" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>中转国/地区名称</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="150"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="TransPort" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>转运港</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="50"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="DestPort" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>目的港</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="50"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="TransDetails" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>运输细节</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="630"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="IntendExpDate" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>出运日期
+                                        “YYYY-MM-DD”
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="10"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="TradeModeCode" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>贸易方式代码</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="4"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="FOBValue" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>FOB值</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="25"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="TotalAmt" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>总金额</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="25"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="Note" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>申请书备注</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="1000"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ContractNo" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>合同号</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="200"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="LcNo" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>信用证号</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="50"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="SpecInvTerms" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>发票特殊条款</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="1000"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="PriceTerms" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>价格条款</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="20"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="Curr" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>货币单位
+                                        （申报为必填项
+                                        常用单位：
+                                        CNY：人民币、
+                                        USD：美元
+                                        EUR：欧元
+                                        HKD：港币
+                                        GBP：英镑
+                                        JPY：日元
+                                        KRW：韩元
+                                        CAD：加元
+                                        AUD：澳元
+                                        CHF：瑞郎
+                                        SGD：新加坡元
+                                        ）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="10"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="Remark" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>证书备注信息</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="300"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ProducerSertFlag" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>是否生产商保密</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="1"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ExhibitFlag" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>是否展览证书
+                                        0：非展览
+                                        1：展览</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="1"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ThirdPartyInvFlag" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>是否第三方发票，第三方发票标志
+                                        0：非第三方
+                                        1：第三方</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="1"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ExporterTel" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>出口商电话
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="50"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ExporterFax" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>出口商传真
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="50"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ExporterEmail" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>出口商邮箱
+                                        （申报为必填项）</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="50"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ConsigneeTel" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>进口商电话</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="50"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ConsigneeFax" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>进口商传真</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="50"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ConsigneeEmail" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>进口商邮箱</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="50"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="PredictFlag" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>是否预计离港日期</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="1"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ExpDeclDate" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>出口报关日期</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="10"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="OriCountryCode" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>原产国代码</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="4"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="OriCountry" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>原产国英文名</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="30"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ChkValidDate" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>签发有效日期
+                                        YYYY-MM-DD</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="10"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="EtpsConcEr" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>企业联系人</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="30"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="EtpsTel" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>企业联系电话</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="20"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="Producer" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>证书货物生产商描述</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="1000"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="PrcsAssembly" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>加工装配工序</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="30"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="EntryId" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>报关单号，若存在多个则以英文分号";"间隔</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="600"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="CertificateList">
+					<xs:annotation>
+						<xs:documentation>原产地证书表体</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="Goods" minOccurs="0" maxOccurs="unbounded">
+								<xs:annotation>
+									<xs:documentation>原产地证书表体货物</xs:documentation>
+								</xs:annotation>
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="GoodsItemFlag" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>非货物项
+                                                    Y：非货物项
+                                                    N：货物项
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="1"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="GNo" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>商品项目编号
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:int"/>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="HSCode" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>HS编码
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="10"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="GoodsName" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>货物名称
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="200"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="GoodsNameE" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>货物名称（英文）
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="400"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="PackQty" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>包装件数
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="25"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="PackUnit" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>包装单位（英文）
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="20"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="GoodsQty" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>标准货物数/重量
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="25"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="GoodsUnitE" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>标准货物单位，数/重量单位（英文）
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="20"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="GoodsUnit" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>标准货物单位，数/重量单位（中文）
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="20"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="GoodsQtyRef" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>辅助货物数/重量</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="25"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="GoodsUnitRef" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>辅助货物数/重量单位
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="20"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="SecdGoodsQtyRef" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>第二辅助货物数/重量</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="25"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="SecdGoodsUnitRef" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>第二辅助货物数/重量单位</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="20"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="GrossWt" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>毛重</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="25"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="NetWt" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>净重</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="25"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="WtUnit" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>重量计量单位</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="10"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="InvPrice" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>发票单价
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="25"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="InvValue" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>发票金额
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="25"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="FOBValue" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>FOB值
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="25"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="ICompPrpr" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>进口成份比例</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="10"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="OriCriteria" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>原产地标准</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="10"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="OriCriteriaRef" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>原产地标准辅助项</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="10"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="Producer" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>证书货物生产商描述</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="1000"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="ProducerTel" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>生产商电话</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="50"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="ProducerFax" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>生产商传真</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="50"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="ProducerEmail" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>生产商邮箱</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="50"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="CiqRegNo" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>生产企业组织机构代码
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="10"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="PrdcEtpsName" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>生产企业名称
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="400"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="PrdcEtpsConcEr" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>生产企业联系人</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="20"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="PrdcEtpsTel" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>生产企业联系电话</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="20"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="ProducerSertFlag" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>是否生产商保密</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="1"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="GoodsDesc" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>货物描述
+                                                    （申报为必填项）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="1000"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="OriCriteriaSub" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>原产地标准子标准
+                                                    </xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="1"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="GoodsOriginCountry" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>货物原产国代码，适用rcpe证书</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="3"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="GoodsOriginCountryEn" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>货物原产国英文，适用rcpe证书</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="80"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="GoodsTaxRate" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>最高税率标志,适用于rcep证书</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="1"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="InvNo" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>发票号</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="50"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="PackType">
+											<xs:annotation>
+												<xs:documentation>包装类型
+1：常规包装
+2：非常规包装（混装、裸装、散装、挂装）</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="1"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="ModCertificate" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>更改证/重发证信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="OldCertNo" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>原证书号
+                                        注：当CertStatus为1、2或3时，此项为必填</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="20"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ModReason" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>更改/重发原因</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="500"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ModColm" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>更改栏目</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="200"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="OldSituDesc" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>原有情况描述</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="2000"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="ModSituDesc" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>更改情况描述</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="2000"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="OldDeclDate" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>原证申请日期</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="20"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+							<xs:element name="OldIssueDate" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>原证签发日期</xs:documentation>
+								</xs:annotation>
+								<xs:simpleType>
+									<xs:restriction base="xs:string">
+										<xs:maxLength value="20"/>
+									</xs:restriction>
+								</xs:simpleType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="NonpartyCorpList" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>非缔约方公司信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="NonpartyCorp" minOccurs="0" maxOccurs="unbounded">
+								<xs:annotation>
+									<xs:documentation>非缔约方信息</xs:documentation>
+								</xs:annotation>
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="SortNo" type="xs:int">
+											<xs:annotation>
+												<xs:documentation>序号</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="EntName">
+											<xs:annotation>
+												<xs:documentation>企业名称</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="500"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="EntAddr">
+											<xs:annotation>
+												<xs:documentation>企业地址</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="1000"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="EntCountryCode">
+											<xs:annotation>
+												<xs:documentation>国别/地区代码</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="3"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="EntCountryName">
+											<xs:annotation>
+												<xs:documentation>国别/地区名称</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="100"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="OriInvs" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>原产地证书发票信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="OriInv" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="CertNo">
+											<xs:annotation>
+												<xs:documentation>证书号</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="20"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="InvNo">
+											<xs:annotation>
+												<xs:documentation>发票号</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="50"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="ContractNo" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>合同号</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="50"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="LcNo" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>信用证号</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="50"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="Value" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>总金额</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="20"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="Curr">
+											<xs:annotation>
+												<xs:documentation>货币单位</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="10"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="PriceClause">
+											<xs:annotation>
+												<xs:documentation>价格条款</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="20"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="SpecInvTerms" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>特殊条款</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="1000"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+										<xs:element name="InvDate">
+											<xs:annotation>
+												<xs:documentation>发票日期</xs:documentation>
+											</xs:annotation>
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:maxLength value="20"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="AplPromise">
+					<xs:annotation>
+						<xs:documentation>申请企业承诺</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="AplPromiseCode">
+								<xs:annotation>
+									<xs:documentation>申请人承诺代码
+1：本公司承诺：本证书的申报信息和材料均真实、准确、完整，与出口商业发票等贸易单据单据相符，与该批出口货物的生产、贸易、运输等实际情况相符。如存在不实申报，我司愿承担全部责任</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>

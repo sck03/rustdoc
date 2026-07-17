@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "出口单证管理系统",
+  "version": "0.1.1",
+  "identifier": "com.exportdocmanager.desktop",
+  "build": {
+    "beforeDevCommand": "npm --prefix ../export-doc-web run dev",
+    "beforeBuildCommand": "npm run prepare:bundle",
+    "devUrl": "http://127.0.0.1:5173",
+    "frontendDist": "../../export-doc-web/dist"
+  },
+  "app": {
+    "windows": [],
+    "withGlobalTauri": true,
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [],
+      "pubkey": ""
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "useLocalToolsDir": true,
+    "windows": {
+      "nsis": {
+        "installerHooks": "nsis/installer-hooks.nsh"
+      }
+    },
+    "icon": [
+      "icons/app.ico"
+    ],
+    "resources": {
+      "../../../artifacts/tauri-bundle/resources/": ""
+    }
+  }
+}

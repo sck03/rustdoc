@@ -1,0 +1,20 @@
+name: Public source guard
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify public repository boundary
+        shell: pwsh
+        run: ./scripts/github/verify-public-source.ps1

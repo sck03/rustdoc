@@ -1,0 +1,302 @@
+{
+  "version": 1,
+  "description": "Golden layout fingerprints for print-media screenshots generated from legacy/customer and built-in report templates.",
+  "grid": {
+    "columns": 32,
+    "rows": 32,
+    "minNonWhiteRatio": 0.006
+  },
+  "defaults": {
+    "maxFingerprintDistance": 42,
+    "maxContentBoundsDelta": 24,
+    "maxFullPageSizeDelta": 24
+  },
+  "pages": {
+    "customer-custom-invoice": {
+      "viewport": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "007ffe00ffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 174,
+        "contentBounds": {
+          "left": 8,
+          "top": 12,
+          "width": 884,
+          "height": 192
+        }
+      },
+      "fullPage": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "007ffe00ffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 174,
+        "contentBounds": {
+          "left": 8,
+          "top": 12,
+          "width": 884,
+          "height": 192
+        }
+      }
+    },
+    "customer-payment-voucher": {
+      "viewport": {
+        "width": 1270,
+        "height": 900,
+        "fingerprintHex": "000ff8000003e000ffffffffffffffffffffffffff800001ffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 216,
+        "contentBounds": {
+          "left": 8,
+          "top": 11,
+          "width": 1254,
+          "height": 217
+        }
+      },
+      "fullPage": {
+        "width": 1270,
+        "height": 900,
+        "fingerprintHex": "000ff8000003e000ffffffffffffffffffffffffff800001ffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 216,
+        "contentBounds": {
+          "left": 8,
+          "top": 11,
+          "width": 1254,
+          "height": 217
+        }
+      }
+    },
+    "customer-compound-selector-invoice": {
+      "viewport": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "007ffe00ffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 174,
+        "contentBounds": {
+          "left": 8,
+          "top": 12,
+          "width": 884,
+          "height": 192
+        }
+      },
+      "fullPage": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "007ffe00ffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 174,
+        "contentBounds": {
+          "left": 8,
+          "top": 12,
+          "width": 884,
+          "height": 192
+        }
+      }
+    },
+    "built-in-invoice-template": {
+      "viewport": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "fffffffefffff8000003c000f800003ffffffffffffffffefffffffffffffffff880003fff80003fff800021f89f0020ffff8020ffffffffffffffbfffffffff3fe60000ffff00000000000000000000000007fc0000060400000404000007fc00000000fe07e000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 420,
+        "contentBounds": {
+          "left": 19,
+          "top": 22,
+          "width": 862,
+          "height": 998
+        }
+      },
+      "fullPage": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "fffffffefffff8000003c000f800003ffffffffffffffffefffffffffffffffff880003fff80003fff800021f89f0020ffff8020ffffffffffffffbfffffffff3fe60000ffff00000000000000000000000007fc0000060400000404000007fc00000000fe07e000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 420,
+        "contentBounds": {
+          "left": 19,
+          "top": 22,
+          "width": 862,
+          "height": 998
+        }
+      }
+    },
+    "built-in-packing-list-template": {
+      "viewport": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "fffffffefffffffe001ff800e003c03ffffffffffffffffcffffff80ffffff91f93ffffff93fffffffffff9181ffff80e1ffff80ffffff8009480000000000000000000000000000000000000000000000000000000007fc0000040400000404000007fcfe07e000fe0000000000000000000000000000000000000000000000",
+        "occupiedCells": 393,
+        "contentBounds": {
+          "left": 19,
+          "top": 22,
+          "width": 862,
+          "height": 1012
+        }
+      },
+      "fullPage": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "fffffffefffffffe001ff800e003c03ffffffffffffffffcffffff80ffffff91f93ffffff93fffffffffff9181ffff80e1ffff80ffffff8009480000000000000000000000000000000000000000000000000000000007fc0000040400000404000007fcfe07e000fe0000000000000000000000000000000000000000000000",
+        "occupiedCells": 393,
+        "contentBounds": {
+          "left": 19,
+          "top": 22,
+          "width": 862,
+          "height": 1012
+        }
+      }
+    },
+    "built-in-contract-template": {
+      "viewport": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "001ff8ff0003c000fc0003fffc0000ffffc00000fffffffffffffffffffffffffffffffffffffffff3f7f1f8f0070000ffffff80ffffffffff000000fe00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 324,
+        "contentBounds": {
+          "left": 19,
+          "top": 0,
+          "width": 881,
+          "height": 611
+        }
+      },
+      "fullPage": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "001ff8ff0003c000fc0003fffc0000ffffc00000fffffffffffffffffffffffffffffffffffffffff3f7f1f8f0070000ffffff80ffffffffff000000fe00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 324,
+        "contentBounds": {
+          "left": 19,
+          "top": 0,
+          "width": 881,
+          "height": 611
+        }
+      }
+    },
+    "built-in-customs-declaration-template": {
+      "viewport": {
+        "width": 1440,
+        "height": 1100,
+        "fingerprintHex": "fffe0000c37c3e00ffffff00ffffff00ffffff00ffffff0083ff6d00ffffff00ffffff00fffff900ffffff00ffffff00ff800000ffc03e00ffffff00ffffff00fffffe00ffffff00ffffff00ff000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 410,
+        "contentBounds": {
+          "left": 0,
+          "top": 1,
+          "width": 1037,
+          "height": 670
+        }
+      },
+      "fullPage": {
+        "width": 1440,
+        "height": 1100,
+        "fingerprintHex": "fffe0000c37c3e00ffffff00ffffff00ffffff00ffffff0083ff6d00ffffff00ffffff00fffff900ffffff00ffffff00ff800000ffc03e00ffffff00ffffff00fffffe00ffffff00ffffff00ff000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 410,
+        "contentBounds": {
+          "left": 0,
+          "top": 1,
+          "width": 1037,
+          "height": 670
+        }
+      }
+    },
+    "built-in-payment-voucher-template": {
+      "viewport": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "003ff800003ff800fffffffcbffdbfc4bfffffc7ffaffb7fffffffffbfbfffc4bfadff84ffffffc4f0c1ec00000168000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 254,
+        "contentBounds": {
+          "left": 15,
+          "top": 18,
+          "width": 865,
+          "height": 436
+        }
+      },
+      "fullPage": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "003ff800003ff800fffffffcbffdbfc4bfffffc7ffaffb7fffffffffbfbfffc4bfadff84ffffffc4f0c1ec00000168000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 254,
+        "contentBounds": {
+          "left": 15,
+          "top": 18,
+          "width": 865,
+          "height": 436
+        }
+      }
+    },
+    "built-in-expense-reimbursement-template": {
+      "viewport": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "003ffc00003ffc007fc180007ffffff0ffffffffffffffff95eb5fb5ffffffffffffffff95eb5bf5fffffffff122489fffffffffffffffffff8000f9ffffffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 390,
+        "contentBounds": {
+          "left": 20,
+          "top": 23,
+          "width": 860,
+          "height": 604
+        }
+      },
+      "fullPage": {
+        "width": 900,
+        "height": 1270,
+        "fingerprintHex": "003ffc00003ffc007fc180007ffffff0ffffffffffffffff95eb5fb5ffffffffffffffff95eb5bf5fffffffff122489fffffffffffffffffff8000f9ffffffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 390,
+        "contentBounds": {
+          "left": 20,
+          "top": 23,
+          "width": 860,
+          "height": 604
+        }
+      }
+    },
+    "synthetic-print-media-sentinel": {
+      "viewport": {
+        "width": 640,
+        "height": 480,
+        "fingerprintHex": "00000000000000003fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 575,
+        "contentBounds": {
+          "left": 40,
+          "top": 40,
+          "width": 492,
+          "height": 332
+        }
+      },
+      "fullPage": {
+        "width": 640,
+        "height": 480,
+        "fingerprintHex": "00000000000000003fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe03fffffe000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 575,
+        "contentBounds": {
+          "left": 40,
+          "top": 40,
+          "width": 492,
+          "height": 332
+        }
+      }
+    },
+    "synthetic-print-full-page-sentinel": {
+      "viewport": {
+        "width": 640,
+        "height": 480,
+        "fingerprintHex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "occupiedCells": 1024,
+        "contentBounds": {
+          "left": 0,
+          "top": 0,
+          "width": 640,
+          "height": 480
+        }
+      },
+      "fullPage": {
+        "width": 640,
+        "height": 1440,
+        "fingerprintHex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "occupiedCells": 1024,
+        "contentBounds": {
+          "left": 0,
+          "top": 0,
+          "width": 640,
+          "height": 1440
+        }
+      }
+    }
+  }
+}

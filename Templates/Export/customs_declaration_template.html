@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+<head>
+    <meta charset="UTF-8">
+    <meta name="ProgId" content="Excel.Sheet">
+    <meta name="Generator" content="Microsoft Excel 15">
+    <title>海关报关单</title>
+    <style>
+        @page {
+            size: A4 landscape; /* 横向 */
+            margin: 1cm;
+        }
+        body { margin: 0; font-family: "Times New Roman", serif; color: black; }
+        .customs-page { position: relative; }
+        table {
+            border-collapse: separate; /* 使用 separate，避免边框合并 */
+            border-spacing: 0; /* 保持单元格间距为 0 */
+            table-layout: fixed;
+            width: 100%; /* 适配 A4 宽度 */
+            max-width: 1120px;
+            margin-bottom: 8px;
+            position: relative;
+        }
+        td {
+            padding: 1px;
+            font-size: 10pt;
+            text-align: left;
+            vertical-align: top;
+            white-space: nowrap;
+        }
+        .bordered {
+
+			border-bottom: 0.5pt solid black;			
+            border-right: 0.5pt solid black;
+        }
+        .bold { font-weight: 700; }
+        .center { text-align: center; }
+        .middle { vertical-align: middle; }
+        .normal-wrap { white-space: normal; }
+        .header { font-size: 13pt; }
+        .subheader { font-size: 9pt; font-family: 宋体; }
+        .small { font-size: 8pt; }
+        .no-inner-vertical { border-left: none; border-right: none; }
+        .outer-bordered td { 
+		
+            border-right: 0.5pt solid black;
+		}
+        .outer-bordered td.no-inner-virtual { border-left: none; border-right: none; }
+        /* 为 .outer-bordered 行的最左边和最右边添加竖边框 */
+        .outer-bordered td:first-child {
+            border-left: 1pt solid black; /* 最左边竖边框 */
+        }
+        .outer-bordered td:last-child {
+            border-right: 1pt solid black; /* 最右边竖边框 */
+        }
+        .special-row td { border-bottom: 0.5pt solid black; }
+        .last-row td { border-bottom: 0.5pt solid black; }
+        .vertical-line-left td:nth-last-child(2) { border-left: 0.5pt solid black; position: relative; }
+        .vertical-line-left td:nth-last-child(2)::after {
+            content: '';
+            position: absolute;
+            left: -0.5pt;
+            top: 0;
+            bottom: -100%;
+            width: 0.5pt;
+            background: black;
+        }
+        .page-break {
+            break-before: page;
+            page-break-before: always;
+            display: block;
+            height: 0;
+        }
+        .商品-row td {
+            text-align: center;
+
+            border-bottom: 0.5pt solid black;			
+            border-left: none; /* 移除商品项的内部竖边框 */
+            border-right: none; /* 移除商品项的内部竖边框 */
+        }
+        /* 为商品项部分的最左边和最右边添加竖边框 */
+        .商品-row td:first-child {
+            border-left: 1pt solid black; /* 最左边竖边框 */
+        }
+        .商品-row td:last-child {
+            border-right: 1pt solid black; /* 最右边竖边框 */
+        }
+        .商品-row-first td { border-bottom: none; } /* 第一行无底部边框 */
+        .商品-row-second td { border-top: none; } /* 第二行无顶部边框 */
+        .page-number { position: absolute; top: 0; right: 10pt; font-size: 9pt; font-family: 宋体; font-weight: 700; }
+        col { width: auto; }
+        tr { height: auto; }
+        @media print {
+            body { padding: 0; }
+            .page-break {
+                break-before: page;
+                page-break-before: always;
+                margin-top: 0;
+            }
+        }
+        @media screen {
+            body { padding: 12px 0; }
+            .customs-page { margin-bottom: 18px; }
+            .page-break { margin-top: 18px; }
+        }
+        /* 自适应缩放样式 */
+        .content-wrapper {
+            zoom: 0.75;
+        }
+        .customs-seal-anchor { position: relative; overflow: visible; }
+        .customs-seal-frame {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -58%);
+            width: 270px;
+            height: 170px;
+            opacity: 0.82;
+            z-index: 3;
+            pointer-events: none;
+        }
+        .customs-seal-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+        @supports not (zoom: 1) {
+            .content-wrapper {
+                transform: scale(0.75);
+                transform-origin: top left;
+                width: 133.33%; /* 1 / 0.75 = 133.33% */
+            }
+        }
+        /* 移除拆分两行之间的横边框 */
+        .split-row-first td.bordered { border-bottom: none; }
+        .split-row-second td.bordered { border-top: none; }
+        /* 移除特定行的边框 */
+        .no-border { border: none !important; }
+        /* 第一页最外层边框：从“境内发货人”行开始 */
+        .first-page tr:nth-child(3) td.bordered {
+            border-top: 1pt solid black; /* 第一页最外层边框顶部 */
+        }
+        .first-page tr td:first-child.bordered {
+            border-left: 1pt solid black; /* 第一页最外层边框左侧 */
+        }
+        .first-page tr td:last-child.bordered {
+            border-right: 1pt solid black; /* 第一页最外层边框右侧 */
+        }
+        .first-page tr:last-child td.bordered {
+            border-bottom: 1pt solid black; /* 第一页最外层边框底部 */
+        }
+        /* 第二页最外层边框：从第二行开始 */
+        .second-page tr:nth-child(2) td.bordered {
+            border-top: 1pt solid black; /* 第二页最外层边框顶部 */
+        }
+        .second-page tr td:first-child.bordered {
+            border-left: 1pt solid black; /* 第二页最外层边框左侧 */
+        }
+        .second-page tr td:last-child.bordered {
+            border-right: 1pt solid black; /* 第二页最外层边框右侧 */
+        }
+        .second-page tr:last-child td.bordered {
+            border-bottom: 1pt solid black; /* 第二页最外层边框底部 */
+        }
+        .special-terms {
+            margin-top: 1px;
+            font-size: 15px;
+            text-align: left;
+            white-space: pre-line; /* 保留换行符，自动分行 */
+            padding-left: 180px; /* 整体向右偏移 */
+            line-height: 1.1; /* 减小行间距 */
+        }
+    </style>
+</head>
+<body link="blue" vlink="purple">
+    <div class="content-wrapper">
+        {{ $customs_total_pages = 1 }}
+        {{ if items.size > 6 }}
+            {{ $customs_total_pages = ((items.size - 6) / 15) | math.ceil + 1 }}
+        {{ end }}
+        <!-- 第一页 -->
+        <div class="customs-page customs-page-first">
+        <table width="1383" class="first-page">
+            <col style="width: 49pt"><col style="width: 94pt"><col style="width: 41pt"><col style="width: 82pt">
+            <col style="width: 34pt"><col style="width: 68pt"><col style="width: 76pt"><col style="width: 103pt">
+            <col style="width: 49pt"><col style="width: 76pt"><col style="width: 77pt"><col style="width: 50pt">
+            <col style="width: 35pt"><col style="width: 103pt"><col style="width: 100pt">
+            <tr style="height: 27pt">
+                <td colspan="15" class="header bold center middle no-border">中华人民共和国海关出口货物报关单</td>
+            </tr>
+            <tr style="height: 16.95pt">
+                <td colspan="5" class="subheader bold middle no-border">预录入编号：　</td>
+                <td class="subheader bold no-border">海关编号：</td>
+                <td colspan="7" class="no-border"></td>
+                <td class="subheader bold no-border">页码/页数：1/{{ $customs_total_pages }}</td>
+                <td class="no-border"></td>
+            </tr>
+            <tr style="height: 15pt" class="split-row-first">
+                <td colspan="5" class="subheader bold bordered normal-wrap">境内发货人&nbsp;&nbsp;{{ Exporter.CreditCode }}</td>
+                <td colspan="2" class="subheader bold bordered normal-wrap">出境关别</td>
+                <td colspan="3" class="subheader bold bordered normal-wrap">出口日期</td>
+                <td colspan="3" class="subheader bold bordered normal-wrap">申报日期</td>
+                <td colspan="2" class="subheader bold bordered normal-wrap">备案号</td>
+            </tr>
+            <tr style="height: 15pt" center class="split-row-second">
+                <td colspan="5" class="bordered normal-wrap">{{ Exporter.ExporterNameCN }}</td>
+                <td colspan="2" class="bordered normal-wrap">　</td>
+                <td colspan="3" class="bordered normal-wrap">　</td>
+                <td colspan="3" class="bordered normal-wrap">　</td>
+                <td colspan="2" class="bordered normal-wrap">　</td>
+            </tr>
+            <tr style="height: 15pt" class="split-row-first">
+                <td colspan="5" class="subheader bold bordered normal-wrap">境外收货人</td>
+                <td colspan="2" class="subheader bold bordered normal-wrap">运输方式</td>
+                <td colspan="3" class="subheader bold bordered normal-wrap">运输工具名称及航次号</td>
+                <td colspan="5" class="subheader bold bordered normal-wrap">提运单号</td>
+            </tr>
+            <tr style="height: 15pt" center class="split-row-second">
+                <td colspan="5" class="bordered normal-wrap">{{ Customer.CustomerNameEN }}</td>
+                <td colspan="2" class="bordered normal-wrap">{{ Invoice.TransportMode }}</td>
+                <td colspan="3" class="bordered normal-wrap">　</td>
+                <td colspan="5" class="bordered normal-wrap">　</td>
+            </tr>
+            <tr style="height: 15pt" class="split-row-first">
+                <td colspan="5" class="subheader bold bordered normal-wrap">生产销售单位&nbsp;&nbsp;{{ Exporter.CreditCode }}</td>
+                <td colspan="2" class="subheader bold bordered normal-wrap">监管方式</td>
+                <td colspan="3" class="subheader bold bordered normal-wrap">征免性质</td>
+                <td colspan="5" class="subheader bold bordered normal-wrap">许可证号</td>
+            </tr>
+            <tr style="height: 15pt" center class="split-row-second">
+                <td colspan="5" class="bordered normal-wrap">{{ Exporter.ExporterNameCN }}</td>
+                <td colspan="2" class="bordered normal-wrap">{{ Invoice.SupervisionMode }}</td>
+                <td colspan="3" class="bordered normal-wrap">　</td>
+                <td colspan="5" class="bordered normal-wrap">　</td>
+            </tr>
+            <tr style="height: 15pt" class="split-row-first">
+                <td colspan="5" class="subheader bold bordered normal-wrap">合同协议号</td>
+                <td colspan="2" class="subheader bold bordered normal-wrap">贸易国(地区)</td>
+                <td colspan="3" class="subheader bold bordered normal-wrap">运抵国(地区)</td>
+                <td colspan="3" class="subheader bold bordered normal-wrap">指运港</td>
+                <td colspan="2" class="subheader bold bordered normal-wrap">离境口岸</td>
+            </tr>
+            <tr style="height: 15pt" center class="split-row-second">
+                <td colspan="5" class="bordered normal-wrap">{{ Invoice.ContractNo }}</td>
+                <td colspan="2" class="bordered normal-wrap">{{ Invoice.DestinationCountry }}</td>
+                <td colspan="3" class="bordered normal-wrap">{{ Invoice.DestinationCountry }}</td>
+                <td colspan="3" class="bordered normal-wrap">{{ Invoice.PortOfDestination }}</td>
+                <td colspan="2" class="bordered normal-wrap">{{ Invoice.PortOfLoading }}</td>
+            </tr>
+            <tr style="height: 15pt" class="split-row-first">
+                <td colspan="5" class="subheader bold bordered normal-wrap">包装种类</td>
+                <td class="subheader bold bordered normal-wrap">件数</td>
+                <td class="subheader bold bordered normal-wrap">毛重(千克)</td>
+                <td colspan="2" class="subheader bold bordered normal-wrap">净重(千克)</td>
+                <td class="subheader bold bordered normal-wrap">成交方式</td>
+                <td colspan="2" class="subheader bold bordered normal-wrap">运费</td>
+                <td colspan="2" class="subheader bold bordered normal-wrap">保费</td>
+                <td class="subheader bold bordered normal-wrap">杂费</td>
+            </tr>
+            <tr style="height: 15pt" center class="split-row-second">
+                <td colspan="5" class="bordered normal-wrap">　</td>
+                <td class="bordered normal-wrap">{{ Invoice.TotalCartons | math.format 'F0' }}</td>
+                <td class="bordered normal-wrap">{{ Invoice.TotalGrossWeight | math.format 'F2' }}KGS</td>
+                <td colspan="2" class="bordered normal-wrap">{{ Invoice.TotalNetWeight | math.format 'F2' }}KGS</td>
+                <td class="bordered normal-wrap">{{ Invoice.PaymentTerms }}</td>
+                <td colspan="2" class="bordered normal-wrap">　</td>
+                <td colspan="2" class="bordered normal-wrap">　</td>
+                <td class="bordered normal-wrap">　</td>
+            </tr>
+            <tr style="height: 13.05pt">
+                <td colspan="15" class="small bold bordered normal-wrap">随附单证</td>
+            </tr>
+            <tr style="height: 19.95pt">
+                <td colspan="15" class="small bold bordered normal-wrap">标记唛码及备注</td>
+            </tr>
+            <tr style="height: 15pt">
+                <td class="subheader bold center middle bordered">项号</td>
+                <td colspan="2" class="subheader bold center middle bordered">商品编号</td>
+                <td colspan="4" class="subheader bold center middle bordered">商品名称及规格型号</td>
+                <td class="subheader bold center middle bordered">数量及单位</td>
+                <td colspan="2" class="subheader bold center middle bordered">单价/总价/币制</td>
+                <td class="subheader bold center middle bordered">原产国(地区)</td>
+                <td colspan="2" class="subheader bold center middle bordered">最终目的国(地区)</td>
+                <td class="subheader bold center middle bordered">境内货源地</td>
+                <td class="subheader bold center middle bordered">征免</td>
+            </tr>
+            {{ for item in items }}
+            {{ if for.index < 6 }}
+            <tr style="height: 12pt" class="商品-row 商品-row-first">
+                <td>{{ for.index + 1 }}</td>
+                <td colspan="2">{{ item.HSCode }}</td>
+                <td colspan="4">{{ item.StyleName }}</td>
+                <td>{{ item.Quantity }}{{ item.UnitCN }}</td>
+                <td colspan="2">{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'F2' }} </td>
+                <td>中国</td>
+                <td colspan="2">{{ Invoice.DestinationCountry }}</td>
+                <td>{{ item.Origin }}</td>
+                <td></td>
+            </tr>
+            <tr style="height: 12pt" class="商品-row 商品-row-second">
+                <td></td>
+                <td colspan="2"></td>
+                <td colspan="4" class="normal-wrap">{{ item.FabricComposition }}&nbsp;品牌:{{ item.Brand ? ' ' + item.Brand : '' }}</td>
+                <td>{{ item.NWTotal | math.format 'F2' }}千克</td>
+                <td colspan="2">{{ Invoice.Currency }}{{ item.TotalPrice | math.format 'F2' }}</td>
+                <td></td>
+                <td colspan="2"></td>
+                <td></td>
+                <td></td>
+            </tr>
+            {{ end }}
+            {{ end }}
+            <!-- 特殊关系确认行 -->
+            <tr style="height: 12pt" class="outer-bordered special-row">
+                <td class="subheader bold no-inner-virtual">　</td>
+                <td class="no-inner-virtual"></td>
+                <td colspan="3" class="subheader bold center no-inner-virtual">特殊关系确认：</td>
+                <td class="no-inner-virtual"></td>
+                <td colspan="2" class="subheader bold center no-inner-virtual">价格影响确认：</td>
+                <td class="no-inner-virtual"></td>
+                <td class="no-inner-virtual"></td>
+                <td colspan="2" class="subheader bold center no-inner-virtual">支付特许权使用费确认：</td>
+                <td class="no-inner-virtual"></td>
+                <td colspan="2" class="subheader bold center no-inner-virtual">自报自缴：</td>
+            </tr>
+            <tr style="height: 12pt" class="outer-bordered vertical-line-left">
+                <td class="subheader bold no-inner-virtual normal-wrap">报关人员</td>
+                <td colspan="2" class="subheader bold center no-inner-virtual">报关人员证号</td>
+                <td class="no-inner-virtual normal-wrap">　</td>
+                <td class="subheader bold no-inner-virtual">电话</td>
+                <td colspan="2" class="no-inner-virtual normal-wrap">　</td>
+                <td colspan="3" class="subheader bold no-inner-virtual">兹申明对以上内容承担如实申报、依法纳税责任</td>
+                <td colspan="2" class="no-inner-virtual normal-wrap">　</td>
+                <td colspan="2" class="subheader bold no-inner-virtual normal-wrap">海关批注及签章</td>
+                <td class="no-inner-virtual normal-wrap">　</td>
+            </tr>
+            <tr style="height: 13.2pt" class="outer-bordered last-row">
+                <td class="subheader bold no-inner-virtual">申报单位</td>
+                <td colspan="9" class="no-inner-virtual">　</td>
+                <td colspan="2" class="subheader bold center no-inner-virtual customs-seal-anchor">
+                    申报单位(签章)
+                    {{ if ShowSeal }}
+                    <span class="customs-seal-frame">
+                        <img src="{{ customs_seal_path }}" class="customs-seal-image">
+                    </span>
+                    {{ end }}
+                </td>
+                <td colspan="3" class="no-inner-virtual">　</td>
+            </tr>
+        </table>
+        <div class="special-terms">
+            境外品牌(贴牌生产)
+            出口货物不能确定在最终目的国（地区）享受优惠
+        </div>
+        </div>
+        <!-- 第二页 -->
+        {{ if items.size > 6 }}
+        <div class="page-break"></div>
+        <div class="customs-page customs-page-following">
+        <table width="1383" class="second-page">
+            <col style="width: 49pt"><col style="width: 94pt"><col style="width: 41pt"><col style="width: 82pt">
+            <col style="width: 34pt"><col style="width: 68pt"><col style="width: 76pt"><col style="width: 103pt">
+            <col style="width: 49pt"><col style="width: 76pt"><col style="width: 77pt"><col style="width: 50pt">
+            <col style="width: 35pt"><col style="width: 103pt"><col style="width: 100pt">
+            <tr style="height: 15pt">
+                <td colspan="13" class="no-border"></td>
+                <td colspan="2" class="subheader bold page-number no-border">页码/页数：2/{{ $customs_total_pages }}</td>
+            </tr>
+            <tr style="height: 15pt">
+                <td class="subheader bold center middle bordered">项号</td>
+                <td colspan="2" class="subheader bold center middle bordered">商品编号</td>
+                <td colspan="4" class="subheader bold center middle bordered">商品名称及规格型号</td>
+                <td class="subheader bold center middle bordered">数量及单位</td>
+                <td colspan="2" class="subheader bold center middle bordered">单价/总价/币制</td>
+                <td class="subheader bold center middle bordered">原产国(地区)</td>
+                <td colspan="2" class="subheader bold center middle bordered">最终目的国(地区)</td>
+                <td class="subheader bold center middle bordered">境内货源地</td>
+                <td class="subheader bold center middle bordered">征免</td>
+            </tr>
+            {{ for item in items }}
+            {{ if for.index >= 6 && for.index < 21 }}
+            <tr style="height: 12pt" class="商品-row 商品-row-first">
+                <td>{{ for.index + 1 }}</td>
+                <td colspan="2">{{ item.HSCode }}</td>
+                <td colspan="4">{{ item.StyleName }}</td>
+                <td>{{ item.Quantity }}{{ item.UnitCN }}</td>
+                <td colspan="2">{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'F2' }} </td>
+                <td>中国</td>
+                <td colspan="2">{{ Invoice.DestinationCountry }}</td>
+                <td>{{ item.Origin }}</td>
+                <td></td>
+            </tr>
+            <tr style="height: 12pt" class="商品-row 商品-row-second">
+                <td></td>
+                <td colspan="2"></td>
+                <td colspan="4" class="normal-wrap">{{ item.FabricComposition }}&nbsp;品牌:{{ item.Brand ? ' ' + item.Brand : '' }}</td>
+                <td>{{ item.NWTotal | math.format 'F2' }}千克</td>
+                <td colspan="2">{{ Invoice.Currency }}{{ item.TotalPrice | math.format 'F2' }}</td>
+                <td></td>
+                <td colspan="2"></td>
+                <td></td>
+                <td></td>
+            </tr>
+            {{ end }}
+            {{ end }}
+        </table>
+        </div>
+        
+        <!-- 第三页及后续页面 -->
+        {{ if $customs_total_pages > 2 }}
+        {{ $customs_page = 3 }}
+        {{ while $customs_page <= $customs_total_pages }}
+        <div class="page-break"></div>
+        <div class="customs-page customs-page-following">
+        <table width="1383" class="second-page">
+            <col style="width: 49pt"><col style="width: 94pt"><col style="width: 41pt"><col style="width: 82pt">
+            <col style="width: 34pt"><col style="width: 68pt"><col style="width: 76pt"><col style="width: 103pt">
+            <col style="width: 49pt"><col style="width: 76pt"><col style="width: 77pt"><col style="width: 50pt">
+            <col style="width: 35pt"><col style="width: 103pt"><col style="width: 100pt">
+            <tr style="height: 15pt">
+                <td colspan="13" class="no-border"></td>
+                <td colspan="2" class="subheader bold page-number no-border">页码/页数：{{ $customs_page }}/{{ $customs_total_pages }}</td>
+            </tr>
+            <tr style="height: 15pt">
+                <td class="subheader bold center middle bordered">项号</td>
+                <td colspan="2" class="subheader bold center middle bordered">商品编号</td>
+                <td colspan="4" class="subheader bold center middle bordered">商品名称及规格型号</td>
+                <td class="subheader bold center middle bordered">数量及单位</td>
+                <td colspan="2" class="subheader bold center middle bordered">单价/总价/币制</td>
+                <td class="subheader bold center middle bordered">原产国(地区)</td>
+                <td colspan="2" class="subheader bold center middle bordered">最终目的国(地区)</td>
+                <td class="subheader bold center middle bordered">境内货源地</td>
+                <td class="subheader bold center middle bordered">征免</td>
+            </tr>
+            {{ $start_index = 6 + ($customs_page - 2) * 15 }}
+            {{ $end_index = $start_index + 15 }}
+            {{ for item in items }}
+            {{ if for.index >= $start_index && for.index < $end_index }}
+            <tr style="height: 12pt" class="商品-row 商品-row-first">
+                <td>{{ for.index + 1 }}</td>
+                <td colspan="2">{{ item.HSCode }}</td>
+                <td colspan="4">{{ item.StyleName }}</td>
+                <td>{{ item.Quantity }}{{ item.UnitCN }}</td>
+                <td colspan="2">{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'F2' }} </td>
+                <td>中国</td>
+                <td colspan="2">{{ Invoice.DestinationCountry }}</td>
+                <td>{{ item.Origin }}</td>
+                <td></td>
+            </tr>
+            <tr style="height: 12pt" class="商品-row 商品-row-second">
+                <td></td>
+                <td colspan="2"></td>
+                <td colspan="4" class="normal-wrap">{{ item.FabricComposition }}&nbsp;品牌:{{ item.Brand ? ' ' + item.Brand : '' }}</td>
+                <td>{{ item.NWTotal | math.format 'F2' }}千克</td>
+                <td colspan="2">{{ Invoice.Currency }}{{ item.TotalPrice | math.format 'F2' }}</td>
+                <td></td>
+                <td colspan="2"></td>
+                <td></td>
+                <td></td>
+            </tr>
+            {{ end }}
+            {{ end }}
+        </table>
+        </div>
+        {{ $customs_page = $customs_page + 1 }}
+        {{ end }}
+        {{ end }}
+        {{ end }}
+    </div>
+</body>
+</html>

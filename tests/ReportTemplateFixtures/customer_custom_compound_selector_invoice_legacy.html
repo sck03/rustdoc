@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: A4 portrait; margin: 11mm; }
+    body { font-family: Arial, sans-serif; font-size: 10pt; }
+    .table-title { font-size: 16pt; font-weight: bold; text-align: center; }
+    .table-meta { text-align: center; margin-bottom: 8px; }
+    table.invoice-grid { width: 100%; border-collapse: collapse; page-break-inside: auto; }
+    table.invoice-grid th, table.invoice-grid td { border: 1px solid #445566; padding: 4px; vertical-align: top; }
+    thead th { background-color: #e8eef7; font-weight: bold; text-align: center; }
+    td.mark-cell { background: #eef9ef; font-weight: 700; }
+    .invoice-grid .description { background: #fff6d8; }
+    tbody td.amount { text-align: right; color: #105f8d; }
+    tbody tr.summary td { border-color: #884422; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="table-title">COMPOUND SELECTOR INVOICE</div>
+  <div class="table-meta">Recovered From Legacy HTML<br>Selector Coverage 2026</div>
+  <table class="invoice-grid">
+    <colgroup>
+      <col style="width: 18%">
+      <col style="width: 32%">
+      <col style="width: 20%">
+      <col style="width: 30%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th colspan="4">Invoice {{ Invoice.InvoiceNo }}</th>
+      </tr>
+      <tr>
+        <th>Marks</th>
+        <th>Description</th>
+        <th>Quantity</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="mark-cell" rowspan="2">{{ Invoice.ShippingMarks }}<br>{{ Invoice.PortOfDestination }}</td>
+        <td class="description">{{ item.StyleName }}<br>{{ item.StyleNo }}</td>
+        <td>{{ item.Quantity }}</td>
+        <td class="amount">{{ item.UnitPrice }}</td>
+      </tr>
+      <tr class="summary">
+        <td colspan="2">Total</td>
+        <td class="amount total">{{ Invoice.TotalAmount }}</td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>

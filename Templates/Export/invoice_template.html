@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+		@page {
+			size: A4 portrait; /* 纵向 */
+			margin: 1cm;
+		}
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }
+        .print-page { position: relative; min-height: 250mm; padding-bottom: 45px; box-sizing: border-box; }
+        .page-break { page-break-before: always; }
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+            position: relative;
+            top: 0;
+        }
+        .company-name { font-weight: bold; font-size: 16px; }
+        .company-address { font-weight: normal; font-size: 10px; }
+        .header .company-address span   { white-space: pre-line;text-align: left;display: inline-block;}
+        .title {
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 0;
+            position: relative;
+            top: 0;
+        }
+        .inline-info {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 5px;
+            position: relative;
+            top: 0;
+        }
+        .inline-info .left { flex: 1; }
+        .inline-info .right { flex: 1; text-align: right; }
+        .inline-info .right span { font-size: 8px; }
+        .address { white-space: pre-line; font-size: 8px; }
+        .inline-sub {
+            display: flex;
+            justify-content: flex-start;
+            width: 100%;
+            margin-bottom: 5px;
+            position: relative;
+        }
+
+        .inline-sub > div:first-child {
+            flex: 0 0 50%; /* 固定第一个 div 的宽度为 50%，确保 To: 和 Issued by: 左对齐 */
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+
+        .inline-sub > div:last-child {
+            flex: 1; /* 第二个 div 占据剩余空间 */
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+
+        .inline-sub .label {
+            flex: 0 0 auto;
+            font-size: 8px;
+        }
+
+        .inline-sub .content {
+            flex: 1;
+            font-size: 8px;
+            padding-bottom: 3px;
+            border-bottom: 1px dashed #000;
+            margin-left: 20px;
+            display: block; /* 确保宽度拉伸 */
+        }
+
+        .inline-sub .to-label {
+            flex: 0 0 auto;
+            font-size: 8px;
+        }
+
+        .inline-sub .to-content {
+            flex: 1;
+            font-size: 8px;
+            padding-bottom: 3px;
+            border-bottom: 1px dashed #000;
+            margin-left: 20px;
+            display: block; /* 确保宽度拉伸 */
+        }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { border: 1px solid black; padding: 8px; text-align: left; background-color: #f2f2f2; font-weight: bold; }
+        td { padding: 8px; text-align: left; }
+        td.marks { 
+            white-space: pre-line; 
+            font-size: 8px;
+            border-left: 1px solid black;
+            border-right: 1px solid black;
+            border-top: none;
+            border-bottom: none;
+            width: 150px; /* 设置固定宽度 */
+            min-width: 150px; /* 确保最小宽度 */
+            max-width: 150px; /* 限制最大宽度 */
+        }
+        td.marks-with-border { 
+            border: 1px solid black; 
+            white-space: pre-line; 
+            font-size: 8px; 
+            width: 150px; /* 增加宽度与marks保持一致 */
+            min-width: 150px; /* 确保最小宽度 */
+            max-width: 150px; /* 限制最大宽度 */
+        }
+        td.description, td.amount { 
+            border-left: 1px solid black; 
+            border-right: 1px solid black; 
+            border-top: none; 
+            border-bottom: none; 
+        }
+        td.description { 
+            padding-left: 10px; /* 增加左侧内边距，与唛头区域保持距离 */
+        }
+        .total-row td { border: 1px solid black; font-weight: bold; font-size: 10px; }
+        .description { line-height: 1.5; font-size: 8px; }
+        .description .po-line { display: block; }
+        .description .style-line { display: block; }
+        .description .style-no { display: inline-block; width: 100px; } /* 保留宽度占位 */
+        .description .item-details span { margin-right: 20px; }
+        .amount { font-size: 8px; }
+        .trade-terms { border: 1px solid black; border-bottom: none; text-align: right; font-size: 10px; }
+        .page-number { text-align: center; font-size: 10px; position: absolute; bottom: 0; left: 0; right: 0; }
+        .document-seal {
+            position: absolute;
+            right: 50px;
+            bottom: 55px;
+            z-index: 2;
+            pointer-events: none;
+        }
+        .special-terms {
+            margin-top: 10px;
+            font-size: 10px;
+            text-align: left;
+            white-space: pre-line; /* 保留换行符，自动分行 */
+            padding-left: 80px; /* 整体向右偏移 */
+            line-height: 1.1; /* 减小行间距 */
+        }
+
+        .special-terms strong {
+            margin-right: 50px; /* 减小REMARKS标签与内容之间的间距 */
+        }
+
+
+        .special-terms strong ~ * {
+            padding-left: 30px; /* 内容部分额外向右偏移 */
+            display: inline-block;
+        }
+       
+    </style>
+</head>
+<body>
+    {{ $items_per_page = 12 }}
+    {{ $total_pages = (items.size / $items_per_page) | math.ceil }}
+    
+    {{ $page = 0 }}
+    {{ while $page < $total_pages }}
+        {{ $start_idx = $page * $items_per_page }}
+        {{ $is_last = ($page + 1) >= $total_pages }}
+        
+        {{ if $page > 0 }}
+        <div class="page-break"></div>
+        {{ end }}
+
+        <div class="print-page">
+        <div class="header">
+            <div class="company-name">{{ Exporter.ExporterNameEN }}</div>
+            <div class="company-address">
+                <span>{{ Exporter.AddressEN }}</span>
+            </div>
+        </div>
+        <div class="title">INVOICE</div>
+        <div class="inline-info">
+            <div class="left">
+                TO: M/S<br>
+                <span class="address">{{ Customer.CustomerNameEN }}</span><br>
+                <span class="address">{{ Customer.AddressEN }}</span>
+            </div>
+            <div class="right">
+                <span>Invoice No.: {{ Invoice.InvoiceNo }}</span><br>
+                <span>Contract No.: {{ Invoice.ContractNo }}</span><br>
+                <span>Date: {{ Invoice.InvoiceDate }}</span>
+            </div>
+        </div>
+        <div class="inline-sub">
+            <div>
+                <span class="label">From:</span>
+                <span class="content">{{ Invoice.PortOfLoading }}</span>            
+            </div>
+            <div>
+                <span class="to-label">To:</span>
+                <span class="to-content">{{ Invoice.PortOfDestination }}</span>           
+            </div>
+        </div>
+        <div class="inline-sub">
+            <div>
+                <span class="label">Payment Terms:</span>
+                <span class="content">{{ Invoice.PaymentTerms }}</span>          
+            </div>
+            <div>
+                <span class="to-label">Issued by:</span>
+                <span class="to-content"></span>          
+            </div>
+        </div>    
+
+        <table>
+            <tr>
+                <th style="width: 150px; min-width: 150px; max-width: 150px;">唛头 / Marks</th>
+                <th style="width: 60%;">货品名称 / Quantities and Descriptions</th>
+                <th style="width: 15%;">总值 / Amount</th>
+            </tr>
+            
+            {{ $current_page_items = [] }}
+            {{ for $item in items offset:$start_idx limit:$items_per_page }}
+                {{ $current_page_items = $current_page_items | array.add $item }}
+            {{ end }}
+            
+            {{ if $page == 0 }}
+            <tr>
+                <td rowspan="{{ $current_page_items.size + 1 }}" class="marks">
+                    {{ if Invoice.ShippingMarksType == 'Image' }}
+                        <img src="{{ shipping_marks_image_data }}" style="max-width: 95%; max-height: 200px; display: block; margin: 0 auto;">
+                    {{ else }}
+                        {{ Invoice.ShippingMarks }}
+                    {{ end }}
+                </td>
+                <td></td>
+                <td class="trade-terms">{{ Invoice.TradeTerms }}</td>
+            </tr>
+            {{ else if $is_last }}
+            <tr>
+                <td rowspan="{{ $current_page_items.size + 1 }}" class="marks-with-border"></td>
+                <td></td>
+                <td class="trade-terms"></td>               
+            </tr>
+            {{ else }}
+            <tr>
+                <td rowspan="{{ $current_page_items.size + 1 }}" class="marks"></td>
+                <td></td>
+                <td class="trade-terms"></td>              
+            </tr>
+            {{ end }}
+            
+            {{ for $item in $current_page_items }}
+            <tr>
+                <td class="description">
+                    <span>{{ $item.StyleName }}</span><br>
+                    {{ if $item.PoNumber && $item.PoNumber != "" }}
+                    <span class="po-line">{{ $item.PoNumber }}</span>
+                    {{ end }}
+                    <span class="style-line">
+                        <span class="style-no">
+                            {{ if $item.StyleNo && $item.StyleNo != "" }}
+                            {{ $item.StyleNo }}
+                            {{ end }}
+                        </span>
+                        <span class="item-details">
+                            <span>{{ $item.Cartons | math.format 'G29' }}{{ $item.CtnUnitEN }}</span>
+                            <span>{{ $item.Quantity | math.format 'G29' }}{{ $item.UnitEN }}</span>
+                            <span>@{{ Invoice.Currency }}{{ $item.UnitPrice | math.format 'G29' }}</span>
+                        </span>
+                    </span>
+                </td>
+                <td class="amount">{{ Invoice.Currency }}{{ $item.TotalPrice | math.format 'F2' }}</td>
+            </tr>
+            {{ end }}
+            
+            {{ if $is_last }}
+            <tr class="total-row">
+                <td colspan="2">
+                    TOTAL: 
+                    {{ for $kvp in total_by_ctn_unit }}
+                        {{ if !for.first }};{{ end }}{{ $kvp.value | math.format 'G29' }}{{ $kvp.key }}
+                    {{ end }}
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    {{ for $kvp in total_by_qty_unit }}
+                        {{ if !for.first }};{{ end }}{{ $kvp.value | math.format 'G29' }}{{ $kvp.key }}
+                    {{ end }}
+                </td>
+                <td>{{ Invoice.Currency }}{{ Invoice.TotalAmount | math.format 'F2' }}</td>
+            </tr>
+            {{ end }}
+            
+        </table>
+        
+        {{ if $is_last && Invoice.SpecialTerms && Invoice.SpecialTerms != "" }}
+        <div class="special-terms">
+            <strong>REMARKS:</strong><br>
+            <span class="remarks-content">{{ Invoice.SpecialTerms }}</span>
+        </div>
+        {{ end }}
+        
+        {{ if ShowSeal && $is_last }}
+        <div class="document-seal">
+            <img src="{{ doc_seal_path }}" style="width: 220px; height: 130px; opacity: 0.8;">
+        </div>
+        {{ end }}
+
+        {{ if $total_pages > 1 }}
+        <div class="page-number">{{ $page + 1 }}/{{ $total_pages }}</div>
+        {{ end }}
+        </div>
+        {{ $page = $page + 1 }}
+        
+    {{ end }}
+</body>
+</html>

@@ -1,0 +1,49 @@
+{
+  "name": "export-doc-web",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "generate:api": "pwsh -ExecutionPolicy Bypass -File ../../scripts/generate-api-client.ps1",
+    "test:new-report-designer-exporter": "node ../../scripts/test_new_report_designer_exporter.mjs",
+    "test:new-report-designer-print": "node ../../scripts/test_new_report_designer_print_regression.mjs",
+    "test:template-visual": "node ../../scripts/test_report_template_visual_regression.mjs",
+    "test:template-pdf": "node ../../scripts/test_report_template_pdf_regression.mjs",
+    "test:template-pdf-pixels": "node ../../scripts/test_report_template_pdf_pixel_regression.mjs",
+    "test:template-print-pixels": "node ../../scripts/test_report_template_print_pixel_regression.mjs",
+    "test:print-preview-document": "node ../../scripts/test_print_report_preview_document.mjs",
+    "test:invoice-list-models": "node ../../scripts/test_invoice_list_models.mjs",
+    "test:settings-models": "node ../../scripts/test_settings_models.mjs",
+    "test:workspace-navigation": "node ../../scripts/test_workspace_navigation_model.mjs",
+    "test:email-template-model": "node ../../scripts/test_email_template_model.mjs",
+    "test:business-status-model": "node ../../scripts/test_business_status_model.mjs",
+    "test:audit-log-maintenance-model": "node ../../scripts/test_audit_log_maintenance_model.mjs",
+    "test:report-template-workspace-model": "node ../../scripts/test_report_template_workspace_model.mjs",
+    "test:supplier-assessment-analytics": "node ../../scripts/test_supplier_assessment_analytics_model.mjs",
+    "test:customs-coo-model": "node ../../scripts/test_customs_coo_model.mjs",
+    "test:reference-catalog-model": "node ../../scripts/test_reference_catalog_model.mjs",
+    "typecheck:api": "tsc -p tsconfig.generated.json --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.101.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.2",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.1",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@types/three": "^0.184.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.11"
+  }
+}

@@ -1,0 +1,133 @@
+using ExportDocManager.DataAccess;
+using ExportDocManager.Models;
+using ExportDocManager.Models.DTOs;
+using ExportDocManager.Models.Entities;
+using ExportDocManager.Utils;
+using Microsoft.EntityFrameworkCore;
+
+namespace ExportDocManager.Services.MasterData
+{
+    public partial class HsCodeService
+    {
+        public async Task SaveAsync(HsCode hsCode)
+        {
+            if (hsCode == null)
+            {
+                return;
+            }
+
+            string normalizedCode = HsCodeTextHelper.NormalizeCode(hsCode.Code);
+            if (string.IsNullOrWhiteSpace(normalizedCode))
+            {
+                throw new InvalidOperationException("HS 编码不能为空。");
+            }
+
+            hsCode.Code = normalizedCode;
+
+            await using var context = await CreateDbContextAsync();
+            var existing = await context.HsCodes.FirstOrDefaultAsync(h => h.NormalizedCode == normalizedCode);
+            if (existing != null)
+            {
+                CopyHsCodeValues(hsCode, existing);
+                existing.UpdateTime = DateTime.Now;
+                context.HsCodes.Update(existing);
+                hsCode.Id = existing.Id;
+            }
+            else
+            {
+                hsCode.Id = 0;
+                hsCode.UpdateTime = DateTime.Now;
+                await context.HsCodes.AddAsync(hsCode);
+            }
+
+            await context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAsync(int id)
+        {
+            if (id <= 0)
+            {
+                return;
+            }
+
+            await using var context = await CreateDbContextAsync();
+            var item = await context.HsCodes.FindAsync(id);
+            if (item == null)
+            {
+                return;
+            }
+
+            context.HsCodes.Remove(item);
+            await context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAsync(IEnumerable<int> ids)
+        {
+            if (ids == null)
+            {
+                return;
+            }
+
+            var validIds = ids
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+            if (validIds.Count == 0)
+            {
+                return;
+            }
+
+            await using var context = await CreateDbContextAsync();
+            var items = await context.HsCodes
+                .Where(h => validIds.Contains(h.Id))
+                .ToListAsync();
+            if (items.Count == 0)
+            {
+                return;
+            }
+
+            context.HsCodes.RemoveRange(items);
+            await context.SaveChangesAsync();
+        }
+
+        public async Task<List<HsCode>> GetAllLocalAsync()
+        {
+            var rows = await GetReadRepository().QueryAsync(new HsCodeReadQuery
+            {
+                ReturnAll = true,
+                PageSize = 100
+            });
+            return rows.ToList();
+        }
+
+        public async Task<PagedResult<HsCode>> GetPagedLocalAsync(int pageNumber, int pageSize, string keyword = null)
+        {
+            return await GetReadRepository().QueryPageAsync(new HsCodeReadQuery
+            {
+                Keyword = keyword ?? string.Empty,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            });
+        }
+
+        public async Task ClearAllLocalAsync()
+        {
+            await using var context = await CreateDbContextAsync();
+            context.HsCodes.RemoveRange(context.HsCodes);
+            await context.SaveChangesAsync();
+        }
+
+        private static void CopyHsCodeValues(HsCode source, HsCode target)
+        {
+            target.Code = source.Code;
+            target.Name = source.Name;
+            target.Unit = source.Unit;
+            target.RebateRate = source.RebateRate;
+            target.SupervisionConditions = source.SupervisionConditions;
+            target.InspectionCategory = source.InspectionCategory;
+            target.Elements = source.Elements;
+            target.Description = source.Description;
+            target.DetailUrl = source.DetailUrl;
+        }
+    }
+}

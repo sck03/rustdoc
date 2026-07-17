@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: A4 portrait; margin: 12mm; }
+    body { font-family: Arial, sans-serif; font-size: 10pt; }
+    .title { font-size: 16pt; font-weight: bold; text-align: center; }
+    .sub-title { text-align: center; margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
+    th, td { border: 1px solid #333; padding: 4px; vertical-align: top; }
+    thead { display: table-header-group; }
+    .label { font-weight: bold; background: #f4f4f4; }
+  </style>
+</head>
+<body>
+  <div class="title">CUSTOMER COMMERCIAL INVOICE</div>
+  <div class="sub-title">Customer Template<br>Version 2026</div>
+  <table>
+    <colgroup>
+      <col style="width: 18%">
+      <col style="width: 32%">
+      <col style="width: 20%">
+      <col style="width: 30%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th colspan="4">Invoice No. {{ Invoice.InvoiceNo }}</th>
+      </tr>
+      <tr>
+        <th>Marks</th>
+        <th>Description</th>
+        <th>Quantity</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="label" rowspan="2">{{ Invoice.ShippingMarks }}<br>{{ Invoice.PortOfDestination }}</td>
+        <td>{{ item.StyleName }}<br>{{ item.StyleNo }}</td>
+        <td style="text-align:right;">{{ item.Quantity }}</td>
+        <td style="text-align:right;">{{ item.TotalPrice }}</td>
+      </tr>
+      <tr>
+        <td colspan="2">HS: {{ item.HSCode }}</td>
+        <td style="text-align:right;">{{ Invoice.TotalAmount }}</td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>

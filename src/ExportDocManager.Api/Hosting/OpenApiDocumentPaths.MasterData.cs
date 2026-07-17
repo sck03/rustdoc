@@ -1,0 +1,391 @@
+namespace ExportDocManager.Api.Hosting
+{
+    public static partial class OpenApiDocumentFactory
+    {
+        private static Dictionary<string, object> CreateMasterDataPaths() =>
+            new Dictionary<string, object>
+            {
+                    ["/api/master-data/customers"] = MasterDataListPath(
+                        "List customers",
+                        "listCustomers",
+                        "ApiCustomerDto",
+                        "Create customer",
+                        "createCustomer"),
+                    ["/api/master-data/customers/{id}"] = MasterDataDetailPath(
+                        "Get customer",
+                        "getCustomer",
+                        "Update customer",
+                        "updateCustomer",
+                        "Delete customer",
+                        "deleteCustomer",
+                        "ApiCustomerDto",
+                        "Customer id."),
+                    ["/api/master-data/exporters"] = MasterDataListPath(
+                        "List exporters",
+                        "listExporters",
+                        "ApiExporterDto",
+                        "Create exporter",
+                        "createExporter"),
+                    ["/api/master-data/exporters/{id}"] = MasterDataDetailPath(
+                        "Get exporter",
+                        "getExporter",
+                        "Update exporter",
+                        "updateExporter",
+                        "Delete exporter",
+                        "deleteExporter",
+                        "ApiExporterDto",
+                        "Exporter id."),
+                    ["/api/master-data/payees"] = MasterDataListPath(
+                        "List payees",
+                        "listPayees",
+                        "ApiPayeeDto",
+                        "Create payee",
+                        "createPayee"),
+                    ["/api/master-data/payees/{id}"] = MasterDataDetailPath(
+                        "Get payee",
+                        "getPayee",
+                        "Update payee",
+                        "updatePayee",
+                        "Delete payee",
+                        "deletePayee",
+                        "ApiPayeeDto",
+                        "Payee id."),
+                    ["/api/master-data/products"] = MasterDataListPath(
+                        "List products",
+                        "listProducts",
+                        "ApiProductDto",
+                        "Create product",
+                        "createProduct"),
+                    ["/api/master-data/products/{id}"] = MasterDataDetailPath(
+                        "Get product",
+                        "getProduct",
+                        "Update product",
+                        "updateProduct",
+                        "Delete product",
+                        "deleteProduct",
+                        "ApiProductDto",
+                        "Product id."),
+                    ["/api/master-data/ports"] = MasterDataListPath(
+                        "List ports",
+                        "listPorts",
+                        "ApiPortDto",
+                        "Create port",
+                        "createPort"),
+                    ["/api/master-data/ports/{id}"] = MasterDataDetailPath(
+                        "Get port",
+                        "getPort",
+                        "Update port",
+                        "updatePort",
+                        "Delete port",
+                        "deletePort",
+                        "ApiPortDto",
+                        "Port id."),
+                    ["/api/master-data/units"] = MasterDataListPath(
+                        "List units",
+                        "listUnits",
+                        "ApiUnitDto",
+                        "Create unit",
+                        "createUnit"),
+                    ["/api/master-data/units/{id}"] = MasterDataDetailPath(
+                        "Get unit",
+                        "getUnit",
+                        "Update unit",
+                        "updateUnit",
+                        "Delete unit",
+                        "deleteUnit",
+                        "ApiUnitDto",
+                        "Unit id."),
+                    ["/api/master-data/hs-codes"] = new
+                    {
+                        get = new
+                        {
+                            summary = "List HS codes",
+                            operationId = "listHsCodes",
+                            parameters = new object[]
+                            {
+                                QueryParameter("pageNumber", "integer", "int32", "Page number starting from 1."),
+                                QueryParameter("pageSize", "integer", "int32", "Page size capped by the API endpoint."),
+                                QueryParameter("keyword", "string", null, "Keyword for HS code, normalized code, name, or description.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "Paged HS code search results.",
+                                    content = JsonContent("ApiPagedResponseOfApiHsCodeDto")
+                                },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
+                            }
+                        },
+                        post = new
+                        {
+                            summary = "Create HS code",
+                            operationId = "createHsCode",
+                            requestBody = new
+                            {
+                                required = true,
+                                content = JsonContent("ApiHsCodeDto")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["201"] = new
+                                {
+                                    description = "Created HS code.",
+                                    content = JsonContent("ApiHsCodeDto")
+                                },
+                                ["400"] = new { description = "Invalid HS code payload." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["409"] = new { description = "HS code could not be saved." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-codes/import-path"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Import HS codes from an explicitly selected desktop Excel path",
+                            operationId = "importHsCodesFromPath",
+                            requestBody = new
+                            {
+                                required = true,
+                                content = JsonContent("ApiHsCodeImportPathRequest")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "HS codes were imported into the current runtime data root database.",
+                                    content = JsonContent("ApiHsCodeImportResponse")
+                                },
+                                ["400"] = new { description = "Invalid import path or workbook format." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["404"] = new { description = "Import workbook was not found." },
+                                ["409"] = new { description = "Workbook could not be imported." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-codes/import-upload"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Upload and import HS code Excel workbook",
+                            operationId = "uploadHsCodesImportFile",
+                            parameters = new object[]
+                            {
+                                QueryParameter("fileName", "string", null, "Original .xlsx or .xlsm file name for validation and diagnostics.")
+                            },
+                            requestBody = new
+                            {
+                                required = true,
+                                content = BinaryContent()
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "Uploaded workbook was staged under runtime Cache/HsCodeImports and imported into the current database.",
+                                    content = JsonContent("ApiHsCodeImportResponse")
+                                },
+                                ["400"] = new { description = "Invalid file name, empty body, or workbook format." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["409"] = new { description = "Workbook could not be imported." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-codes/search-remote"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Search HS codes from the configured online source",
+                            operationId = "searchRemoteHsCodes",
+                            parameters = new object[]
+                            {
+                                QueryParameter("keyword", "string", null, "HS code or product keyword.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "Remote HS code search results returned in memory.",
+                                    content = JsonContent("ApiHsCodeSearchResponse")
+                                },
+                                ["400"] = new { description = "Missing search keyword." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["409"] = new { description = "Remote search failed." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-codes/fetch-remote-detail"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Fetch remote HS code detail",
+                            operationId = "fetchRemoteHsCodeDetail",
+                            requestBody = new
+                            {
+                                required = true,
+                                content = JsonContent("ApiHsCodeDto")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "Remote detail was fetched and returned in memory.",
+                                    content = JsonContent("ApiHsCodeDto")
+                                },
+                                ["400"] = new { description = "Missing detail URL or invalid payload." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["409"] = new { description = "Remote detail could not be fetched." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-codes/resolve-remote-detail"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Resolve remote HS code detail and replace expired records",
+                            operationId = "resolveRemoteHsCodeDetail",
+                            requestBody = new
+                            {
+                                required = true,
+                                content = JsonContent("ApiHsCodeDto")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "Remote detail was resolved; expired rows may be removed and replacement rows returned.",
+                                    content = JsonContent("ApiHsCodeRemoteDetailResolutionResponse")
+                                },
+                                ["400"] = new { description = "Missing detail URL or invalid payload." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["409"] = new { description = "Remote detail could not be resolved." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-codes/{code}"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Get HS code",
+                            operationId = "getHsCode",
+                            parameters = new object[]
+                            {
+                                PathParameter("code", "string", null, "HS code.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "HS code detail.",
+                                    content = JsonContent("ApiHsCodeDto")
+                                },
+                                ["400"] = new { description = "Missing HS code." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["404"] = new { description = "HS code not found." }
+                            }
+                        },
+                        put = new
+                        {
+                            summary = "Update HS code",
+                            operationId = "updateHsCode",
+                            parameters = new object[]
+                            {
+                                PathParameter("code", "string", null, "HS code.")
+                            },
+                            requestBody = new
+                            {
+                                required = true,
+                                content = JsonContent("ApiHsCodeDto")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "Updated HS code.",
+                                    content = JsonContent("ApiHsCodeDto")
+                                },
+                                ["400"] = new { description = "Invalid HS code payload." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["404"] = new { description = "HS code not found." },
+                                ["409"] = new { description = "HS code could not be saved." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-codes/by-id/{id}"] = new
+                    {
+                        delete = new
+                        {
+                            summary = "Delete HS code",
+                            operationId = "deleteHsCode",
+                            parameters = new object[]
+                            {
+                                PathParameter("id", "integer", "int32", "HS code id.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "Deleted HS code.",
+                                    content = JsonContent("ApiCommandResponse")
+                                },
+                                ["400"] = new { description = "Invalid HS code id." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["404"] = new { description = "HS code not found." },
+                                ["409"] = new { description = "HS code could not be deleted." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-codes/delete-batch"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Delete selected HS codes",
+                            operationId = "deleteHsCodesBatch",
+                            requestBody = new
+                            {
+                                required = true,
+                                content = JsonContent("ApiHsCodeBatchDeleteRequest")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "Selected HS codes were deleted from the current runtime data root database.",
+                                    content = JsonContent("ApiCommandResponse")
+                                },
+                                ["400"] = new { description = "No valid HS code ids were selected." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["404"] = new { description = "No selected HS code exists." },
+                                ["409"] = new { description = "Selected HS codes could not be deleted." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-codes/clear-all"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Clear all local HS codes",
+                            operationId = "clearAllHsCodes",
+                            requestBody = new
+                            {
+                                required = true,
+                                content = JsonContent("ApiHsCodeClearAllRequest")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "All local HS codes were cleared from the current runtime data root database.",
+                                    content = JsonContent("ApiCommandResponse")
+                                },
+                                ["400"] = new { description = "Missing confirmation text." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Only administrators can clear the local HS code library." },
+                                ["409"] = new { description = "HS code library could not be cleared." }
+                            }
+                        }
+                    },
+            };
+    }
+}

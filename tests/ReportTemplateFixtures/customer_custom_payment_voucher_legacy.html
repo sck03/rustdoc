@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: A4 landscape; margin: 10mm; }
+    body { font-family: Arial, sans-serif; font-size: 10pt; }
+    .voucher-title { font-size: 15pt; font-weight: bold; text-align: center; }
+    .voucher-meta { text-align: center; margin-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; page-break-inside: avoid; }
+    th, td { border: 1px solid #222; padding: 5px; vertical-align: top; }
+    thead { display: table-header-group; }
+    .label { font-weight: bold; background: #f3f6f8; }
+  </style>
+</head>
+<body>
+  <div class="voucher-title">CUSTOMER PAYMENT VOUCHER</div>
+  <div class="voucher-meta">Payment Request<br>{{ Payment.PaymentDate }}</div>
+  <table>
+    <colgroup>
+      <col style="width: 16%">
+      <col style="width: 34%">
+      <col style="width: 18%">
+      <col style="width: 32%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th colspan="4">Voucher No. {{ Payment.PaymentNo }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="label">Payee</td>
+        <td>{{ Payment.PayeeName }}<br>{{ Payment.BankAccount }}</td>
+        <td class="label">Reference</td>
+        <td>{{ Payment.InvoiceNo }}</td>
+      </tr>
+      <tr>
+        <td class="label" rowspan="2">Purpose</td>
+        <td colspan="3">{{ Payment.Project }}<br>{{ Payment.Remarks }}</td>
+      </tr>
+      <tr>
+        <td>{{ Payment.PaymentMethod }}</td>
+        <td class="label">Amount</td>
+        <td style="text-align:right;">{{ Payment.CNYAmount }}</td>
+      </tr>
+      <tr>
+        <td class="label">Prepared By</td>
+        <td>{{ Payment.Applicant }}</td>
+        <td class="label">Approved By</td>
+        <td>{{ Payment.Approver }}</td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>

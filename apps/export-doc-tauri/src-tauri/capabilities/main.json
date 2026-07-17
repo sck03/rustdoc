@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-desktop",
+  "description": "Allow the main ExportDocManager desktop window to use Tauri IPC and desktop bridge commands.",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["http://127.0.0.1:5173"]
+  },
+  "permissions": ["core:default", "allow-desktop-bridge"]
+}

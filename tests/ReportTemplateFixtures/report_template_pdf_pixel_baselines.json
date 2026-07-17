@@ -1,0 +1,304 @@
+{
+  "version": 1,
+  "description": "Golden layout fingerprints for PDF viewer screenshots generated from legacy/customer and built-in report templates.",
+  "grid": {
+    "columns": 24,
+    "rows": 32,
+    "minInkRatio": 0.006
+  },
+  "defaults": {
+    "maxFingerprintDistance": 24,
+    "maxPaperBoundsDelta": 10,
+    "maxInkBoundsDelta": 28
+  },
+  "pages": {
+    "customer-custom-invoice#1": {
+      "fingerprintHex": "f0000003ffc07ffffe7ffffe7ffffe7ffffe7ffffe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
+      "occupiedCells": 150,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 836
+      },
+      "inkBounds": {
+        "left": 328,
+        "top": 75,
+        "width": 544,
+        "height": 805
+      }
+    },
+    "customer-payment-voucher#1": {
+      "fingerprintHex": "e0000000ff0000ff00ffffffffffffff0ff1ffffffff0001ffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffc1",
+      "occupiedCells": 208,
+      "paperBounds": {
+        "left": 306,
+        "top": 59,
+        "width": 959,
+        "height": 679
+      },
+      "inkBounds": {
+        "left": 333,
+        "top": 77,
+        "width": 894,
+        "height": 644
+      }
+    },
+    "customer-compound-selector-invoice#1": {
+      "fingerprintHex": "f0000003ffc07ffffe7ffffe7ffffe7ffffe7ffffe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
+      "occupiedCells": 150,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 836
+      },
+      "inkBounds": {
+        "left": 328,
+        "top": 75,
+        "width": 544,
+        "height": 805
+      }
+    },
+    "built-in-invoice-template#1": {
+      "fingerprintHex": "f000007ffffc3d7ef8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
+      "occupiedCells": 65,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 836
+      },
+      "inkBounds": {
+        "left": 328,
+        "top": 75,
+        "width": 534,
+        "height": 805
+      }
+    },
+    "built-in-invoice-template#2": {
+      "fingerprintHex": "f000007ffffc3d7ef8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
+      "occupiedCells": 65,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 836
+      },
+      "inkBounds": {
+        "left": 328,
+        "top": 75,
+        "width": 534,
+        "height": 805
+      }
+    },
+    "built-in-packing-list-template#1": {
+      "fingerprintHex": "f000007ffffe7ffffc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
+      "occupiedCells": 71,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 836
+      },
+      "inkBounds": {
+        "left": 328,
+        "top": 75,
+        "width": 534,
+        "height": 805
+      }
+    },
+    "built-in-packing-list-template#2": {
+      "fingerprintHex": "f000007ffffe7ffffc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
+      "occupiedCells": 71,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 836
+      },
+      "inkBounds": {
+        "left": 328,
+        "top": 75,
+        "width": 534,
+        "height": 805
+      }
+    },
+    "built-in-contract-template#1": {
+      "fingerprintHex": "f0008100ffff001c007e03fe7c00fe7c00007ffff07ffffe7ffffe7ffffe7ffffe63f87a7ffffe77fffc7038007ffffe7ffffe7fe0007f00007c0000000000000000000000000000000000000000000000000000000000000000000000ffffff",
+      "occupiedCells": 316,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 836
+      },
+      "inkBounds": {
+        "left": 328,
+        "top": 75,
+        "width": 544,
+        "height": 805
+      }
+    },
+    "built-in-customs-declaration-template#1": {
+      "fingerprintHex": "e00c00fffe00ff7e00c17e3efffffffffffffffffff9f181ffffffffffff81ff25fffffffffffffffffffffff9ffffffffffffffffff1f8000ff8000000000000000000000000000000000000000000000000000000000000000000000ffffc1",
+      "occupiedCells": 394,
+      "paperBounds": {
+        "left": 306,
+        "top": 59,
+        "width": 959,
+        "height": 679
+      },
+      "inkBounds": {
+        "left": 333,
+        "top": 76,
+        "width": 904,
+        "height": 645
+      }
+    },
+    "built-in-customs-declaration-template#2": {
+      "fingerprintHex": "e00c00fffe00ff7e00c17e3efffffffffffffffffff9f181ffffffffffff81ff25fffffffffffffffffffffff9ffffffffffffffffff1f8000ff8000000000000000000000000000000000000000000000000000000000000000000000ffffc1",
+      "occupiedCells": 394,
+      "paperBounds": {
+        "left": 306,
+        "top": 59,
+        "width": 959,
+        "height": 679
+      },
+      "inkBounds": {
+        "left": 333,
+        "top": 76,
+        "width": 904,
+        "height": 645
+      }
+    },
+    "built-in-customs-declaration-template#3": {
+      "fingerprintHex": "e00c00fffe00ff7e00c17e3efffffffffffffffffff9f181ffffffffffff81ff25fffffffffffffffffffffff9ffffffffffffffffff1f8000ff8000000000000000000000000000000000000000000000000000000000000000000000ffffc1",
+      "occupiedCells": 394,
+      "paperBounds": {
+        "left": 306,
+        "top": 59,
+        "width": 959,
+        "height": 679
+      },
+      "inkBounds": {
+        "left": 333,
+        "top": 76,
+        "width": 904,
+        "height": 645
+      }
+    },
+    "built-in-payment-voucher-template#1": {
+      "fingerprintHex": "f0000001ff0000fe007e00007ffffe7f7fe27fffe27ffff27fffbe7ffffe71df827dffe27d15027d15027d1f827fffe2708600000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
+      "occupiedCells": 261,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 765
+      },
+      "inkBounds": {
+        "left": 339,
+        "top": 74,
+        "width": 533,
+        "height": 734
+      }
+    },
+    "built-in-expense-reimbursement-template#1": {
+      "fingerprintHex": "f00f0001ff80007e007fc0007ffffc7ffffe7ffffe7ffffe5ffffe7ffffe7ffffe5ffffe7ffffe74a54e74a54e7ffffe701f027ffffe7f807e7ffffe000000000000000000000000000000000000000000000000000000000000000000ffffc3",
+      "occupiedCells": 361,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 836
+      },
+      "inkBounds": {
+        "left": 328,
+        "top": 74,
+        "width": 544,
+        "height": 806
+      }
+    },
+    "structured-multi-table-page-break#1": {
+      "fingerprintHex": "f000007ffffe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
+      "occupiedCells": 50,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 836
+      },
+      "inkBounds": {
+        "left": 328,
+        "top": 75,
+        "width": 534,
+        "height": 805
+      }
+    },
+    "structured-multi-table-page-break#2": {
+      "fingerprintHex": "f000007ffffe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
+      "occupiedCells": 50,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 836
+      },
+      "inkBounds": {
+        "left": 328,
+        "top": 75,
+        "width": 534,
+        "height": 805
+      }
+    },
+    "structured-multi-table-page-break#3": {
+      "fingerprintHex": "f000007ffffe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
+      "occupiedCells": 50,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 836
+      },
+      "inkBounds": {
+        "left": 328,
+        "top": 75,
+        "width": 534,
+        "height": 805
+      }
+    },
+    "synthetic-page-break#1": {
+      "fingerprintHex": "f000007ffffe4000024000024000024000027ffffe7ffffe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
+      "occupiedCells": 102,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 836
+      },
+      "inkBounds": {
+        "left": 328,
+        "top": 75,
+        "width": 534,
+        "height": 805
+      }
+    },
+    "synthetic-page-break#2": {
+      "fingerprintHex": "f000007ffffe4000024000024000024000027ffffe7ffffe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
+      "occupiedCells": 102,
+      "paperBounds": {
+        "left": 305,
+        "top": 59,
+        "width": 591,
+        "height": 836
+      },
+      "inkBounds": {
+        "left": 328,
+        "top": 75,
+        "width": 534,
+        "height": 805
+      }
+    }
+  }
+}

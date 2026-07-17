@@ -1,0 +1,1 @@
+{"main-desktop":{"identifier":"main-desktop","description":"Allow the main ExportDocManager desktop window to use Tauri IPC and desktop bridge commands.","remote":{"urls":["http://127.0.0.1:5173"]},"local":true,"windows":["main"],"permissions":["core:default","allow-desktop-bridge"]}}

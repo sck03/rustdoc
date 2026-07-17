@@ -1,0 +1,100 @@
+name: Cross-platform validation
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-validation:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64 + Windows ARM64 contract
+            os: windows-latest
+            x64_rid: win-x64
+            arm64_rid: win-arm64
+          - name: Linux x64 + Linux ARM64 contract
+            os: ubuntu-latest
+            x64_rid: linux-x64
+            arm64_rid: linux-arm64
+          - name: macOS native + macOS ARM64 contract
+            os: macos-latest
+            x64_rid: osx-x64
+            arm64_rid: osx-arm64
+
+    runs-on: ${{ matrix.os }}
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}/artifacts/nuget-packages
+      CARGO_TARGET_DIR: ${{ github.workspace }}/artifacts/cargo-target-exportdoc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            apps/export-doc-web/package-lock.json
+            apps/export-doc-tauri/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install web and Tauri dependencies
+        run: |
+          npm ci --prefix apps/export-doc-web
+          npm ci --prefix apps/export-doc-tauri
+
+      - name: Restore .NET projects
+        run: dotnet restore ExportDocManager.sln
+
+      - name: Build cross-platform backend layers
+        run: dotnet build src/ExportDocManager.Api/ExportDocManager.Api.csproj --no-restore -c Release -v minimal
+
+      - name: Validate x64 backend contract
+        run: dotnet build src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -c Release -r ${{ matrix.x64_rid }} -v minimal
+
+      - name: Validate ARM64 backend contract
+        run: dotnet build src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -c Release -r ${{ matrix.arm64_rid }} -v minimal
+
+      - name: Test portable runtime path contracts
+        run: >-
+          dotnet test tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj
+          --no-restore
+          -c Release
+          -m:1
+          -p:BuildInParallel=false
+          --filter "FullyQualifiedName~RuntimeAppPathProviderTests|FullyQualifiedName~InfrastructurePathPolicyTests|FullyQualifiedName~RuntimeDependencyDiagnosticsServiceTests"
+
+      - name: Build shared React frontend
+        run: npm --prefix apps/export-doc-web run build
+
+      - name: Prepare native Tauri sidecar and resources
+        run: npm --prefix apps/export-doc-tauri run prepare:bundle
+
+      - name: Check native Tauri shell
+        run: cargo check --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml
+
+      - name: Test native Tauri path contracts
+        run: cargo test --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml

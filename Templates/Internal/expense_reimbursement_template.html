@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>费用报销明细单</title>
+<style>
+    @page {
+        size: A4 portrait;
+        margin: 1cm;
+    }
+    *, *::before, *::after {
+        box-sizing: border-box;
+    }
+    html, body {
+        max-width: 100%;
+    }
+    body {
+        font-family: 'SimSun', '宋体', serif;
+        font-size: 14px;
+        margin: 20px;
+        overflow-wrap: anywhere;
+    }
+    .center-text {
+        text-align: center;
+    }
+    .company-title {
+        font-family: 'SimHei', '黑体', sans-serif;
+        font-size: 26px;
+        font-weight: bold;
+    }
+    .sub-title {
+        font-family: 'SimHei', '黑体', sans-serif;
+        font-size: 20px;
+        margin: 10px 0;
+    }
+    .header-info {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 8px 20px;
+        margin: 20px 0 10px 0; /* 上=20px, 右=0, 下=10px, 左=0 */
+        padding: 0 10px;
+    }
+    .date-fields span {
+        margin: 0 10px;
+    }
+    .main-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+    }
+    .main-table th, .main-table td {
+        border: 1px solid #474747;
+        border-bottom: none;
+        padding: 13px; /* 增加内边距以扩大行高 */
+        text-align: center;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+    .diag-header {
+        position: relative;
+        padding: 0;
+        vertical-align: middle;
+    }
+
+    .diag-header .diag-text-top {
+        position: absolute;
+        top: 6px;
+        right: 12px;
+    }
+    .diag-header .diag-text-bottom {
+        position: absolute;
+        bottom: 6px;
+        left: 12px;
+    }
+    .footer-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        margin-top: -1px; /* Overlap with main table border */
+    }
+    .footer-table td {
+        border: 1px solid #474747;
+        
+        padding: 10px;
+    }
+    .text-left {
+        text-align: left;
+    }
+    .text-right {
+        text-align: right;
+    }
+    .signature-row {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-start; /* 左对齐 */
+        gap: 10px 32px;
+    }
+    .signature-row span {
+        flex: 1 1 180px;
+        margin-right: 0;
+    }
+</style>
+</head>
+<body>
+
+<div class="center-text company-title">{{ Payment.PayerName }}</div>
+<div class="center-text sub-title">费用报销明细单</div>
+
+<div class="header-info">
+    <span>业务科别: {{ Payment.Department }}</span>
+    <span class="date-fields">
+        {{ Payment.PaymentDate | date.to_string "%Y" }} 年
+        <span>{{ Payment.PaymentDate | date.to_string "%m" }}</span> 月
+        <span>{{ Payment.PaymentDate | date.to_string "%d" }}</span> 日
+    </span>
+</div>
+
+<table class="main-table">
+    <thead>
+        <tr>
+            <th class="diag-header" style="width: 10%;">
+                <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="position: absolute; top: 0; left: 0;">
+                    <line x1="0" y1="0" x2="100%" y2="100%" stroke="#474747" stroke-width="1"></line>
+                </svg>
+                <span class="diag-text-top">项目</span>
+                <span class="diag-text-bottom"></span>
+            </th>
+            <th>差旅费</th>
+            <th>业务招待费</th>
+            <th>电话费</th>
+            <th>办公费</th>
+            <th>修理费</th>
+            <th>运杂费</th>
+            <th>检验费</th>
+            <th>其他</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>金额</td>
+            <td>{{ Payment.TravelExpense | math.format 'F2' }}</td>
+            <td>{{ Payment.BusinessEntertainmentExpense | math.format 'F2' }}</td>
+            <td>{{ Payment.TelephoneExpense | math.format 'F2' }}</td>
+            <td>{{ Payment.OfficeExpense | math.format 'F2' }}</td>
+            <td>{{ Payment.RepairExpense | math.format 'F2' }}</td>
+            <td>{{ Payment.FreightMiscExpense | math.format 'F2' }}</td>
+            <td>{{ Payment.InspectionExpense | math.format 'F2' }}</td>
+            <td>{{ Payment.OtherExpense | math.format 'F2' }}</td>
+        </tr>
+        <tr>
+            <td>附件(张)</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>{{ Payment.AttachmentsCount }}</td>
+        </tr>
+        <tr>
+            <td>备注</td>
+            <td colspan="8" class="text-left">{{ Payment.Notes }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<table class="footer-table">
+    <tr>
+        <td class="text-left" style="width: 75%; border-right: none;">报销净额: {{ cny_amount_upper }}</td>
+        <td class="text-left" style="width: 25%;border-left: none;">小计: ￥{{ Payment.CNYAmount | math.format 'F2' }}</td>
+    </tr>
+</table>
+
+<div class="signature-row">
+    <span>报销人:</span>
+    <span>主管签字:</span>
+    <span>审批签字:</span>
+</div>
+
+</body>
+</html>

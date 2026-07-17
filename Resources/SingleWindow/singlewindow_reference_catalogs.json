@@ -1,0 +1,4593 @@
+{
+  "countries": [
+    {
+      "code": "032",
+      "englishName": "ARGENTINA",
+      "chineseName": "阿根廷",
+      "aliases": [
+        "AR",
+        "ARG",
+        "ARGENTINA",
+        "阿根廷"
+      ]
+    },
+    {
+      "code": "036",
+      "englishName": "AUSTRALIA",
+      "chineseName": "澳大利亚",
+      "aliases": [
+        "AU",
+        "AUS",
+        "AUSTRALIA",
+        "澳大利亚"
+      ]
+    },
+    {
+      "code": "050",
+      "englishName": "BANGLADESH",
+      "chineseName": "孟加拉国",
+      "aliases": [
+        "BD",
+        "BGD",
+        "BANGLADESH",
+        "孟加拉",
+        "孟加拉国"
+      ]
+    },
+    {
+      "code": "056",
+      "englishName": "BELGIUM",
+      "chineseName": "比利时",
+      "aliases": [
+        "BE",
+        "BEL",
+        "BELGIUM",
+        "比利时"
+      ]
+    },
+    {
+      "code": "076",
+      "englishName": "BRAZIL",
+      "chineseName": "巴西",
+      "aliases": [
+        "BR",
+        "BRA",
+        "BRAZIL",
+        "巴西"
+      ]
+    },
+    {
+      "code": "104",
+      "englishName": "MYANMAR",
+      "chineseName": "缅甸",
+      "aliases": [
+        "MM",
+        "MMR",
+        "BURMA",
+        "MYANMAR",
+        "缅甸"
+      ]
+    },
+    {
+      "code": "116",
+      "englishName": "CAMBODIA",
+      "chineseName": "柬埔寨",
+      "aliases": [
+        "KH",
+        "KHM",
+        "CAMBODIA",
+        "柬埔寨"
+      ]
+    },
+    {
+      "code": "124",
+      "englishName": "CANADA",
+      "chineseName": "加拿大",
+      "aliases": [
+        "CA",
+        "CAN",
+        "CANADA",
+        "加拿大"
+      ]
+    },
+    {
+      "code": "144",
+      "englishName": "SRI LANKA",
+      "chineseName": "斯里兰卡",
+      "aliases": [
+        "LK",
+        "LKA",
+        "SRILANKA",
+        "斯里兰卡"
+      ]
+    },
+    {
+      "code": "152",
+      "englishName": "CHILE",
+      "chineseName": "智利",
+      "aliases": [
+        "CL",
+        "CHL",
+        "CHILE",
+        "智利"
+      ]
+    },
+    {
+      "code": "156",
+      "englishName": "CHINA",
+      "chineseName": "中国",
+      "aliases": [
+        "CN",
+        "CHN",
+        "PRC",
+        "CHINA",
+        "中国"
+      ]
+    },
+    {
+      "code": "158",
+      "englishName": "TAIWAN",
+      "chineseName": "中国台湾",
+      "aliases": [
+        "TW",
+        "TWN",
+        "TAIWAN",
+        "中国台湾",
+        "台湾"
+      ]
+    },
+    {
+      "code": "178",
+      "englishName": "CONGO",
+      "chineseName": "刚果(布)",
+      "aliases": [
+        "CG",
+        "COG",
+        "CONGO",
+        "REPUBLICOFCONGO",
+        "刚果",
+        "刚果布"
+      ]
+    },
+    {
+      "code": "188",
+      "englishName": "COSTA RICA",
+      "chineseName": "哥斯达黎加",
+      "aliases": [
+        "CR",
+        "CRI",
+        "COSTARICA",
+        "哥斯达黎加"
+      ]
+    },
+    {
+      "code": "203",
+      "englishName": "CZECH REPUBLIC",
+      "chineseName": "捷克",
+      "aliases": [
+        "CZ",
+        "CZE",
+        "CZECHIA",
+        "CZECHREPUBLIC",
+        "捷克"
+      ]
+    },
+    {
+      "code": "208",
+      "englishName": "DENMARK",
+      "chineseName": "丹麦",
+      "aliases": [
+        "DK",
+        "DNK",
+        "DENMARK",
+        "丹麦"
+      ]
+    },
+    {
+      "code": "218",
+      "englishName": "ECUADOR",
+      "chineseName": "厄瓜多尔",
+      "aliases": [
+        "EC",
+        "ECU",
+        "ECUADOR",
+        "厄瓜多尔"
+      ]
+    },
+    {
+      "code": "246",
+      "englishName": "FINLAND",
+      "chineseName": "芬兰",
+      "aliases": [
+        "FI",
+        "FIN",
+        "FINLAND",
+        "芬兰"
+      ]
+    },
+    {
+      "code": "250",
+      "englishName": "FRANCE",
+      "chineseName": "法国",
+      "aliases": [
+        "FR",
+        "FRA",
+        "FRANCE",
+        "法国"
+      ]
+    },
+    {
+      "code": "268",
+      "englishName": "GEORGIA",
+      "chineseName": "格鲁吉亚",
+      "aliases": [
+        "GE",
+        "GEO",
+        "GEORGIA",
+        "格鲁吉亚"
+      ]
+    },
+    {
+      "code": "276",
+      "englishName": "GERMANY",
+      "chineseName": "德国",
+      "aliases": [
+        "DE",
+        "DEU",
+        "GERMANY",
+        "德国"
+      ]
+    },
+    {
+      "code": "300",
+      "englishName": "GREECE",
+      "chineseName": "希腊",
+      "aliases": [
+        "GR",
+        "GRC",
+        "GREECE",
+        "希腊"
+      ]
+    },
+    {
+      "code": "340",
+      "englishName": "HONDURAS",
+      "chineseName": "洪都拉斯",
+      "aliases": [
+        "HN",
+        "HND",
+        "HONDURAS",
+        "洪都拉斯"
+      ]
+    },
+    {
+      "code": "344",
+      "englishName": "HONG KONG",
+      "chineseName": "中国香港",
+      "aliases": [
+        "HK",
+        "HKG",
+        "HONGKONG",
+        "香港",
+        "中国香港"
+      ]
+    },
+    {
+      "code": "348",
+      "englishName": "HUNGARY",
+      "chineseName": "匈牙利",
+      "aliases": [
+        "HU",
+        "HUN",
+        "HUNGARY",
+        "匈牙利"
+      ]
+    },
+    {
+      "code": "352",
+      "englishName": "ICELAND",
+      "chineseName": "冰岛",
+      "aliases": [
+        "IS",
+        "ISL",
+        "ICELAND",
+        "冰岛"
+      ]
+    },
+    {
+      "code": "356",
+      "englishName": "INDIA",
+      "chineseName": "印度",
+      "aliases": [
+        "IN",
+        "IND",
+        "INDIA",
+        "印度"
+      ]
+    },
+    {
+      "code": "360",
+      "englishName": "INDONESIA",
+      "chineseName": "印度尼西亚",
+      "aliases": [
+        "ID",
+        "IDN",
+        "INDONESIA",
+        "印尼",
+        "印度尼西亚"
+      ]
+    },
+    {
+      "code": "372",
+      "englishName": "IRELAND",
+      "chineseName": "爱尔兰",
+      "aliases": [
+        "IE",
+        "IRL",
+        "IRELAND",
+        "爱尔兰"
+      ]
+    },
+    {
+      "code": "376",
+      "englishName": "ISRAEL",
+      "chineseName": "以色列",
+      "aliases": [
+        "IL",
+        "ISR",
+        "ISRAEL",
+        "以色列"
+      ]
+    },
+    {
+      "code": "380",
+      "englishName": "ITALY",
+      "chineseName": "意大利",
+      "aliases": [
+        "IT",
+        "ITA",
+        "ITALY",
+        "意大利"
+      ]
+    },
+    {
+      "code": "392",
+      "englishName": "JAPAN",
+      "chineseName": "日本",
+      "aliases": [
+        "JP",
+        "JPN",
+        "JAPAN",
+        "日本"
+      ]
+    },
+    {
+      "code": "410",
+      "englishName": "KOREA",
+      "chineseName": "韩国",
+      "aliases": [
+        "KR",
+        "KOR",
+        "SOUTHKOREA",
+        "韩国",
+        "南韩"
+      ]
+    },
+    {
+      "code": "418",
+      "englishName": "LAOS",
+      "chineseName": "老挝",
+      "aliases": [
+        "LA",
+        "LAO",
+        "LAOS",
+        "老挝"
+      ]
+    },
+    {
+      "code": "442",
+      "englishName": "LUXEMBOURG",
+      "chineseName": "卢森堡",
+      "aliases": [
+        "LU",
+        "LUX",
+        "LUXEMBOURG",
+        "卢森堡"
+      ]
+    },
+    {
+      "code": "446",
+      "englishName": "MACAO",
+      "chineseName": "中国澳门",
+      "aliases": [
+        "MO",
+        "MAC",
+        "MACAO",
+        "MACAU",
+        "澳门",
+        "中国澳门"
+      ]
+    },
+    {
+      "code": "458",
+      "englishName": "MALAYSIA",
+      "chineseName": "马来西亚",
+      "aliases": [
+        "MY",
+        "MYS",
+        "MALAYSIA",
+        "马来西亚"
+      ]
+    },
+    {
+      "code": "462",
+      "englishName": "MALDIVES",
+      "chineseName": "马尔代夫",
+      "aliases": [
+        "MV",
+        "MDV",
+        "MALDIVES",
+        "马尔代夫"
+      ]
+    },
+    {
+      "code": "480",
+      "englishName": "MAURITIUS",
+      "chineseName": "毛里求斯",
+      "aliases": [
+        "MU",
+        "MUS",
+        "MAURITIUS",
+        "毛里求斯"
+      ]
+    },
+    {
+      "code": "484",
+      "englishName": "MEXICO",
+      "chineseName": "墨西哥",
+      "aliases": [
+        "MX",
+        "MEX",
+        "MEXICO",
+        "墨西哥"
+      ]
+    },
+    {
+      "code": "496",
+      "englishName": "MONGOLIA",
+      "chineseName": "蒙古",
+      "aliases": [
+        "MN",
+        "MNG",
+        "MONGOLIA",
+        "蒙古"
+      ]
+    },
+    {
+      "code": "528",
+      "englishName": "NETHERLANDS",
+      "chineseName": "荷兰",
+      "aliases": [
+        "NL",
+        "NLD",
+        "NETHERLANDS",
+        "荷兰"
+      ]
+    },
+    {
+      "code": "554",
+      "englishName": "NEW ZEALAND",
+      "chineseName": "新西兰",
+      "aliases": [
+        "NZ",
+        "NZL",
+        "NEWZEALAND",
+        "新西兰"
+      ]
+    },
+    {
+      "code": "558",
+      "englishName": "NICARAGUA",
+      "chineseName": "尼加拉瓜",
+      "aliases": [
+        "NI",
+        "NIC",
+        "NICARAGUA",
+        "尼加拉瓜"
+      ]
+    },
+    {
+      "code": "578",
+      "englishName": "NORWAY",
+      "chineseName": "挪威",
+      "aliases": [
+        "NO",
+        "NOR",
+        "NORWAY",
+        "挪威"
+      ]
+    },
+    {
+      "code": "586",
+      "englishName": "PAKISTAN",
+      "chineseName": "巴基斯坦",
+      "aliases": [
+        "PK",
+        "PAK",
+        "PAKISTAN",
+        "巴基斯坦"
+      ]
+    },
+    {
+      "code": "604",
+      "englishName": "PERU",
+      "chineseName": "秘鲁",
+      "aliases": [
+        "PE",
+        "PER",
+        "PERU",
+        "秘鲁"
+      ]
+    },
+    {
+      "code": "608",
+      "englishName": "PHILIPPINES",
+      "chineseName": "菲律宾",
+      "aliases": [
+        "PH",
+        "PHL",
+        "PHILIPPINES",
+        "菲律宾"
+      ]
+    },
+    {
+      "code": "616",
+      "englishName": "POLAND",
+      "chineseName": "波兰",
+      "aliases": [
+        "PL",
+        "POL",
+        "POLAND",
+        "波兰"
+      ]
+    },
+    {
+      "code": "620",
+      "englishName": "PORTUGAL",
+      "chineseName": "葡萄牙",
+      "aliases": [
+        "PT",
+        "PRT",
+        "PORTUGAL",
+        "葡萄牙"
+      ]
+    },
+    {
+      "code": "642",
+      "englishName": "ROMANIA",
+      "chineseName": "罗马尼亚",
+      "aliases": [
+        "RO",
+        "ROU",
+        "ROMANIA",
+        "罗马尼亚"
+      ]
+    },
+    {
+      "code": "643",
+      "englishName": "RUSSIA",
+      "chineseName": "俄罗斯",
+      "aliases": [
+        "RU",
+        "RUS",
+        "RUSSIA",
+        "俄罗斯"
+      ]
+    },
+    {
+      "code": "688",
+      "englishName": "SERBIA",
+      "chineseName": "塞尔维亚",
+      "aliases": [
+        "RS",
+        "SRB",
+        "SERBIA",
+        "塞尔维亚"
+      ]
+    },
+    {
+      "code": "682",
+      "englishName": "SAUDI ARABIA",
+      "chineseName": "沙特阿拉伯",
+      "aliases": [
+        "SA",
+        "SAU",
+        "SAUDIARABIA",
+        "沙特",
+        "沙特阿拉伯"
+      ]
+    },
+    {
+      "code": "702",
+      "englishName": "SINGAPORE",
+      "chineseName": "新加坡",
+      "aliases": [
+        "SG",
+        "SGP",
+        "SINGAPORE",
+        "新加坡"
+      ]
+    },
+    {
+      "code": "704",
+      "englishName": "VIETNAM",
+      "chineseName": "越南",
+      "aliases": [
+        "VN",
+        "VNM",
+        "VIETNAM",
+        "越南"
+      ]
+    },
+    {
+      "code": "710",
+      "englishName": "SOUTH AFRICA",
+      "chineseName": "南非",
+      "aliases": [
+        "ZA",
+        "ZAF",
+        "SOUTHAFRICA",
+        "南非"
+      ]
+    },
+    {
+      "code": "724",
+      "englishName": "SPAIN",
+      "chineseName": "西班牙",
+      "aliases": [
+        "ES",
+        "ESP",
+        "SPAIN",
+        "西班牙"
+      ]
+    },
+    {
+      "code": "752",
+      "englishName": "SWEDEN",
+      "chineseName": "瑞典",
+      "aliases": [
+        "SE",
+        "SWE",
+        "SWEDEN",
+        "瑞典"
+      ]
+    },
+    {
+      "code": "756",
+      "englishName": "SWITZERLAND",
+      "chineseName": "瑞士",
+      "aliases": [
+        "CH",
+        "CHE",
+        "SWITZERLAND",
+        "瑞士"
+      ]
+    },
+    {
+      "code": "764",
+      "englishName": "THAILAND",
+      "chineseName": "泰国",
+      "aliases": [
+        "TH",
+        "THA",
+        "THAILAND",
+        "泰国"
+      ]
+    },
+    {
+      "code": "784",
+      "englishName": "UNITED ARAB EMIRATES",
+      "chineseName": "阿联酋",
+      "aliases": [
+        "AE",
+        "ARE",
+        "UAE",
+        "UNITEDARABEMIRATES",
+        "阿联酋"
+      ]
+    },
+    {
+      "code": "792",
+      "englishName": "TURKIYE",
+      "chineseName": "土耳其",
+      "aliases": [
+        "TR",
+        "TUR",
+        "TURKEY",
+        "TURKIYE",
+        "土耳其"
+      ]
+    },
+    {
+      "code": "818",
+      "englishName": "EGYPT",
+      "chineseName": "埃及",
+      "aliases": [
+        "EG",
+        "EGY",
+        "EGYPT",
+        "埃及"
+      ]
+    },
+    {
+      "code": "826",
+      "englishName": "UNITED KINGDOM",
+      "chineseName": "英国",
+      "aliases": [
+        "GB",
+        "GBR",
+        "UK",
+        "UNITEDKINGDOM",
+        "英国"
+      ]
+    },
+    {
+      "code": "840",
+      "englishName": "UNITED STATES",
+      "chineseName": "美国",
+      "aliases": [
+        "US",
+        "USA",
+        "UNITEDSTATES",
+        "美国"
+      ]
+    }
+  ],
+  "currencies": [
+    {
+      "code": "032",
+      "acdCode": "",
+      "alphaCode": "ARS",
+      "aliases": [
+        "ARGENTINEPESO",
+        "阿根廷比索"
+      ]
+    },
+    {
+      "code": "036",
+      "acdCode": "601",
+      "alphaCode": "AUD",
+      "aliases": [
+        "AUSTRALIANDOLLAR",
+        "澳元"
+      ]
+    },
+    {
+      "code": "050",
+      "acdCode": "",
+      "alphaCode": "BDT",
+      "aliases": [
+        "TAKA",
+        "孟加拉塔卡"
+      ]
+    },
+    {
+      "code": "116",
+      "acdCode": "",
+      "alphaCode": "KHR",
+      "aliases": [
+        "RIEL",
+        "柬埔寨瑞尔"
+      ]
+    },
+    {
+      "code": "124",
+      "acdCode": "501",
+      "alphaCode": "CAD",
+      "aliases": [
+        "CANADIANDOLLAR",
+        "加元"
+      ]
+    },
+    {
+      "code": "144",
+      "acdCode": "",
+      "alphaCode": "LKR",
+      "aliases": [
+        "SRILANKANRUPEE",
+        "斯里兰卡卢比"
+      ]
+    },
+    {
+      "code": "152",
+      "acdCode": "",
+      "alphaCode": "CLP",
+      "aliases": [
+        "CHILEANPESO",
+        "智利比索"
+      ]
+    },
+    {
+      "code": "156",
+      "acdCode": "142",
+      "alphaCode": "CNY",
+      "aliases": [
+        "RMB",
+        "RENMINBI",
+        "YUAN",
+        "人民币"
+      ]
+    },
+    {
+      "code": "188",
+      "acdCode": "",
+      "alphaCode": "CRC",
+      "aliases": [
+        "COLON",
+        "哥斯达黎加科朗"
+      ]
+    },
+    {
+      "code": "203",
+      "acdCode": "",
+      "alphaCode": "CZK",
+      "aliases": [
+        "CZECHKORUNA",
+        "捷克克朗"
+      ]
+    },
+    {
+      "code": "208",
+      "acdCode": "302",
+      "alphaCode": "DKK",
+      "aliases": [
+        "DANISHKRONE",
+        "丹麦克朗"
+      ]
+    },
+    {
+      "code": "268",
+      "acdCode": "",
+      "alphaCode": "GEL",
+      "aliases": [
+        "LARI",
+        "格鲁吉亚拉里"
+      ]
+    },
+    {
+      "code": "344",
+      "acdCode": "110",
+      "alphaCode": "HKD",
+      "aliases": [
+        "HONGKONGDOLLAR",
+        "港币",
+        "港元"
+      ]
+    },
+    {
+      "code": "348",
+      "acdCode": "",
+      "alphaCode": "HUF",
+      "aliases": [
+        "FORINT",
+        "匈牙利福林"
+      ]
+    },
+    {
+      "code": "352",
+      "acdCode": "",
+      "alphaCode": "ISK",
+      "aliases": [
+        "ICELANDKRONA",
+        "冰岛克朗"
+      ]
+    },
+    {
+      "code": "356",
+      "acdCode": "",
+      "alphaCode": "INR",
+      "aliases": [
+        "INDIANRUPEE",
+        "印度卢比"
+      ]
+    },
+    {
+      "code": "360",
+      "acdCode": "",
+      "alphaCode": "IDR",
+      "aliases": [
+        "INDONESIANRUPIAH",
+        "印尼盾"
+      ]
+    },
+    {
+      "code": "376",
+      "acdCode": "",
+      "alphaCode": "ILS",
+      "aliases": [
+        "ISRAELISHEKEL",
+        "以色列新谢克尔",
+        "新谢克尔"
+      ]
+    },
+    {
+      "code": "392",
+      "acdCode": "116",
+      "alphaCode": "JPY",
+      "aliases": [
+        "YEN",
+        "日元"
+      ]
+    },
+    {
+      "code": "410",
+      "acdCode": "133",
+      "alphaCode": "KRW",
+      "aliases": [
+        "WON",
+        "韩元"
+      ]
+    },
+    {
+      "code": "418",
+      "acdCode": "",
+      "alphaCode": "LAK",
+      "aliases": [
+        "KIP",
+        "老挝基普"
+      ]
+    },
+    {
+      "code": "458",
+      "acdCode": "",
+      "alphaCode": "MYR",
+      "aliases": [
+        "RINGGIT",
+        "马币",
+        "林吉特"
+      ]
+    },
+    {
+      "code": "462",
+      "acdCode": "",
+      "alphaCode": "MVR",
+      "aliases": [
+        "RUFIYAA",
+        "马尔代夫拉菲亚"
+      ]
+    },
+    {
+      "code": "480",
+      "acdCode": "",
+      "alphaCode": "MUR",
+      "aliases": [
+        "MAURITIANRUPEE",
+        "毛里求斯卢比"
+      ]
+    },
+    {
+      "code": "484",
+      "acdCode": "",
+      "alphaCode": "MXN",
+      "aliases": [
+        "MEXICANPESO",
+        "墨西哥比索"
+      ]
+    },
+    {
+      "code": "554",
+      "acdCode": "609",
+      "alphaCode": "NZD",
+      "aliases": [
+        "NEWZEALANDDOLLAR",
+        "新西兰元"
+      ]
+    },
+    {
+      "code": "558",
+      "acdCode": "",
+      "alphaCode": "NIO",
+      "aliases": [
+        "CORDOBA",
+        "尼加拉瓜科多巴"
+      ]
+    },
+    {
+      "code": "578",
+      "acdCode": "326",
+      "alphaCode": "NOK",
+      "aliases": [
+        "NORWEGIANKRONE",
+        "挪威克朗"
+      ]
+    },
+    {
+      "code": "586",
+      "acdCode": "",
+      "alphaCode": "PKR",
+      "aliases": [
+        "PAKISTANIRUPEE",
+        "巴基斯坦卢比"
+      ]
+    },
+    {
+      "code": "604",
+      "acdCode": "",
+      "alphaCode": "PEN",
+      "aliases": [
+        "SOL",
+        "秘鲁索尔"
+      ]
+    },
+    {
+      "code": "608",
+      "acdCode": "129",
+      "alphaCode": "PHP",
+      "aliases": [
+        "PESO",
+        "菲律宾比索"
+      ]
+    },
+    {
+      "code": "688",
+      "acdCode": "",
+      "alphaCode": "RSD",
+      "aliases": [
+        "SERBIANDINAR",
+        "塞尔维亚第纳尔"
+      ]
+    },
+    {
+      "code": "702",
+      "acdCode": "132",
+      "alphaCode": "SGD",
+      "aliases": [
+        "SINGAPOREDOLLAR",
+        "新加坡元"
+      ]
+    },
+    {
+      "code": "710",
+      "acdCode": "",
+      "alphaCode": "ZAR",
+      "aliases": [
+        "RAND",
+        "南非兰特"
+      ]
+    },
+    {
+      "code": "752",
+      "acdCode": "330",
+      "alphaCode": "SEK",
+      "aliases": [
+        "SWEDISHKRONA",
+        "瑞典克朗"
+      ]
+    },
+    {
+      "code": "756",
+      "acdCode": "331",
+      "alphaCode": "CHF",
+      "aliases": [
+        "SWISSFRANC",
+        "瑞士法郎"
+      ]
+    },
+    {
+      "code": "764",
+      "acdCode": "136",
+      "alphaCode": "THB",
+      "aliases": [
+        "BAHT",
+        "泰铢"
+      ]
+    },
+    {
+      "code": "784",
+      "acdCode": "",
+      "alphaCode": "AED",
+      "aliases": [
+        "DIRHAM",
+        "阿联酋迪拉姆",
+        "迪拉姆"
+      ]
+    },
+    {
+      "code": "818",
+      "acdCode": "",
+      "alphaCode": "EGP",
+      "aliases": [
+        "EGYPTIANPOUND",
+        "埃及镑"
+      ]
+    },
+    {
+      "code": "826",
+      "acdCode": "303",
+      "alphaCode": "GBP",
+      "aliases": [
+        "POUND",
+        "英镑"
+      ]
+    },
+    {
+      "code": "840",
+      "acdCode": "502",
+      "alphaCode": "USD",
+      "aliases": [
+        "DOLLAR",
+        "美金",
+        "美元"
+      ]
+    },
+    {
+      "code": "978",
+      "acdCode": "300",
+      "alphaCode": "EUR",
+      "aliases": [
+        "EURO",
+        "欧元"
+      ]
+    },
+    {
+      "code": "986",
+      "acdCode": "",
+      "alphaCode": "BRL",
+      "aliases": [
+        "BRAZILIANREAL",
+        "巴西雷亚尔"
+      ]
+    }
+  ],
+  "transportModes": [
+    {
+      "value": "BY SEA",
+      "aliases": [
+        "SEA",
+        "OCEAN",
+        "VESSEL",
+        "SHIP",
+        "海运",
+        "船运",
+        "水运"
+      ]
+    },
+    {
+      "value": "BY AIR",
+      "aliases": [
+        "AIR",
+        "AIRPLANE",
+        "FLIGHT",
+        "空运"
+      ]
+    },
+    {
+      "value": "BY RAIL",
+      "aliases": [
+        "RAIL",
+        "TRAIN",
+        "铁运",
+        "铁路"
+      ]
+    },
+    {
+      "value": "BY TRUCK",
+      "aliases": [
+        "TRUCK",
+        "ROAD",
+        "汽运",
+        "陆运",
+        "公路"
+      ]
+    },
+    {
+      "value": "BY POST",
+      "aliases": [
+        "MAIL",
+        "POST",
+        "邮寄",
+        "邮政"
+      ]
+    }
+  ],
+  "ports": [
+    {
+      "value": "NINGBO",
+      "aliases": [
+        "宁波",
+        "NINGBOCHINA",
+        "NINGBO PORT"
+      ]
+    },
+    {
+      "value": "SHANGHAI",
+      "aliases": [
+        "上海",
+        "SHANGHAICHINA",
+        "SHANGHAI PORT"
+      ]
+    },
+    {
+      "value": "QINGDAO",
+      "aliases": [
+        "青岛",
+        "QINGDAOCHINA",
+        "QINGDAO PORT"
+      ]
+    },
+    {
+      "value": "XIAMEN",
+      "aliases": [
+        "厦门",
+        "XIAMENCHINA",
+        "XIAMEN PORT"
+      ]
+    },
+    {
+      "value": "SHENZHEN",
+      "aliases": [
+        "深圳",
+        "YANTIAN",
+        "SHEKOU",
+        "SHENZHENCHINA"
+      ]
+    },
+    {
+      "value": "GUANGZHOU",
+      "aliases": [
+        "广州",
+        "NANSHA",
+        "GUANGZHOUCHINA"
+      ]
+    },
+    {
+      "value": "TIANJIN",
+      "aliases": [
+        "天津",
+        "TIANJINCHINA"
+      ]
+    },
+    {
+      "value": "DALIAN",
+      "aliases": [
+        "大连",
+        "DALIANCHINA"
+      ]
+    },
+    {
+      "value": "JAKARTA",
+      "aliases": [
+        "雅加达",
+        "TANJUNGPRIOK"
+      ]
+    },
+    {
+      "value": "SINGAPORE",
+      "aliases": [
+        "新加坡"
+      ]
+    },
+    {
+      "value": "BUSAN",
+      "aliases": [
+        "釜山",
+        "PUSAN"
+      ]
+    },
+    {
+      "value": "TOKYO",
+      "aliases": [
+        "东京"
+      ]
+    },
+    {
+      "value": "OSAKA",
+      "aliases": [
+        "大阪"
+      ]
+    },
+    {
+      "value": "LOS ANGELES",
+      "aliases": [
+        "洛杉矶",
+        "LOSANGELES"
+      ]
+    },
+    {
+      "value": "LONG BEACH",
+      "aliases": [
+        "长滩",
+        "LONGBEACH"
+      ]
+    },
+    {
+      "value": "NEW YORK",
+      "aliases": [
+        "纽约",
+        "NEWYORK"
+      ]
+    },
+    {
+      "value": "HAMBURG",
+      "aliases": [
+        "汉堡"
+      ]
+    },
+    {
+      "value": "ROTTERDAM",
+      "aliases": [
+        "鹿特丹"
+      ]
+    },
+    {
+      "value": "DUBAI",
+      "aliases": [
+        "迪拜",
+        "JEBELALI",
+        "JEBEL ALI"
+      ]
+    },
+    {
+      "value": "HO CHI MINH",
+      "aliases": [
+        "胡志明",
+        "HOCHIMINH",
+        "SAIGON"
+      ]
+    },
+    {
+      "value": "BANGKOK",
+      "aliases": [
+        "曼谷",
+        "LAEMCHABANG",
+        "LAEM CHABANG"
+      ]
+    },
+    {
+      "value": "MANILA",
+      "aliases": [
+        "马尼拉"
+      ]
+    },
+    {
+      "value": "HAIPHONG",
+      "aliases": [
+        "海防",
+        "HAI PHONG"
+      ]
+    }
+  ],
+  "acdCountries": [
+    {
+      "code": "101",
+      "chineseName": "阿富汗",
+      "englishName": "Afghanistan",
+      "aliases": [
+        "阿富汗",
+        "Afghanistan"
+      ]
+    },
+    {
+      "code": "102",
+      "chineseName": "巴林",
+      "englishName": "Bahrian",
+      "aliases": [
+        "巴林",
+        "Bahrian"
+      ]
+    },
+    {
+      "code": "103",
+      "chineseName": "孟加拉国",
+      "englishName": "Bangladesh",
+      "aliases": [
+        "孟加拉国",
+        "Bangladesh",
+        "BANGLADESH",
+        "BD",
+        "BGD",
+        "孟加拉"
+      ]
+    },
+    {
+      "code": "104",
+      "chineseName": "不丹",
+      "englishName": "Bhutan",
+      "aliases": [
+        "不丹",
+        "Bhutan"
+      ]
+    },
+    {
+      "code": "105",
+      "chineseName": "文莱",
+      "englishName": "Brunei",
+      "aliases": [
+        "文莱",
+        "Brunei"
+      ]
+    },
+    {
+      "code": "106",
+      "chineseName": "缅甸",
+      "englishName": "Myanmar",
+      "aliases": [
+        "缅甸",
+        "Myanmar",
+        "BURMA",
+        "MM",
+        "MMR",
+        "MYANMAR"
+      ]
+    },
+    {
+      "code": "107",
+      "chineseName": "柬埔寨",
+      "englishName": "Cambodia",
+      "aliases": [
+        "柬埔寨",
+        "Cambodia",
+        "CAMBODIA",
+        "KH",
+        "KHM"
+      ]
+    },
+    {
+      "code": "108",
+      "chineseName": "塞浦路斯",
+      "englishName": "Cyprus",
+      "aliases": [
+        "塞浦路斯",
+        "Cyprus"
+      ]
+    },
+    {
+      "code": "109",
+      "chineseName": "朝鲜",
+      "englishName": "Korea,DPR",
+      "aliases": [
+        "朝鲜",
+        "Korea,DPR"
+      ]
+    },
+    {
+      "code": "110",
+      "chineseName": "香港",
+      "englishName": "Hong Kong",
+      "aliases": [
+        "香港",
+        "Hong Kong",
+        "HK",
+        "HKG",
+        "HONG KONG",
+        "HONGKONG",
+        "中国香港"
+      ]
+    },
+    {
+      "code": "111",
+      "chineseName": "印度",
+      "englishName": "India",
+      "aliases": [
+        "印度",
+        "India",
+        "IN",
+        "IND",
+        "INDIA"
+      ]
+    },
+    {
+      "code": "112",
+      "chineseName": "印度尼西亚",
+      "englishName": "Indonesia",
+      "aliases": [
+        "印度尼西亚",
+        "Indonesia",
+        "ID",
+        "IDN",
+        "INDONESIA",
+        "印尼"
+      ]
+    },
+    {
+      "code": "113",
+      "chineseName": "伊朗",
+      "englishName": "Iran",
+      "aliases": [
+        "伊朗",
+        "Iran"
+      ]
+    },
+    {
+      "code": "114",
+      "chineseName": "伊拉克",
+      "englishName": "Iraq",
+      "aliases": [
+        "伊拉克",
+        "Iraq"
+      ]
+    },
+    {
+      "code": "115",
+      "chineseName": "以色列",
+      "englishName": "Israel",
+      "aliases": [
+        "以色列",
+        "Israel",
+        "IL",
+        "ISR",
+        "ISRAEL"
+      ]
+    },
+    {
+      "code": "116",
+      "chineseName": "日本",
+      "englishName": "Japan",
+      "aliases": [
+        "日本",
+        "Japan",
+        "JAPAN",
+        "JP",
+        "JPN"
+      ]
+    },
+    {
+      "code": "117",
+      "chineseName": "约旦",
+      "englishName": "Jordan",
+      "aliases": [
+        "约旦",
+        "Jordan"
+      ]
+    },
+    {
+      "code": "118",
+      "chineseName": "科威特",
+      "englishName": "Kuwait",
+      "aliases": [
+        "科威特",
+        "Kuwait"
+      ]
+    },
+    {
+      "code": "119",
+      "chineseName": "老挝",
+      "englishName": "Lao PDR",
+      "aliases": [
+        "老挝",
+        "Lao PDR",
+        "LA",
+        "LAO",
+        "LAOS"
+      ]
+    },
+    {
+      "code": "120",
+      "chineseName": "黎巴嫩",
+      "englishName": "Lebanon",
+      "aliases": [
+        "黎巴嫩",
+        "Lebanon"
+      ]
+    },
+    {
+      "code": "121",
+      "chineseName": "澳门",
+      "englishName": "Macau",
+      "aliases": [
+        "澳门",
+        "Macau",
+        "MAC",
+        "MACAO",
+        "MACAU",
+        "MO",
+        "中国澳门"
+      ]
+    },
+    {
+      "code": "122",
+      "chineseName": "马来西亚",
+      "englishName": "Malaysia",
+      "aliases": [
+        "马来西亚",
+        "Malaysia",
+        "MALAYSIA",
+        "MY",
+        "MYS"
+      ]
+    },
+    {
+      "code": "123",
+      "chineseName": "马尔代夫",
+      "englishName": "Maldives",
+      "aliases": [
+        "马尔代夫",
+        "Maldives",
+        "MALDIVES",
+        "MDV",
+        "MV"
+      ]
+    },
+    {
+      "code": "124",
+      "chineseName": "蒙古",
+      "englishName": "Mongolia",
+      "aliases": [
+        "蒙古",
+        "Mongolia",
+        "MN",
+        "MNG",
+        "MONGOLIA"
+      ]
+    },
+    {
+      "code": "125",
+      "chineseName": "尼泊尔联邦民主共和国",
+      "englishName": "Nepal, FDR",
+      "aliases": [
+        "尼泊尔联邦民主共和国",
+        "Nepal, FDR"
+      ]
+    },
+    {
+      "code": "126",
+      "chineseName": "阿曼",
+      "englishName": "Oman",
+      "aliases": [
+        "阿曼",
+        "Oman"
+      ]
+    },
+    {
+      "code": "127",
+      "chineseName": "巴基斯坦",
+      "englishName": "Pakistan",
+      "aliases": [
+        "巴基斯坦",
+        "Pakistan",
+        "PAK",
+        "PAKISTAN",
+        "PK"
+      ]
+    },
+    {
+      "code": "128",
+      "chineseName": "巴勒斯坦",
+      "englishName": "Palestine",
+      "aliases": [
+        "巴勒斯坦",
+        "Palestine"
+      ]
+    },
+    {
+      "code": "129",
+      "chineseName": "菲律宾",
+      "englishName": "Philippines",
+      "aliases": [
+        "菲律宾",
+        "Philippines",
+        "PH",
+        "PHILIPPINES",
+        "PHL"
+      ]
+    },
+    {
+      "code": "130",
+      "chineseName": "卡塔尔",
+      "englishName": "Qatar",
+      "aliases": [
+        "卡塔尔",
+        "Qatar"
+      ]
+    },
+    {
+      "code": "131",
+      "chineseName": "沙特阿拉伯",
+      "englishName": "Saudi Arabia",
+      "aliases": [
+        "沙特阿拉伯",
+        "Saudi Arabia",
+        "SA",
+        "SAU",
+        "SAUDI ARABIA",
+        "SAUDIARABIA",
+        "沙特"
+      ]
+    },
+    {
+      "code": "132",
+      "chineseName": "新加坡",
+      "englishName": "Singapore",
+      "aliases": [
+        "新加坡",
+        "Singapore",
+        "SG",
+        "SGP",
+        "SINGAPORE"
+      ]
+    },
+    {
+      "code": "133",
+      "chineseName": "韩国",
+      "englishName": "Korea, Rep.",
+      "aliases": [
+        "韩国",
+        "Korea, Rep.",
+        "KOR",
+        "KOREA",
+        "KR",
+        "SOUTHKOREA",
+        "南韩"
+      ]
+    },
+    {
+      "code": "134",
+      "chineseName": "斯里兰卡",
+      "englishName": "Sri Lanka",
+      "aliases": [
+        "斯里兰卡",
+        "Sri Lanka",
+        "LK",
+        "LKA",
+        "SRI LANKA",
+        "SRILANKA"
+      ]
+    },
+    {
+      "code": "135",
+      "chineseName": "叙利亚",
+      "englishName": "Syrian Arab Republic",
+      "aliases": [
+        "叙利亚",
+        "Syrian Arab Republic"
+      ]
+    },
+    {
+      "code": "136",
+      "chineseName": "泰国",
+      "englishName": "Thailand",
+      "aliases": [
+        "泰国",
+        "Thailand",
+        "TH",
+        "THA",
+        "THAILAND"
+      ]
+    },
+    {
+      "code": "137",
+      "chineseName": "土耳其",
+      "englishName": "Turkey",
+      "aliases": [
+        "土耳其",
+        "Turkey",
+        "TR",
+        "TUR",
+        "TURKEY",
+        "TURKIYE"
+      ]
+    },
+    {
+      "code": "138",
+      "chineseName": "阿联酋",
+      "englishName": "United Arab Emirates",
+      "aliases": [
+        "阿联酋",
+        "United Arab Emirates",
+        "AE",
+        "ARE",
+        "UAE",
+        "UNITED ARAB EMIRATES",
+        "UNITEDARABEMIRATES"
+      ]
+    },
+    {
+      "code": "139",
+      "chineseName": "也门",
+      "englishName": "Yemen",
+      "aliases": [
+        "也门",
+        "Yemen"
+      ]
+    },
+    {
+      "code": "141",
+      "chineseName": "越南",
+      "englishName": "Viet Nam",
+      "aliases": [
+        "越南",
+        "Viet Nam",
+        "VIETNAM",
+        "VN",
+        "VNM"
+      ]
+    },
+    {
+      "code": "142",
+      "chineseName": "中国",
+      "englishName": "China",
+      "aliases": [
+        "中国",
+        "China",
+        "CHINA",
+        "CHN",
+        "CN",
+        "PRC"
+      ]
+    },
+    {
+      "code": "143",
+      "chineseName": "台澎金马关税区",
+      "englishName": "Taiwan, Prov.of China",
+      "aliases": [
+        "台澎金马关税区",
+        "Taiwan, Prov.of China"
+      ]
+    },
+    {
+      "code": "144",
+      "chineseName": "东帝汶",
+      "englishName": "Timor-Leste",
+      "aliases": [
+        "东帝汶",
+        "Timor-Leste"
+      ]
+    },
+    {
+      "code": "145",
+      "chineseName": "哈萨克斯坦",
+      "englishName": "Kazakhstan",
+      "aliases": [
+        "哈萨克斯坦",
+        "Kazakhstan"
+      ]
+    },
+    {
+      "code": "146",
+      "chineseName": "吉尔吉斯斯坦",
+      "englishName": "Kyrgyzstan",
+      "aliases": [
+        "吉尔吉斯斯坦",
+        "Kyrgyzstan"
+      ]
+    },
+    {
+      "code": "147",
+      "chineseName": "塔吉克斯坦",
+      "englishName": "Tajikistan",
+      "aliases": [
+        "塔吉克斯坦",
+        "Tajikistan"
+      ]
+    },
+    {
+      "code": "148",
+      "chineseName": "土库曼斯坦",
+      "englishName": "Turkmenistan",
+      "aliases": [
+        "土库曼斯坦",
+        "Turkmenistan"
+      ]
+    },
+    {
+      "code": "149",
+      "chineseName": "乌兹别克斯坦",
+      "englishName": "Uzbekistan",
+      "aliases": [
+        "乌兹别克斯坦",
+        "Uzbekistan"
+      ]
+    },
+    {
+      "code": "199",
+      "chineseName": "亚洲其他国家(地区)",
+      "englishName": "Oth. Asia nes",
+      "aliases": [
+        "亚洲其他国家(地区)",
+        "Oth. Asia nes"
+      ]
+    },
+    {
+      "code": "201",
+      "chineseName": "阿尔及利亚",
+      "englishName": "Algeria",
+      "aliases": [
+        "阿尔及利亚",
+        "Algeria"
+      ]
+    },
+    {
+      "code": "202",
+      "chineseName": "安哥拉",
+      "englishName": "Angola",
+      "aliases": [
+        "安哥拉",
+        "Angola"
+      ]
+    },
+    {
+      "code": "203",
+      "chineseName": "贝宁",
+      "englishName": "Benin",
+      "aliases": [
+        "贝宁",
+        "Benin"
+      ]
+    },
+    {
+      "code": "204",
+      "chineseName": "博茨瓦那",
+      "englishName": "Botswana",
+      "aliases": [
+        "博茨瓦那",
+        "Botswana"
+      ]
+    },
+    {
+      "code": "205",
+      "chineseName": "布隆迪",
+      "englishName": "Burundi",
+      "aliases": [
+        "布隆迪",
+        "Burundi"
+      ]
+    },
+    {
+      "code": "206",
+      "chineseName": "喀麦隆",
+      "englishName": "Cameroon",
+      "aliases": [
+        "喀麦隆",
+        "Cameroon"
+      ]
+    },
+    {
+      "code": "207",
+      "chineseName": "加那利群岛",
+      "englishName": "Canary Islands",
+      "aliases": [
+        "加那利群岛",
+        "Canary Islands"
+      ]
+    },
+    {
+      "code": "208",
+      "chineseName": "佛得角",
+      "englishName": "Cape Verde",
+      "aliases": [
+        "佛得角",
+        "Cape Verde"
+      ]
+    },
+    {
+      "code": "209",
+      "chineseName": "中非",
+      "englishName": "Central African Republic.",
+      "aliases": [
+        "中非",
+        "Central African Republic."
+      ]
+    },
+    {
+      "code": "210",
+      "chineseName": "塞卜泰(休达)",
+      "englishName": "Ceuta",
+      "aliases": [
+        "塞卜泰(休达)",
+        "Ceuta"
+      ]
+    },
+    {
+      "code": "211",
+      "chineseName": "乍得",
+      "englishName": "Chad",
+      "aliases": [
+        "乍得",
+        "Chad"
+      ]
+    },
+    {
+      "code": "212",
+      "chineseName": "科摩罗",
+      "englishName": "Comoros",
+      "aliases": [
+        "科摩罗",
+        "Comoros"
+      ]
+    },
+    {
+      "code": "213",
+      "chineseName": "刚果(布)",
+      "englishName": "Congo",
+      "aliases": [
+        "刚果(布)",
+        "Congo",
+        "CG",
+        "COG",
+        "CONGO",
+        "REPUBLICOFCONGO",
+        "刚果",
+        "刚果布"
+      ]
+    },
+    {
+      "code": "214",
+      "chineseName": "吉布提",
+      "englishName": "Djibouti",
+      "aliases": [
+        "吉布提",
+        "Djibouti"
+      ]
+    },
+    {
+      "code": "215",
+      "chineseName": "埃及",
+      "englishName": "Egypt",
+      "aliases": [
+        "埃及",
+        "Egypt",
+        "EG",
+        "EGY",
+        "EGYPT"
+      ]
+    },
+    {
+      "code": "216",
+      "chineseName": "赤道几内亚",
+      "englishName": "Equatorial Guinea",
+      "aliases": [
+        "赤道几内亚",
+        "Equatorial Guinea"
+      ]
+    },
+    {
+      "code": "217",
+      "chineseName": "埃塞俄比亚",
+      "englishName": "Ethiopia",
+      "aliases": [
+        "埃塞俄比亚",
+        "Ethiopia"
+      ]
+    },
+    {
+      "code": "218",
+      "chineseName": "加蓬",
+      "englishName": "Gabon",
+      "aliases": [
+        "加蓬",
+        "Gabon"
+      ]
+    },
+    {
+      "code": "219",
+      "chineseName": "冈比亚",
+      "englishName": "Gambia",
+      "aliases": [
+        "冈比亚",
+        "Gambia"
+      ]
+    },
+    {
+      "code": "220",
+      "chineseName": "加纳",
+      "englishName": "Ghana",
+      "aliases": [
+        "加纳",
+        "Ghana"
+      ]
+    },
+    {
+      "code": "221",
+      "chineseName": "几内亚",
+      "englishName": "Guinea",
+      "aliases": [
+        "几内亚",
+        "Guinea"
+      ]
+    },
+    {
+      "code": "222",
+      "chineseName": "几内亚比绍",
+      "englishName": "Guinea-Bissau",
+      "aliases": [
+        "几内亚比绍",
+        "Guinea-Bissau"
+      ]
+    },
+    {
+      "code": "223",
+      "chineseName": "科特迪瓦",
+      "englishName": "Cote d'lvoire",
+      "aliases": [
+        "科特迪瓦",
+        "Cote d'lvoire"
+      ]
+    },
+    {
+      "code": "224",
+      "chineseName": "肯尼亚",
+      "englishName": "Kenya",
+      "aliases": [
+        "肯尼亚",
+        "Kenya"
+      ]
+    },
+    {
+      "code": "225",
+      "chineseName": "利比里亚",
+      "englishName": "Liberia",
+      "aliases": [
+        "利比里亚",
+        "Liberia"
+      ]
+    },
+    {
+      "code": "226",
+      "chineseName": "利比亚",
+      "englishName": "Libyan Arab Jamahiriya",
+      "aliases": [
+        "利比亚",
+        "Libyan Arab Jamahiriya"
+      ]
+    },
+    {
+      "code": "227",
+      "chineseName": "马达加斯加",
+      "englishName": "Madagascar",
+      "aliases": [
+        "马达加斯加",
+        "Madagascar"
+      ]
+    },
+    {
+      "code": "228",
+      "chineseName": "马拉维",
+      "englishName": "Malawi",
+      "aliases": [
+        "马拉维",
+        "Malawi"
+      ]
+    },
+    {
+      "code": "229",
+      "chineseName": "马里",
+      "englishName": "Mali",
+      "aliases": [
+        "马里",
+        "Mali"
+      ]
+    },
+    {
+      "code": "230",
+      "chineseName": "毛里塔尼亚",
+      "englishName": "Mauritania",
+      "aliases": [
+        "毛里塔尼亚",
+        "Mauritania"
+      ]
+    },
+    {
+      "code": "231",
+      "chineseName": "毛里求斯",
+      "englishName": "Mauritius",
+      "aliases": [
+        "毛里求斯",
+        "Mauritius",
+        "MAURITIUS",
+        "MU",
+        "MUS"
+      ]
+    },
+    {
+      "code": "232",
+      "chineseName": "摩洛哥",
+      "englishName": "Morocco",
+      "aliases": [
+        "摩洛哥",
+        "Morocco"
+      ]
+    },
+    {
+      "code": "233",
+      "chineseName": "莫桑比克",
+      "englishName": "Mozambique",
+      "aliases": [
+        "莫桑比克",
+        "Mozambique"
+      ]
+    },
+    {
+      "code": "234",
+      "chineseName": "纳米比亚",
+      "englishName": "Namibia",
+      "aliases": [
+        "纳米比亚",
+        "Namibia"
+      ]
+    },
+    {
+      "code": "235",
+      "chineseName": "尼日尔",
+      "englishName": "Niger",
+      "aliases": [
+        "尼日尔",
+        "Niger"
+      ]
+    },
+    {
+      "code": "236",
+      "chineseName": "尼日利亚",
+      "englishName": "Nigeria",
+      "aliases": [
+        "尼日利亚",
+        "Nigeria"
+      ]
+    },
+    {
+      "code": "237",
+      "chineseName": "留尼汪",
+      "englishName": "Reunion",
+      "aliases": [
+        "留尼汪",
+        "Reunion"
+      ]
+    },
+    {
+      "code": "238",
+      "chineseName": "卢旺达",
+      "englishName": "Rwanda",
+      "aliases": [
+        "卢旺达",
+        "Rwanda"
+      ]
+    },
+    {
+      "code": "239",
+      "chineseName": "圣多美和普林西比",
+      "englishName": "Sao Tome and Principe",
+      "aliases": [
+        "圣多美和普林西比",
+        "Sao Tome and Principe"
+      ]
+    },
+    {
+      "code": "240",
+      "chineseName": "塞内加尔",
+      "englishName": "Senegal",
+      "aliases": [
+        "塞内加尔",
+        "Senegal"
+      ]
+    },
+    {
+      "code": "241",
+      "chineseName": "塞舌尔",
+      "englishName": "Seychelles",
+      "aliases": [
+        "塞舌尔",
+        "Seychelles"
+      ]
+    },
+    {
+      "code": "242",
+      "chineseName": "塞拉利昂",
+      "englishName": "Sierra Leone",
+      "aliases": [
+        "塞拉利昂",
+        "Sierra Leone"
+      ]
+    },
+    {
+      "code": "243",
+      "chineseName": "索马里",
+      "englishName": "Somalia",
+      "aliases": [
+        "索马里",
+        "Somalia"
+      ]
+    },
+    {
+      "code": "244",
+      "chineseName": "南非",
+      "englishName": "South Africa",
+      "aliases": [
+        "南非",
+        "South Africa",
+        "SOUTH AFRICA",
+        "SOUTHAFRICA",
+        "ZA",
+        "ZAF"
+      ]
+    },
+    {
+      "code": "245",
+      "chineseName": "西撒哈拉",
+      "englishName": "Western Sahara",
+      "aliases": [
+        "西撒哈拉",
+        "Western Sahara"
+      ]
+    },
+    {
+      "code": "246",
+      "chineseName": "苏丹",
+      "englishName": "Sudan",
+      "aliases": [
+        "苏丹",
+        "Sudan"
+      ]
+    },
+    {
+      "code": "247",
+      "chineseName": "坦桑尼亚",
+      "englishName": "Tanzania",
+      "aliases": [
+        "坦桑尼亚",
+        "Tanzania"
+      ]
+    },
+    {
+      "code": "248",
+      "chineseName": "多哥",
+      "englishName": "Togo",
+      "aliases": [
+        "多哥",
+        "Togo"
+      ]
+    },
+    {
+      "code": "249",
+      "chineseName": "突尼斯",
+      "englishName": "Tunisia",
+      "aliases": [
+        "突尼斯",
+        "Tunisia"
+      ]
+    },
+    {
+      "code": "250",
+      "chineseName": "乌干达",
+      "englishName": "Uganda",
+      "aliases": [
+        "乌干达",
+        "Uganda"
+      ]
+    },
+    {
+      "code": "251",
+      "chineseName": "布基纳法索",
+      "englishName": "Burkina Faso",
+      "aliases": [
+        "布基纳法索",
+        "Burkina Faso"
+      ]
+    },
+    {
+      "code": "252",
+      "chineseName": "刚果(金)",
+      "englishName": "Congo,DR",
+      "aliases": [
+        "刚果(金)",
+        "Congo,DR"
+      ]
+    },
+    {
+      "code": "253",
+      "chineseName": "赞比亚",
+      "englishName": "Zambia",
+      "aliases": [
+        "赞比亚",
+        "Zambia"
+      ]
+    },
+    {
+      "code": "254",
+      "chineseName": "津巴布韦",
+      "englishName": "Zimbabwe",
+      "aliases": [
+        "津巴布韦",
+        "Zimbabwe"
+      ]
+    },
+    {
+      "code": "255",
+      "chineseName": "莱索托",
+      "englishName": "Lesotho",
+      "aliases": [
+        "莱索托",
+        "Lesotho"
+      ]
+    },
+    {
+      "code": "256",
+      "chineseName": "梅利利亚",
+      "englishName": "Melilla",
+      "aliases": [
+        "梅利利亚",
+        "Melilla"
+      ]
+    },
+    {
+      "code": "257",
+      "chineseName": "斯威士兰",
+      "englishName": "Swaziland",
+      "aliases": [
+        "斯威士兰",
+        "Swaziland"
+      ]
+    },
+    {
+      "code": "258",
+      "chineseName": "厄立特里亚",
+      "englishName": "Eritrea",
+      "aliases": [
+        "厄立特里亚",
+        "Eritrea"
+      ]
+    },
+    {
+      "code": "259",
+      "chineseName": "马约特",
+      "englishName": "Mayotte",
+      "aliases": [
+        "马约特",
+        "Mayotte"
+      ]
+    },
+    {
+      "code": "299",
+      "chineseName": "非洲其他国家(地区)",
+      "englishName": "Oth. Afr. nes",
+      "aliases": [
+        "非洲其他国家(地区)",
+        "Oth. Afr. nes"
+      ]
+    },
+    {
+      "code": "301",
+      "chineseName": "比利时",
+      "englishName": "Belgium",
+      "aliases": [
+        "比利时",
+        "Belgium",
+        "BE",
+        "BEL",
+        "BELGIUM"
+      ]
+    },
+    {
+      "code": "302",
+      "chineseName": "丹麦",
+      "englishName": "Denmark",
+      "aliases": [
+        "丹麦",
+        "Denmark",
+        "DENMARK",
+        "DK",
+        "DNK"
+      ]
+    },
+    {
+      "code": "303",
+      "chineseName": "英国",
+      "englishName": "United Kingdom",
+      "aliases": [
+        "英国",
+        "United Kingdom",
+        "GB",
+        "GBR",
+        "UK",
+        "UNITED KINGDOM",
+        "UNITEDKINGDOM"
+      ]
+    },
+    {
+      "code": "304",
+      "chineseName": "德国",
+      "englishName": "Germany",
+      "aliases": [
+        "德国",
+        "Germany",
+        "DE",
+        "DEU",
+        "GERMANY"
+      ]
+    },
+    {
+      "code": "305",
+      "chineseName": "法国",
+      "englishName": "France",
+      "aliases": [
+        "法国",
+        "France",
+        "FR",
+        "FRA",
+        "FRANCE"
+      ]
+    },
+    {
+      "code": "306",
+      "chineseName": "爱尔兰",
+      "englishName": "Ireland",
+      "aliases": [
+        "爱尔兰",
+        "Ireland",
+        "IE",
+        "IRELAND",
+        "IRL"
+      ]
+    },
+    {
+      "code": "307",
+      "chineseName": "意大利",
+      "englishName": "Italy",
+      "aliases": [
+        "意大利",
+        "Italy",
+        "IT",
+        "ITA",
+        "ITALY"
+      ]
+    },
+    {
+      "code": "308",
+      "chineseName": "卢森堡",
+      "englishName": "Luxembourg",
+      "aliases": [
+        "卢森堡",
+        "Luxembourg",
+        "LU",
+        "LUX",
+        "LUXEMBOURG"
+      ]
+    },
+    {
+      "code": "309",
+      "chineseName": "荷兰",
+      "englishName": "Netherlands",
+      "aliases": [
+        "荷兰",
+        "Netherlands",
+        "NETHERLANDS",
+        "NL",
+        "NLD"
+      ]
+    },
+    {
+      "code": "310",
+      "chineseName": "希腊",
+      "englishName": "Greece",
+      "aliases": [
+        "希腊",
+        "Greece",
+        "GR",
+        "GRC",
+        "GREECE"
+      ]
+    },
+    {
+      "code": "311",
+      "chineseName": "葡萄牙",
+      "englishName": "Portugal",
+      "aliases": [
+        "葡萄牙",
+        "Portugal",
+        "PORTUGAL",
+        "PRT",
+        "PT"
+      ]
+    },
+    {
+      "code": "312",
+      "chineseName": "西班牙",
+      "englishName": "Spain",
+      "aliases": [
+        "西班牙",
+        "Spain",
+        "ES",
+        "ESP",
+        "SPAIN"
+      ]
+    },
+    {
+      "code": "313",
+      "chineseName": "阿尔巴尼亚",
+      "englishName": "Albania",
+      "aliases": [
+        "阿尔巴尼亚",
+        "Albania"
+      ]
+    },
+    {
+      "code": "314",
+      "chineseName": "安道尔",
+      "englishName": "Andorra",
+      "aliases": [
+        "安道尔",
+        "Andorra"
+      ]
+    },
+    {
+      "code": "315",
+      "chineseName": "奥地利",
+      "englishName": "Austria",
+      "aliases": [
+        "奥地利",
+        "Austria"
+      ]
+    },
+    {
+      "code": "316",
+      "chineseName": "保加利亚",
+      "englishName": "Bulgaria",
+      "aliases": [
+        "保加利亚",
+        "Bulgaria"
+      ]
+    },
+    {
+      "code": "318",
+      "chineseName": "芬兰",
+      "englishName": "Finland",
+      "aliases": [
+        "芬兰",
+        "Finland",
+        "FI",
+        "FIN",
+        "FINLAND"
+      ]
+    },
+    {
+      "code": "320",
+      "chineseName": "直布罗陀",
+      "englishName": "Gibraltar",
+      "aliases": [
+        "直布罗陀",
+        "Gibraltar"
+      ]
+    },
+    {
+      "code": "321",
+      "chineseName": "匈牙利",
+      "englishName": "Hungary",
+      "aliases": [
+        "匈牙利",
+        "Hungary",
+        "HU",
+        "HUN",
+        "HUNGARY"
+      ]
+    },
+    {
+      "code": "322",
+      "chineseName": "冰岛",
+      "englishName": "Iceland",
+      "aliases": [
+        "冰岛",
+        "Iceland",
+        "ICELAND",
+        "IS",
+        "ISL"
+      ]
+    },
+    {
+      "code": "323",
+      "chineseName": "列支敦士登",
+      "englishName": "Liechtenstein",
+      "aliases": [
+        "列支敦士登",
+        "Liechtenstein"
+      ]
+    },
+    {
+      "code": "324",
+      "chineseName": "马耳他",
+      "englishName": "Malta",
+      "aliases": [
+        "马耳他",
+        "Malta"
+      ]
+    },
+    {
+      "code": "325",
+      "chineseName": "摩纳哥",
+      "englishName": "Monaco",
+      "aliases": [
+        "摩纳哥",
+        "Monaco"
+      ]
+    },
+    {
+      "code": "326",
+      "chineseName": "挪威",
+      "englishName": "Norway",
+      "aliases": [
+        "挪威",
+        "Norway",
+        "NO",
+        "NOR",
+        "NORWAY"
+      ]
+    },
+    {
+      "code": "327",
+      "chineseName": "波兰",
+      "englishName": "Poland",
+      "aliases": [
+        "波兰",
+        "Poland",
+        "PL",
+        "POL",
+        "POLAND"
+      ]
+    },
+    {
+      "code": "328",
+      "chineseName": "罗马尼亚",
+      "englishName": "Romania",
+      "aliases": [
+        "罗马尼亚",
+        "Romania",
+        "RO",
+        "ROMANIA",
+        "ROU"
+      ]
+    },
+    {
+      "code": "329",
+      "chineseName": "圣马力诺",
+      "englishName": "San Marino",
+      "aliases": [
+        "圣马力诺",
+        "San Marino"
+      ]
+    },
+    {
+      "code": "330",
+      "chineseName": "瑞典",
+      "englishName": "Sweden",
+      "aliases": [
+        "瑞典",
+        "Sweden",
+        "SE",
+        "SWE",
+        "SWEDEN"
+      ]
+    },
+    {
+      "code": "331",
+      "chineseName": "瑞士",
+      "englishName": "Switzerland",
+      "aliases": [
+        "瑞士",
+        "Switzerland",
+        "CH",
+        "CHE",
+        "SWITZERLAND"
+      ]
+    },
+    {
+      "code": "334",
+      "chineseName": "爱沙尼亚",
+      "englishName": "Estonia",
+      "aliases": [
+        "爱沙尼亚",
+        "Estonia"
+      ]
+    },
+    {
+      "code": "335",
+      "chineseName": "拉脱维亚",
+      "englishName": "Latvia",
+      "aliases": [
+        "拉脱维亚",
+        "Latvia"
+      ]
+    },
+    {
+      "code": "336",
+      "chineseName": "立陶宛",
+      "englishName": "Lithuania",
+      "aliases": [
+        "立陶宛",
+        "Lithuania"
+      ]
+    },
+    {
+      "code": "337",
+      "chineseName": "格鲁吉亚",
+      "englishName": "Georgia",
+      "aliases": [
+        "格鲁吉亚",
+        "Georgia",
+        "GE",
+        "GEO",
+        "GEORGIA"
+      ]
+    },
+    {
+      "code": "338",
+      "chineseName": "亚美尼亚",
+      "englishName": "Armenia",
+      "aliases": [
+        "亚美尼亚",
+        "Armenia"
+      ]
+    },
+    {
+      "code": "339",
+      "chineseName": "阿塞拜疆",
+      "englishName": "Azerbai jan",
+      "aliases": [
+        "阿塞拜疆",
+        "Azerbai jan"
+      ]
+    },
+    {
+      "code": "340",
+      "chineseName": "白俄罗斯",
+      "englishName": "Belarus",
+      "aliases": [
+        "白俄罗斯",
+        "Belarus"
+      ]
+    },
+    {
+      "code": "343",
+      "chineseName": "摩尔多瓦",
+      "englishName": "Moldova",
+      "aliases": [
+        "摩尔多瓦",
+        "Moldova"
+      ]
+    },
+    {
+      "code": "344",
+      "chineseName": "俄罗斯联邦",
+      "englishName": "Russian Federation",
+      "aliases": [
+        "俄罗斯联邦",
+        "Russian Federation"
+      ]
+    },
+    {
+      "code": "347",
+      "chineseName": "乌克兰",
+      "englishName": "Ukraine",
+      "aliases": [
+        "乌克兰",
+        "Ukraine"
+      ]
+    },
+    {
+      "code": "349",
+      "chineseName": "塞尔维亚和黑山",
+      "englishName": "Serbia and Montenegro",
+      "aliases": [
+        "塞尔维亚和黑山",
+        "Serbia and Montenegro"
+      ]
+    },
+    {
+      "code": "350",
+      "chineseName": "斯洛文尼亚",
+      "englishName": "Slovenia",
+      "aliases": [
+        "斯洛文尼亚",
+        "Slovenia"
+      ]
+    },
+    {
+      "code": "351",
+      "chineseName": "克罗地亚",
+      "englishName": "Croatia",
+      "aliases": [
+        "克罗地亚",
+        "Croatia"
+      ]
+    },
+    {
+      "code": "352",
+      "chineseName": "捷克",
+      "englishName": "Czech Republic",
+      "aliases": [
+        "捷克",
+        "Czech Republic",
+        "CZ",
+        "CZE",
+        "CZECH REPUBLIC",
+        "CZECHIA",
+        "CZECHREPUBLIC"
+      ]
+    },
+    {
+      "code": "353",
+      "chineseName": "斯洛伐克",
+      "englishName": "Slovakia",
+      "aliases": [
+        "斯洛伐克",
+        "Slovakia"
+      ]
+    },
+    {
+      "code": "354",
+      "chineseName": "前南马其顿",
+      "englishName": "Macedonia,FYR",
+      "aliases": [
+        "前南马其顿",
+        "Macedonia,FYR"
+      ]
+    },
+    {
+      "code": "355",
+      "chineseName": "波黑",
+      "englishName": "Bosnia and Hercegovina",
+      "aliases": [
+        "波黑",
+        "Bosnia and Hercegovina"
+      ]
+    },
+    {
+      "code": "356",
+      "chineseName": "梵蒂冈城国",
+      "englishName": "Vatican City State",
+      "aliases": [
+        "梵蒂冈城国",
+        "Vatican City State"
+      ]
+    },
+    {
+      "code": "357",
+      "chineseName": "法罗群岛",
+      "englishName": "Faroe Islands",
+      "aliases": [
+        "法罗群岛",
+        "Faroe Islands"
+      ]
+    },
+    {
+      "code": "358",
+      "chineseName": "塞尔维亚",
+      "englishName": "Serbia",
+      "aliases": [
+        "塞尔维亚",
+        "Serbia",
+        "RS",
+        "SERBIA",
+        "SRB"
+      ]
+    },
+    {
+      "code": "359",
+      "chineseName": "黑山",
+      "englishName": "Montenegro",
+      "aliases": [
+        "黑山",
+        "Montenegro"
+      ]
+    },
+    {
+      "code": "399",
+      "chineseName": "欧洲其他国家(地区)",
+      "englishName": "Oth. Eur. nes",
+      "aliases": [
+        "欧洲其他国家(地区)",
+        "Oth. Eur. nes"
+      ]
+    },
+    {
+      "code": "401",
+      "chineseName": "安提瓜和巴布达",
+      "englishName": "Antigua & Barbuda",
+      "aliases": [
+        "安提瓜和巴布达",
+        "Antigua & Barbuda"
+      ]
+    },
+    {
+      "code": "402",
+      "chineseName": "阿根廷",
+      "englishName": "Argentina",
+      "aliases": [
+        "阿根廷",
+        "Argentina",
+        "AR",
+        "ARG",
+        "ARGENTINA"
+      ]
+    },
+    {
+      "code": "403",
+      "chineseName": "阿鲁巴",
+      "englishName": "Aruba",
+      "aliases": [
+        "阿鲁巴",
+        "Aruba"
+      ]
+    },
+    {
+      "code": "404",
+      "chineseName": "巴哈马",
+      "englishName": "Bahamas",
+      "aliases": [
+        "巴哈马",
+        "Bahamas"
+      ]
+    },
+    {
+      "code": "405",
+      "chineseName": "巴巴多斯",
+      "englishName": "Barbados",
+      "aliases": [
+        "巴巴多斯",
+        "Barbados"
+      ]
+    },
+    {
+      "code": "406",
+      "chineseName": "伯利兹",
+      "englishName": "Belize",
+      "aliases": [
+        "伯利兹",
+        "Belize"
+      ]
+    },
+    {
+      "code": "408",
+      "chineseName": "玻利维亚",
+      "englishName": "Bolivia",
+      "aliases": [
+        "玻利维亚",
+        "Bolivia"
+      ]
+    },
+    {
+      "code": "409",
+      "chineseName": "博内尔",
+      "englishName": "Bonaire",
+      "aliases": [
+        "博内尔",
+        "Bonaire"
+      ]
+    },
+    {
+      "code": "410",
+      "chineseName": "巴西",
+      "englishName": "Brazil",
+      "aliases": [
+        "巴西",
+        "Brazil",
+        "BR",
+        "BRA",
+        "BRAZIL"
+      ]
+    },
+    {
+      "code": "411",
+      "chineseName": "开曼群岛",
+      "englishName": "Cayman Islands",
+      "aliases": [
+        "开曼群岛",
+        "Cayman Islands"
+      ]
+    },
+    {
+      "code": "412",
+      "chineseName": "智利",
+      "englishName": "Chile",
+      "aliases": [
+        "智利",
+        "Chile",
+        "CHILE",
+        "CHL",
+        "CL"
+      ]
+    },
+    {
+      "code": "413",
+      "chineseName": "哥伦比亚",
+      "englishName": "Colombia",
+      "aliases": [
+        "哥伦比亚",
+        "Colombia"
+      ]
+    },
+    {
+      "code": "414",
+      "chineseName": "多米尼克",
+      "englishName": "Dominica",
+      "aliases": [
+        "多米尼克",
+        "Dominica"
+      ]
+    },
+    {
+      "code": "415",
+      "chineseName": "哥斯达黎加",
+      "englishName": "Costa Rica",
+      "aliases": [
+        "哥斯达黎加",
+        "Costa Rica",
+        "COSTA RICA",
+        "COSTARICA",
+        "CR",
+        "CRI"
+      ]
+    },
+    {
+      "code": "416",
+      "chineseName": "古巴",
+      "englishName": "Cuba",
+      "aliases": [
+        "古巴",
+        "Cuba"
+      ]
+    },
+    {
+      "code": "417",
+      "chineseName": "库腊索岛",
+      "englishName": "Curacao",
+      "aliases": [
+        "库腊索岛",
+        "Curacao"
+      ]
+    },
+    {
+      "code": "418",
+      "chineseName": "多米尼加共和国",
+      "englishName": "Dominican Republic",
+      "aliases": [
+        "多米尼加共和国",
+        "Dominican Republic"
+      ]
+    },
+    {
+      "code": "419",
+      "chineseName": "厄瓜多尔",
+      "englishName": "Ecuador",
+      "aliases": [
+        "厄瓜多尔",
+        "Ecuador",
+        "EC",
+        "ECU",
+        "ECUADOR"
+      ]
+    },
+    {
+      "code": "420",
+      "chineseName": "法属圭亚那",
+      "englishName": "French Guiana",
+      "aliases": [
+        "法属圭亚那",
+        "French Guiana"
+      ]
+    },
+    {
+      "code": "421",
+      "chineseName": "格林纳达",
+      "englishName": "Grenada",
+      "aliases": [
+        "格林纳达",
+        "Grenada"
+      ]
+    },
+    {
+      "code": "422",
+      "chineseName": "瓜德罗普",
+      "englishName": "Guadeloupe",
+      "aliases": [
+        "瓜德罗普",
+        "Guadeloupe"
+      ]
+    },
+    {
+      "code": "423",
+      "chineseName": "危地马拉",
+      "englishName": "Guatemala",
+      "aliases": [
+        "危地马拉",
+        "Guatemala"
+      ]
+    },
+    {
+      "code": "424",
+      "chineseName": "圭亚那",
+      "englishName": "Guyana",
+      "aliases": [
+        "圭亚那",
+        "Guyana"
+      ]
+    },
+    {
+      "code": "425",
+      "chineseName": "海地",
+      "englishName": "Haiti",
+      "aliases": [
+        "海地",
+        "Haiti"
+      ]
+    },
+    {
+      "code": "426",
+      "chineseName": "洪都拉斯",
+      "englishName": "Honduras",
+      "aliases": [
+        "洪都拉斯",
+        "Honduras",
+        "HN",
+        "HND",
+        "HONDURAS"
+      ]
+    },
+    {
+      "code": "427",
+      "chineseName": "牙买加",
+      "englishName": "Jamaica",
+      "aliases": [
+        "牙买加",
+        "Jamaica"
+      ]
+    },
+    {
+      "code": "428",
+      "chineseName": "马提尼克",
+      "englishName": "Martinique",
+      "aliases": [
+        "马提尼克",
+        "Martinique"
+      ]
+    },
+    {
+      "code": "429",
+      "chineseName": "墨西哥",
+      "englishName": "Mexico",
+      "aliases": [
+        "墨西哥",
+        "Mexico",
+        "MEX",
+        "MEXICO",
+        "MX"
+      ]
+    },
+    {
+      "code": "430",
+      "chineseName": "蒙特塞拉特",
+      "englishName": "Montserrat",
+      "aliases": [
+        "蒙特塞拉特",
+        "Montserrat"
+      ]
+    },
+    {
+      "code": "431",
+      "chineseName": "尼加拉瓜",
+      "englishName": "Nicaragua",
+      "aliases": [
+        "尼加拉瓜",
+        "Nicaragua",
+        "NI",
+        "NIC",
+        "NICARAGUA"
+      ]
+    },
+    {
+      "code": "432",
+      "chineseName": "巴拿马",
+      "englishName": "Panama",
+      "aliases": [
+        "巴拿马",
+        "Panama"
+      ]
+    },
+    {
+      "code": "433",
+      "chineseName": "巴拉圭",
+      "englishName": "Paraguay",
+      "aliases": [
+        "巴拉圭",
+        "Paraguay"
+      ]
+    },
+    {
+      "code": "434",
+      "chineseName": "秘鲁",
+      "englishName": "Peru",
+      "aliases": [
+        "秘鲁",
+        "Peru",
+        "PE",
+        "PER",
+        "PERU"
+      ]
+    },
+    {
+      "code": "435",
+      "chineseName": "波多黎各",
+      "englishName": "Puerto Rico",
+      "aliases": [
+        "波多黎各",
+        "Puerto Rico"
+      ]
+    },
+    {
+      "code": "436",
+      "chineseName": "萨巴",
+      "englishName": "Saba",
+      "aliases": [
+        "萨巴",
+        "Saba"
+      ]
+    },
+    {
+      "code": "437",
+      "chineseName": "圣卢西亚",
+      "englishName": "Saint Lucia",
+      "aliases": [
+        "圣卢西亚",
+        "Saint Lucia"
+      ]
+    },
+    {
+      "code": "438",
+      "chineseName": "圣马丁岛",
+      "englishName": "Saint Martin Islands",
+      "aliases": [
+        "圣马丁岛",
+        "Saint Martin Islands"
+      ]
+    },
+    {
+      "code": "439",
+      "chineseName": "圣文森特和格林纳丁斯",
+      "englishName": "Saint Vincent and Grenadines",
+      "aliases": [
+        "圣文森特和格林纳丁斯",
+        "Saint Vincent and Grenadines"
+      ]
+    },
+    {
+      "code": "440",
+      "chineseName": "萨尔瓦多",
+      "englishName": "El Salvador",
+      "aliases": [
+        "萨尔瓦多",
+        "El Salvador"
+      ]
+    },
+    {
+      "code": "441",
+      "chineseName": "苏里南",
+      "englishName": "Suriname",
+      "aliases": [
+        "苏里南",
+        "Suriname"
+      ]
+    },
+    {
+      "code": "442",
+      "chineseName": "特立尼达和多巴哥",
+      "englishName": "Trinidad and Tobago",
+      "aliases": [
+        "特立尼达和多巴哥",
+        "Trinidad and Tobago"
+      ]
+    },
+    {
+      "code": "443",
+      "chineseName": "特克斯和凯科斯群岛",
+      "englishName": "Turks and Caicos Islands",
+      "aliases": [
+        "特克斯和凯科斯群岛",
+        "Turks and Caicos Islands"
+      ]
+    },
+    {
+      "code": "444",
+      "chineseName": "乌拉圭",
+      "englishName": "Uruguay",
+      "aliases": [
+        "乌拉圭",
+        "Uruguay"
+      ]
+    },
+    {
+      "code": "445",
+      "chineseName": "委内瑞拉",
+      "englishName": "Venezuela",
+      "aliases": [
+        "委内瑞拉",
+        "Venezuela"
+      ]
+    },
+    {
+      "code": "446",
+      "chineseName": "英属维尔京群岛",
+      "englishName": "Virgin  Islands, British",
+      "aliases": [
+        "英属维尔京群岛",
+        "Virgin  Islands, British"
+      ]
+    },
+    {
+      "code": "447",
+      "chineseName": "圣其茨和尼维斯",
+      "englishName": "Saint  Kitts and Nevis",
+      "aliases": [
+        "圣其茨和尼维斯",
+        "Saint  Kitts and Nevis"
+      ]
+    },
+    {
+      "code": "448",
+      "chineseName": "圣皮埃尔和密克隆",
+      "englishName": "Saint.Pierre and Miquelon",
+      "aliases": [
+        "圣皮埃尔和密克隆",
+        "Saint.Pierre and Miquelon"
+      ]
+    },
+    {
+      "code": "449",
+      "chineseName": "荷属安地列斯",
+      "englishName": "Netherlands Antilles",
+      "aliases": [
+        "荷属安地列斯",
+        "Netherlands Antilles"
+      ]
+    },
+    {
+      "code": "499",
+      "chineseName": "拉丁美洲其他国家(地区)",
+      "englishName": "Oth. L.Amer. nes",
+      "aliases": [
+        "拉丁美洲其他国家(地区)",
+        "Oth. L.Amer. nes"
+      ]
+    },
+    {
+      "code": "501",
+      "chineseName": "加拿大",
+      "englishName": "Canada",
+      "aliases": [
+        "加拿大",
+        "Canada",
+        "CA",
+        "CAN",
+        "CANADA"
+      ]
+    },
+    {
+      "code": "502",
+      "chineseName": "美国",
+      "englishName": "United States",
+      "aliases": [
+        "美国",
+        "United States",
+        "UNITED STATES",
+        "UNITEDSTATES",
+        "US",
+        "USA"
+      ]
+    },
+    {
+      "code": "503",
+      "chineseName": "格陵兰",
+      "englishName": "Greenland",
+      "aliases": [
+        "格陵兰",
+        "Greenland"
+      ]
+    },
+    {
+      "code": "504",
+      "chineseName": "百慕大",
+      "englishName": "Bermuda",
+      "aliases": [
+        "百慕大",
+        "Bermuda"
+      ]
+    },
+    {
+      "code": "599",
+      "chineseName": "北美洲其他国家(地区)",
+      "englishName": "Oth. N.Amer. nes",
+      "aliases": [
+        "北美洲其他国家(地区)",
+        "Oth. N.Amer. nes"
+      ]
+    },
+    {
+      "code": "601",
+      "chineseName": "澳大利亚",
+      "englishName": "Australia",
+      "aliases": [
+        "澳大利亚",
+        "Australia",
+        "AU",
+        "AUS",
+        "AUSTRALIA"
+      ]
+    },
+    {
+      "code": "602",
+      "chineseName": "库克群岛",
+      "englishName": "Cook Islands",
+      "aliases": [
+        "库克群岛",
+        "Cook Islands"
+      ]
+    },
+    {
+      "code": "603",
+      "chineseName": "斐济",
+      "englishName": "Fiji",
+      "aliases": [
+        "斐济",
+        "Fiji"
+      ]
+    },
+    {
+      "code": "604",
+      "chineseName": "盖比群岛",
+      "englishName": "Gambier Islands",
+      "aliases": [
+        "盖比群岛",
+        "Gambier Islands"
+      ]
+    },
+    {
+      "code": "605",
+      "chineseName": "马克萨斯群岛",
+      "englishName": "Marquesas Islands",
+      "aliases": [
+        "马克萨斯群岛",
+        "Marquesas Islands"
+      ]
+    },
+    {
+      "code": "606",
+      "chineseName": "瑙鲁",
+      "englishName": "Nauru",
+      "aliases": [
+        "瑙鲁",
+        "Nauru"
+      ]
+    },
+    {
+      "code": "607",
+      "chineseName": "新喀里多尼亚",
+      "englishName": "New Caledonia",
+      "aliases": [
+        "新喀里多尼亚",
+        "New Caledonia"
+      ]
+    },
+    {
+      "code": "608",
+      "chineseName": "瓦努阿图",
+      "englishName": "Vanuatu",
+      "aliases": [
+        "瓦努阿图",
+        "Vanuatu"
+      ]
+    },
+    {
+      "code": "609",
+      "chineseName": "新西兰",
+      "englishName": "New Zealand",
+      "aliases": [
+        "新西兰",
+        "New Zealand",
+        "NEW ZEALAND",
+        "NEWZEALAND",
+        "NZ",
+        "NZL"
+      ]
+    },
+    {
+      "code": "610",
+      "chineseName": "诺福克岛",
+      "englishName": "Norfolk Island",
+      "aliases": [
+        "诺福克岛",
+        "Norfolk Island"
+      ]
+    },
+    {
+      "code": "611",
+      "chineseName": "巴布亚新几内亚",
+      "englishName": "Papua New Guinea",
+      "aliases": [
+        "巴布亚新几内亚",
+        "Papua New Guinea"
+      ]
+    },
+    {
+      "code": "612",
+      "chineseName": "社会群岛",
+      "englishName": "Society Islands",
+      "aliases": [
+        "社会群岛",
+        "Society Islands"
+      ]
+    },
+    {
+      "code": "613",
+      "chineseName": "所罗门群岛",
+      "englishName": "Solomon Islands",
+      "aliases": [
+        "所罗门群岛",
+        "Solomon Islands"
+      ]
+    },
+    {
+      "code": "614",
+      "chineseName": "汤加",
+      "englishName": "Tonga",
+      "aliases": [
+        "汤加",
+        "Tonga"
+      ]
+    },
+    {
+      "code": "615",
+      "chineseName": "土阿莫土群岛",
+      "englishName": "Tuamotu Islands",
+      "aliases": [
+        "土阿莫土群岛",
+        "Tuamotu Islands"
+      ]
+    },
+    {
+      "code": "616",
+      "chineseName": "土布艾群岛",
+      "englishName": "Tubai Islands",
+      "aliases": [
+        "土布艾群岛",
+        "Tubai Islands"
+      ]
+    },
+    {
+      "code": "617",
+      "chineseName": "萨摩亚",
+      "englishName": "Samoa",
+      "aliases": [
+        "萨摩亚",
+        "Samoa"
+      ]
+    },
+    {
+      "code": "618",
+      "chineseName": "基里巴斯",
+      "englishName": "Kiribati",
+      "aliases": [
+        "基里巴斯",
+        "Kiribati"
+      ]
+    },
+    {
+      "code": "619",
+      "chineseName": "图瓦卢",
+      "englishName": "Tuvalu",
+      "aliases": [
+        "图瓦卢",
+        "Tuvalu"
+      ]
+    },
+    {
+      "code": "620",
+      "chineseName": "密克罗尼西亚联邦",
+      "englishName": "Micronesia, Fs",
+      "aliases": [
+        "密克罗尼西亚联邦",
+        "Micronesia, Fs"
+      ]
+    },
+    {
+      "code": "621",
+      "chineseName": "马绍尔群岛",
+      "englishName": "Marshall Islands",
+      "aliases": [
+        "马绍尔群岛",
+        "Marshall Islands"
+      ]
+    },
+    {
+      "code": "622",
+      "chineseName": "帕劳",
+      "englishName": "Palau",
+      "aliases": [
+        "帕劳",
+        "Palau"
+      ]
+    },
+    {
+      "code": "623",
+      "chineseName": "法属波利尼西亚",
+      "englishName": "French Polynesia",
+      "aliases": [
+        "法属波利尼西亚",
+        "French Polynesia"
+      ]
+    },
+    {
+      "code": "625",
+      "chineseName": "瓦利斯和浮图纳",
+      "englishName": "Wallis and Futuna",
+      "aliases": [
+        "瓦利斯和浮图纳",
+        "Wallis and Futuna"
+      ]
+    },
+    {
+      "code": "699",
+      "chineseName": "大洋洲其他国家(地区)",
+      "englishName": "Oth. Ocean. nes",
+      "aliases": [
+        "大洋洲其他国家(地区)",
+        "Oth. Ocean. nes"
+      ]
+    },
+    {
+      "code": "701",
+      "chineseName": "国(地)别不详",
+      "englishName": "Countries(reg.) unknown",
+      "aliases": [
+        "国(地)别不详",
+        "Countries(reg.) unknown"
+      ]
+    },
+    {
+      "code": "702",
+      "chineseName": "联合国及机构和国际组织",
+      "englishName": "UN and oth. int'l  org.",
+      "aliases": [
+        "联合国及机构和国际组织",
+        "UN and oth. int'l  org."
+      ]
+    },
+    {
+      "code": "999",
+      "chineseName": "中性包装原产国别",
+      "englishName": "Conutries of Neutral Package",
+      "aliases": [
+        "中性包装原产国别",
+        "Conutries of Neutral Package"
+      ]
+    },
+    {
+      "code": "260",
+      "chineseName": "南苏丹共和国",
+      "englishName": "Republic of South Sudan",
+      "aliases": [
+        "南苏丹共和国",
+        "Republic of South Sudan"
+      ]
+    }
+  ],
+  "acdTradeModes": [
+    {
+      "code": "0110",
+      "name": "一般贸易",
+      "description": "一般贸易",
+      "aliases": [
+        "一般贸易"
+      ]
+    },
+    {
+      "code": "0130",
+      "name": "易货贸易",
+      "description": "易货贸易",
+      "aliases": [
+        "易货贸易"
+      ]
+    },
+    {
+      "code": "0139",
+      "name": "旅游购物商品",
+      "description": "用于旅游者五万美元以下的出口小批量订货",
+      "aliases": [
+        "旅游购物商品",
+        "用于旅游者五万美元以下的出口小批量订货"
+      ]
+    },
+    {
+      "code": "0200",
+      "name": "料件放弃",
+      "description": "主动放弃交由海关处理的来料或进料加工料件",
+      "aliases": [
+        "料件放弃",
+        "主动放弃交由海关处理的来料或进料加工料件"
+      ]
+    },
+    {
+      "code": "0214",
+      "name": "来料加工",
+      "description": "来料加工装配贸易进口料件及加工出口货物",
+      "aliases": [
+        "来料加工",
+        "来料加工装配贸易进口料件及加工出口货物"
+      ]
+    },
+    {
+      "code": "0245",
+      "name": "来料料件内销",
+      "description": "来料加工料件转内销",
+      "aliases": [
+        "来料料件内销",
+        "来料加工料件转内销"
+      ]
+    },
+    {
+      "code": "0255",
+      "name": "来料深加工",
+      "description": "来料深加工结转货物",
+      "aliases": [
+        "来料深加工",
+        "来料深加工结转货物"
+      ]
+    },
+    {
+      "code": "0258",
+      "name": "来料余料结转",
+      "description": "来料加工余料结转",
+      "aliases": [
+        "来料余料结转",
+        "来料加工余料结转"
+      ]
+    },
+    {
+      "code": "0265",
+      "name": "来料料件复出",
+      "description": "来料加工复运出境的原进口料件",
+      "aliases": [
+        "来料料件复出",
+        "来料加工复运出境的原进口料件"
+      ]
+    },
+    {
+      "code": "0300",
+      "name": "来料料件退换",
+      "description": "来料加工料件退换",
+      "aliases": [
+        "来料料件退换",
+        "来料加工料件退换"
+      ]
+    },
+    {
+      "code": "0314",
+      "name": "加工专用油",
+      "description": "国营贸易企业代理来料加工企业进口柴油",
+      "aliases": [
+        "加工专用油",
+        "国营贸易企业代理来料加工企业进口柴油"
+      ]
+    },
+    {
+      "code": "0320",
+      "name": "不作价设备",
+      "description": "加工贸易外商提供的不作价进口设备",
+      "aliases": [
+        "不作价设备",
+        "加工贸易外商提供的不作价进口设备"
+      ]
+    },
+    {
+      "code": "0345",
+      "name": "来料成品减免",
+      "description": "来料加工成品凭征免税证明转减免税",
+      "aliases": [
+        "来料成品减免",
+        "来料加工成品凭征免税证明转减免税"
+      ]
+    },
+    {
+      "code": "0400",
+      "name": "成品放弃",
+      "description": "主动放弃交由海关处理的来料及进料加工成品",
+      "aliases": [
+        "成品放弃",
+        "主动放弃交由海关处理的来料及进料加工成品"
+      ]
+    },
+    {
+      "code": "0420",
+      "name": "加工贸易设备",
+      "description": "加工贸易项下外商提供的进口设备",
+      "aliases": [
+        "加工贸易设备",
+        "加工贸易项下外商提供的进口设备"
+      ]
+    },
+    {
+      "code": "0444",
+      "name": "保区进料成品",
+      "description": "按成品征税的保税区进料加工成品转内销货物",
+      "aliases": [
+        "保区进料成品",
+        "按成品征税的保税区进料加工成品转内销货物"
+      ]
+    },
+    {
+      "code": "0445",
+      "name": "保区来料成品",
+      "description": "按成品征税的保税区来料加工成品转内销货物",
+      "aliases": [
+        "保区来料成品",
+        "按成品征税的保税区来料加工成品转内销货物"
+      ]
+    },
+    {
+      "code": "0446",
+      "name": "加工设备内销",
+      "description": "加工贸易免税进口设备转内销",
+      "aliases": [
+        "加工设备内销",
+        "加工贸易免税进口设备转内销"
+      ]
+    },
+    {
+      "code": "0456",
+      "name": "加工设备结转",
+      "description": "加工贸易免税进口设备结转",
+      "aliases": [
+        "加工设备结转",
+        "加工贸易免税进口设备结转"
+      ]
+    },
+    {
+      "code": "0466",
+      "name": "加工设备退运",
+      "description": "加工贸易免税进口设备退运出境",
+      "aliases": [
+        "加工设备退运",
+        "加工贸易免税进口设备退运出境"
+      ]
+    },
+    {
+      "code": "0500",
+      "name": "减免设备结转",
+      "description": "用于监管年限内减免税设备的结转",
+      "aliases": [
+        "减免设备结转",
+        "用于监管年限内减免税设备的结转"
+      ]
+    },
+    {
+      "code": "0513",
+      "name": "补偿贸易",
+      "description": "补偿贸易",
+      "aliases": [
+        "补偿贸易"
+      ]
+    },
+    {
+      "code": "0544",
+      "name": "保区进料料件",
+      "description": "按料件征税的保税区进料加工成品转内销货物",
+      "aliases": [
+        "保区进料料件",
+        "按料件征税的保税区进料加工成品转内销货物"
+      ]
+    },
+    {
+      "code": "0545",
+      "name": "保区来料料件",
+      "description": "按料件征税的保税区来料加工成品转内销货物",
+      "aliases": [
+        "保区来料料件",
+        "按料件征税的保税区来料加工成品转内销货物"
+      ]
+    },
+    {
+      "code": "0615",
+      "name": "进料对口",
+      "description": "进料加工(对口合同)",
+      "aliases": [
+        "进料对口",
+        "进料加工(对口合同)"
+      ]
+    },
+    {
+      "code": "0642",
+      "name": "进料以产顶进",
+      "description": "进料加工成品以产顶进",
+      "aliases": [
+        "进料以产顶进",
+        "进料加工成品以产顶进"
+      ]
+    },
+    {
+      "code": "0644",
+      "name": "进料料件内销",
+      "description": "进料加工料件转内销",
+      "aliases": [
+        "进料料件内销",
+        "进料加工料件转内销"
+      ]
+    },
+    {
+      "code": "0654",
+      "name": "进料深加工",
+      "description": "进料深加工结转货物",
+      "aliases": [
+        "进料深加工",
+        "进料深加工结转货物"
+      ]
+    },
+    {
+      "code": "0657",
+      "name": "进料余料结转",
+      "description": "进料加工余料结转",
+      "aliases": [
+        "进料余料结转",
+        "进料加工余料结转"
+      ]
+    },
+    {
+      "code": "0664",
+      "name": "进料料件复出",
+      "description": "进料加工复运出境的原进口料件",
+      "aliases": [
+        "进料料件复出",
+        "进料加工复运出境的原进口料件"
+      ]
+    },
+    {
+      "code": "0700",
+      "name": "进料料件退换",
+      "description": "进料加工料件退换",
+      "aliases": [
+        "进料料件退换",
+        "进料加工料件退换"
+      ]
+    },
+    {
+      "code": "0715",
+      "name": "进料非对口",
+      "description": "进料加工(非对口合同)",
+      "aliases": [
+        "进料非对口",
+        "进料加工(非对口合同)"
+      ]
+    },
+    {
+      "code": "0744",
+      "name": "进料成品减免",
+      "description": "进料加工成品凭征免税证明转减免税",
+      "aliases": [
+        "进料成品减免",
+        "进料加工成品凭征免税证明转减免税"
+      ]
+    },
+    {
+      "code": "0815",
+      "name": "低值辅料",
+      "description": "低值辅料",
+      "aliases": [
+        "低值辅料"
+      ]
+    },
+    {
+      "code": "0844",
+      "name": "进料边角料内销",
+      "description": "进料加工项下边角料转内销",
+      "aliases": [
+        "进料边角料内销",
+        "进料加工项下边角料转内销"
+      ]
+    },
+    {
+      "code": "0845",
+      "name": "来料边角料内销",
+      "description": "来料加工项下边角料内销",
+      "aliases": [
+        "来料边角料内销",
+        "来料加工项下边角料内销"
+      ]
+    },
+    {
+      "code": "0864",
+      "name": "进料边角料复出",
+      "description": "进料加工项下边角料复出口",
+      "aliases": [
+        "进料边角料复出",
+        "进料加工项下边角料复出口"
+      ]
+    },
+    {
+      "code": "0865",
+      "name": "来料边角料复出",
+      "description": "来料加工项下边角料复出口",
+      "aliases": [
+        "来料边角料复出",
+        "来料加工项下边角料复出口"
+      ]
+    },
+    {
+      "code": "1139",
+      "name": "国轮油物料",
+      "description": "中国籍运输工具境内添加的保税油料、物料",
+      "aliases": [
+        "国轮油物料",
+        "中国籍运输工具境内添加的保税油料、物料"
+      ]
+    },
+    {
+      "code": "1200",
+      "name": "保税间货物",
+      "description": "海关保税场所及保税区域之间往来的货物",
+      "aliases": [
+        "保税间货物",
+        "海关保税场所及保税区域之间往来的货物"
+      ]
+    },
+    {
+      "code": "1215",
+      "name": "保税工厂",
+      "description": "保税工厂",
+      "aliases": [
+        "保税工厂"
+      ]
+    },
+    {
+      "code": "1233",
+      "name": "保税仓库货物",
+      "description": "保税仓库进出境货物",
+      "aliases": [
+        "保税仓库货物",
+        "保税仓库进出境货物"
+      ]
+    },
+    {
+      "code": "1234",
+      "name": "保税区仓储转口",
+      "description": "保税区进出境仓储转口货物",
+      "aliases": [
+        "保税区仓储转口",
+        "保税区进出境仓储转口货物"
+      ]
+    },
+    {
+      "code": "1300",
+      "name": "修理物品",
+      "description": "进出境修理物品",
+      "aliases": [
+        "修理物品",
+        "进出境修理物品"
+      ]
+    },
+    {
+      "code": "1427",
+      "name": "出料加工",
+      "description": "出料加工",
+      "aliases": [
+        "出料加工"
+      ]
+    },
+    {
+      "code": "1500",
+      "name": "租赁不满一年",
+      "description": "租期不满一年的租赁贸易货物",
+      "aliases": [
+        "租赁不满一年",
+        "租期不满一年的租赁贸易货物"
+      ]
+    },
+    {
+      "code": "1523",
+      "name": "租赁贸易",
+      "description": "租期在一年及以上的租赁贸易货物",
+      "aliases": [
+        "租赁贸易",
+        "租期在一年及以上的租赁贸易货物"
+      ]
+    },
+    {
+      "code": "1616",
+      "name": "寄售代销",
+      "description": "寄售、代销贸易",
+      "aliases": [
+        "寄售代销",
+        "寄售、代销贸易"
+      ]
+    },
+    {
+      "code": "1741",
+      "name": "免税品",
+      "description": "免税品",
+      "aliases": [
+        "免税品"
+      ]
+    },
+    {
+      "code": "1831",
+      "name": "外汇商品",
+      "description": "免税外汇商品",
+      "aliases": [
+        "外汇商品",
+        "免税外汇商品"
+      ]
+    },
+    {
+      "code": "2025",
+      "name": "合资合作设备",
+      "description": "合资合作企业作为投资进口设备物品",
+      "aliases": [
+        "合资合作设备",
+        "合资合作企业作为投资进口设备物品"
+      ]
+    },
+    {
+      "code": "2225",
+      "name": "外资设备物品",
+      "description": "外资企业作为投资进口的设备物品",
+      "aliases": [
+        "外资设备物品",
+        "外资企业作为投资进口的设备物品"
+      ]
+    },
+    {
+      "code": "2439",
+      "name": "常驻机构公用",
+      "description": "外国常驻机构进口办公用品",
+      "aliases": [
+        "常驻机构公用",
+        "外国常驻机构进口办公用品"
+      ]
+    },
+    {
+      "code": "2600",
+      "name": "暂时进出货物",
+      "description": "暂时进出口货物",
+      "aliases": [
+        "暂时进出货物",
+        "暂时进出口货物"
+      ]
+    },
+    {
+      "code": "2700",
+      "name": "展览品",
+      "description": "进出境展览品",
+      "aliases": [
+        "展览品",
+        "进出境展览品"
+      ]
+    },
+    {
+      "code": "2939",
+      "name": "陈列样品",
+      "description": "驻华商业机构不复运出口的进口陈列样品",
+      "aliases": [
+        "陈列样品",
+        "驻华商业机构不复运出口的进口陈列样品"
+      ]
+    },
+    {
+      "code": "3010",
+      "name": "货样广告品Ａ",
+      "description": "有经营权单位进出口的货样广告品",
+      "aliases": [
+        "货样广告品Ａ",
+        "有经营权单位进出口的货样广告品"
+      ]
+    },
+    {
+      "code": "3039",
+      "name": "货样广告品Ｂ",
+      "description": "无经营权单位进出口的货样广告品",
+      "aliases": [
+        "货样广告品Ｂ",
+        "无经营权单位进出口的货样广告品"
+      ]
+    },
+    {
+      "code": "3100",
+      "name": "无代价抵偿",
+      "description": "无代价抵偿进出口货物",
+      "aliases": [
+        "无代价抵偿",
+        "无代价抵偿进出口货物"
+      ]
+    },
+    {
+      "code": "3339",
+      "name": "其他进出口免费",
+      "description": "其他进出口免费提供货物",
+      "aliases": [
+        "其他进出口免费",
+        "其他进出口免费提供货物"
+      ]
+    },
+    {
+      "code": "3410",
+      "name": "承包工程进口",
+      "description": "对外承包工程进口物资",
+      "aliases": [
+        "承包工程进口",
+        "对外承包工程进口物资"
+      ]
+    },
+    {
+      "code": "3422",
+      "name": "对外承包出口",
+      "description": "对外承包工程出口物资",
+      "aliases": [
+        "对外承包出口",
+        "对外承包工程出口物资"
+      ]
+    },
+    {
+      "code": "3511",
+      "name": "援助物资",
+      "description": "国家和国际组织无偿援助物资",
+      "aliases": [
+        "援助物资",
+        "国家和国际组织无偿援助物资"
+      ]
+    },
+    {
+      "code": "3611",
+      "name": "无偿军援",
+      "description": "无偿军援",
+      "aliases": [
+        "无偿军援"
+      ]
+    },
+    {
+      "code": "3612",
+      "name": "捐赠物资",
+      "description": "进出口捐赠物资",
+      "aliases": [
+        "捐赠物资",
+        "进出口捐赠物资"
+      ]
+    },
+    {
+      "code": "3910",
+      "name": "军事装备",
+      "description": "军事装备",
+      "aliases": [
+        "军事装备"
+      ]
+    },
+    {
+      "code": "4019",
+      "name": "边境小额",
+      "description": "边境小额贸易(边民互市贸易除外)",
+      "aliases": [
+        "边境小额",
+        "边境小额贸易(边民互市贸易除外)"
+      ]
+    },
+    {
+      "code": "4039",
+      "name": "对台小额",
+      "description": "对台小额贸易",
+      "aliases": [
+        "对台小额",
+        "对台小额贸易"
+      ]
+    },
+    {
+      "code": "4139",
+      "name": "对台小额商品交易",
+      "description": "进入对台小额商品交易专用市场的货物",
+      "aliases": [
+        "对台小额商品交易",
+        "进入对台小额商品交易专用市场的货物"
+      ]
+    },
+    {
+      "code": "4200",
+      "name": "驻外机构运回",
+      "description": "我驻外机构运回旧公用物品",
+      "aliases": [
+        "驻外机构运回",
+        "我驻外机构运回旧公用物品"
+      ]
+    },
+    {
+      "code": "4239",
+      "name": "驻外机构购进",
+      "description": "我驻外机构境外购买运回国的公务用品",
+      "aliases": [
+        "驻外机构购进",
+        "我驻外机构境外购买运回国的公务用品"
+      ]
+    },
+    {
+      "code": "4400",
+      "name": "来料成品退换",
+      "description": "来料加工成品退换",
+      "aliases": [
+        "来料成品退换",
+        "来料加工成品退换"
+      ]
+    },
+    {
+      "code": "4500",
+      "name": "直接退运",
+      "description": "直接退运",
+      "aliases": [
+        "直接退运"
+      ]
+    },
+    {
+      "code": "4539",
+      "name": "进口溢误卸",
+      "description": "进口溢卸、误卸货物",
+      "aliases": [
+        "进口溢误卸",
+        "进口溢卸、误卸货物"
+      ]
+    },
+    {
+      "code": "4561",
+      "name": "退运货物",
+      "description": "因质量不符、延误交货等原因退运进出境货物",
+      "aliases": [
+        "退运货物",
+        "因质量不符、延误交货等原因退运进出境货物"
+      ]
+    },
+    {
+      "code": "4600",
+      "name": "进料成品退换",
+      "description": "进料成品退换",
+      "aliases": [
+        "进料成品退换"
+      ]
+    },
+    {
+      "code": "5000",
+      "name": "料件进出区",
+      "description": "用于区内外非实际进出境货物",
+      "aliases": [
+        "料件进出区",
+        "用于区内外非实际进出境货物"
+      ]
+    },
+    {
+      "code": "5010",
+      "name": "出口加工区研发货",
+      "description": "出口加工区与境外之间进出的研发货物",
+      "aliases": [
+        "出口加工区研发货",
+        "出口加工区与境外之间进出的研发货物"
+      ]
+    },
+    {
+      "code": "5015",
+      "name": "区内加工货物",
+      "description": "加工区内企业从境外进口料件及加工出口成品",
+      "aliases": [
+        "区内加工货物",
+        "加工区内企业从境外进口料件及加工出口成品"
+      ]
+    },
+    {
+      "code": "5033",
+      "name": "区内仓储货物",
+      "description": "加工区内仓储企业从境外进口的货物",
+      "aliases": [
+        "区内仓储货物",
+        "加工区内仓储企业从境外进口的货物"
+      ]
+    },
+    {
+      "code": "5100",
+      "name": "成品进出区",
+      "description": "用于区内外非实际进出境货物",
+      "aliases": [
+        "成品进出区",
+        "用于区内外非实际进出境货物"
+      ]
+    },
+    {
+      "code": "5200",
+      "name": "区内边角调出",
+      "description": "用于区内外非实际进出境货物",
+      "aliases": [
+        "区内边角调出",
+        "用于区内外非实际进出境货物"
+      ]
+    },
+    {
+      "code": "5300",
+      "name": "设备进出区",
+      "description": "用于区内外非实际进出境货物",
+      "aliases": [
+        "设备进出区",
+        "用于区内外非实际进出境货物"
+      ]
+    },
+    {
+      "code": "5335",
+      "name": "境外设备进区",
+      "description": "加工区内企业从境外进口的设备物资",
+      "aliases": [
+        "境外设备进区",
+        "加工区内企业从境外进口的设备物资"
+      ]
+    },
+    {
+      "code": "5361",
+      "name": "区内设备退运",
+      "description": "加工区内设备退运境外",
+      "aliases": [
+        "区内设备退运",
+        "加工区内设备退运境外"
+      ]
+    },
+    {
+      "code": "6033",
+      "name": "物流中心进出境货",
+      "description": "保税物流中心与境外之间进出仓储货物",
+      "aliases": [
+        "物流中心进出境货",
+        "保税物流中心与境外之间进出仓储货物"
+      ]
+    },
+    {
+      "code": "9600",
+      "name": "内贸货物跨境运输",
+      "description": "内贸货物跨境运输",
+      "aliases": [
+        "内贸货物跨境运输"
+      ]
+    },
+    {
+      "code": "9639",
+      "name": "海关处理货物",
+      "description": "海关变卖处理的超期未报货物 ,走私违规货物",
+      "aliases": [
+        "海关处理货物",
+        "海关变卖处理的超期未报货物 ,走私违规货物"
+      ]
+    },
+    {
+      "code": "9700",
+      "name": "后续补税",
+      "description": "无原始报关单的后续补税",
+      "aliases": [
+        "后续补税",
+        "无原始报关单的后续补税"
+      ]
+    },
+    {
+      "code": "9739",
+      "name": "其他贸易",
+      "description": "其他贸易",
+      "aliases": [
+        "其他贸易"
+      ]
+    },
+    {
+      "code": "9800",
+      "name": "租赁征税",
+      "description": "租赁期一年及以上的租赁贸易货物的租金",
+      "aliases": [
+        "租赁征税",
+        "租赁期一年及以上的租赁贸易货物的租金"
+      ]
+    },
+    {
+      "code": "9839",
+      "name": "留赠转卖物品",
+      "description": "外交机构转售境内或国际活动留赠放弃特批货",
+      "aliases": [
+        "留赠转卖物品",
+        "外交机构转售境内或国际活动留赠放弃特批货"
+      ]
+    },
+    {
+      "code": "9900",
+      "name": "其他",
+      "description": "其他",
+      "aliases": [
+        "其他"
+      ]
+    }
+  ]
+}

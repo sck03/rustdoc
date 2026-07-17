@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+		@page {
+			size: A4 portrait; /* 纵向 */
+			margin: 1cm;
+		}
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { max-width: 100%; }
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; overflow-wrap: anywhere; }
+        .print-page { position: relative; min-height: 250mm; padding-bottom: 45px; box-sizing: border-box; }
+        .page-break { page-break-before: always; }
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+            position: relative;
+            top: 0;
+        }
+        .company-name { font-weight: bold; font-size: 16px; }
+        .company-address { font-weight: normal; font-size: 10px; }
+        .header .company-address span   { white-space: pre-line;text-align: left;display: inline-block;}
+        .title {
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 0;
+            position: relative;
+            top: 0;
+        }
+        .inline-info {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 5px;
+            position: relative;
+            top: 0;
+        }
+        .inline-info .left { flex: 1; min-width: 0; }
+        .inline-info .right { flex: 1; min-width: 0; text-align: right; }
+        .inline-info .right span { font-size: 8px; }
+        .address { white-space: pre-line; font-size: 8px; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 10px; }
+        th { border: 1px solid black; padding: 8px; text-align: left; background-color: #f2f2f2; font-weight: bold; overflow-wrap: anywhere; word-break: break-word; }
+        td { min-width: 0; padding: 8px; text-align: left; overflow-wrap: anywhere; word-break: break-word; }
+        td.marks { 
+            white-space: pre-line; 
+            font-size: 8px;
+            border-left: 1px solid black;
+            border-right: 1px solid black;
+            border-top: none;
+            border-bottom: none; 
+        }
+        td.marks-with-border { border: 1px solid black; white-space: pre-line; font-size: 8px; }
+        td.description, td.package, td.quantity, td.gw, td.nw, td.volume {
+            border-left: 1px solid black;
+            border-right: 1px solid black;
+            border-top: none;
+            border-bottom: none;
+        }
+        .total-row td { border: 1px solid black; font-weight: bold; font-size: 10px; }
+        .description { line-height: 1.5; font-size: 8px; }
+        .description .style-name { display: block; white-space: normal; }
+        .description .po-line { display: block; }
+        .description .style-line { display: block; }
+        .description .style-no { display: inline-block; width: 100px; }
+        .package, .quantity, .gw, .nw, .volume { font-size: 8px; }
+        .page-number { text-align: center; font-size: 10px; position: absolute; bottom: 0; left: 0; right: 0; }
+        .document-seal {
+            position: absolute;
+            right: 50px;
+            bottom: 55px;
+            z-index: 2;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    {{ $items_per_page = 12 }}
+    {{ $total_pages = (items.size / $items_per_page) | math.ceil }}
+    {{ $page = 0 }}
+    {{ while $page < $total_pages }}
+        {{ $start_idx = $page * $items_per_page }}
+        {{ $is_last = ($page + 1) >= $total_pages }}
+
+        {{ $current_page_items = [] }}
+        {{ for $item in items offset:$start_idx limit:$items_per_page }}
+            {{ $current_page_items = $current_page_items | array.add $item }}
+        {{ end }}
+
+        {{ if $page > 0 }}
+        <div class="page-break"></div>
+        {{ end }}
+
+        <div class="print-page">
+            <div class="header">
+                <div class="company-name">{{ Exporter.ExporterNameEN }}</div>
+                <div class="company-address">
+                    <span>{{ Exporter.AddressEN }}</span>
+                </div>
+            </div>
+            <div class="title">PACKING LIST</div>
+            <div class="inline-info">
+                <div class="left">
+                    TO: M/S<br>
+                    <span class="address">{{ Customer.CustomerNameEN }}</span><br>
+                    <span class="address">{{ Customer.AddressEN }}</span>
+                </div>
+                <div class="right">
+                    <span>Invoice No.: {{ Invoice.InvoiceNo }}</span><br>
+                    <span>Contract No.: {{ Invoice.ContractNo }}</span><br>
+                    <span>Date: {{ Invoice.InvoiceDate }}</span>
+                </div>
+            </div>
+
+            <table>
+                <tr>
+                    <th>唛头 / Marks</th>
+                    <th>货品名称 / Quantities and Descriptions</th>
+                    <th>包装 / Package</th>
+                    <th>数量 / Quantity</th>
+                    <th>毛重 / G.W.</th>
+                    <th>净重 / N.W.</th>
+                    <th>体积 / Meas.</th>
+                </tr>
+
+                {{ for $item in $current_page_items }}
+                <tr>
+                    {{ if for.first && $page == 0 }}
+                    <td rowspan="{{ $current_page_items.size }}" class="marks">
+                        {{ if Invoice.ShippingMarksType == 'Image' }}
+                            <img src="{{ shipping_marks_image_data }}" style="max-width: 95%; max-height: 200px; display: block; margin: 0 auto;">
+                        {{ else }}
+                            {{ Invoice.ShippingMarks }}
+                        {{ end }}
+                    </td>
+                    {{ else if for.first && $is_last }}
+                    <td rowspan="{{ $current_page_items.size }}" class="marks-with-border"></td>
+                    {{ else if for.first }}
+                    <td rowspan="{{ $current_page_items.size }}" class="marks"></td>
+                    {{ end }}
+                    <td class="description">
+                        <span class="style-name">{{ $item.StyleName }}</span>
+                        {{ if $item.PoNumber && $item.PoNumber != "" }}
+                        <span class="po-line">{{ $item.PoNumber }}</span>
+                        {{ end }}
+                        <span class="style-line">
+                            <span class="style-no">
+                                {{ if $item.StyleNo && $item.StyleNo != "" }}
+                                {{ $item.StyleNo }}
+                                {{ end }}
+                            </span>
+                        </span>
+                    </td>
+                    <td class="package">{{ $item.Cartons | math.format 'G29' }}{{ $item.CtnUnitEN }}</td>
+                    <td class="quantity">{{ $item.Quantity | math.format 'G29' }}{{ $item.UnitEN }}</td>
+                    <td class="gw">{{ $item.GWTotal | math.format 'F2' }}KGS</td>
+                    <td class="nw">{{ $item.NWTotal | math.format 'F2' }}KGS</td>
+                    <td class="volume">{{ $item.Volume | math.format 'F3' }}CBM</td>
+                </tr>
+                {{ end }}
+
+                {{ if $is_last }}
+                <tr class="total-row">
+                    <td colspan="2">TOTAL:</td>
+                    <td>
+                        {{ for kvp in total_by_ctn_unit }}
+                            {{ if !for.first }};{{ end }}{{ kvp.value | math.format 'G29' }}{{ kvp.key }}
+                        {{ end }}
+                    </td>
+                    <td>
+                        {{ for kvp in total_by_qty_unit }}
+                            {{ if !for.first }};{{ end }}{{ kvp.value | math.format 'G29' }}{{ kvp.key }}
+                        {{ end }}
+                    </td>
+                    <td>{{ Invoice.TotalGrossWeight | math.format 'F2' }}KGS</td>
+                    <td>{{ Invoice.TotalNetWeight | math.format 'F2' }}KGS</td>
+                    <td>{{ Invoice.TotalVolume | math.format 'F3' }}CBM</td>
+                </tr>
+                {{ end }}
+            </table>
+
+            {{ if ShowSeal && $is_last }}
+            <div class="document-seal">
+                <img src="{{ doc_seal_path }}" style="width: 220px; height: 130px; opacity: 0.8;">
+            </div>
+            {{ end }}
+
+            {{ if $total_pages > 1 }}
+            <div class="page-number">{{ $page + 1 }}/{{ $total_pages }}</div>
+            {{ end }}
+        </div>
+        {{ $page = $page + 1 }}
+    {{ end }}
+</body>
+</html>

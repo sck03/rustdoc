@@ -1,0 +1,53 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim AS build
+WORKDIR /src
+
+COPY Directory.Build.props NuGet.Config version.json ./
+COPY src/ExportDocManager.Domain/ExportDocManager.Domain.csproj src/ExportDocManager.Domain/
+COPY src/ExportDocManager.Application/ExportDocManager.Application.csproj src/ExportDocManager.Application/
+COPY src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj src/ExportDocManager.Infrastructure/
+COPY src/ExportDocManager.Api/ExportDocManager.Api.csproj src/ExportDocManager.Api/
+RUN dotnet restore src/ExportDocManager.Api/ExportDocManager.Api.csproj --configfile NuGet.Config
+
+COPY src/ src/
+COPY Templates/ Templates/
+COPY Resources/ Resources/
+COPY OcrModels/ OcrModels/
+COPY Browsers/ Browsers/
+RUN dotnet publish src/ExportDocManager.Api/ExportDocManager.Api.csproj \
+    --configuration Release \
+    --no-restore \
+    --output /out \
+    /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim AS runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        chromium \
+        fonts-noto-cjk \
+        libasound2 \
+        libatk-bridge2.0-0 \
+        libatk1.0-0 \
+        libcups2 \
+        libdrm2 \
+        libgbm1 \
+        libgtk-3-0 \
+        libnss3 \
+        libx11-xcb1 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxfixes3 \
+        libxrandr2 \
+        tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=build /out/ ./
+ENV ASPNETCORE_URLS=http://0.0.0.0:5188 \
+    EXPORTDOCMANAGER_DATA_ROOT=/runtime-data \
+    EXPORTDOCMANAGER_NETWORK_MODE=true \
+    EXPORTDOCMANAGER_PRODUCT_EDITION=Full \
+    EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
+    TZ=Asia/Shanghai
+EXPOSE 5188
+ENTRYPOINT ["dotnet", "ExportDocManager.Api.dll"]

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+		@page {
+			size: A4 portrait; /* 纵向 */
+			margin: 1cm;
+		}
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+            position: relative;
+            top: 0;
+        }
+        .company-name { font-weight: bold; font-size: 16px; }
+        .title {
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 0;
+            position: relative;
+            top: 0;
+        }
+        .inline-info {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 5px;
+            position: relative;
+            top: 0;
+        }
+        .inline-info .left { flex: 1; }
+        .inline-info .right { flex: 1; text-align: right; }
+        .inline-info .right span { font-size: 12px; }
+        .address { white-space: pre-line; font-size: 10px; }
+        .terms { margin-top: 10px; font-size: 10px; white-space: pre-line; }
+        .signature {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            font-size: 10px;
+        }
+        .signature.with-seal { margin-top: 92px; }
+        .seller-signature {
+            position: relative;
+            min-width: 260px;
+            text-align: left;
+        }
+        .seller-signature.with-seal { min-height: 28px; }
+        .seller-seal {
+            position: absolute;
+            right: 0;
+            top: -92px;
+            width: 220px;
+            height: 130px;
+            opacity: 0.8;
+            pointer-events: none;
+            z-index: 1;
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { border: 1px solid black; padding: 8px; text-align: left; background-color: #f2f2f2; font-weight: bold; }
+        td { padding: 8px; text-align: left; border-left: 1px solid black; border-right: 1px solid black; }
+        .total-row td { border: 1px solid black; border-top: 1px solid black; font-weight: bold; font-size: 10px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">{{ Exporter.ExporterNameEN }}</div>
+    </div>
+    <div class="title">售货合同</div>
+    <div class="inline-info">
+        <div class="left">
+            买方: / Buyer:<br>
+            <span class="address">{{ Customer.CustomerNameEN }}</span><br>
+            <span class="address">{{ Customer.AddressEN }}</span><br><br>
+            卖方: / Seller:<br>
+            <span class="address">{{ Exporter.ExporterNameEN }}</span>
+        </div>
+        <div class="right">
+			<br>
+            <span>合同号码(Contract No.): {{ Invoice.ContractNo }}</span><br><br>
+            <span>日期(Date): {{ Invoice.InvoiceDate }}</span><br><br>
+        </div>
+    </div>
+    <div class="terms">
+        双方同意按本合同所列条款由卖方出售，买方购进下列货物：
+        The sellers agree to sell and the Buyers agree to buy the under-mentioned commodities on the terms and conditions stated below:
+    </div>
+    <table style="font-size: 10px;">
+        <tr>
+            <th>Name of Commodity, Specification, Packing and Shipping Marks</th>
+            <th>Quantity</th>
+            <th>Unit Price</th>
+            <th>Total Amount</th>
+        </tr>
+        {{ for item in items }}
+        <tr>
+            <td>{{ item.StyleNo }} {{ item.StyleName }}</td>
+            <td>{{ item.Quantity | math.format 'G29' }}{{ item.UnitEN }}</td>
+            <td>{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'G29' }}</td>
+            <td>{{ Invoice.Currency }}{{ item.TotalPrice | math.format 'F2' }}</td>
+        </tr>
+        {{ end }}
+        <tr class="total-row">
+            <td>TOTAL:</td>
+            <td>
+                {{ for kvp in total_by_qty_unit }}
+                    {{ if !for.first }};{{ end }}{{ kvp.value | math.format 'G29' }}{{ kvp.key }}
+                {{ end }}
+            </td>
+            <td></td>
+            <td>{{ Invoice.Currency }}{{ Invoice.TotalAmount | math.format 'F2' }}</td>
+        </tr>
+    </table>
+	<table style="border-collapse: collapse; border: 0; width: 100%; font-size: 10px;">
+		<tr>
+			<td style="width: 20%; border: 0; padding: 2px;">(5)装运期限:</td>
+			<td style="width: 20%; border: 0; padding: 2px;">{{ Invoice.ShipmentDate }}</td>
+			<td style="width: 35%; border: 0; padding: 2px;">(6)装运数量允许有 5 % 的增减。</td>
+			<td style="width: 25%; border: 0; padding: 2px;"></td>
+		</tr>
+		<tr>
+			<td style="width: 20%; border: 0; padding: 2px;">Time of shipment:</td>
+			<td style="width: 20%; border: 0; padding: 2px;"></td>
+			<td style="width: 35%; border: 0; padding: 2px;">Shipment quantity 5 % more or less allowed</td>
+			<td style="width: 25%; border: 0; padding: 2px;"></td>
+		</tr>
+		<tr>
+			<td style="width: 20%; border: 0; padding: 2px;">(7)装运口岸:</td>
+			<td style="width: 20%; border: 0; padding: 2px;">{{ Invoice.PortOfLoading }}</td>
+			<td style="width: 20%; border: 0; padding: 2px;">(8)目的港:</td>
+			<td style="width: 30%; border: 0; padding: 2px;">{{ Invoice.PortOfDestination }}</td>
+		</tr>
+		<tr>
+			<td style="width: 20%; border: 0; padding: 2px;">Port of loading:</td>
+			<td style="width: 20%; border: 0; padding: 2px;"></td>
+			<td style="width: 20%; border: 0; padding: 2px;">Port of destination:</td>
+			<td style="width: 30%; border: 0; padding: 2px;"></td>
+		</tr>
+	</table>
+    <div class="terms">
+        (9)交货条件：FOB/CFR/CIF 若无另外规定均按照《国际贸易术语解释通则（ TNCOTERMS）1990》办理。
+        Terms of delivery: FOB/CFR/CIF shall conform to 《INCOTERMS1990》unless otherwise agreed.
+        (10)保 险：由卖方按发票总值的110%投保一切险加战争险，如买方欲增加其他险别或超过上述额度保险时须事先征得卖方同意，增加的保费由买方承担。
+        Insurance: To be covered by the sellers for 110% of the total value against, all risks and war risks. Should the Buyers desire to cover for other risks besides the above mentioned or for an amount exceeding the above mentioned limit. The sellers’ approval must be obtained first and all additional premium charges incurred therewith shall be for buyers’ account.
+        (11)付款条件：Terms of payment {{ Invoice.PaymentTerms }}
+    </div>
+    <div class="signature{{ if ShowSeal }} with-seal{{ end }}">
+        <div>买方签字：<br>The buyers’ signature:</div>
+        <div class="seller-signature{{ if ShowSeal }} with-seal{{ end }}">
+            {{ if ShowSeal }}
+            <img src="{{ doc_seal_path }}" class="seller-seal">
+            {{ end }}
+            卖方签字：<br>The sellers’ signature:
+        </div>
+    </div>
+</body>
+</html>
