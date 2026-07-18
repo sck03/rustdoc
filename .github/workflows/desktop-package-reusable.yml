@@ -157,9 +157,10 @@ jobs:
             throw "Chrome Headless Shell was not staged under '$browserRoot'."
           }
           if ($env:RUNNER_OS -ne "Windows") {
-            & /usr/bin/test -x $browser.FullName
+            $chmod = Get-Command chmod -ErrorAction Stop
+            & $chmod.Source "+x" $browser.FullName
             if ($LASTEXITCODE -ne 0) {
-              throw "Chrome Headless Shell is not executable: $($browser.FullName)"
+              throw "Failed to make Chrome Headless Shell executable: $($browser.FullName)"
             }
           }
           Write-Host "Chrome Headless Shell staged at $($browser.FullName)"
@@ -182,9 +183,10 @@ jobs:
             throw "Chrome Headless Shell did not enter the Tauri resource staging directory '$resourceRoot'."
           }
           if ($env:RUNNER_OS -ne "Windows") {
-            & /usr/bin/test -x $browser.FullName
+            $chmod = Get-Command chmod -ErrorAction Stop
+            & $chmod.Source "+x" $browser.FullName
             if ($LASTEXITCODE -ne 0) {
-              throw "Bundled Chrome Headless Shell is not executable: $($browser.FullName)"
+              throw "Failed to preserve bundled Chrome Headless Shell executable permission: $($browser.FullName)"
             }
           }
           Write-Host "Chrome Headless Shell bundled from $($browser.FullName)"
