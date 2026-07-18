@@ -315,7 +315,10 @@ function Set-UnixExecutablePermission {
         throw "chmod was not found; cannot make the bundled browser executable: $Path"
     }
 
-    & $chmod.Source "+x" "--" $Path
+    # macOS uses BSD chmod, which treats the GNU-style `--` separator as a
+    # file name. The path is already passed as one PowerShell argument and is
+    # always an absolute repository path, so no separator is required.
+    & $chmod.Source "+x" $Path
     if ($LASTEXITCODE -ne 0) {
         throw "chmod failed for the bundled browser executable: $Path"
     }
