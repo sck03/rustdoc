@@ -36,10 +36,7 @@ namespace ExportDocManager.Api.Tests
                 .Options;
             var factory = new PostgreSqlTestDbContextFactory(options);
 
-            await using (var cleanup = factory.CreateDbContext())
-            {
-                await cleanup.Database.EnsureDeletedAsync();
-            }
+            await ResetPublicSchemaAsync(connectionString);
 
             try
             {
@@ -86,10 +83,22 @@ namespace ExportDocManager.Api.Tests
             }
             finally
             {
+                await ResetPublicSchemaAsync(connectionString);
                 NpgsqlConnection.ClearAllPools();
-                await using var cleanup = factory.CreateDbContext();
-                await cleanup.Database.EnsureDeletedAsync();
             }
+        }
+
+        private static async Task ResetPublicSchemaAsync(string connectionString)
+        {
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                DROP SCHEMA IF EXISTS public CASCADE;
+                CREATE SCHEMA public;
+                GRANT ALL ON SCHEMA public TO PUBLIC;
+                """;
+            await command.ExecuteNonQueryAsync();
         }
 
         private sealed class PostgreSqlTestDbContextFactory : IDbContextFactory<AppDbContext>
