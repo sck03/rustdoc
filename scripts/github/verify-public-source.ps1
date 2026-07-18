@@ -89,7 +89,13 @@ foreach ($relativePathValue in ($candidateFiles | Sort-Object -Unique)) {
         continue
     }
 
-    $file = Get-Item -LiteralPath $absolutePath
+    # PowerShell treats Unix dotfiles such as .dockerignore as hidden items.
+    # Use FileInfo directly so a clean Linux checkout is handled exactly like
+    # Windows and does not require provider-specific -Force behavior.
+    $file = [System.IO.FileInfo]::new($absolutePath)
+    if (-not $file.Exists) {
+        continue
+    }
     $checkedFiles++
     $checkedBytes += $file.Length
     if ($file.Length -ge 95MB) {
