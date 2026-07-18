@@ -21,7 +21,9 @@ app.UseExportDocManagerDesktopAccess();
 app.UseExportDocManagerApiAuthentication();
 app.UseExportDocManagerWorkspaceAccess();
 app.UseExportDocManagerLicenseRequirement();
+app.UseExportDocManagerBrowserFrontend(pathProvider.AppRoot);
 app.MapExportDocManagerApiEndpoints(runtimeOptions, databaseSettings);
+app.MapExportDocManagerBrowserFallback(pathProvider.AppRoot);
 app.Run();
 
 public partial class Program

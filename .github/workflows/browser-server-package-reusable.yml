@@ -1,0 +1,170 @@
+name: Reusable browser server package
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+      runtime_identifier:
+        required: true
+        type: string
+      chrome_platform:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      publish_release:
+        required: true
+        type: boolean
+
+concurrency:
+  group: browser-server-${{ inputs.platform }}-${{ inputs.version }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ${{ inputs.runner }}
+    env:
+      DOTNET_CLI_HOME: ${{ github.workspace }}/.codex-runtime/dotnet-cli
+      NUGET_PACKAGES: ${{ github.workspace }}/.codex-runtime/nuget-packages
+      NUGET_HTTP_CACHE_PATH: ${{ github.workspace }}/.codex-runtime/nuget-http-cache
+      npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Verify public repository boundary
+        shell: pwsh
+        run: ./scripts/github/verify-public-source.ps1
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/export-doc-web/package-lock.json
+
+      - name: Install Web dependencies
+        run: npm ci --prefix apps/export-doc-web
+
+      - name: Validate and apply requested version
+        id: version
+        shell: pwsh
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          $version = $env:REQUESTED_VERSION.Trim()
+          if ($version.StartsWith("v", [System.StringComparison]::OrdinalIgnoreCase)) {
+            $version = $version.Substring(1)
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "版本格式无效：$($env:REQUESTED_VERSION)"
+          }
+          "value=$version" | Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          node scripts/sync-version.mjs $version
+
+      - name: Provision Chrome Headless Shell
+        shell: pwsh
+        run: >-
+          ./scripts/provision-chrome-for-testing.ps1
+          -Product ChromeHeadlessShell
+          -Platform ${{ inputs.chrome_platform }}
+
+      - name: Build shared browser frontend
+        run: npm --prefix apps/export-doc-web run build
+
+      - name: Restore browser server runtime graph
+        shell: pwsh
+        run: >-
+          dotnet restore src/ExportDocManager.Api/ExportDocManager.Api.csproj
+          --runtime ${{ inputs.runtime_identifier }}
+          --configfile NuGet.Config
+
+      - name: Publish self-contained browser server
+        shell: pwsh
+        run: >-
+          dotnet publish src/ExportDocManager.Api/ExportDocManager.Api.csproj
+          --configuration Release
+          --runtime ${{ inputs.runtime_identifier }}
+          --self-contained true
+          --no-restore
+          --output artifacts/browser-server/package
+          /p:PublishSingleFile=false
+          /p:PublishReadyToRun=false
+          /p:DebugType=None
+          /p:DebugSymbols=false
+
+      - name: Assemble browser server package
+        shell: pwsh
+        run: |
+          $packageRoot = Join-Path $env:GITHUB_WORKSPACE "artifacts/browser-server/package"
+          $webRoot = Join-Path $packageRoot "wwwroot"
+          New-Item -ItemType Directory -Path $webRoot -Force | Out-Null
+          Copy-Item -Path "apps/export-doc-web/dist/*" -Destination $webRoot -Recurse -Force
+          Copy-Item -LiteralPath "deploy/browser-server/appsettings.json" -Destination $packageRoot -Force
+          Copy-Item -LiteralPath "deploy/browser-server/start-windows.ps1" -Destination $packageRoot -Force
+          Copy-Item -LiteralPath "deploy/browser-server/start-linux.sh" -Destination $packageRoot -Force
+
+          $browser = Get-ChildItem -LiteralPath (Join-Path $packageRoot "Browsers") -File -Recurse |
+            Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome-headless-shell") } |
+            Select-Object -First 1
+          if ($null -eq $browser) { throw "Chrome Headless Shell was not included in the server package." }
+          if (-not (Test-Path -LiteralPath (Join-Path $webRoot "index.html"))) { throw "Web index.html was not included." }
+          if ("${{ inputs.platform }}" -eq "linux") {
+            & chmod +x -- (Join-Path $packageRoot "ExportDocManager.Api") (Join-Path $packageRoot "start-linux.sh") $browser.FullName
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Create downloadable archive
+        id: archive
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.value }}"
+          $releaseRoot = Join-Path $env:GITHUB_WORKSPACE "artifacts/browser-server/release"
+          $packageRoot = Join-Path $env:GITHUB_WORKSPACE "artifacts/browser-server/package"
+          New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
+          if ("${{ inputs.platform }}" -eq "windows") {
+            $archive = Join-Path $releaseRoot "export-doc-manager-browser-server-windows-x64-$version.zip"
+            Compress-Archive -Path (Join-Path $packageRoot "*") -DestinationPath $archive -CompressionLevel Optimal
+          } else {
+            $archive = Join-Path $releaseRoot "export-doc-manager-browser-server-linux-x64-$version.tar.gz"
+            & tar -czf $archive -C $packageRoot .
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          "path=$archive" | Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload browser server artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: export-doc-manager-browser-server-${{ inputs.platform }}-${{ steps.version.outputs.value }}
+          path: ${{ steps.archive.outputs.path }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Publish to GitHub Release
+        if: inputs.publish_release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v${{ steps.version.outputs.value }}"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --title "ExportDocManager ${{ steps.version.outputs.value }}" --notes "testing"
+          }
+          gh release upload $tag "${{ steps.archive.outputs.path }}" --clobber
