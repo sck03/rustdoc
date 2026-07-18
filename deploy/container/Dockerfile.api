@@ -9,6 +9,7 @@ COPY src/ExportDocManager.Api/ExportDocManager.Api.csproj src/ExportDocManager.A
 RUN dotnet restore src/ExportDocManager.Api/ExportDocManager.Api.csproj --configfile NuGet.Config
 
 COPY src/ src/
+COPY Shared/ Shared/
 COPY Templates/ Templates/
 COPY Resources/ Resources/
 COPY OcrModels/ OcrModels/
