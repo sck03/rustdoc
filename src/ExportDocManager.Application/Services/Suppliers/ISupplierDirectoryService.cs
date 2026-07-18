@@ -4,30 +4,30 @@ namespace ExportDocManager.Services.Suppliers
 {
     public sealed record SupplierRecord(
         int Id, string Name, string CountryRegion, string Category, string Website,
-        string Status, string MainProducts, string Notes);
+        string Status, string MainProducts, string Notes, int VersionNumber);
 
     public sealed record SupplierContactRecord(
         int Id, int SupplierCompanyId, string Name, string Title, string Email,
-        string Phone, string InstantMessaging, bool IsPrimary);
+        string Phone, string InstantMessaging, bool IsPrimary, int VersionNumber);
 
     public sealed record SupplierSaveRequest(
         int Id, string Name, string CountryRegion, string Category, string Website,
-        string Status, string MainProducts, string Notes);
+        string Status, string MainProducts, string Notes, int ExpectedVersion = 0);
 
     public sealed record SupplierContactSaveRequest(
         int Id, int SupplierCompanyId, string Name, string Title, string Email,
-        string Phone, string InstantMessaging, bool IsPrimary);
+        string Phone, string InstantMessaging, bool IsPrimary, int ExpectedVersion = 0);
 
     public sealed record SupplierProductOptionRecord(int Id, string ProductCode, string NameCN, string NameEN);
 
     public sealed record SupplierProductLinkRecord(
         int Id, int SupplierCompanyId, int ProductId, string ProductCode, string ProductNameCN,
         string ProductNameEN, string SupplierProductCode, decimal ReferencePrice, string Currency,
-        int LeadTimeDays, string Status);
+        int LeadTimeDays, string Status, int VersionNumber);
 
     public sealed record SupplierProductLinkSaveRequest(
         int Id, int SupplierCompanyId, int ProductId, string SupplierProductCode,
-        decimal ReferencePrice, string Currency, int LeadTimeDays, string Status);
+        decimal ReferencePrice, string Currency, int LeadTimeDays, string Status, int ExpectedVersion = 0);
 
     public sealed record SupplierImportRow(
         int RowNumber, string Name, string CountryRegion, string Category, string Website,

@@ -57,7 +57,7 @@ namespace ExportDocManager.Services.Security
 
             if (PasswordHasher.VerifyPassword(user.PasswordHash, password))
             {
-                PopulateEffectiveModuleAccess(user);
+                UserPermissionAccessResolver.PopulateEffectiveModuleAccess(user);
                 return user;
             }
 
@@ -67,7 +67,45 @@ namespace ExportDocManager.Services.Security
         public async Task<User> GetUserByUsernameAsync(string username)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.Users.FirstOrDefaultAsync(u => u.Username == username);
+            var normalizedUsername = (username ?? string.Empty).Trim();
+            var user = (await context.Users
+                    .Include(item => item.PermissionTemplate)
+                    .ThenInclude(template => template.Modules)
+                    .Where(item => item.IsActive)
+                    .ToListAsync())
+                .FirstOrDefault(item => string.Equals(
+                    item.Username,
+                    normalizedUsername,
+                    StringComparison.OrdinalIgnoreCase));
+            if (user != null)
+            {
+                UserPermissionAccessResolver.PopulateEffectiveModuleAccess(user);
+            }
+
+            return user;
+        }
+
+        public async Task<User> GetActiveUserByIdAsync(
+            int userId,
+            CancellationToken cancellationToken = default)
+        {
+            if (userId <= 0)
+            {
+                return null;
+            }
+
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var user = await context.Users
+                .Include(item => item.PermissionTemplate)
+                .ThenInclude(template => template.Modules)
+                .AsNoTracking()
+                .SingleOrDefaultAsync(item => item.Id == userId && item.IsActive, cancellationToken);
+            if (user != null)
+            {
+                UserPermissionAccessResolver.PopulateEffectiveModuleAccess(user);
+            }
+
+            return user;
         }
 
         public async Task<IReadOnlyList<User>> GetUsersAsync(CancellationToken cancellationToken = default)
@@ -284,32 +322,6 @@ namespace ExportDocManager.Services.Security
         private static bool CanManageUsers(User user)
         {
             return BusinessDataAccessScope.CanViewAllBusinessData(user);
-        }
-
-        private static void PopulateEffectiveModuleAccess(User user)
-        {
-            if (user.PermissionTemplate != null)
-            {
-                user.EffectiveModuleAccess = user.PermissionTemplate.IsActive
-                    ? user.PermissionTemplate.Modules
-                        .Where(module => PermissionModuleCatalog.IsKnown(module.ModuleKey))
-                        .GroupBy(module => module.ModuleKey, StringComparer.OrdinalIgnoreCase)
-                        .ToDictionary(
-                            group => group.Key,
-                            group => PermissionAccessLevel.Normalize(group.Last().AccessLevel),
-                            StringComparer.OrdinalIgnoreCase)
-                    : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                return;
-            }
-
-            if (user.PermissionTemplateId == null)
-            {
-                user.EffectiveModuleAccess = BuiltInPermissionTemplateCatalog.FindForRole(user.Role)
-                    .GetModuleAccess();
-                return;
-            }
-
-            user.EffectiveModuleAccess = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         }
 
         private static async Task<int> ResolvePermissionTemplateIdAsync(

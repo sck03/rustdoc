@@ -139,13 +139,26 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("请求体付款ID与路径ID不一致。"));
                 }
 
+                if (string.IsNullOrWhiteSpace(request.RowVersion))
+                {
+                    return Results.Conflict(new ApiErrorResponse("付款记录缺少版本号，请刷新后重试。"));
+                }
+
                 var existing = await paymentDetailReadRepository.GetByIdAsync(id, cancellationToken);
                 if (existing == null)
                 {
                     return Results.NotFound();
                 }
 
-                var payment = ApiPaymentDtoFactory.ToPaymentForSave(request);
+                Payment payment;
+                try
+                {
+                    payment = ApiPaymentDtoFactory.ToPaymentForSave(request);
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                }
                 payment.Id = id;
                 ApiPaymentDtoFactory.PreserveExistingOwnership(payment, existing);
 

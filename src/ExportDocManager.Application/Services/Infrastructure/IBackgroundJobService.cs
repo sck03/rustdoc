@@ -50,6 +50,8 @@ namespace ExportDocManager.Services.Infrastructure
 
         public string RequestedBy { get; init; } = string.Empty;
 
+        public int RequestedByUserId { get; init; }
+
         public DateTimeOffset CreatedAt { get; init; }
 
         public DateTimeOffset? StartedAt { get; init; }

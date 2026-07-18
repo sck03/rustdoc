@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
+using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -23,6 +25,21 @@ namespace ExportDocManager.Api.Hosting
 
             _pathProvider = pathProvider;
             _storePath = Path.Combine(pathProvider.CacheRoot, "BackgroundJobs", "jobs.json");
+            LoadPersistedJobs();
+        }
+
+        public ApiBackgroundJobService(
+            IAppPathProvider pathProvider,
+            DatabaseConnectionSettings databaseSettings,
+            IDbContextFactory<AppDbContext> contextFactory)
+        {
+            _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+            _useDatabaseStore = DatabaseModeHelper.UsesPostgreSql(
+                databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings)));
+            _storePath = _useDatabaseStore
+                ? string.Empty
+                : Path.Combine(pathProvider.CacheRoot, "BackgroundJobs", "jobs.json");
             LoadPersistedJobs();
         }
 
@@ -70,7 +87,7 @@ namespace ExportDocManager.Api.Hosting
             bool updated = _jobs.TryUpdate(key, next, job);
             if (updated)
             {
-                PersistJobs();
+                PersistJob(next);
             }
 
             return Task.FromResult(updated);
@@ -95,7 +112,7 @@ namespace ExportDocManager.Api.Hosting
             if (removed)
             {
                 TryDeleteControlledBrowserOutput(removedJob?.OutputPath);
-                PersistJobs();
+                DeletePersistedJobs(new[] { key });
             }
 
             return Task.FromResult(removed);
@@ -107,6 +124,7 @@ namespace ExportDocManager.Api.Hosting
         {
             requestedBy = requestedBy?.Trim() ?? string.Empty;
             int removedCount = 0;
+            var removedJobIds = new List<string>();
             foreach (var pair in _jobs.ToArray())
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -124,13 +142,14 @@ namespace ExportDocManager.Api.Hosting
                 if (_jobs.TryRemove(pair.Key, out var removedJob))
                 {
                     TryDeleteControlledBrowserOutput(removedJob?.OutputPath);
+                    removedJobIds.Add(pair.Key);
                     removedCount++;
                 }
             }
 
             if (removedCount > 0)
             {
-                PersistJobs();
+                DeletePersistedJobs(removedJobIds);
             }
 
             return Task.FromResult(removedCount);
@@ -185,6 +204,7 @@ namespace ExportDocManager.Api.Hosting
                 StatusText = job.StatusText ?? string.Empty,
                 DetailText = job.DetailText ?? string.Empty,
                 RequestedBy = job.RequestedBy ?? string.Empty,
+                RequestedByUserId = job.RequestedByUserId,
                 CreatedAt = job.CreatedAt == default ? DateTimeOffset.UtcNow : job.CreatedAt,
                 StartedAt = job.StartedAt,
                 CompletedAt = job.CompletedAt,
@@ -197,7 +217,7 @@ namespace ExportDocManager.Api.Hosting
             };
 
             _jobs.AddOrUpdate(key, normalized, (_, _) => normalized);
-            PersistJobs();
+            PersistJob(normalized);
             return normalized;
         }
 
@@ -214,7 +234,7 @@ namespace ExportDocManager.Api.Hosting
                 var next = Normalize(update(current), current);
                 if (_jobs.TryUpdate(key, next, current))
                 {
-                    PersistJobs();
+                    PersistJob(next);
                     return next;
                 }
             }
@@ -260,6 +280,9 @@ namespace ExportDocManager.Api.Hosting
                 StatusText = job.StatusText ?? string.Empty,
                 DetailText = job.DetailText ?? string.Empty,
                 RequestedBy = job.RequestedBy ?? fallback.RequestedBy ?? string.Empty,
+                RequestedByUserId = job.RequestedByUserId > 0
+                    ? job.RequestedByUserId
+                    : fallback.RequestedByUserId,
                 CreatedAt = job.CreatedAt == default ? fallback.CreatedAt : job.CreatedAt,
                 StartedAt = job.StartedAt,
                 CompletedAt = job.CompletedAt,

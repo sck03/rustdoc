@@ -41,6 +41,13 @@ fn main() {
 
 fn run_tauri_app() -> tauri::Result<()> {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .invoke_handler(tauri::generate_handler![
             desktop_commands::select_single_window_package_file,
             desktop_commands::select_invoice_transfer_package_file,

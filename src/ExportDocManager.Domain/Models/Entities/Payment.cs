@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace ExportDocManager.Models.Entities
 {
@@ -36,5 +37,8 @@ namespace ExportDocManager.Models.Entities
         public decimal FreightMiscExpense { get; set; }
         public decimal InspectionExpense { get; set; }
         public decimal OtherExpense { get; set; }
+
+        [ConcurrencyCheck]
+        public byte[] RowVersion { get; set; }
     }
 }

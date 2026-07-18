@@ -118,7 +118,8 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
     event.preventDefault();
     if (!canEdit) return;
     const id = selected?.id ?? 0;
-    const body = { id, name: name.trim(), category: category.trim() || "通用", subject, bodyHtml, isActive, isShared };
+    const body = { id, name: name.trim(), category: category.trim() || "通用", subject, bodyHtml, isActive, isShared,
+      expectedVersion: id > 0 ? selected?.versionNumber ?? 0 : 0 };
     try {
       const saved = id ? await client.updateEmailTemplate({ id, body }) : await client.createEmailTemplate({ body });
       const nextIncludeInactive = includeInactive || !saved.isActive;

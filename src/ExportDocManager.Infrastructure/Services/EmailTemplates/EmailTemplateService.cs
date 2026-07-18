@@ -66,6 +66,11 @@ namespace ExportDocManager.Services.EmailTemplates
                 entity = await _accessScope.ApplyOwnedEmailTemplateScope(context.EmailTemplates)
                     .FirstOrDefaultAsync(item => item.Id == request.Id, cancellationToken)
                     ?? throw new KeyNotFoundException("邮件模板不存在或无权访问。");
+                if (request.ExpectedVersion <= 0)
+                    throw new BusinessConcurrencyException("保存现有邮件模板时必须提供版本号，请刷新后重试。");
+                if (entity.VersionNumber != request.ExpectedVersion)
+                    throw new BusinessConcurrencyException("该邮件模板已被其他用户修改，请刷新后重试。");
+                context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = request.ExpectedVersion;
             }
             else
             {
@@ -88,7 +93,14 @@ namespace ExportDocManager.Services.EmailTemplates
             entity.VersionNumber = isNew ? 1 : Math.Max(1, entity.VersionNumber + 1);
             entity.UpdatedAt = now;
             await context.EmailTemplateVersions.AddAsync(CreateVersion(entity, isNew ? "创建" : "更新", now), cancellationToken);
-            await context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException("该邮件模板已被其他用户修改，请刷新后重试。", exception);
+            }
             return ToRecord(entity);
         }
 
@@ -122,6 +134,8 @@ namespace ExportDocManager.Services.EmailTemplates
                 .FirstOrDefaultAsync(item => item.EmailTemplateId == id && item.VersionNumber == versionNumber, cancellationToken)
                 ?? throw new KeyNotFoundException("邮件模板历史版本不存在。");
             if (source.VersionNumber == entity.VersionNumber) return ToRecord(entity);
+            int expectedVersion = entity.VersionNumber;
+            context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = expectedVersion;
             bool duplicate = await _accessScope.ApplyOwnedEmailTemplateScope(context.EmailTemplates.AsNoTracking())
                 .AnyAsync(item => item.Id != id && item.Name == source.Name && item.Category == source.Category, cancellationToken);
             if (duplicate) throw new ArgumentException("恢复后的分类和名称与现有邮件模板重复。");
@@ -136,7 +150,14 @@ namespace ExportDocManager.Services.EmailTemplates
             entity.UpdatedAt = DateTimeOffset.UtcNow;
             await context.EmailTemplateVersions.AddAsync(
                 CreateVersion(entity, $"恢复 V{source.VersionNumber}", entity.UpdatedAt), cancellationToken);
-            await context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException("该邮件模板已被其他用户修改，请刷新后重试。", exception);
+            }
             return ToRecord(entity);
         }
 
@@ -147,7 +168,14 @@ namespace ExportDocManager.Services.EmailTemplates
                 .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
             if (entity == null) return false;
             context.EmailTemplates.Remove(entity);
-            await context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException("该邮件模板已被其他用户修改，请刷新后重试。", exception);
+            }
             return true;
         }
 

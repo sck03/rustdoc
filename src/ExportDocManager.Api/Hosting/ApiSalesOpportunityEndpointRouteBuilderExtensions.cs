@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Opportunities;
+using ExportDocManager.Services.Security;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -44,24 +45,30 @@ namespace ExportDocManager.Api.Hosting
                 if (request == null || id <= 0) return Results.BadRequest(new ApiErrorResponse("商机ID无效。"));
                 try { return Results.Ok(ToApiDto(await service.SaveAsync(ToSaveRequest(request, id), ct))); }
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
             }).WithName("UpdateSalesOpportunity");
             endpoints.MapDelete("/api/crm/opportunities/{id:int}", async (HttpContext c, IApiSessionTokenService t,
                 ApiAuthorizationService a, ISalesOpportunityService service, int id, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(c, t, a, out var denied)) return denied;
-                return await service.DeleteAsync(id, ct)
-                    ? Results.Ok(new ApiCommandResponse(true, "商机已删除。")) : Results.NotFound();
+                try
+                {
+                    return await service.DeleteAsync(id, ct)
+                        ? Results.Ok(new ApiCommandResponse(true, "商机已删除。")) : Results.NotFound();
+                }
+                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
             }).WithName("DeleteSalesOpportunity");
         }
 
         private static ApiSalesOpportunityDto ToApiDto(SalesOpportunityRecord item) => new(item.Id, item.CrmCustomerId,
             item.CustomerName, item.ProductId, item.ProductCode, item.ProductName, item.Title, item.Stage,
             item.QuotationNo, item.EstimatedAmount, item.Currency, item.ProbabilityPercent,
-            item.ExpectedCloseAt, item.NextAction, item.Notes);
+            item.ExpectedCloseAt, item.NextAction, item.Notes, item.VersionNumber);
         private static SalesOpportunitySaveRequest ToSaveRequest(ApiSalesOpportunitySaveRequest item, int id) =>
             new(id, item.CrmCustomerId, item.ProductId, item.Title, item.Stage, item.QuotationNo,
-                item.EstimatedAmount, item.Currency, item.ProbabilityPercent, item.ExpectedCloseAt, item.NextAction, item.Notes, item.ChangeNote);
+                item.EstimatedAmount, item.Currency, item.ProbabilityPercent, item.ExpectedCloseAt, item.NextAction,
+                item.Notes, item.ChangeNote, item.ExpectedVersion);
         private static ApiSalesOpportunityHistoryDto ToApiDto(SalesOpportunityHistoryRecord item) =>
             new(item.Id, item.SalesOpportunityId, item.VersionNumber, item.ChangeType, item.Stage,
                 item.QuotationNo, item.EstimatedAmount, item.Currency, item.ProbabilityPercent,

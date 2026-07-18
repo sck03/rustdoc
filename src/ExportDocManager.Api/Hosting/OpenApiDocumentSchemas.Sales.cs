@@ -57,7 +57,7 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiSalesOpportunityDto"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "crmCustomerId", "customerName", "title", "stage", "quotationNo", "estimatedAmount", "currency", "probabilityPercent", "nextAction", "notes" },
+                            required = new[] { "id", "crmCustomerId", "customerName", "title", "stage", "quotationNo", "estimatedAmount", "currency", "probabilityPercent", "nextAction", "notes", "versionNumber" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" }, ["crmCustomerId"] = new { type = "integer", format = "int32" },
@@ -67,13 +67,14 @@ namespace ExportDocManager.Api.Hosting
                                 ["quotationNo"] = StringProperty("Latest quotation tracking number."), ["estimatedAmount"] = new { type = "number", format = "decimal" },
                                 ["currency"] = StringProperty("ISO currency code."), ["probabilityPercent"] = new { type = "integer", format = "int32" },
                                 ["expectedCloseAt"] = new { type = "string", format = "date-time", nullable = true },
-                                ["nextAction"] = StringProperty("Next action."), ["notes"] = StringProperty("Notes.")
+                                ["nextAction"] = StringProperty("Next action."), ["notes"] = StringProperty("Notes."),
+                                ["versionNumber"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiSalesOpportunitySaveRequest"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "crmCustomerId", "title", "stage", "quotationNo", "estimatedAmount", "currency", "probabilityPercent", "nextAction", "notes", "changeNote" },
+                            required = new[] { "id", "crmCustomerId", "title", "stage", "quotationNo", "estimatedAmount", "currency", "probabilityPercent", "nextAction", "notes", "changeNote", "expectedVersion" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" }, ["crmCustomerId"] = new { type = "integer", format = "int32" },
@@ -83,7 +84,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["probabilityPercent"] = new { type = "integer", format = "int32" },
                                 ["expectedCloseAt"] = new { type = "string", format = "date-time", nullable = true },
                                 ["nextAction"] = StringProperty("Next action."), ["notes"] = StringProperty("Notes."),
-                                ["changeNote"] = StringProperty("Append-only history note for this change.")
+                                ["changeNote"] = StringProperty("Append-only history note for this change."),
+                                ["expectedVersion"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiSalesOpportunityHistoryDto"] = new
@@ -120,7 +122,7 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiCrmCustomerDto"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "name", "status" },
+                            required = new[] { "id", "name", "status", "versionNumber" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" },
@@ -130,13 +132,14 @@ namespace ExportDocManager.Api.Hosting
                                 ["status"] = StringProperty("Customer status."),
                                 ["source"] = StringProperty("Customer source."),
                                 ["notes"] = StringProperty("Notes."),
-                                ["linkedDocumentCustomerId"] = new { type = "integer", format = "int32", nullable = true }
+                                ["linkedDocumentCustomerId"] = new { type = "integer", format = "int32", nullable = true },
+                                ["versionNumber"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiCrmCustomerSaveRequest"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "name", "status" },
+                            required = new[] { "id", "name", "status", "expectedVersion" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" },
@@ -146,13 +149,14 @@ namespace ExportDocManager.Api.Hosting
                                 ["status"] = StringProperty("Customer status."),
                                 ["source"] = StringProperty("Customer source."),
                                 ["notes"] = StringProperty("Notes."),
-                                ["linkedDocumentCustomerId"] = new { type = "integer", format = "int32", nullable = true }
+                                ["linkedDocumentCustomerId"] = new { type = "integer", format = "int32", nullable = true },
+                                ["expectedVersion"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiCrmContactDto"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "crmCustomerId", "name", "isPrimary" },
+                            required = new[] { "id", "crmCustomerId", "name", "isPrimary", "versionNumber" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" },
@@ -162,13 +166,14 @@ namespace ExportDocManager.Api.Hosting
                                 ["email"] = StringProperty("Email."),
                                 ["phone"] = StringProperty("Phone."),
                                 ["instantMessaging"] = StringProperty("Instant messaging account."),
-                                ["isPrimary"] = new { type = "boolean" }
+                                ["isPrimary"] = new { type = "boolean" },
+                                ["versionNumber"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiCrmContactSaveRequest"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "crmCustomerId", "name", "isPrimary" },
+                            required = new[] { "id", "crmCustomerId", "name", "isPrimary", "expectedVersion" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" },
@@ -178,13 +183,14 @@ namespace ExportDocManager.Api.Hosting
                                 ["email"] = StringProperty("Email."),
                                 ["phone"] = StringProperty("Phone."),
                                 ["instantMessaging"] = StringProperty("Instant messaging account."),
-                                ["isPrimary"] = new { type = "boolean" }
+                                ["isPrimary"] = new { type = "boolean" },
+                                ["expectedVersion"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiCrmFollowUpDto"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "crmCustomerId", "customerName", "contactName", "type", "summary", "followedUpAt", "isCompleted", "createdAt", "updatedAt" },
+                            required = new[] { "id", "crmCustomerId", "customerName", "contactName", "type", "summary", "followedUpAt", "isCompleted", "createdAt", "updatedAt", "versionNumber" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" },
@@ -199,13 +205,14 @@ namespace ExportDocManager.Api.Hosting
                                 ["nextFollowUpAt"] = new { type = "string", format = "date-time", nullable = true },
                                 ["isCompleted"] = new { type = "boolean" },
                                 ["createdAt"] = new { type = "string", format = "date-time" },
-                                ["updatedAt"] = new { type = "string", format = "date-time" }
+                                ["updatedAt"] = new { type = "string", format = "date-time" },
+                                ["versionNumber"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiCrmFollowUpSaveRequest"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "crmCustomerId", "type", "summary", "isCompleted" },
+                            required = new[] { "id", "crmCustomerId", "type", "summary", "isCompleted", "expectedVersion" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" },
@@ -216,7 +223,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["nextAction"] = StringProperty("Next action."),
                                 ["followedUpAt"] = new { type = "string", format = "date-time", nullable = true },
                                 ["nextFollowUpAt"] = new { type = "string", format = "date-time", nullable = true },
-                                ["isCompleted"] = new { type = "boolean" }
+                                ["isCompleted"] = new { type = "boolean" },
+                                ["expectedVersion"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiCrmCustomerImportRowDto"] = new
@@ -315,13 +323,14 @@ namespace ExportDocManager.Api.Hosting
                         },
                         ["ApiEmailTemplateSaveRequest"] = new
                         {
-                            type = "object", required = new[] { "id", "name", "category", "subject", "bodyHtml", "isActive", "isShared" },
+                            type = "object", required = new[] { "id", "name", "category", "subject", "bodyHtml", "isActive", "isShared", "expectedVersion" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" }, ["name"] = StringProperty("Template name."),
                                 ["category"] = StringProperty("Template category."), ["subject"] = StringProperty("Email subject."),
                                 ["bodyHtml"] = StringProperty("Email HTML body."), ["isActive"] = new { type = "boolean" },
-                                ["isShared"] = new { type = "boolean" }
+                                ["isShared"] = new { type = "boolean" },
+                                ["expectedVersion"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiEmailTemplateVariableDto"] = new
@@ -371,49 +380,53 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiSupplierDto"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "name", "status" },
+                            required = new[] { "id", "name", "status", "versionNumber" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" }, ["name"] = StringProperty("Supplier name."),
                                 ["countryRegion"] = StringProperty("Country or region."), ["category"] = StringProperty("Supplier category."),
                                 ["website"] = StringProperty("Website."), ["status"] = StringProperty("Supplier status."),
-                                ["mainProducts"] = StringProperty("Main products."), ["notes"] = StringProperty("Notes.")
+                                ["mainProducts"] = StringProperty("Main products."), ["notes"] = StringProperty("Notes."),
+                                ["versionNumber"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiSupplierSaveRequest"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "name", "status" },
+                            required = new[] { "id", "name", "status", "expectedVersion" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" }, ["name"] = StringProperty("Supplier name."),
                                 ["countryRegion"] = StringProperty("Country or region."), ["category"] = StringProperty("Supplier category."),
                                 ["website"] = StringProperty("Website."), ["status"] = StringProperty("Supplier status."),
-                                ["mainProducts"] = StringProperty("Main products."), ["notes"] = StringProperty("Notes.")
+                                ["mainProducts"] = StringProperty("Main products."), ["notes"] = StringProperty("Notes."),
+                                ["expectedVersion"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiSupplierContactDto"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "supplierCompanyId", "name", "isPrimary" },
+                            required = new[] { "id", "supplierCompanyId", "name", "isPrimary", "versionNumber" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" }, ["supplierCompanyId"] = new { type = "integer", format = "int32" },
                                 ["name"] = StringProperty("Contact name."), ["title"] = StringProperty("Job title."),
                                 ["email"] = StringProperty("Email."), ["phone"] = StringProperty("Phone."),
-                                ["instantMessaging"] = StringProperty("Instant messaging."), ["isPrimary"] = new { type = "boolean" }
+                                ["instantMessaging"] = StringProperty("Instant messaging."), ["isPrimary"] = new { type = "boolean" },
+                                ["versionNumber"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiSupplierContactSaveRequest"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "supplierCompanyId", "name", "isPrimary" },
+                            required = new[] { "id", "supplierCompanyId", "name", "isPrimary", "expectedVersion" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" }, ["supplierCompanyId"] = new { type = "integer", format = "int32" },
                                 ["name"] = StringProperty("Contact name."), ["title"] = StringProperty("Job title."),
                                 ["email"] = StringProperty("Email."), ["phone"] = StringProperty("Phone."),
-                                ["instantMessaging"] = StringProperty("Instant messaging."), ["isPrimary"] = new { type = "boolean" }
+                                ["instantMessaging"] = StringProperty("Instant messaging."), ["isPrimary"] = new { type = "boolean" },
+                                ["expectedVersion"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiPagedResponseOfApiSupplierDto"] = new
@@ -491,7 +504,7 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiSupplierProductLinkDto"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "supplierCompanyId", "productId", "productCode", "productNameCN", "productNameEN", "supplierProductCode", "referencePrice", "currency", "leadTimeDays", "status" },
+                            required = new[] { "id", "supplierCompanyId", "productId", "productCode", "productNameCN", "productNameEN", "supplierProductCode", "referencePrice", "currency", "leadTimeDays", "status", "versionNumber" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" }, ["supplierCompanyId"] = new { type = "integer", format = "int32" },
@@ -499,24 +512,26 @@ namespace ExportDocManager.Api.Hosting
                                 ["productNameCN"] = StringProperty("Chinese product name."), ["productNameEN"] = StringProperty("English product name."),
                                 ["supplierProductCode"] = StringProperty("Supplier product code."), ["referencePrice"] = new { type = "number", format = "decimal" },
                                 ["currency"] = StringProperty("ISO currency code."), ["leadTimeDays"] = new { type = "integer", format = "int32" },
-                                ["status"] = StringProperty("Supply status.")
+                                ["status"] = StringProperty("Supply status."),
+                                ["versionNumber"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiSupplierProductLinkSaveRequest"] = new
                         {
-                            type = "object", required = new[] { "id", "supplierCompanyId", "productId", "supplierProductCode", "referencePrice", "currency", "leadTimeDays", "status" },
+                            type = "object", required = new[] { "id", "supplierCompanyId", "productId", "supplierProductCode", "referencePrice", "currency", "leadTimeDays", "status", "expectedVersion" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" }, ["supplierCompanyId"] = new { type = "integer", format = "int32" },
                                 ["productId"] = new { type = "integer", format = "int32" }, ["supplierProductCode"] = StringProperty("Supplier product code."),
                                 ["referencePrice"] = new { type = "number", format = "decimal" }, ["currency"] = StringProperty("ISO currency code."),
-                                ["leadTimeDays"] = new { type = "integer", format = "int32" }, ["status"] = StringProperty("Supply status.")
+                                ["leadTimeDays"] = new { type = "integer", format = "int32" }, ["status"] = StringProperty("Supply status."),
+                                ["expectedVersion"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiSupplierAssessmentDto"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "supplierCompanyId", "assessedAt", "assessmentKind", "qualityScore", "deliveryScore", "serviceScore", "priceScore", "averageScore", "conclusion", "notes", "assessedBy", "createdAt", "updatedAt" },
+                            required = new[] { "id", "supplierCompanyId", "assessedAt", "assessmentKind", "qualityScore", "deliveryScore", "serviceScore", "priceScore", "averageScore", "conclusion", "notes", "assessedBy", "createdAt", "updatedAt", "versionNumber" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" }, ["supplierCompanyId"] = new { type = "integer", format = "int32" },
@@ -525,20 +540,22 @@ namespace ExportDocManager.Api.Hosting
                                 ["serviceScore"] = new { type = "integer", format = "int32" }, ["priceScore"] = new { type = "integer", format = "int32" },
                                 ["averageScore"] = new { type = "number", format = "decimal" }, ["conclusion"] = StringProperty("Assessment conclusion."),
                                 ["notes"] = StringProperty("Assessment notes."), ["assessedBy"] = StringProperty("Account that saved the assessment."),
-                                ["createdAt"] = new { type = "string", format = "date-time" }, ["updatedAt"] = new { type = "string", format = "date-time" }
+                                ["createdAt"] = new { type = "string", format = "date-time" }, ["updatedAt"] = new { type = "string", format = "date-time" },
+                                ["versionNumber"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiSupplierAssessmentSaveRequest"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "supplierCompanyId", "assessedAt", "assessmentKind", "qualityScore", "deliveryScore", "serviceScore", "priceScore", "conclusion", "notes" },
+                            required = new[] { "id", "supplierCompanyId", "assessedAt", "assessmentKind", "qualityScore", "deliveryScore", "serviceScore", "priceScore", "conclusion", "notes", "expectedVersion" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" }, ["supplierCompanyId"] = new { type = "integer", format = "int32" },
                                 ["assessedAt"] = new { type = "string", format = "date-time" }, ["assessmentKind"] = StringProperty("Assessment kind."),
                                 ["qualityScore"] = new { type = "integer", format = "int32" }, ["deliveryScore"] = new { type = "integer", format = "int32" },
                                 ["serviceScore"] = new { type = "integer", format = "int32" }, ["priceScore"] = new { type = "integer", format = "int32" },
-                                ["conclusion"] = StringProperty("Assessment conclusion."), ["notes"] = StringProperty("Assessment notes.")
+                                ["conclusion"] = StringProperty("Assessment conclusion."), ["notes"] = StringProperty("Assessment notes."),
+                                ["expectedVersion"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiSupplierAssessmentOverviewItemDto"] = new

@@ -82,7 +82,7 @@ namespace ExportDocManager.Api.Tests
                         StringComparison.Ordinal));
             }
 
-            var updateResponse = await adminClient.PutAsJsonAsync($"/api/payments/{created.Id}", new
+            var updateRequest = new
             {
                 id = created.Id,
                 invoiceNo = "PAY-API-001",
@@ -110,13 +110,19 @@ namespace ExportDocManager.Api.Tests
                 repairExpense = 5m,
                 freightMiscExpense = 6m,
                 inspectionExpense = 7m,
-                otherExpense = 9m
-            });
+                otherExpense = 9m,
+                rowVersion = payment.RowVersion
+            };
+            var updateResponse = await adminClient.PutAsJsonAsync($"/api/payments/{created.Id}", updateRequest);
             Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
             var updated = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPaymentSaveResponse>(updateResponse);
             Assert.Equal(created.Id, updated.Id);
             Assert.Equal("Factory Updated", updated.Payment.PayeeName);
             Assert.Equal(150m, updated.Payment.USDAmount);
+            var staleUpdateResponse = await adminClient.PutAsJsonAsync(
+                $"/api/payments/{created.Id}",
+                updateRequest);
+            Assert.Equal(HttpStatusCode.Conflict, staleUpdateResponse.StatusCode);
 
             var deleteResponse = await adminClient.DeleteAsync($"/api/payments/{created.Id}");
             Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);

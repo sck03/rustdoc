@@ -1,0 +1,53 @@
+name: PostgreSQL integration validation
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: postgresql-integration-validation
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  postgresql-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: exportdoc_test
+          POSTGRES_USER: exportdoc
+          POSTGRES_PASSWORD: exportdoc-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U exportdoc -d exportdoc_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}/artifacts/nuget-packages
+      EXPORTDOC_TEST_POSTGRES_CONNECTION_STRING: Host=127.0.0.1;Port=5432;Database=exportdoc_test;Username=exportdoc;Password=exportdoc-test-password
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore tests/ExportDocManager.Api.Tests/ExportDocManager.Api.Tests.csproj
+
+      - name: Run real PostgreSQL integration test
+        run: >-
+          dotnet test tests/ExportDocManager.Api.Tests/ExportDocManager.Api.Tests.csproj
+          -c Release
+          --no-restore
+          --filter FullyQualifiedName~PostgreSqlIntegrationTests
+          --logger "console;verbosity=normal"

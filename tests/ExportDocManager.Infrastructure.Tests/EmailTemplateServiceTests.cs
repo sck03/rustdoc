@@ -69,7 +69,8 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.True(version1.CanRestore);
 
             var updated = await service.SaveAsync(new EmailTemplateSaveRequest(
-                copy.Id, copy.Name, copy.Category, "第二版", "<p>第二版</p>", true, false));
+                copy.Id, copy.Name, copy.Category, "第二版", "<p>第二版</p>", true, false,
+                copy.VersionNumber));
             Assert.Equal(2, updated.VersionNumber);
             Assert.Equal(2, (await service.ListVersionsAsync(copy.Id)).Count);
 
@@ -81,7 +82,8 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal("恢复 V1", versions[0].ChangeType);
 
             var unchanged = await service.SaveAsync(new EmailTemplateSaveRequest(
-                restored.Id, restored.Name, restored.Category, restored.Subject, restored.BodyHtml, restored.IsActive, restored.IsShared));
+                restored.Id, restored.Name, restored.Category, restored.Subject, restored.BodyHtml,
+                restored.IsActive, restored.IsShared, restored.VersionNumber));
             Assert.Equal(3, unchanged.VersionNumber);
             Assert.Equal(3, (await service.ListVersionsAsync(copy.Id)).Count);
         }

@@ -100,11 +100,17 @@ namespace ExportDocManager.Services.Reporting
                     throw new ArgumentException("不能修改报表模板类型。");
                 }
 
-                if (request.ExpectedVersion > 0 && entity.VersionNumber != request.ExpectedVersion)
+                if (request.ExpectedVersion <= 0)
+                {
+                    throw new UserReportTemplateConcurrencyException(
+                        "保存现有模板时必须提供版本号，请刷新后重试。");
+                }
+                if (entity.VersionNumber != request.ExpectedVersion)
                 {
                     throw new UserReportTemplateConcurrencyException(
                         "模板已被其他操作更新，请刷新后确认差异再保存。");
                 }
+                context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = request.ExpectedVersion;
             }
 
             int currentUserId = _accessScope.CurrentUser?.Id ?? 0;
@@ -138,7 +144,16 @@ namespace ExportDocManager.Services.Reporting
                 ChangedBy = _accessScope.CurrentUser?.Username ?? string.Empty,
                 CreatedAt = entity.UpdatedAt
             }, cancellationToken);
-            await context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new UserReportTemplateConcurrencyException(
+                    "模板已被其他操作更新，请刷新后确认差异再保存。",
+                    exception);
+            }
             return ToRecord(entity, true);
         }
 
@@ -193,6 +208,8 @@ namespace ExportDocManager.Services.Reporting
             {
                 return ToRecord(entity, true);
             }
+            int expectedVersion = entity.VersionNumber;
+            context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = expectedVersion;
 
             ValidateDataDomain(Enum.Parse<ReportDocumentType>(entity.ReportType), source.ContentHtml);
             entity.Name = source.Name;
@@ -215,7 +232,16 @@ namespace ExportDocManager.Services.Reporting
                 ChangedBy = _accessScope.CurrentUser?.Username ?? string.Empty,
                 CreatedAt = entity.UpdatedAt
             }, cancellationToken);
-            await context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new UserReportTemplateConcurrencyException(
+                    "模板已被其他操作更新，请刷新后确认差异再恢复。",
+                    exception);
+            }
             return ToRecord(entity, true);
         }
 
@@ -230,7 +256,16 @@ namespace ExportDocManager.Services.Reporting
             }
 
             context.UserReportTemplates.Remove(entity);
-            await context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new UserReportTemplateConcurrencyException(
+                    "模板已被其他操作更新，请刷新后重试。",
+                    exception);
+            }
             return true;
         }
 

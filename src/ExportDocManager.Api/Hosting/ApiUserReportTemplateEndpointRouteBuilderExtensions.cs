@@ -170,9 +170,16 @@ namespace ExportDocManager.Api.Hosting
                     return WriteForbidden("当前权限模板不允许删除设计模板。");
                 }
 
-                return await service.DeleteAsync(id, cancellationToken)
-                    ? Results.Ok(new ApiCommandResponse(true, "报表模板已删除。"))
-                    : Results.NotFound();
+                try
+                {
+                    return await service.DeleteAsync(id, cancellationToken)
+                        ? Results.Ok(new ApiCommandResponse(true, "报表模板已删除。"))
+                        : Results.NotFound();
+                }
+                catch (UserReportTemplateConcurrencyException ex)
+                {
+                    return Results.Conflict(new ApiErrorResponse(ex.Message));
+                }
             })
             .WithName("DeleteUserReportTemplate");
 

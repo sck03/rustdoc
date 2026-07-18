@@ -50,13 +50,19 @@ namespace ExportDocManager.Services.Suppliers
             SupplierCompany entity;
             if (request.Id > 0)
             {
+                if (request.ExpectedVersion <= 0)
+                    throw new BusinessConcurrencyException("保存现有供应商时必须提供版本号，请刷新后重试。");
                 entity = await _accessScope.ApplySupplierScope(context.SupplierCompanies)
                     .FirstOrDefaultAsync(item => item.Id == request.Id, cancellationToken)
                     ?? throw new KeyNotFoundException("供应商不存在或无权访问。");
+                if (entity.VersionNumber != request.ExpectedVersion)
+                    throw new BusinessConcurrencyException("该供应商已被其他用户修改，请刷新后重试。");
+                context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = request.ExpectedVersion;
+                entity.VersionNumber++;
             }
             else
             {
-                entity = new SupplierCompany();
+                entity = new SupplierCompany { VersionNumber = 1 };
                 _accessScope.ApplyOwner(entity);
                 await context.SupplierCompanies.AddAsync(entity, cancellationToken);
             }
@@ -68,7 +74,14 @@ namespace ExportDocManager.Services.Suppliers
             entity.MainProducts = Clean(request.MainProducts);
             entity.Notes = Clean(request.Notes);
             entity.UpdatedAt = DateTimeOffset.UtcNow;
-            await context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException("该供应商已被其他用户修改，请刷新后重试。", exception);
+            }
             return ToRecord(entity);
         }
 
@@ -79,7 +92,14 @@ namespace ExportDocManager.Services.Suppliers
                 .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
             if (entity == null) return false;
             context.SupplierCompanies.Remove(entity);
-            await context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException("该供应商已被其他用户修改，请刷新后重试。", exception);
+            }
             return true;
         }
 
@@ -93,8 +113,20 @@ namespace ExportDocManager.Services.Suppliers
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var rows = await _accessScope.ApplySupplierScope(context.SupplierCompanies)
                 .Where(item => normalizedIds.Contains(item.Id)).ToListAsync(cancellationToken);
-            foreach (var row in rows) { row.Status = status; row.UpdatedAt = DateTimeOffset.UtcNow; }
-            await context.SaveChangesAsync(cancellationToken);
+            foreach (var row in rows)
+            {
+                row.Status = status;
+                row.VersionNumber++;
+                row.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException("部分供应商已被其他用户修改，请刷新列表后重试。", exception);
+            }
             return rows.Count;
         }
 
@@ -106,7 +138,7 @@ namespace ExportDocManager.Services.Suppliers
                 .Where(item => item.SupplierCompanyId == supplierCompanyId && suppliers.Any(supplier => supplier.Id == item.SupplierCompanyId))
                 .OrderByDescending(item => item.IsPrimary).ThenBy(item => item.Name)
                 .Select(item => new SupplierContactRecord(item.Id, item.SupplierCompanyId, item.Name, item.Title,
-                    item.Email, item.Phone, item.InstantMessaging, item.IsPrimary))
+                    item.Email, item.Phone, item.InstantMessaging, item.IsPrimary, item.VersionNumber))
                 .ToListAsync(cancellationToken);
         }
 
@@ -117,10 +149,17 @@ namespace ExportDocManager.Services.Suppliers
             if (!await _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking())
                     .AnyAsync(item => item.Id == request.SupplierCompanyId, cancellationToken))
                 throw new KeyNotFoundException("供应商不存在或无权访问。");
+            bool isNew = request.Id <= 0;
             var entity = request.Id > 0
                 ? await context.SupplierContacts.FirstOrDefaultAsync(item => item.Id == request.Id && item.SupplierCompanyId == request.SupplierCompanyId, cancellationToken)
                     ?? throw new KeyNotFoundException("供应商联系人不存在。")
-                : new SupplierContact { SupplierCompanyId = request.SupplierCompanyId };
+                : new SupplierContact { SupplierCompanyId = request.SupplierCompanyId, VersionNumber = 1 };
+            if (!isNew)
+            {
+                EnsureExpectedVersion(request.ExpectedVersion, entity.VersionNumber, "供应商联系人");
+                context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = request.ExpectedVersion;
+                entity.VersionNumber++;
+            }
             if (entity.Id == 0) await context.SupplierContacts.AddAsync(entity, cancellationToken);
             entity.Name = Required(request.Name, "联系人姓名");
             entity.Title = Clean(request.Title);
@@ -132,11 +171,16 @@ namespace ExportDocManager.Services.Suppliers
             if (entity.IsPrimary)
             {
                 var previous = await context.SupplierContacts.Where(item => item.SupplierCompanyId == request.SupplierCompanyId && item.Id != entity.Id && item.IsPrimary).ToListAsync(cancellationToken);
-                foreach (var item in previous) item.IsPrimary = false;
+                foreach (var item in previous)
+                {
+                    item.IsPrimary = false;
+                    item.VersionNumber++;
+                    item.UpdatedAt = DateTimeOffset.UtcNow;
+                }
             }
-            await context.SaveChangesAsync(cancellationToken);
+            await SaveWithConcurrencyAsync(context, "供应商联系人", cancellationToken);
             return new(entity.Id, entity.SupplierCompanyId, entity.Name, entity.Title, entity.Email,
-                entity.Phone, entity.InstantMessaging, entity.IsPrimary);
+                entity.Phone, entity.InstantMessaging, entity.IsPrimary, entity.VersionNumber);
         }
 
         public async Task<bool> DeleteContactAsync(int supplierCompanyId, int id, CancellationToken cancellationToken = default)
@@ -147,7 +191,7 @@ namespace ExportDocManager.Services.Suppliers
             var entity = await context.SupplierContacts.FirstOrDefaultAsync(item => item.Id == id && item.SupplierCompanyId == supplierCompanyId, cancellationToken);
             if (entity == null) return false;
             context.SupplierContacts.Remove(entity);
-            await context.SaveChangesAsync(cancellationToken);
+            await SaveWithConcurrencyAsync(context, "供应商联系人", cancellationToken);
             return true;
         }
 
@@ -177,7 +221,8 @@ namespace ExportDocManager.Services.Suppliers
                 orderby product.ProductCode, product.NameCN
                 select new SupplierProductLinkRecord(link.Id, link.SupplierCompanyId, link.ProductId,
                     product.ProductCode ?? string.Empty, product.NameCN ?? string.Empty, product.NameEN ?? string.Empty,
-                    link.SupplierProductCode, link.ReferencePrice, link.Currency, link.LeadTimeDays, link.Status))
+                    link.SupplierProductCode, link.ReferencePrice, link.Currency, link.LeadTimeDays, link.Status,
+                    link.VersionNumber))
                 .ToListAsync(cancellationToken);
         }
 
@@ -202,10 +247,17 @@ namespace ExportDocManager.Services.Suppliers
                 item.ProductId == request.ProductId && item.Id != request.Id, cancellationToken);
             if (duplicate) throw new ArgumentException("该供应商已经关联此产品。");
 
+            bool isNew = request.Id <= 0;
             var entity = request.Id > 0
                 ? await context.SupplierProductLinks.FirstOrDefaultAsync(item => item.Id == request.Id && item.SupplierCompanyId == request.SupplierCompanyId, cancellationToken)
                     ?? throw new KeyNotFoundException("供应商产品关联不存在。")
-                : new SupplierProductLink { SupplierCompanyId = request.SupplierCompanyId };
+                : new SupplierProductLink { SupplierCompanyId = request.SupplierCompanyId, VersionNumber = 1 };
+            if (!isNew)
+            {
+                EnsureExpectedVersion(request.ExpectedVersion, entity.VersionNumber, "供应产品关联");
+                context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = request.ExpectedVersion;
+                entity.VersionNumber++;
+            }
             if (entity.Id == 0) await context.SupplierProductLinks.AddAsync(entity, cancellationToken);
             entity.ProductId = request.ProductId;
             entity.SupplierProductCode = Clean(request.SupplierProductCode);
@@ -214,7 +266,7 @@ namespace ExportDocManager.Services.Suppliers
             entity.LeadTimeDays = request.LeadTimeDays;
             entity.Status = status;
             entity.UpdatedAt = DateTimeOffset.UtcNow;
-            await context.SaveChangesAsync(cancellationToken);
+            await SaveWithConcurrencyAsync(context, "供应产品关联", cancellationToken);
             return ToProductLinkRecord(entity, product);
         }
 
@@ -226,7 +278,7 @@ namespace ExportDocManager.Services.Suppliers
             var entity = await context.SupplierProductLinks.FirstOrDefaultAsync(item => item.Id == id && item.SupplierCompanyId == supplierCompanyId, cancellationToken);
             if (entity == null) return false;
             context.SupplierProductLinks.Remove(entity);
-            await context.SaveChangesAsync(cancellationToken);
+            await SaveWithConcurrencyAsync(context, "供应产品关联", cancellationToken);
             return true;
         }
 
@@ -237,14 +289,38 @@ namespace ExportDocManager.Services.Suppliers
         private static SupplierProductLinkRecord ToProductLinkRecord(SupplierProductLink link, Product product) =>
             new(link.Id, link.SupplierCompanyId, link.ProductId, product.ProductCode ?? string.Empty,
                 product.NameCN ?? string.Empty, product.NameEN ?? string.Empty, link.SupplierProductCode,
-                link.ReferencePrice, link.Currency, link.LeadTimeDays, link.Status);
+                link.ReferencePrice, link.Currency, link.LeadTimeDays, link.Status, link.VersionNumber);
 
         private static System.Linq.Expressions.Expression<Func<SupplierCompany, SupplierRecord>> ToRecordExpression() =>
             item => new SupplierRecord(item.Id, item.Name, item.CountryRegion, item.Category, item.Website,
-                item.Status, item.MainProducts, item.Notes);
+                item.Status, item.MainProducts, item.Notes, item.VersionNumber);
         private static SupplierRecord ToRecord(SupplierCompany item) =>
-            new(item.Id, item.Name, item.CountryRegion, item.Category, item.Website, item.Status, item.MainProducts, item.Notes);
+            new(item.Id, item.Name, item.CountryRegion, item.Category, item.Website, item.Status, item.MainProducts,
+                item.Notes, item.VersionNumber);
         private static string Required(string value, string field) => string.IsNullOrWhiteSpace(value) ? throw new ArgumentException($"{field}不能为空。") : value.Trim();
         private static string Clean(string value) => (value ?? string.Empty).Trim();
+
+        private static void EnsureExpectedVersion(int expectedVersion, int currentVersion, string entityName)
+        {
+            if (expectedVersion <= 0)
+                throw new BusinessConcurrencyException($"保存现有{entityName}时必须提供版本号，请刷新后重试。");
+            if (expectedVersion != currentVersion)
+                throw new BusinessConcurrencyException($"该{entityName}已被其他用户修改，请刷新后重试。");
+        }
+
+        private static async Task SaveWithConcurrencyAsync(
+            AppDbContext context,
+            string entityName,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException($"该{entityName}已被其他用户修改，请刷新后重试。", exception);
+            }
+        }
     }
 }

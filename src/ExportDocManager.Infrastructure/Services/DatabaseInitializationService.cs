@@ -9,30 +9,48 @@ namespace ExportDocManager.Services.Infrastructure
 {
     public class DatabaseInitializationService : IDatabaseInitializationService
     {
-        private readonly DatabaseKeyProvider _keyProvider;
+        private const long PostgreSqlInitializationLockId = 73190520260718;
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
         private readonly DatabaseConnectionSettings _databaseSettings;
+        private readonly DatabaseInitializationCoordinator _coordinator;
 
         public DatabaseInitializationService(
-            DatabaseKeyProvider keyProvider,
             IDbContextFactory<AppDbContext> dbContextFactory,
-            DatabaseConnectionSettings databaseSettings)
+            DatabaseConnectionSettings databaseSettings,
+            DatabaseInitializationCoordinator coordinator)
         {
-            _keyProvider = keyProvider ?? throw new ArgumentNullException(nameof(keyProvider));
             _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
             _databaseSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
+            _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
         }
 
-        public async Task<DatabaseInitializationResult> InitializeAsync(string username, string password)
+        public Task<DatabaseInitializationResult> InitializeAsync(string username, string password)
+        {
+            return _coordinator.InitializeOnceAsync(() => InitializeCoreAsync(username, password));
+        }
+
+        private async Task<DatabaseInitializationResult> InitializeCoreAsync(string username, string password)
         {
             bool usesPostgreSql = DatabaseModeHelper.UsesPostgreSql(_databaseSettings);
+            bool advisoryLockAcquired = false;
+            AppDbContext context = null;
 
             try
             {
-                _keyProvider.DeriveAndSetKey(usesPostgreSql ? string.Empty : password);
+                context = await _dbContextFactory.CreateDbContextAsync();
+                if (usesPostgreSql)
+                {
+                    await context.Database.OpenConnectionAsync().ConfigureAwait(false);
+                    await context.Database.ExecuteSqlRawAsync(
+                        $"SELECT pg_advisory_lock({PostgreSqlInitializationLockId});").ConfigureAwait(false);
+                    advisoryLockAcquired = true;
+                }
 
-                await using var context = await _dbContextFactory.CreateDbContextAsync();
-                context.Database.EnsureCreated();
+                await context.Database.EnsureCreatedAsync().ConfigureAwait(false);
+                if (!usesPostgreSql)
+                {
+                    await ConfigureSingleProcessSqliteAsync(context).ConfigureAwait(false);
+                }
                 await EnsureInvoiceTypeSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 await EnsureUserReportTemplateSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 DbSeeder.SeedAuxiliaryData(
@@ -41,10 +59,6 @@ namespace ExportDocManager.Services.Infrastructure
                     ResolveInitialAdminPassword(usesPostgreSql, username, password));
 
                 return DatabaseInitializationResult.Success();
-            }
-            catch (SqliteException ex) when (ex.SqliteErrorCode == 26)
-            {
-                return DatabaseInitializationResult.Fail("数据库解密失败，密码可能错误。");
             }
             catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
             {
@@ -74,6 +88,33 @@ namespace ExportDocManager.Services.Infrastructure
                     "连接共享数据库失败，请检查数据库服务状态和连接配置。\n\n" + ex.Message,
                 shouldResetPassword: false);
             }
+            finally
+            {
+                if (advisoryLockAcquired)
+                {
+                    try
+                    {
+                        await context.Database.ExecuteSqlRawAsync(
+                            $"SELECT pg_advisory_unlock({PostgreSqlInitializationLockId});").ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (context != null)
+                {
+                    await context.DisposeAsync().ConfigureAwait(false);
+                }
+            }
+        }
+
+        private static async Task ConfigureSingleProcessSqliteAsync(AppDbContext context)
+        {
+            await context.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;").ConfigureAwait(false);
+            await context.Database.ExecuteSqlRawAsync("PRAGMA synchronous=NORMAL;").ConfigureAwait(false);
+            await context.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout=10000;").ConfigureAwait(false);
+            await context.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys=ON;").ConfigureAwait(false);
         }
 
         internal static string ResolveInitialAdminPassword(

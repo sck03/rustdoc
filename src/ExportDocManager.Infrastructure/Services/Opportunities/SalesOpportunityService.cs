@@ -44,7 +44,8 @@ namespace ExportDocManager.Services.Opportunities
                     item.Product != null ? (item.Product.NameCN ?? item.Product.NameEN ?? string.Empty) : string.Empty,
                     item.Opportunity.Title, item.Opportunity.Stage, item.Opportunity.QuotationNo,
                     item.Opportunity.EstimatedAmount, item.Opportunity.Currency, item.Opportunity.ProbabilityPercent,
-                    item.Opportunity.ExpectedCloseAt, item.Opportunity.NextAction, item.Opportunity.Notes))
+                    item.Opportunity.ExpectedCloseAt, item.Opportunity.NextAction, item.Opportunity.Notes,
+                    item.Opportunity.VersionNumber))
                 .ToListAsync(cancellationToken);
             return new PagedResult<SalesOpportunityRecord>(rows, total, pageNumber, pageSize);
         }
@@ -79,12 +80,20 @@ namespace ExportDocManager.Services.Opportunities
             SalesOpportunity entity;
             bool isNew = request.Id <= 0;
             if (request.Id > 0)
+            {
+                if (request.ExpectedVersion <= 0)
+                    throw new BusinessConcurrencyException("保存现有商机时必须提供版本号，请刷新后重试。");
                 entity = await _accessScope.ApplySalesOpportunityScope(context.SalesOpportunities)
                     .FirstOrDefaultAsync(item => item.Id == request.Id, cancellationToken)
                     ?? throw new KeyNotFoundException("商机不存在或无权访问。");
+                if (entity.VersionNumber != request.ExpectedVersion)
+                    throw new BusinessConcurrencyException("该商机已被其他用户修改，请刷新后重试。");
+                context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = request.ExpectedVersion;
+                entity.VersionNumber++;
+            }
             else
             {
-                entity = new SalesOpportunity(); _accessScope.ApplyOwner(entity);
+                entity = new SalesOpportunity { VersionNumber = 1 }; _accessScope.ApplyOwner(entity);
                 await context.SalesOpportunities.AddAsync(entity, cancellationToken);
             }
             string previousStage = entity.Stage;
@@ -119,10 +128,18 @@ namespace ExportDocManager.Services.Opportunities
                 };
                 await context.SalesOpportunityHistories.AddAsync(history, cancellationToken);
             }
-            await context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException("该商机已被其他用户修改，请刷新后重试。", exception);
+            }
             return new(entity.Id, entity.CrmCustomerId, customer.Name, entity.ProductId, product?.ProductCode ?? string.Empty,
                 product?.NameCN ?? product?.NameEN ?? string.Empty, entity.Title, entity.Stage, entity.QuotationNo,
-                entity.EstimatedAmount, entity.Currency, entity.ProbabilityPercent, entity.ExpectedCloseAt, entity.NextAction, entity.Notes);
+                entity.EstimatedAmount, entity.Currency, entity.ProbabilityPercent, entity.ExpectedCloseAt,
+                entity.NextAction, entity.Notes, entity.VersionNumber);
         }
 
         public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -131,7 +148,16 @@ namespace ExportDocManager.Services.Opportunities
             var entity = await _accessScope.ApplySalesOpportunityScope(context.SalesOpportunities)
                 .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
             if (entity == null) return false;
-            context.SalesOpportunities.Remove(entity); await context.SaveChangesAsync(cancellationToken); return true;
+            context.SalesOpportunities.Remove(entity);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException("该商机已被其他用户修改，请刷新后重试。", exception);
+            }
+            return true;
         }
 
         public async Task<IReadOnlyList<SalesOpportunityHistoryRecord>> ListHistoryAsync(
@@ -170,7 +196,7 @@ namespace ExportDocManager.Services.Opportunities
                     product != null ? (product.NameCN ?? product.NameEN ?? string.Empty) : string.Empty,
                     opportunity.Title, opportunity.Stage, opportunity.QuotationNo, opportunity.EstimatedAmount,
                     opportunity.Currency, opportunity.ProbabilityPercent, opportunity.ExpectedCloseAt,
-                    opportunity.NextAction, opportunity.Notes)).ToListAsync(cancellationToken);
+                    opportunity.NextAction, opportunity.Notes, opportunity.VersionNumber)).ToListAsync(cancellationToken);
             var currencies = rows.GroupBy(item => item.Currency, StringComparer.OrdinalIgnoreCase)
                 .Select(group => new SalesOpportunityCurrencySummary(group.Key.ToUpperInvariant(), group.Count(),
                     group.Sum(item => item.EstimatedAmount),

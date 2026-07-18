@@ -2800,6 +2800,11 @@ namespace ExportDocManager.Api.Tests
                     : null);
             }
 
+            public Task<User> GetActiveUserByIdAsync(int userId, CancellationToken cancellationToken = default)
+            {
+                return Task.FromResult(_user.Id == userId && _user.IsActive ? _user : null);
+            }
+
             public Task<IReadOnlyList<User>> GetUsersAsync(CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();

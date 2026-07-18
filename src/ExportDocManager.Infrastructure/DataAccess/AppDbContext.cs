@@ -20,6 +20,8 @@ namespace ExportDocManager.DataAccess
         public DbSet<Unit> Units { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<User> Users { get; set; }
+        public DbSet<ApiUserSession> ApiUserSessions { get; set; }
+        public DbSet<ApiBackgroundJobRecord> ApiBackgroundJobs { get; set; }
         public DbSet<PermissionTemplate> PermissionTemplates { get; set; }
         public DbSet<PermissionTemplateModule> PermissionTemplateModules { get; set; }
         public DbSet<CrmCustomer> CrmCustomers { get; set; }
@@ -197,6 +199,24 @@ namespace ExportDocManager.DataAccess
                 .WithMany()
                 .HasForeignKey(user => user.PermissionTemplateId)
                 .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<ApiUserSession>().HasIndex(session => session.TokenHash).IsUnique();
+            modelBuilder.Entity<ApiUserSession>().HasIndex(session => new { session.UserId, session.ExpiresAt });
+            modelBuilder.Entity<ApiUserSession>().HasIndex(session => session.ExpiresAt);
+            modelBuilder.Entity<ApiUserSession>().HasIndex(session => session.RevokedAt);
+            modelBuilder.Entity<ApiUserSession>().Property(session => session.TokenHash).HasMaxLength(64);
+            modelBuilder.Entity<ApiUserSession>()
+                .HasOne<User>()
+                .WithMany()
+                .HasForeignKey(session => session.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<ApiBackgroundJobRecord>().HasKey(job => job.JobId);
+            modelBuilder.Entity<ApiBackgroundJobRecord>().Property(job => job.JobId).HasMaxLength(120);
+            modelBuilder.Entity<ApiBackgroundJobRecord>().Property(job => job.Kind).HasMaxLength(80);
+            modelBuilder.Entity<ApiBackgroundJobRecord>().Property(job => job.Status).HasMaxLength(30);
+            modelBuilder.Entity<ApiBackgroundJobRecord>().Property(job => job.RequestedBy).HasMaxLength(100);
+            modelBuilder.Entity<ApiBackgroundJobRecord>().HasIndex(job => job.RequestedByUserId);
+            modelBuilder.Entity<ApiBackgroundJobRecord>().HasIndex(job => new { job.RequestedBy, job.CreatedAt });
+            modelBuilder.Entity<ApiBackgroundJobRecord>().HasIndex(job => new { job.Status, job.CreatedAt });
             modelBuilder.Entity<PermissionTemplate>().HasIndex(template => template.Code).IsUnique();
             modelBuilder.Entity<PermissionTemplate>().HasIndex(template => new { template.IsActive, template.Name });
             modelBuilder.Entity<PermissionTemplateModule>()

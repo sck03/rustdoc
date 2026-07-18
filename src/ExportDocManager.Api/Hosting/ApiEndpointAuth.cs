@@ -9,7 +9,8 @@ namespace ExportDocManager.Api.Hosting
 
         public static User RequireUser(HttpContext context, IApiSessionTokenService tokenService)
         {
-            return ApiCurrentUserResolver.Resolve(context, tokenService);
+            ArgumentNullException.ThrowIfNull(tokenService);
+            return ApiCurrentUserResolver.ResolveCachedUser(context);
         }
 
         public static bool HasValidDesktopAccess(HttpContext context, ApiDesktopAccessOptions options)
@@ -42,7 +43,7 @@ namespace ExportDocManager.Api.Hosting
                 return;
             }
 
-            if (currentUserResolver.Resolve(context) == null)
+            if (await currentUserResolver.ResolveAsync(context, context.RequestAborted).ConfigureAwait(false) == null)
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
@@ -170,7 +171,7 @@ namespace ExportDocManager.Api.Hosting
                 return;
             }
 
-            var user = currentUserResolver.Resolve(context);
+            var user = currentUserResolver.ResolveCached(context);
             string requiredAccessLevel = GetRequiredAccessLevel(context.Request.Method);
             if (!authorizationService.CanUseModule(user, requiredModule, requiredAccessLevel))
             {

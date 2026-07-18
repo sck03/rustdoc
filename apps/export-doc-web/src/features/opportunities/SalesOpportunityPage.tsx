@@ -78,6 +78,7 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
       expectedCloseAt: expectedCloseDate ? new Date(`${expectedCloseDate}T00:00:00`).toISOString() : undefined,
       nextAction: String(form.get("nextAction") ?? "").trim(), notes: String(form.get("notes") ?? "").trim(),
       changeNote: String(form.get("changeNote") ?? "").trim(),
+      expectedVersion: id > 0 ? selected?.versionNumber ?? 0 : 0,
     };
     try {
       const saved = id ? await client.updateSalesOpportunity({ id, body }) : await client.createSalesOpportunity({ body });

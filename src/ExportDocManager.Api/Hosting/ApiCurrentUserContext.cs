@@ -34,7 +34,7 @@ namespace ExportDocManager.Api.Hosting
                     return cachedUser;
                 }
 
-                return _currentUserResolver.Resolve(context);
+                return _currentUserResolver.ResolveCached(context);
             }
         }
 

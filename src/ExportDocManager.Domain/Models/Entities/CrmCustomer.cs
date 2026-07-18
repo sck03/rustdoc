@@ -17,6 +17,7 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(1000)] public string Notes { get; set; } = string.Empty;
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
     }
 
     public sealed class CrmContact
@@ -31,6 +32,7 @@ namespace ExportDocManager.Models.Entities
         public bool IsPrimary { get; set; }
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
     }
 
     public sealed class CrmFollowUp
@@ -49,5 +51,6 @@ namespace ExportDocManager.Models.Entities
         public bool IsCompleted { get; set; }
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
     }
 }

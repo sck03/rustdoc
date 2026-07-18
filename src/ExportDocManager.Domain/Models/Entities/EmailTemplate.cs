@@ -14,7 +14,7 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(10000)] public string BodyHtml { get; set; } = string.Empty;
         public bool IsActive { get; set; } = true;
         public bool IsShared { get; set; }
-        public int VersionNumber { get; set; } = 1;
+        [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     }

@@ -36,6 +36,20 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public void SessionTokenService_ShouldRevokeAllSessionsForUser()
+        {
+            var service = new InMemoryApiSessionTokenService();
+            var first = service.Issue(new User { Id = 7, Username = "operator", Role = "User", IsActive = true });
+            var second = service.Issue(new User { Id = 7, Username = "operator", Role = "User", IsActive = true });
+            var other = service.Issue(new User { Id = 8, Username = "other", Role = "User", IsActive = true });
+
+            Assert.Equal(2, service.RevokeUserSessions(7));
+            Assert.Null(service.Validate(first.AccessToken));
+            Assert.Null(service.Validate(second.AccessToken));
+            Assert.NotNull(service.Validate(other.AccessToken));
+        }
+
+        [Fact]
         public void SessionTokenService_ShouldRejectExpiredToken()
         {
             var service = new InMemoryApiSessionTokenService();
@@ -47,7 +61,7 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
-        public void CurrentUserContext_ShouldResolveBearerToken()
+        public async Task CurrentUserContext_ShouldResolveBearerToken()
         {
             var httpContext = new DefaultHttpContext();
             var tokenService = new InMemoryApiSessionTokenService();
@@ -59,14 +73,16 @@ namespace ExportDocManager.Api.Tests
             {
                 HttpContext = httpContext
             };
-            var context = new ApiCurrentUserContext(accessor, new ApiCurrentUserResolver(tokenService));
+            var resolver = new ApiCurrentUserResolver(tokenService);
+            await resolver.ResolveAsync(httpContext);
+            var context = new ApiCurrentUserContext(accessor, resolver);
 
             Assert.Equal("admin", context.CurrentUser.Username);
             Assert.Equal(issued.AccessToken, ApiCurrentUserContext.GetBearerToken(httpContext));
         }
 
         [Fact]
-        public void CurrentUserResolver_ShouldKeepUsersSeparatedByHttpContext()
+        public async Task CurrentUserResolver_ShouldKeepUsersSeparatedByHttpContext()
         {
             var tokenService = new InMemoryApiSessionTokenService();
             var adminToken = tokenService.Issue(
@@ -77,8 +93,8 @@ namespace ExportDocManager.Api.Tests
             var operatorContext = CreateHttpContextWithBearerToken(operatorToken.AccessToken);
             var resolver = new ApiCurrentUserResolver(tokenService);
 
-            var admin = resolver.Resolve(adminContext);
-            var operatorUser = resolver.Resolve(operatorContext);
+            var admin = await resolver.ResolveAsync(adminContext);
+            var operatorUser = await resolver.ResolveAsync(operatorContext);
 
             Assert.Equal("admin", admin.Username);
             Assert.Equal("operator", operatorUser.Username);
@@ -87,7 +103,7 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
-        public void CurrentUserContext_ShouldResolveActiveHttpContextWithoutCrossRequestState()
+        public async Task CurrentUserContext_ShouldResolveActiveHttpContextWithoutCrossRequestState()
         {
             var tokenService = new InMemoryApiSessionTokenService();
             var adminToken = tokenService.Issue(
@@ -97,7 +113,10 @@ namespace ExportDocManager.Api.Tests
             var adminContext = CreateHttpContextWithBearerToken(adminToken.AccessToken);
             var operatorContext = CreateHttpContextWithBearerToken(operatorToken.AccessToken);
             var accessor = new HttpContextAccessor();
-            var currentUserContext = new ApiCurrentUserContext(accessor, new ApiCurrentUserResolver(tokenService));
+            var resolver = new ApiCurrentUserResolver(tokenService);
+            await resolver.ResolveAsync(adminContext);
+            await resolver.ResolveAsync(operatorContext);
+            var currentUserContext = new ApiCurrentUserContext(accessor, resolver);
 
             accessor.HttpContext = adminContext;
             Assert.Equal("admin", currentUserContext.CurrentUser.Username);

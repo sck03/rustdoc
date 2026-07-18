@@ -21,5 +21,6 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(2000)] public string Notes { get; set; } = string.Empty;
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
     }
 }

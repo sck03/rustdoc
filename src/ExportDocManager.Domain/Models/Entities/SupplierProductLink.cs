@@ -14,5 +14,6 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(30)] public string Status { get; set; } = "供货中";
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
     }
 }

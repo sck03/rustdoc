@@ -23,7 +23,7 @@ namespace ExportDocManager.Services.Crm
             return await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking())
                 .OrderBy(item => item.Name)
                 .Select(item => new CrmCustomerRecord(item.Id, item.Name, item.CountryRegion, item.Website,
-                    item.Status, item.Source, item.Notes, item.LinkedDocumentCustomerId))
+                    item.Status, item.Source, item.Notes, item.LinkedDocumentCustomerId, item.VersionNumber))
                 .ToListAsync(cancellationToken);
         }
 
@@ -51,7 +51,7 @@ namespace ExportDocManager.Services.Crm
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .Select(item => new CrmCustomerRecord(item.Id, item.Name, item.CountryRegion, item.Website,
-                    item.Status, item.Source, item.Notes, item.LinkedDocumentCustomerId))
+                    item.Status, item.Source, item.Notes, item.LinkedDocumentCustomerId, item.VersionNumber))
                 .ToListAsync(cancellationToken);
             return new PagedResult<CrmCustomerRecord>(items, totalCount, pageNumber, pageSize);
         }
@@ -64,13 +64,19 @@ namespace ExportDocManager.Services.Crm
             CrmCustomer entity;
             if (request.Id > 0)
             {
+                if (request.ExpectedVersion <= 0)
+                    throw new BusinessConcurrencyException("保存现有 CRM 客户时必须提供版本号，请刷新后重试。");
                 entity = await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers)
                     .FirstOrDefaultAsync(item => item.Id == request.Id, cancellationToken)
                     ?? throw new KeyNotFoundException("CRM 客户不存在或无权访问。");
+                if (entity.VersionNumber != request.ExpectedVersion)
+                    throw new BusinessConcurrencyException("该 CRM 客户已被其他用户修改，请刷新后重试。");
+                context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = request.ExpectedVersion;
+                entity.VersionNumber++;
             }
             else
             {
-                entity = new CrmCustomer();
+                entity = new CrmCustomer { VersionNumber = 1 };
                 _accessScope.ApplyOwner(entity);
                 await context.CrmCustomers.AddAsync(entity, cancellationToken);
             }
@@ -83,9 +89,16 @@ namespace ExportDocManager.Services.Crm
             entity.Notes = Clean(request.Notes);
             entity.LinkedDocumentCustomerId = request.LinkedDocumentCustomerId;
             entity.UpdatedAt = DateTimeOffset.UtcNow;
-            await context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException("该 CRM 客户已被其他用户修改，请刷新后重试。", exception);
+            }
             return new(entity.Id, entity.Name, entity.CountryRegion, entity.Website, entity.Status,
-                entity.Source, entity.Notes, entity.LinkedDocumentCustomerId);
+                entity.Source, entity.Notes, entity.LinkedDocumentCustomerId, entity.VersionNumber);
         }
 
         public async Task<bool> DeleteCustomerAsync(int id, CancellationToken cancellationToken = default)
@@ -120,8 +133,20 @@ namespace ExportDocManager.Services.Crm
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var rows = await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers)
                 .Where(item => normalizedIds.Contains(item.Id)).ToListAsync(cancellationToken);
-            foreach (var row in rows) { row.Status = status; row.UpdatedAt = DateTimeOffset.UtcNow; }
-            await context.SaveChangesAsync(cancellationToken);
+            foreach (var row in rows)
+            {
+                row.Status = status;
+                row.VersionNumber++;
+                row.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException("部分 CRM 客户已被其他用户修改，请刷新列表后重试。", exception);
+            }
             return rows.Count;
         }
 
@@ -157,7 +182,7 @@ namespace ExportDocManager.Services.Crm
                 .OrderByDescending(item => item.IsPrimary)
                 .ThenBy(item => item.Name)
                 .Select(item => new CrmContactRecord(item.Id, item.CrmCustomerId, item.Name, item.Title,
-                    item.Email, item.Phone, item.InstantMessaging, item.IsPrimary))
+                    item.Email, item.Phone, item.InstantMessaging, item.IsPrimary, item.VersionNumber))
                 .ToListAsync(cancellationToken);
         }
 
@@ -171,10 +196,17 @@ namespace ExportDocManager.Services.Crm
                 throw new KeyNotFoundException("CRM 客户不存在或无权访问。");
             }
 
+            bool isNew = request.Id <= 0;
             CrmContact entity = request.Id > 0
                 ? await context.CrmContacts.FirstOrDefaultAsync(item => item.Id == request.Id && item.CrmCustomerId == request.CrmCustomerId, cancellationToken)
                     ?? throw new KeyNotFoundException("联系人不存在。")
-                : new CrmContact { CrmCustomerId = request.CrmCustomerId };
+                : new CrmContact { CrmCustomerId = request.CrmCustomerId, VersionNumber = 1 };
+            if (!isNew)
+            {
+                EnsureExpectedVersion(request.ExpectedVersion, entity.VersionNumber, "联系人");
+                context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = request.ExpectedVersion;
+                entity.VersionNumber++;
+            }
             if (entity.Id == 0) await context.CrmContacts.AddAsync(entity, cancellationToken);
             entity.Name = Required(request.Name, "联系人姓名");
             entity.Title = Clean(request.Title);
@@ -191,11 +223,13 @@ namespace ExportDocManager.Services.Crm
                 foreach (var previousPrimary in previousPrimaryContacts)
                 {
                     previousPrimary.IsPrimary = false;
+                    previousPrimary.VersionNumber++;
+                    previousPrimary.UpdatedAt = DateTimeOffset.UtcNow;
                 }
             }
-            await context.SaveChangesAsync(cancellationToken);
+            await SaveWithConcurrencyAsync(context, "联系人", cancellationToken);
             return new(entity.Id, entity.CrmCustomerId, entity.Name, entity.Title, entity.Email,
-                entity.Phone, entity.InstantMessaging, entity.IsPrimary);
+                entity.Phone, entity.InstantMessaging, entity.IsPrimary, entity.VersionNumber);
         }
 
         public async Task<bool> DeleteContactAsync(int crmCustomerId, int id, CancellationToken cancellationToken = default)
@@ -208,7 +242,7 @@ namespace ExportDocManager.Services.Crm
                 cancellationToken);
             if (entity == null) return false;
             context.CrmContacts.Remove(entity);
-            await context.SaveChangesAsync(cancellationToken);
+            await SaveWithConcurrencyAsync(context, "联系人", cancellationToken);
             return true;
         }
 
@@ -228,7 +262,7 @@ namespace ExportDocManager.Services.Crm
                     item.CrmContactId,
                     context.CrmContacts.Where(contact => contact.Id == item.CrmContactId).Select(contact => contact.Name).FirstOrDefault() ?? string.Empty,
                     item.Type, item.Summary, item.NextAction, item.FollowedUpAt, item.NextFollowUpAt,
-                    item.IsCompleted, item.CreatedAt, item.UpdatedAt))
+                    item.IsCompleted, item.CreatedAt, item.UpdatedAt, item.VersionNumber))
                 .ToListAsync(cancellationToken);
             return rows
                 .OrderBy(item => item.IsCompleted)
@@ -253,11 +287,18 @@ namespace ExportDocManager.Services.Crm
                     cancellationToken) ?? throw new KeyNotFoundException("联系人不存在。");
             }
 
+            bool isNew = request.Id <= 0;
             CrmFollowUp entity = request.Id > 0
                 ? await _accessScope.ApplyCrmFollowUpScope(context.CrmFollowUps)
                     .FirstOrDefaultAsync(item => item.Id == request.Id, cancellationToken)
                     ?? throw new KeyNotFoundException("跟进记录不存在或无权访问。")
-                : new CrmFollowUp();
+                : new CrmFollowUp { VersionNumber = 1 };
+            if (!isNew)
+            {
+                EnsureExpectedVersion(request.ExpectedVersion, entity.VersionNumber, "跟进记录");
+                context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = request.ExpectedVersion;
+                entity.VersionNumber++;
+            }
             if (entity.Id == 0)
             {
                 _accessScope.ApplyOwner(entity);
@@ -272,10 +313,11 @@ namespace ExportDocManager.Services.Crm
             entity.NextFollowUpAt = request.NextFollowUpAt;
             entity.IsCompleted = request.IsCompleted;
             entity.UpdatedAt = DateTimeOffset.UtcNow;
-            await context.SaveChangesAsync(cancellationToken);
+            await SaveWithConcurrencyAsync(context, "跟进记录", cancellationToken);
             return new(entity.Id, entity.CrmCustomerId, customer.Name, entity.CrmContactId,
                 contact?.Name ?? string.Empty, entity.Type, entity.Summary, entity.NextAction,
-                entity.FollowedUpAt, entity.NextFollowUpAt, entity.IsCompleted, entity.CreatedAt, entity.UpdatedAt);
+                entity.FollowedUpAt, entity.NextFollowUpAt, entity.IsCompleted, entity.CreatedAt,
+                entity.UpdatedAt, entity.VersionNumber);
         }
 
         public async Task<bool> DeleteFollowUpAsync(int id, CancellationToken cancellationToken = default)
@@ -285,7 +327,7 @@ namespace ExportDocManager.Services.Crm
                 .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
             if (entity == null) return false;
             context.CrmFollowUps.Remove(entity);
-            await context.SaveChangesAsync(cancellationToken);
+            await SaveWithConcurrencyAsync(context, "跟进记录", cancellationToken);
             return true;
         }
 
@@ -326,5 +368,28 @@ namespace ExportDocManager.Services.Crm
         }
 
         private static string Clean(string value) => (value ?? string.Empty).Trim();
+
+        private static void EnsureExpectedVersion(int expectedVersion, int currentVersion, string entityName)
+        {
+            if (expectedVersion <= 0)
+                throw new BusinessConcurrencyException($"保存现有{entityName}时必须提供版本号，请刷新后重试。");
+            if (expectedVersion != currentVersion)
+                throw new BusinessConcurrencyException($"该{entityName}已被其他用户修改，请刷新后重试。");
+        }
+
+        private static async Task SaveWithConcurrencyAsync(
+            AppDbContext context,
+            string entityName,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException($"该{entityName}已被其他用户修改，请刷新后重试。", exception);
+            }
+        }
     }
 }

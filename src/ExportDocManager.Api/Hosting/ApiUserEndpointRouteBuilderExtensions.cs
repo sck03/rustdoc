@@ -150,6 +150,7 @@ namespace ExportDocManager.Api.Hosting
                         ApiUserManagementDtoFactory.ToUser(request, id),
                         request.ResetPassword ?? string.Empty,
                         cancellationToken);
+                    await tokenService.RevokeUserSessionsAsync(savedUserId, cancellationToken);
                     var savedUser = await FindUserByIdAsync(userService, savedUserId, cancellationToken);
                     return Results.Ok(new ApiUserSaveResponse(
                         true,
@@ -194,6 +195,10 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     bool deleted = await userService.DeleteUserAsync(id, cancellationToken);
+                    if (deleted)
+                    {
+                        await tokenService.RevokeUserSessionsAsync(id, cancellationToken);
+                    }
                     return deleted
                         ? Results.Ok(new ApiCommandResponse(true, "用户已删除。"))
                         : Results.NotFound(new ApiErrorResponse("未找到要删除的用户。"));

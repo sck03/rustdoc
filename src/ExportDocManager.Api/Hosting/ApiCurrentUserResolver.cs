@@ -11,28 +11,34 @@ namespace ExportDocManager.Api.Hosting
             _tokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
         }
 
-        public User Resolve(HttpContext context)
+        public User ResolveCached(HttpContext context)
         {
-            return Resolve(context, _tokenService);
+            return ResolveCachedUser(context);
         }
 
-        internal static User Resolve(HttpContext context, IApiSessionTokenService tokenService)
+        public async Task<User> ResolveAsync(HttpContext context, CancellationToken cancellationToken = default)
         {
-            ArgumentNullException.ThrowIfNull(tokenService);
-
-            if (context?.Items.TryGetValue(ApiEndpointAuth.AuthenticatedUserItemKey, out var item) == true &&
-                item is User cachedUser)
+            var cachedUser = ResolveCachedUser(context);
+            if (cachedUser != null)
             {
                 return cachedUser;
             }
 
-            var user = tokenService.Validate(GetBearerToken(context));
+            var user = await _tokenService.ValidateAsync(GetBearerToken(context), cancellationToken)
+                .ConfigureAwait(false);
             if (context != null && user != null)
             {
                 context.Items[ApiEndpointAuth.AuthenticatedUserItemKey] = user;
             }
 
             return user;
+        }
+
+        internal static User ResolveCachedUser(HttpContext context)
+        {
+            return context?.Items.TryGetValue(ApiEndpointAuth.AuthenticatedUserItemKey, out var item) == true
+                ? item as User
+                : null;
         }
 
         public static string GetBearerToken(HttpContext context)

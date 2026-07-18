@@ -5,7 +5,8 @@ namespace ExportDocManager.Services.EmailTemplates
         int VersionNumber, bool CanEdit);
 
     public sealed record EmailTemplateSaveRequest(
-        int Id, string Name, string Category, string Subject, string BodyHtml, bool IsActive, bool IsShared);
+        int Id, string Name, string Category, string Subject, string BodyHtml, bool IsActive, bool IsShared,
+        int ExpectedVersion = 0);
 
     public sealed record EmailTemplateVariableRecord(string Key, string Token, string Label, string SampleValue);
 

@@ -57,7 +57,8 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
     const form = new FormData(event.currentTarget);
     const id = newSupplier ? 0 : selectedSupplier?.id ?? 0;
     const body = { id, name: text(form, "name"), countryRegion: text(form, "countryRegion"), category: text(form, "category"),
-      website: text(form, "website"), status: text(form, "supplierStatus") || "合作中", mainProducts: text(form, "mainProducts"), notes: text(form, "notes") };
+      website: text(form, "website"), status: text(form, "supplierStatus") || "合作中", mainProducts: text(form, "mainProducts"), notes: text(form, "notes"),
+      expectedVersion: id > 0 ? selectedSupplier?.versionNumber ?? 0 : 0 };
     try {
       const saved = id ? await client.updateSupplier({ id, body }) : await client.createSupplier({ body });
       await loadSuppliers(saved.id); setNewSupplier(false); setFeedback(successFeedback(id ? "供应商已更新。" : "供应商已建立。"));
@@ -74,7 +75,8 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
     event.preventDefault(); if (!supplierPermission.canOperate || !supplierId) return;
     const form = new FormData(event.currentTarget); const id = selectedContact?.id ?? 0;
     const body = { id, supplierCompanyId: supplierId, name: text(form, "contactName"), title: text(form, "title"), email: text(form, "email"),
-      phone: text(form, "phone"), instantMessaging: text(form, "instantMessaging"), isPrimary: form.get("isPrimary") === "on" };
+      phone: text(form, "phone"), instantMessaging: text(form, "instantMessaging"), isPrimary: form.get("isPrimary") === "on",
+      expectedVersion: id > 0 ? selectedContact?.versionNumber ?? 0 : 0 };
     try {
       const saved = id ? await client.updateSupplierContact({ supplierId, id, body }) : await client.createSupplierContact({ supplierId, body });
       const rows = await client.listSupplierContacts({ supplierId }); setContacts(rows); setContactId(saved.id); setContactView("editor"); setFeedback(successFeedback(id ? "联系人已更新。" : "联系人已添加。"));

@@ -32,6 +32,8 @@ namespace ExportDocManager.Api.Hosting
         public decimal FreightMiscExpense { get; init; }
         public decimal InspectionExpense { get; init; }
         public decimal OtherExpense { get; init; }
+
+        public string RowVersion { get; init; } = string.Empty;
     }
 
     public sealed record ApiPaymentSaveResponse(

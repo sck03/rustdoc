@@ -63,6 +63,7 @@ export function SupplierProductLinksPanel({
       currency: String(form.get("currency") ?? "CNY").trim().toUpperCase(),
       leadTimeDays: Number(form.get("leadTimeDays") ?? 0),
       status: String(form.get("linkStatus") ?? "供货中"),
+      expectedVersion: id > 0 ? selected?.versionNumber ?? 0 : 0,
     };
     try {
       const saved = id

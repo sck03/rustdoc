@@ -99,11 +99,19 @@ namespace ExportDocManager.Services.Suppliers
             if (!await CanAccessSupplierAsync(context, request.SupplierCompanyId, cancellationToken))
                 throw new KeyNotFoundException("供应商不存在或无权访问。");
 
+            bool isNew = request.Id <= 0;
             var entity = request.Id > 0
                 ? await context.SupplierAssessments.FirstOrDefaultAsync(
                     item => item.Id == request.Id && item.SupplierCompanyId == request.SupplierCompanyId,
                     cancellationToken) ?? throw new KeyNotFoundException("供应商评价不存在。")
-                : new SupplierAssessment { SupplierCompanyId = request.SupplierCompanyId };
+                : new SupplierAssessment { SupplierCompanyId = request.SupplierCompanyId, VersionNumber = 1 };
+
+            if (!isNew)
+            {
+                EnsureExpectedVersion(request.ExpectedVersion, entity.VersionNumber);
+                context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = request.ExpectedVersion;
+                entity.VersionNumber++;
+            }
 
             if (entity.Id == 0) await context.SupplierAssessments.AddAsync(entity, cancellationToken);
             entity.AssessedAt = request.AssessedAt;
@@ -117,7 +125,7 @@ namespace ExportDocManager.Services.Suppliers
             entity.AssessedBy = _accessScope.CurrentUser?.Username?.Trim() ?? string.Empty;
             entity.UpdatedAt = DateTimeOffset.UtcNow;
 
-            await context.SaveChangesAsync(cancellationToken);
+            await SaveWithConcurrencyAsync(context, cancellationToken);
             return ToRecord(entity);
         }
 
@@ -131,7 +139,7 @@ namespace ExportDocManager.Services.Suppliers
                 cancellationToken);
             if (entity == null) return false;
             context.SupplierAssessments.Remove(entity);
-            await context.SaveChangesAsync(cancellationToken);
+            await SaveWithConcurrencyAsync(context, cancellationToken);
             return true;
         }
 
@@ -163,7 +171,30 @@ namespace ExportDocManager.Services.Suppliers
             item.Id, item.SupplierCompanyId, item.AssessedAt, item.AssessmentKind,
             item.QualityScore, item.DeliveryScore, item.ServiceScore, item.PriceScore,
             Math.Round((item.QualityScore + item.DeliveryScore + item.ServiceScore + item.PriceScore) / 4m, 2),
-            item.Conclusion, item.Notes, item.AssessedBy, item.CreatedAt, item.UpdatedAt);
+            item.Conclusion, item.Notes, item.AssessedBy, item.CreatedAt, item.UpdatedAt,
+            item.VersionNumber);
+
+        private static void EnsureExpectedVersion(int expectedVersion, int currentVersion)
+        {
+            if (expectedVersion <= 0)
+                throw new BusinessConcurrencyException("保存现有供应商评价时必须提供版本号，请刷新后重试。");
+            if (expectedVersion != currentVersion)
+                throw new BusinessConcurrencyException("该供应商评价已被其他用户修改，请刷新后重试。");
+        }
+
+        private static async Task SaveWithConcurrencyAsync(AppDbContext context, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException(
+                    "该供应商评价已被其他用户修改，请刷新后重试。",
+                    exception);
+            }
+        }
 
         private static decimal Average(int quality, int delivery, int service, int price) =>
             Math.Round((quality + delivery + service + price) / 4m, 2);

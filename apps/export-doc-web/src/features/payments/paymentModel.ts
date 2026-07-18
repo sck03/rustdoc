@@ -27,6 +27,7 @@ export function createEmptyPayment(): ApiPaymentDto {
     freightMiscExpense: 0,
     inspectionExpense: 0,
     otherExpense: 0,
+    rowVersion: "",
   };
 }
 

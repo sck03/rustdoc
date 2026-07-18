@@ -123,6 +123,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
           nextAction: String(form.get("nextAction") ?? ""),
           nextFollowUpAt: toIsoDateTime(form.get("nextFollowUpAt")),
           isCompleted: editingFollowUp?.isCompleted ?? false,
+          expectedVersion: editingFollowUp?.versionNumber ?? 0,
         };
       if (editingFollowUp) {
         await client.updateCrmFollowUp({ id: editingFollowUp.id, body: { ...body, id: editingFollowUp.id, followedUpAt: editingFollowUp.followedUpAt } });
@@ -156,6 +157,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
           followedUpAt: item.followedUpAt,
           nextFollowUpAt: item.nextFollowUpAt,
           isCompleted: !item.isCompleted,
+          expectedVersion: item.versionNumber,
         },
       });
       await refresh();

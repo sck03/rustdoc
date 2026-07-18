@@ -12,8 +12,22 @@ namespace ExportDocManager.Api.Hosting
             Func<IServiceProvider, ApiBackgroundJobExecutionContext, Task<string>> executeAsync)
         {
             string jobId = initial.JobId;
+            var userConcurrency = GetUserConcurrency(initial.RequestedBy);
+            bool globalAcquired = false;
+            bool userAcquired = false;
+            bool browserAcquired = false;
             try
             {
+                await userConcurrency.WaitAsync(cancellationSource.Token).ConfigureAwait(false);
+                userAcquired = true;
+                if (UsesBrowserCapacity(initial.Kind))
+                {
+                    await _browserConcurrency.WaitAsync(cancellationSource.Token).ConfigureAwait(false);
+                    browserAcquired = true;
+                }
+                await _globalConcurrency.WaitAsync(cancellationSource.Token).ConfigureAwait(false);
+                globalAcquired = true;
+
                 _jobs.Update(jobId, current => new BackgroundJobSnapshot
                 {
                     JobId = current.JobId,
@@ -24,6 +38,7 @@ namespace ExportDocManager.Api.Hosting
                     StatusText = "运行中",
                     DetailText = current.DetailText,
                     RequestedBy = current.RequestedBy,
+                    RequestedByUserId = current.RequestedByUserId,
                     CreatedAt = current.CreatedAt,
                     StartedAt = DateTimeOffset.UtcNow,
                     OutputPath = current.OutputPath,
@@ -37,9 +52,14 @@ namespace ExportDocManager.Api.Hosting
                 using var scope = _scopeFactory.CreateScope();
                 var backgroundUser = await ResolveBackgroundUserAsync(
                         scope.ServiceProvider,
+                        initial.RequestedByUserId,
                         initial.RequestedBy,
                         cancellationSource.Token)
                     .ConfigureAwait(false);
+                if (initial.RequestedByUserId > 0 && backgroundUser == null)
+                {
+                    throw new InvalidOperationException("任务提交账号已停用或不存在，任务已阻止执行。");
+                }
                 using var backgroundUserScope = ApiCurrentUserContext.UseBackgroundUser(backgroundUser);
                 var context = new ApiBackgroundJobExecutionContext(_jobs, initial, cancellationSource.Token);
                 string outputPath = await executeAsync(scope.ServiceProvider, context);
@@ -55,6 +75,7 @@ namespace ExportDocManager.Api.Hosting
                     StatusText = "已完成",
                     DetailText = current.DetailText,
                     RequestedBy = current.RequestedBy,
+                    RequestedByUserId = current.RequestedByUserId,
                     CreatedAt = current.CreatedAt,
                     StartedAt = current.StartedAt,
                     CompletedAt = DateTimeOffset.UtcNow,
@@ -78,6 +99,7 @@ namespace ExportDocManager.Api.Hosting
                     StatusText = "已取消",
                     DetailText = current.DetailText,
                     RequestedBy = current.RequestedBy,
+                    RequestedByUserId = current.RequestedByUserId,
                     CreatedAt = current.CreatedAt,
                     StartedAt = current.StartedAt,
                     CompletedAt = DateTimeOffset.UtcNow,
@@ -102,6 +124,7 @@ namespace ExportDocManager.Api.Hosting
                     StatusText = "失败",
                     DetailText = current.DetailText,
                     RequestedBy = current.RequestedBy,
+                    RequestedByUserId = current.RequestedByUserId,
                     CreatedAt = current.CreatedAt,
                     StartedAt = current.StartedAt,
                     CompletedAt = DateTimeOffset.UtcNow,
@@ -115,6 +138,18 @@ namespace ExportDocManager.Api.Hosting
             }
             finally
             {
+                if (globalAcquired)
+                {
+                    _globalConcurrency.Release();
+                }
+                if (browserAcquired)
+                {
+                    _browserConcurrency.Release();
+                }
+                if (userAcquired)
+                {
+                    userConcurrency.Release();
+                }
                 _jobs.RemoveCancellationSource(jobId);
             }
         }
@@ -127,6 +162,7 @@ namespace ExportDocManager.Api.Hosting
 
         private static async Task<User> ResolveBackgroundUserAsync(
             IServiceProvider provider,
+            int requestedByUserId,
             string requestedBy,
             CancellationToken cancellationToken)
         {
@@ -143,6 +179,12 @@ namespace ExportDocManager.Api.Hosting
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            if (requestedByUserId > 0)
+            {
+                return await userService.GetActiveUserByIdAsync(requestedByUserId, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             return await userService.GetUserByUsernameAsync(requestedBy).ConfigureAwait(false);
         }
     }

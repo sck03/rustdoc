@@ -8,6 +8,7 @@ namespace ExportDocManager.Api.Hosting
         private static void MapAuthEndpoints(this IEndpointRouteBuilder endpoints)
         {
             endpoints.MapPost("/api/auth/login", async (
+                HttpContext context,
                 ApiLoginRequest request,
                 IDatabaseInitializationService databaseInitializationService,
                 IUserService userService,
@@ -35,7 +36,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Unauthorized();
                 }
 
-                var token = tokenService.Issue(user);
+                var token = await tokenService.IssueAsync(user, cancellationToken: context.RequestAborted);
                 return Results.Ok(new ApiLoginResponse(
                     "Bearer",
                     token.AccessToken,
@@ -56,9 +57,11 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("CurrentUser");
 
-            endpoints.MapPost("/api/auth/logout", (HttpContext context, IApiSessionTokenService tokenService) =>
+            endpoints.MapPost("/api/auth/logout", async (HttpContext context, IApiSessionTokenService tokenService) =>
             {
-                bool revoked = tokenService.Revoke(ApiCurrentUserContext.GetBearerToken(context));
+                bool revoked = await tokenService.RevokeAsync(
+                    ApiCurrentUserContext.GetBearerToken(context),
+                    context.RequestAborted);
                 return Results.Ok(new ApiLogoutResponse(revoked));
             })
             .WithName("Logout");

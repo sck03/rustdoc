@@ -2,30 +2,30 @@ namespace ExportDocManager.Api.Hosting
 {
     public sealed record ApiCrmCustomerDto(
         int Id, string Name, string CountryRegion, string Website, string Status,
-        string Source, string Notes, int? LinkedDocumentCustomerId);
+        string Source, string Notes, int? LinkedDocumentCustomerId, int VersionNumber);
 
     public sealed record ApiCrmContactDto(
         int Id, int CrmCustomerId, string Name, string Title, string Email,
-        string Phone, string InstantMessaging, bool IsPrimary);
+        string Phone, string InstantMessaging, bool IsPrimary, int VersionNumber);
 
     public sealed record ApiCrmFollowUpDto(
         int Id, int CrmCustomerId, string CustomerName, int? CrmContactId,
         string ContactName, string Type, string Summary, string NextAction,
         DateTimeOffset FollowedUpAt, DateTimeOffset? NextFollowUpAt, bool IsCompleted,
-        DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+        DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int VersionNumber);
 
     public sealed record ApiCrmCustomerSaveRequest(
         int Id, string Name, string CountryRegion, string Website, string Status,
-        string Source, string Notes, int? LinkedDocumentCustomerId);
+        string Source, string Notes, int? LinkedDocumentCustomerId, int ExpectedVersion = 0);
 
     public sealed record ApiCrmContactSaveRequest(
         int Id, int CrmCustomerId, string Name, string Title, string Email,
-        string Phone, string InstantMessaging, bool IsPrimary);
+        string Phone, string InstantMessaging, bool IsPrimary, int ExpectedVersion = 0);
 
     public sealed record ApiCrmFollowUpSaveRequest(
         int Id, int CrmCustomerId, int? CrmContactId, string Type, string Summary,
         string NextAction, DateTimeOffset? FollowedUpAt, DateTimeOffset? NextFollowUpAt,
-        bool IsCompleted);
+        bool IsCompleted, int ExpectedVersion = 0);
 
     public sealed record ApiCrmDashboardDto(
         int CustomerCount,

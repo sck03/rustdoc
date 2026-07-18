@@ -354,11 +354,13 @@ export interface ApiCrmContactDto {
   name: string;
   phone?: string;
   title?: string;
+  versionNumber: number;
 }
 
 export interface ApiCrmContactSaveRequest {
   crmCustomerId: number;
   email?: string;
+  expectedVersion: number;
   id: number;
   instantMessaging?: string;
   isPrimary: boolean;
@@ -385,6 +387,7 @@ export interface ApiCrmCustomerDto {
   notes?: string;
   source?: string;
   status: string;
+  versionNumber: number;
   website?: string;
 }
 
@@ -423,6 +426,7 @@ export interface ApiCrmCustomerImportRowDto {
 
 export interface ApiCrmCustomerSaveRequest {
   countryRegion?: string;
+  expectedVersion: number;
   id: number;
   linkedDocumentCustomerId?: number;
   name: string;
@@ -465,11 +469,13 @@ export interface ApiCrmFollowUpDto {
   summary: string;
   type: string;
   updatedAt: string;
+  versionNumber: number;
 }
 
 export interface ApiCrmFollowUpSaveRequest {
   crmContactId?: number;
   crmCustomerId: number;
+  expectedVersion: number;
   followedUpAt?: string;
   id: number;
   isCompleted: boolean;
@@ -870,6 +876,7 @@ export interface ApiEmailTemplatePreviewRequest {
 export interface ApiEmailTemplateSaveRequest {
   bodyHtml: string;
   category: string;
+  expectedVersion: number;
   id: number;
   isActive: boolean;
   isShared: boolean;
@@ -1688,6 +1695,7 @@ export interface ApiPaymentDto {
   quantity?: string;
   receiptDate?: string;
   repairExpense?: number;
+  rowVersion: string;
   shipmentCountry?: string;
   shipmentDate?: string;
   telephoneExpense?: number;
@@ -2058,6 +2066,7 @@ export interface ApiSalesOpportunityDto {
   quotationNo: string;
   stage: string;
   title: string;
+  versionNumber: number;
 }
 
 export interface ApiSalesOpportunityHistoryDto {
@@ -2082,6 +2091,7 @@ export interface ApiSalesOpportunitySaveRequest {
   currency: string;
   estimatedAmount: number;
   expectedCloseAt?: string;
+  expectedVersion: number;
   id: number;
   nextAction: string;
   notes: string;
@@ -2403,6 +2413,7 @@ export interface ApiSupplierAssessmentDto {
   serviceScore: number;
   supplierCompanyId: number;
   updatedAt: string;
+  versionNumber: number;
 }
 
 export interface ApiSupplierAssessmentOverviewDto {
@@ -2442,6 +2453,7 @@ export interface ApiSupplierAssessmentSaveRequest {
   assessmentKind: string;
   conclusion: string;
   deliveryScore: number;
+  expectedVersion: number;
   id: number;
   notes: string;
   priceScore: number;
@@ -2469,10 +2481,12 @@ export interface ApiSupplierContactDto {
   phone?: string;
   supplierCompanyId: number;
   title?: string;
+  versionNumber: number;
 }
 
 export interface ApiSupplierContactSaveRequest {
   email?: string;
+  expectedVersion: number;
   id: number;
   instantMessaging?: string;
   isPrimary: boolean;
@@ -2490,6 +2504,7 @@ export interface ApiSupplierDto {
   name: string;
   notes?: string;
   status: string;
+  versionNumber: number;
   website?: string;
 }
 
@@ -2539,10 +2554,12 @@ export interface ApiSupplierProductLinkDto {
   status: string;
   supplierCompanyId: number;
   supplierProductCode: string;
+  versionNumber: number;
 }
 
 export interface ApiSupplierProductLinkSaveRequest {
   currency: string;
+  expectedVersion: number;
   id: number;
   leadTimeDays: number;
   productId: number;
@@ -2562,6 +2579,7 @@ export interface ApiSupplierProductOptionDto {
 export interface ApiSupplierSaveRequest {
   category?: string;
   countryRegion?: string;
+  expectedVersion: number;
   id: number;
   mainProducts?: string;
   name: string;

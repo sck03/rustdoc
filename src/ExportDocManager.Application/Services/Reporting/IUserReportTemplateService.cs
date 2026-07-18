@@ -39,6 +39,8 @@ namespace ExportDocManager.Services.Reporting
     public sealed class UserReportTemplateConcurrencyException : InvalidOperationException
     {
         public UserReportTemplateConcurrencyException(string message) : base(message) { }
+        public UserReportTemplateConcurrencyException(string message, Exception innerException)
+            : base(message, innerException) { }
     }
 
     public interface IUserReportTemplateService

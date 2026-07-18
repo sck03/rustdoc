@@ -1041,7 +1041,7 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiPaymentDto"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "invoiceNo", "paymentDate", "payeeName", "payerName" },
+                            required = new[] { "id", "invoiceNo", "paymentDate", "payeeName", "payerName", "rowVersion" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" },
@@ -1073,7 +1073,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["repairExpense"] = DecimalProperty("Repair expense."),
                                 ["freightMiscExpense"] = DecimalProperty("Freight miscellaneous expense."),
                                 ["inspectionExpense"] = DecimalProperty("Inspection expense."),
-                                ["otherExpense"] = DecimalProperty("Other expense.")
+                                ["otherExpense"] = DecimalProperty("Other expense."),
+                                ["rowVersion"] = StringProperty("Concurrency row version encoded as base64.")
                             }
                         },
                         ["ApiPaymentSaveResponse"] = new

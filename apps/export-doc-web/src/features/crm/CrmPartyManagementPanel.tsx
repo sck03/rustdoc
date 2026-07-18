@@ -43,6 +43,7 @@ export function CrmPartyManagementPanel(props: Props) {
         source: String(form.get("source") ?? ""),
         notes: String(form.get("notes") ?? ""),
         linkedDocumentCustomerId: selectedCustomer?.linkedDocumentCustomerId,
+        expectedVersion: id > 0 ? selectedCustomer?.versionNumber ?? 0 : 0,
       };
       const saved = id > 0
         ? await client.updateCrmCustomer({ id, body })
@@ -77,6 +78,7 @@ export function CrmPartyManagementPanel(props: Props) {
       phone: String(form.get("phone") ?? ""),
       instantMessaging: String(form.get("instantMessaging") ?? ""),
       isPrimary: form.get("isPrimary") === "on",
+      expectedVersion: id > 0 ? selectedContact?.versionNumber ?? 0 : 0,
     };
     try {
       const saved = id > 0

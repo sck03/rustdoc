@@ -32,7 +32,7 @@ namespace ExportDocManager.Models.Entities
         [Required, MaxLength(20)]
         public string ShareScope { get; set; } = "Private";
         public bool IsActive { get; set; } = true;
-        public int VersionNumber { get; set; } = 1;
+        [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     }

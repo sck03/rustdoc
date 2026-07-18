@@ -1,4 +1,5 @@
 using ExportDocManager.Services.EmailTemplates;
+using ExportDocManager.Services.Security;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -44,6 +45,7 @@ namespace ExportDocManager.Api.Hosting
                 if (request == null || id <= 0) return Results.BadRequest(new ApiErrorResponse("邮件模板ID无效。"));
                 try { return Results.Ok(ToApiDto(await service.SaveAsync(ToSaveRequest(request, id), ct))); }
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
             }).WithName("UpdateEmailTemplate");
             endpoints.MapGet("/api/email-templates/{id:int}/versions", async (HttpContext c, IApiSessionTokenService t,
@@ -61,14 +63,19 @@ namespace ExportDocManager.Api.Hosting
                 if (id <= 0 || versionNumber <= 0) return Results.BadRequest(new ApiErrorResponse("邮件模板历史版本无效。"));
                 try { return Results.Ok(ToApiDto(await service.RestoreVersionAsync(id, versionNumber, ct))); }
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
             }).WithName("RestoreEmailTemplateVersion");
             endpoints.MapDelete("/api/email-templates/{id:int}", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 IEmailTemplateService service, int id, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(c, t, a, out var denied)) return denied;
-                return await service.DeleteAsync(id, ct)
-                    ? Results.Ok(new ApiCommandResponse(true, "邮件模板已删除。")) : Results.NotFound();
+                try
+                {
+                    return await service.DeleteAsync(id, ct)
+                        ? Results.Ok(new ApiCommandResponse(true, "邮件模板已删除。")) : Results.NotFound();
+                }
+                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
             }).WithName("DeleteEmailTemplate");
         }
 
@@ -83,6 +90,7 @@ namespace ExportDocManager.Api.Hosting
         private static ApiEmailTemplatePreviewDto ToApiDto(EmailTemplatePreview item) =>
             new(item.Subject, item.BodyHtml, item.UnresolvedTokens);
         private static EmailTemplateSaveRequest ToSaveRequest(ApiEmailTemplateSaveRequest item, int id) =>
-            new(id, item.Name, item.Category, item.Subject, item.BodyHtml, item.IsActive, item.IsShared);
+            new(id, item.Name, item.Category, item.Subject, item.BodyHtml, item.IsActive, item.IsShared,
+                item.ExpectedVersion);
     }
 }

@@ -54,7 +54,16 @@ namespace ExportDocManager.Services.Core
 
                     context.Payments.Update(payment);
                 }
-                await context.SaveChangesAsync();
+                try
+                {
+                    await context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException exception)
+                {
+                    throw new BusinessConcurrencyException(
+                        "该付款记录已被其他用户修改或删除，请刷新后重试。",
+                        exception);
+                }
                 return payment.Id;
             }
             catch (Exception ex)

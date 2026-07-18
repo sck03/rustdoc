@@ -46,10 +46,15 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("{{Unknown}}", preview.UnresolvedTokens);
 
             var updateResponse = await client.PutAsJsonAsync($"/api/email-templates/{template.Id}",
-                new ApiEmailTemplateSaveRequest(template.Id, "首次报价", "报价", "Updated", "<p>Updated</p>", false, true));
+                new ApiEmailTemplateSaveRequest(template.Id, "首次报价", "报价", "Updated", "<p>Updated</p>",
+                    false, true, template.VersionNumber));
             Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
             var updated = await ApiIntegrationTestHarness.ReadJsonAsync<ApiEmailTemplateDto>(updateResponse);
             Assert.Equal(2, updated.VersionNumber);
+            var staleUpdateResponse = await client.PutAsJsonAsync($"/api/email-templates/{template.Id}",
+                new ApiEmailTemplateSaveRequest(template.Id, "首次报价", "报价", "Stale", "<p>Stale</p>",
+                    true, true, template.VersionNumber));
+            Assert.Equal(HttpStatusCode.Conflict, staleUpdateResponse.StatusCode);
             Assert.Empty(await client.GetFromJsonAsync<List<ApiEmailTemplateDto>>("/api/email-templates") ?? []);
             Assert.Single(await client.GetFromJsonAsync<List<ApiEmailTemplateDto>>("/api/email-templates?includeInactive=true") ?? []);
             var versions = await client.GetFromJsonAsync<List<ApiEmailTemplateVersionDto>>($"/api/email-templates/{template.Id}/versions");

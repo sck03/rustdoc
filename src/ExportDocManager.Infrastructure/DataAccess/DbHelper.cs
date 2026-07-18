@@ -18,7 +18,7 @@ namespace ExportDocManager.DataAccess
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
         }
 
-        public static string BuildConnectionString(string path, string password = null)
+        public static string BuildConnectionString(string path)
         {
             var builder = new SqliteConnectionStringBuilder
             {
@@ -27,12 +27,8 @@ namespace ExportDocManager.DataAccess
                 Cache = SqliteCacheMode.Shared,
                 Pooling = true,
                 DefaultTimeout = 10,
+                ForeignKeys = true,
             };
-            
-            if (!string.IsNullOrEmpty(password))
-            {
-                builder.Password = password;
-            }
             
             return builder.ToString();
         }
@@ -98,8 +94,7 @@ namespace ExportDocManager.DataAccess
 
         public static void ConfigureDbContextOptions(
             DbContextOptionsBuilder options,
-            DatabaseConnectionSettings databaseSettings,
-            string password = null)
+            DatabaseConnectionSettings databaseSettings)
         {
             ArgumentNullException.ThrowIfNull(options);
             ArgumentNullException.ThrowIfNull(databaseSettings);
@@ -118,7 +113,7 @@ namespace ExportDocManager.DataAccess
 
             var sqliteFileName = NormalizeSqliteDatabaseFileName(databaseSettings.SqliteDatabaseFileName);
             var dbPath = GetDatabasePath(sqliteFileName);
-            var connectionString = BuildConnectionString(dbPath, password);
+            var connectionString = BuildConnectionString(dbPath);
 
             options.UseSqlite(connectionString);
         }
@@ -130,15 +125,10 @@ namespace ExportDocManager.DataAccess
 
         public static AppDbContext CreateDbContext(DatabaseConnectionSettings databaseSettings)
         {
-            return CreateDbContext(databaseSettings, password: null);
-        }
-
-        public static AppDbContext CreateDbContext(DatabaseConnectionSettings databaseSettings, string password)
-        {
             ArgumentNullException.ThrowIfNull(databaseSettings);
 
             var options = new DbContextOptionsBuilder<AppDbContext>();
-            ConfigureDbContextOptions(options, databaseSettings, password);
+            ConfigureDbContextOptions(options, databaseSettings);
             return new AppDbContext(options.Options);
         }
 

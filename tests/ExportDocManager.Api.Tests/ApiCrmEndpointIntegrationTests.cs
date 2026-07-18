@@ -21,6 +21,19 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.Created, createCustomerResponse.StatusCode);
             var customer = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCrmCustomerDto>(createCustomerResponse);
 
+            var updateCustomerResponse = await client.PutAsJsonAsync($"/api/crm/customers/{customer.Id}",
+                new ApiCrmCustomerSaveRequest(customer.Id, customer.Name, customer.CountryRegion, customer.Website,
+                    "跟进中", customer.Source, customer.Notes, customer.LinkedDocumentCustomerId,
+                    customer.VersionNumber));
+            Assert.Equal(HttpStatusCode.OK, updateCustomerResponse.StatusCode);
+            var updatedCustomer = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCrmCustomerDto>(updateCustomerResponse);
+            Assert.Equal(2, updatedCustomer.VersionNumber);
+            var staleCustomerResponse = await client.PutAsJsonAsync($"/api/crm/customers/{customer.Id}",
+                new ApiCrmCustomerSaveRequest(customer.Id, customer.Name, customer.CountryRegion, customer.Website,
+                    "暂停", customer.Source, customer.Notes, customer.LinkedDocumentCustomerId,
+                    customer.VersionNumber));
+            Assert.Equal(HttpStatusCode.Conflict, staleCustomerResponse.StatusCode);
+
             var documentCustomers = await client.GetFromJsonAsync<List<ApiCustomerDto>>("/api/master-data/customers");
             Assert.Empty(documentCustomers ?? []);
 
@@ -37,6 +50,18 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(2, contacts?.Count);
             Assert.Single(contacts!, item => item.IsPrimary);
             Assert.True(contacts.Single(item => item.Id == secondContact.Id).IsPrimary);
+            var contactUpdateResponse = await client.PutAsJsonAsync(
+                $"/api/crm/customers/{customer.Id}/contacts/{secondContact.Id}",
+                new ApiCrmContactSaveRequest(secondContact.Id, customer.Id, secondContact.Name, "Director",
+                    secondContact.Email, secondContact.Phone, secondContact.InstantMessaging, true,
+                    secondContact.VersionNumber));
+            Assert.Equal(HttpStatusCode.OK, contactUpdateResponse.StatusCode);
+            var staleContactResponse = await client.PutAsJsonAsync(
+                $"/api/crm/customers/{customer.Id}/contacts/{secondContact.Id}",
+                new ApiCrmContactSaveRequest(secondContact.Id, customer.Id, secondContact.Name, "Stale",
+                    secondContact.Email, secondContact.Phone, secondContact.InstantMessaging, true,
+                    secondContact.VersionNumber));
+            Assert.Equal(HttpStatusCode.Conflict, staleContactResponse.StatusCode);
 
             var followUpResponse = await client.PostAsJsonAsync("/api/crm/follow-ups", new ApiCrmFollowUpSaveRequest(
                 0, customer.Id, secondContact.Id, "邮件", "客户等待新版报价", "发送报价", null,
@@ -46,9 +71,16 @@ namespace ExportDocManager.Api.Tests
 
             var updateFollowUpResponse = await client.PutAsJsonAsync($"/api/crm/follow-ups/{followUp.Id}",
                 new ApiCrmFollowUpSaveRequest(followUp.Id, customer.Id, secondContact.Id, "电话",
-                    "客户确认收到报价", "下周确认订单", followUp.FollowedUpAt, DateTimeOffset.UtcNow.AddDays(2), false));
+                    "客户确认收到报价", "下周确认订单", followUp.FollowedUpAt,
+                    DateTimeOffset.UtcNow.AddDays(2), false, followUp.VersionNumber));
             Assert.Equal(HttpStatusCode.OK, updateFollowUpResponse.StatusCode);
-            Assert.Equal("电话", (await ApiIntegrationTestHarness.ReadJsonAsync<ApiCrmFollowUpDto>(updateFollowUpResponse)).Type);
+            var updatedFollowUp = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCrmFollowUpDto>(updateFollowUpResponse);
+            Assert.Equal("电话", updatedFollowUp.Type);
+            var staleFollowUpResponse = await client.PutAsJsonAsync($"/api/crm/follow-ups/{followUp.Id}",
+                new ApiCrmFollowUpSaveRequest(followUp.Id, customer.Id, secondContact.Id, "邮件",
+                    "过期修改", followUp.NextAction, followUp.FollowedUpAt, followUp.NextFollowUpAt,
+                    false, followUp.VersionNumber));
+            Assert.Equal(HttpStatusCode.Conflict, staleFollowUpResponse.StatusCode);
 
             var dashboard = await client.GetFromJsonAsync<ApiCrmDashboardDto>("/api/crm/dashboard");
             Assert.Equal(1, dashboard?.CustomerCount);

@@ -19,7 +19,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/", () => Results.Redirect("/swagger"));
 
-            endpoints.MapGet("/healthz", (
+            endpoints.MapGet("/healthz", async (
                 HttpContext context,
                 IAppPathProvider paths,
                 IRuntimeDependencyDiagnosticsService dependencyDiagnostics,
@@ -36,7 +36,7 @@ namespace ExportDocManager.Api.Hosting
                     databaseSettings,
                     sqliteDatabasePath,
                     dependencyDiagnostics.Inspect());
-                var user = currentUserResolver.Resolve(context);
+                var user = await currentUserResolver.ResolveAsync(context, context.RequestAborted);
                 bool canViewDetails = ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions) ||
                     authorizationService.CanManageSettings(user);
                 return Results.Ok(canViewDetails ? response : ApiHealthResponseFactory.CreatePublic(response));

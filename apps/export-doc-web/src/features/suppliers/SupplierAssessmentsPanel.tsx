@@ -50,6 +50,7 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
       priceScore: number(form, "priceScore"),
       conclusion: text(form, "conclusion"),
       notes: text(form, "notes"),
+      expectedVersion: id > 0 ? selected?.versionNumber ?? 0 : 0,
     };
     try {
       const saved = id

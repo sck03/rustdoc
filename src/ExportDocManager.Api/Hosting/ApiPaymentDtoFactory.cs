@@ -54,7 +54,10 @@ namespace ExportDocManager.Api.Hosting
                 RepairExpense = payment.RepairExpense,
                 FreightMiscExpense = payment.FreightMiscExpense,
                 InspectionExpense = payment.InspectionExpense,
-                OtherExpense = payment.OtherExpense
+                OtherExpense = payment.OtherExpense,
+                RowVersion = payment.RowVersion == null || payment.RowVersion.Length == 0
+                    ? string.Empty
+                    : Convert.ToBase64String(payment.RowVersion)
             };
         }
 
@@ -90,7 +93,8 @@ namespace ExportDocManager.Api.Hosting
                 RepairExpense = request.RepairExpense,
                 FreightMiscExpense = request.FreightMiscExpense,
                 InspectionExpense = request.InspectionExpense,
-                OtherExpense = request.OtherExpense
+                OtherExpense = request.OtherExpense,
+                RowVersion = DecodeRowVersion(request.RowVersion)
             };
         }
 
@@ -102,6 +106,19 @@ namespace ExportDocManager.Api.Hosting
             target.OwnerUserId = existing.OwnerUserId;
             target.DepartmentId = existing.DepartmentId ?? string.Empty;
             target.CompanyScope = existing.CompanyScope ?? string.Empty;
+        }
+
+        private static byte[] DecodeRowVersion(string rowVersion)
+        {
+            if (string.IsNullOrWhiteSpace(rowVersion)) return null;
+            try
+            {
+                return Convert.FromBase64String(rowVersion);
+            }
+            catch (FormatException exception)
+            {
+                throw new ArgumentException("付款记录版本号格式无效，请刷新后重试。", nameof(rowVersion), exception);
+            }
         }
     }
 }

@@ -34,9 +34,16 @@ namespace ExportDocManager.Api.Tests
                 productId = product.Id;
             }
 
-            var updateResponse = await client.PutAsJsonAsync($"/api/suppliers/{supplier.Id}", supplier with { Status = "考察中" });
+            var updateResponse = await client.PutAsJsonAsync($"/api/suppliers/{supplier.Id}",
+                new ApiSupplierSaveRequest(supplier.Id, supplier.Name, supplier.CountryRegion, supplier.Category,
+                    supplier.Website, "考察中", supplier.MainProducts, supplier.Notes, supplier.VersionNumber));
             Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
-            Assert.Equal("考察中", (await ApiIntegrationTestHarness.ReadJsonAsync<ApiSupplierDto>(updateResponse)).Status);
+            var updatedSupplier = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSupplierDto>(updateResponse);
+            Assert.Equal("考察中", updatedSupplier.Status);
+            var staleSupplierResponse = await client.PutAsJsonAsync($"/api/suppliers/{supplier.Id}",
+                new ApiSupplierSaveRequest(supplier.Id, supplier.Name, supplier.CountryRegion, supplier.Category,
+                    supplier.Website, "暂停", supplier.MainProducts, supplier.Notes, supplier.VersionNumber));
+            Assert.Equal(HttpStatusCode.Conflict, staleSupplierResponse.StatusCode);
 
             var first = await client.PostAsJsonAsync($"/api/suppliers/{supplier.Id}/contacts",
                 new ApiSupplierContactSaveRequest(0, supplier.Id, "张三", "业务员", "a@example.com", "100", "wx-a", true));
@@ -49,6 +56,18 @@ namespace ExportDocManager.Api.Tests
             var contacts = await client.GetFromJsonAsync<List<ApiSupplierContactDto>>($"/api/suppliers/{supplier.Id}/contacts");
             Assert.Single(contacts!, item => item.IsPrimary);
             Assert.True(contacts.Single(item => item.Id == secondContact.Id).IsPrimary);
+            var updateContactResponse = await client.PutAsJsonAsync(
+                $"/api/suppliers/{supplier.Id}/contacts/{secondContact.Id}",
+                new ApiSupplierContactSaveRequest(secondContact.Id, supplier.Id, secondContact.Name, "采购总监",
+                    secondContact.Email, secondContact.Phone, secondContact.InstantMessaging, true,
+                    secondContact.VersionNumber));
+            Assert.Equal(HttpStatusCode.OK, updateContactResponse.StatusCode);
+            var staleContactResponse = await client.PutAsJsonAsync(
+                $"/api/suppliers/{supplier.Id}/contacts/{secondContact.Id}",
+                new ApiSupplierContactSaveRequest(secondContact.Id, supplier.Id, secondContact.Name, "过期修改",
+                    secondContact.Email, secondContact.Phone, secondContact.InstantMessaging, true,
+                    secondContact.VersionNumber));
+            Assert.Equal(HttpStatusCode.Conflict, staleContactResponse.StatusCode);
 
             var productOptions = await client.GetFromJsonAsync<List<ApiSupplierProductOptionDto>>("/api/suppliers/product-options?keyword=FAB-001");
             Assert.Equal(productId, Assert.Single(productOptions!).Id);
@@ -64,11 +83,16 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.BadRequest, duplicateLinkResponse.StatusCode);
 
             var updateLinkResponse = await client.PutAsJsonAsync($"/api/suppliers/{supplier.Id}/products/{productLink.Id}",
-                new ApiSupplierProductLinkSaveRequest(productLink.Id, supplier.Id, productId, "SUP-FAB-10", 13m, "CNY", 14, "备选"));
+                new ApiSupplierProductLinkSaveRequest(productLink.Id, supplier.Id, productId, "SUP-FAB-10", 13m,
+                    "CNY", 14, "备选", productLink.VersionNumber));
             Assert.Equal(HttpStatusCode.OK, updateLinkResponse.StatusCode);
             var updatedLink = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSupplierProductLinkDto>(updateLinkResponse);
             Assert.Equal("SUP-FAB-10", updatedLink.SupplierProductCode);
             Assert.Equal("备选", updatedLink.Status);
+            var staleLinkResponse = await client.PutAsJsonAsync($"/api/suppliers/{supplier.Id}/products/{productLink.Id}",
+                new ApiSupplierProductLinkSaveRequest(productLink.Id, supplier.Id, productId, "STALE", 9m,
+                    "USD", 30, "暂停", productLink.VersionNumber));
+            Assert.Equal(HttpStatusCode.Conflict, staleLinkResponse.StatusCode);
             Assert.Single(await client.GetFromJsonAsync<List<ApiSupplierProductLinkDto>>($"/api/suppliers/{supplier.Id}/products") ?? []);
 
             var createAssessmentResponse = await client.PostAsJsonAsync($"/api/suppliers/{supplier.Id}/assessments",
@@ -86,9 +110,16 @@ namespace ExportDocManager.Api.Tests
 
             var updateAssessmentResponse = await client.PutAsJsonAsync($"/api/suppliers/{supplier.Id}/assessments/{assessment.Id}",
                 new ApiSupplierAssessmentSaveRequest(assessment.Id, supplier.Id, assessment.AssessedAt,
-                    "订单复盘", 5, 5, 5, 4, "优先合作", "复评后交期表现提升。"));
+                    "订单复盘", 5, 5, 5, 4, "优先合作", "复评后交期表现提升。",
+                    assessment.VersionNumber));
             Assert.Equal(HttpStatusCode.OK, updateAssessmentResponse.StatusCode);
-            Assert.Equal(4.75m, (await ApiIntegrationTestHarness.ReadJsonAsync<ApiSupplierAssessmentDto>(updateAssessmentResponse)).AverageScore);
+            var updatedAssessment = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSupplierAssessmentDto>(updateAssessmentResponse);
+            Assert.Equal(4.75m, updatedAssessment.AverageScore);
+            var staleAssessmentResponse = await client.PutAsJsonAsync(
+                $"/api/suppliers/{supplier.Id}/assessments/{assessment.Id}",
+                new ApiSupplierAssessmentSaveRequest(assessment.Id, supplier.Id, assessment.AssessedAt,
+                    "订单复盘", 1, 1, 1, 1, "观察", "过期修改", assessment.VersionNumber));
+            Assert.Equal(HttpStatusCode.Conflict, staleAssessmentResponse.StatusCode);
             Assert.Single(await client.GetFromJsonAsync<List<ApiSupplierAssessmentDto>>($"/api/suppliers/{supplier.Id}/assessments") ?? []);
 
             var temporaryAssessmentResponse = await client.PostAsJsonAsync($"/api/suppliers/{supplier.Id}/assessments",

@@ -5,7 +5,8 @@ namespace ExportDocManager.Api.Hosting
         int VersionNumber, bool CanEdit);
 
     public sealed record ApiEmailTemplateSaveRequest(
-        int Id, string Name, string Category, string Subject, string BodyHtml, bool IsActive, bool IsShared);
+        int Id, string Name, string Category, string Subject, string BodyHtml, bool IsActive, bool IsShared,
+        int ExpectedVersion = 0);
 
     public sealed record ApiEmailTemplateVariableDto(string Key, string Token, string Label, string SampleValue);
 

@@ -19,6 +19,19 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public void SqliteConnectionString_ShouldUseStandardPortableSqliteWithoutPassword()
+        {
+            string databasePath = Path.Combine(Path.GetTempPath(), "exportdoc-standard-sqlite.db");
+            var builder = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(
+                DbHelper.BuildConnectionString(databasePath));
+
+            Assert.Equal(databasePath, builder.DataSource);
+            Assert.True(builder.ForeignKeys);
+            Assert.Equal(10, builder.DefaultTimeout);
+            Assert.DoesNotContain("Password", builder.ConnectionString, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
         public void DatabaseModeHelper_ShouldNormalizeAndValidateProvider()
         {
             Assert.Equal(DatabaseConnectionSettings.SqliteProvider, DatabaseModeHelper.NormalizeProvider(" sqlite "));
@@ -31,19 +44,6 @@ namespace ExportDocManager.Infrastructure.Tests
             };
 
             Assert.Contains("PostgreSQL", DatabaseModeHelper.Validate(incompletePostgreSql));
-        }
-
-        [Fact]
-        public void DatabaseKeyProvider_ShouldDeriveStableKey()
-        {
-            var first = new DatabaseKeyProvider();
-            var second = new DatabaseKeyProvider();
-
-            first.DeriveAndSetKey("secret");
-            second.DeriveAndSetKey("secret");
-
-            Assert.False(string.IsNullOrWhiteSpace(first.Key));
-            Assert.Equal(first.Key, second.Key);
         }
 
         [Fact]
@@ -237,9 +237,9 @@ namespace ExportDocManager.Infrastructure.Tests
             }
 
             var service = new DatabaseInitializationService(
-                new DatabaseKeyProvider(),
                 factory,
-                new DatabaseConnectionSettings());
+                new DatabaseConnectionSettings(),
+                new DatabaseInitializationCoordinator());
 
             var result = await service.InitializeAsync("admin", string.Empty);
 

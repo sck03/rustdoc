@@ -44,18 +44,26 @@ namespace ExportDocManager.Api.Hosting
                         .AllowAnyHeader()
                         .AllowAnyMethod());
             });
-            services.AddSingleton<IApiSessionTokenService, InMemoryApiSessionTokenService>();
+            if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
+            {
+                services.AddSingleton<IApiSessionTokenService, DatabaseApiSessionTokenService>();
+            }
+            else
+            {
+                services.AddSingleton<IApiSessionTokenService, InMemoryApiSessionTokenService>();
+            }
             services.AddSingleton<ApiCurrentUserResolver>();
             services.AddSingleton<ApiAuthorizationService>();
+            services.AddSingleton(_ => ApiBackgroundJobConcurrencyOptions.FromEnvironment());
             services.AddSingleton<ApiBackgroundJobService>();
             services.AddSingleton<ApiBackgroundJobRunner>();
             services.AddSingleton<ApiBackgroundJobRetryDispatcher>();
+            services.AddHostedService<SqliteSingleInstanceHostedService>();
             services.AddHostedService<PostgreSqlAutomaticBackupHostedService>();
             services.AddSingleton<IBackgroundJobService>(provider =>
                 provider.GetRequiredService<ApiBackgroundJobService>());
             services.AddSingleton<ICurrentUserContext, ApiCurrentUserContext>();
             services.AddSingleton<IAuditUserProvider, ApiAuditUserProvider>();
-            services.AddSingleton<DatabaseKeyProvider>();
             services.AddSingleton<AuditInterceptor>();
             services.AddSingleton<ISettingsService>(_ => new SettingsService(pathProvider));
             services.AddSingleton<IRuntimeDependencyDiagnosticsService, RuntimeDependencyDiagnosticsService>();
@@ -76,6 +84,7 @@ namespace ExportDocManager.Api.Hosting
                     provider.GetRequiredService<ISettingsService>(),
                     provider.GetRequiredService<IHttpClientFactory>().CreateClient("ExchangeRates")));
             services.AddScoped<IDatabaseInitializationService, DatabaseInitializationService>();
+            services.AddSingleton<DatabaseInitializationCoordinator>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IPermissionTemplateService, PermissionTemplateService>();
             services.AddScoped<BusinessDataAccessScope>();
@@ -168,11 +177,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddSharedReadRepositories();
             services.AddDbContextFactory<AppDbContext>((serviceProvider, options) =>
             {
-                string password = DatabaseModeHelper.UsesPostgreSql(databaseSettings)
-                    ? null
-                    : serviceProvider.GetRequiredService<DatabaseKeyProvider>().Key;
-
-                DbHelper.ConfigureDbContextOptions(options, databaseSettings, password);
+                DbHelper.ConfigureDbContextOptions(options, databaseSettings);
                 options.AddInterceptors(serviceProvider.GetRequiredService<AuditInterceptor>());
             });
 

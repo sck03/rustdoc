@@ -1,5 +1,6 @@
 using ExportDocManager.Services.Crm;
 using ExportDocManager.Services.Opportunities;
+using ExportDocManager.Services.Security;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -40,6 +41,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Ok(new ApiCrmCustomerBatchStatusResult(affected, request.Status));
                 }
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
             }).WithName("UpdateCrmCustomerBatchStatus");
 
             endpoints.MapGet("/api/crm/customers/export", async (HttpContext context, IApiSessionTokenService tokens,
@@ -71,6 +73,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("CRM 客户ID无效。"));
                 try { return Results.Ok(ToApiDto(await service.SaveCustomerAsync(ToSaveRequest(request, id), ct))); }
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
             }).WithName("UpdateCrmCustomer");
 
@@ -144,6 +147,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Created($"/api/crm/customers/{customerId}/contacts/{saved.Id}", ToApiDto(saved));
                 }
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
             }).WithName("CreateCrmContact");
 
@@ -156,6 +160,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("联系人ID无效。"));
                 try { return Results.Ok(ToApiDto(await service.SaveContactAsync(ToSaveRequest(request, customerId, id), ct))); }
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
             }).WithName("UpdateCrmContact");
 
@@ -164,9 +169,13 @@ namespace ExportDocManager.Api.Hosting
                 CancellationToken ct) =>
             {
                 if (!HasSalesAccess(context, tokens, auth, out var denied)) return denied;
-                return await service.DeleteContactAsync(customerId, id, ct)
-                    ? Results.Ok(new ApiCommandResponse(true, "联系人已删除，历史跟进仍保留。"))
-                    : Results.NotFound();
+                try
+                {
+                    return await service.DeleteContactAsync(customerId, id, ct)
+                        ? Results.Ok(new ApiCommandResponse(true, "联系人已删除，历史跟进仍保留。"))
+                        : Results.NotFound();
+                }
+                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
             }).WithName("DeleteCrmContact");
 
             endpoints.MapGet("/api/crm/follow-ups", async (HttpContext context, IApiSessionTokenService tokens,
@@ -183,6 +192,7 @@ namespace ExportDocManager.Api.Hosting
                 if (request == null || request.Id > 0) return Results.BadRequest(new ApiErrorResponse("新增跟进不能包含已有ID。"));
                 try { return Results.Ok(ToApiDto(await service.SaveFollowUpAsync(ToSaveRequest(request, 0), ct))); }
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
             }).WithName("CreateCrmFollowUp");
 
@@ -193,6 +203,7 @@ namespace ExportDocManager.Api.Hosting
                 if (request == null || id <= 0) return Results.BadRequest(new ApiErrorResponse("跟进记录ID无效。"));
                 try { return Results.Ok(ToApiDto(await service.SaveFollowUpAsync(ToSaveRequest(request, id), ct))); }
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
             }).WithName("UpdateCrmFollowUp");
 
@@ -200,9 +211,13 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService auth, ICrmService service, int id, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(context, tokens, auth, out var denied)) return denied;
-                return await service.DeleteFollowUpAsync(id, ct)
-                    ? Results.Ok(new ApiCommandResponse(true, "跟进记录已删除。"))
-                    : Results.NotFound();
+                try
+                {
+                    return await service.DeleteFollowUpAsync(id, ct)
+                        ? Results.Ok(new ApiCommandResponse(true, "跟进记录已删除。"))
+                        : Results.NotFound();
+                }
+                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
             }).WithName("DeleteCrmFollowUp");
         }
 
@@ -215,12 +230,15 @@ namespace ExportDocManager.Api.Hosting
         }
 
         private static ApiCrmCustomerDto ToApiDto(CrmCustomerRecord item) =>
-            new(item.Id, item.Name, item.CountryRegion, item.Website, item.Status, item.Source, item.Notes, item.LinkedDocumentCustomerId);
+            new(item.Id, item.Name, item.CountryRegion, item.Website, item.Status, item.Source, item.Notes,
+                item.LinkedDocumentCustomerId, item.VersionNumber);
         private static ApiCrmContactDto ToApiDto(CrmContactRecord item) =>
-            new(item.Id, item.CrmCustomerId, item.Name, item.Title, item.Email, item.Phone, item.InstantMessaging, item.IsPrimary);
+            new(item.Id, item.CrmCustomerId, item.Name, item.Title, item.Email, item.Phone,
+                item.InstantMessaging, item.IsPrimary, item.VersionNumber);
         private static ApiCrmFollowUpDto ToApiDto(CrmFollowUpRecord item) =>
             new(item.Id, item.CrmCustomerId, item.CustomerName, item.CrmContactId, item.ContactName, item.Type,
-                item.Summary, item.NextAction, item.FollowedUpAt, item.NextFollowUpAt, item.IsCompleted, item.CreatedAt, item.UpdatedAt);
+                item.Summary, item.NextAction, item.FollowedUpAt, item.NextFollowUpAt, item.IsCompleted,
+                item.CreatedAt, item.UpdatedAt, item.VersionNumber);
         private static ApiCrmDashboardDto ToApiDto(CrmDashboardRecord item, SalesOpportunityDashboard opportunities) =>
             new(item.CustomerCount, item.ContactCount, item.PendingFollowUpCount, item.OverdueFollowUpCount,
                 item.DueNextSevenDaysCount, item.UpcomingFollowUps.Select(ToApiDto).ToArray(),
@@ -239,11 +257,13 @@ namespace ExportDocManager.Api.Hosting
             new(item.RowNumber, item.Name, item.CountryRegion, item.Website, item.Status, item.Source, item.Notes,
                 item.ContactName, item.ContactTitle, item.ContactEmail, item.ContactPhone, item.IsDuplicate, item.Error);
         private static CrmCustomerSaveRequest ToSaveRequest(ApiCrmCustomerSaveRequest item, int id) =>
-            new(id, item.Name, item.CountryRegion, item.Website, item.Status, item.Source, item.Notes, item.LinkedDocumentCustomerId);
+            new(id, item.Name, item.CountryRegion, item.Website, item.Status, item.Source, item.Notes,
+                item.LinkedDocumentCustomerId, item.ExpectedVersion);
         private static CrmContactSaveRequest ToSaveRequest(ApiCrmContactSaveRequest item, int customerId, int id) =>
-            new(id, customerId, item.Name, item.Title, item.Email, item.Phone, item.InstantMessaging, item.IsPrimary);
+            new(id, customerId, item.Name, item.Title, item.Email, item.Phone, item.InstantMessaging,
+                item.IsPrimary, item.ExpectedVersion);
         private static CrmFollowUpSaveRequest ToSaveRequest(ApiCrmFollowUpSaveRequest item, int id) =>
             new(id, item.CrmCustomerId, item.CrmContactId, item.Type, item.Summary, item.NextAction,
-                item.FollowedUpAt, item.NextFollowUpAt, item.IsCompleted);
+                item.FollowedUpAt, item.NextFollowUpAt, item.IsCompleted, item.ExpectedVersion);
     }
 }
