@@ -125,9 +125,32 @@ jobs:
           if ($null -eq $browser) { throw "Chrome Headless Shell was not included in the server package." }
           if (-not (Test-Path -LiteralPath (Join-Path $webRoot "index.html"))) { throw "Web index.html was not included." }
           if ("${{ inputs.platform }}" -eq "linux") {
+            @(
+              (Join-Path $packageRoot "libOpenCvSharpExtern.so"),
+              (Join-Path $packageRoot "libonnxruntime.so"),
+              (Join-Path $packageRoot "OcrModels/PaddleOCR/V6/det/inference.onnx"),
+              (Join-Path $packageRoot "OcrModels/PaddleOCR/V6/rec/inference.onnx"),
+              (Join-Path $packageRoot "OcrModels/PaddleOCR/V6/THIRD_PARTY_NOTICES.md")
+            ) | ForEach-Object {
+              if (-not (Test-Path -LiteralPath $_ -PathType Leaf)) {
+                throw "Linux PP-OCRv6 package file was not included: $_"
+              }
+            }
             & chmod +x -- (Join-Path $packageRoot "ExportDocManager.Api") (Join-Path $packageRoot "start-linux.sh") $browser.FullName
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+
+      - name: Verify bundled PP-OCRv6 runtime
+        if: inputs.platform == 'linux'
+        shell: pwsh
+        env:
+          EXPORTDOCMANAGER_OCR_RUNTIME: enabled
+        run: |
+          $packageRoot = Join-Path $env:GITHUB_WORKSPACE "artifacts/browser-server/package"
+          $dataRoot = Join-Path $packageRoot "App_Data/OcrBuildCheck"
+          & (Join-Path $packageRoot "ExportDocManager.Api") --app-root $packageRoot --data-root $dataRoot --verify-ocr-runtime
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item -LiteralPath $dataRoot -Recurse -Force -ErrorAction SilentlyContinue
 
       - name: Create downloadable archive
         id: archive

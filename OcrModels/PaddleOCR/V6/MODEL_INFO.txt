@@ -3,4 +3,4 @@ Version: PP-OCRv6 Small
 Detection: PaddlePaddle/PP-OCRv6_small_det
 Recognition: PaddlePaddle/PP-OCRv6_small_rec
 Source: https://huggingface.co/PaddlePaddle
-License: follow PaddlePaddle model license on HuggingFace
+License: Apache-2.0 (commercial use and redistribution permitted subject to license terms)

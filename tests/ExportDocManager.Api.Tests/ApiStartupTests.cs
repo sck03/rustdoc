@@ -2445,7 +2445,7 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
-        public void ApiServices_ShouldUsePaddleOcrOnWindowsWhenBundledModelsArePresent()
+        public void ApiServices_ShouldUsePaddleOcrOnSupportedPlatformWhenBundledModelsArePresent()
         {
             lock (OcrRuntimeEnvironmentLock)
             {
@@ -2472,7 +2472,7 @@ namespace ExportDocManager.Api.Tests
 
                     var ocrService = scope.ServiceProvider.GetRequiredService<IOcrService>();
 
-                    if (OperatingSystem.IsWindows())
+                    if (OcrRuntimeAvailabilityInspector.IsSupportedPlatform())
                     {
                         Assert.IsType<PaddleOcrService>(ocrService);
                     }

@@ -41,8 +41,8 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.Equal(Path.GetFullPath(browserPath), renderer.ResolvedPath);
 
                 var ocr = Assert.Single(diagnostics, item => item.Key == "ocr-runtime");
-                Assert.Equal(OperatingSystem.IsWindows(), ocr.Ready);
-                Assert.Equal(OperatingSystem.IsWindows() ? "ready" : "unsupported", ocr.Status);
+                Assert.Equal(OcrRuntimeAvailabilityInspector.IsSupportedPlatform(), ocr.Ready);
+                Assert.Equal(OcrRuntimeAvailabilityInspector.IsSupportedPlatform() ? "ready" : "unsupported", ocr.Status);
 
                 var postgreSql = Assert.Single(diagnostics, item => item.Key == "postgresql-tools");
                 Assert.False(postgreSql.Ready);

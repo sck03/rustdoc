@@ -22,6 +22,16 @@ chmod +x "$BROWSER" "$ROOT/ExportDocManager.Api"
 export EXPORTDOCMANAGER_NETWORK_MODE=true
 export EXPORTDOCMANAGER_PRODUCT_EDITION=Full
 export EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE="$BROWSER"
+export EXPORTDOCMANAGER_OCR_RUNTIME="${EXPORTDOCMANAGER_OCR_RUNTIME:-enabled}"
+case "$EXPORTDOCMANAGER_OCR_RUNTIME" in
+  0|false|disabled|off|none|unsupported) ;;
+  *)
+    "$ROOT/ExportDocManager.Api" \
+      --app-root "$ROOT" \
+      --data-root "$ROOT/App_Data" \
+      --verify-ocr-runtime
+    ;;
+esac
 exec "$ROOT/ExportDocManager.Api" \
   --app-root "$ROOT" \
   --data-root "$ROOT/App_Data" \

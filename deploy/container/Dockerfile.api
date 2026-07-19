@@ -33,6 +33,7 @@ RUN apt-get update \
         libdrm2 \
         libgbm1 \
         libgtk-3-0 \
+        libgomp1 \
         libnss3 \
         libx11-xcb1 \
         libxcomposite1 \
@@ -44,11 +45,19 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=build /out/ ./
+ARG TARGETARCH
 ENV ASPNETCORE_URLS=http://0.0.0.0:5188 \
     EXPORTDOCMANAGER_DATA_ROOT=/runtime-data \
     EXPORTDOCMANAGER_NETWORK_MODE=true \
     EXPORTDOCMANAGER_PRODUCT_EDITION=Full \
     EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
+    EXPORTDOCMANAGER_OCR_RUNTIME=enabled \
     TZ=Asia/Shanghai
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+        dotnet ExportDocManager.Api.dll --app-root /app --data-root /tmp/exportdoc-ocr-check --verify-ocr-runtime; \
+    else \
+        echo "PP-OCRv6 runtime verification skipped for unsupported architecture: $TARGETARCH"; \
+    fi \
+    && rm -rf /tmp/exportdoc-ocr-check
 EXPOSE 5188
 ENTRYPOINT ["dotnet", "ExportDocManager.Api.dll"]

@@ -172,13 +172,16 @@ namespace ExportDocManager.Services.Tools
 
         private static DenseTensor<float> CreateDetectionTensor(Mat src)
         {
-            var tensor = new DenseTensor<float>([1, 3, src.Height, src.Width]);
-            Mat.Indexer<Vec3b> indexer = src.GetGenericIndexer<Vec3b>();
-            for (int y = 0; y < src.Height; y++)
+            int height = src.Height;
+            int width = src.Width;
+            var tensor = new DenseTensor<float>([1, 3, height, width]);
+            var rows = src.AsRows<Vec3b>();
+            for (int y = 0; y < height; y++)
             {
-                for (int x = 0; x < src.Width; x++)
+                Span<Vec3b> row = rows[y];
+                for (int x = 0; x < width; x++)
                 {
-                    Vec3b pixel = indexer[y, x];
+                    Vec3b pixel = row[x];
                     tensor[0, 0, y, x] = NormalizeImageValue(pixel.Item0, DetectionMean[0], DetectionStd[0]);
                     tensor[0, 1, y, x] = NormalizeImageValue(pixel.Item1, DetectionMean[1], DetectionStd[1]);
                     tensor[0, 2, y, x] = NormalizeImageValue(pixel.Item2, DetectionMean[2], DetectionStd[2]);
@@ -190,13 +193,16 @@ namespace ExportDocManager.Services.Tools
 
         private static DenseTensor<float> CreateRecognitionTensor(Mat src)
         {
-            var tensor = new DenseTensor<float>([1, 3, src.Height, src.Width]);
-            Mat.Indexer<Vec3b> indexer = src.GetGenericIndexer<Vec3b>();
-            for (int y = 0; y < src.Height; y++)
+            int height = src.Height;
+            int width = src.Width;
+            var tensor = new DenseTensor<float>([1, 3, height, width]);
+            var rows = src.AsRows<Vec3b>();
+            for (int y = 0; y < height; y++)
             {
-                for (int x = 0; x < src.Width; x++)
+                Span<Vec3b> row = rows[y];
+                for (int x = 0; x < width; x++)
                 {
-                    Vec3b pixel = indexer[y, x];
+                    Vec3b pixel = row[x];
                     tensor[0, 0, y, x] = NormalizeRecognitionValue(pixel.Item0);
                     tensor[0, 1, y, x] = NormalizeRecognitionValue(pixel.Item1);
                     tensor[0, 2, y, x] = NormalizeRecognitionValue(pixel.Item2);
@@ -219,14 +225,15 @@ namespace ExportDocManager.Services.Tools
 
         private static float CalculateBoxScore(float[] map, Mat binary, Rect rect, int mapWidth)
         {
-            Mat.Indexer<byte> binaryIndexer = binary.GetGenericIndexer<byte>();
+            var binaryRows = binary.AsRows<byte>();
             double sum = 0;
             int count = 0;
             for (int y = rect.Y; y < rect.Bottom; y++)
             {
+                Span<byte> binaryRow = binaryRows[y];
                 for (int x = rect.X; x < rect.Right; x++)
                 {
-                    if (binaryIndexer[y, x] == 0)
+                    if (binaryRow[x] == 0)
                     {
                         continue;
                     }
