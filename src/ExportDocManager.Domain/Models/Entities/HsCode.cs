@@ -22,6 +22,11 @@ namespace ExportDocManager.Models.Entities
         private string _rebateRate;
         private DateTime? _updateTime = DateTime.Now;
         private string _detailUrl;
+        private string _status = "Active";
+        private string _sourceName;
+        private int? _effectiveYear;
+        private DateTime? _lastVerifiedAt;
+        private string _replacedByCodes;
 
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -127,6 +132,39 @@ namespace ExportDocManager.Models.Entities
         {
             get => _updateTime;
             set => SetProperty(ref _updateTime, value);
+        }
+
+        [MaxLength(30)]
+        public string Status
+        {
+            get => string.IsNullOrWhiteSpace(_status) ? "Active" : _status;
+            set => SetProperty(ref _status, string.IsNullOrWhiteSpace(value) ? "Active" : value.Trim());
+        }
+
+        [MaxLength(200)]
+        public string SourceName
+        {
+            get => _sourceName;
+            set => SetProperty(ref _sourceName, value?.Trim());
+        }
+
+        public int? EffectiveYear
+        {
+            get => _effectiveYear;
+            set => SetProperty(ref _effectiveYear, value);
+        }
+
+        public DateTime? LastVerifiedAt
+        {
+            get => _lastVerifiedAt;
+            set => SetProperty(ref _lastVerifiedAt, value);
+        }
+
+        [MaxLength(500)]
+        public string ReplacedByCodes
+        {
+            get => _replacedByCodes;
+            set => SetProperty(ref _replacedByCodes, value?.Trim());
         }
 
         [NotMapped]

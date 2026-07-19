@@ -40,7 +40,12 @@ namespace ExportDocManager.Api.Hosting
                 hsCode.InspectionCategory ?? string.Empty,
                 hsCode.RebateRate ?? string.Empty,
                 hsCode.UpdateTime,
-                hsCode.DetailUrl ?? string.Empty);
+                hsCode.DetailUrl ?? string.Empty,
+                hsCode.Status ?? "Active",
+                hsCode.SourceName ?? string.Empty,
+                hsCode.EffectiveYear,
+                hsCode.LastVerifiedAt,
+                hsCode.ReplacedByCodes ?? string.Empty);
         }
 
         public static HsCode ToHsCodeForSave(ApiHsCodeDto dto)
@@ -59,7 +64,12 @@ namespace ExportDocManager.Api.Hosting
                 InspectionCategory = dto.InspectionCategory ?? string.Empty,
                 RebateRate = dto.RebateRate ?? string.Empty,
                 UpdateTime = dto.UpdateTime,
-                DetailUrl = dto.DetailUrl ?? string.Empty
+                DetailUrl = dto.DetailUrl ?? string.Empty,
+                Status = dto.Status ?? "Active",
+                SourceName = dto.SourceName ?? string.Empty,
+                EffectiveYear = dto.EffectiveYear,
+                LastVerifiedAt = dto.LastVerifiedAt,
+                ReplacedByCodes = dto.ReplacedByCodes ?? string.Empty
             };
         }
     }

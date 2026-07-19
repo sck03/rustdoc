@@ -164,6 +164,63 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
+                    ["/api/master-data/hs-codes/import-preview-path"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Analyze an HS code workbook selected by the desktop user",
+                            operationId = "previewHsCodesImportFromPath",
+                            requestBody = new { required = true, content = JsonContent("ApiHsCodeImportPreviewPathRequest") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Detected columns and import differences.", content = JsonContent("ApiHsCodeImportPreviewResponse") },
+                                ["400"] = new { description = "Invalid request." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["404"] = new { description = "Workbook was not found." },
+                                ["409"] = new { description = "Workbook could not be analyzed." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-codes/import-preview-upload"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Upload and analyze an HS code workbook without committing it",
+                            operationId = "previewHsCodesImportUpload",
+                            parameters = new object[]
+                            {
+                                QueryParameter("fileName", "string", null, "Original workbook file name."),
+                                QueryParameter("mode", "string", null, "Incremental or CompleteSnapshot."),
+                                QueryParameter("sourceName", "string", null, "Human readable data source."),
+                                QueryParameter("effectiveYear", "integer", "int32", "Optional effective year.")
+                            },
+                            requestBody = new { required = true, content = BinaryContent() },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Detected columns and import differences.", content = JsonContent("ApiHsCodeImportPreviewResponse") },
+                                ["400"] = new { description = "Invalid workbook." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["409"] = new { description = "Workbook could not be analyzed." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-codes/import-commit"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Commit a previously reviewed HS code import preview",
+                            operationId = "commitHsCodesImport",
+                            requestBody = new { required = true, content = JsonContent("ApiHsCodeImportCommitRequest") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Import commit result.", content = JsonContent("ApiHsCodeImportCommitResponse") },
+                                ["400"] = new { description = "Invalid preview token." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["404"] = new { description = "Preview expired." },
+                                ["409"] = new { description = "Import could not be committed." }
+                            }
+                        }
+                    },
                     ["/api/master-data/hs-codes/import-upload"] = new
                     {
                         post = new
@@ -212,6 +269,19 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Missing search keyword." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["409"] = new { description = "Remote search failed." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-codes/remote-health"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Check the configured HS code remote source",
+                            operationId = "getHsCodeRemoteHealth",
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Remote source health.", content = JsonContent("ApiHsCodeRemoteHealthResponse") },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
                             }
                         }
                     },

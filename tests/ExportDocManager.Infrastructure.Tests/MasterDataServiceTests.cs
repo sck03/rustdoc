@@ -5,11 +5,102 @@ using ExportDocManager.Services.MasterData;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using ClosedXML.Excel;
 
 namespace ExportDocManager.Infrastructure.Tests
 {
     public class MasterDataServiceTests
     {
+        [Fact]
+        public async Task HsCodeImport_ShouldDetectNonStandardHeaderAndPreserveExistingNonEmptyFields()
+        {
+            using var factory = new SqliteTestDbContextFactory();
+            var repository = new LocalMasterDataReadRepository(factory);
+            var service = new HsCodeService(factory, repository);
+            await service.SaveAsync(new HsCode
+            {
+                Code = "6205200090",
+                Name = "旧名称",
+                Elements = "保留的申报要素",
+                Unit = "件"
+            });
+            string path = CreateHsCodeWorkbook(workbook =>
+            {
+                var sheet = workbook.AddWorksheet("2026税则资料");
+                sheet.Cell(1, 1).Value = "某第三方中国HS编码资料";
+                sheet.Cell(3, 2).Value = "商品税号";
+                sheet.Cell(3, 4).Value = "货品名称";
+                sheet.Cell(3, 6).Value = "第一法定单位";
+                sheet.Cell(3, 8).Value = "出口商品退税率";
+                sheet.Cell(4, 2).Value = "6205200090";
+                sheet.Cell(4, 4).Value = "棉制男衬衫";
+                sheet.Cell(4, 6).Value = "011 件";
+                sheet.Cell(4, 8).Value = "13%";
+            });
+            try
+            {
+                var preview = await service.PreviewImportAsync(path, HsCodeImportMode.Incremental, "测试资料", 2026);
+                Assert.Equal(3, preview.HeaderRowNumber);
+                Assert.True(preview.Confidence >= 75);
+                Assert.Equal(1, preview.UpdateCount);
+
+                await service.CommitImportAsync(preview);
+                var saved = await service.GetByCodeAsync("6205200090");
+                Assert.Equal("棉制男衬衫", saved.Name);
+                Assert.Equal("保留的申报要素", saved.Elements);
+                Assert.Equal("件", saved.Unit);
+                Assert.Equal("13%", saved.RebateRate);
+                Assert.Equal("测试资料", saved.SourceName);
+                Assert.Equal(2026, saved.EffectiveYear);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public async Task HsCodeCompleteSnapshot_ShouldMarkMissingCodeWithoutDeletingIt()
+        {
+            using var factory = new SqliteTestDbContextFactory();
+            var repository = new LocalMasterDataReadRepository(factory);
+            var service = new HsCodeService(factory, repository);
+            await service.SaveAsync(new HsCode { Code = "8517000000", Name = "旧通信设备", Unit = "台" });
+            string path = CreateHsCodeWorkbook(workbook =>
+            {
+                var sheet = workbook.AddWorksheet("完整库");
+                sheet.Cell(1, 1).Value = "HS编码";
+                sheet.Cell(1, 2).Value = "商品名称";
+                sheet.Cell(2, 1).Value = "8517130000";
+                sheet.Cell(2, 2).Value = "智能手机";
+            });
+            try
+            {
+                var preview = await service.PreviewImportAsync(path, HsCodeImportMode.CompleteSnapshot, "完整库", 2026);
+                Assert.Equal(1, preview.SuspectedObsoleteCount);
+                await service.CommitImportAsync(preview);
+                var oldItem = await service.GetByCodeAsync("8517000000");
+                Assert.NotNull(oldItem);
+                Assert.Equal("SuspectedObsolete", oldItem.Status);
+                Assert.NotNull(await service.GetByCodeAsync("8517130000"));
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        private static string CreateHsCodeWorkbook(Action<XLWorkbook> build)
+        {
+            string directory = Path.Combine(AppContext.BaseDirectory, "HsCodeImportTests");
+            Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory, $"{Guid.NewGuid():N}.xlsx");
+            using var workbook = new XLWorkbook();
+            build(workbook);
+            workbook.SaveAs(path);
+            return path;
+        }
+
         [Fact]
         public async Task CustomerService_ShouldNormalizeAndReturnSavedCustomer()
         {

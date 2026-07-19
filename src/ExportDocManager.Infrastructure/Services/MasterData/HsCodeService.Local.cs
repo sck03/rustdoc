@@ -23,6 +23,7 @@ namespace ExportDocManager.Services.MasterData
             }
 
             hsCode.Code = normalizedCode;
+            hsCode.Status = NormalizeHsCodeStatus(hsCode.Status);
 
             await using var context = await CreateDbContextAsync();
             var existing = await context.HsCodes.FirstOrDefaultAsync(h => h.NormalizedCode == normalizedCode);
@@ -128,6 +129,22 @@ namespace ExportDocManager.Services.MasterData
             target.Elements = source.Elements;
             target.Description = source.Description;
             target.DetailUrl = source.DetailUrl;
+            target.Status = NormalizeHsCodeStatus(source.Status);
+            if (!string.IsNullOrWhiteSpace(source.SourceName)) target.SourceName = source.SourceName;
+            if (source.EffectiveYear.HasValue) target.EffectiveYear = source.EffectiveYear;
+            if (source.LastVerifiedAt.HasValue) target.LastVerifiedAt = source.LastVerifiedAt;
+            if (!string.IsNullOrWhiteSpace(source.ReplacedByCodes)) target.ReplacedByCodes = source.ReplacedByCodes;
+        }
+
+        private static string NormalizeHsCodeStatus(string status)
+        {
+            string value = (status ?? string.Empty).Trim();
+            return value.ToUpperInvariant() switch
+            {
+                "SUSPECTEDOBSOLETE" or "疑似作废" => "SuspectedObsolete",
+                "OBSOLETE" or "已作废" or "作废" => "Obsolete",
+                _ => "Active"
+            };
         }
     }
 }

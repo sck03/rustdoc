@@ -1133,7 +1133,12 @@ namespace ExportDocManager.Api.Hosting
                                 ["inspectionCategory"] = StringProperty("Inspection category."),
                                 ["rebateRate"] = StringProperty("Rebate rate."),
                                 ["updateTime"] = new { type = "string", format = "date-time", nullable = true },
-                                ["detailUrl"] = StringProperty("Source detail URL.")
+                                ["detailUrl"] = StringProperty("Source detail URL."),
+                                ["status"] = StringProperty("Active, SuspectedObsolete, or Obsolete."),
+                                ["sourceName"] = StringProperty("Data source name."),
+                                ["effectiveYear"] = new { type = "integer", format = "int32", nullable = true },
+                                ["lastVerifiedAt"] = new { type = "string", format = "date-time", nullable = true },
+                                ["replacedByCodes"] = StringProperty("Comma-separated replacement candidates.")
                             }
                         },
                         ["ApiHsCodeImportPathRequest"] = new
@@ -1143,6 +1148,103 @@ namespace ExportDocManager.Api.Hosting
                             properties = new Dictionary<string, object>
                             {
                                 ["filePath"] = StringProperty("User selected .xlsx, .xlsm, .xltx, .xltm, or .xls workbook path.")
+                            }
+                        },
+                        ["ApiHsCodeImportPreviewPathRequest"] = new
+                        {
+                            type = "object",
+                            required = new[] { "filePath" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["filePath"] = StringProperty("Explicitly selected workbook path."),
+                                ["mode"] = StringProperty("Incremental or CompleteSnapshot."),
+                                ["sourceName"] = StringProperty("Human readable source name."),
+                                ["effectiveYear"] = new { type = "integer", format = "int32", nullable = true }
+                            }
+                        },
+                        ["ApiHsCodeImportCommitRequest"] = new
+                        {
+                            type = "object",
+                            required = new[] { "token" },
+                            properties = new Dictionary<string, object> { ["token"] = StringProperty("Server-side preview token.") }
+                        },
+                        ["ApiHsCodeImportColumnMappingDto"] = new
+                        {
+                            type = "object",
+                            required = new[] { "field", "header", "columnNumber", "confidence" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["field"] = StringProperty("Normalized field name."),
+                                ["header"] = StringProperty("Detected workbook header."),
+                                ["columnNumber"] = new { type = "integer", format = "int32" },
+                                ["confidence"] = new { type = "integer", format = "int32" }
+                            }
+                        },
+                        ["ApiHsCodeImportPreviewItemDto"] = new
+                        {
+                            type = "object",
+                            required = new[] { "changeType", "rowNumber", "item", "changedFields", "replacementCandidates", "message" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["changeType"] = StringProperty("Add, Update, Unchanged, SuspectedObsolete, Conflict, or Invalid."),
+                                ["rowNumber"] = new { type = "integer", format = "int32" },
+                                ["item"] = RefSchema("ApiHsCodeDto"),
+                                ["changedFields"] = new { type = "array", items = new { type = "string" } },
+                                ["replacementCandidates"] = new { type = "array", items = new { type = "string" } },
+                                ["message"] = StringProperty("Operator-facing difference message.")
+                            }
+                        },
+                        ["ApiHsCodeImportPreviewResponse"] = new
+                        {
+                            type = "object",
+                            required = new[] { "token", "fileName", "mode", "sourceName", "worksheetName", "headerRowNumber", "confidence", "columns", "items", "addCount", "updateCount", "unchangedCount", "suspectedObsoleteCount", "conflictCount", "invalidCount", "warnings", "storagePolicy" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["token"] = StringProperty("Server-side preview token."),
+                                ["fileName"] = StringProperty("Workbook file name."),
+                                ["mode"] = StringProperty("Import mode."),
+                                ["sourceName"] = StringProperty("Data source name."),
+                                ["effectiveYear"] = new { type = "integer", format = "int32", nullable = true },
+                                ["worksheetName"] = StringProperty("Detected worksheet."),
+                                ["headerRowNumber"] = new { type = "integer", format = "int32" },
+                                ["confidence"] = new { type = "integer", format = "int32" },
+                                ["columns"] = new { type = "array", items = RefSchema("ApiHsCodeImportColumnMappingDto") },
+                                ["items"] = new { type = "array", items = RefSchema("ApiHsCodeImportPreviewItemDto") },
+                                ["addCount"] = new { type = "integer", format = "int32" },
+                                ["updateCount"] = new { type = "integer", format = "int32" },
+                                ["unchangedCount"] = new { type = "integer", format = "int32" },
+                                ["suspectedObsoleteCount"] = new { type = "integer", format = "int32" },
+                                ["conflictCount"] = new { type = "integer", format = "int32" },
+                                ["invalidCount"] = new { type = "integer", format = "int32" },
+                                ["warnings"] = new { type = "array", items = new { type = "string" } },
+                                ["storagePolicy"] = StringProperty("Runtime storage policy.")
+                            }
+                        },
+                        ["ApiHsCodeImportCommitResponse"] = new
+                        {
+                            type = "object",
+                            required = new[] { "success", "addedCount", "updatedCount", "unchangedCount", "suspectedObsoleteCount", "skippedCount", "message" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["success"] = new { type = "boolean" },
+                                ["addedCount"] = new { type = "integer", format = "int32" },
+                                ["updatedCount"] = new { type = "integer", format = "int32" },
+                                ["unchangedCount"] = new { type = "integer", format = "int32" },
+                                ["suspectedObsoleteCount"] = new { type = "integer", format = "int32" },
+                                ["skippedCount"] = new { type = "integer", format = "int32" },
+                                ["message"] = StringProperty("Commit summary.")
+                            }
+                        },
+                        ["ApiHsCodeRemoteHealthResponse"] = new
+                        {
+                            type = "object",
+                            required = new[] { "source", "available", "checkedAt", "message" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["source"] = StringProperty("Remote source name."),
+                                ["available"] = new { type = "boolean" },
+                                ["checkedAt"] = new { type = "string", format = "date-time" },
+                                ["message"] = StringProperty("Health summary.")
                             }
                         },
                         ["ApiHsCodeClearAllRequest"] = new

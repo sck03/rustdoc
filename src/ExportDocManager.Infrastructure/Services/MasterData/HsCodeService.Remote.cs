@@ -47,7 +47,7 @@ namespace ExportDocManager.Services.MasterData
                             continue;
                         }
 
-                        await FetchDetailAsync(item);
+                        await FetchDetailAsync(item, cancellationToken);
                         if (cancellationToken.IsCancellationRequested)
                         {
                             break;
@@ -63,7 +63,7 @@ namespace ExportDocManager.Services.MasterData
                             await TryReplaceItemAsync(item, [], onItemUpdated, onItemRemoved, onItemsAdded, cancellationToken);
                         }
                     }
-                    catch (ExpiredHsCodeException ex)
+                    catch (HsCodeRemoteExpiredException ex)
                     {
                         var replaced = await TryReplaceItemAsync(item, ex.RecommendedKeywords, onItemUpdated, onItemRemoved, onItemsAdded, cancellationToken);
                         if (!replaced)
@@ -101,19 +101,56 @@ namespace ExportDocManager.Services.MasterData
             }
         }
 
-        public Task<List<HsCode>> SearchRemoteAsync(string keyword)
+        public async Task<List<HsCode>> SearchRemoteAsync(string keyword, CancellationToken cancellationToken = default)
         {
-            return SearchRemoteCoreAsync(
-                keyword,
-                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-                depth: 0);
+            if (_remoteProviders.Count == 0)
+            {
+                return await SearchI5a6DirectAsync(keyword).ConfigureAwait(false);
+            }
+
+            var merged = new List<HsCode>();
+            foreach (var provider in _remoteProviders)
+            {
+                try
+                {
+                    var rows = await provider.SearchAsync(keyword, cancellationToken).ConfigureAwait(false);
+                    AppendSearchResults(merged, rows);
+                    if (merged.Count > 0) break;
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "HS编码联网 Provider 查询失败。Provider={Provider}", provider.Name);
+                }
+            }
+            return DeduplicateByCode(merged);
         }
 
-        public async Task<HsCode> FetchDetailAsync(HsCode hsCode)
+        internal Task<List<HsCode>> SearchI5a6DirectAsync(string keyword) => SearchRemoteCoreAsync(
+            keyword, new HashSet<string>(StringComparer.OrdinalIgnoreCase), depth: 0);
+
+        public async Task<HsCode> FetchDetailAsync(HsCode hsCode, CancellationToken cancellationToken = default)
+        {
+            if (_remoteProviders.Count > 0)
+            {
+                var provider = _remoteProviders.FirstOrDefault(item => item.CanHandleDetailUrl(hsCode?.DetailUrl));
+                if (provider == null) throw new ArgumentException("没有可处理该HS编码详情地址的联网 Provider。", nameof(hsCode));
+                return await provider.FetchDetailAsync(hsCode, cancellationToken).ConfigureAwait(false);
+            }
+            return await FetchI5a6DetailDirectAsync(hsCode).ConfigureAwait(false);
+        }
+
+        internal async Task<HsCode> FetchI5a6DetailDirectAsync(HsCode hsCode)
         {
             if (string.IsNullOrEmpty(hsCode?.DetailUrl))
             {
                 return hsCode;
+            }
+
+            if (!Uri.TryCreate(hsCode.DetailUrl, UriKind.Absolute, out var detailUri) ||
+                detailUri.Scheme != Uri.UriSchemeHttps ||
+                !string.Equals(detailUri.Host, "www.i5a6.com", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("HS编码详情地址不是受信任的联网数据源。", nameof(hsCode));
             }
 
             try
@@ -127,7 +164,7 @@ namespace ExportDocManager.Services.MasterData
 
                 if (doc.DocumentNode.SelectSingleNode("//div[@id='hscode-detail']//span[contains(normalize-space(.), '已作废')]") != null)
                 {
-                    throw new ExpiredHsCodeException(recommendedKeywords);
+                    throw new HsCodeRemoteExpiredException(recommendedKeywords);
                 }
 
                 string GetValue(string label)
@@ -168,7 +205,7 @@ namespace ExportDocManager.Services.MasterData
                 {
                     if (HsCodeTextHelper.IsExpiredText(fetchedCode))
                     {
-                        throw new ExpiredHsCodeException(recommendedKeywords);
+                        throw new HsCodeRemoteExpiredException(recommendedKeywords);
                     }
 
                     hsCode.Code = HsCodeTextHelper.NormalizeCode(fetchedCode);
@@ -179,7 +216,7 @@ namespace ExportDocManager.Services.MasterData
                 {
                     if (HsCodeTextHelper.IsExpiredText(fetchedName))
                     {
-                        throw new ExpiredHsCodeException(recommendedKeywords);
+                        throw new HsCodeRemoteExpiredException(recommendedKeywords);
                     }
 
                     hsCode.Name = fetchedName;
@@ -213,9 +250,12 @@ namespace ExportDocManager.Services.MasterData
                 }
 
                 hsCode.UpdateTime = DateTime.Now;
+                hsCode.Status = "Active";
+                hsCode.SourceName = "i5a6（第三方参考）";
+                hsCode.LastVerifiedAt = DateTime.Now;
                 return hsCode;
             }
-            catch (ExpiredHsCodeException)
+            catch (HsCodeRemoteExpiredException)
             {
                 throw;
             }
@@ -338,7 +378,7 @@ namespace ExportDocManager.Services.MasterData
 
                 try
                 {
-                    await FetchDetailAsync(expandedItem);
+                    await FetchDetailAsync(expandedItem, cancellationToken);
                     if (!string.IsNullOrWhiteSpace(expandedItem.Elements))
                     {
                         await SaveAsync(expandedItem);
@@ -349,7 +389,7 @@ namespace ExportDocManager.Services.MasterData
                         await TryReplaceItemAsync(expandedItem, [], onItemUpdated, onItemRemoved, onItemsAdded, cancellationToken);
                     }
                 }
-                catch (ExpiredHsCodeException ex)
+                catch (HsCodeRemoteExpiredException ex)
                 {
                     var replaced = await TryReplaceItemAsync(expandedItem, ex.RecommendedKeywords, onItemUpdated, onItemRemoved, onItemsAdded, cancellationToken);
                     if (!replaced)
@@ -618,21 +658,6 @@ namespace ExportDocManager.Services.MasterData
             }
 
             return $"https://www.i5a6.com{href}";
-        }
-
-        internal sealed class ExpiredHsCodeException : InvalidOperationException
-        {
-            public ExpiredHsCodeException(IEnumerable<string> recommendedKeywords = null)
-                : base("该 HS 编码已作废")
-            {
-                RecommendedKeywords = (recommendedKeywords ?? Enumerable.Empty<string>())
-                    .Select(HsCodeTextHelper.NormalizeCode)
-                    .Where(code => !string.IsNullOrWhiteSpace(code))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-            }
-
-            public IReadOnlyList<string> RecommendedKeywords { get; }
         }
 
         internal sealed class DetailFetchFailedException : InvalidOperationException

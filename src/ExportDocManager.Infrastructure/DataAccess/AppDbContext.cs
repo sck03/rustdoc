@@ -189,6 +189,8 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<HsCode>().HasIndex(h => h.Code);
             modelBuilder.Entity<HsCode>().HasIndex(h => h.NormalizedCode);
             modelBuilder.Entity<HsCode>().HasIndex(h => h.Name);
+            modelBuilder.Entity<HsCode>().HasIndex(h => h.Status);
+            modelBuilder.Entity<HsCode>().HasIndex(h => new { h.EffectiveYear, h.Status });
 
             modelBuilder.Entity<User>().HasIndex(u => u.Username).IsUnique();
             modelBuilder.Entity<User>().HasIndex(u => u.PermissionTemplateId);

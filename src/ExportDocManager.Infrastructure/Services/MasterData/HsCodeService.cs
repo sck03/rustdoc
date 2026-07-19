@@ -21,6 +21,7 @@ namespace ExportDocManager.Services.MasterData
         private readonly SemaphoreSlim _detailFetchSemaphore = new SemaphoreSlim(1, 1);
         private readonly System.Net.Http.HttpClient _httpClient;
         private readonly bool _ownsHttpClient;
+        private readonly IReadOnlyList<IHsCodeRemoteProvider> _remoteProviders;
 
         // 海关标准计量单位代码映射表 (Customs Unit Code Map)
         private static readonly Dictionary<string, string> CustomsUnitMap = new Dictionary<string, string>
@@ -44,16 +45,36 @@ namespace ExportDocManager.Services.MasterData
         };
 
         public HsCodeService(IDbContextFactory<AppDbContext> dbContextFactory, IHsCodeReadRepository hsCodeReadRepository)
-            : this(dbContextFactory, hsCodeReadRepository, null)
+            : this(dbContextFactory, hsCodeReadRepository, null, null)
         {
         }
 
-        public HsCodeService(IDbContextFactory<AppDbContext> dbContextFactory, IHsCodeReadRepository hsCodeReadRepository, System.Net.Http.HttpClient httpClient)
+        internal HsCodeService(IDbContextFactory<AppDbContext> dbContextFactory, IHsCodeReadRepository hsCodeReadRepository, System.Net.Http.HttpClient httpClient)
+            : this(dbContextFactory, hsCodeReadRepository, httpClient, null)
+        {
+        }
+
+        public HsCodeService(
+            IDbContextFactory<AppDbContext> dbContextFactory,
+            IHsCodeReadRepository hsCodeReadRepository,
+            IEnumerable<IHsCodeRemoteProvider> remoteProviders)
+            : this(dbContextFactory, hsCodeReadRepository, null, remoteProviders)
+        {
+        }
+
+        private HsCodeService(
+            IDbContextFactory<AppDbContext> dbContextFactory,
+            IHsCodeReadRepository hsCodeReadRepository,
+            System.Net.Http.HttpClient httpClient,
+            IEnumerable<IHsCodeRemoteProvider> remoteProviders)
         {
             _dbContextFactory = dbContextFactory;
             _hsCodeReadRepository = hsCodeReadRepository;
-            _httpClient = httpClient ?? CreateHttpClient();
-            _ownsHttpClient = httpClient == null;
+            _remoteProviders = (remoteProviders ?? Enumerable.Empty<IHsCodeRemoteProvider>())
+                .OrderBy(provider => provider.Priority)
+                .ToList();
+            _httpClient = httpClient ?? (_remoteProviders.Count == 0 ? CreateHttpClient() : null);
+            _ownsHttpClient = httpClient == null && _httpClient != null;
         }
 
         private IHsCodeReadRepository GetReadRepository()
@@ -118,13 +139,9 @@ namespace ExportDocManager.Services.MasterData
                 AutomaticDecompression = System.Net.DecompressionMethods.All,
                 // Limit connection lifetime to handle DNS changes and prevent stale connections
                 PooledConnectionLifetime = TimeSpan.FromMinutes(2),
-                // Configure SSL options
+                // 使用操作系统标准 TLS 与证书链验证，禁止接受伪造或无效证书。
                 SslOptions = new System.Net.Security.SslClientAuthenticationOptions
                 {
-                    // Ignore SSL certificate errors to prevent handshake failures
-                    RemoteCertificateValidationCallback = (sender, cert, chain, sslPolicyErrors) => true,
-                    // Do NOT strictly force TLS versions; let the OS and Server negotiate the best protocol.
-                    // Forcing Tls12|Tls13 can sometimes cause handshake failures with specific server configs.
                     EnabledSslProtocols = System.Security.Authentication.SslProtocols.None
                 }
             };
@@ -167,6 +184,47 @@ namespace ExportDocManager.Services.MasterData
                     System.Diagnostics.Debug.WriteLine($"Attempt {attempt} failed: {ex.Message}. Retrying...");
                     await Task.Delay(1000 * attempt); // Exponential backoff: 1s, 2s, 3s
                 }
+            }
+        }
+
+        public async Task<HsCodeRemoteSourceHealth> GetRemoteSourceHealthAsync(CancellationToken cancellationToken = default)
+        {
+            if (_remoteProviders.Count > 0)
+            {
+                var results = new List<HsCodeRemoteSourceHealth>();
+                foreach (var provider in _remoteProviders)
+                    results.Add(await provider.CheckHealthAsync(cancellationToken).ConfigureAwait(false));
+                bool available = results.Any(result => result.Available);
+                return new HsCodeRemoteSourceHealth(
+                    string.Join(", ", results.Select(result => result.Source)),
+                    available,
+                    DateTimeOffset.Now,
+                    string.Join("；", results.Select(result => result.Message)));
+            }
+
+            var checkedAt = DateTimeOffset.Now;
+            try
+            {
+                using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, "https://www.i5a6.com/hscode/");
+                using var response = await _httpClient.SendAsync(
+                    request,
+                    System.Net.Http.HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken);
+                return new HsCodeRemoteSourceHealth(
+                    "i5a6",
+                    response.IsSuccessStatusCode,
+                    checkedAt,
+                    response.IsSuccessStatusCode
+                        ? "第三方HS编码来源当前可访问。"
+                        : $"第三方HS编码来源返回 HTTP {(int)response.StatusCode}。");
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                return new HsCodeRemoteSourceHealth("i5a6", false, checkedAt, $"第三方HS编码来源当前不可用：{ex.Message}");
             }
         }
 

@@ -40,6 +40,7 @@ RUN apt-get update \
         libxdamage1 \
         libxfixes3 \
         libxrandr2 \
+        tini \
         tzdata \
     && rm -rf /var/lib/apt/lists/*
 
@@ -60,4 +61,4 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     fi \
     && rm -rf /tmp/exportdoc-ocr-check
 EXPOSE 5188
-ENTRYPOINT ["dotnet", "ExportDocManager.Api.dll"]
+ENTRYPOINT ["/usr/bin/tini", "--", "dotnet", "ExportDocManager.Api.dll"]

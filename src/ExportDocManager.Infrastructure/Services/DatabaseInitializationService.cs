@@ -53,6 +53,7 @@ namespace ExportDocManager.Services.Infrastructure
                 }
                 await EnsureInvoiceTypeSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 await EnsureUserReportTemplateSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
+                await EnsureHsCodeMetadataSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 DbSeeder.SeedAuxiliaryData(
                     context,
                     _databaseSettings,
@@ -130,6 +131,77 @@ namespace ExportDocManager.Services.Infrastructure
 
         private const string DefaultInvoiceType = "实际数据";
         private const string InvoiceNoTypeIndexName = "IX_Invoices_InvoiceNo_Type";
+
+        private static async Task EnsureHsCodeMetadataSchemaAsync(AppDbContext context, bool usesPostgreSql)
+        {
+            if (!context.Database.IsRelational())
+            {
+                return;
+            }
+
+            if (usesPostgreSql)
+            {
+                await context.Database.ExecuteSqlRawAsync(
+                    """
+                    ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "Status" character varying(30) NOT NULL DEFAULT 'Active';
+                    ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "SourceName" character varying(200) NULL;
+                    ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "EffectiveYear" integer NULL;
+                    ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "LastVerifiedAt" timestamp with time zone NULL;
+                    ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "ReplacedByCodes" character varying(500) NULL;
+                    CREATE INDEX IF NOT EXISTS "IX_HsCodes_Status" ON "HsCodes" ("Status");
+                    CREATE INDEX IF NOT EXISTS "IX_HsCodes_EffectiveYear_Status" ON "HsCodes" ("EffectiveYear", "Status");
+                    """).ConfigureAwait(false);
+                return;
+            }
+
+            await AddSqliteColumnIfMissingAsync(context, "HsCodes", "Status", "TEXT NOT NULL DEFAULT 'Active'").ConfigureAwait(false);
+            await AddSqliteColumnIfMissingAsync(context, "HsCodes", "SourceName", "TEXT NULL").ConfigureAwait(false);
+            await AddSqliteColumnIfMissingAsync(context, "HsCodes", "EffectiveYear", "INTEGER NULL").ConfigureAwait(false);
+            await AddSqliteColumnIfMissingAsync(context, "HsCodes", "LastVerifiedAt", "TEXT NULL").ConfigureAwait(false);
+            await AddSqliteColumnIfMissingAsync(context, "HsCodes", "ReplacedByCodes", "TEXT NULL").ConfigureAwait(false);
+            await context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS \"IX_HsCodes_Status\" ON \"HsCodes\" (\"Status\")").ConfigureAwait(false);
+            await context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS \"IX_HsCodes_EffectiveYear_Status\" ON \"HsCodes\" (\"EffectiveYear\", \"Status\")").ConfigureAwait(false);
+        }
+
+        private static async Task AddSqliteColumnIfMissingAsync(AppDbContext context, string tableName, string columnName, string definition)
+        {
+            var connection = context.Database.GetDbConnection();
+            bool shouldClose = connection.State != ConnectionState.Open;
+            if (shouldClose)
+            {
+                await connection.OpenAsync().ConfigureAwait(false);
+            }
+            try
+            {
+                bool exists = false;
+                await using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = $"PRAGMA table_info(\"{EscapeSqliteIdentifier(tableName)}\")";
+                    await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+                    while (await reader.ReadAsync().ConfigureAwait(false))
+                    {
+                        if (string.Equals(reader["name"]?.ToString(), columnName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            exists = true;
+                            break;
+                        }
+                    }
+                }
+                if (!exists)
+                {
+                    await using var command = connection.CreateCommand();
+                    command.CommandText = $"ALTER TABLE \"{EscapeSqliteIdentifier(tableName)}\" ADD COLUMN \"{EscapeSqliteIdentifier(columnName)}\" {definition}";
+                    await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                if (shouldClose)
+                {
+                    await connection.CloseAsync().ConfigureAwait(false);
+                }
+            }
+        }
 
         private static async Task EnsureUserReportTemplateSchemaAsync(AppDbContext context, bool usesPostgreSql)
         {

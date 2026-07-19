@@ -3,6 +3,7 @@ import { Eye,FileSpreadsheet,Globe2,RefreshCw,Save,Search,Trash2,Upload,X } from
 import { ChangeEvent,FormEvent,Fragment,useEffect,useRef,useState } from "react";
 import {
 ApiHsCodeDto,
+ApiHsCodeImportPreviewResponse,
 ExportDocManagerApiClient
 } from "../../api/index.ts";
 import { isDesktopBridgeAvailable,selectExcelFile } from "../../desktop/desktopBridge.ts";
@@ -44,6 +45,12 @@ export function HsCodeToolsPanel({
   const [expandedResultKey, setExpandedResultKey] = useState<string | null>(null);
   const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
   const [clearAllConfirmation, setClearAllConfirmation] = useState("");
+  const [workspace, setWorkspace] = useState<"none" | "import" | "remote">("none");
+  const [importMode, setImportMode] = useState<"Incremental" | "CompleteSnapshot">("Incremental");
+  const [importSourceName, setImportSourceName] = useState("");
+  const [importEffectiveYear, setImportEffectiveYear] = useState(String(new Date().getFullYear()));
+  const [importPreview, setImportPreview] = useState<ApiHsCodeImportPreviewResponse | null>(null);
+  const [remoteHealth, setRemoteHealth] = useState<string | null>(null);
 
   useEffect(() => {
     if (!remoteKeyword.trim() && keyword.trim()) {
@@ -59,27 +66,52 @@ export function HsCodeToolsPanel({
 
   const importPathMutation = useMutation({
     mutationFn: (filePath: string) =>
-      client.importHsCodesFromPath({
-        body: { filePath },
+      client.previewHsCodesImportFromPath({
+        body: {
+          filePath,
+          mode: importMode,
+          sourceName: importSourceName.trim() || undefined,
+          effectiveYear: parseImportYear(importEffectiveYear),
+        },
       }),
-    onSuccess: async (response) => {
-      showSuccess(`${response.message} 当前本地库 ${response.totalCount} 条。`);
-      await onLocalDataChanged();
+    onSuccess: (response) => {
+      setImportPreview(response);
+      showSuccess("文件分析完成，请核对识别结果和数据变更后再确认导入。");
     },
     onError: (error) => showError(readApiError(error)),
   });
 
   const uploadImportMutation = useMutation({
     mutationFn: (file: File) =>
-      client.uploadHsCodesImportFile({
+      client.previewHsCodesImportUpload({
         fileName: file.name,
+        mode: importMode,
+        sourceName: importSourceName.trim() || undefined,
+        effectiveYear: parseImportYear(importEffectiveYear),
         body: file,
       }),
+    onSuccess: (response) => {
+      setImportPreview(response);
+      showSuccess("文件分析完成，请核对识别结果和数据变更后再确认导入。");
+    },
+    onError: (error) => showError(readApiError(error)),
+  });
+
+  const commitImportMutation = useMutation({
+    mutationFn: (token: string) => client.commitHsCodesImport({ body: { token } }),
     onSuccess: async (response) => {
-      showSuccess(`${response.message} 当前本地库 ${response.totalCount} 条。`);
+      showSuccess(response.message);
+      setImportPreview(null);
+      setWorkspace("none");
       await onLocalDataChanged();
     },
     onError: (error) => showError(readApiError(error)),
+  });
+
+  const remoteHealthMutation = useMutation({
+    mutationFn: () => client.getHsCodeRemoteHealth(),
+    onSuccess: (response) => setRemoteHealth(response.message),
+    onError: (error) => setRemoteHealth(readApiError(error)),
   });
 
   const remoteSearchMutation = useMutation({
@@ -159,6 +191,7 @@ export function HsCodeToolsPanel({
     disabled ||
     importPathMutation.isPending ||
     uploadImportMutation.isPending ||
+    commitImportMutation.isPending ||
     remoteSearchMutation.isPending ||
     isAutoDetailLoading ||
     fetchDetailMutation.isPending ||
@@ -187,6 +220,27 @@ export function HsCodeToolsPanel({
     }
   }
 
+  function openImportWorkspace() {
+    setWorkspace("import");
+    setImportPreview(null);
+    setMessage(null);
+  }
+
+  function openRemoteWorkspace() {
+    setWorkspace("remote");
+    setMessage(null);
+    if (!remoteHealthMutation.isPending) {
+      remoteHealthMutation.mutate();
+    }
+  }
+
+  function closeWorkspace() {
+    if (isBusy) return;
+    setWorkspace("none");
+    setImportPreview(null);
+    setMessage(null);
+  }
+
   function chooseUploadFile() {
     if (!isBusy) {
       uploadInputRef.current?.click();
@@ -201,6 +255,12 @@ export function HsCodeToolsPanel({
     }
 
     uploadImportMutation.mutate(file);
+  }
+
+  function commitImport() {
+    if (importPreview && !isBusy) {
+      commitImportMutation.mutate(importPreview.token);
+    }
   }
 
   function handleRemoteSearch(event: FormEvent<HTMLFormElement>) {
@@ -351,47 +411,67 @@ export function HsCodeToolsPanel({
 
       {message ? <div className={messageType === "error" ? "alert" : "success-alert"}>{message}</div> : null}
 
-      <div className="hs-code-tool-grid">
-        <div className="hs-code-import-actions">
-          {desktopAvailable ? (
-            <button className="command-button secondary" type="button" disabled={isBusy} onClick={() => void importFromDesktopPath()}>
-              <FileSpreadsheet size={17} aria-hidden="true" />
-              <span>选择 Excel 导入</span>
-            </button>
-          ) : null}
-          <input
-            ref={uploadInputRef}
-            type="file"
-            accept=".xlsx,.xlsm"
-            className="visually-hidden"
-            onChange={handleUploadFile}
-          />
-          <button className="command-button secondary" type="button" disabled={isBusy} onClick={chooseUploadFile}>
-            <Upload size={17} aria-hidden="true" />
-            <span>上传 Excel 导入</span>
-          </button>
-          <button className="command-button secondary danger" type="button" disabled={isBusy} onClick={clearAllLocalHsCodes}>
-            <Trash2 size={17} aria-hidden="true" />
-            <span>清空本地库</span>
-          </button>
-        </div>
-
-        <form className="hs-code-remote-form" onSubmit={handleRemoteSearch}>
-          <div className="search-form hs-code-remote-search">
-            <Search size={17} aria-hidden="true" />
-            <input
-              aria-label="联网查询 HS 编码"
-              value={remoteKeyword}
-              onChange={(event) => setRemoteKeyword(event.target.value)}
-              placeholder="HS 编码、品名或关键词"
-            />
-          </div>
-          <button className="command-button" type="submit" disabled={isBusy || !remoteKeyword.trim()}>
-            <Globe2 size={17} aria-hidden="true" />
-            <span>联网查询</span>
-          </button>
-        </form>
+      <div className="hs-code-action-hub">
+        <button className="hs-code-action-card" type="button" disabled={isBusy} onClick={openImportWorkspace}>
+          <FileSpreadsheet size={22} aria-hidden="true" />
+          <strong>智能导入</strong>
+          <span>识别不同格式 Excel，预览新增、更新和疑似作废后再提交</span>
+        </button>
+        <button className="hs-code-action-card" type="button" disabled={isBusy} onClick={openRemoteWorkspace}>
+          <Globe2 size={22} aria-hidden="true" />
+          <strong>联网查询</strong>
+          <span>独立查询第三方数据，确认后才保存到本地库</span>
+        </button>
+        <button className="hs-code-action-card danger-card" type="button" disabled={isBusy} onClick={clearAllLocalHsCodes}>
+          <Trash2 size={22} aria-hidden="true" />
+          <strong>本地库维护</strong>
+          <span>普通修改请打开下方记录；清空整库需要管理员再次确认</span>
+        </button>
       </div>
+
+      <input ref={uploadInputRef} type="file" accept=".xlsx,.xlsm" className="visually-hidden" onChange={handleUploadFile} />
+
+      {workspace !== "none" ? (
+        <div className="hs-code-workspace-backdrop" role="presentation">
+          <section className="hs-code-workspace" role="dialog" aria-modal="true" aria-label={workspace === "import" ? "HS编码智能导入" : "HS编码联网查询"}>
+            <header>
+              <div>
+                <strong>{workspace === "import" ? "智能导入向导" : "联网查询"}</strong>
+                <span>{workspace === "import" ? "先分析文件，确认差异后才写入本地库" : "联网结果不会自动覆盖本地资料"}</span>
+              </div>
+              <button className="icon-button" type="button" title="关闭" disabled={isBusy} onClick={closeWorkspace}><X size={18} /></button>
+            </header>
+
+            {workspace === "import" ? (
+              <div className="hs-code-import-wizard">
+                {!importPreview ? (
+                  <>
+                    <div className="hs-code-import-settings">
+                      <label><span>数据来源</span><input value={importSourceName} onChange={(event) => setImportSourceName(event.target.value)} placeholder="例如：2026年度税则资料" /></label>
+                      <label><span>适用年份</span><input type="number" min="2000" max="2100" value={importEffectiveYear} onChange={(event) => setImportEffectiveYear(event.target.value)} /></label>
+                      <label><span>导入方式</span><select value={importMode} onChange={(event) => setImportMode(event.target.value as "Incremental" | "CompleteSnapshot")}><option value="Incremental">增量资料（安全，不判断作废）</option><option value="CompleteSnapshot">完整年度库（缺失编码标记疑似作废）</option></select></label>
+                    </div>
+                    {importMode === "CompleteSnapshot" ? <div className="warning-note">只有确认文件是完整中国 HS 年度库时才使用此模式。系统不会删除历史记录或改写商业发票。</div> : null}
+                    <div className="hs-code-import-source-actions">
+                      {desktopAvailable ? <button className="command-button" type="button" disabled={isBusy} onClick={() => void importFromDesktopPath()}><FileSpreadsheet size={17} /><span>选择本机 Excel</span></button> : null}
+                      <button className="command-button secondary" type="button" disabled={isBusy} onClick={chooseUploadFile}><Upload size={17} /><span>上传 Excel</span></button>
+                    </div>
+                  </>
+                ) : <HsCodeImportPreview preview={importPreview} busy={isBusy} onBack={() => setImportPreview(null)} onCommit={commitImport} />}
+              </div>
+            ) : (
+              <div className="hs-code-remote-workspace">
+                {remoteHealth ? <div className="hs-code-source-health">{remoteHealth}</div> : null}
+                <form className="hs-code-remote-form" onSubmit={handleRemoteSearch}>
+                  <div className="search-form hs-code-remote-search"><Search size={17} /><input aria-label="联网查询 HS 编码" value={remoteKeyword} onChange={(event) => setRemoteKeyword(event.target.value)} placeholder="HS 编码、品名或关键词" /></div>
+                  <button className="command-button" type="submit" disabled={isBusy || !remoteKeyword.trim()}><Globe2 size={17} /><span>查询</span></button>
+                </form>
+                {remoteResults.length > 0 ? <HsCodeRemoteResults items={remoteResults} expandedResultKey={expandedResultKey} setExpandedResultKey={setExpandedResultKey} isBusy={isBusy} fetchDetail={(item) => fetchDetailMutation.mutate(item)} saveItem={(item) => saveRemoteMutation.mutate(item)} /> : null}
+              </div>
+            )}
+          </section>
+        </div>
+      ) : null}
 
       {clearAllConfirmOpen ? (
         <form className="hs-code-clear-confirmation" aria-label="HS编码清空确认" onSubmit={submitClearAllLocalHsCodes}>
@@ -421,79 +501,76 @@ export function HsCodeToolsPanel({
         </form>
       ) : null}
 
-      {remoteResults.length > 0 ? (
-        <div className="table-frame hs-code-remote-table-frame">
-          <table className="hs-code-remote-table" aria-label="HS 编码联网结果">
-            <thead>
-              <tr>
-                <th>编码</th>
-                <th>名称</th>
-                <th>单位</th>
-                <th>退税率</th>
-                <th>监管条件</th>
-                <th className="row-actions-cell">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {remoteResults.map((item, index) => {
-                const resultKey = buildHsCodeResultKey(item, index);
-                const isExpanded = expandedResultKey === resultKey;
-                return (
-                  <Fragment key={resultKey}>
-                    <tr>
-                      <td className="strong-cell">{item.code || "-"}</td>
-                      <td>{item.name || "-"}</td>
-                      <td>{item.unit || "-"}</td>
-                      <td>{item.rebateRate || "-"}</td>
-                      <td>{item.supervisionConditions || "-"}</td>
-                      <td className="row-actions-cell">
-                        <button
-                          className="icon-button compact-icon-button"
-                          type="button"
-                          title={isExpanded ? "收起详情" : "查看详情"}
-                          aria-label={`${isExpanded ? "收起" : "查看"} HS 编码 ${item.code || index + 1} 详情`}
-                          onClick={() => setExpandedResultKey(isExpanded ? null : resultKey)}
-                        >
-                          <Eye size={15} aria-hidden="true" />
-                        </button>
-                        <button
-                          className="icon-button compact-icon-button"
-                          type="button"
-                          title="补全详情"
-                          aria-label={`补全 HS 编码 ${item.code || index + 1} 详情`}
-                          disabled={isBusy || !item.detailUrl}
-                          onClick={() => fetchDetailMutation.mutate(item)}
-                        >
-                          <RefreshCw size={15} aria-hidden="true" />
-                        </button>
-                        <button
-                          className="icon-button compact-icon-button"
-                          type="button"
-                          title="保存到本地库"
-                          aria-label={`保存 HS 编码 ${item.code || index + 1} 到本地库`}
-                          disabled={isBusy || !item.code}
-                          onClick={() => saveRemoteMutation.mutate(item)}
-                        >
-                          <Save size={15} aria-hidden="true" />
-                        </button>
-                      </td>
-                    </tr>
-                    {isExpanded ? (
-                      <tr className="hs-code-detail-row">
-                        <td colSpan={6}>
-                          <HsCodeRemoteDetail item={item} />
-                        </td>
-                      </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
     </section>
   );
+}
+
+function parseImportYear(value: string) {
+  const year = Number.parseInt(value, 10);
+  return Number.isInteger(year) && year >= 2000 && year <= 2100 ? year : undefined;
+}
+
+function HsCodeImportPreview({
+  preview,
+  busy,
+  onBack,
+  onCommit,
+}: {
+  preview: ApiHsCodeImportPreviewResponse;
+  busy: boolean;
+  onBack: () => void;
+  onCommit: () => void;
+}) {
+  const labels: Record<string, string> = {
+    Add: "新增",
+    Update: "更新",
+    Unchanged: "不变",
+    SuspectedObsolete: "疑似作废",
+    Conflict: "冲突",
+    Invalid: "无效",
+  };
+  return (
+    <div className="hs-code-preview">
+      <div className="hs-code-preview-summary">
+        <div><span>识别可信度</span><strong>{preview.confidence}%</strong></div>
+        <div><span>新增</span><strong>{preview.addCount}</strong></div>
+        <div><span>更新</span><strong>{preview.updateCount}</strong></div>
+        <div><span>疑似作废</span><strong>{preview.suspectedObsoleteCount}</strong></div>
+        <div><span>需处理</span><strong>{preview.conflictCount + preview.invalidCount}</strong></div>
+      </div>
+      <div className="hs-code-preview-meta">
+        <span>工作表：{preview.worksheetName}</span>
+        <span>标题行：第 {preview.headerRowNumber} 行</span>
+        <span>来源：{preview.sourceName || "未填写"}</span>
+        <span>年份：{preview.effectiveYear ?? "未填写"}</span>
+      </div>
+      {preview.warnings.map((warning) => <div className="warning-note" key={warning}>{warning}</div>)}
+      <details className="hs-code-column-mapping"><summary>查看识别到的字段映射</summary><div>{preview.columns.map((column) => <span key={column.field}>{column.header} → {column.field}（{column.confidence}%）</span>)}</div></details>
+      <div className="table-frame hs-code-preview-table-frame">
+        <table><thead><tr><th>处理</th><th>Excel 行</th><th>编码</th><th>名称</th><th>说明</th></tr></thead><tbody>
+          {preview.items.map((row, index) => <tr key={`${row.changeType}-${row.item.code}-${row.rowNumber}-${index}`}><td><span className={`hs-code-change-badge change-${row.changeType.toLowerCase()}`}>{labels[row.changeType] ?? row.changeType}</span></td><td>{row.rowNumber || "-"}</td><td>{row.item.code || "-"}</td><td>{row.item.name || "-"}</td><td>{row.message}{row.replacementCandidates.length ? ` 候选：${row.replacementCandidates.join("、")}` : ""}</td></tr>)}
+        </tbody></table>
+      </div>
+      <div className="hs-code-preview-actions"><button className="command-button secondary" type="button" disabled={busy} onClick={onBack}>重新选择</button><button className="command-button" type="button" disabled={busy || preview.conflictCount + preview.invalidCount > 0 && preview.addCount + preview.updateCount + preview.suspectedObsoleteCount === 0} onClick={onCommit}>{busy ? "正在导入" : "确认导入"}</button></div>
+    </div>
+  );
+}
+
+function HsCodeRemoteResults({ items, expandedResultKey, setExpandedResultKey, isBusy, fetchDetail, saveItem }: {
+  items: ApiHsCodeDto[];
+  expandedResultKey: string | null;
+  setExpandedResultKey: (value: string | null) => void;
+  isBusy: boolean;
+  fetchDetail: (item: ApiHsCodeDto) => void;
+  saveItem: (item: ApiHsCodeDto) => void;
+}) {
+  return <div className="table-frame hs-code-remote-table-frame"><table className="hs-code-remote-table" aria-label="HS 编码联网结果"><thead><tr><th>编码</th><th>名称</th><th>单位</th><th>退税率</th><th>监管条件</th><th className="row-actions-cell">操作</th></tr></thead><tbody>
+    {items.map((item, index) => {
+      const key = buildHsCodeResultKey(item, index);
+      const expanded = expandedResultKey === key;
+      return <Fragment key={key}><tr><td className="strong-cell">{item.code || "-"}</td><td>{item.name || "-"}</td><td>{item.unit || "-"}</td><td>{item.rebateRate || "-"}</td><td>{item.supervisionConditions || "-"}</td><td className="row-actions-cell"><button className="icon-button compact-icon-button" type="button" title="查看详情" onClick={() => setExpandedResultKey(expanded ? null : key)}><Eye size={15} /></button><button className="icon-button compact-icon-button" type="button" title="补全详情" disabled={isBusy || !item.detailUrl} onClick={() => fetchDetail(item)}><RefreshCw size={15} /></button><button className="icon-button compact-icon-button" type="button" title="保存到本地库" disabled={isBusy || !item.code} onClick={() => saveItem(item)}><Save size={15} /></button></td></tr>{expanded ? <tr className="hs-code-detail-row"><td colSpan={6}><HsCodeRemoteDetail item={item} /></td></tr> : null}</Fragment>;
+    })}
+  </tbody></table></div>;
 }
 
 function HsCodeRemoteDetail({ item }: { item: ApiHsCodeDto }) {
@@ -521,4 +598,3 @@ function DetailField({ label, value, wide = false }: { label: string; value?: st
     </div>
   );
 }
-

@@ -3,54 +3,28 @@ using System.Globalization;
 using System.Text;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
+using ExportDocManager.Services.BrowserRuntime;
 
 namespace ExportDocManager.Services.Reporting
 {
     public sealed class ChromiumHtmlToPdfService : IHtmlToPdfService
     {
-        public const string ChromiumExecutableEnvironmentVariable = "EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE";
+        public const string ChromiumExecutableEnvironmentVariable = BrowserExecutableResolver.ChromiumExecutableEnvironmentVariable;
         public const string ChromiumTimeoutEnvironmentVariable = "EXPORTDOCMANAGER_CHROMIUM_TIMEOUT_SECONDS";
 
         private static readonly TimeSpan DefaultRenderTimeout = TimeSpan.FromSeconds(60);
         private static readonly TimeSpan ProcessDrainTimeout = TimeSpan.FromSeconds(5);
 
-        private static readonly string[] PreferredRelativeExecutables =
-        {
-            Path.Combine("Browsers", "chrome-headless-shell.exe"),
-            Path.Combine("Browsers", "chrome-headless-shell"),
-            Path.Combine("Browsers", "ChromeHeadlessShell", "chrome-headless-shell.exe"),
-            Path.Combine("Browsers", "ChromeHeadlessShell", "chrome-headless-shell"),
-            Path.Combine("Browsers", "chrome.exe"),
-            Path.Combine("Browsers", "chromium.exe"),
-            Path.Combine("Browsers", "Chromium", "chrome.exe"),
-            Path.Combine("Browsers", "Chromium", "chrome-win", "chrome.exe"),
-            Path.Combine("Browsers", "chrome-win", "chrome.exe"),
-            Path.Combine("Browsers", "chrome"),
-            Path.Combine("Browsers", "chromium"),
-            Path.Combine("Browsers", "Chromium", "chrome"),
-            Path.Combine("Browsers", "Chromium", "chrome-linux", "chrome"),
-            Path.Combine("Browsers", "chrome-linux", "chrome"),
-            Path.Combine("Browsers", "Chromium.app", "Contents", "MacOS", "Chromium"),
-            Path.Combine("Browsers", "Google Chrome for Testing.app", "Contents", "MacOS", "Google Chrome for Testing")
-        };
-
-        private static readonly string[] RecursiveExecutableNames =
-        {
-            "chrome-headless-shell.exe",
-            "chrome-headless-shell",
-            "chrome.exe",
-            "chromium.exe",
-            "chrome",
-            "chromium",
-            "Chromium",
-            "Google Chrome for Testing"
-        };
-
         private readonly IAppPathProvider _pathProvider;
+        private readonly BrowserExecutableResolver _executableResolver;
+        private readonly BrowserRuntimeManager _browserRuntime;
+        private static readonly BrowserRuntimeManager StandaloneBrowserRuntime = new();
 
-        public ChromiumHtmlToPdfService(IAppPathProvider pathProvider)
+        public ChromiumHtmlToPdfService(IAppPathProvider pathProvider, BrowserRuntimeManager browserRuntime = null)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            _executableResolver = new BrowserExecutableResolver(pathProvider);
+            _browserRuntime = browserRuntime ?? StandaloneBrowserRuntime;
         }
 
         public async Task<HtmlToPdfRenderResult> RenderAsync(
@@ -70,6 +44,9 @@ namespace ExportDocManager.Services.Reporting
             string diskCachePath = Path.Combine(tempRoot, "disk-cache");
             TimeSpan renderTimeout = ResolveRenderTimeout();
 
+            await using var workloadLease = await _browserRuntime
+                .AcquireAsync(BrowserWorkloadKind.PdfRendering, cancellationToken)
+                .ConfigureAwait(false);
             try
             {
                 Directory.CreateDirectory(tempRoot);
@@ -117,49 +94,7 @@ namespace ExportDocManager.Services.Reporting
             }
         }
 
-        public string ResolveRendererExecutablePath()
-        {
-            string configuredPath = Environment.GetEnvironmentVariable(ChromiumExecutableEnvironmentVariable);
-            if (!string.IsNullOrWhiteSpace(configuredPath))
-            {
-                string fullPath = Path.GetFullPath(configuredPath.Trim().Trim('"'));
-                if (File.Exists(fullPath))
-                {
-                    return fullPath;
-                }
-
-                throw new InvalidOperationException(
-                    $"{ChromiumExecutableEnvironmentVariable} 指向的 Chromium 可执行文件不存在：{fullPath}");
-            }
-
-            foreach (string relativePath in PreferredRelativeExecutables)
-            {
-                string candidate = Path.Combine(_pathProvider.AppRoot, relativePath);
-                if (File.Exists(candidate))
-                {
-                    return Path.GetFullPath(candidate);
-                }
-            }
-
-            string browserRoot = _pathProvider.BrowserRoot;
-            if (Directory.Exists(browserRoot))
-            {
-                foreach (string executableName in RecursiveExecutableNames)
-                {
-                    var recursiveCandidate = Directory.EnumerateFiles(browserRoot, executableName, SearchOption.AllDirectories)
-                        .OrderBy(file => file.Length)
-                        .FirstOrDefault();
-
-                    if (!string.IsNullOrWhiteSpace(recursiveCandidate))
-                    {
-                        return Path.GetFullPath(recursiveCandidate);
-                    }
-                }
-            }
-
-            throw new InvalidOperationException(
-                "未找到用于报表 PDF 生成的 Chromium。请将 chrome-headless-shell、Chromium 或 Chrome for Testing 放在程序目录 Browsers/ 下，或显式设置 EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE。服务不会自动下载浏览器，也不会默认使用系统 C 盘目录。");
-        }
+        public string ResolveRendererExecutablePath() => _executableResolver.Resolve();
 
         private static string PrepareHtml(string html, HtmlToPdfRenderOptions options)
         {
@@ -205,7 +140,7 @@ namespace ExportDocManager.Services.Reporting
             return content;
         }
 
-        private static async Task RunChromiumAsync(
+        private async Task RunChromiumAsync(
             string rendererPath,
             string htmlPath,
             string pdfPath,
@@ -251,6 +186,11 @@ namespace ExportDocManager.Services.Reporting
             {
                 throw new InvalidOperationException("无法启动 Chromium PDF 渲染进程。");
             }
+
+            using var processRegistration = _browserRuntime.RegisterOwnedProcess(
+                process,
+                BrowserWorkloadKind.PdfRendering,
+                "HTML to PDF");
 
             Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
             Task<string> errorTask = process.StandardError.ReadToEndAsync();

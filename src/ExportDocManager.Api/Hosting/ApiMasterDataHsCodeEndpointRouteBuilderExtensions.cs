@@ -11,6 +11,116 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapHsCodeMasterDataEndpoints(this IEndpointRouteBuilder endpoints)
         {
+            endpoints.MapPost("/api/master-data/hs-codes/import-preview-path", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                IHsCodeService hsCodeService,
+                IAppPathProvider pathProvider,
+                ApiHsCodeImportPreviewPathRequest request,
+                CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                if (request == null || string.IsNullOrWhiteSpace(request.FilePath))
+                    return Results.BadRequest(new ApiErrorResponse("HS编码导入文件路径不能为空。"));
+                if (!File.Exists(request.FilePath)) return Results.NotFound(new ApiErrorResponse("HS编码导入文件不存在。"));
+                if (!IsAllowedHsCodeImportFileName(request.FilePath))
+                    return Results.BadRequest(new ApiErrorResponse("HS编码导入仅支持 .xlsx 或 .xlsm 文件。"));
+                try
+                {
+                    var preview = await hsCodeService.PreviewImportAsync(
+                        request.FilePath,
+                        ParseHsCodeImportMode(request.Mode),
+                        request.SourceName,
+                        request.EffectiveYear,
+                        cancellationToken);
+                    return Results.Ok(await StoreHsCodeImportPreviewAsync(pathProvider, preview, cancellationToken));
+                }
+                catch (Exception ex) when (ex is ArgumentException or InvalidDataException or IOException or InvalidOperationException)
+                {
+                    return WriteConflict(ex.Message);
+                }
+            }).WithName("PreviewHsCodesImportFromPath");
+
+            endpoints.MapPost("/api/master-data/hs-codes/import-preview-upload", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                IHsCodeService hsCodeService,
+                IAppPathProvider pathProvider,
+                CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                string tempRoot = RuntimeCachePathHelper.CreateUniqueDirectory(pathProvider, "HsCodeImports", "hs-preview");
+                try
+                {
+                    string fileName = NormalizeUploadedHsCodeImportFileName(context.Request.Query["fileName"].ToString());
+                    string importPath = Path.Combine(tempRoot, fileName);
+                    await using (var output = File.Create(importPath))
+                    {
+                        await context.Request.Body.CopyToAsync(output, cancellationToken);
+                    }
+                    if (new FileInfo(importPath).Length == 0) return Results.BadRequest(new ApiErrorResponse("HS编码导入文件不能为空。"));
+                    var preview = await hsCodeService.PreviewImportAsync(
+                        importPath,
+                        ParseHsCodeImportMode(context.Request.Query["mode"].ToString()),
+                        context.Request.Query["sourceName"].ToString(),
+                        int.TryParse(context.Request.Query["effectiveYear"], out int year) ? year : null,
+                        cancellationToken);
+                    return Results.Ok(await StoreHsCodeImportPreviewAsync(pathProvider, preview, cancellationToken));
+                }
+                catch (Exception ex) when (ex is ArgumentException or InvalidDataException or IOException or InvalidOperationException)
+                {
+                    return WriteConflict(ex.Message);
+                }
+                finally
+                {
+                    AtomicFileHelper.TryDeleteDirectory(tempRoot);
+                }
+            }).WithName("PreviewHsCodesImportUpload");
+
+            endpoints.MapPost("/api/master-data/hs-codes/import-commit", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                IHsCodeService hsCodeService,
+                IAppPathProvider pathProvider,
+                ApiHsCodeImportCommitRequest request,
+                CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                if (request == null || !Guid.TryParseExact(request.Token, "N", out _))
+                    return Results.BadRequest(new ApiErrorResponse("HS编码导入预检令牌无效。"));
+                string previewPath = GetHsCodeImportPreviewPath(pathProvider, request.Token);
+                if (!File.Exists(previewPath)) return Results.NotFound(new ApiErrorResponse("导入预检已过期，请重新选择文件。"));
+                try
+                {
+                    await using var input = File.OpenRead(previewPath);
+                    var preview = await System.Text.Json.JsonSerializer.DeserializeAsync<HsCodeImportPreview>(input, cancellationToken: cancellationToken)
+                        ?? throw new InvalidDataException("HS编码导入预检内容无效。");
+                    var result = await hsCodeService.CommitImportAsync(preview, cancellationToken);
+                    return Results.Ok(new ApiHsCodeImportCommitResponse(
+                        true, result.AddedCount, result.UpdatedCount, result.UnchangedCount,
+                        result.SuspectedObsoleteCount, result.SkippedCount, result.Message));
+                }
+                catch (Exception ex) when (ex is InvalidDataException or IOException or InvalidOperationException)
+                {
+                    return WriteConflict(ex.Message);
+                }
+                finally
+                {
+                    AtomicFileHelper.TryDeleteFile(previewPath);
+                }
+            }).WithName("CommitHsCodesImport");
+
+            endpoints.MapGet("/api/master-data/hs-codes/remote-health", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                IHsCodeService hsCodeService,
+                CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                var health = await hsCodeService.GetRemoteSourceHealthAsync(cancellationToken);
+                return Results.Ok(new ApiHsCodeRemoteHealthResponse(health.Source, health.Available, health.CheckedAt, health.Message));
+            }).WithName("GetHsCodeRemoteHealth");
+
             endpoints.MapGet("/api/master-data/hs-codes", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
@@ -169,7 +279,7 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    var results = await hsCodeService.SearchRemoteAsync(keyword.Trim());
+                    var results = await hsCodeService.SearchRemoteAsync(keyword.Trim(), cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
                     var items = ApiMasterDataDtoFactory.FromHsCodes(results);
                     return Results.Ok(new ApiHsCodeSearchResponse(
@@ -214,7 +324,7 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     var hsCode = ApiMasterDataDtoFactory.ToHsCodeForSave(request);
-                    var detailed = await hsCodeService.FetchDetailAsync(hsCode);
+                    var detailed = await hsCodeService.FetchDetailAsync(hsCode, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
                     return Results.Ok(ApiMasterDataDtoFactory.FromHsCode(detailed));
                 }
@@ -546,6 +656,44 @@ namespace ExportDocManager.Api.Hosting
 
         private const string RemoteHsCodeDetailResolutionStoragePolicy =
             "HS编码联网详情补全只访问在线来源；有效编码写入当前运行数据根数据库用于下次本地查询，过期编码只从本次结果中清理，不新增默认目录或系统 C 盘落点。";
+
+        private static HsCodeImportMode ParseHsCodeImportMode(string value) =>
+            string.Equals(value?.Trim(), "CompleteSnapshot", StringComparison.OrdinalIgnoreCase)
+                ? HsCodeImportMode.CompleteSnapshot
+                : HsCodeImportMode.Incremental;
+
+        private static async Task<ApiHsCodeImportPreviewResponse> StoreHsCodeImportPreviewAsync(
+            IAppPathProvider pathProvider,
+            HsCodeImportPreview preview,
+            CancellationToken cancellationToken)
+        {
+            string token = Guid.NewGuid().ToString("N");
+            string path = GetHsCodeImportPreviewPath(pathProvider, token);
+            string previewRoot = Path.GetDirectoryName(path)!;
+            Directory.CreateDirectory(previewRoot);
+            foreach (string staleFile in Directory.EnumerateFiles(previewRoot, "*.json")
+                         .Where(file => File.GetLastWriteTimeUtc(file) < DateTime.UtcNow.AddHours(-24)))
+            {
+                AtomicFileHelper.TryDeleteFile(staleFile);
+            }
+            await using (var output = File.Create(path))
+            {
+                await System.Text.Json.JsonSerializer.SerializeAsync(output, preview, cancellationToken: cancellationToken);
+            }
+            return new ApiHsCodeImportPreviewResponse(
+                token, preview.FileName, preview.Mode.ToString(), preview.SourceName, preview.EffectiveYear,
+                preview.WorksheetName, preview.HeaderRowNumber, preview.Confidence,
+                preview.Columns.Select(item => new ApiHsCodeImportColumnMappingDto(item.Field, item.Header, item.ColumnNumber, item.Confidence)).ToList(),
+                preview.Items.Take(200).Select(item => new ApiHsCodeImportPreviewItemDto(
+                    item.ChangeType, item.RowNumber, ApiMasterDataDtoFactory.FromHsCode(item.Item),
+                    item.ChangedFields, item.ReplacementCandidates, item.Message)).ToList(),
+                preview.AddCount, preview.UpdateCount, preview.UnchangedCount, preview.SuspectedObsoleteCount,
+                preview.ConflictCount, preview.InvalidCount, preview.Warnings,
+                "预检文件仅保存在运行数据根 Cache/HsCodeImports/Previews，提交或过期后删除；不会写系统临时目录，也不会触碰商业发票Excel导入。" );
+        }
+
+        private static string GetHsCodeImportPreviewPath(IAppPathProvider pathProvider, string token) =>
+            Path.Combine(pathProvider.CacheRoot, "HsCodeImports", "Previews", $"{token}.json");
 
         private static async Task<ApiHsCodeRemoteDetailResolutionResponse> ResolveRemoteHsCodeDetailAsync(
             IHsCodeService hsCodeService,

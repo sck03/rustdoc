@@ -1,6 +1,7 @@
 using ExportDocManager.Services;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Tools;
+using ExportDocManager.Services.BrowserRuntime;
 
 namespace ExportDocManager.Services.Infrastructure
 {
@@ -18,9 +19,37 @@ namespace ExportDocManager.Services.Infrastructure
             return
             [
                 InspectReportRenderer(),
+                InspectBrowserAutomation(),
                 InspectOcrRuntime(),
                 InspectPostgreSqlTools()
             ];
+        }
+
+        private RuntimeDependencyDiagnostic InspectBrowserAutomation()
+        {
+            try
+            {
+                string executablePath = new BrowserExecutableResolver(_pathProvider).Resolve();
+                return new RuntimeDependencyDiagnostic(
+                    "browser-automation",
+                    "受控网页自动化",
+                    "optional",
+                    "ready",
+                    true,
+                    executablePath,
+                    "Playwright 将通过受控 Chromium/CDP 连接执行 HS 查询降级；进程由应用登记、限流和退出清理。");
+            }
+            catch (InvalidOperationException)
+            {
+                return new RuntimeDependencyDiagnostic(
+                    "browser-automation",
+                    "受控网页自动化",
+                    "optional",
+                    "missing",
+                    false,
+                    Path.GetFullPath(_pathProvider.BrowserRoot),
+                    "未找到浏览器运行包；HS 本地库和静态 HTTP 查询仍可使用，只有动态网页降级不可用。");
+            }
         }
 
         private RuntimeDependencyDiagnostic InspectReportRenderer()

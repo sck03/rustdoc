@@ -8,6 +8,7 @@ using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Opportunities;
 using ExportDocManager.Services.Reporting;
+using ExportDocManager.Services.BrowserRuntime;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Services.Suppliers;
@@ -109,6 +110,10 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IPayeeService, PayeeService>();
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<IAuxiliaryService, AuxiliaryService>();
+            services.AddSingleton<BrowserRuntimeManager>();
+            services.AddSingleton<BrowserExecutableResolver>();
+            services.AddSingleton<ManagedPlaywrightBrowserHost>();
+            services.AddSingleton<IHsCodeRemoteProvider, I5a6HsCodeProvider>();
             services.AddScoped<IHsCodeService, HsCodeService>();
             services.AddScoped<IPdfMergeService, PdfMergeService>();
             services.AddScoped<IEmailService, SmtpEmailService>();

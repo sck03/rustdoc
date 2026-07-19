@@ -151,11 +151,12 @@ export function readProductUnitFieldOptions(name: string, assistance: ProductUni
 }
 
 export function buildProductInputAssistance(products: ApiProductDto[], hsCodes: ApiHsCodeDto[] = []): ProductInputAssistance {
+  const activeHsCodes = (hsCodes ?? []).filter((hsCode) => !hsCode.status || hsCode.status === "Active");
   return {
     brand: buildUniqueTextSuggestions((products ?? []).map((product) => product.brand)),
     hsCode: buildUniqueTextSuggestions([
       ...(products ?? []).map((product) => product.hsCode),
-      ...(hsCodes ?? []).flatMap((hsCode) => [hsCode.code, hsCode.normalizedCode]),
+      ...activeHsCodes.flatMap((hsCode) => [hsCode.code, hsCode.normalizedCode]),
     ], true),
     material: buildUniqueTextSuggestions((products ?? []).map((product) => product.material)),
     nameCN: buildUniqueTextSuggestions((products ?? []).map((product) => product.nameCN)),
@@ -168,6 +169,9 @@ export function buildProductInputAssistance(products: ApiProductDto[], hsCodes: 
 export function buildProductHsCodeLookup(hsCodes: ApiHsCodeDto[]) {
   const lookup = new Map<string, ApiHsCodeDto>();
   for (const hsCode of hsCodes ?? []) {
+    if (hsCode.status && hsCode.status !== "Active") {
+      continue;
+    }
     const key = normalizeHsCodeKey(hsCode.code || hsCode.normalizedCode);
     if (key && !lookup.has(key)) {
       lookup.set(key, hsCode);
@@ -550,5 +554,7 @@ const hsCodeTextFields = [
   "inspectionCategory",
   "rebateRate",
   "detailUrl",
+  "status",
+  "sourceName",
+  "replacedByCodes",
 ];
-

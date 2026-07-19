@@ -1094,19 +1094,82 @@ export interface ApiHsCodeDto {
   code: string;
   description?: string;
   detailUrl?: string;
+  effectiveYear?: number;
   elements?: string;
   id: number;
   inspectionCategory?: string;
+  lastVerifiedAt?: string;
   name: string;
   normalizedCode: string;
   rebateRate?: string;
+  replacedByCodes?: string;
+  sourceName?: string;
+  status?: string;
   supervisionConditions?: string;
   unit?: string;
   updateTime?: string;
 }
 
+export interface ApiHsCodeImportColumnMappingDto {
+  columnNumber: number;
+  confidence: number;
+  field: string;
+  header: string;
+}
+
+export interface ApiHsCodeImportCommitRequest {
+  token: string;
+}
+
+export interface ApiHsCodeImportCommitResponse {
+  addedCount: number;
+  message: string;
+  skippedCount: number;
+  success: boolean;
+  suspectedObsoleteCount: number;
+  unchangedCount: number;
+  updatedCount: number;
+}
+
 export interface ApiHsCodeImportPathRequest {
   filePath: string;
+}
+
+export interface ApiHsCodeImportPreviewItemDto {
+  changeType: string;
+  changedFields: string[];
+  item: ApiHsCodeDto;
+  message: string;
+  replacementCandidates: string[];
+  rowNumber: number;
+}
+
+export interface ApiHsCodeImportPreviewPathRequest {
+  effectiveYear?: number;
+  filePath: string;
+  mode?: string;
+  sourceName?: string;
+}
+
+export interface ApiHsCodeImportPreviewResponse {
+  addCount: number;
+  columns: ApiHsCodeImportColumnMappingDto[];
+  confidence: number;
+  conflictCount: number;
+  effectiveYear?: number;
+  fileName: string;
+  headerRowNumber: number;
+  invalidCount: number;
+  items: ApiHsCodeImportPreviewItemDto[];
+  mode: string;
+  sourceName: string;
+  storagePolicy: string;
+  suspectedObsoleteCount: number;
+  token: string;
+  unchangedCount: number;
+  updateCount: number;
+  warnings: string[];
+  worksheetName: string;
 }
 
 export interface ApiHsCodeImportResponse {
@@ -1124,6 +1187,13 @@ export interface ApiHsCodeRemoteDetailResolutionResponse {
   removedItems: ApiHsCodeDto[];
   storagePolicy: string;
   updatedCount: number;
+}
+
+export interface ApiHsCodeRemoteHealthResponse {
+  available: boolean;
+  checkedAt: string;
+  message: string;
+  source: string;
 }
 
 export interface ApiHsCodeSearchResponse {
@@ -3052,6 +3122,10 @@ export interface CollectSingleWindowClientReceiptsRequest {
   body: ApiSingleWindowReceiptCollectionRequest;
 }
 
+export interface CommitHsCodesImportRequest {
+  body: ApiHsCodeImportCommitRequest;
+}
+
 export interface CreateCrmContactRequest {
   customerId: number;
   body: ApiCrmContactSaveRequest;
@@ -3624,6 +3698,18 @@ export interface PreviewEmailTemplateRequest {
 
 export interface PreviewExcelImportRequest {
   body: ApiExcelImportPreviewRequest;
+}
+
+export interface PreviewHsCodesImportFromPathRequest {
+  body: ApiHsCodeImportPreviewPathRequest;
+}
+
+export interface PreviewHsCodesImportUploadRequest {
+  fileName?: string;
+  mode?: string;
+  sourceName?: string;
+  effectiveYear?: number;
+  body: Blob;
 }
 
 export interface PreviewInvoiceDocumentPackageHtmlRequest {
@@ -4246,6 +4332,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public commitHsCodesImport(request: CommitHsCodesImportRequest, init?: RequestInit): Promise<ApiHsCodeImportCommitResponse> {
+    const path = "/api/master-data/hs-codes/import-commit";
+    return this.request<ApiHsCodeImportCommitResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public createCrmContact(request: CreateCrmContactRequest, init?: RequestInit): Promise<ApiCrmContactDto> {
     const path = `/api/crm/customers/${encodePath(request.customerId)}/contacts`;
     return this.request<ApiCrmContactDto>("POST", path, {
@@ -4791,6 +4885,11 @@ export class ExportDocManagerApiClient {
   public getHsCode(request: GetHsCodeRequest, init?: RequestInit): Promise<ApiHsCodeDto> {
     const path = `/api/master-data/hs-codes/${encodePath(request.code)}`;
     return this.request<ApiHsCodeDto>("GET", path, { init });
+  }
+
+  public getHsCodeRemoteHealth(init?: RequestInit): Promise<ApiHsCodeRemoteHealthResponse> {
+    const path = "/api/master-data/hs-codes/remote-health";
+    return this.request<ApiHsCodeRemoteHealthResponse>("GET", path, { init });
   }
 
   public getInvoice(request: GetInvoiceRequest, init?: RequestInit): Promise<ApiInvoiceDetailDto> {
@@ -5359,6 +5458,28 @@ export class ExportDocManagerApiClient {
   public previewExcelImport(request: PreviewExcelImportRequest, init?: RequestInit): Promise<ApiExcelImportPreviewResponse> {
     const path = "/api/tools/excel/import-preview";
     return this.request<ApiExcelImportPreviewResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public previewHsCodesImportFromPath(request: PreviewHsCodesImportFromPathRequest, init?: RequestInit): Promise<ApiHsCodeImportPreviewResponse> {
+    const path = "/api/master-data/hs-codes/import-preview-path";
+    return this.request<ApiHsCodeImportPreviewResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public previewHsCodesImportUpload(request: PreviewHsCodesImportUploadRequest, init?: RequestInit): Promise<ApiHsCodeImportPreviewResponse> {
+    const path = "/api/master-data/hs-codes/import-preview-upload";
+    return this.request<ApiHsCodeImportPreviewResponse>("POST", path, {
+      query: {
+        "fileName": request.fileName,
+        "mode": request.mode,
+        "sourceName": request.sourceName,
+        "effectiveYear": request.effectiveYear,
+      },
       body: request.body,
       init,
     });

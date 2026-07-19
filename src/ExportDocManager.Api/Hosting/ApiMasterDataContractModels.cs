@@ -96,10 +96,72 @@ namespace ExportDocManager.Api.Hosting
         string InspectionCategory,
         string RebateRate,
         DateTime? UpdateTime,
-        string DetailUrl);
+        string DetailUrl,
+        string Status = "Active",
+        string SourceName = "",
+        int? EffectiveYear = null,
+        DateTime? LastVerifiedAt = null,
+        string ReplacedByCodes = "");
 
     public sealed record ApiHsCodeImportPathRequest(
         string FilePath);
+
+    public sealed record ApiHsCodeImportPreviewPathRequest(
+        string FilePath,
+        string Mode,
+        string SourceName,
+        int? EffectiveYear);
+
+    public sealed record ApiHsCodeImportCommitRequest(string Token);
+
+    public sealed record ApiHsCodeImportColumnMappingDto(
+        string Field,
+        string Header,
+        int ColumnNumber,
+        int Confidence);
+
+    public sealed record ApiHsCodeImportPreviewItemDto(
+        string ChangeType,
+        int RowNumber,
+        ApiHsCodeDto Item,
+        IReadOnlyList<string> ChangedFields,
+        IReadOnlyList<string> ReplacementCandidates,
+        string Message);
+
+    public sealed record ApiHsCodeImportPreviewResponse(
+        string Token,
+        string FileName,
+        string Mode,
+        string SourceName,
+        int? EffectiveYear,
+        string WorksheetName,
+        int HeaderRowNumber,
+        int Confidence,
+        IReadOnlyList<ApiHsCodeImportColumnMappingDto> Columns,
+        IReadOnlyList<ApiHsCodeImportPreviewItemDto> Items,
+        int AddCount,
+        int UpdateCount,
+        int UnchangedCount,
+        int SuspectedObsoleteCount,
+        int ConflictCount,
+        int InvalidCount,
+        IReadOnlyList<string> Warnings,
+        string StoragePolicy);
+
+    public sealed record ApiHsCodeImportCommitResponse(
+        bool Success,
+        int AddedCount,
+        int UpdatedCount,
+        int UnchangedCount,
+        int SuspectedObsoleteCount,
+        int SkippedCount,
+        string Message);
+
+    public sealed record ApiHsCodeRemoteHealthResponse(
+        string Source,
+        bool Available,
+        DateTimeOffset CheckedAt,
+        string Message);
 
     public sealed record ApiHsCodeClearAllRequest(
         string Confirmation);

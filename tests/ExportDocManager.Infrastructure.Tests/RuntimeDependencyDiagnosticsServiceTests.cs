@@ -39,6 +39,9 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.True(renderer.Ready);
                 Assert.Equal("ready", renderer.Status);
                 Assert.Equal(Path.GetFullPath(browserPath), renderer.ResolvedPath);
+                var automation = Assert.Single(diagnostics, item => item.Key == "browser-automation");
+                Assert.True(automation.Ready);
+                Assert.Equal(Path.GetFullPath(browserPath), automation.ResolvedPath);
 
                 var ocr = Assert.Single(diagnostics, item => item.Key == "ocr-runtime");
                 Assert.Equal(OcrRuntimeAvailabilityInspector.IsSupportedPlatform(), ocr.Ready);
@@ -53,6 +56,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 var missingPaths = new RuntimeAppPathProvider(missingAppRoot, Path.Combine(root, "missing-data"));
                 var missingDiagnostics = new RuntimeDependencyDiagnosticsService(missingPaths).Inspect();
                 Assert.Contains(missingDiagnostics, item => item.Key == "report-renderer" && item.Status == "missing");
+                Assert.Contains(missingDiagnostics, item => item.Key == "browser-automation" && item.Status == "missing");
                 Assert.Contains(missingDiagnostics, item => item.Key == "postgresql-tools" && item.Status == "missing");
                 Assert.False(Directory.Exists(missingPaths.BrowserRoot));
                 Assert.False(Directory.Exists(missingPaths.OcrModelRoot));
