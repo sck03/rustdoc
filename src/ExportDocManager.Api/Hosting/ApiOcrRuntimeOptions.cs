@@ -1,17 +1,13 @@
-using ExportDocManager.Services.Infrastructure;
-using ExportDocManager.Services.Tools;
-
 namespace ExportDocManager.Api.Hosting
 {
     internal static class ApiOcrRuntimeOptions
     {
-        public const string RuntimeEnvironmentVariable = OcrRuntimeAvailabilityInspector.RuntimeEnvironmentVariable;
+        public const string RuntimeEnvironmentVariable = "EXPORTDOCMANAGER_OCR_RUNTIME";
 
-        public static bool ShouldUsePaddleOcr(IAppPathProvider pathProvider)
+        public static bool IsEnabled()
         {
-            ArgumentNullException.ThrowIfNull(pathProvider);
-
-            return OcrRuntimeAvailabilityInspector.Inspect(pathProvider).UsePaddleOcr;
+            string mode = (Environment.GetEnvironmentVariable(RuntimeEnvironmentVariable) ?? "auto").Trim().ToLowerInvariant();
+            return mode is not ("0" or "false" or "disabled" or "off" or "none" or "unsupported");
         }
     }
 }

@@ -21,8 +21,7 @@ namespace ExportDocManager.Infrastructure.Tests
             string startScript = File.ReadAllText(Path.Combine(root, "deploy", "browser-server", "start-linux.sh"));
             string notices = Path.Combine(root, "OcrModels", "PaddleOCR", "V6", "THIRD_PARTY_NOTICES.md");
 
-            Assert.Contains("OpenCvSharp4.official.runtime.linux-x64.slim", project, StringComparison.Ordinal);
-            Assert.Contains("'$(RuntimeIdentifier)' == 'linux-x64'", project, StringComparison.Ordinal);
+            Assert.DoesNotContain("OpenCvSharp", project, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("EXPORTDOCMANAGER_OCR_RUNTIME=enabled", dockerfile, StringComparison.Ordinal);
             Assert.Contains("--verify-ocr-runtime", dockerfile, StringComparison.Ordinal);
             Assert.Contains("apps/exportdoc-ocr-rs/Cargo.toml", workflow, StringComparison.Ordinal);

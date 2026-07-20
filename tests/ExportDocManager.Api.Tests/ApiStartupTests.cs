@@ -2406,7 +2406,7 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
-        public void ApiServices_ShouldUseUnsupportedOcrByDefaultWhenPaddleModelsAreMissing()
+        public void ApiServices_ShouldUseUnsupportedOcrByDefaultWhenRustSidecarIsMissing()
         {
             lock (OcrRuntimeEnvironmentLock)
             {
@@ -2445,7 +2445,7 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
-        public void ApiServices_ShouldUsePaddleOcrOnSupportedPlatformWhenBundledModelsArePresent()
+        public void ApiServices_ShouldUseRustOcrWhenSidecarIsBundled()
         {
             lock (OcrRuntimeEnvironmentLock)
             {
@@ -2456,7 +2456,7 @@ namespace ExportDocManager.Api.Tests
                 try
                 {
                     Environment.SetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME", null);
-                    CreatePaddleOcrModelPlaceholders(appRoot);
+                    CreateRustOcrPlaceholders(appRoot);
                     var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
                     var services = new ServiceCollection();
                     services.AddExportDocManagerApiServices(
@@ -2472,14 +2472,7 @@ namespace ExportDocManager.Api.Tests
 
                     var ocrService = scope.ServiceProvider.GetRequiredService<IOcrService>();
 
-                    if (OcrRuntimeAvailabilityInspector.IsSupportedPlatform())
-                    {
-                        Assert.IsType<PaddleOcrService>(ocrService);
-                    }
-                    else
-                    {
-                        Assert.IsType<UnsupportedOcrService>(ocrService);
-                    }
+                    Assert.IsType<RustOcrService>(ocrService);
 
                     Assert.Equal(Path.Combine(appRoot, "OcrModels"), pathProvider.OcrModelRoot);
                 }
@@ -2504,7 +2497,7 @@ namespace ExportDocManager.Api.Tests
                 try
                 {
                     Environment.SetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME", "disabled");
-                    CreatePaddleOcrModelPlaceholders(appRoot);
+                    CreateRustOcrPlaceholders(appRoot);
                     var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
                     var services = new ServiceCollection();
                     services.AddExportDocManagerApiServices(
@@ -2636,8 +2629,11 @@ namespace ExportDocManager.Api.Tests
             return path;
         }
 
-        private static void CreatePaddleOcrModelPlaceholders(string appRoot)
+        private static void CreateRustOcrPlaceholders(string appRoot)
         {
+            string sidecarRoot = Path.Combine(appRoot, "sidecar", "ocr");
+            Directory.CreateDirectory(sidecarRoot);
+            File.WriteAllText(Path.Combine(sidecarRoot, OperatingSystem.IsWindows() ? "exportdoc-ocr.exe" : "exportdoc-ocr"), string.Empty);
             string modelBasePath = Path.Combine(appRoot, "OcrModels", "PaddleOCR", "V6");
             string detDir = Path.Combine(modelBasePath, "det");
             string recDir = Path.Combine(modelBasePath, "rec");

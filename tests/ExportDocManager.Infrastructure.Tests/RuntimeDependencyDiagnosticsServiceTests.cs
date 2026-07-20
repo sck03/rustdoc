@@ -17,18 +17,21 @@ namespace ExportDocManager.Infrastructure.Tests
             string modelRoot = Path.Combine(appRoot, "OcrModels", "PaddleOCR", "V6");
             string postgreSqlBin = Path.Combine(appRoot, "Tools", "PostgreSQL", "bin");
             string previousBrowser = Environment.GetEnvironmentVariable(ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable);
-            string previousOcr = Environment.GetEnvironmentVariable(OcrRuntimeAvailabilityInspector.RuntimeEnvironmentVariable);
+            string previousOcr = Environment.GetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME");
             string previousPostgreSql = Environment.GetEnvironmentVariable(PostgreSqlToolLocator.BinRootEnvironmentVariable);
 
             try
             {
                 Environment.SetEnvironmentVariable(ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable, null);
-                Environment.SetEnvironmentVariable(OcrRuntimeAvailabilityInspector.RuntimeEnvironmentVariable, null);
+                Environment.SetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME", null);
                 Environment.SetEnvironmentVariable(PostgreSqlToolLocator.BinRootEnvironmentVariable, null);
 
                 Directory.CreateDirectory(Path.GetDirectoryName(browserPath)!);
                 File.WriteAllText(browserPath, string.Empty);
                 WriteOcrModelBundle(modelRoot);
+                string ocrSidecar = Path.Combine(appRoot, "sidecar", "ocr", OperatingSystem.IsWindows() ? "exportdoc-ocr.exe" : "exportdoc-ocr");
+                Directory.CreateDirectory(Path.GetDirectoryName(ocrSidecar)!);
+                File.WriteAllText(ocrSidecar, string.Empty);
                 Directory.CreateDirectory(postgreSqlBin);
                 File.WriteAllText(Path.Combine(postgreSqlBin, OperatingSystem.IsWindows() ? "pg_dump.exe" : "pg_dump"), string.Empty);
 
@@ -44,8 +47,8 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.Equal(Path.GetFullPath(browserPath), automation.ResolvedPath);
 
                 var ocr = Assert.Single(diagnostics, item => item.Key == "ocr-runtime");
-                Assert.Equal(OcrRuntimeAvailabilityInspector.IsSupportedPlatform(), ocr.Ready);
-                Assert.Equal(OcrRuntimeAvailabilityInspector.IsSupportedPlatform() ? "ready" : "unsupported", ocr.Status);
+                Assert.True(ocr.Ready);
+                Assert.Equal("ready", ocr.Status);
 
                 var postgreSql = Assert.Single(diagnostics, item => item.Key == "postgresql-tools");
                 Assert.False(postgreSql.Ready);
@@ -65,7 +68,7 @@ namespace ExportDocManager.Infrastructure.Tests
             finally
             {
                 Environment.SetEnvironmentVariable(ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable, previousBrowser);
-                Environment.SetEnvironmentVariable(OcrRuntimeAvailabilityInspector.RuntimeEnvironmentVariable, previousOcr);
+                Environment.SetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME", previousOcr);
                 Environment.SetEnvironmentVariable(PostgreSqlToolLocator.BinRootEnvironmentVariable, previousPostgreSql);
                 if (Directory.Exists(root))
                 {

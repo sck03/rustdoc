@@ -82,6 +82,37 @@ namespace ExportDocManager.Services.Infrastructure
         private RuntimeDependencyDiagnostic InspectOcrRuntime()
         {
             string rustExecutable = RustOcrSidecarHost.FindExecutable(_pathProvider);
+            string modelRoot = Path.Combine(_pathProvider.OcrModelRoot, "PaddleOCR", "V6");
+            string mode = (Environment.GetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME") ?? "auto").Trim().ToLowerInvariant();
+            if (mode is "0" or "false" or "disabled" or "off" or "none" or "unsupported")
+            {
+                return new RuntimeDependencyDiagnostic(
+                    "ocr-runtime", "智能 OCR", "optional", "disabled", false,
+                    Path.GetFullPath(modelRoot),
+                    "OCR 已通过运行配置关闭；不影响其它业务功能。");
+            }
+
+            string[] requiredModels =
+            [
+                Path.Combine(modelRoot, "det", "inference.onnx"),
+                Path.Combine(modelRoot, "rec", "inference.onnx"),
+                Path.Combine(modelRoot, "rec", "inference.yml")
+            ];
+            if (!File.Exists(rustExecutable))
+            {
+                return new RuntimeDependencyDiagnostic(
+                    "ocr-runtime", "智能 OCR", "optional", "missing", false,
+                    Path.GetFullPath(Path.Combine(_pathProvider.AppRoot, "sidecar", "ocr")),
+                    "未找到Rust PP-OCRv6 Sidecar；OCR不可用，其它业务功能不受影响。");
+            }
+            if (requiredModels.Any(path => !File.Exists(path)))
+            {
+                return new RuntimeDependencyDiagnostic(
+                    "ocr-runtime", "智能 OCR", "optional", "incomplete", false,
+                    Path.GetFullPath(modelRoot),
+                    "Rust OCR Sidecar已安装，但PP-OCRv6模型文件不完整。");
+            }
+
             if (File.Exists(rustExecutable))
             {
                 return new RuntimeDependencyDiagnostic(
@@ -89,15 +120,7 @@ namespace ExportDocManager.Services.Infrastructure
                     Path.GetFullPath(rustExecutable),
                     "Rust PP-OCRv6 Sidecar已就绪；使用ONNX Runtime和纯Rust图像处理，不依赖OpenCV。");
             }
-            OcrRuntimeAvailability availability = OcrRuntimeAvailabilityInspector.Inspect(_pathProvider);
-            return new RuntimeDependencyDiagnostic(
-                "ocr-runtime",
-                "智能 OCR",
-                "optional",
-                availability.Status,
-                availability.Ready,
-                Path.GetFullPath(availability.ModelBasePath),
-                availability.Message);
+            throw new InvalidOperationException("OCR runtime diagnostic reached an invalid state.");
         }
 
         private RuntimeDependencyDiagnostic InspectPostgreSqlTools()

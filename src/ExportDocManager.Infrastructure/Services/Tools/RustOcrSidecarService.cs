@@ -6,7 +6,7 @@ using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Tools
 {
-    public sealed class RustOcrSidecarHost : IAsyncDisposable
+    public sealed class RustOcrSidecarHost : IDisposable, IAsyncDisposable
     {
         public const string ExecutableEnvironmentVariable = "EXPORTDOCMANAGER_RUST_OCR_EXECUTABLE";
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -15,6 +15,7 @@ namespace ExportDocManager.Services.Tools
         private Process _process;
         private StreamWriter _stdin;
         private StreamReader _stdout;
+        private int _disposed;
 
         public RustOcrSidecarHost(IAppPathProvider paths) => _paths = paths ?? throw new ArgumentNullException(nameof(paths));
 
@@ -108,7 +109,15 @@ namespace ExportDocManager.Services.Tools
             _stdin?.Dispose(); _stdout?.Dispose(); _process?.Dispose(); _stdin = null; _stdout = null; _process = null;
         }
 
-        public async ValueTask DisposeAsync() { await _gate.WaitAsync(); try { await StopAsync(); } finally { _gate.Release(); _gate.Dispose(); } }
+        public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+        public async ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            await _gate.WaitAsync();
+            try { await StopAsync(); }
+            finally { _gate.Release(); _gate.Dispose(); }
+        }
 
         private sealed record RustOcrResponse(string Id, bool Success, string FullText, List<RustOcrLine> Lines, string Error);
         private sealed record RustOcrLine(string Text, float Confidence, int X, int Y, int Width, int Height);

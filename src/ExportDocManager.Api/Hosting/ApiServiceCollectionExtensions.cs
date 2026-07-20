@@ -126,13 +126,9 @@ namespace ExportDocManager.Api.Hosting
             services.AddSingleton<IContainerPackingEngine, ContainerPackingEngine>();
             services.AddScoped<IOcrService, UnsupportedOcrService>();
             services.AddSingleton<RustOcrSidecarHost>();
-            if (File.Exists(RustOcrSidecarHost.FindExecutable(pathProvider)))
+            if (ApiOcrRuntimeOptions.IsEnabled() && File.Exists(RustOcrSidecarHost.FindExecutable(pathProvider)))
             {
                 services.AddScoped<IOcrService, RustOcrService>();
-            }
-            else if (ApiOcrRuntimeOptions.ShouldUsePaddleOcr(pathProvider))
-            {
-                services.AddScoped<IOcrService, PaddleOcrService>();
             }
 
             services.AddScoped<IAIService>(provider =>
