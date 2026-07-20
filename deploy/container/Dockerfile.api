@@ -26,6 +26,12 @@ COPY apps/exportdoc-ocr-rs/Cargo.toml apps/exportdoc-ocr-rs/Cargo.lock ./
 COPY apps/exportdoc-ocr-rs/src/ ./src/
 RUN cargo build --release --locked
 
+FROM rust:1.96-bookworm AS excel-analyzer-build
+WORKDIR /src
+COPY tools/excel-analyzer-rs/Cargo.toml tools/excel-analyzer-rs/Cargo.lock ./
+COPY tools/excel-analyzer-rs/src/ ./src/
+RUN cargo build --release --locked
+
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim AS runtime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -53,6 +59,8 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build /out/ ./
 COPY --from=ocr-build /src/target/release/exportdoc-ocr ./sidecar/ocr/exportdoc-ocr
+COPY --from=excel-analyzer-build /src/target/release/exportdoc-excel-analyzer ./Tools/exportdoc-excel-analyzer
+COPY tools/excel-analyzer-rs/THIRD_PARTY_NOTICES.md ./Tools/EXCEL_ANALYZER_NOTICES.md
 COPY apps/exportdoc-ocr-rs/README.md ./sidecar/ocr/README.md
 ARG TARGETARCH
 ENV ASPNETCORE_URLS=http://0.0.0.0:5188 \
@@ -62,7 +70,7 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:5188 \
     EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
     EXPORTDOCMANAGER_OCR_RUNTIME=enabled \
     TZ=Asia/Shanghai
-RUN chmod +x /app/sidecar/ocr/exportdoc-ocr
+RUN chmod +x /app/sidecar/ocr/exportdoc-ocr /app/Tools/exportdoc-excel-analyzer
 RUN dotnet ExportDocManager.Api.dll --app-root /app --data-root /tmp/exportdoc-ocr-check --verify-ocr-runtime \
     && rm -rf /tmp/exportdoc-ocr-check
 EXPOSE 5188

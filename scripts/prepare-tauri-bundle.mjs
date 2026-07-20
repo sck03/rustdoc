@@ -73,6 +73,7 @@ console.log(`Publishing API sidecar for Tauri bundle (${rid}, self-contained=${s
 run("dotnet", args, env);
 await ensureMacOsX64OnnxRuntime(env);
 await buildRustOcrSidecar(env);
+await buildRustExcelAnalyzer(env);
 
 const entries = await readdir(publishRoot, { withFileTypes: true });
 for (const entry of entries) {
@@ -149,6 +150,13 @@ async function buildRustOcrSidecar(buildEnv) {
   await mkdir(ocrSidecarRoot, { recursive: true });
   await cp(binary, path.join(ocrSidecarRoot, fileName), { force: true });
   await cp(path.join(repoRoot, "apps", "exportdoc-ocr-rs", "README.md"), path.join(ocrSidecarRoot, "README.md"), { force: true });
+}
+
+async function buildRustExcelAnalyzer(buildEnv) {
+  const target = rustTargetTripleFromRid(rid);
+  const manifest = path.join(repoRoot, "tools", "excel-analyzer-rs", "Cargo.toml");
+  console.log(`Building Rust Excel analyzer for ${target}...`);
+  run("cargo", ["build", "--manifest-path", manifest, "--release", "--locked", "--target", target], buildEnv);
 }
 
 async function ensureMacOsX64OnnxRuntime(buildEnv) {
@@ -462,6 +470,7 @@ async function copyExcelAnalyzerIfAvailable() {
   }
 
   await cp(source, path.join(toolsRoot, excelAnalyzerFileName()), { force: true });
+  await cp(path.join(repoRoot, "tools", "excel-analyzer-rs", "THIRD_PARTY_NOTICES.md"), path.join(toolsRoot, "EXCEL_ANALYZER_NOTICES.md"), { force: true });
 }
 
 async function findExcelAnalyzerBinary() {

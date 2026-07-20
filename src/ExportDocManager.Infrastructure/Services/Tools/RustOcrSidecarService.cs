@@ -38,30 +38,48 @@ namespace ExportDocManager.Services.Tools
             await _gate.WaitAsync(cancellationToken);
             try
             {
-                await EnsureStartedAsync(cancellationToken);
-                string id = Guid.NewGuid().ToString("N");
-                string request = JsonSerializer.Serialize(new { id, command = "recognize", imagePath }, JsonOptions);
-                await _stdin.WriteLineAsync(request.AsMemory(), cancellationToken);
-                await _stdin.FlushAsync(cancellationToken);
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                timeout.CancelAfter(TimeSpan.FromSeconds(90));
-                string line = await _stdout.ReadLineAsync(timeout.Token) ?? throw new InvalidOperationException("Rust OCR Sidecar已退出且未返回结果。");
-                var response = JsonSerializer.Deserialize<RustOcrResponse>(line, JsonOptions) ?? throw new InvalidDataException("Rust OCR Sidecar返回了无效响应。");
-                if (!string.Equals(response.Id, id, StringComparison.Ordinal)) throw new InvalidDataException($"Rust OCR Sidecar响应编号不匹配。Expected={id}; Actual={response.Id}; Payload={line}");
-                if (!response.Success) throw new InvalidOperationException($"Rust OCR识别失败：{response.Error}");
-                return new OcrResult
+                for (int attempt = 0; ; attempt++)
                 {
-                    FullText = response.FullText ?? string.Empty,
-                    Lines = (response.Lines ?? []).Select(item => new OcrLine { Text = item.Text ?? string.Empty, X = item.X, Y = item.Y, Width = item.Width, Height = item.Height }).ToList()
-                };
-            }
-            catch
-            {
-                if (_process?.HasExited == true) await StopAsync();
-                throw;
+                    try
+                    {
+                        return await RecognizeCoreAsync(imagePath, cancellationToken);
+                    }
+                    catch (Exception ex) when (attempt == 0 && IsRecoverableTransportFailure(ex, cancellationToken))
+                    {
+                        await StopAsync();
+                    }
+                    catch
+                    {
+                        await StopAsync();
+                        throw;
+                    }
+                }
             }
             finally { _gate.Release(); }
         }
+
+        private async Task<OcrResult> RecognizeCoreAsync(string imagePath, CancellationToken cancellationToken)
+        {
+            await EnsureStartedAsync(cancellationToken);
+            string id = Guid.NewGuid().ToString("N");
+            string request = JsonSerializer.Serialize(new { id, command = "recognize", imagePath }, JsonOptions);
+            await _stdin.WriteLineAsync(request.AsMemory(), cancellationToken);
+            await _stdin.FlushAsync(cancellationToken);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(90));
+            string line = await _stdout.ReadLineAsync(timeout.Token) ?? throw new EndOfStreamException("Rust OCR Sidecar已退出且未返回结果。");
+            var response = JsonSerializer.Deserialize<RustOcrResponse>(line, JsonOptions) ?? throw new InvalidDataException("Rust OCR Sidecar返回了无效响应。");
+            if (!string.Equals(response.Id, id, StringComparison.Ordinal)) throw new InvalidDataException($"Rust OCR Sidecar响应编号不匹配。Expected={id}; Actual={response.Id}; Payload={line}");
+            if (!response.Success) throw new RustOcrRecognitionException(response.Error);
+            return new OcrResult
+            {
+                FullText = response.FullText ?? string.Empty,
+                Lines = (response.Lines ?? []).Select(item => new OcrLine { Text = item.Text ?? string.Empty, X = item.X, Y = item.Y, Width = item.Width, Height = item.Height }).ToList()
+            };
+        }
+
+        private static bool IsRecoverableTransportFailure(Exception exception, CancellationToken callerToken) =>
+            !callerToken.IsCancellationRequested && exception is IOException or JsonException or InvalidDataException or OperationCanceledException;
 
         private Task EnsureStartedAsync(CancellationToken cancellationToken)
         {
@@ -121,6 +139,7 @@ namespace ExportDocManager.Services.Tools
 
         private sealed record RustOcrResponse(string Id, bool Success, string FullText, List<RustOcrLine> Lines, string Error);
         private sealed record RustOcrLine(string Text, float Confidence, int X, int Y, int Width, int Height);
+        private sealed class RustOcrRecognitionException(string error) : InvalidOperationException($"Rust OCR识别失败：{error}");
     }
 
     public sealed class RustOcrService : IOcrService

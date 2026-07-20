@@ -128,6 +128,10 @@ jobs:
         shell: pwsh
         run: cargo build --manifest-path apps/exportdoc-ocr-rs/Cargo.toml --release --target ${{ inputs.rust_target }}
 
+      - name: Build Rust Excel analyzer
+        shell: pwsh
+        run: cargo build --manifest-path tools/excel-analyzer-rs/Cargo.toml --release --locked --target ${{ inputs.rust_target }}
+
       - name: Assemble browser server package
         shell: pwsh
         run: |
@@ -143,6 +147,11 @@ jobs:
           $ocrName = if ('${{ inputs.platform }}' -eq 'windows') { 'exportdoc-ocr.exe' } else { 'exportdoc-ocr' }
           Copy-Item -LiteralPath (Join-Path $env:CARGO_TARGET_DIR "${{ inputs.rust_target }}/release/$ocrName") -Destination (Join-Path $ocrRoot $ocrName) -Force
           Copy-Item -LiteralPath "apps/exportdoc-ocr-rs/README.md" -Destination $ocrRoot -Force
+          $toolsRoot = Join-Path $packageRoot "Tools"
+          New-Item -ItemType Directory -Path $toolsRoot -Force | Out-Null
+          $analyzerName = if ('${{ inputs.platform }}' -eq 'windows') { 'exportdoc-excel-analyzer.exe' } else { 'exportdoc-excel-analyzer' }
+          Copy-Item -LiteralPath (Join-Path $env:CARGO_TARGET_DIR "${{ inputs.rust_target }}/release/$analyzerName") -Destination (Join-Path $toolsRoot $analyzerName) -Force
+          Copy-Item -LiteralPath "tools/excel-analyzer-rs/THIRD_PARTY_NOTICES.md" -Destination (Join-Path $toolsRoot "EXCEL_ANALYZER_NOTICES.md") -Force
 
           $browser = Get-ChildItem -LiteralPath (Join-Path $packageRoot "Browsers") -File -Recurse |
             Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome-headless-shell", "chrome") } |
@@ -160,7 +169,7 @@ jobs:
                 throw "Linux PP-OCRv6 package file was not included: $_"
               }
             }
-            & chmod +x -- (Join-Path $packageRoot "ExportDocManager.Api") (Join-Path $packageRoot "start-linux.sh") $browser.FullName (Join-Path $ocrRoot "exportdoc-ocr")
+            & chmod +x -- (Join-Path $packageRoot "ExportDocManager.Api") (Join-Path $packageRoot "start-linux.sh") $browser.FullName (Join-Path $ocrRoot "exportdoc-ocr") (Join-Path $toolsRoot "exportdoc-excel-analyzer")
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 

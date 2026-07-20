@@ -538,6 +538,60 @@ fn validate_image_path(value: &str, root: &Path) -> Result<PathBuf> {
     }
     Ok(path)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn merge_lines_combines_nearby_boxes_but_keeps_separate_rows() {
+        let merged = merge_lines(vec![
+            Rect {
+                x: 10,
+                y: 10,
+                width: 40,
+                height: 20,
+            },
+            Rect {
+                x: 55,
+                y: 12,
+                width: 35,
+                height: 18,
+            },
+            Rect {
+                x: 12,
+                y: 70,
+                width: 30,
+                height: 18,
+            },
+        ]);
+        assert_eq!(merged.len(), 2);
+        assert_eq!((merged[0].x, merged[0].width), (10, 80));
+    }
+
+    #[test]
+    fn decode_ctc_collapses_duplicates_and_maps_extra_class_to_space() {
+        let labels = vec!["A".to_string(), "B".to_string()];
+        let data = vec![
+            0.01, 0.95, 0.02, 0.02, 0.01, 0.96, 0.02, 0.01, 0.98, 0.01, 0.01, 0.00, 0.01, 0.01,
+            0.02, 0.96, 0.01, 0.02, 0.95, 0.02,
+        ];
+        let (text, confidence) = decode_ctc(data, &[1, 5, 4], &labels).unwrap();
+        assert_eq!(text, "A B");
+        assert!(confidence > 0.9);
+    }
+
+    #[test]
+    fn otsu_separates_dark_and_light_pixels() {
+        let mut image = GrayImage::new(20, 10);
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            pixel.0[0] = if x < 10 { 10 } else { 240 };
+            let _ = y;
+        }
+        let threshold = otsu(&image);
+        assert!((10..=240).contains(&threshold));
+    }
+}
 fn write_response(w: &mut impl Write, r: Response) -> Result<()> {
     serde_json::to_writer(&mut *w, &r)?;
     w.write_all(b"\n")?;

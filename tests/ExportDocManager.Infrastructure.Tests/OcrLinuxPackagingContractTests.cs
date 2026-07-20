@@ -35,6 +35,8 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.DoesNotContain("opencv", rustManifest, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("FROM rust:", dockerfile, StringComparison.Ordinal);
             Assert.Contains("sidecar/ocr/exportdoc-ocr", dockerfile, StringComparison.Ordinal);
+            Assert.Contains("tools/excel-analyzer-rs/Cargo.toml", workflow, StringComparison.Ordinal);
+            Assert.Contains("Tools/exportdoc-excel-analyzer", dockerfile, StringComparison.Ordinal);
         }
 
         private static string FindWorkspaceRoot()
