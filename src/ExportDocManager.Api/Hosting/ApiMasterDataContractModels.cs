@@ -101,7 +101,13 @@ namespace ExportDocManager.Api.Hosting
         string SourceName = "",
         int? EffectiveYear = null,
         DateTime? LastVerifiedAt = null,
-        string ReplacedByCodes = "");
+        string ReplacedByCodes = "",
+        string NormalTariffRate = "",
+        string PreferentialTariffRate = "",
+        string ExportTariffRate = "",
+        string ConsumptionTaxRate = "",
+        string ValueAddedTaxRate = "",
+        string Notes = "");
 
     public sealed record ApiHsCodeImportPathRequest(
         string FilePath);

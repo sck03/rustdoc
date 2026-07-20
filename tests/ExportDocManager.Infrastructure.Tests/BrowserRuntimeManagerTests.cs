@@ -3,6 +3,7 @@ using ExportDocManager.Services.BrowserRuntime;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.MasterData;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Infrastructure.Tests
 {
@@ -76,7 +77,7 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 await host.DisposeAsync();
                 Assert.Empty(runtime.GetSnapshot().OwnedProcessIds);
-                if (Directory.Exists(dataRoot)) Directory.Delete(dataRoot, recursive: true);
+                AtomicFileHelper.TryDeleteDirectory(dataRoot);
             }
         }
 
@@ -100,7 +101,7 @@ namespace ExportDocManager.Infrastructure.Tests
             }
             finally
             {
-                if (Directory.Exists(dataRoot)) Directory.Delete(dataRoot, recursive: true);
+                AtomicFileHelper.TryDeleteDirectory(dataRoot);
             }
         }
 
@@ -131,7 +132,7 @@ namespace ExportDocManager.Infrastructure.Tests
             finally
             {
                 await host.DisposeAsync();
-                if (Directory.Exists(dataRoot)) Directory.Delete(dataRoot, recursive: true);
+                AtomicFileHelper.TryDeleteDirectory(dataRoot);
             }
         }
 

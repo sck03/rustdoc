@@ -557,4 +557,10 @@ const hsCodeTextFields = [
   "status",
   "sourceName",
   "replacedByCodes",
+  "normalTariffRate",
+  "preferentialTariffRate",
+  "exportTariffRate",
+  "consumptionTaxRate",
+  "valueAddedTaxRate",
+  "notes",
 ];

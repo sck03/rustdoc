@@ -13,13 +13,19 @@ namespace ExportDocManager.Services.MasterData
             {
                 ["Code"] = ["HS编码", "HSCODE", "海关编码", "商品编码", "商品税号", "税则号列", "税则号", "税号"],
                 ["Name"] = ["商品名称", "货品名称", "中文品名", "税目名称", "商品品名", "名称", "品名", "NAME"],
-                ["Unit1"] = ["法定第一单位", "第一法定单位", "法一单位", "计量单位1", "第一单位", "UNIT1"],
+                ["Unit1"] = ["法定第一单位", "第一法定单位", "法一单位", "计量单位1", "第一单位", "单位", "UNIT1", "UNIT"],
                 ["Unit2"] = ["法定第二单位", "第二法定单位", "法二单位", "计量单位2", "第二单位", "UNIT2"],
                 ["RebateRate"] = ["出口退税率", "出口商品退税率", "退税率", "REBATERATE", "REBATE"],
-                ["SupervisionConditions"] = ["海关监管条件", "监管证件代码", "监管条件", "SUPERVISIONCONDITIONS", "SUPERVISION"],
+                ["NormalTariffRate"] = ["普通税率", "普通关税率", "普通进口税率", "GENERALTARIFFRATE"],
+                ["PreferentialTariffRate"] = ["优惠税率", "最惠国税率", "最惠国税率MFN", "MFN税率", "PREFERENTIALTARIFFRATE"],
+                ["ExportTariffRate"] = ["出口税率", "出口关税率", "EXPORTTARIFFRATE"],
+                ["ConsumptionTaxRate"] = ["消费税率", "CONSUMPTIONTAXRATE"],
+                ["ValueAddedTaxRate"] = ["增值税率", "进口增值税率", "VAT", "VAT率"],
+                ["SupervisionConditions"] = ["海关监管条件", "监管证件代码", "许可证代码", "监管条件", "SUPERVISIONCONDITIONS", "SUPERVISION"],
                 ["InspectionCategory"] = ["检验检疫类别", "检疫类别", "检验检疫", "CIQ类别", "INSPECTIONCATEGORY", "INSPECTION"],
-                ["Elements"] = ["规范申报要素", "申报要素内容", "申报要素", "ELEMENTS", "ELEMENT"],
-                ["Description"] = ["英文名称", "英文品名", "商品描述", "英文描述", "DESCRIPTION", "DESC"]
+                ["Elements"] = ["规范申报要素", "申报要素内容", "申报要素", "规格型号", "ELEMENTS", "ELEMENT"],
+                ["Description"] = ["英文名称", "英文品名", "商品描述", "英文描述", "DESCRIPTION", "DESC"],
+                ["Notes"] = ["备注", "说明", "REMARKS", "NOTES"]
             };
 
         public async Task ImportAsync(string filePath)
@@ -237,19 +243,41 @@ namespace ExportDocManager.Services.MasterData
                 }
             }
 
-            int Column(string field) => matches.TryGetValue(field, out var match) ? match.Column : -1;
-            var mappings = matches
+            var resolvedMatches = matches
+                .OrderByDescending(pair => pair.Value.Score)
+                .ThenBy(pair => ImportFieldPriority(pair.Key))
+                .Aggregate(
+                    new Dictionary<string, (int Column, string Header, int Score)>(StringComparer.OrdinalIgnoreCase),
+                    (selected, pair) =>
+                    {
+                        if (!selected.Values.Any(value => value.Column == pair.Value.Column)) selected[pair.Key] = pair.Value;
+                        return selected;
+                    });
+            int Column(string field) => resolvedMatches.TryGetValue(field, out var match) ? match.Column : -1;
+            var mappings = resolvedMatches
                 .Select(pair => new HsCodeImportColumnMapping(pair.Key, pair.Value.Header, pair.Value.Column, pair.Value.Score))
                 .OrderBy(item => item.ColumnNumber)
                 .ToList();
-            int confidence = matches.TryGetValue("Code", out var code) ? code.Score / 2 : 0;
-            confidence += matches.ContainsKey("Name") ? 20 : 0;
-            confidence += Math.Min(30, Math.Max(0, matches.Count - 2) * 5);
+            int confidence = resolvedMatches.TryGetValue("Code", out var code) ? code.Score / 2 : 0;
+            confidence += resolvedMatches.ContainsKey("Name") ? 20 : 0;
+            confidence += Math.Min(30, Math.Max(0, resolvedMatches.Count - 2) * 5);
             return new ImportLayout(
                 Column("Code"), Column("Name"), Column("Unit1"), Column("Unit2"),
                 Column("RebateRate"), Column("SupervisionConditions"), Column("InspectionCategory"),
-                Column("Elements"), Column("Description"), Math.Min(90, confidence), mappings);
+                Column("Elements"), Column("Description"), Column("NormalTariffRate"),
+                Column("PreferentialTariffRate"), Column("ExportTariffRate"), Column("ConsumptionTaxRate"),
+                Column("ValueAddedTaxRate"), Column("Notes"), Math.Min(90, confidence), mappings);
         }
+
+        private static int ImportFieldPriority(string field) => field switch
+        {
+            "Code" => 0,
+            "Name" => 1,
+            "Elements" => 2,
+            "Unit1" => 3,
+            "Unit2" => 4,
+            _ => 10
+        };
 
         private static int ScoreHeader(string header, IEnumerable<string> aliases)
         {
@@ -260,7 +288,7 @@ namespace ExportDocManager.Services.MasterData
                 {
                     best = Math.Max(best, 100);
                 }
-                else if (header.Contains(alias, StringComparison.OrdinalIgnoreCase) || alias.Contains(header, StringComparison.OrdinalIgnoreCase))
+                else if (header.Contains(alias, StringComparison.OrdinalIgnoreCase))
                 {
                     best = Math.Max(best, 70);
                 }
@@ -411,17 +439,51 @@ namespace ExportDocManager.Services.MasterData
                 Code = code,
                 Name = ReadOptionalCell(row, layout.NameColumn),
                 Unit = MergeImportUnits(row, layout),
-                RebateRate = ReadOptionalCell(row, layout.RebateColumn),
+                RebateRate = ReadImportRateCell(row, layout.RebateColumn),
+                NormalTariffRate = ReadImportRateCell(row, layout.NormalTariffRateColumn),
+                PreferentialTariffRate = ReadImportRateCell(row, layout.PreferentialTariffRateColumn),
+                ExportTariffRate = ReadImportRateCell(row, layout.ExportTariffRateColumn),
+                ConsumptionTaxRate = ReadImportRateCell(row, layout.ConsumptionTaxRateColumn),
+                ValueAddedTaxRate = ReadImportRateCell(row, layout.ValueAddedTaxRateColumn),
                 SupervisionConditions = ReadOptionalCell(row, layout.SupervisionColumn),
                 InspectionCategory = ReadOptionalCell(row, layout.InspectionColumn),
                 Elements = ReadOptionalCell(row, layout.ElementsColumn),
                 Description = ReadOptionalCell(row, layout.DescriptionColumn),
+                Notes = NormalizeImportNotes(ReadOptionalCell(row, layout.NotesColumn)),
                 Status = "Active",
                 UpdateTime = DateTime.Now
             };
         }
 
         private static string ReadOptionalCell(IXLRow row, int column) => column > 0 ? ReadImportCell(row.Cell(column)) : null;
+
+        private static string ReadImportRateCell(IXLRow row, int column)
+        {
+            if (column <= 0) return null;
+            var cell = row.Cell(column);
+            if (cell.IsEmpty()) return null;
+            if (cell.TryGetValue<decimal>(out decimal number) && number >= 0m && number <= 1m)
+            {
+                decimal percent = number * 100m;
+                return percent.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + "%";
+            }
+            return ReadImportCell(cell);
+        }
+
+        private static string NormalizeImportNotes(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+            string normalized = value.Trim();
+            int markerIndex = normalized.LastIndexOf("备注:", StringComparison.OrdinalIgnoreCase);
+            if (markerIndex < 0) markerIndex = normalized.LastIndexOf("备注：", StringComparison.OrdinalIgnoreCase);
+            if (markerIndex >= 0 &&
+                (normalized.Contains("普通税率", StringComparison.OrdinalIgnoreCase) ||
+                 normalized.Contains("优惠税率", StringComparison.OrdinalIgnoreCase)))
+            {
+                return normalized[(markerIndex + 3)..].Trim().Trim(';', '；');
+            }
+            return normalized;
+        }
 
         private static string ReadImportCell(IXLCell cell)
         {
@@ -472,10 +534,16 @@ namespace ExportDocManager.Services.MasterData
             Compare("商品名称", existing.Name, imported.Name);
             Compare("法定单位", existing.Unit, imported.Unit);
             Compare("退税率", existing.RebateRate, imported.RebateRate);
+            Compare("普通税率", existing.NormalTariffRate, imported.NormalTariffRate);
+            Compare("优惠税率", existing.PreferentialTariffRate, imported.PreferentialTariffRate);
+            Compare("出口税率", existing.ExportTariffRate, imported.ExportTariffRate);
+            Compare("消费税率", existing.ConsumptionTaxRate, imported.ConsumptionTaxRate);
+            Compare("增值税率", existing.ValueAddedTaxRate, imported.ValueAddedTaxRate);
             Compare("监管条件", existing.SupervisionConditions, imported.SupervisionConditions);
             Compare("检验检疫类别", existing.InspectionCategory, imported.InspectionCategory);
             Compare("申报要素", existing.Elements, imported.Elements);
             Compare("描述", existing.Description, imported.Description);
+            Compare("备注", existing.Notes, imported.Notes);
             return fields;
 
             void Compare(string name, string oldValue, string newValue)
@@ -492,10 +560,16 @@ namespace ExportDocManager.Services.MasterData
             target.Name = Coalesce(source.Name, target.Name, string.Empty);
             target.Unit = Coalesce(source.Unit, target.Unit);
             target.RebateRate = Coalesce(source.RebateRate, target.RebateRate);
+            target.NormalTariffRate = Coalesce(source.NormalTariffRate, target.NormalTariffRate);
+            target.PreferentialTariffRate = Coalesce(source.PreferentialTariffRate, target.PreferentialTariffRate);
+            target.ExportTariffRate = Coalesce(source.ExportTariffRate, target.ExportTariffRate);
+            target.ConsumptionTaxRate = Coalesce(source.ConsumptionTaxRate, target.ConsumptionTaxRate);
+            target.ValueAddedTaxRate = Coalesce(source.ValueAddedTaxRate, target.ValueAddedTaxRate);
             target.SupervisionConditions = Coalesce(source.SupervisionConditions, target.SupervisionConditions);
             target.InspectionCategory = Coalesce(source.InspectionCategory, target.InspectionCategory);
             target.Elements = Coalesce(source.Elements, target.Elements);
             target.Description = Coalesce(source.Description, target.Description);
+            target.Notes = Coalesce(source.Notes, target.Notes);
         }
 
         private static string Coalesce(params string[] values) => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
@@ -549,13 +623,18 @@ namespace ExportDocManager.Services.MasterData
 
         private static string BuildComparableValue(HsCode item) => string.Join("|",
             item.Name?.Trim(), item.Unit?.Trim(), item.RebateRate?.Trim(), item.SupervisionConditions?.Trim(),
-            item.InspectionCategory?.Trim(), item.Elements?.Trim(), item.Description?.Trim());
+            item.InspectionCategory?.Trim(), item.Elements?.Trim(), item.Description?.Trim(),
+            item.NormalTariffRate?.Trim(), item.PreferentialTariffRate?.Trim(), item.ExportTariffRate?.Trim(),
+            item.ConsumptionTaxRate?.Trim(), item.ValueAddedTaxRate?.Trim(), item.Notes?.Trim());
 
         private static HsCode CloneHsCode(HsCode item) => new()
         {
             Id = item.Id, Code = item.Code, Name = item.Name, Unit = item.Unit, RebateRate = item.RebateRate,
             SupervisionConditions = item.SupervisionConditions, InspectionCategory = item.InspectionCategory,
             Elements = item.Elements, Description = item.Description, Status = item.Status,
+            NormalTariffRate = item.NormalTariffRate, PreferentialTariffRate = item.PreferentialTariffRate,
+            ExportTariffRate = item.ExportTariffRate, ConsumptionTaxRate = item.ConsumptionTaxRate,
+            ValueAddedTaxRate = item.ValueAddedTaxRate, Notes = item.Notes,
             SourceName = item.SourceName, EffectiveYear = item.EffectiveYear, LastVerifiedAt = item.LastVerifiedAt,
             ReplacedByCodes = item.ReplacedByCodes, UpdateTime = item.UpdateTime
         };
@@ -565,6 +644,8 @@ namespace ExportDocManager.Services.MasterData
         private sealed record ImportLayout(
             int CodeColumn, int NameColumn, int Unit1Column, int Unit2Column, int RebateColumn,
             int SupervisionColumn, int InspectionColumn, int ElementsColumn, int DescriptionColumn,
+            int NormalTariffRateColumn, int PreferentialTariffRateColumn, int ExportTariffRateColumn,
+            int ConsumptionTaxRateColumn, int ValueAddedTaxRateColumn, int NotesColumn,
             int Confidence, IReadOnlyList<HsCodeImportColumnMapping> Mappings);
     }
 }

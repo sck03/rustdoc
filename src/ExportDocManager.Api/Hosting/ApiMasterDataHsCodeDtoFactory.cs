@@ -45,7 +45,13 @@ namespace ExportDocManager.Api.Hosting
                 hsCode.SourceName ?? string.Empty,
                 hsCode.EffectiveYear,
                 hsCode.LastVerifiedAt,
-                hsCode.ReplacedByCodes ?? string.Empty);
+                hsCode.ReplacedByCodes ?? string.Empty,
+                hsCode.NormalTariffRate ?? string.Empty,
+                hsCode.PreferentialTariffRate ?? string.Empty,
+                hsCode.ExportTariffRate ?? string.Empty,
+                hsCode.ConsumptionTaxRate ?? string.Empty,
+                hsCode.ValueAddedTaxRate ?? string.Empty,
+                hsCode.Notes ?? string.Empty);
         }
 
         public static HsCode ToHsCodeForSave(ApiHsCodeDto dto)
@@ -69,7 +75,13 @@ namespace ExportDocManager.Api.Hosting
                 SourceName = dto.SourceName ?? string.Empty,
                 EffectiveYear = dto.EffectiveYear,
                 LastVerifiedAt = dto.LastVerifiedAt,
-                ReplacedByCodes = dto.ReplacedByCodes ?? string.Empty
+                ReplacedByCodes = dto.ReplacedByCodes ?? string.Empty,
+                NormalTariffRate = dto.NormalTariffRate ?? string.Empty,
+                PreferentialTariffRate = dto.PreferentialTariffRate ?? string.Empty,
+                ExportTariffRate = dto.ExportTariffRate ?? string.Empty,
+                ConsumptionTaxRate = dto.ConsumptionTaxRate ?? string.Empty,
+                ValueAddedTaxRate = dto.ValueAddedTaxRate ?? string.Empty,
+                Notes = dto.Notes ?? string.Empty
             };
         }
     }

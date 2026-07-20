@@ -545,7 +545,7 @@ function HsCodeImportPreview({
         <span>年份：{preview.effectiveYear ?? "未填写"}</span>
       </div>
       {preview.warnings.map((warning) => <div className="warning-note" key={warning}>{warning}</div>)}
-      <details className="hs-code-column-mapping"><summary>查看识别到的字段映射</summary><div>{preview.columns.map((column) => <span key={column.field}>{column.header} → {column.field}（{column.confidence}%）</span>)}</div></details>
+      <details className="hs-code-column-mapping"><summary>查看识别到的字段映射</summary><div>{preview.columns.map((column) => <span key={column.field}>{column.header} → {hsCodeImportFieldLabel(column.field)}（{column.confidence}%）</span>)}</div></details>
       <div className="table-frame hs-code-preview-table-frame">
         <table><thead><tr><th>处理</th><th>Excel 行</th><th>编码</th><th>名称</th><th>说明</th></tr></thead><tbody>
           {preview.items.map((row, index) => <tr key={`${row.changeType}-${row.item.code}-${row.rowNumber}-${index}`}><td><span className={`hs-code-change-badge change-${row.changeType.toLowerCase()}`}>{labels[row.changeType] ?? row.changeType}</span></td><td>{row.rowNumber || "-"}</td><td>{row.item.code || "-"}</td><td>{row.item.name || "-"}</td><td>{row.message}{row.replacementCandidates.length ? ` 候选：${row.replacementCandidates.join("、")}` : ""}</td></tr>)}
@@ -554,6 +554,27 @@ function HsCodeImportPreview({
       <div className="hs-code-preview-actions"><button className="command-button secondary" type="button" disabled={busy} onClick={onBack}>重新选择</button><button className="command-button" type="button" disabled={busy || preview.conflictCount + preview.invalidCount > 0 && preview.addCount + preview.updateCount + preview.suspectedObsoleteCount === 0} onClick={onCommit}>{busy ? "正在导入" : "确认导入"}</button></div>
     </div>
   );
+}
+
+function hsCodeImportFieldLabel(field: string) {
+  const labels: Record<string, string> = {
+    Code: "商品编码",
+    Name: "商品名称",
+    Elements: "申报要素",
+    Unit1: "法定第一单位",
+    Unit2: "法定第二单位",
+    SupervisionConditions: "海关监管条件",
+    InspectionCategory: "检验检疫类别",
+    RebateRate: "出口退税率",
+    NormalTariffRate: "普通税率",
+    PreferentialTariffRate: "优惠/最惠国税率",
+    ExportTariffRate: "出口税率",
+    ConsumptionTaxRate: "消费税率",
+    ValueAddedTaxRate: "增值税率",
+    Description: "英文描述",
+    Notes: "备注",
+  };
+  return labels[field] ?? field;
 }
 
 function HsCodeRemoteResults({ items, expandedResultKey, setExpandedResultKey, isBusy, fetchDetail, saveItem }: {
@@ -581,10 +602,16 @@ function HsCodeRemoteDetail({ item }: { item: ApiHsCodeDto }) {
         <DetailField label="商品名称" value={item.name} />
         <DetailField label="法定单位" value={item.unit} />
         <DetailField label="退税率" value={item.rebateRate} />
+        <DetailField label="普通税率" value={item.normalTariffRate} />
+        <DetailField label="优惠/最惠国税率" value={item.preferentialTariffRate} />
+        <DetailField label="出口税率" value={item.exportTariffRate} />
+        <DetailField label="消费税率" value={item.consumptionTaxRate} />
+        <DetailField label="增值税率" value={item.valueAddedTaxRate} />
         <DetailField label="监管条件" value={item.supervisionConditions} />
         <DetailField label="检验检疫" value={item.inspectionCategory} />
         <DetailField label="申报要素" value={item.elements} wide />
         <DetailField label="描述" value={item.description} wide />
+        <DetailField label="备注" value={item.notes} wide />
       </div>
     </div>
   );

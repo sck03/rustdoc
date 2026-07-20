@@ -808,6 +808,12 @@ namespace ExportDocManager.Api.Hosting
             target.SupervisionConditions = source.SupervisionConditions;
             target.InspectionCategory = source.InspectionCategory;
             target.RebateRate = source.RebateRate;
+            target.NormalTariffRate = source.NormalTariffRate;
+            target.PreferentialTariffRate = source.PreferentialTariffRate;
+            target.ExportTariffRate = source.ExportTariffRate;
+            target.ConsumptionTaxRate = source.ConsumptionTaxRate;
+            target.ValueAddedTaxRate = source.ValueAddedTaxRate;
+            target.Notes = source.Notes;
             target.UpdateTime = source.UpdateTime;
             target.DetailUrl = source.DetailUrl;
         }

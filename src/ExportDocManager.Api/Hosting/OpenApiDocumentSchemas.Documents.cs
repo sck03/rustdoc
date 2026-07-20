@@ -1138,7 +1138,13 @@ namespace ExportDocManager.Api.Hosting
                                 ["sourceName"] = StringProperty("Data source name."),
                                 ["effectiveYear"] = new { type = "integer", format = "int32", nullable = true },
                                 ["lastVerifiedAt"] = new { type = "string", format = "date-time", nullable = true },
-                                ["replacedByCodes"] = StringProperty("Comma-separated replacement candidates.")
+                                ["replacedByCodes"] = StringProperty("Comma-separated replacement candidates."),
+                                ["normalTariffRate"] = StringProperty("China general import tariff rate."),
+                                ["preferentialTariffRate"] = StringProperty("China preferential or MFN import tariff rate."),
+                                ["exportTariffRate"] = StringProperty("China export tariff rate."),
+                                ["consumptionTaxRate"] = StringProperty("China consumption tax rate."),
+                                ["valueAddedTaxRate"] = StringProperty("China import VAT rate."),
+                                ["notes"] = StringProperty("Source remarks for the HS code.")
                             }
                         },
                         ["ApiHsCodeImportPathRequest"] = new

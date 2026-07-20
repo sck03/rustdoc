@@ -1092,15 +1092,20 @@ export interface ApiHsCodeClearAllRequest {
 
 export interface ApiHsCodeDto {
   code: string;
+  consumptionTaxRate?: string;
   description?: string;
   detailUrl?: string;
   effectiveYear?: number;
   elements?: string;
+  exportTariffRate?: string;
   id: number;
   inspectionCategory?: string;
   lastVerifiedAt?: string;
   name: string;
+  normalTariffRate?: string;
   normalizedCode: string;
+  notes?: string;
+  preferentialTariffRate?: string;
   rebateRate?: string;
   replacedByCodes?: string;
   sourceName?: string;
@@ -1108,6 +1113,7 @@ export interface ApiHsCodeDto {
   supervisionConditions?: string;
   unit?: string;
   updateTime?: string;
+  valueAddedTaxRate?: string;
 }
 
 export interface ApiHsCodeImportColumnMappingDto {

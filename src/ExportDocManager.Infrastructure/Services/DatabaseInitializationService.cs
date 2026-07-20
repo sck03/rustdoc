@@ -148,6 +148,12 @@ namespace ExportDocManager.Services.Infrastructure
                     ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "EffectiveYear" integer NULL;
                     ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "LastVerifiedAt" timestamp with time zone NULL;
                     ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "ReplacedByCodes" character varying(500) NULL;
+                    ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "NormalTariffRate" character varying(50) NULL;
+                    ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "PreferentialTariffRate" character varying(50) NULL;
+                    ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "ExportTariffRate" character varying(50) NULL;
+                    ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "ConsumptionTaxRate" character varying(50) NULL;
+                    ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "ValueAddedTaxRate" character varying(50) NULL;
+                    ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "Notes" character varying(1000) NULL;
                     CREATE INDEX IF NOT EXISTS "IX_HsCodes_Status" ON "HsCodes" ("Status");
                     CREATE INDEX IF NOT EXISTS "IX_HsCodes_EffectiveYear_Status" ON "HsCodes" ("EffectiveYear", "Status");
                     """).ConfigureAwait(false);
@@ -159,6 +165,12 @@ namespace ExportDocManager.Services.Infrastructure
             await AddSqliteColumnIfMissingAsync(context, "HsCodes", "EffectiveYear", "INTEGER NULL").ConfigureAwait(false);
             await AddSqliteColumnIfMissingAsync(context, "HsCodes", "LastVerifiedAt", "TEXT NULL").ConfigureAwait(false);
             await AddSqliteColumnIfMissingAsync(context, "HsCodes", "ReplacedByCodes", "TEXT NULL").ConfigureAwait(false);
+            await AddSqliteColumnIfMissingAsync(context, "HsCodes", "NormalTariffRate", "TEXT NULL").ConfigureAwait(false);
+            await AddSqliteColumnIfMissingAsync(context, "HsCodes", "PreferentialTariffRate", "TEXT NULL").ConfigureAwait(false);
+            await AddSqliteColumnIfMissingAsync(context, "HsCodes", "ExportTariffRate", "TEXT NULL").ConfigureAwait(false);
+            await AddSqliteColumnIfMissingAsync(context, "HsCodes", "ConsumptionTaxRate", "TEXT NULL").ConfigureAwait(false);
+            await AddSqliteColumnIfMissingAsync(context, "HsCodes", "ValueAddedTaxRate", "TEXT NULL").ConfigureAwait(false);
+            await AddSqliteColumnIfMissingAsync(context, "HsCodes", "Notes", "TEXT NULL").ConfigureAwait(false);
             await context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS \"IX_HsCodes_Status\" ON \"HsCodes\" (\"Status\")").ConfigureAwait(false);
             await context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS \"IX_HsCodes_EffectiveYear_Status\" ON \"HsCodes\" (\"EffectiveYear\", \"Status\")").ConfigureAwait(false);
         }

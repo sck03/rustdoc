@@ -90,6 +90,56 @@ namespace ExportDocManager.Infrastructure.Tests
             }
         }
 
+        [Fact]
+        public async Task HsCodeImport_ShouldRecognizeSpecificationElementsAndChineseTariffColumns()
+        {
+            using var factory = new SqliteTestDbContextFactory();
+            var repository = new LocalMasterDataReadRepository(factory);
+            var service = new HsCodeService(factory, repository);
+            string path = CreateHsCodeWorkbook(workbook =>
+            {
+                var sheet = workbook.AddWorksheet("完整税则");
+                string[] headers =
+                [
+                    "商品编码", "名称", "许可证代码", "普通税率", "优惠税率", "备注",
+                    "出口税率", "消费税率", "增值税率", "第一法定单位", "第二法定单位", "规格型号"
+                ];
+                for (int index = 0; index < headers.Length; index++) sheet.Cell(3, index + 1).Value = headers[index];
+                sheet.Cell(4, 1).Value = "0101290010";
+                sheet.Cell(4, 2).Value = "非改良种用濒危野马";
+                sheet.Cell(4, 3).Value = "AFEB";
+                sheet.Cell(4, 4).Value = 0.30m;
+                sheet.Cell(4, 5).Value = 0.10m;
+                sheet.Cell(4, 6).Value = "普通税率:0.3;优惠税率:0.1;消费税率:0;备注:";
+                sheet.Cell(4, 7).Value = 0m;
+                sheet.Cell(4, 8).Value = 0m;
+                sheet.Cell(4, 9).Value = 0.09m;
+                sheet.Cell(4, 10).Value = "035";
+                sheet.Cell(4, 11).Value = "009";
+                sheet.Cell(4, 12).Value = "0:品牌类型|1:出口享惠情况|2:品种|3:其他";
+            });
+            try
+            {
+                var preview = await service.PreviewImportAsync(path);
+                var item = Assert.Single(preview.Items).Item;
+                Assert.Equal("AFEB", item.SupervisionConditions);
+                Assert.Equal("0:品牌类型|1:出口享惠情况|2:品种|3:其他", item.Elements);
+                Assert.Equal("30%", item.NormalTariffRate);
+                Assert.Equal("10%", item.PreferentialTariffRate);
+                Assert.Equal("0%", item.ExportTariffRate);
+                Assert.Equal("0%", item.ConsumptionTaxRate);
+                Assert.Equal("9%", item.ValueAddedTaxRate);
+                Assert.True(string.IsNullOrWhiteSpace(item.Description));
+                Assert.True(string.IsNullOrWhiteSpace(item.Notes));
+                Assert.Contains(preview.Columns, column => column.Field == "Name" && column.ColumnNumber == 2);
+                Assert.DoesNotContain(preview.Columns, column => column.Field == "Description" && column.ColumnNumber == 2);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
         private static string CreateHsCodeWorkbook(Action<XLWorkbook> build)
         {
             string directory = Path.Combine(AppContext.BaseDirectory, "HsCodeImportTests");

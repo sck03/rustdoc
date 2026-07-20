@@ -124,6 +124,12 @@ namespace ExportDocManager.Services.MasterData
             target.Name = source.Name;
             target.Unit = source.Unit;
             target.RebateRate = source.RebateRate;
+            if (!string.IsNullOrWhiteSpace(source.NormalTariffRate)) target.NormalTariffRate = source.NormalTariffRate;
+            if (!string.IsNullOrWhiteSpace(source.PreferentialTariffRate)) target.PreferentialTariffRate = source.PreferentialTariffRate;
+            if (!string.IsNullOrWhiteSpace(source.ExportTariffRate)) target.ExportTariffRate = source.ExportTariffRate;
+            if (!string.IsNullOrWhiteSpace(source.ConsumptionTaxRate)) target.ConsumptionTaxRate = source.ConsumptionTaxRate;
+            if (!string.IsNullOrWhiteSpace(source.ValueAddedTaxRate)) target.ValueAddedTaxRate = source.ValueAddedTaxRate;
+            if (!string.IsNullOrWhiteSpace(source.Notes)) target.Notes = source.Notes;
             target.SupervisionConditions = source.SupervisionConditions;
             target.InspectionCategory = source.InspectionCategory;
             target.Elements = source.Elements;

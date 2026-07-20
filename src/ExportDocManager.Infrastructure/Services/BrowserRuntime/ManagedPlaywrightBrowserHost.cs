@@ -196,7 +196,14 @@ namespace ExportDocManager.Services.BrowserRuntime
                 _process.Dispose();
                 _process = null;
             }
-            if (!string.IsNullOrWhiteSpace(_profileRoot)) AtomicFileHelper.TryDeleteDirectory(_profileRoot);
+            if (!string.IsNullOrWhiteSpace(_profileRoot))
+            {
+                for (int attempt = 0; attempt < 5 && Directory.Exists(_profileRoot); attempt++)
+                {
+                    AtomicFileHelper.TryDeleteDirectory(_profileRoot);
+                    if (Directory.Exists(_profileRoot)) await Task.Delay(200).ConfigureAwait(false);
+                }
+            }
             _profileRoot = null;
             _useCount = 0;
         }

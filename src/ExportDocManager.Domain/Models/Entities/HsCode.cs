@@ -27,6 +27,12 @@ namespace ExportDocManager.Models.Entities
         private int? _effectiveYear;
         private DateTime? _lastVerifiedAt;
         private string _replacedByCodes;
+        private string _normalTariffRate;
+        private string _preferentialTariffRate;
+        private string _exportTariffRate;
+        private string _consumptionTaxRate;
+        private string _valueAddedTaxRate;
+        private string _notes;
 
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -165,6 +171,48 @@ namespace ExportDocManager.Models.Entities
         {
             get => _replacedByCodes;
             set => SetProperty(ref _replacedByCodes, value?.Trim());
+        }
+
+        [MaxLength(50)]
+        public string NormalTariffRate
+        {
+            get => _normalTariffRate;
+            set => SetProperty(ref _normalTariffRate, value?.Trim());
+        }
+
+        [MaxLength(50)]
+        public string PreferentialTariffRate
+        {
+            get => _preferentialTariffRate;
+            set => SetProperty(ref _preferentialTariffRate, value?.Trim());
+        }
+
+        [MaxLength(50)]
+        public string ExportTariffRate
+        {
+            get => _exportTariffRate;
+            set => SetProperty(ref _exportTariffRate, value?.Trim());
+        }
+
+        [MaxLength(50)]
+        public string ConsumptionTaxRate
+        {
+            get => _consumptionTaxRate;
+            set => SetProperty(ref _consumptionTaxRate, value?.Trim());
+        }
+
+        [MaxLength(50)]
+        public string ValueAddedTaxRate
+        {
+            get => _valueAddedTaxRate;
+            set => SetProperty(ref _valueAddedTaxRate, value?.Trim());
+        }
+
+        [MaxLength(1000)]
+        public string Notes
+        {
+            get => _notes;
+            set => SetProperty(ref _notes, value?.Trim());
         }
 
         [NotMapped]
