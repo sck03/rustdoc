@@ -114,6 +114,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddSingleton<BrowserExecutableResolver>();
             services.AddSingleton<ManagedPlaywrightBrowserHost>();
             services.AddSingleton<IHsCodeRemoteProvider, I5a6HsCodeProvider>();
+            services.AddScoped<IHsCodeKnowledgeService, HsCodeKnowledgeService>();
             services.AddScoped<IHsCodeService, HsCodeService>();
             services.AddScoped<IPdfMergeService, PdfMergeService>();
             services.AddScoped<IEmailService, SmtpEmailService>();

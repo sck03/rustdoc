@@ -41,6 +41,7 @@ const MasterDataEditorRoute = lazyNamed(
   () => import("./features/master-data/MasterDataPages.tsx"),
   "MasterDataEditorRoute",
 );
+const HsCodeKnowledgePage = lazyNamed(() => import("./features/master-data/HsCodeKnowledgePage.tsx"), "HsCodeKnowledgePage");
 const SingleWindowRoute = lazyNamed(() => import("./features/single-window/SingleWindowPages.tsx"), "SingleWindowRoute");
 const SingleWindowOperationCenterPage = lazyNamed(
   () => import("./features/single-window/SingleWindowPages.tsx"),
@@ -419,6 +420,7 @@ function App() {
               <Route path="/payments/new" element={<PaymentEditorPage client={client} mode="new" />} />
               <Route path="/payments/:paymentId" element={<PaymentEditorPage client={client} mode="edit" />} />
               <Route path="/master-data" element={<MasterDataRoute client={client} />} />
+              <Route path="/master-data/hs-knowledge/:section" element={<HsCodeKnowledgePage client={client} />} />
               <Route path="/master-data/:entityKey" element={<MasterDataRoute client={client} />} />
               <Route path="/master-data/:entityKey/new" element={<MasterDataEditorRoute client={client} mode="new" />} />
               <Route path="/master-data/:entityKey/:recordKey" element={<MasterDataEditorRoute client={client} mode="edit" />} />

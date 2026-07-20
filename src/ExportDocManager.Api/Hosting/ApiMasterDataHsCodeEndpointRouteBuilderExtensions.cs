@@ -81,6 +81,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IHsCodeService hsCodeService,
+                IHsCodeKnowledgeService knowledgeService,
                 IAppPathProvider pathProvider,
                 ApiHsCodeImportCommitRequest request,
                 CancellationToken cancellationToken) =>
@@ -96,6 +97,7 @@ namespace ExportDocManager.Api.Hosting
                     var preview = await System.Text.Json.JsonSerializer.DeserializeAsync<HsCodeImportPreview>(input, cancellationToken: cancellationToken)
                         ?? throw new InvalidDataException("HS编码导入预检内容无效。");
                     var result = await hsCodeService.CommitImportAsync(preview, cancellationToken);
+                    await knowledgeService.RefreshReplacementRelationsAsync(preview, cancellationToken);
                     return Results.Ok(new ApiHsCodeImportCommitResponse(
                         true, result.AddedCount, result.UpdatedCount, result.UnchangedCount,
                         result.SuspectedObsoleteCount, result.SkippedCount, result.Message));
@@ -264,6 +266,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IHsCodeService hsCodeService,
+                IHsCodeKnowledgeService knowledgeService,
                 string keyword,
                 CancellationToken cancellationToken) =>
             {
@@ -280,6 +283,7 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     var results = await hsCodeService.SearchRemoteAsync(keyword.Trim(), cancellationToken);
+                    await knowledgeService.CaptureRemoteExamplesAsync(keyword.Trim(), results, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
                     var items = ApiMasterDataDtoFactory.FromHsCodes(results);
                     return Results.Ok(new ApiHsCodeSearchResponse(
@@ -652,6 +656,82 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("ClearAllHsCodes");
+
+            endpoints.MapGet("/api/master-data/hs-knowledge/search", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                string query, int? maxResults, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                return Results.Ok(await service.SearchAsync(query, maxResults ?? 20, cancellationToken));
+            }).WithName("SearchHsCodeKnowledge");
+
+            endpoints.MapGet("/api/master-data/hs-knowledge/examples", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                string keyword, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                int page = Math.Max(pageNumber ?? 1, 1);
+                int size = Math.Clamp(pageSize ?? 50, 1, 200);
+                var items = await service.ListExamplesAsync(keyword, page, size, cancellationToken);
+                int total = await service.CountExamplesAsync(keyword, cancellationToken);
+                return Results.Ok(new { items, totalCount = total, pageNumber = page, pageSize = size });
+            }).WithName("ListHsCodeKnowledgeExamples");
+
+            endpoints.MapPost("/api/master-data/hs-knowledge/examples", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                HsCodeExampleInput request, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                try { return Results.Ok(await service.SaveExampleAsync(request, cancellationToken)); }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+            }).WithName("SaveHsCodeKnowledgeExample");
+
+            endpoints.MapDelete("/api/master-data/hs-knowledge/examples/{id:int}", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                int id, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                return await service.DeleteExampleAsync(id, cancellationToken) ? Results.NoContent() : Results.NotFound();
+            }).WithName("DeleteHsCodeKnowledgeExample");
+
+            endpoints.MapPost("/api/master-data/hs-knowledge/feedback", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                HsCodeKnowledgeFeedbackInput request, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                try { await service.RecordFeedbackAsync(request, cancellationToken); return Results.Ok(new ApiCommandResponse(true, "已记录本次选择，本地推荐会逐步优化。")); }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+            }).WithName("RecordHsCodeKnowledgeFeedback");
+
+            endpoints.MapGet("/api/master-data/hs-knowledge/export", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                DateTimeOffset? since, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                byte[] package = await service.ExportPackageAsync(since, cancellationToken);
+                return Results.File(package, "application/vnd.exportdocmanager.hs-knowledge+zip", $"ExportDocManager-HsLibrary-{DateTime.Now:yyyyMMdd}.edmhs");
+            }).WithName("ExportHsCodeKnowledge");
+
+            endpoints.MapPost("/api/master-data/hs-knowledge/import", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                IAppPathProvider pathProvider, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                string tempRoot = RuntimeCachePathHelper.CreateUniqueDirectory(pathProvider, "HsKnowledgeImports", "knowledge-import");
+                try
+                {
+                    string path = Path.Combine(tempRoot, "library.edmhs");
+                    await using (var output = File.Create(path)) await context.Request.Body.CopyToAsync(output, cancellationToken);
+                    var preview = await service.PreviewPackageAsync(path, cancellationToken);
+                    var result = await service.ImportPackageAsync(preview, cancellationToken);
+                    return Results.Ok(new { preview.FileName, preview.HsCodeCount, preview.ExampleCount, preview.ReplacementCount, preview.FeedbackCount, preview.Warnings, result });
+                }
+                catch (Exception ex) when (ex is InvalidDataException or IOException or InvalidOperationException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                }
+                finally { AtomicFileHelper.TryDeleteDirectory(tempRoot); }
+            }).WithName("ImportHsCodeKnowledge");
         }
 
         private const string RemoteHsCodeDetailResolutionStoragePolicy =

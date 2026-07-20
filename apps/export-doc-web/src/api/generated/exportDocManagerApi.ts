@@ -4189,6 +4189,14 @@ export interface ValidateSettingsRequest {
   body: ApiSettingsValidationRequest;
 }
 
+export interface HsCodeKnowledgeSearchItem { currentCode: string; rawCode: string; name: string; specification: string; standardName: string; resolutionStatus: string; score: number; exampleCount: number; confirmedCount: number; replacementCandidates: string[]; canUse: boolean; }
+export interface HsCodeKnowledgeSearchResponse { query: string; items: HsCodeKnowledgeSearchItem[]; localExampleCount: number; message: string; }
+export interface HsCodeKnowledgeExample { id: number; rawReportedHsCode: string; resolvedCurrentHsCode?: string | null; productName: string; specification?: string | null; source: string; sourceYear?: number | null; resolutionStatus: string; isManuallyVerified: boolean; useCount: number; updatedAt: string; }
+export interface HsCodeKnowledgeExamplePage { items: HsCodeKnowledgeExample[]; totalCount: number; pageNumber: number; pageSize: number; }
+export interface HsCodeKnowledgeExampleInput { id: number; rawReportedHsCode: string; resolvedCurrentHsCode: string; productName: string; specification: string; source: string; sourceYear?: number | null; resolutionStatus: string; isManuallyVerified: boolean; }
+export interface HsCodeKnowledgeFeedbackInput { queryText: string; productName: string; specification: string; candidateCode: string; accepted: boolean; }
+export interface HsCodeKnowledgeImportResponse { fileName: string; hsCodeCount: number; exampleCount: number; replacementCount: number; feedbackCount: number; warnings: string[]; result: { message: string }; }
+
 export type AccessTokenProvider = string | (() => string | undefined | Promise<string | undefined>);
 type QueryValue = string | number | boolean | null | undefined;
 const desktopAccessTokenHeaderName = "X-ExportDocManager-Desktop-Token";
@@ -4232,6 +4240,34 @@ export class ExportDocManagerApiClient {
     } else {
       throw new Error("A fetch implementation is required to use ExportDocManagerApiClient.");
     }
+  }
+
+  public searchHsCodeKnowledge(query: string, maxResults = 20): Promise<HsCodeKnowledgeSearchResponse> {
+    return this.request("GET", "/api/master-data/hs-knowledge/search", { query: { query, maxResults } });
+  }
+
+  public listHsCodeKnowledgeExamples(keyword = "", pageNumber = 1, pageSize = 50): Promise<HsCodeKnowledgeExamplePage> {
+    return this.request("GET", "/api/master-data/hs-knowledge/examples", { query: { keyword, pageNumber, pageSize } });
+  }
+
+  public saveHsCodeKnowledgeExample(body: HsCodeKnowledgeExampleInput): Promise<HsCodeKnowledgeExample> {
+    return this.request("POST", "/api/master-data/hs-knowledge/examples", { body });
+  }
+
+  public deleteHsCodeKnowledgeExample(id: number): Promise<void> {
+    return this.request("DELETE", `/api/master-data/hs-knowledge/examples/${encodePath(id)}`);
+  }
+
+  public recordHsCodeKnowledgeFeedback(body: HsCodeKnowledgeFeedbackInput): Promise<ApiCommandResponse> {
+    return this.request("POST", "/api/master-data/hs-knowledge/feedback", { body });
+  }
+
+  public importHsCodeKnowledge(file: Blob): Promise<HsCodeKnowledgeImportResponse> {
+    return this.request("POST", "/api/master-data/hs-knowledge/import", { body: file, init: { headers: { "Content-Type": "application/octet-stream" } } });
+  }
+
+  public exportHsCodeKnowledge(since?: string): Promise<Blob> {
+    return this.request("GET", "/api/master-data/hs-knowledge/export", { query: { since } });
   }
 
   public analyzeContainerPacking(request: AnalyzeContainerPackingRequest, init?: RequestInit): Promise<ApiContainerPackingAnalyzeResponse> {

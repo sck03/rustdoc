@@ -25,7 +25,6 @@ buildMasterDataDisplayName,
 formatColumnValue
 } from "./masterDataModel.ts";
 
-import { HsCodeToolsPanel } from "./HsCodeToolsPanel.tsx";
 import { masterDataConfigs } from "./masterDataConfigs.ts";
 
 export function MasterDataListPage({
@@ -290,14 +289,7 @@ export function MasterDataListPage({
       {message ? <div className="alert">{message}</div> : null}
       {successMessage ? <div className="success-alert">{successMessage}</div> : null}
 
-      {config.key === "hs-codes" ? (
-        <HsCodeToolsPanel
-          client={client}
-          disabled={!canOperate || isBusy}
-          keyword={keyword}
-          onLocalDataChanged={handleLocalHsCodesChanged}
-        />
-      ) : null}
+      {config.key === "hs-codes" ? <div className="hs-knowledge-entry"><div><strong>HS 编码知识中心</strong><span>智能查询、申报实例、年度税则、联网补充与换机迁移已拆分为独立任务。</span></div><button className="command-button" type="button" onClick={() => navigate("/master-data/hs-knowledge/search")}>打开知识中心</button></div> : null}
 
       <MasterDataTable
         config={config}
@@ -491,4 +483,3 @@ function MasterDataTable({
     </div>
   );
 }
-
