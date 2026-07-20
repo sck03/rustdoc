@@ -4196,6 +4196,7 @@ export interface HsCodeKnowledgeExamplePage { items: HsCodeKnowledgeExample[]; t
 export interface HsCodeKnowledgeExampleInput { id: number; rawReportedHsCode: string; resolvedCurrentHsCode: string; productName: string; specification: string; source: string; sourceYear?: number | null; resolutionStatus: string; isManuallyVerified: boolean; }
 export interface HsCodeKnowledgeFeedbackInput { queryText: string; productName: string; specification: string; candidateCode: string; accepted: boolean; }
 export interface HsCodeHistoryLearningCandidate { fingerprint: string; rawCode: string; currentCode: string; productName: string; specification: string; source: string; sourceCount: number; resolutionStatus: string; replacementCandidates: string[]; canConfirm: boolean; }
+export interface HsCodeRemoteCandidate { id: number; queryText: string; rawReportedHsCode: string; suggestedCurrentHsCode?: string | null; productName: string; specification?: string | null; source: string; reviewStatus: string; resolutionStatus: string; seenCount: number; lastSeenAt: string; }
 export interface HsCodeKnowledgeImportResponse { fileName: string; hsCodeCount: number; exampleCount: number; replacementCount: number; feedbackCount: number; warnings: string[]; result: { message: string }; }
 
 export type AccessTokenProvider = string | (() => string | undefined | Promise<string | undefined>);
@@ -4265,6 +4266,14 @@ export class ExportDocManagerApiClient {
 
   public discoverHsCodeHistoryCandidates(keyword = "", maxResults = 200): Promise<HsCodeHistoryLearningCandidate[]> {
     return this.request("GET", "/api/master-data/hs-knowledge/history-candidates", { query: { keyword, maxResults } });
+  }
+
+  public listHsCodeRemoteCandidates(status = "Pending", maxResults = 200): Promise<HsCodeRemoteCandidate[]> {
+    return this.request("GET", "/api/master-data/hs-knowledge/remote-candidates", { query: { status, maxResults } });
+  }
+
+  public reviewHsCodeRemoteCandidate(body: { id: number; currentCode: string; confirmed: boolean }): Promise<ApiCommandResponse> {
+    return this.request("POST", "/api/master-data/hs-knowledge/remote-candidates/review", { body });
   }
 
   public importHsCodeKnowledge(file: Blob): Promise<HsCodeKnowledgeImportResponse> {

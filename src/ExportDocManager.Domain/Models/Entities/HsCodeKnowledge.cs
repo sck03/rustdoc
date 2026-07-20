@@ -52,4 +52,24 @@ namespace ExportDocManager.Models.Entities
         public DateTime? LastConfirmedAt { get; set; }
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
+
+    [Table("HsCodeRemoteCandidates")]
+    public sealed class HsCodeRemoteCandidate
+    {
+        [Key] public int Id { get; set; }
+        [Required, MaxLength(64)] public string Fingerprint { get; set; } = string.Empty;
+        [Required, MaxLength(500)] public string QueryText { get; set; } = string.Empty;
+        [Required, MaxLength(20)] public string RawReportedHsCode { get; set; } = string.Empty;
+        [MaxLength(20)] public string SuggestedCurrentHsCode { get; set; }
+        [Required, MaxLength(300)] public string ProductName { get; set; } = string.Empty;
+        [MaxLength(1500)] public string Specification { get; set; }
+        [Required, MaxLength(100)] public string Source { get; set; } = "i5a6";
+        [MaxLength(1000)] public string SourceUrl { get; set; }
+        [Required, MaxLength(30)] public string ReviewStatus { get; set; } = "Pending";
+        [Required, MaxLength(30)] public string ResolutionStatus { get; set; } = "Unresolved";
+        public int SeenCount { get; set; } = 1;
+        public DateTime FirstSeenAt { get; set; } = DateTime.UtcNow;
+        public DateTime LastSeenAt { get; set; } = DateTime.UtcNow;
+        public DateTime? ReviewedAt { get; set; }
+    }
 }

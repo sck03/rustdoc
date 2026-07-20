@@ -69,6 +69,27 @@ public sealed class HsCodeKnowledgeServiceTests
     }
 
     [Fact]
+    public async Task RemoteResults_ShouldStayInCandidatePoolUntilUserConfirms()
+    {
+        using var factory = new SqliteFactory();
+        await using (var context = factory.CreateDbContext())
+        {
+            context.HsCodes.Add(new HsCode { Code = "6109100090", Name = "棉制T恤衫", Status = "Active" });
+            await context.SaveChangesAsync();
+        }
+        var service = new HsCodeKnowledgeService(factory);
+
+        await service.CaptureRemoteExamplesAsync("男士全棉短袖", [new HsCode { Code = "6109100090", Name = "男士全棉圆领短袖", Description = "针织，100%棉", DetailUrl = "" }]);
+
+        Assert.Equal(0, await service.CountExamplesAsync(string.Empty));
+        var candidate = Assert.Single(await service.ListRemoteCandidatesAsync("Pending"));
+        Assert.Equal("6109100090", candidate.SuggestedCurrentHsCode);
+        await service.ReviewRemoteCandidateAsync(new HsCodeRemoteCandidateReviewInput(candidate.Id, "6109100090", true));
+        Assert.Empty(await service.ListRemoteCandidatesAsync("Pending"));
+        Assert.Equal(1, await service.CountExamplesAsync(string.Empty));
+    }
+
+    [Fact]
     public async Task Search_ShouldMatchOrdinaryNameAndResolveSingleObsoleteCode()
     {
         using var factory = new SqliteFactory();

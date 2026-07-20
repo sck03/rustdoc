@@ -711,6 +711,23 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Ok(await service.DiscoverHistoryCandidatesAsync(keyword, maxResults ?? 200, cancellationToken));
             }).WithName("DiscoverHsCodeHistoryCandidates");
 
+            endpoints.MapGet("/api/master-data/hs-knowledge/remote-candidates", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                string status, int? maxResults, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                return Results.Ok(await service.ListRemoteCandidatesAsync(status, maxResults ?? 200, cancellationToken));
+            }).WithName("ListHsCodeRemoteCandidates");
+
+            endpoints.MapPost("/api/master-data/hs-knowledge/remote-candidates/review", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                HsCodeRemoteCandidateReviewInput request, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                try { return await service.ReviewRemoteCandidateAsync(request, cancellationToken) ? Results.Ok(new ApiCommandResponse(true, request.Confirmed ? "已确认并加入正式申报实例库。" : "已忽略该联网候选。")) : Results.NotFound(); }
+                catch (InvalidOperationException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+            }).WithName("ReviewHsCodeRemoteCandidate");
+
             endpoints.MapGet("/api/master-data/hs-knowledge/export", async (
                 HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
                 DateTimeOffset? since, CancellationToken cancellationToken) =>

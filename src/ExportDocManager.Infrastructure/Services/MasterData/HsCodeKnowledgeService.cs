@@ -270,31 +270,64 @@ namespace ExportDocManager.Services.MasterData
                 .ToList();
             if (examples.Count == 0) return 0;
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var codes = await context.HsCodes.AsNoTracking().ToListAsync(cancellationToken);
+            var codeMap = codes.Where(item => !string.IsNullOrWhiteSpace(item.NormalizedCode)).GroupBy(item => item.NormalizedCode, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var relations = await context.HsCodeReplacementRelations.AsNoTracking().ToListAsync(cancellationToken);
             DateTime now = DateTime.UtcNow;
             int added = 0;
             foreach (var item in examples)
             {
                 string code = HsCodeTextHelper.NormalizeCode(item.Code);
                 string fingerprint = BuildFingerprint(code, item.Name, item.Description);
-                var existing = await context.HsCodeDeclarationExamples.FirstOrDefaultAsync(row => row.Fingerprint == fingerprint, cancellationToken);
+                var existing = await context.HsCodeRemoteCandidates.FirstOrDefaultAsync(row => row.Fingerprint == fingerprint, cancellationToken);
                 if (existing == null)
                 {
-                    existing = new HsCodeDeclarationExample
+                    existing = new HsCodeRemoteCandidate
                     {
-                        Fingerprint = fingerprint, RawReportedHsCode = code, ProductName = item.Name.Trim(),
-                        Specification = (item.Description ?? string.Empty).Trim(), Source = "i5a6",
-                        SourceYear = DateTime.Now.Year, CreatedAt = now
+                        Fingerprint = fingerprint, QueryText = (query ?? string.Empty).Trim(), RawReportedHsCode = code,
+                        ProductName = item.Name.Trim(), Specification = (item.Description ?? string.Empty).Trim(),
+                        Source = "i5a6", SourceUrl = item.DetailUrl, ReviewStatus = "Pending", FirstSeenAt = now
                     };
-                    await context.HsCodeDeclarationExamples.AddAsync(existing, cancellationToken);
+                    await context.HsCodeRemoteCandidates.AddAsync(existing, cancellationToken);
                     added++;
                 }
-                existing.SearchText = NormalizeSearchText($"{query} {existing.ProductName} {existing.Specification}");
-                existing.UpdatedAt = now;
-                existing.ResolutionStatus = "Unresolved";
+                else existing.SeenCount++;
+                var resolution = ResolveCurrentCode(new HsCodeDeclarationExample { RawReportedHsCode = code }, codeMap, relations);
+                existing.QueryText = (query ?? string.Empty).Trim(); existing.LastSeenAt = now;
+                existing.SuggestedCurrentHsCode = resolution.CurrentCode; existing.ResolutionStatus = resolution.Status;
             }
             await context.SaveChangesAsync(cancellationToken);
-            await ResolveExamplesAsync(context, cancellationToken);
             return added;
+        }
+
+        public async Task<IReadOnlyList<HsCodeRemoteCandidate>> ListRemoteCandidatesAsync(
+            string reviewStatus, int maxResults = 200, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            string status = string.IsNullOrWhiteSpace(reviewStatus) ? "Pending" : reviewStatus.Trim();
+            return await context.HsCodeRemoteCandidates.AsNoTracking().Where(item => item.ReviewStatus == status)
+                .OrderByDescending(item => item.LastSeenAt).Take(Math.Clamp(maxResults, 1, 1000)).ToListAsync(cancellationToken);
+        }
+
+        public async Task<bool> ReviewRemoteCandidateAsync(HsCodeRemoteCandidateReviewInput input, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(input);
+            await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var candidate = await context.HsCodeRemoteCandidates.FirstOrDefaultAsync(item => item.Id == input.Id, cancellationToken);
+            if (candidate == null) return false;
+            DateTime now = DateTime.UtcNow;
+            if (!input.Confirmed)
+            {
+                candidate.ReviewStatus = "Ignored"; candidate.ReviewedAt = now;
+                await context.SaveChangesAsync(cancellationToken); return true;
+            }
+            string currentCode = HsCodeTextHelper.NormalizeCode(input.CurrentCode);
+            bool active = await context.HsCodes.AsNoTracking().AnyAsync(item => item.NormalizedCode == currentCode && item.Status == "Active", cancellationToken);
+            if (!active) throw new InvalidOperationException("确认前必须选择当前税则中有效的HS编码。");
+            await UpsertExampleInContextAsync(context, new HsCodeExampleInput(0, candidate.RawReportedHsCode, currentCode,
+                candidate.ProductName, candidate.Specification, $"RemoteConfirmed:{candidate.Source}", DateTime.Now.Year, "ManuallyVerified", true), now, cancellationToken);
+            candidate.SuggestedCurrentHsCode = currentCode; candidate.ReviewStatus = "Confirmed"; candidate.ReviewedAt = now;
+            await context.SaveChangesAsync(cancellationToken); return true;
         }
 
         public async Task RefreshReplacementRelationsAsync(HsCodeImportPreview preview, CancellationToken cancellationToken = default)
@@ -539,7 +572,7 @@ namespace ExportDocManager.Services.MasterData
                 example = new HsCodeDeclarationExample { Fingerprint = fingerprint, CreatedAt = now };
                 await context.HsCodeDeclarationExamples.AddAsync(example, cancellationToken);
             }
-            example.RawReportedHsCode = code; example.ResolvedCurrentHsCode = code; example.ProductName = name;
+            example.RawReportedHsCode = code; example.ResolvedCurrentHsCode = HsCodeTextHelper.NormalizeCode(input.ResolvedCurrentHsCode); example.ProductName = name;
             example.Specification = (input.Specification ?? string.Empty).Trim(); example.SearchText = NormalizeSearchText($"{name} {input.Specification}");
             example.Source = "UserConfirmed"; example.SourceYear = DateTime.Now.Year; example.ResolutionStatus = "ManuallyVerified";
             example.IsManuallyVerified = true; example.UseCount++; example.LastUsedAt = now; example.UpdatedAt = now;

@@ -19,6 +19,7 @@ namespace ExportDocManager.DataAccess
         public DbSet<HsCodeDeclarationExample> HsCodeDeclarationExamples { get; set; }
         public DbSet<HsCodeReplacementRelation> HsCodeReplacementRelations { get; set; }
         public DbSet<HsCodeSearchFeedback> HsCodeSearchFeedback { get; set; }
+        public DbSet<HsCodeRemoteCandidate> HsCodeRemoteCandidates { get; set; }
         public DbSet<Port> Ports { get; set; }
         public DbSet<Unit> Units { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
@@ -204,6 +205,9 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<HsCodeReplacementRelation>().HasIndex(item => item.OldCode);
             modelBuilder.Entity<HsCodeSearchFeedback>().HasIndex(item => item.Fingerprint).IsUnique();
             modelBuilder.Entity<HsCodeSearchFeedback>().HasIndex(item => item.CandidateCode);
+            modelBuilder.Entity<HsCodeRemoteCandidate>().HasIndex(item => item.Fingerprint).IsUnique();
+            modelBuilder.Entity<HsCodeRemoteCandidate>().HasIndex(item => new { item.ReviewStatus, item.LastSeenAt });
+            modelBuilder.Entity<HsCodeRemoteCandidate>().HasIndex(item => item.RawReportedHsCode);
 
             modelBuilder.Entity<User>().HasIndex(u => u.Username).IsUnique();
             modelBuilder.Entity<User>().HasIndex(u => u.PermissionTemplateId);

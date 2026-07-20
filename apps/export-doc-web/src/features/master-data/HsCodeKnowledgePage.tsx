@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, CloudDownload, Database, Download, GraduationCap, Search, Sparkles, Upload } from "lucide-react";
+import { BookOpen, CloudDownload, Database, Download, GraduationCap, RefreshCw, Search, Sparkles, Upload } from "lucide-react";
 import { type FormEvent, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import type { ExportDocManagerApiClient, HsCodeKnowledgeExampleInput } from "../../api/index.ts";
@@ -25,8 +25,15 @@ export function HsCodeKnowledgePage({ client }: { client: ExportDocManagerApiCli
     {section === "history" ? <HistoryLearning client={client}/> : null}
     {section === "transfer" ? <KnowledgeTransfer client={client}/> : null}
     {section === "annual" ? <div className="knowledge-task-card"><p>导入新年度完整税则前先预检差异，过期编码不会直接作为可用编码推荐。</p><HsCodeToolsPanel mode="import" client={client} disabled={false} keyword="" onLocalDataChanged={async () => undefined}/></div> : null}
-    {section === "online" ? <div className="knowledge-task-card"><p>联网结果只作为补充资料；申报实例会沉淀到本地，后续查询不依赖网页持续可用。</p><HsCodeToolsPanel mode="remote" client={client} disabled={false} keyword="" onLocalDataChanged={async () => undefined}/></div> : null}
+    {section === "online" ? <div className="knowledge-task-card"><p>联网结果只进入待审核候选池，不参与正式推荐。确认当前有效编码后，才会加入本公司的申报实例库。</p><HsCodeToolsPanel mode="remote" client={client} disabled={false} keyword="" onLocalDataChanged={async () => undefined}/><RemoteCandidateReview client={client}/></div> : null}
   </section>;
+}
+
+function RemoteCandidateReview({ client }: { client: ExportDocManagerApiClient }) {
+  const queryClient = useQueryClient();
+  const candidates = useQuery({ queryKey: ["hs-remote-candidates", "Pending"], queryFn: () => client.listHsCodeRemoteCandidates("Pending") });
+  const review = useMutation({ mutationFn: (value: { id: number; code: string; confirmed: boolean }) => client.reviewHsCodeRemoteCandidate({ id: value.id, currentCode: value.code, confirmed: value.confirmed }), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["hs-remote-candidates"] }); void queryClient.invalidateQueries({ queryKey: ["hs-knowledge-examples"] }); } });
+  return <section className="remote-candidate-review"><div className="section-heading"><div><h2>联网候选审核</h2><p>查询后点击刷新。待审核记录不会参与本地智能推荐。</p></div><button className="secondary-button" onClick={() => void candidates.refetch()}><RefreshCw size={16}/>刷新候选</button></div><div className="knowledge-table">{candidates.data?.map(item => <article key={item.id}><div><strong>{item.productName}</strong><span>{item.rawReportedHsCode}{item.suggestedCurrentHsCode && item.suggestedCurrentHsCode !== item.rawReportedHsCode ? ` → ${item.suggestedCurrentHsCode}` : ""}</span><p>{item.specification || "暂无规格"}</p><small>查询词：{item.queryText} · 出现 {item.seenCount} 次 · {item.source}</small></div><div><span className="status-pill">{item.resolutionStatus}</span><button className="command-button" disabled={!item.suggestedCurrentHsCode || review.isPending} onClick={() => review.mutate({ id:item.id, code:item.suggestedCurrentHsCode ?? "", confirmed:true })}>{item.suggestedCurrentHsCode ? "确认加入" : "需选择有效编码"}</button><button className="text-button" disabled={review.isPending} onClick={() => review.mutate({ id:item.id, code:"", confirmed:false })}>忽略</button></div></article>)}</div>{candidates.data?.length === 0 ? <div className="empty-guidance"><strong>暂无待审核联网实例</strong><span>先在上方联网查询，再刷新候选列表。</span></div> : null}</section>;
 }
 
 function HistoryLearning({ client }: { client: ExportDocManagerApiClient }) {
