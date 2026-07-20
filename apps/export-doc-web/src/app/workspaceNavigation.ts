@@ -147,7 +147,7 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
 ];
 
 export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
-  const enabledModules = capabilities.enabledModules?.length
+  const enabledModules = Array.isArray(capabilities.enabledModules)
     ? new Set(capabilities.enabledModules.map((moduleKey) => moduleKey.toLowerCase()))
     : null;
   return workspaceNavGroups

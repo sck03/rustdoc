@@ -5,6 +5,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import type { ExportDocManagerApiClient, HsCodeKnowledgeExampleInput } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { HsCodeToolsPanel } from "./HsCodeToolsPanel.tsx";
+import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 
 const sections = [
   ["search", "智能查询", Search], ["examples", "申报实例库", BookOpen],
@@ -14,18 +15,20 @@ const sections = [
 
 export function HsCodeKnowledgePage({ client }: { client: ExportDocManagerApiClient }) {
   const { section = "search" } = useParams();
+  const permission = useModulePermission("document.master-data");
   if (!sections.some(([key]) => key === section)) return <Navigate to="/master-data/hs-knowledge/search" replace />;
-  return <section className="work-surface hs-knowledge-surface">
+  return <section className={`work-surface hs-knowledge-surface ${permission.canOperate ? "" : "hs-knowledge-readonly"}`}>
     <header className="page-heading"><div><span className="eyebrow">HS KNOWLEDGE CENTER</span><h1>HS 编码知识中心</h1><p>先查询、再确认，系统会保留申报经验并自动识别过期编码。</p></div><Link className="secondary-button" to="/master-data/hs-codes">返回标准编码库</Link></header>
     <nav className="hs-knowledge-nav" aria-label="HS知识中心功能">
       {sections.map(([key, label, Icon]) => <Link key={key} className={section === key ? "active" : ""} to={`/master-data/hs-knowledge/${key}`}><Icon size={18}/><span>{label}</span></Link>)}
     </nav>
+    {!permission.canOperate ? <div className="permission-readonly-notice">当前权限模板只允许查询和查看 HS 知识库，导入、确认、编辑和删除操作已禁用。</div> : null}
     {section === "search" ? <KnowledgeSearch client={client}/> : null}
     {section === "examples" ? <ExampleLibrary client={client}/> : null}
     {section === "history" ? <HistoryLearning client={client}/> : null}
     {section === "transfer" ? <KnowledgeTransfer client={client}/> : null}
-    {section === "annual" ? <div className="knowledge-task-card"><p>导入新年度完整税则前先预检差异，过期编码不会直接作为可用编码推荐。</p><HsCodeToolsPanel mode="import" client={client} disabled={false} keyword="" onLocalDataChanged={async () => undefined}/></div> : null}
-    {section === "online" ? <div className="knowledge-task-card"><p>联网结果只进入待审核候选池，不参与正式推荐。确认当前有效编码后，才会加入本公司的申报实例库。</p><HsCodeToolsPanel mode="remote" client={client} disabled={false} keyword="" onLocalDataChanged={async () => undefined}/><RemoteCandidateReview client={client}/></div> : null}
+    {section === "annual" ? <div className="knowledge-task-card"><p>导入新年度完整税则前先预检差异，过期编码不会直接作为可用编码推荐。</p><HsCodeToolsPanel mode="import" client={client} disabled={!permission.canOperate} keyword="" onLocalDataChanged={async () => undefined}/></div> : null}
+    {section === "online" ? <div className="knowledge-task-card"><p>联网结果只进入待审核候选池，不参与正式推荐。确认当前有效编码后，才会加入本公司的申报实例库。</p><HsCodeToolsPanel mode="remote" client={client} disabled={!permission.canOperate} keyword="" onLocalDataChanged={async () => undefined}/><RemoteCandidateReview client={client}/></div> : null}
   </section>;
 }
 

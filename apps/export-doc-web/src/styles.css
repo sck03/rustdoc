@@ -846,6 +846,14 @@ tbody tr:hover {
 }
 .hs-knowledge-surface input::placeholder,
 .hs-knowledge-surface textarea::placeholder { color: #7b8b93; opacity: 1; }
+.hs-knowledge-readonly .knowledge-score button,
+.hs-knowledge-readonly .remote-candidate-review article > div:last-child button,
+.hs-knowledge-readonly .knowledge-table article > div:last-child button,
+.hs-knowledge-readonly .section-heading .command-button,
+.hs-knowledge-readonly .knowledge-editor,
+.hs-knowledge-readonly .knowledge-task-grid article:nth-of-type(2) .command-button {
+  display: none;
+}
 .hs-code-import-source-actions { display: flex; gap: 10px; margin-top: 18px; }
 .warning-note { margin-top: 12px; padding: 10px 12px; color: #7c4a03; background: #fff8e8; border: 1px solid #f1d59c; border-radius: 8px; font-size: 12px; }
 .hs-code-preview { display: grid; gap: 12px; }

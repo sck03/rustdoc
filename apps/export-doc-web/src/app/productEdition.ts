@@ -57,7 +57,9 @@ export function getDefaultWorkspaceRoute(capabilities: {
     if (enabled.has("document.payments")) return "/payments";
     if (enabled.has("document.query")) return "/query/invoices";
     if (enabled.has("system.about")) return "/system/about";
+    return "/access-denied";
   }
+  if (Array.isArray(capabilities.enabledModules)) return "/access-denied";
   return capabilities.canUseSalesWorkspace === true && capabilities.canUseDocumentWorkspace !== true
     ? "/crm/dashboard"
     : "/dashboard";

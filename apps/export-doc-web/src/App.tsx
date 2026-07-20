@@ -17,7 +17,7 @@ import { readStoredJson, removeStoredValue, writeStoredJson } from "./ui/browser
 import { readApiError } from "./ui/formUtils.ts";
 import { useConfirmUnsavedChanges } from "./ui/unsavedChangesGuard.tsx";
 import { WorkspaceShell } from "./app/WorkspaceShell.tsx";
-import { hasModulePermission, PermissionAccessProvider } from "./app/PermissionAccessContext.tsx";
+import { hasModulePermission, hasRouteModulePermission, PermissionAccessProvider } from "./app/PermissionAccessContext.tsx";
 import { getRequiredModule, getRequiredRouteAccessLevel, getRequiredWorkspace, isAdminOnlyRoute, isDashboardRoute, isDesktopOnlyRoute, isFullEditionOnlyRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
 import {
   getDefaultWorkspaceRoute,
@@ -238,12 +238,13 @@ function App() {
         ? session.user.capabilities.canUseDocumentWorkspace
         : true;
     const requiredModule = getRequiredModule(location.pathname);
-    const enabledModules = session.user.capabilities.enabledModules ?? [];
     const requiredAccessLevel = getRequiredRouteAccessLevel(location.pathname);
-    const moduleAllowed = !requiredModule ||
-      (session.user.capabilities.moduleAccess?.length
-        ? hasModulePermission(session.user.capabilities.moduleAccess, requiredModule, requiredAccessLevel)
-        : enabledModules.length === 0 || enabledModules.some((moduleKey) => moduleKey.toLowerCase() === requiredModule.toLowerCase()));
+    const moduleAllowed = !requiredModule || hasRouteModulePermission(
+      session.user.capabilities.moduleAccess,
+      session.user.capabilities.enabledModules,
+      requiredModule,
+      requiredAccessLevel,
+    );
     if (!workspaceAllowed || !moduleAllowed) {
       setMessage("当前产品版本或权限模板未启用该模块。");
       navigate(getDefaultWorkspaceRoute(session.user.capabilities), { replace: true });
@@ -470,6 +471,7 @@ function App() {
               <Route path="/system/update" element={<UpdateCenterPage />} />
               <Route path="/system/license" element={<LicensePage client={client} />} />
               <Route path="/system/about" element={<AboutPage client={client} />} />
+              <Route path="/access-denied" element={<NoModuleAccessPage />} />
               <Route
                 path="/audit-logs"
                 element={
@@ -511,6 +513,17 @@ function RouteLoadingPanel() {
   return (
     <section className="work-surface">
       <div className="loading-panel">正在加载页面...</div>
+    </section>
+  );
+}
+
+function NoModuleAccessPage() {
+  return (
+    <section className="work-surface">
+      <div className="empty-guidance">
+        <strong>当前账号尚未分配可用模块</strong>
+        <span>请联系系统管理员启用权限模板或重新分配岗位权限。账号本身仍可安全退出登录。</span>
+      </div>
     </section>
   );
 }

@@ -63,6 +63,7 @@ const financeModules = [
   "system.about",
 ];
 const financeGroups = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: true, enabledModules: financeModules });
+const noPermissionGroups = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: false, canUseSalesWorkspace: false, enabledModules: [] });
 const financeRoutes = financeGroups.flatMap((group) => group.items).map((item) => item.to);
 assert(!userGroups.flatMap((group) => group.items).some((item) => item.to === "/audit-logs"), "audit hidden for normal user");
 assert(!userGroups.flatMap((group) => group.items).some((item) => item.to === "/crm/follow-ups"), "sales hidden for document user");
@@ -92,6 +93,7 @@ assert(financeRoutes.includes("/tools/exchange-rates"), "finance exchange rate v
 assert(financeRoutes.includes("/tools/email"), "finance email visible");
 assert(financeRoutes.includes("/system/about"), "finance about visible");
 assert(!financeRoutes.some((route) => ["/dashboard", "/invoices", "/master-data", "/tools/excel", "/tools/container-packing", "/crm/dashboard"].includes(route)), "finance hidden modules stay hidden");
+assert(noPermissionGroups.length === 0, "explicit empty permission template exposes no navigation");
 assert(model.getRequiredModule("/payments/8") === "document.payments", "payment route module guard");
 assert(model.getRequiredModule("/crm/follow-ups") === "sales.crm", "sales route module guard");
 assert(model.getRequiredRouteAccessLevel("/invoices/new") === "operate", "new invoice route requires operate");
@@ -100,9 +102,13 @@ assert(model.getRequiredRouteAccessLevel("/single-window/coo/8") === "operate", 
 assert(model.getRequiredRouteAccessLevel("/single-window/acd/8") === "operate", "ACD editor route requires operate");
 assert(model.getRequiredRouteAccessLevel("/invoices/8") === "view", "invoice detail route permits view");
 assert(product.getDefaultWorkspaceRoute({ enabledModules: financeModules }) === "/payments", "finance default route");
+assert(product.getDefaultWorkspaceRoute({ enabledModules: [] }) === "/access-denied", "empty permission template uses access denied route");
 assert(permission.hasModulePermission([{ moduleKey: "document.payments", accessLevel: "view" }], "document.payments", "view"), "view grant permits view");
 assert(!permission.hasModulePermission([{ moduleKey: "document.payments", accessLevel: "view" }], "document.payments", "operate"), "view grant blocks operate");
 assert(permission.hasModulePermission([{ moduleKey: "document.reports", accessLevel: "manage" }], "document.reports", "manage"), "manage grant permits report design");
+assert(!permission.hasRouteModulePermission([], [], "system.about", "view"), "explicit empty grants deny route module");
+assert(permission.hasRouteModulePermission(undefined, undefined, "system.about", "view"), "missing legacy grants retain compatibility");
+assert(!permission.hasRouteModulePermission(undefined, ["document.payments"], "document.payments", "operate"), "legacy enabled module list cannot imply operate access");
 assert(model.isAdminOnlyRoute("/settings"), "settings route requires administrator");
 assert(model.isAdminOnlyRoute("/system/access-control"), "access control route requires administrator");
 assert(model.isFullEditionOnlyRoute("/audit-logs"), "audit route requires full edition");

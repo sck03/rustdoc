@@ -54,6 +54,22 @@ export function hasModulePermission(
     permissionAccessRank(requiredAccessLevel);
 }
 
+export function hasRouteModulePermission(
+  moduleAccess: ApiModuleAccessDto[] | undefined,
+  enabledModules: string[] | undefined,
+  moduleKey: string,
+  requiredAccessLevel: PermissionAccessLevel = "view",
+) {
+  if (Array.isArray(moduleAccess)) {
+    return hasModulePermission(moduleAccess, moduleKey, requiredAccessLevel);
+  }
+  if (Array.isArray(enabledModules)) {
+    return permissionAccessRank(requiredAccessLevel) <= permissionAccessRank("view") &&
+      enabledModules.some((item) => item.toLowerCase() === moduleKey.toLowerCase());
+  }
+  return true;
+}
+
 export function normalizePermissionAccessLevel(value: unknown): PermissionAccessLevel {
   if (typeof value !== "string") return "none";
   const normalized = value.trim().toLowerCase();
