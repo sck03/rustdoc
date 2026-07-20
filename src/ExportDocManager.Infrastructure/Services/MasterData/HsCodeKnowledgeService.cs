@@ -20,7 +20,11 @@ namespace ExportDocManager.Services.MasterData
             ["男士"] = "男式", ["男款"] = "男式", ["MENS"] = "男式", ["MEN'S"] = "男式",
             ["女士"] = "女式", ["女款"] = "女式", ["WOMENS"] = "女式", ["WOMEN'S"] = "女式",
             ["全棉"] = "100%棉", ["纯棉"] = "100%棉", ["COTTON"] = "棉",
-            ["针织物"] = "针织", ["KNITTED"] = "针织", ["钩编"] = "针织"
+            ["针织物"] = "针织", ["KNITTED"] = "针织"
+        };
+        private static readonly IReadOnlyDictionary<string, string> RelatedTerms = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["针织"] = "钩编", ["钩编"] = "针织"
         };
 
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
@@ -45,9 +49,13 @@ namespace ExportDocManager.Services.MasterData
                 .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
             var relations = await context.HsCodeReplacementRelations.AsNoTracking().ToListAsync(cancellationToken);
             string primaryToken = BuildNgrams(normalizedQuery).OrderByDescending(token => token.Length).FirstOrDefault() ?? normalizedQuery;
+            var relatedPair = RelatedTerms.FirstOrDefault(pair => normalizedQuery.Contains(pair.Key, StringComparison.OrdinalIgnoreCase));
+            string relatedToken = string.IsNullOrWhiteSpace(relatedPair.Key) ? string.Empty : NormalizeSearchText(relatedPair.Value);
             var exampleQuery = context.HsCodeDeclarationExamples.AsNoTracking();
             if (!string.IsNullOrWhiteSpace(primaryToken))
-                exampleQuery = exampleQuery.Where(item => item.SearchText.Contains(primaryToken));
+                exampleQuery = string.IsNullOrWhiteSpace(relatedToken)
+                    ? exampleQuery.Where(item => item.SearchText.Contains(primaryToken))
+                    : exampleQuery.Where(item => item.SearchText.Contains(primaryToken) || item.SearchText.Contains(relatedToken));
             var examples = await exampleQuery.OrderByDescending(item => item.IsManuallyVerified)
                 .ThenByDescending(item => item.UseCount).ThenByDescending(item => item.UpdatedAt)
                 .Take(5000).ToListAsync(cancellationToken);
@@ -465,7 +473,8 @@ namespace ExportDocManager.Services.MasterData
             int intersection = queryGrams.Intersect(candidateGrams).Count();
             int denominator = queryGrams.Count + candidateGrams.Count;
             int dice = denominator == 0 ? 0 : (int)Math.Round(intersection * 120d / denominator);
-            return Math.Clamp(Math.Max(score, dice), 0, 90);
+            int relatedBoost = RelatedTerms.Any(pair => query.Contains(pair.Key, StringComparison.OrdinalIgnoreCase) && candidate.Contains(pair.Value, StringComparison.OrdinalIgnoreCase)) ? 12 : 0;
+            return Math.Clamp(Math.Max(score, dice) + relatedBoost, 0, 90);
         }
 
         internal static string NormalizeSearchText(string value)

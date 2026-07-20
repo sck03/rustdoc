@@ -24,7 +24,8 @@ export function HsCodeKnowledgePage({ client }: { client: ExportDocManagerApiCli
     {section === "examples" ? <ExampleLibrary client={client}/> : null}
     {section === "history" ? <HistoryLearning client={client}/> : null}
     {section === "transfer" ? <KnowledgeTransfer client={client}/> : null}
-    {section === "annual" || section === "online" ? <div className="knowledge-task-card"><h2>{section === "annual" ? "年度税则资料" : "联网补充申报实例"}</h2><p>{section === "annual" ? "导入新年度完整税则前先预检差异，过期编码不会直接作为可用编码推荐。" : "联网结果会保存为申报实例；后续优先使用本地知识库，网页改版也不会丢失已积累经验。"}</p><HsCodeToolsPanel client={client} disabled={false} keyword="" onLocalDataChanged={async () => undefined}/></div> : null}
+    {section === "annual" ? <div className="knowledge-task-card"><p>导入新年度完整税则前先预检差异，过期编码不会直接作为可用编码推荐。</p><HsCodeToolsPanel mode="import" client={client} disabled={false} keyword="" onLocalDataChanged={async () => undefined}/></div> : null}
+    {section === "online" ? <div className="knowledge-task-card"><p>联网结果只作为补充资料；申报实例会沉淀到本地，后续查询不依赖网页持续可用。</p><HsCodeToolsPanel mode="remote" client={client} disabled={false} keyword="" onLocalDataChanged={async () => undefined}/></div> : null}
   </section>;
 }
 

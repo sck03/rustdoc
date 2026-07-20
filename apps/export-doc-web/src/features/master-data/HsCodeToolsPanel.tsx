@@ -28,11 +28,13 @@ export function HsCodeToolsPanel({
   disabled,
   keyword,
   onLocalDataChanged,
+  mode = "hub",
 }: {
   client: ExportDocManagerApiClient;
   disabled: boolean;
   keyword: string;
   onLocalDataChanged: () => Promise<void>;
+  mode?: "hub" | "import" | "remote";
 }) {
   const desktopAvailable = isDesktopBridgeAvailable();
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -45,7 +47,7 @@ export function HsCodeToolsPanel({
   const [expandedResultKey, setExpandedResultKey] = useState<string | null>(null);
   const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
   const [clearAllConfirmation, setClearAllConfirmation] = useState("");
-  const [workspace, setWorkspace] = useState<"none" | "import" | "remote">("none");
+  const [workspace, setWorkspace] = useState<"none" | "import" | "remote">(mode === "hub" ? "none" : mode);
   const [importMode, setImportMode] = useState<"Incremental" | "CompleteSnapshot">("Incremental");
   const [importSourceName, setImportSourceName] = useState("");
   const [importEffectiveYear, setImportEffectiveYear] = useState(String(new Date().getFullYear()));
@@ -102,7 +104,7 @@ export function HsCodeToolsPanel({
     onSuccess: async (response) => {
       showSuccess(response.message);
       setImportPreview(null);
-      setWorkspace("none");
+      setWorkspace(mode === "hub" ? "none" : mode);
       await onLocalDataChanged();
     },
     onError: (error) => showError(readApiError(error)),
@@ -404,14 +406,14 @@ export function HsCodeToolsPanel({
     <section className="form-section hs-code-tools" aria-label="HS 编码导入与联网查询">
       <div className="section-header">
         <div>
-          <h2>HS 编码工具</h2>
-          <span>{remoteResultStatus}</span>
+          <h2>{mode === "import" ? "年度税则智能导入" : mode === "remote" ? "联网补充" : "HS 编码工具"}</h2>
+          <span>{mode === "import" ? "识别工作表和字段，预检差异后才写入本地库" : mode === "remote" ? "查询第三方申报实例并沉淀到本地知识库" : remoteResultStatus}</span>
         </div>
       </div>
 
       {message ? <div className={messageType === "error" ? "alert" : "success-alert"}>{message}</div> : null}
 
-      <div className="hs-code-action-hub">
+      {mode === "hub" ? <div className="hs-code-action-hub">
         <button className="hs-code-action-card" type="button" disabled={isBusy} onClick={openImportWorkspace}>
           <FileSpreadsheet size={22} aria-hidden="true" />
           <strong>智能导入</strong>
@@ -427,19 +429,19 @@ export function HsCodeToolsPanel({
           <strong>本地库维护</strong>
           <span>普通修改请打开下方记录；清空整库需要管理员再次确认</span>
         </button>
-      </div>
+      </div> : null}
 
       <input ref={uploadInputRef} type="file" accept=".xlsx,.xlsm" className="visually-hidden" onChange={handleUploadFile} />
 
       {workspace !== "none" ? (
-        <div className="hs-code-workspace-backdrop" role="presentation">
-          <section className="hs-code-workspace" role="dialog" aria-modal="true" aria-label={workspace === "import" ? "HS编码智能导入" : "HS编码联网查询"}>
+        <div className={mode === "hub" ? "hs-code-workspace-backdrop" : "hs-code-inline-workspace"} role="presentation">
+          <section className="hs-code-workspace" role={mode === "hub" ? "dialog" : "region"} aria-modal={mode === "hub" ? true : undefined} aria-label={workspace === "import" ? "HS编码智能导入" : "HS编码联网查询"}>
             <header>
               <div>
                 <strong>{workspace === "import" ? "智能导入向导" : "联网查询"}</strong>
                 <span>{workspace === "import" ? "先分析文件，确认差异后才写入本地库" : "联网结果不会自动覆盖本地资料"}</span>
               </div>
-              <button className="icon-button" type="button" title="关闭" disabled={isBusy} onClick={closeWorkspace}><X size={18} /></button>
+              {mode === "hub" ? <button className="icon-button" type="button" title="关闭" disabled={isBusy} onClick={closeWorkspace}><X size={18} /></button> : null}
             </header>
 
             {workspace === "import" ? (
@@ -473,7 +475,7 @@ export function HsCodeToolsPanel({
         </div>
       ) : null}
 
-      {clearAllConfirmOpen ? (
+      {mode === "hub" && clearAllConfirmOpen ? (
         <form className="hs-code-clear-confirmation" aria-label="HS编码清空确认" onSubmit={submitClearAllLocalHsCodes}>
           <div>
             <strong>清空本地HS编码库</strong>

@@ -29,6 +29,24 @@ public sealed class HsCodeKnowledgeServiceTests
     }
 
     [Fact]
+    public async Task Search_ShouldTreatKnittingAndCrochetAsRelatedButKeepOriginalWording()
+    {
+        using var factory = new SqliteFactory();
+        await using (var context = factory.CreateDbContext())
+        {
+            context.HsCodes.Add(new HsCode { Code = "6110200090", Name = "棉制钩编套头衫", Status = "Active" });
+            await context.SaveChangesAsync();
+        }
+        var service = new HsCodeKnowledgeService(factory);
+        await service.SaveExampleAsync(new HsCodeExampleInput(0, "6110200090", "6110200090", "棉制钩编男式套头衫", "长袖", "Manual", 2026, "Active", true));
+
+        var result = await service.SearchAsync("棉制针织男式套头衫");
+
+        Assert.Equal("6110200090", result.Items.First().CurrentCode);
+        Assert.Contains("钩编", result.Items.First().Name);
+    }
+
+    [Fact]
     public async Task HistoryDiscovery_ShouldRequireExplicitConfirmationBeforeLearning()
     {
         using var factory = new SqliteFactory();

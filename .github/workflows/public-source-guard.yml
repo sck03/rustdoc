@@ -1,8 +1,6 @@
 name: Public source guard
 
 on:
-  push:
-    branches: [main, master]
   workflow_dispatch:
 
 concurrency:
