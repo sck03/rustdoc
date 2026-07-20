@@ -22,6 +22,7 @@ const rootConfigFiles = ["appsettings.json", "local-preferences.json"];
 const runtimeDataDirectories = ["Database", "Files", "Exports", "SingleWindow", "Backups", "Cache", "Config", "Security", "WebView", "Logs"];
 
 const rid = process.env.EXPORTDOCMANAGER_TAURI_RID || detectRuntimeIdentifier();
+const rustTarget = resolveRustTargetTriple(rid);
 const selfContained = (process.env.EXPORTDOCMANAGER_TAURI_SELF_CONTAINED || "true").toLowerCase() !== "false";
 const productEdition = normalizeProductEdition(process.env.EXPORTDOCMANAGER_PRODUCT_EDITION);
 const allowMissingBrowser = (process.env.EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER || "").toLowerCase() === "true";
@@ -139,7 +140,7 @@ console.log(`  resources/${runtimeLayoutManifestFileName}  machine-readable runt
 console.log(`  resources/${productEditionManifestFileName}  build-time product edition manifest`);
 
 async function buildRustOcrSidecar(buildEnv) {
-  const target = rustTargetTripleFromRid(rid);
+  const target = rustTarget;
   if (!target) {
     throw new Error(`No Rust OCR target mapping is defined for ${rid}.`);
   }
@@ -154,7 +155,7 @@ async function buildRustOcrSidecar(buildEnv) {
 }
 
 async function buildRustExcelAnalyzer(buildEnv) {
-  const target = rustTargetTripleFromRid(rid);
+  const target = rustTarget;
   const manifest = path.join(repoRoot, "tools", "excel-analyzer-rs", "Cargo.toml");
   console.log(`Building Rust Excel analyzer for ${target}...`);
   run("cargo", ["build", "--manifest-path", manifest, "--release", "--locked", "--target", target], buildEnv);
@@ -513,6 +514,34 @@ function rustTargetTripleFromRid(runtimeIdentifier) {
   ]);
 
   return map.get(runtimeIdentifier) || "";
+}
+
+function resolveRustTargetTriple(runtimeIdentifier) {
+  const configured = String(process.env.EXPORTDOCMANAGER_RUST_TARGET || process.env.CARGO_BUILD_TARGET || "").trim();
+  if (configured) return configured;
+
+  const host = detectRustHostTriple();
+  if (host && rustHostMatchesRid(host, runtimeIdentifier)) return host;
+
+  const mapped = rustTargetTripleFromRid(runtimeIdentifier);
+  if (!mapped) throw new Error(`No Rust target mapping is defined for ${runtimeIdentifier}.`);
+  return mapped;
+}
+
+function detectRustHostTriple() {
+  const result = spawnSync("rustc", ["-vV"], { cwd: repoRoot, encoding: "utf8", shell: false, windowsHide: true });
+  if (result.status !== 0) return "";
+  return result.stdout.split(/\r?\n/u).find((line) => line.startsWith("host:"))?.slice(5).trim() || "";
+}
+
+function rustHostMatchesRid(host, runtimeIdentifier) {
+  if (runtimeIdentifier === "win-x64") return host === "x86_64-pc-windows-msvc" || host === "x86_64-pc-windows-gnu";
+  if (runtimeIdentifier === "win-arm64") return host === "aarch64-pc-windows-msvc";
+  if (runtimeIdentifier === "linux-x64") return host === "x86_64-unknown-linux-gnu";
+  if (runtimeIdentifier === "linux-arm64") return host === "aarch64-unknown-linux-gnu";
+  if (runtimeIdentifier === "osx-x64") return host === "x86_64-apple-darwin";
+  if (runtimeIdentifier === "osx-arm64") return host === "aarch64-apple-darwin";
+  return false;
 }
 
 async function copyBrowserRuntimeResources(sourceRoot, destinationRoot) {

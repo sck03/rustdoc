@@ -24,6 +24,20 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("Browser payload must contain only", verifier, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void DesktopBundle_ShouldUseCompatibleLocalRustHostAndExplicitCiTarget()
+    {
+        string root = FindWorkspaceRoot();
+        string bundleScript = File.ReadAllText(Path.Combine(root, "scripts", "prepare-tauri-bundle.mjs"));
+        string desktopWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "desktop-package-reusable.yml"));
+
+        Assert.Contains("resolveRustTargetTriple(rid)", bundleScript, StringComparison.Ordinal);
+        Assert.Contains("x86_64-pc-windows-gnu", bundleScript, StringComparison.Ordinal);
+        Assert.Contains("x86_64-pc-windows-msvc", bundleScript, StringComparison.Ordinal);
+        Assert.Contains("const target = rustTarget;", bundleScript, StringComparison.Ordinal);
+        Assert.Contains("EXPORTDOCMANAGER_RUST_TARGET: ${{ inputs.rust_target }}", desktopWorkflow, StringComparison.Ordinal);
+    }
+
     private static string FindWorkspaceRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

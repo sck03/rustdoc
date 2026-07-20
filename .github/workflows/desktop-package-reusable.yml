@@ -58,6 +58,7 @@ jobs:
       CARGO_HOME: ${{ github.workspace }}/.codex-runtime/cargo-home
       CARGO_TARGET_DIR: ${{ github.workspace }}/artifacts/cargo-target-exportdoc
       EXPORTDOCMANAGER_TAURI_RID: ${{ inputs.runtime_identifier }}
+      EXPORTDOCMANAGER_RUST_TARGET: ${{ inputs.rust_target }}
       EXPORTDOCMANAGER_PRODUCT_EDITION: ${{ inputs.edition }}
       EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER: ${{ inputs.include_browser && 'false' || 'true' }}
 
