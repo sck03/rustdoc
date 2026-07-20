@@ -6,6 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>12</LangVersion>
     <RootNamespace>ExportDocManager.Api</RootNamespace>
+    <ExportDocPackageProfile Condition="'$(ExportDocPackageProfile)' == ''">Desktop</ExportDocPackageProfile>
+    <ExportDocIncludeTemplates Condition="'$(ExportDocIncludeTemplates)' == ''">true</ExportDocIncludeTemplates>
+    <ExportDocIncludeOcrModels Condition="'$(ExportDocIncludeOcrModels)' == ''">true</ExportDocIncludeOcrModels>
+    <ExportDocIncludeBusinessResources Condition="'$(ExportDocIncludeBusinessResources)' == ''">true</ExportDocIncludeBusinessResources>
+    <ExportDocIncludeBundledBrowser Condition="'$(ExportDocIncludeBundledBrowser)' == '' and '$(ExportDocPackageProfile)' == 'Container'">false</ExportDocIncludeBundledBrowser>
+    <ExportDocIncludeBundledBrowser Condition="'$(ExportDocIncludeBundledBrowser)' == ''">true</ExportDocIncludeBundledBrowser>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,26 +20,41 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\Templates\**\*">
+    <Content Include="..\..\Templates\**\*" Condition="'$(ExportDocIncludeTemplates)' == 'true'">
       <Link>Templates\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
-    <Content Include="..\..\OcrModels\**\*">
+    <Content Include="..\..\OcrModels\**\*" Condition="'$(ExportDocIncludeOcrModels)' == 'true'">
       <Link>OcrModels\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
-    <Content Include="..\..\Browsers\**\*">
+    <Content Include="..\..\Browsers\**\*" Condition="'$(ExportDocIncludeBundledBrowser)' == 'true'">
       <Link>Browsers\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
-    <Content Include="..\..\Resources\ExcelTemplates\**\*">
+    <Content Include="..\..\Resources\ExcelTemplates\**\*" Condition="'$(ExportDocIncludeBusinessResources)' == 'true'">
       <Link>Resources\ExcelTemplates\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
-    <Content Include="..\..\Resources\SingleWindow\**\*">
+    <Content Include="..\..\Resources\SingleWindow\**\*" Condition="'$(ExportDocIncludeBusinessResources)' == 'true'">
       <Link>Resources\SingleWindow\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
+
+  <Target Name="RemoveUnusedOnnxRuntimeProviderPayload" AfterTargets="Build;Publish">
+    <ItemGroup>
+      <_UnusedOnnxPayload Include="$(TargetDir)onnxruntime_providers_shared.dll;$(TargetDir)libonnxruntime_providers_shared.so;$(TargetDir)libonnxruntime_providers_shared.dylib" />
+      <_UnusedOnnxPayload Include="$(PublishDir)onnxruntime_providers_shared.dll;$(PublishDir)libonnxruntime_providers_shared.so;$(PublishDir)libonnxruntime_providers_shared.dylib" Condition="'$(PublishDir)' != ''" />
+    </ItemGroup>
+    <Delete Files="@(_UnusedOnnxPayload)" />
+  </Target>
+
+  <Target Name="RemoveReleaseNativeDebugSymbols" AfterTargets="Publish" Condition="'$(Configuration)' == 'Release' and '$(PublishDir)' != ''">
+    <ItemGroup>
+      <_ReleaseNativeDebugSymbols Include="$(PublishDir)**\*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(_ReleaseNativeDebugSymbols)" />
+  </Target>
 
 </Project>

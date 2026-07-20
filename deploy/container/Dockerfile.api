@@ -13,12 +13,12 @@ COPY Shared/ Shared/
 COPY Templates/ Templates/
 COPY Resources/ Resources/
 COPY OcrModels/ OcrModels/
-COPY Browsers/ Browsers/
 RUN dotnet publish src/ExportDocManager.Api/ExportDocManager.Api.csproj \
     --configuration Release \
     --no-restore \
     --output /out \
-    /p:UseAppHost=false
+    /p:UseAppHost=false \
+    /p:ExportDocPackageProfile=Container
 
 FROM rust:1.96-bookworm AS ocr-build
 WORKDIR /src

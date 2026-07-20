@@ -67,6 +67,7 @@ const args = [
   "/p:PublishReadyToRun=false",
   "/p:DebugType=None",
   "/p:DebugSymbols=false",
+  "/p:ExportDocPackageProfile=Desktop",
 ];
 
 console.log(`Publishing API sidecar for Tauri bundle (${rid}, self-contained=${selfContained})...`);
@@ -176,9 +177,9 @@ async function ensureMacOsX64OnnxRuntime(buildEnv) {
     run("tar", ["-xzf", archive, "-C", archiveRoot], buildEnv);
   }
   const libRoot = path.join(extracted, "lib");
-  const libraries = (await readdir(libRoot)).filter((name) => name.startsWith("libonnxruntime") && name.endsWith(".dylib"));
-  if (!libraries.includes("libonnxruntime.dylib")) throw new Error(`ONNX Runtime macOS x64 native library was not found after extracting ${archive}.`);
-  for (const name of libraries) await cp(path.join(libRoot, name), path.join(publishRoot, name), { force: true, dereference: true });
+  const source = path.join(libRoot, "libonnxruntime.dylib");
+  if (!(await tryStat(source))) throw new Error(`ONNX Runtime macOS x64 native library was not found after extracting ${archive}.`);
+  await cp(source, nativeLibrary, { force: true, dereference: true });
 }
 
 async function createProductEditionManifest() {

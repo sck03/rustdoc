@@ -123,6 +123,7 @@ jobs:
           /p:PublishReadyToRun=false
           /p:DebugType=None
           /p:DebugSymbols=false
+          /p:ExportDocPackageProfile=Server
 
       - name: Build Rust OCR sidecar
         shell: pwsh
@@ -140,8 +141,11 @@ jobs:
           New-Item -ItemType Directory -Path $webRoot -Force | Out-Null
           Copy-Item -Path "apps/export-doc-web/dist/*" -Destination $webRoot -Recurse -Force
           Copy-Item -LiteralPath "deploy/browser-server/appsettings.json" -Destination $packageRoot -Force
-          Copy-Item -LiteralPath "deploy/browser-server/start-windows.ps1" -Destination $packageRoot -Force
-          Copy-Item -LiteralPath "deploy/browser-server/start-linux.sh" -Destination $packageRoot -Force
+          if ('${{ inputs.platform }}' -eq 'windows') {
+            Copy-Item -LiteralPath "deploy/browser-server/start-windows.ps1" -Destination $packageRoot -Force
+          } else {
+            Copy-Item -LiteralPath "deploy/browser-server/start-linux.sh" -Destination $packageRoot -Force
+          }
           $ocrRoot = Join-Path $packageRoot "sidecar/ocr"
           New-Item -ItemType Directory -Path $ocrRoot -Force | Out-Null
           $ocrName = if ('${{ inputs.platform }}' -eq 'windows') { 'exportdoc-ocr.exe' } else { 'exportdoc-ocr' }
@@ -176,6 +180,10 @@ jobs:
       - name: Verify bundled browser PDF generation
         shell: pwsh
         run: ./scripts/verify-bundled-browser-pdf.ps1 -BrowserRoot ./artifacts/browser-server/package/Browsers
+
+      - name: Verify lean server payload
+        shell: pwsh
+        run: ./scripts/verify-package-payload.ps1 -PackageRoot ./artifacts/browser-server/package -Profile Server -RuntimeIdentifier ${{ inputs.runtime_identifier }}
 
       - name: Verify bundled Rust PP-OCRv6 runtime
         shell: pwsh

@@ -16,7 +16,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.25" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.25" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite.Core" Version="8.0.25" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.27.1" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.27.1" GeneratePathProperty="true" ExcludeAssets="compile;runtime" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Playwright" Version="1.61.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
     <PackageReference Include="PDFsharp" Version="6.2.4" />
@@ -26,6 +26,17 @@
     <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win-'))">onnxruntime.dll</_ExportDocOnnxRuntimeFile>
+    <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('linux-'))">libonnxruntime.so</_ExportDocOnnxRuntimeFile>
+    <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('osx-'))">libonnxruntime.dylib</_ExportDocOnnxRuntimeFile>
+    <_ExportDocOnnxRuntimeSource Condition="'$(_ExportDocOnnxRuntimeFile)' != ''">$(PkgMicrosoft_ML_OnnxRuntime)\runtimes\$(RuntimeIdentifier)\native\$(_ExportDocOnnxRuntimeFile)</_ExportDocOnnxRuntimeSource>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(_ExportDocOnnxRuntimeSource)')">
+    <None Include="$(_ExportDocOnnxRuntimeSource)" Link="$(_ExportDocOnnxRuntimeFile)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

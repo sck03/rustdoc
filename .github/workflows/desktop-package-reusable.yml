@@ -219,6 +219,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Remove-Item -LiteralPath $dataRoot -Recurse -Force -ErrorAction SilentlyContinue
 
+      - name: Verify lean desktop payload
+        shell: pwsh
+        run: ./scripts/verify-package-payload.ps1 -PackageRoot ./artifacts/tauri-bundle/resources -Profile Desktop -RuntimeIdentifier ${{ inputs.runtime_identifier }}
+
       - name: Upload desktop package artifact
         uses: actions/upload-artifact@v5
         with:
