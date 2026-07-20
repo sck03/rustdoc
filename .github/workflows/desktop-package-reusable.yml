@@ -138,20 +138,25 @@ jobs:
         run: cargo fetch --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --target ${{ inputs.rust_target }}
 
       - name: Provision Chrome Headless Shell
-        if: inputs.include_browser
+        if: inputs.include_browser && inputs.chrome_platform != 'chromium-linux-arm64'
         shell: pwsh
         run: >-
           ./scripts/provision-chrome-for-testing.ps1
           -Product ChromeHeadlessShell
           -Platform ${{ inputs.chrome_platform }}
 
+      - name: Provision Chromium ARM64
+        if: inputs.include_browser && inputs.chrome_platform == 'chromium-linux-arm64'
+        shell: pwsh
+        run: ./scripts/provision-playwright-chromium-arm64.ps1
+
       - name: Verify staged Chrome Headless Shell
         if: inputs.include_browser
         shell: pwsh
         run: |
-          $browserRoot = Join-Path $env:GITHUB_WORKSPACE "Browsers/ChromeForTesting/${{ inputs.chrome_platform }}"
+          $browserRoot = if ('${{ inputs.chrome_platform }}' -eq 'chromium-linux-arm64') { Join-Path $env:GITHUB_WORKSPACE 'Browsers/ChromiumArm64' } else { Join-Path $env:GITHUB_WORKSPACE "Browsers/ChromeForTesting/${{ inputs.chrome_platform }}" }
           $browser = Get-ChildItem -LiteralPath $browserRoot -File -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome-headless-shell") } |
+            Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome-headless-shell", "chrome") } |
             Select-Object -First 1
           if ($null -eq $browser) {
             throw "Chrome Headless Shell was not staged under '$browserRoot'."
@@ -165,6 +170,11 @@ jobs:
           }
           Write-Host "Chrome Headless Shell staged at $($browser.FullName)"
 
+      - name: Verify bundled browser PDF generation
+        if: inputs.include_browser
+        shell: pwsh
+        run: ./scripts/verify-bundled-browser-pdf.ps1 -BrowserRoot ./Browsers
+
       - name: Build unsigned desktop package
         shell: pwsh
         run: |
@@ -177,7 +187,7 @@ jobs:
         run: |
           $resourceRoot = Join-Path $env:GITHUB_WORKSPACE "artifacts/tauri-bundle/resources/Browsers"
           $browser = Get-ChildItem -LiteralPath $resourceRoot -File -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome-headless-shell") } |
+            Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome-headless-shell", "chrome") } |
             Select-Object -First 1
           if ($null -eq $browser) {
             throw "Chrome Headless Shell did not enter the Tauri resource staging directory '$resourceRoot'."

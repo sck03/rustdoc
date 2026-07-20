@@ -467,6 +467,19 @@ async function copyBrowserRuntimeResources(sourceRoot, destinationRoot) {
 
   await copyIfExists(path.join(sourceRoot, "README.md"), path.join(destinationRoot, "README.md"));
 
+  if (rid === "linux-arm64") {
+    const chromiumArm64Source = path.join(sourceRoot, "ChromiumArm64");
+    const chromiumArm64Stat = await tryStat(chromiumArm64Source);
+    if (chromiumArm64Stat?.isDirectory()) {
+      await cp(chromiumArm64Source, path.join(destinationRoot, "ChromiumArm64"), { recursive: true, force: true });
+      return;
+    }
+    if (!allowMissingBrowser) {
+      throw new Error(`Chromium ARM64 was not found under ${sourceRoot}. Run scripts/provision-playwright-chromium-arm64.ps1 on Linux ARM64 before building.`);
+    }
+    return;
+  }
+
   let platform;
   try {
     platform = chromeForTestingPlatform();

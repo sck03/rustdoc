@@ -23,7 +23,7 @@ on:
         type: boolean
 
 concurrency:
-  group: browser-server-${{ inputs.platform }}-${{ inputs.version }}
+  group: browser-server-${{ inputs.platform }}-${{ inputs.runtime_identifier }}-${{ inputs.version }}
   cancel-in-progress: true
 
 permissions:
@@ -78,11 +78,17 @@ jobs:
           node scripts/sync-version.mjs $version
 
       - name: Provision Chrome Headless Shell
+        if: inputs.chrome_platform != 'chromium-linux-arm64'
         shell: pwsh
         run: >-
           ./scripts/provision-chrome-for-testing.ps1
           -Product ChromeHeadlessShell
           -Platform ${{ inputs.chrome_platform }}
+
+      - name: Provision Chromium ARM64
+        if: inputs.chrome_platform == 'chromium-linux-arm64'
+        shell: pwsh
+        run: ./scripts/provision-playwright-chromium-arm64.ps1
 
       - name: Build shared browser frontend
         run: npm --prefix apps/export-doc-web run build
@@ -120,11 +126,11 @@ jobs:
           Copy-Item -LiteralPath "deploy/browser-server/start-linux.sh" -Destination $packageRoot -Force
 
           $browser = Get-ChildItem -LiteralPath (Join-Path $packageRoot "Browsers") -File -Recurse |
-            Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome-headless-shell") } |
+            Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome-headless-shell", "chrome") } |
             Select-Object -First 1
           if ($null -eq $browser) { throw "Chrome Headless Shell was not included in the server package." }
           if (-not (Test-Path -LiteralPath (Join-Path $webRoot "index.html"))) { throw "Web index.html was not included." }
-          if ("${{ inputs.platform }}" -eq "linux") {
+          if ("${{ inputs.runtime_identifier }}" -eq "linux-x64") {
             @(
               (Join-Path $packageRoot "libOpenCvSharpExtern.so"),
               (Join-Path $packageRoot "libonnxruntime.so"),
@@ -140,8 +146,12 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
+      - name: Verify bundled browser PDF generation
+        shell: pwsh
+        run: ./scripts/verify-bundled-browser-pdf.ps1 -BrowserRoot ./artifacts/browser-server/package/Browsers
+
       - name: Verify bundled PP-OCRv6 runtime
-        if: inputs.platform == 'linux'
+        if: inputs.runtime_identifier == 'linux-x64'
         shell: pwsh
         env:
           EXPORTDOCMANAGER_OCR_RUNTIME: enabled
@@ -164,7 +174,8 @@ jobs:
             $archive = Join-Path $releaseRoot "export-doc-manager-browser-server-windows-x64-$version.zip"
             Compress-Archive -Path (Join-Path $packageRoot "*") -DestinationPath $archive -CompressionLevel Optimal
           } else {
-            $archive = Join-Path $releaseRoot "export-doc-manager-browser-server-linux-x64-$version.tar.gz"
+            $architecture = if ('${{ inputs.runtime_identifier }}' -eq 'linux-arm64') { 'arm64' } else { 'x64' }
+            $archive = Join-Path $releaseRoot "export-doc-manager-browser-server-linux-$architecture-$version.tar.gz"
             & tar -czf $archive -C $packageRoot .
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
@@ -173,7 +184,7 @@ jobs:
       - name: Upload browser server artifact
         uses: actions/upload-artifact@v5
         with:
-          name: export-doc-manager-browser-server-${{ inputs.platform }}-${{ steps.version.outputs.value }}
+          name: export-doc-manager-browser-server-${{ inputs.platform }}-${{ inputs.runtime_identifier }}-${{ steps.version.outputs.value }}
           path: ${{ steps.archive.outputs.path }}
           if-no-files-found: error
           retention-days: 14

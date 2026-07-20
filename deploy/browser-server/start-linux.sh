@@ -14,7 +14,7 @@ fi
 
 BROWSER=$(find "$ROOT/Browsers" -type f \( -name chrome-headless-shell -o -name chrome \) -print -quit 2>/dev/null || true)
 if [ -z "$BROWSER" ]; then
-  echo "内置 Chrome Headless Shell 不存在。" >&2
+  echo "内置 Chrome Headless Shell / Chromium ARM64 不存在。" >&2
   exit 1
 fi
 chmod +x "$BROWSER" "$ROOT/ExportDocManager.Api"
@@ -22,7 +22,11 @@ chmod +x "$BROWSER" "$ROOT/ExportDocManager.Api"
 export EXPORTDOCMANAGER_NETWORK_MODE=true
 export EXPORTDOCMANAGER_PRODUCT_EDITION=Full
 export EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE="$BROWSER"
-export EXPORTDOCMANAGER_OCR_RUNTIME="${EXPORTDOCMANAGER_OCR_RUNTIME:-enabled}"
+case "$(uname -m)" in
+  aarch64|arm64) DEFAULT_OCR_RUNTIME=disabled ;;
+  *) DEFAULT_OCR_RUNTIME=enabled ;;
+esac
+export EXPORTDOCMANAGER_OCR_RUNTIME="${EXPORTDOCMANAGER_OCR_RUNTIME:-$DEFAULT_OCR_RUNTIME}"
 case "$EXPORTDOCMANAGER_OCR_RUNTIME" in
   0|false|disabled|off|none|unsupported) ;;
   *)

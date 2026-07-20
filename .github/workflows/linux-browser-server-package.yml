@@ -7,6 +7,14 @@ on:
         description: '程序版本（例如 0.1.2）'
         required: true
         type: string
+      architecture:
+        description: 'Linux架构（ARM64内置标记明确的Chromium ARM64）'
+        required: true
+        default: x64
+        type: choice
+        options:
+          - x64
+          - arm64
       publish_release:
         description: '同时上传到 GitHub Release'
         required: true
@@ -21,8 +29,8 @@ jobs:
     uses: ./.github/workflows/browser-server-package-reusable.yml
     with:
       platform: linux
-      runner: ubuntu-latest
-      runtime_identifier: linux-x64
-      chrome_platform: linux64
+      runner: ${{ inputs.architecture == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+      runtime_identifier: ${{ inputs.architecture == 'arm64' && 'linux-arm64' || 'linux-x64' }}
+      chrome_platform: ${{ inputs.architecture == 'arm64' && 'chromium-linux-arm64' || 'linux64' }}
       version: ${{ inputs.version }}
       publish_release: ${{ inputs.publish_release }}

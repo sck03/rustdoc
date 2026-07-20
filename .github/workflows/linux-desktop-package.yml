@@ -16,6 +16,14 @@ on:
           - Full
           - Document
           - Sales
+      architecture:
+        description: 'Linux架构（ARM64内置标记明确的Chromium ARM64）'
+        required: true
+        default: x64
+        type: choice
+        options:
+          - x64
+          - arm64
       publish_release:
         description: '同时上传到对应版本的 GitHub Release'
         required: true
@@ -30,13 +38,13 @@ jobs:
     uses: ./.github/workflows/desktop-package-reusable.yml
     with:
       platform: linux
-      runner: ubuntu-latest
-      runtime_identifier: linux-x64
-      rust_target: x86_64-unknown-linux-gnu
-      chrome_platform: linux64
+      runner: ${{ inputs.architecture == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+      runtime_identifier: ${{ inputs.architecture == 'arm64' && 'linux-arm64' || 'linux-x64' }}
+      rust_target: ${{ inputs.architecture == 'arm64' && 'aarch64-unknown-linux-gnu' || 'x86_64-unknown-linux-gnu' }}
+      chrome_platform: ${{ inputs.architecture == 'arm64' && 'chromium-linux-arm64' || 'linux64' }}
       bundle_targets: deb,appimage
       version: ${{ inputs.version }}
-      architecture: x64
+      architecture: ${{ inputs.architecture }}
       edition: ${{ inputs.edition }}
       include_browser: true
       publish_release: ${{ inputs.publish_release }}
