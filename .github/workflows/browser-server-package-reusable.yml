@@ -12,6 +12,9 @@ on:
       runtime_identifier:
         required: true
         type: string
+      rust_target:
+        required: true
+        type: string
       chrome_platform:
         required: true
         type: string
@@ -37,6 +40,8 @@ jobs:
       NUGET_PACKAGES: ${{ github.workspace }}/.codex-runtime/nuget-packages
       NUGET_HTTP_CACHE_PATH: ${{ github.workspace }}/.codex-runtime/nuget-http-cache
       npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
+      CARGO_HOME: ${{ github.workspace }}/.codex-runtime/cargo-home
+      CARGO_TARGET_DIR: ${{ github.workspace }}/artifacts/cargo-target-ocr
 
     steps:
       - name: Checkout
@@ -57,6 +62,11 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: apps/export-doc-web/package-lock.json
+
+      - name: Set up Rust target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ inputs.rust_target }}
 
       - name: Install Web dependencies
         run: npm ci --prefix apps/export-doc-web
@@ -114,6 +124,10 @@ jobs:
           /p:DebugType=None
           /p:DebugSymbols=false
 
+      - name: Build Rust OCR sidecar
+        shell: pwsh
+        run: cargo build --manifest-path apps/exportdoc-ocr-rs/Cargo.toml --release --target ${{ inputs.rust_target }}
+
       - name: Assemble browser server package
         shell: pwsh
         run: |
@@ -124,15 +138,19 @@ jobs:
           Copy-Item -LiteralPath "deploy/browser-server/appsettings.json" -Destination $packageRoot -Force
           Copy-Item -LiteralPath "deploy/browser-server/start-windows.ps1" -Destination $packageRoot -Force
           Copy-Item -LiteralPath "deploy/browser-server/start-linux.sh" -Destination $packageRoot -Force
+          $ocrRoot = Join-Path $packageRoot "sidecar/ocr"
+          New-Item -ItemType Directory -Path $ocrRoot -Force | Out-Null
+          $ocrName = if ('${{ inputs.platform }}' -eq 'windows') { 'exportdoc-ocr.exe' } else { 'exportdoc-ocr' }
+          Copy-Item -LiteralPath (Join-Path $env:CARGO_TARGET_DIR "${{ inputs.rust_target }}/release/$ocrName") -Destination (Join-Path $ocrRoot $ocrName) -Force
+          Copy-Item -LiteralPath "apps/exportdoc-ocr-rs/README.md" -Destination $ocrRoot -Force
 
           $browser = Get-ChildItem -LiteralPath (Join-Path $packageRoot "Browsers") -File -Recurse |
             Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome-headless-shell", "chrome") } |
             Select-Object -First 1
           if ($null -eq $browser) { throw "Chrome Headless Shell was not included in the server package." }
           if (-not (Test-Path -LiteralPath (Join-Path $webRoot "index.html"))) { throw "Web index.html was not included." }
-          if ("${{ inputs.runtime_identifier }}" -eq "linux-x64") {
+          if ("${{ inputs.platform }}" -eq "linux") {
             @(
-              (Join-Path $packageRoot "libOpenCvSharpExtern.so"),
               (Join-Path $packageRoot "libonnxruntime.so"),
               (Join-Path $packageRoot "OcrModels/PaddleOCR/V6/det/inference.onnx"),
               (Join-Path $packageRoot "OcrModels/PaddleOCR/V6/rec/inference.onnx"),
@@ -142,7 +160,7 @@ jobs:
                 throw "Linux PP-OCRv6 package file was not included: $_"
               }
             }
-            & chmod +x -- (Join-Path $packageRoot "ExportDocManager.Api") (Join-Path $packageRoot "start-linux.sh") $browser.FullName
+            & chmod +x -- (Join-Path $packageRoot "ExportDocManager.Api") (Join-Path $packageRoot "start-linux.sh") $browser.FullName (Join-Path $ocrRoot "exportdoc-ocr")
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
@@ -150,8 +168,7 @@ jobs:
         shell: pwsh
         run: ./scripts/verify-bundled-browser-pdf.ps1 -BrowserRoot ./artifacts/browser-server/package/Browsers
 
-      - name: Verify bundled PP-OCRv6 runtime
-        if: inputs.runtime_identifier == 'linux-x64'
+      - name: Verify bundled Rust PP-OCRv6 runtime
         shell: pwsh
         env:
           EXPORTDOCMANAGER_OCR_RUNTIME: enabled

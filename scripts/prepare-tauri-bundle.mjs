@@ -11,6 +11,7 @@ const bundleRoot = path.join(repoRoot, "artifacts", "tauri-bundle");
 const publishRoot = path.join(bundleRoot, "publish");
 const resourcesRoot = path.join(bundleRoot, "resources");
 const sidecarRoot = path.join(resourcesRoot, "sidecar");
+const ocrSidecarRoot = path.join(sidecarRoot, "ocr");
 const toolsRoot = path.join(resourcesRoot, "Tools");
 const runtimeLayoutManifestFileName = "runtime-layout.json";
 const productEditionManifestFileName = "product-edition.json";
@@ -43,6 +44,7 @@ const env = {
   NUGET_HTTP_CACHE_PATH: resolveLocalBuildPath("NUGET_HTTP_CACHE_PATH", "nuget-http-cache"),
   TEMP: resolveLocalBuildPath("TEMP", "temp"),
   TMP: resolveLocalBuildPath("TMP", "temp"),
+  CARGO_TARGET_DIR: process.env.CARGO_TARGET_DIR || path.join(bundleRoot, "cargo-ocr-target"),
 };
 await mkdir(env.DOTNET_CLI_HOME, { recursive: true });
 await mkdir(env.NUGET_PACKAGES, { recursive: true });
@@ -69,6 +71,8 @@ const args = [
 
 console.log(`Publishing API sidecar for Tauri bundle (${rid}, self-contained=${selfContained})...`);
 run("dotnet", args, env);
+await ensureMacOsX64OnnxRuntime(env);
+await buildRustOcrSidecar(env);
 
 const entries = await readdir(publishRoot, { withFileTypes: true });
 for (const entry of entries) {
@@ -120,6 +124,7 @@ console.log("Prepared Tauri resources:");
 console.log(`  ${resourcesRoot}`);
 console.log("Runtime layout:");
 console.log("  resources/sidecar/        API executable and self-contained runtime");
+console.log("  resources/sidecar/ocr/    Rust PP-OCRv6 sidecar without OpenCV");
 console.log("  resources/Templates/      report templates");
 console.log("  resources/OcrModels/      OCR models");
 console.log("  resources/Resources/      Excel and Single Window built-in resources");
@@ -130,6 +135,43 @@ if (rid.startsWith("win-")) {
 }
 console.log(`  resources/${runtimeLayoutManifestFileName}  machine-readable runtime layout manifest`);
 console.log(`  resources/${productEditionManifestFileName}  build-time product edition manifest`);
+
+async function buildRustOcrSidecar(buildEnv) {
+  const target = rustTargetTripleFromRid(rid);
+  if (!target) {
+    throw new Error(`No Rust OCR target mapping is defined for ${rid}.`);
+  }
+  const manifest = path.join(repoRoot, "apps", "exportdoc-ocr-rs", "Cargo.toml");
+  console.log(`Building Rust OCR sidecar for ${target}...`);
+  run("cargo", ["build", "--manifest-path", manifest, "--release", "--target", target], buildEnv);
+  const fileName = rid.startsWith("win-") ? "exportdoc-ocr.exe" : "exportdoc-ocr";
+  const binary = path.join(buildEnv.CARGO_TARGET_DIR, target, "release", fileName);
+  await mkdir(ocrSidecarRoot, { recursive: true });
+  await cp(binary, path.join(ocrSidecarRoot, fileName), { force: true });
+  await cp(path.join(repoRoot, "apps", "exportdoc-ocr-rs", "README.md"), path.join(ocrSidecarRoot, "README.md"), { force: true });
+}
+
+async function ensureMacOsX64OnnxRuntime(buildEnv) {
+  if (rid !== "osx-x64") return;
+  const nativeLibrary = path.join(publishRoot, "libonnxruntime.dylib");
+  if (await tryStat(nativeLibrary)) return;
+
+  const version = "1.27.1";
+  const archiveRoot = path.join(localRuntimeRoot, "onnxruntime", `osx-x64-${version}`);
+  const archive = path.join(archiveRoot, `onnxruntime-osx-x86_64-${version}.tgz`);
+  const extracted = path.join(archiveRoot, `onnxruntime-osx-x86_64-${version}`);
+  await mkdir(archiveRoot, { recursive: true });
+  if (!(await tryStat(archive))) {
+    run("curl", ["-fL", "--retry", "3", "-o", archive, `https://github.com/microsoft/onnxruntime/releases/download/v${version}/onnxruntime-osx-x86_64-${version}.tgz`], buildEnv);
+  }
+  if (!(await tryStat(extracted))) {
+    run("tar", ["-xzf", archive, "-C", archiveRoot], buildEnv);
+  }
+  const libRoot = path.join(extracted, "lib");
+  const libraries = (await readdir(libRoot)).filter((name) => name.startsWith("libonnxruntime") && name.endsWith(".dylib"));
+  if (!libraries.includes("libonnxruntime.dylib")) throw new Error(`ONNX Runtime macOS x64 native library was not found after extracting ${archive}.`);
+  for (const name of libraries) await cp(path.join(libRoot, name), path.join(publishRoot, name), { force: true, dereference: true });
+}
 
 async function createProductEditionManifest() {
   const versionManifest = JSON.parse(await readFile(path.join(repoRoot, "version.json"), "utf8"));
@@ -452,6 +494,8 @@ async function findExcelAnalyzerBinary() {
 
 function rustTargetTripleFromRid(runtimeIdentifier) {
   const map = new Map([
+    ["win-x64", "x86_64-pc-windows-msvc"],
+    ["win-arm64", "aarch64-pc-windows-msvc"],
     ["linux-x64", "x86_64-unknown-linux-gnu"],
     ["linux-arm64", "aarch64-unknown-linux-gnu"],
     ["osx-x64", "x86_64-apple-darwin"],

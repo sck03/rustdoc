@@ -20,6 +20,12 @@ RUN dotnet publish src/ExportDocManager.Api/ExportDocManager.Api.csproj \
     --output /out \
     /p:UseAppHost=false
 
+FROM rust:1.96-bookworm AS ocr-build
+WORKDIR /src
+COPY apps/exportdoc-ocr-rs/Cargo.toml apps/exportdoc-ocr-rs/Cargo.lock ./
+COPY apps/exportdoc-ocr-rs/src/ ./src/
+RUN cargo build --release --locked
+
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim AS runtime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -46,6 +52,8 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=build /out/ ./
+COPY --from=ocr-build /src/target/release/exportdoc-ocr ./sidecar/ocr/exportdoc-ocr
+COPY apps/exportdoc-ocr-rs/README.md ./sidecar/ocr/README.md
 ARG TARGETARCH
 ENV ASPNETCORE_URLS=http://0.0.0.0:5188 \
     EXPORTDOCMANAGER_DATA_ROOT=/runtime-data \
@@ -54,11 +62,8 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:5188 \
     EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
     EXPORTDOCMANAGER_OCR_RUNTIME=enabled \
     TZ=Asia/Shanghai
-RUN if [ "$TARGETARCH" = "amd64" ]; then \
-        dotnet ExportDocManager.Api.dll --app-root /app --data-root /tmp/exportdoc-ocr-check --verify-ocr-runtime; \
-    else \
-        echo "PP-OCRv6 runtime verification skipped for unsupported architecture: $TARGETARCH"; \
-    fi \
+RUN chmod +x /app/sidecar/ocr/exportdoc-ocr
+RUN dotnet ExportDocManager.Api.dll --app-root /app --data-root /tmp/exportdoc-ocr-check --verify-ocr-runtime \
     && rm -rf /tmp/exportdoc-ocr-check
 EXPOSE 5188
 ENTRYPOINT ["/usr/bin/tini", "--", "dotnet", "ExportDocManager.Api.dll"]

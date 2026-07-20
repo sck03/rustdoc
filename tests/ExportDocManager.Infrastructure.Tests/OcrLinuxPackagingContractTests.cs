@@ -12,6 +12,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 "ExportDocManager.Infrastructure",
                 "ExportDocManager.Infrastructure.csproj"));
             string dockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.api"));
+            string rustManifest = File.ReadAllText(Path.Combine(root, "apps", "exportdoc-ocr-rs", "Cargo.toml"));
             string workflow = File.ReadAllText(Path.Combine(
                 root,
                 ".github",
@@ -24,13 +25,17 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("'$(RuntimeIdentifier)' == 'linux-x64'", project, StringComparison.Ordinal);
             Assert.Contains("EXPORTDOCMANAGER_OCR_RUNTIME=enabled", dockerfile, StringComparison.Ordinal);
             Assert.Contains("--verify-ocr-runtime", dockerfile, StringComparison.Ordinal);
-            Assert.Contains("libOpenCvSharpExtern.so", workflow, StringComparison.Ordinal);
+            Assert.Contains("apps/exportdoc-ocr-rs/Cargo.toml", workflow, StringComparison.Ordinal);
+            Assert.Contains("sidecar/ocr", workflow, StringComparison.Ordinal);
             Assert.Contains("libonnxruntime.so", workflow, StringComparison.Ordinal);
             Assert.Contains("--verify-ocr-runtime", workflow, StringComparison.Ordinal);
             Assert.Contains("--verify-ocr-runtime", startScript, StringComparison.Ordinal);
             Assert.True(File.Exists(notices));
             Assert.Contains("Apache License 2.0", File.ReadAllText(notices), StringComparison.Ordinal);
             Assert.Contains("MIT License", File.ReadAllText(notices), StringComparison.Ordinal);
+            Assert.DoesNotContain("opencv", rustManifest, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("FROM rust:", dockerfile, StringComparison.Ordinal);
+            Assert.Contains("sidecar/ocr/exportdoc-ocr", dockerfile, StringComparison.Ordinal);
         }
 
         private static string FindWorkspaceRoot()

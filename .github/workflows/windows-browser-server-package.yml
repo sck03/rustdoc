@@ -23,6 +23,7 @@ jobs:
       platform: windows
       runner: windows-latest
       runtime_identifier: win-x64
+      rust_target: x86_64-pc-windows-msvc
       chrome_platform: win64
       version: ${{ inputs.version }}
       publish_release: ${{ inputs.publish_release }}

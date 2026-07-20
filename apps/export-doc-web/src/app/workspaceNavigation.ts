@@ -1,5 +1,6 @@
 import {
   CircleDollarSign,
+  BookOpen,
   ContactRound,
   ClipboardList,
   CreditCard,
@@ -104,6 +105,12 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
       { label: "协同看板", to: "/single-window/collaboration", icon: ClipboardList, isActive: isSingleWindowCollaborationRoute, workspace: "document", moduleKey: "document.single-window" },
       { label: "参考词典", to: "/single-window/reference-catalog", icon: Database, isActive: isSingleWindowReferenceCatalogRoute, workspace: "document", moduleKey: "document.single-window" },
     ],
+  },
+  {
+    key: "hs-knowledge",
+    label: "HS 编码库",
+    icon: BookOpen,
+    items: [{ label: "知识中心", to: "/master-data/hs-knowledge/search", icon: BookOpen, isActive: isHsKnowledgeRoute, workspace: "document", moduleKey: "document.master-data" }],
   },
   {
     key: "master-data",
@@ -233,6 +240,9 @@ export function getWorkspaceContext(pathname: string): WorkspaceContext {
   if (pathname.startsWith("/single-window")) {
     return getSingleWindowWorkspaceContext(pathname);
   }
+  if (pathname.startsWith("/master-data/hs-knowledge")) {
+    return createWorkspaceContext("HS 编码库", "HS 编码知识中心", "查询、维护和迁移本公司的税则与申报经验", BookOpen);
+  }
   if (pathname.startsWith("/master-data")) {
     return createWorkspaceContext("基础资料", "主数据维护", "统一维护客户、出口商、商品、港口、单位与 HS 编码", Database);
   }
@@ -359,6 +369,7 @@ function isSupplierRoute(pathname: string) { return pathname.startsWith("/suppli
 function isQueryRoute(pathname: string) { return pathname.startsWith("/query"); }
 function isPaymentRoute(pathname: string) { return pathname.startsWith("/payments"); }
 function isMasterDataRoute(pathname: string) { return pathname.startsWith("/master-data"); }
+function isHsKnowledgeRoute(pathname: string) { return pathname.startsWith("/master-data/hs-knowledge"); }
 function isSingleWindowOperationRoute(pathname: string) { return pathname === "/single-window" || pathname.startsWith("/single-window/operation-center") || pathname.startsWith("/single-window/coo") || pathname.startsWith("/single-window/acd"); }
 function isSingleWindowCollaborationRoute(pathname: string) { return pathname.startsWith("/single-window/collaboration"); }
 function isSingleWindowReferenceCatalogRoute(pathname: string) { return pathname.startsWith("/single-window/reference-catalog"); }

@@ -81,6 +81,14 @@ namespace ExportDocManager.Services.Infrastructure
 
         private RuntimeDependencyDiagnostic InspectOcrRuntime()
         {
+            string rustExecutable = RustOcrSidecarHost.FindExecutable(_pathProvider);
+            if (File.Exists(rustExecutable))
+            {
+                return new RuntimeDependencyDiagnostic(
+                    "ocr-runtime", "智能 OCR", "optional", "ready", true,
+                    Path.GetFullPath(rustExecutable),
+                    "Rust PP-OCRv6 Sidecar已就绪；使用ONNX Runtime和纯Rust图像处理，不依赖OpenCV。");
+            }
             OcrRuntimeAvailability availability = OcrRuntimeAvailabilityInspector.Inspect(_pathProvider);
             return new RuntimeDependencyDiagnostic(
                 "ocr-runtime",

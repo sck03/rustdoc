@@ -455,8 +455,9 @@ export function HsCodeToolsPanel({
                     </div>
                     {importMode === "CompleteSnapshot" ? <div className="warning-note">只有确认文件是完整中国 HS 年度库时才使用此模式。系统不会删除历史记录或改写商业发票。</div> : null}
                     <div className="hs-code-import-source-actions">
-                      {desktopAvailable ? <button className="command-button" type="button" disabled={isBusy} onClick={() => void importFromDesktopPath()}><FileSpreadsheet size={17} /><span>选择本机 Excel</span></button> : null}
-                      <button className="command-button secondary" type="button" disabled={isBusy} onClick={chooseUploadFile}><Upload size={17} /><span>上传 Excel</span></button>
+                      {desktopAvailable
+                        ? <button className="command-button" type="button" disabled={isBusy} onClick={() => void importFromDesktopPath()}><FileSpreadsheet size={17} /><span>选择 Excel 文件</span></button>
+                        : <button className="command-button" type="button" disabled={isBusy} onClick={chooseUploadFile}><Upload size={17} /><span>选择 Excel 文件</span></button>}
                     </div>
                   </>
                 ) : <HsCodeImportPreview preview={importPreview} busy={isBusy} onBack={() => setImportPreview(null)} onCommit={commitImport} />}

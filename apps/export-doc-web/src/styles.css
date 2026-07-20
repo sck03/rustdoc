@@ -836,6 +836,16 @@ tbody tr:hover {
 .hs-code-import-settings label { display: grid; gap: 6px; color: #43515b; font-size: 12px; font-weight: 700; }
 .hs-code-import-settings input,
 .hs-code-import-settings select { height: 38px; padding: 0 10px; background: #fff; border: 1px solid #ccd7dd; border-radius: 8px; }
+.hs-knowledge-surface input:not([type="checkbox"]):not([type="radio"]),
+.hs-knowledge-surface select,
+.hs-knowledge-surface textarea {
+  color: #17252e;
+  background: #fff;
+  border: 1px solid #b8c9ce;
+  box-shadow: inset 0 1px 2px rgb(15 23 42 / 4%);
+}
+.hs-knowledge-surface input::placeholder,
+.hs-knowledge-surface textarea::placeholder { color: #7b8b93; opacity: 1; }
 .hs-code-import-source-actions { display: flex; gap: 10px; margin-top: 18px; }
 .warning-note { margin-top: 12px; padding: 10px 12px; color: #7c4a03; background: #fff8e8; border: 1px solid #f1d59c; border-radius: 8px; font-size: 12px; }
 .hs-code-preview { display: grid; gap: 12px; }

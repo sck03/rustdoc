@@ -201,6 +201,24 @@ jobs:
           }
           Write-Host "Chrome Headless Shell bundled from $($browser.FullName)"
 
+      - name: Verify bundled Rust PP-OCRv6 runtime
+        shell: pwsh
+        run: |
+          $resourceRoot = Join-Path $env:GITHUB_WORKSPACE "artifacts/tauri-bundle/resources"
+          $apiRelative = if ($env:RUNNER_OS -eq "Windows") { "sidecar/ExportDocManager.Api.exe" } else { "sidecar/ExportDocManager.Api" }
+          $ocrRelative = if ($env:RUNNER_OS -eq "Windows") { "sidecar/ocr/exportdoc-ocr.exe" } else { "sidecar/ocr/exportdoc-ocr" }
+          $api = Join-Path $resourceRoot $apiRelative
+          $ocr = Join-Path $resourceRoot $ocrRelative
+          if (-not (Test-Path -LiteralPath $ocr -PathType Leaf)) { throw "Rust OCR Sidecar was not bundled: $ocr" }
+          if ($env:RUNNER_OS -ne "Windows") {
+            & chmod +x $api $ocr
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          $dataRoot = Join-Path $env:GITHUB_WORKSPACE "artifacts/ocr-desktop-check"
+          & $api --app-root $resourceRoot --data-root $dataRoot --verify-ocr-runtime
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item -LiteralPath $dataRoot -Recurse -Force -ErrorAction SilentlyContinue
+
       - name: Upload desktop package artifact
         uses: actions/upload-artifact@v5
         with:

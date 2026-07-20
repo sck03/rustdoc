@@ -12,7 +12,7 @@ DbHelper.ConfigurePathProvider(pathProvider);
 if (args.Any(value => string.Equals(value, "--verify-ocr-runtime", StringComparison.OrdinalIgnoreCase)))
 {
     var verification = await OcrRuntimeVerifier.VerifyAsync(pathProvider);
-    Console.WriteLine($"PP-OCRv6 verification passed. Platform={verification.Platform}; OpenCV={verification.OpenCvVersion}; Text={verification.RecognizedText}");
+    Console.WriteLine($"PP-OCRv6 verification passed. Platform={verification.Platform}; Engine={verification.Engine}; Text={verification.RecognizedText}");
     return;
 }
 

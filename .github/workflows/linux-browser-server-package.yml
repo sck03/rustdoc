@@ -31,6 +31,7 @@ jobs:
       platform: linux
       runner: ${{ inputs.architecture == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
       runtime_identifier: ${{ inputs.architecture == 'arm64' && 'linux-arm64' || 'linux-x64' }}
+      rust_target: ${{ inputs.architecture == 'arm64' && 'aarch64-unknown-linux-gnu' || 'x86_64-unknown-linux-gnu' }}
       chrome_platform: ${{ inputs.architecture == 'arm64' && 'chromium-linux-arm64' || 'linux64' }}
       version: ${{ inputs.version }}
       publish_release: ${{ inputs.publish_release }}
