@@ -9,6 +9,48 @@ namespace ExportDocManager.Infrastructure.Tests;
 public sealed class HsCodeKnowledgeServiceTests
 {
     [Fact]
+    public async Task Search_ShouldNormalizeFullWidthAndPreferProductName()
+    {
+        using var factory = new SqliteFactory();
+        await using (var context = factory.CreateDbContext())
+        {
+            context.HsCodes.AddRange(
+                new HsCode { Code = "6109100090", Name = "棉制针织男式T恤衫", Status = "Active" },
+                new HsCode { Code = "9999999999", Name = "其它商品", Status = "Active" });
+            await context.SaveChangesAsync();
+        }
+        var service = new HsCodeKnowledgeService(factory);
+        await service.SaveExampleAsync(new HsCodeExampleInput(0, "6109100090", "6109100090", "男士全棉圆领短袖T-SHIRT", "针织", "Manual", 2026, "Active", true));
+        await service.SaveExampleAsync(new HsCodeExampleInput(0, "9999999999", "9999999999", "其它商品", "男士全棉圆领短袖T恤衫", "Manual", 2026, "Active", true));
+
+        var result = await service.SearchAsync("ＭＥＮＳ　１００％ＣＯＴＴＯＮ　Ｔ－ＳＨＩＲＴ");
+
+        Assert.Equal("6109100090", result.Items.First().CurrentCode);
+    }
+
+    [Fact]
+    public async Task HistoryDiscovery_ShouldRequireExplicitConfirmationBeforeLearning()
+    {
+        using var factory = new SqliteFactory();
+        await using (var context = factory.CreateDbContext())
+        {
+            context.HsCodes.Add(new HsCode { Code = "6109100090", Name = "棉制T恤衫", Status = "Active" });
+            context.Products.Add(new Product { ProductCode = "TS01", NameCN = "男士全棉圆领短袖", HSCode = "6109100090", Material = "100%棉", Brand = "自有品牌" });
+            await context.SaveChangesAsync();
+        }
+        var service = new HsCodeKnowledgeService(factory);
+
+        var candidate = Assert.Single(await service.DiscoverHistoryCandidatesAsync("圆领短袖"));
+        Assert.True(candidate.CanConfirm);
+        Assert.Equal(0, await service.CountExamplesAsync(string.Empty));
+
+        await service.SaveExampleAsync(new HsCodeExampleInput(0, candidate.RawCode, candidate.CurrentCode, candidate.ProductName,
+            candidate.Specification, "HistoryConfirmed", 2026, "ManuallyVerified", true));
+        Assert.Empty(await service.DiscoverHistoryCandidatesAsync("圆领短袖"));
+        Assert.Equal(1, await service.CountExamplesAsync(string.Empty));
+    }
+
+    [Fact]
     public async Task Search_ShouldMatchOrdinaryNameAndResolveSingleObsoleteCode()
     {
         using var factory = new SqliteFactory();

@@ -703,6 +703,14 @@ namespace ExportDocManager.Api.Hosting
                 catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
             }).WithName("RecordHsCodeKnowledgeFeedback");
 
+            endpoints.MapGet("/api/master-data/hs-knowledge/history-candidates", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                string keyword, int? maxResults, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                return Results.Ok(await service.DiscoverHistoryCandidatesAsync(keyword, maxResults ?? 200, cancellationToken));
+            }).WithName("DiscoverHsCodeHistoryCandidates");
+
             endpoints.MapGet("/api/master-data/hs-knowledge/export", async (
                 HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
                 DateTimeOffset? since, CancellationToken cancellationToken) =>

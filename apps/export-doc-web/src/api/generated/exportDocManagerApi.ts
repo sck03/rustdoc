@@ -4195,6 +4195,7 @@ export interface HsCodeKnowledgeExample { id: number; rawReportedHsCode: string;
 export interface HsCodeKnowledgeExamplePage { items: HsCodeKnowledgeExample[]; totalCount: number; pageNumber: number; pageSize: number; }
 export interface HsCodeKnowledgeExampleInput { id: number; rawReportedHsCode: string; resolvedCurrentHsCode: string; productName: string; specification: string; source: string; sourceYear?: number | null; resolutionStatus: string; isManuallyVerified: boolean; }
 export interface HsCodeKnowledgeFeedbackInput { queryText: string; productName: string; specification: string; candidateCode: string; accepted: boolean; }
+export interface HsCodeHistoryLearningCandidate { fingerprint: string; rawCode: string; currentCode: string; productName: string; specification: string; source: string; sourceCount: number; resolutionStatus: string; replacementCandidates: string[]; canConfirm: boolean; }
 export interface HsCodeKnowledgeImportResponse { fileName: string; hsCodeCount: number; exampleCount: number; replacementCount: number; feedbackCount: number; warnings: string[]; result: { message: string }; }
 
 export type AccessTokenProvider = string | (() => string | undefined | Promise<string | undefined>);
@@ -4260,6 +4261,10 @@ export class ExportDocManagerApiClient {
 
   public recordHsCodeKnowledgeFeedback(body: HsCodeKnowledgeFeedbackInput): Promise<ApiCommandResponse> {
     return this.request("POST", "/api/master-data/hs-knowledge/feedback", { body });
+  }
+
+  public discoverHsCodeHistoryCandidates(keyword = "", maxResults = 200): Promise<HsCodeHistoryLearningCandidate[]> {
+    return this.request("GET", "/api/master-data/hs-knowledge/history-candidates", { query: { keyword, maxResults } });
   }
 
   public importHsCodeKnowledge(file: Blob): Promise<HsCodeKnowledgeImportResponse> {

@@ -55,3 +55,14 @@ apps/license-keygen-tauri/
 .env.*
 !.env.example
 !*.env.example
+
+# Runtime databases and user-owned HS knowledge/history exports must stay local.
+*.edmhs
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+**/HsKnowledgeImports/
+**/HsCodeImports/
+**/hs-import-probe/

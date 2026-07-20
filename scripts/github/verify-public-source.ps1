@@ -18,7 +18,12 @@ $requiredIgnoreRules = @(
     "apps/license-keygen-tauri/",
     "Browsers/**",
     "**/KEY/",
-    "**/ExportDocLicenseKeyGen*"
+    "**/ExportDocLicenseKeyGen*",
+    "*.edmhs",
+    "*.sqlite",
+    "*.db",
+    "**/HsKnowledgeImports/",
+    "**/HsCodeImports/"
 )
 $ignorePath = Join-Path $repositoryRoot ".gitignore"
 $ignoreText = Get-Content -LiteralPath $ignorePath -Raw -Encoding UTF8
@@ -54,7 +59,12 @@ $forbiddenPathPatterns = @(
     '^apps/license-keygen-tauri/',
     '(^|/)KEY/',
     'ExportDocLicenseKeyGen',
-    '\.(pem|key|p8|p12|pfx|snk)$'
+    '\.(pem|key|p8|p12|pfx|snk)$',
+    '\.(edmhs|sqlite|sqlite3|db|db-shm|db-wal)$',
+    '(^|/)HsKnowledgeImports/',
+    '(^|/)HsCodeImports/',
+    '(^|/)hs-import-probe/',
+    '税则.*\.(xlsx|xlsm|xls|csv)$'
 )
 $textExtensions = @(
     '.cs', '.rs', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.ps1', '.cmd',

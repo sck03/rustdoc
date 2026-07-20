@@ -20,7 +20,7 @@ namespace ExportDocManager.Services.MasterData
             ["男士"] = "男式", ["男款"] = "男式", ["MENS"] = "男式", ["MEN'S"] = "男式",
             ["女士"] = "女式", ["女款"] = "女式", ["WOMENS"] = "女式", ["WOMEN'S"] = "女式",
             ["全棉"] = "100%棉", ["纯棉"] = "100%棉", ["COTTON"] = "棉",
-            ["针织物"] = "针织", ["KNITTED"] = "针织"
+            ["针织物"] = "针织", ["KNITTED"] = "针织", ["钩编"] = "针织"
         };
 
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
@@ -62,7 +62,10 @@ namespace ExportDocManager.Services.MasterData
             foreach (var example in examples)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                int textScore = ScoreText(normalizedQuery, example.SearchText);
+                int nameScore = ScoreText(normalizedQuery, NormalizeSearchText(example.ProductName));
+                int specificationScore = ScoreText(normalizedQuery, NormalizeSearchText(example.Specification));
+                int combinedScore = ScoreText(normalizedQuery, example.SearchText);
+                int textScore = Math.Max(combinedScore, (int)Math.Round(nameScore * 0.72d + specificationScore * 0.28d));
                 if (textScore < 18) continue;
                 var resolution = ResolveCurrentCode(example, codeMap, relations);
                 int feedbackBoost = feedback
@@ -208,6 +211,46 @@ namespace ExportDocManager.Services.MasterData
                 await UpsertExampleInContextAsync(context, exampleInput, now, cancellationToken);
             }
             await context.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<IReadOnlyList<HsCodeHistoryLearningCandidate>> DiscoverHistoryCandidatesAsync(
+            string keyword, int maxResults = 200, CancellationToken cancellationToken = default)
+        {
+            maxResults = Math.Clamp(maxResults, 1, 1000);
+            string filter = NormalizeSearchText(keyword);
+            await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var codes = await context.HsCodes.AsNoTracking().ToListAsync(cancellationToken);
+            var codeMap = codes.Where(item => !string.IsNullOrWhiteSpace(item.NormalizedCode))
+                .GroupBy(item => item.NormalizedCode, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var relations = await context.HsCodeReplacementRelations.AsNoTracking().ToListAsync(cancellationToken);
+            var known = (await context.HsCodeDeclarationExamples.AsNoTracking().Select(item => item.Fingerprint).ToListAsync(cancellationToken))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var rows = new List<HistorySourceRow>();
+
+            rows.AddRange((await context.Products.AsNoTracking().Where(item => item.HSCode != null && item.HSCode != "").Take(5000).ToListAsync(cancellationToken))
+                .Select(item => new HistorySourceRow(item.HSCode, Prefer(item.NameCN, item.NameEN), $"{item.Material} {item.Brand} {item.Elements} {item.Description}", "商品主数据")));
+            rows.AddRange((await context.Items.AsNoTracking().Where(item => item.HSCode != null && item.HSCode != "").Take(10000).ToListAsync(cancellationToken))
+                .Select(item => new HistorySourceRow(item.HSCode, Prefer(item.StyleNameCN, item.StyleName), $"{item.FabricComposition} {item.Brand} {item.StyleNo}", "历史商业发票")));
+            rows.AddRange((await context.CustomsCooItems.AsNoTracking().Where(item => item.HSCode != "").Take(5000).ToListAsync(cancellationToken))
+                .Select(item => new HistorySourceRow(item.HSCode, Prefer(item.GoodsName, item.GoodsNameE), item.GoodsDesc, "历史报关资料")));
+
+            return rows.Where(item => !string.IsNullOrWhiteSpace(item.Code) && !string.IsNullOrWhiteSpace(item.Name))
+                .Select(item => item with { Code = HsCodeTextHelper.NormalizeCode(item.Code), Name = item.Name.Trim(), Specification = (item.Specification ?? string.Empty).Trim() })
+                .Where(item => string.IsNullOrWhiteSpace(filter) || NormalizeSearchText($"{item.Name} {item.Specification} {item.Code}").Contains(filter, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(item => new { item.Code, Name = NormalizeSearchText(item.Name), Specification = NormalizeSearchText(item.Specification) })
+                .Select(group =>
+                {
+                    var first = group.First();
+                    string fingerprint = BuildFingerprint(first.Code, first.Name, first.Specification);
+                    var resolution = ResolveCurrentCode(new HsCodeDeclarationExample { RawReportedHsCode = first.Code }, codeMap, relations);
+                    return new HsCodeHistoryLearningCandidate(fingerprint, first.Code, resolution.CurrentCode ?? string.Empty,
+                        first.Name, first.Specification, string.Join("、", group.Select(item => item.Source).Distinct()), group.Count(),
+                        resolution.Status, resolution.Replacements, !known.Contains(fingerprint) && !string.IsNullOrWhiteSpace(resolution.CurrentCode));
+                })
+                .Where(item => !known.Contains(item.Fingerprint))
+                .OrderByDescending(item => item.CanConfirm).ThenByDescending(item => item.SourceCount).ThenBy(item => item.ProductName)
+                .Take(maxResults).ToList();
         }
 
         public async Task<int> CaptureRemoteExamplesAsync(
@@ -427,8 +470,9 @@ namespace ExportDocManager.Services.MasterData
 
         internal static string NormalizeSearchText(string value)
         {
-            string normalized = (value ?? string.Empty).Trim().ToUpperInvariant();
-            foreach (var synonym in Synonyms) normalized = normalized.Replace(synonym.Key.ToUpperInvariant(), synonym.Value.ToUpperInvariant(), StringComparison.Ordinal);
+            string normalized = (value ?? string.Empty).Normalize(NormalizationForm.FormKC).Trim().ToUpperInvariant();
+            foreach (var synonym in Synonyms.OrderByDescending(item => item.Key.Length))
+                normalized = normalized.Replace(synonym.Key.Normalize(NormalizationForm.FormKC).ToUpperInvariant(), synonym.Value.ToUpperInvariant(), StringComparison.Ordinal);
             return new string(normalized.Where(character => char.IsLetterOrDigit(character) || character >= 0x4e00 && character <= 0x9fff || character == '%').ToArray());
         }
 
@@ -550,6 +594,7 @@ namespace ExportDocManager.Services.MasterData
         private sealed record KnowledgeManifest(string SchemaVersion, DateTimeOffset ExportedAt, DateTimeOffset? Since, Dictionary<string, string> Checksums);
         private sealed record CurrentCodeResolution(string CurrentCode, string Status, IReadOnlyList<string> Replacements);
         private sealed record KnowledgeCandidate(HsCodeDeclarationExample Example, CurrentCodeResolution Resolution, int Score);
+        private sealed record HistorySourceRow(string Code, string Name, string Specification, string Source);
     }
 
 }

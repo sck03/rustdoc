@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, CloudDownload, Database, Download, Search, Sparkles, Upload } from "lucide-react";
+import { BookOpen, CloudDownload, Database, Download, GraduationCap, Search, Sparkles, Upload } from "lucide-react";
 import { type FormEvent, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import type { ExportDocManagerApiClient, HsCodeKnowledgeExampleInput } from "../../api/index.ts";
@@ -8,6 +8,7 @@ import { HsCodeToolsPanel } from "./HsCodeToolsPanel.tsx";
 
 const sections = [
   ["search", "智能查询", Search], ["examples", "申报实例库", BookOpen],
+  ["history", "历史资料学习", GraduationCap],
   ["annual", "年度税则", Database], ["transfer", "换机迁移", Download], ["online", "联网补充", CloudDownload],
 ] as const;
 
@@ -21,9 +22,18 @@ export function HsCodeKnowledgePage({ client }: { client: ExportDocManagerApiCli
     </nav>
     {section === "search" ? <KnowledgeSearch client={client}/> : null}
     {section === "examples" ? <ExampleLibrary client={client}/> : null}
+    {section === "history" ? <HistoryLearning client={client}/> : null}
     {section === "transfer" ? <KnowledgeTransfer client={client}/> : null}
     {section === "annual" || section === "online" ? <div className="knowledge-task-card"><h2>{section === "annual" ? "年度税则资料" : "联网补充申报实例"}</h2><p>{section === "annual" ? "导入新年度完整税则前先预检差异，过期编码不会直接作为可用编码推荐。" : "联网结果会保存为申报实例；后续优先使用本地知识库，网页改版也不会丢失已积累经验。"}</p><HsCodeToolsPanel client={client} disabled={false} keyword="" onLocalDataChanged={async () => undefined}/></div> : null}
   </section>;
+}
+
+function HistoryLearning({ client }: { client: ExportDocManagerApiClient }) {
+  const queryClient = useQueryClient(); const [keyword, setKeyword] = useState("");
+  const candidates = useQuery({ queryKey: ["hs-history-candidates", keyword], queryFn: () => client.discoverHsCodeHistoryCandidates(keyword) });
+  const confirm = useMutation({ mutationFn: (item: NonNullable<typeof candidates.data>[number]) => client.saveHsCodeKnowledgeExample({ id: 0, rawReportedHsCode: item.rawCode, resolvedCurrentHsCode: item.currentCode, productName: item.productName, specification: item.specification, source: `HistoryConfirmed:${item.source}`, sourceYear: new Date().getFullYear(), resolutionStatus: "ManuallyVerified", isManuallyVerified: true }), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["hs-history-candidates"] }); void queryClient.invalidateQueries({ queryKey: ["hs-knowledge-examples"] }); } });
+  return <div className="knowledge-task-card"><div className="section-heading"><div><h2>从自己的历史资料学习</h2><p>这里只生成待审核候选。只有点击“确认加入”的记录才会成为正式申报实例，系统猜测不会自动学习。</p></div></div><input className="knowledge-filter" value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="筛选商品名称、材质、品牌或HS编码"/>
+    <div className="knowledge-table">{candidates.data?.map(item => <article key={item.fingerprint}><div><strong>{item.productName}</strong><span>{item.rawCode}{item.currentCode && item.currentCode !== item.rawCode ? ` → ${item.currentCode}` : ""}</span><p>{item.specification || "暂无规格"}</p><small>{item.source} · 历史出现 {item.sourceCount} 次</small></div><div><span className="status-pill">{item.resolutionStatus}</span><button className="command-button" disabled={!item.canConfirm || confirm.isPending} onClick={() => confirm.mutate(item)}>{item.canConfirm ? "确认加入" : "需先处理编码"}</button></div></article>)}</div>{candidates.data?.length === 0 ? <div className="empty-guidance"><strong>没有新的待确认资料</strong><span>已确认或没有填写HS编码的历史商品不会重复显示。</span></div> : null}</div>;
 }
 
 function KnowledgeSearch({ client }: { client: ExportDocManagerApiClient }) {

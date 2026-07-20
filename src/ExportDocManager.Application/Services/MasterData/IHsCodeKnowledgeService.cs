@@ -39,6 +39,10 @@ namespace ExportDocManager.Services.MasterData
         string CandidateCode,
         bool Accepted);
 
+    public sealed record HsCodeHistoryLearningCandidate(string Fingerprint, string RawCode, string CurrentCode,
+        string ProductName, string Specification, string Source, int SourceCount, string ResolutionStatus,
+        IReadOnlyList<string> ReplacementCandidates, bool CanConfirm);
+
     public sealed record HsCodeKnowledgePackagePreview(
         string FileName,
         string SchemaVersion,
@@ -70,6 +74,7 @@ namespace ExportDocManager.Services.MasterData
         Task<HsCodeDeclarationExample> SaveExampleAsync(HsCodeExampleInput input, CancellationToken cancellationToken = default);
         Task<bool> DeleteExampleAsync(int id, CancellationToken cancellationToken = default);
         Task RecordFeedbackAsync(HsCodeKnowledgeFeedbackInput input, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<HsCodeHistoryLearningCandidate>> DiscoverHistoryCandidatesAsync(string keyword, int maxResults = 200, CancellationToken cancellationToken = default);
         Task<int> CaptureRemoteExamplesAsync(string query, IEnumerable<HsCode> remoteRows, CancellationToken cancellationToken = default);
         Task RefreshReplacementRelationsAsync(HsCodeImportPreview preview, CancellationToken cancellationToken = default);
         Task<byte[]> ExportPackageAsync(DateTimeOffset? since = null, CancellationToken cancellationToken = default);
