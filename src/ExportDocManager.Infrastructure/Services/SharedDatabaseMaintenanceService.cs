@@ -14,7 +14,7 @@ namespace ExportDocManager.Services.Infrastructure
     public sealed class SharedDatabaseMaintenanceService : ISharedDatabaseMaintenanceService
     {
         private const string OwnershipStoragePolicy =
-            "共享库权限改派只更新发票和付款报销的 OwnerUserId、DepartmentId、CompanyScope 归属字段；不移动附件、不生成导出目录、不读取用户显式导出文件。";
+            "共享库权限改派只更新发票、付款报销、CRM、供应商、商机、邮件/报表模板和装柜方案的 OwnerUserId、DepartmentId、CompanyScope 归属字段；关联子记录继续随所属业务聚合访问，不移动附件、不生成导出目录、不读取用户显式导出文件。";
         private const string SupportPackageStoragePolicy =
             "支持包默认写入运行数据根 SupportPackages/，只收集脱敏运行诊断、任务快照、设置摘要和运行数据根 Logs 最近文本日志；默认不打包数据库正文或样张文件，管理员显式勾选并确认后才包含最近数据库备份或样张索引；不会打包授权私钥、邮件密码、WebDAV 密码或 PostgreSQL 密码。";
         private const string PostgreSqlPhysicalBackupStoragePolicy =
@@ -194,21 +194,23 @@ namespace ExportDocManager.Services.Infrastructure
         {
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
             var users = await context.Users.AsNoTracking().OrderBy(user => user.Username).ToListAsync(cancellationToken).ConfigureAwait(false);
-            var invoiceGroups = await context.Invoices.AsNoTracking()
-                .GroupBy(invoice => invoice.OwnerUserId)
-                .Select(group => new { OwnerUserId = group.Key, Count = group.Count() })
-                .ToListAsync(cancellationToken)
-                .ConfigureAwait(false);
-            var paymentGroups = await context.Payments.AsNoTracking()
-                .GroupBy(payment => payment.OwnerUserId)
-                .Select(group => new { OwnerUserId = group.Key, Count = group.Count() })
-                .ToListAsync(cancellationToken)
-                .ConfigureAwait(false);
+            var invoiceGroups = await LoadOwnerCountsAsync(context.Invoices.AsNoTracking(), cancellationToken).ConfigureAwait(false);
+            var paymentGroups = await LoadOwnerCountsAsync(context.Payments.AsNoTracking(), cancellationToken).ConfigureAwait(false);
+            var otherBusinessGroups = CombineOwnerCounts(
+                await LoadOwnerCountsAsync(context.CrmCustomers.AsNoTracking(), cancellationToken).ConfigureAwait(false),
+                await LoadOwnerCountsAsync(context.CrmFollowUps.AsNoTracking(), cancellationToken).ConfigureAwait(false),
+                await LoadOwnerCountsAsync(context.SupplierCompanies.AsNoTracking(), cancellationToken).ConfigureAwait(false),
+                await LoadOwnerCountsAsync(context.SalesOpportunities.AsNoTracking(), cancellationToken).ConfigureAwait(false),
+                await LoadOwnerCountsAsync(context.EmailTemplates.AsNoTracking(), cancellationToken).ConfigureAwait(false),
+                await LoadOwnerCountsAsync(context.UserReportTemplates.AsNoTracking(), cancellationToken).ConfigureAwait(false),
+                await LoadOwnerCountsAsync(context.ContainerProjects.AsNoTracking(), cancellationToken).ConfigureAwait(false));
 
             int invoiceTotal = invoiceGroups.Sum(group => group.Count);
             int paymentTotal = paymentGroups.Sum(group => group.Count);
+            int otherBusinessTotal = otherBusinessGroups.TotalCount;
             int unassignedInvoices = invoiceGroups.FirstOrDefault(group => group.OwnerUserId == null)?.Count ?? 0;
             int unassignedPayments = paymentGroups.FirstOrDefault(group => group.OwnerUserId == null)?.Count ?? 0;
+            int unassignedOtherBusiness = otherBusinessGroups.UnassignedCount;
 
             var ownerItems = users
                 .Select(user => new SharedDatabaseOwnerSummaryItem(
@@ -218,8 +220,10 @@ namespace ExportDocManager.Services.Infrastructure
                     user.Role ?? string.Empty,
                     user.DepartmentId ?? string.Empty,
                     user.CompanyScope ?? string.Empty,
+                    user.IsActive,
                     invoiceGroups.FirstOrDefault(group => group.OwnerUserId == user.Id)?.Count ?? 0,
-                    paymentGroups.FirstOrDefault(group => group.OwnerUserId == user.Id)?.Count ?? 0))
+                    paymentGroups.FirstOrDefault(group => group.OwnerUserId == user.Id)?.Count ?? 0,
+                    otherBusinessGroups.GetCount(user.Id)))
                 .ToArray();
 
             return new SharedDatabaseOwnershipSummary(
@@ -227,6 +231,8 @@ namespace ExportDocManager.Services.Infrastructure
                 unassignedInvoices,
                 paymentTotal,
                 unassignedPayments,
+                otherBusinessTotal,
+                unassignedOtherBusiness,
                 ownerItems,
                 OwnershipStoragePolicy);
         }
@@ -236,14 +242,19 @@ namespace ExportDocManager.Services.Infrastructure
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(request);
-            if (!request.IncludeInvoices && !request.IncludePayments)
+            if (!request.IncludeInvoices && !request.IncludePayments && !request.IncludeOtherBusinessData)
             {
-                throw new InvalidOperationException("请至少选择发票或付款报销一种业务数据。");
+                throw new InvalidOperationException("请至少选择一种需要改派的业务数据。");
             }
 
             if (request.ToUserId <= 0)
             {
                 throw new InvalidOperationException("请选择新的归属用户。");
+            }
+
+            if (!request.OnlyUnassigned && request.FromUserId == request.ToUserId)
+            {
+                throw new InvalidOperationException("来源用户和目标用户不能相同。");
             }
 
             return await AppDbContextExecution.ExecuteInTransactionAsync(
@@ -258,6 +269,7 @@ namespace ExportDocManager.Services.Infrastructure
 
                     int updatedInvoices = 0;
                     int updatedPayments = 0;
+                    int updatedOtherBusinessData = 0;
                     string departmentId = string.IsNullOrWhiteSpace(request.DepartmentId)
                         ? targetUser.DepartmentId ?? string.Empty
                         : request.DepartmentId.Trim();
@@ -267,40 +279,149 @@ namespace ExportDocManager.Services.Infrastructure
 
                     if (request.IncludeInvoices)
                     {
-                        var invoices = await BuildOwnershipQuery(context.Invoices, request)
-                            .ToListAsync(token)
-                            .ConfigureAwait(false);
-                        foreach (var invoice in invoices)
-                        {
-                            invoice.OwnerUserId = targetUser.Id;
-                            invoice.DepartmentId = departmentId;
-                            invoice.CompanyScope = companyScope;
-                        }
-
-                        updatedInvoices = invoices.Count;
+                        updatedInvoices = await TransferOwnedRowsAsync(
+                            context,
+                            context.Invoices,
+                            request,
+                            (item, ownerUserId, department, company) =>
+                            {
+                                item.OwnerUserId = ownerUserId;
+                                item.DepartmentId = department;
+                                item.CompanyScope = company;
+                            },
+                            targetUser.Id,
+                            departmentId,
+                            companyScope,
+                            token).ConfigureAwait(false);
                     }
 
                     if (request.IncludePayments)
                     {
-                        var payments = await BuildOwnershipQuery(context.Payments, request)
-                            .ToListAsync(token)
-                            .ConfigureAwait(false);
-                        foreach (var payment in payments)
-                        {
-                            payment.OwnerUserId = targetUser.Id;
-                            payment.DepartmentId = departmentId;
-                            payment.CompanyScope = companyScope;
-                        }
+                        updatedPayments = await TransferOwnedRowsAsync(
+                            context,
+                            context.Payments,
+                            request,
+                            (item, ownerUserId, department, company) =>
+                            {
+                                item.OwnerUserId = ownerUserId;
+                                item.DepartmentId = department;
+                                item.CompanyScope = company;
+                            },
+                            targetUser.Id,
+                            departmentId,
+                            companyScope,
+                            token).ConfigureAwait(false);
+                    }
 
-                        updatedPayments = payments.Count;
+                    if (request.IncludeOtherBusinessData)
+                    {
+                        updatedOtherBusinessData += await TransferOwnedRowsAsync(
+                            context,
+                            context.CrmCustomers,
+                            request,
+                            (item, ownerUserId, department, company) =>
+                            {
+                                item.OwnerUserId = ownerUserId;
+                                item.DepartmentId = department;
+                                item.CompanyScope = company;
+                            },
+                            targetUser.Id,
+                            departmentId,
+                            companyScope,
+                            token).ConfigureAwait(false);
+                        updatedOtherBusinessData += await TransferOwnedRowsAsync(
+                            context,
+                            context.CrmFollowUps,
+                            request,
+                            (item, ownerUserId, department, company) =>
+                            {
+                                item.OwnerUserId = ownerUserId;
+                                item.DepartmentId = department;
+                                item.CompanyScope = company;
+                            },
+                            targetUser.Id,
+                            departmentId,
+                            companyScope,
+                            token).ConfigureAwait(false);
+                        updatedOtherBusinessData += await TransferOwnedRowsAsync(
+                            context,
+                            context.SupplierCompanies,
+                            request,
+                            (item, ownerUserId, department, company) =>
+                            {
+                                item.OwnerUserId = ownerUserId;
+                                item.DepartmentId = department;
+                                item.CompanyScope = company;
+                            },
+                            targetUser.Id,
+                            departmentId,
+                            companyScope,
+                            token).ConfigureAwait(false);
+                        updatedOtherBusinessData += await TransferOwnedRowsAsync(
+                            context,
+                            context.SalesOpportunities,
+                            request,
+                            (item, ownerUserId, department, company) =>
+                            {
+                                item.OwnerUserId = ownerUserId;
+                                item.DepartmentId = department;
+                                item.CompanyScope = company;
+                            },
+                            targetUser.Id,
+                            departmentId,
+                            companyScope,
+                            token).ConfigureAwait(false);
+                        updatedOtherBusinessData += await TransferOwnedRowsAsync(
+                            context,
+                            context.EmailTemplates,
+                            request,
+                            (item, ownerUserId, department, company) =>
+                            {
+                                item.OwnerUserId = ownerUserId;
+                                item.DepartmentId = department;
+                                item.CompanyScope = company;
+                            },
+                            targetUser.Id,
+                            departmentId,
+                            companyScope,
+                            token).ConfigureAwait(false);
+                        updatedOtherBusinessData += await TransferOwnedRowsAsync(
+                            context,
+                            context.UserReportTemplates,
+                            request,
+                            (item, ownerUserId, department, company) =>
+                            {
+                                item.OwnerUserId = ownerUserId;
+                                item.DepartmentId = department;
+                                item.CompanyScope = company;
+                            },
+                            targetUser.Id,
+                            departmentId,
+                            companyScope,
+                            token).ConfigureAwait(false);
+                        updatedOtherBusinessData += await TransferOwnedRowsAsync(
+                            context,
+                            context.ContainerProjects,
+                            request,
+                            (item, ownerUserId, department, company) =>
+                            {
+                                item.OwnerUserId = ownerUserId;
+                                item.DepartmentId = department;
+                                item.CompanyScope = company;
+                            },
+                            targetUser.Id,
+                            departmentId,
+                            companyScope,
+                            token).ConfigureAwait(false);
                     }
 
                     await context.SaveChangesAsync(token).ConfigureAwait(false);
                     return new SharedDatabaseOwnershipTransferResult(
                         true,
-                        $"归属改派完成：发票 {updatedInvoices} 条，付款报销 {updatedPayments} 条。",
+                        $"归属改派完成：发票 {updatedInvoices} 条，付款报销 {updatedPayments} 条，其他业务资料 {updatedOtherBusinessData} 条。",
                         updatedInvoices,
                         updatedPayments,
+                        updatedOtherBusinessData,
                         OwnershipStoragePolicy);
                 },
                 cancellationToken).ConfigureAwait(false);
@@ -367,32 +488,96 @@ namespace ExportDocManager.Services.Infrastructure
             await JsonSerializer.SerializeAsync(stream, value, JsonOptions, cancellationToken).ConfigureAwait(false);
         }
 
-        private static IQueryable<Invoice> BuildOwnershipQuery(
-            IQueryable<Invoice> source,
-            SharedDatabaseOwnershipTransferRequest request)
+        private static async Task<List<OwnerCount>> LoadOwnerCountsAsync<TEntity>(
+            IQueryable<TEntity> source,
+            CancellationToken cancellationToken)
+            where TEntity : class
         {
-            if (request.OnlyUnassigned)
-            {
-                return source.Where(item => item.OwnerUserId == null);
-            }
-
-            return request.FromUserId.HasValue
-                ? source.Where(item => item.OwnerUserId == request.FromUserId.Value)
-                : source;
+            return await source
+                .GroupBy(item => EF.Property<int?>(item, nameof(Invoice.OwnerUserId)))
+                .Select(group => new OwnerCount(group.Key, group.Count()))
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
         }
 
-        private static IQueryable<Payment> BuildOwnershipQuery(
-            IQueryable<Payment> source,
-            SharedDatabaseOwnershipTransferRequest request)
+        private static OwnerCountAggregate CombineOwnerCounts(params IReadOnlyList<OwnerCount>[] groups)
         {
-            if (request.OnlyUnassigned)
+            var counts = new Dictionary<int, int>();
+            int unassignedCount = 0;
+            foreach (var group in groups.SelectMany(items => items))
             {
-                return source.Where(item => item.OwnerUserId == null);
+                if (group.OwnerUserId.HasValue)
+                {
+                    int ownerUserId = group.OwnerUserId.Value;
+                    counts[ownerUserId] = counts.GetValueOrDefault(ownerUserId) + group.Count;
+                }
+                else
+                {
+                    unassignedCount += group.Count;
+                }
             }
 
-            return request.FromUserId.HasValue
-                ? source.Where(item => item.OwnerUserId == request.FromUserId.Value)
-                : source;
+            return new OwnerCountAggregate(counts, unassignedCount);
+        }
+
+        private static async Task<int> TransferOwnedRowsAsync<TEntity>(
+            AppDbContext context,
+            DbSet<TEntity> source,
+            SharedDatabaseOwnershipTransferRequest request,
+            Action<TEntity, int, string, string> applyOwner,
+            int ownerUserId,
+            string departmentId,
+            string companyScope,
+            CancellationToken cancellationToken)
+            where TEntity : class
+        {
+            const int batchSize = 500;
+            int updatedCount = 0;
+            int lastId = 0;
+            while (true)
+            {
+                IQueryable<TEntity> query = source.Where(item => EF.Property<int>(item, "Id") > lastId);
+                if (request.OnlyUnassigned)
+                {
+                    query = query.Where(item => EF.Property<int?>(item, nameof(Invoice.OwnerUserId)) == null);
+                }
+                else if (request.FromUserId.HasValue)
+                {
+                    int fromUserId = request.FromUserId.Value;
+                    query = query.Where(item => EF.Property<int?>(item, nameof(Invoice.OwnerUserId)) == fromUserId);
+                }
+
+                var rows = await query
+                    .OrderBy(item => EF.Property<int>(item, "Id"))
+                    .Take(batchSize)
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                if (rows.Count == 0)
+                {
+                    break;
+                }
+
+                foreach (var row in rows)
+                {
+                    applyOwner(row, ownerUserId, departmentId, companyScope);
+                }
+
+                await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                lastId = context.Entry(rows[^1]).Property<int>("Id").CurrentValue;
+                updatedCount += rows.Count;
+                context.ChangeTracker.Clear();
+            }
+
+            return updatedCount;
+        }
+
+        private sealed record OwnerCount(int? OwnerUserId, int Count);
+
+        private sealed record OwnerCountAggregate(IReadOnlyDictionary<int, int> Counts, int UnassignedCount)
+        {
+            public int TotalCount => UnassignedCount + Counts.Values.Sum();
+
+            public int GetCount(int ownerUserId) => Counts.GetValueOrDefault(ownerUserId);
         }
 
         private async Task WriteJobSnapshotAsync(ZipArchive archive, CancellationToken cancellationToken)

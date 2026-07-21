@@ -22,6 +22,8 @@ namespace ExportDocManager.Services.BrowserRuntime
         private string _profileRoot;
         private DateTimeOffset _startedAt;
         private int _useCount;
+        private int _activeOperations;
+        private bool _recycleRequested;
         private int _disposed;
 
         public ManagedPlaywrightBrowserHost(
@@ -32,6 +34,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
             _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            CleanupStaleProfiles();
         }
 
         public string GetAvailabilityMessage()
@@ -60,9 +63,12 @@ namespace ExportDocManager.Services.BrowserRuntime
 
             IBrowserContext context = null;
             IPage page = null;
+            bool recycleBrowser = false;
+            bool operationStarted = false;
             try
             {
-                IBrowser browser = await GetOrCreateBrowserAsync(linkedCts.Token).ConfigureAwait(false);
+                IBrowser browser = await BeginOperationAsync(linkedCts.Token).ConfigureAwait(false);
+                operationStarted = true;
                 context = await browser.NewContextAsync(new BrowserNewContextOptions
                 {
                     IgnoreHTTPSErrors = false,
@@ -78,64 +84,44 @@ namespace ExportDocManager.Services.BrowserRuntime
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
             {
-                await InvalidateAsync().ConfigureAwait(false);
-                throw new InvalidOperationException($"浏览器自动化超过 {Math.Ceiling(timeout.TotalSeconds)} 秒，已关闭本任务页面并回收受控浏览器进程。");
+                recycleBrowser = true;
+                throw new InvalidOperationException($"浏览器自动化超过 {Math.Ceiling(timeout.TotalSeconds)} 秒，已关闭本任务页面；受控浏览器将在其他并行页面结束后安全回收。");
             }
             catch
             {
                 if (_process == null || _process.HasExited || _browser == null || !_browser.IsConnected)
-                    await InvalidateAsync().ConfigureAwait(false);
+                    recycleBrowser = true;
                 throw;
             }
             finally
             {
                 if (page != null) try { await page.CloseAsync().ConfigureAwait(false); } catch { }
                 if (context != null) try { await context.CloseAsync().ConfigureAwait(false); } catch { }
-                if (ShouldRecycle()) await InvalidateAsync().ConfigureAwait(false);
+                if (operationStarted)
+                {
+                    await EndOperationAsync(recycleBrowser || ShouldRecycle()).ConfigureAwait(false);
+                }
             }
         }
 
-        private async Task<IBrowser> GetOrCreateBrowserAsync(CancellationToken cancellationToken)
+        private async Task<IBrowser> BeginOperationAsync(CancellationToken cancellationToken)
         {
             await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                if (_browser != null && _browser.IsConnected && _process != null && !_process.HasExited) return _browser;
-                await StopBrowserCoreAsync().ConfigureAwait(false);
-                string executable = _resolver.Resolve();
-                _profileRoot = Path.Combine(_pathProvider.CacheRoot, "BrowserRuntime", $"automation-{Environment.ProcessId}-{Guid.NewGuid():N}");
-                Directory.CreateDirectory(_profileRoot);
-                var endpointSource = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-                var process = new Process
+                if (_activeOperations == 0 && (_recycleRequested || ShouldRecycle()))
                 {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = executable,
-                        UseShellExecute = false,
-                        RedirectStandardError = true,
-                        RedirectStandardOutput = true,
-                        CreateNoWindow = true
-                    },
-                    EnableRaisingEvents = true
-                };
-                AddBrowserArguments(process.StartInfo, _profileRoot);
-                process.ErrorDataReceived += (_, args) =>
+                    await StopBrowserCoreAsync().ConfigureAwait(false);
+                    _recycleRequested = false;
+                }
+
+                if (_browser == null || !_browser.IsConnected || _process == null || _process.HasExited)
                 {
-                    const string marker = "DevTools listening on ";
-                    int markerIndex = args.Data?.IndexOf(marker, StringComparison.OrdinalIgnoreCase) ?? -1;
-                    if (markerIndex >= 0) endpointSource.TrySetResult(args.Data![(markerIndex + marker.Length)..].Trim());
-                };
-                process.Exited += (_, _) => endpointSource.TrySetException(new InvalidOperationException("受控 Chromium 在建立自动化连接前退出。"));
-                if (!process.Start()) throw new InvalidOperationException("无法启动受控 Chromium 自动化进程。");
-                process.BeginErrorReadLine();
-                process.BeginOutputReadLine();
-                _process = process;
-                _registration = _runtime.RegisterOwnedProcess(process, BrowserWorkloadKind.WebAutomation, "Playwright HS lookup");
-                string endpoint = await endpointSource.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(false);
-                _playwright = await Playwright.CreateAsync().ConfigureAwait(false);
-                _browser = await _playwright.Chromium.ConnectOverCDPAsync(endpoint).ConfigureAwait(false);
-                _startedAt = DateTimeOffset.Now;
-                _useCount = 0;
+                    await StopBrowserCoreAsync().ConfigureAwait(false);
+                    await StartBrowserCoreAsync(cancellationToken).ConfigureAwait(false);
+                }
+
+                _activeOperations++;
                 return _browser;
             }
             catch
@@ -147,6 +133,63 @@ namespace ExportDocManager.Services.BrowserRuntime
             {
                 _lifecycleGate.Release();
             }
+        }
+
+        private async Task EndOperationAsync(bool requestRecycle)
+        {
+            await _lifecycleGate.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                _recycleRequested |= requestRecycle;
+                _activeOperations = Math.Max(0, _activeOperations - 1);
+                if (_activeOperations == 0 && _recycleRequested)
+                {
+                    await StopBrowserCoreAsync().ConfigureAwait(false);
+                    _recycleRequested = false;
+                }
+            }
+            finally
+            {
+                _lifecycleGate.Release();
+            }
+        }
+
+        private async Task StartBrowserCoreAsync(CancellationToken cancellationToken)
+        {
+            string executable = _resolver.Resolve();
+            _profileRoot = Path.Combine(_pathProvider.CacheRoot, "BrowserRuntime", $"automation-{Environment.ProcessId}-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(_profileRoot);
+            var endpointSource = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = executable,
+                    UseShellExecute = false,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                },
+                EnableRaisingEvents = true
+            };
+            AddBrowserArguments(process.StartInfo, _profileRoot);
+            process.ErrorDataReceived += (_, args) =>
+            {
+                const string marker = "DevTools listening on ";
+                int markerIndex = args.Data?.IndexOf(marker, StringComparison.OrdinalIgnoreCase) ?? -1;
+                if (markerIndex >= 0) endpointSource.TrySetResult(args.Data![(markerIndex + marker.Length)..].Trim());
+            };
+            process.Exited += (_, _) => endpointSource.TrySetException(new InvalidOperationException("受控 Chromium 在建立自动化连接前退出。"));
+            if (!process.Start()) throw new InvalidOperationException("无法启动受控 Chromium 自动化进程。");
+            process.BeginErrorReadLine();
+            process.BeginOutputReadLine();
+            _process = process;
+            _registration = _runtime.RegisterOwnedProcess(process, BrowserWorkloadKind.WebAutomation, "Playwright HS lookup");
+            string endpoint = await endpointSource.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(false);
+            _playwright = await Playwright.CreateAsync().ConfigureAwait(false);
+            _browser = await _playwright.Chromium.ConnectOverCDPAsync(endpoint).ConfigureAwait(false);
+            _startedAt = DateTimeOffset.Now;
+            _useCount = 0;
         }
 
         private static void AddBrowserArguments(ProcessStartInfo startInfo, string profileRoot)
@@ -180,6 +223,47 @@ namespace ExportDocManager.Services.BrowserRuntime
             await _lifecycleGate.WaitAsync().ConfigureAwait(false);
             try { await StopBrowserCoreAsync().ConfigureAwait(false); }
             finally { _lifecycleGate.Release(); }
+        }
+
+        private void CleanupStaleProfiles()
+        {
+            string runtimeRoot = Path.Combine(_pathProvider.CacheRoot, "BrowserRuntime");
+            if (!Directory.Exists(runtimeRoot))
+            {
+                return;
+            }
+
+            try
+            {
+                foreach (string directory in Directory.EnumerateDirectories(runtimeRoot, "automation-*", SearchOption.TopDirectoryOnly))
+                {
+                    string name = Path.GetFileName(directory);
+                    string processIdPart = name.Split('-', StringSplitOptions.RemoveEmptyEntries).Skip(1).FirstOrDefault() ?? string.Empty;
+                    if (!int.TryParse(processIdPart, out int processId) || processId == Environment.ProcessId || IsProcessRunning(processId))
+                    {
+                        continue;
+                    }
+
+                    AtomicFileHelper.TryDeleteDirectory(directory);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Stale cache cleanup is best effort and must not prevent browser startup.
+            }
+        }
+
+        private static bool IsProcessRunning(int processId)
+        {
+            try
+            {
+                using var process = Process.GetProcessById(processId);
+                return !process.HasExited;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private async Task StopBrowserCoreAsync()

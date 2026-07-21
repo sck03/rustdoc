@@ -56,6 +56,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddSingleton<ApiCurrentUserResolver>();
             services.AddSingleton<ApiAuthorizationService>();
             services.AddSingleton(_ => ApiBackgroundJobConcurrencyOptions.FromEnvironment());
+            services.AddSingleton(_ => ApiBackgroundJobRetentionOptions.FromEnvironment());
             services.AddSingleton<ApiBackgroundJobService>();
             services.AddSingleton<ApiBackgroundJobRunner>();
             services.AddSingleton<ApiBackgroundJobRetryDispatcher>();

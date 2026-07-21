@@ -137,6 +137,8 @@ namespace ExportDocManager.Api.Hosting
                     summary.UnassignedInvoices,
                     summary.TotalPayments,
                     summary.UnassignedPayments,
+                    summary.TotalOtherBusinessData,
+                    summary.UnassignedOtherBusinessData,
                     summary.Owners.Select(ToSharedDatabaseOwnerSummaryItemDto).ToArray(),
                     summary.StoragePolicy));
             })
@@ -180,6 +182,7 @@ namespace ExportDocManager.Api.Hosting
                             ToUserId = request.ToUserId,
                             IncludeInvoices = request.IncludeInvoices,
                             IncludePayments = request.IncludePayments,
+                            IncludeOtherBusinessData = request.IncludeOtherBusinessData,
                             OnlyUnassigned = request.OnlyUnassigned,
                             DepartmentId = request.DepartmentId ?? string.Empty,
                             CompanyScope = request.CompanyScope ?? string.Empty
@@ -190,6 +193,7 @@ namespace ExportDocManager.Api.Hosting
                         result.Message,
                         result.UpdatedInvoices,
                         result.UpdatedPayments,
+                        result.UpdatedOtherBusinessData,
                         result.StoragePolicy));
                 }
                 catch (InvalidOperationException ex)
@@ -352,8 +356,10 @@ namespace ExportDocManager.Api.Hosting
                 item.Role,
                 item.DepartmentId,
                 item.CompanyScope,
+                item.IsActive,
                 item.InvoiceCount,
-                item.PaymentCount);
+                item.PaymentCount,
+                item.OtherBusinessDataCount);
         }
     }
 }

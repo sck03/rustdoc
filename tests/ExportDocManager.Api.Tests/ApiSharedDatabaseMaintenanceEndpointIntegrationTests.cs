@@ -47,6 +47,19 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, createTargetResponse.StatusCode);
             var createdTarget = await ApiIntegrationTestHarness.ReadJsonAsync<ApiUserSaveResponse>(createTargetResponse);
 
+            var createInactiveResponse = await adminClient.PostAsJsonAsync("/api/users", new
+            {
+                username = "shared-inactive",
+                fullName = "Shared Inactive",
+                role = "User",
+                departmentId = "OLD",
+                companyScope = "CN",
+                isActive = false,
+                resetPassword = "inactive-pass"
+            });
+            Assert.Equal(HttpStatusCode.OK, createInactiveResponse.StatusCode);
+            var createdInactive = await ApiIntegrationTestHarness.ReadJsonAsync<ApiUserSaveResponse>(createInactiveResponse);
+
             await SeedOwnedBusinessDataAsync(harness.DatabasePath, createdOperator.User.Id);
 
             var operatorLogin = await harness.LoginAsync(anonymousClient, "shared-operator", "operator-pass");
@@ -66,6 +79,12 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(1, summary.UnassignedInvoices);
             Assert.Equal(2, summary.TotalPayments);
             Assert.Equal(1, summary.UnassignedPayments);
+            Assert.Equal(515, summary.TotalOtherBusinessData);
+            Assert.Equal(508, summary.UnassignedOtherBusinessData);
+            var operatorSummary = Assert.Single(summary.Owners, owner => owner.UserId == createdOperator.User.Id);
+            Assert.True(operatorSummary.IsActive);
+            Assert.Equal(7, operatorSummary.OtherBusinessDataCount);
+            Assert.False(Assert.Single(summary.Owners, owner => owner.UserId == createdInactive.User.Id).IsActive);
 
             var transferResponse = await adminClient.PostAsJsonAsync("/api/shared-database/ownership/transfer", new
             {
@@ -73,6 +92,7 @@ namespace ExportDocManager.Api.Tests
                 toUserId = createdTarget.User.Id,
                 includeInvoices = true,
                 includePayments = true,
+                includeOtherBusinessData = true,
                 onlyUnassigned = true,
                 departmentId = "",
                 companyScope = "",
@@ -82,8 +102,37 @@ namespace ExportDocManager.Api.Tests
             var transfer = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSharedDatabaseOwnershipTransferResponse>(transferResponse);
             Assert.Equal(1, transfer.UpdatedInvoices);
             Assert.Equal(1, transfer.UpdatedPayments);
+            Assert.Equal(508, transfer.UpdatedOtherBusinessData);
 
             await AssertUnassignedRecordsTransferredAsync(harness.DatabasePath, createdTarget.User.Id);
+
+            var sameUserResponse = await adminClient.PostAsJsonAsync("/api/shared-database/ownership/transfer", new
+            {
+                fromUserId = createdTarget.User.Id,
+                toUserId = createdTarget.User.Id,
+                includeInvoices = true,
+                includePayments = false,
+                includeOtherBusinessData = false,
+                onlyUnassigned = false,
+                departmentId = "",
+                companyScope = "",
+                confirmationText = "TRANSFER OWNERSHIP"
+            });
+            Assert.Equal(HttpStatusCode.Conflict, sameUserResponse.StatusCode);
+
+            var inactiveTargetResponse = await adminClient.PostAsJsonAsync("/api/shared-database/ownership/transfer", new
+            {
+                fromUserId = createdOperator.User.Id,
+                toUserId = createdInactive.User.Id,
+                includeInvoices = false,
+                includePayments = false,
+                includeOtherBusinessData = true,
+                onlyUnassigned = false,
+                departmentId = "",
+                companyScope = "",
+                confirmationText = "TRANSFER OWNERSHIP"
+            });
+            Assert.Equal(HttpStatusCode.Conflict, inactiveTargetResponse.StatusCode);
 
             Directory.CreateDirectory(Path.Combine(harness.DataRoot, "Logs"));
             await File.WriteAllTextAsync(Path.Combine(harness.DataRoot, "Logs", "crash-test.log"), "sample crash diagnostic");
@@ -163,6 +212,31 @@ namespace ExportDocManager.Api.Tests
             await context.Payments.AddRangeAsync(
                 CreatePayment("UNASSIGNED-1", null, "", ""),
                 CreatePayment("OWNED-1", ownerUserId, "OPS", "HQ"));
+            var unassignedCustomer = CreateCrmCustomer("UNASSIGNED CRM", null, "", "");
+            var ownedCustomer = CreateCrmCustomer("OWNED CRM", ownerUserId, "OPS", "HQ");
+            await context.CrmCustomers.AddRangeAsync(unassignedCustomer, ownedCustomer);
+            await context.SaveChangesAsync();
+            await context.CrmFollowUps.AddRangeAsync(
+                CreateCrmFollowUp(unassignedCustomer.Id, "UNASSIGNED FOLLOWUP", null, "", ""),
+                CreateCrmFollowUp(ownedCustomer.Id, "OWNED FOLLOWUP", ownerUserId, "OPS", "HQ"));
+            await context.SupplierCompanies.AddRangeAsync(
+                CreateSupplier("UNASSIGNED SUPPLIER", null, "", ""),
+                CreateSupplier("OWNED SUPPLIER", ownerUserId, "OPS", "HQ"));
+            await context.SalesOpportunities.AddRangeAsync(
+                CreateOpportunity(unassignedCustomer.Id, "UNASSIGNED OPPORTUNITY", null, "", ""),
+                CreateOpportunity(ownedCustomer.Id, "OWNED OPPORTUNITY", ownerUserId, "OPS", "HQ"));
+            await context.EmailTemplates.AddRangeAsync(
+                CreateEmailTemplate("UNASSIGNED EMAIL", null, "", ""),
+                CreateEmailTemplate("OWNED EMAIL", ownerUserId, "OPS", "HQ"));
+            await context.UserReportTemplates.AddRangeAsync(
+                CreateReportTemplate("UNASSIGNED REPORT", null, "", ""),
+                CreateReportTemplate("OWNED REPORT", ownerUserId, "OPS", "HQ"));
+            await context.ContainerProjects.AddRangeAsync(
+                CreateContainerProject("UNASSIGNED CONTAINER", null, "", ""),
+                CreateContainerProject("OWNED CONTAINER", ownerUserId, "OPS", "HQ"));
+            await context.ContainerProjects.AddRangeAsync(
+                Enumerable.Range(1, 501)
+                    .Select(index => CreateContainerProject($"BATCH CONTAINER {index:000}", null, "", "")));
             await context.SaveChangesAsync();
         }
 
@@ -181,6 +255,69 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(targetUserId, transferredPayment.OwnerUserId);
             Assert.Equal("DOC", transferredPayment.DepartmentId);
             Assert.Equal("CN", transferredPayment.CompanyScope);
+
+            AssertTransferred(await context.CrmCustomers.AsNoTracking().SingleAsync(item => item.Name == "UNASSIGNED CRM"), targetUserId);
+            AssertTransferred(await context.CrmFollowUps.AsNoTracking().SingleAsync(item => item.Summary == "UNASSIGNED FOLLOWUP"), targetUserId);
+            AssertTransferred(await context.SupplierCompanies.AsNoTracking().SingleAsync(item => item.Name == "UNASSIGNED SUPPLIER"), targetUserId);
+            AssertTransferred(await context.SalesOpportunities.AsNoTracking().SingleAsync(item => item.Title == "UNASSIGNED OPPORTUNITY"), targetUserId);
+            AssertTransferred(await context.EmailTemplates.AsNoTracking().SingleAsync(item => item.Name == "UNASSIGNED EMAIL"), targetUserId);
+            AssertTransferred(await context.UserReportTemplates.AsNoTracking().SingleAsync(item => item.Name == "UNASSIGNED REPORT"), targetUserId);
+            AssertTransferred(await context.ContainerProjects.AsNoTracking().SingleAsync(item => item.Name == "UNASSIGNED CONTAINER"), targetUserId);
+            Assert.Equal(
+                501,
+                await context.ContainerProjects.AsNoTracking().CountAsync(item => item.Name.StartsWith("BATCH CONTAINER ") && item.OwnerUserId == targetUserId));
+
+            Assert.Equal(targetUserId, (await context.CrmCustomers.AsNoTracking().SingleAsync(item => item.Name == "UNASSIGNED CRM")).OwnerUserId);
+            Assert.NotEqual(targetUserId, (await context.CrmCustomers.AsNoTracking().SingleAsync(item => item.Name == "OWNED CRM")).OwnerUserId);
+        }
+
+        private static void AssertTransferred(CrmCustomer item, int targetUserId)
+        {
+            Assert.Equal(targetUserId, item.OwnerUserId);
+            Assert.Equal("DOC", item.DepartmentId);
+            Assert.Equal("CN", item.CompanyScope);
+        }
+
+        private static void AssertTransferred(CrmFollowUp item, int targetUserId)
+        {
+            Assert.Equal(targetUserId, item.OwnerUserId);
+            Assert.Equal("DOC", item.DepartmentId);
+            Assert.Equal("CN", item.CompanyScope);
+        }
+
+        private static void AssertTransferred(SupplierCompany item, int targetUserId)
+        {
+            Assert.Equal(targetUserId, item.OwnerUserId);
+            Assert.Equal("DOC", item.DepartmentId);
+            Assert.Equal("CN", item.CompanyScope);
+        }
+
+        private static void AssertTransferred(SalesOpportunity item, int targetUserId)
+        {
+            Assert.Equal(targetUserId, item.OwnerUserId);
+            Assert.Equal("DOC", item.DepartmentId);
+            Assert.Equal("CN", item.CompanyScope);
+        }
+
+        private static void AssertTransferred(EmailTemplate item, int targetUserId)
+        {
+            Assert.Equal(targetUserId, item.OwnerUserId);
+            Assert.Equal("DOC", item.DepartmentId);
+            Assert.Equal("CN", item.CompanyScope);
+        }
+
+        private static void AssertTransferred(UserReportTemplate item, int targetUserId)
+        {
+            Assert.Equal(targetUserId, item.OwnerUserId);
+            Assert.Equal("DOC", item.DepartmentId);
+            Assert.Equal("CN", item.CompanyScope);
+        }
+
+        private static void AssertTransferred(ContainerProject item, int targetUserId)
+        {
+            Assert.Equal(targetUserId, item.OwnerUserId);
+            Assert.Equal("DOC", item.DepartmentId);
+            Assert.Equal("CN", item.CompanyScope);
         }
 
         private static AppDbContext CreateContext(string databasePath)
@@ -271,5 +408,67 @@ namespace ExportDocManager.Api.Tests
                 ShipmentCountry = ""
             };
         }
+
+        private static CrmCustomer CreateCrmCustomer(string name, int? ownerUserId, string departmentId, string companyScope) => new()
+        {
+            Name = name,
+            OwnerUserId = ownerUserId,
+            DepartmentId = departmentId,
+            CompanyScope = companyScope
+        };
+
+        private static CrmFollowUp CreateCrmFollowUp(int customerId, string summary, int? ownerUserId, string departmentId, string companyScope) => new()
+        {
+            CrmCustomerId = customerId,
+            Summary = summary,
+            OwnerUserId = ownerUserId,
+            DepartmentId = departmentId,
+            CompanyScope = companyScope
+        };
+
+        private static SupplierCompany CreateSupplier(string name, int? ownerUserId, string departmentId, string companyScope) => new()
+        {
+            Name = name,
+            OwnerUserId = ownerUserId,
+            DepartmentId = departmentId,
+            CompanyScope = companyScope
+        };
+
+        private static SalesOpportunity CreateOpportunity(int customerId, string title, int? ownerUserId, string departmentId, string companyScope) => new()
+        {
+            CrmCustomerId = customerId,
+            Title = title,
+            OwnerUserId = ownerUserId,
+            DepartmentId = departmentId,
+            CompanyScope = companyScope
+        };
+
+        private static EmailTemplate CreateEmailTemplate(string name, int? ownerUserId, string departmentId, string companyScope) => new()
+        {
+            Name = name,
+            OwnerUserId = ownerUserId,
+            DepartmentId = departmentId,
+            CompanyScope = companyScope
+        };
+
+        private static UserReportTemplate CreateReportTemplate(string name, int? ownerUserId, string departmentId, string companyScope) => new()
+        {
+            Name = name,
+            ContentHtml = "<html></html>",
+            OwnerUserId = ownerUserId,
+            DepartmentId = departmentId,
+            CompanyScope = companyScope
+        };
+
+        private static ContainerProject CreateContainerProject(string name, int? ownerUserId, string departmentId, string companyScope) => new()
+        {
+            Name = name,
+            ContainerType = "40HQ",
+            OwnerUserId = ownerUserId,
+            DepartmentId = departmentId,
+            CompanyScope = companyScope,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
     }
 }

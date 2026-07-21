@@ -9,10 +9,11 @@ namespace ExportDocManager.Api.Hosting
         private async Task RunAsync(
             BackgroundJobSnapshot initial,
             CancellationTokenSource cancellationSource,
-            Func<IServiceProvider, ApiBackgroundJobExecutionContext, Task<string>> executeAsync)
+            Func<IServiceProvider, ApiBackgroundJobExecutionContext, Task<string>> executeAsync,
+            UserConcurrencyState userState)
         {
             string jobId = initial.JobId;
-            var userConcurrency = GetUserConcurrency(initial.RequestedBy);
+            var userConcurrency = userState.Gate;
             bool globalAcquired = false;
             bool userAcquired = false;
             bool browserAcquired = false;
@@ -151,6 +152,7 @@ namespace ExportDocManager.Api.Hosting
                     userConcurrency.Release();
                 }
                 _jobs.RemoveCancellationSource(jobId);
+                ReleaseQueueSlot(initial.RequestedBy, userState);
             }
         }
 

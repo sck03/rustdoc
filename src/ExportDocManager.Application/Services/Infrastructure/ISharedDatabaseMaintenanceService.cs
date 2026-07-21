@@ -17,6 +17,8 @@ namespace ExportDocManager.Services.Infrastructure
         int UnassignedInvoices,
         int TotalPayments,
         int UnassignedPayments,
+        int TotalOtherBusinessData,
+        int UnassignedOtherBusinessData,
         IReadOnlyList<SharedDatabaseOwnerSummaryItem> Owners,
         string StoragePolicy);
 
@@ -27,14 +29,17 @@ namespace ExportDocManager.Services.Infrastructure
         string Role,
         string DepartmentId,
         string CompanyScope,
+        bool IsActive,
         int InvoiceCount,
-        int PaymentCount);
+        int PaymentCount,
+        int OtherBusinessDataCount);
 
     public sealed record SharedDatabaseOwnershipTransferResult(
         bool Success,
         string Message,
         int UpdatedInvoices,
         int UpdatedPayments,
+        int UpdatedOtherBusinessData,
         string StoragePolicy);
 
     public sealed record SupportPackageResult(
@@ -99,6 +104,7 @@ namespace ExportDocManager.Services.Infrastructure
         public int ToUserId { get; set; }
         public bool IncludeInvoices { get; set; } = true;
         public bool IncludePayments { get; set; } = true;
+        public bool IncludeOtherBusinessData { get; set; } = true;
         public bool OnlyUnassigned { get; set; }
         public string DepartmentId { get; set; } = string.Empty;
         public string CompanyScope { get; set; } = string.Empty;

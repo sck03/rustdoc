@@ -13,8 +13,11 @@ namespace ExportDocManager.Api.Hosting
         private readonly SemaphoreSlim _globalConcurrency;
         private readonly SemaphoreSlim _browserConcurrency;
         private readonly int _perUserConcurrencyLimit;
-        private readonly ConcurrentDictionary<string, SemaphoreSlim> _userConcurrency =
+        private readonly int _globalQueueLimit;
+        private readonly int _perUserQueueLimit;
+        private readonly ConcurrentDictionary<string, UserConcurrencyState> _userConcurrency =
             new(StringComparer.OrdinalIgnoreCase);
+        private int _reservedJobs;
 
         public ApiBackgroundJobRunner(
             ApiBackgroundJobService jobs,
@@ -49,6 +52,8 @@ namespace ExportDocManager.Api.Hosting
             _globalConcurrency = new SemaphoreSlim(normalizedOptions.GlobalLimit, normalizedOptions.GlobalLimit);
             _browserConcurrency = new SemaphoreSlim(normalizedOptions.BrowserLimit, normalizedOptions.BrowserLimit);
             _perUserConcurrencyLimit = normalizedOptions.PerUserLimit;
+            _globalQueueLimit = normalizedOptions.GlobalQueueLimit;
+            _perUserQueueLimit = normalizedOptions.PerUserQueueLimit;
         }
 
         public BackgroundJobSnapshot Enqueue(
@@ -69,6 +74,21 @@ namespace ExportDocManager.Api.Hosting
             string jobId = $"{normalizedKind.ToLowerInvariant()}-{Guid.NewGuid():N}";
             var now = DateTimeOffset.UtcNow;
             var currentUser = _currentUserContext?.CurrentUser;
+            string normalizedRequestedBy = requestedBy?.Trim() ?? string.Empty;
+            if (!TryReserveQueueSlot(normalizedRequestedBy, out var userState, out string rejectionMessage))
+            {
+                return CreateQueueRejectedJob(
+                    jobId,
+                    normalizedKind,
+                    title.Trim(),
+                    normalizedRequestedBy,
+                    currentUser,
+                    now,
+                    rejectionMessage,
+                    normalizedRetryOperation,
+                    normalizedRetryRequestJson);
+            }
+
             var snapshot = _jobs.Upsert(new BackgroundJobSnapshot
             {
                 JobId = jobId,
@@ -78,9 +98,9 @@ namespace ExportDocManager.Api.Hosting
                 ProgressPercent = 0,
                 StatusText = "排队中",
                 DetailText = string.Empty,
-                RequestedBy = requestedBy ?? string.Empty,
+                RequestedBy = normalizedRequestedBy,
                 RequestedByUserId = currentUser != null &&
-                    string.Equals(currentUser.Username, requestedBy, StringComparison.OrdinalIgnoreCase)
+                    string.Equals(currentUser.Username, normalizedRequestedBy, StringComparison.OrdinalIgnoreCase)
                         ? currentUser.Id
                         : 0,
                 CreatedAt = now,
@@ -92,17 +112,72 @@ namespace ExportDocManager.Api.Hosting
 
             var cancellationSource = new CancellationTokenSource();
             _jobs.RegisterCancellationSource(jobId, cancellationSource);
-            _ = Task.Run(() => RunAsync(snapshot, cancellationSource, executeAsync));
+            _ = Task.Run(() => RunAsync(snapshot, cancellationSource, executeAsync, userState));
 
             return snapshot;
         }
 
-        private SemaphoreSlim GetUserConcurrency(string requestedBy)
+        private bool TryReserveQueueSlot(
+            string requestedBy,
+            out UserConcurrencyState userState,
+            out string rejectionMessage)
         {
             string key = string.IsNullOrWhiteSpace(requestedBy) ? "__system__" : requestedBy.Trim();
-            return _userConcurrency.GetOrAdd(
-                key,
-                _ => new SemaphoreSlim(_perUserConcurrencyLimit, _perUserConcurrencyLimit));
+            int globalCount = Interlocked.Increment(ref _reservedJobs);
+            if (globalCount > _globalQueueLimit)
+            {
+                Interlocked.Decrement(ref _reservedJobs);
+                userState = null;
+                rejectionMessage = $"系统任务队列已达到 {_globalQueueLimit} 条上限，请等待现有任务完成后重试。";
+                return false;
+            }
+
+            while (true)
+            {
+                userState = _userConcurrency.GetOrAdd(
+                    key,
+                    static (_, limit) => new UserConcurrencyState(limit),
+                    _perUserConcurrencyLimit);
+                lock (userState.SyncRoot)
+                {
+                    if (!_userConcurrency.TryGetValue(key, out var current) || !ReferenceEquals(current, userState))
+                    {
+                        continue;
+                    }
+
+                    if (userState.ReservedJobs >= _perUserQueueLimit)
+                    {
+                        Interlocked.Decrement(ref _reservedJobs);
+                        rejectionMessage = $"当前用户任务队列已达到 {_perUserQueueLimit} 条上限，请等待现有任务完成后重试。";
+                        return false;
+                    }
+
+                    userState.ReservedJobs++;
+                    rejectionMessage = string.Empty;
+                    return true;
+                }
+            }
+        }
+
+        private void ReleaseQueueSlot(string requestedBy, UserConcurrencyState userState)
+        {
+            Interlocked.Decrement(ref _reservedJobs);
+            if (userState == null)
+            {
+                return;
+            }
+
+            string key = string.IsNullOrWhiteSpace(requestedBy) ? "__system__" : requestedBy.Trim();
+            lock (userState.SyncRoot)
+            {
+                userState.ReservedJobs = Math.Max(0, userState.ReservedJobs - 1);
+                if (userState.ReservedJobs == 0)
+                {
+                    ((ICollection<KeyValuePair<string, UserConcurrencyState>>)_userConcurrency)
+                        .Remove(new KeyValuePair<string, UserConcurrencyState>(key, userState));
+                    userState.Gate.Dispose();
+                }
+            }
         }
 
         private static bool UsesBrowserCapacity(string kind)
@@ -110,6 +185,20 @@ namespace ExportDocManager.Api.Hosting
             string normalized = kind?.Trim() ?? string.Empty;
             return normalized.Contains("Pdf", StringComparison.OrdinalIgnoreCase) ||
                    normalized.Contains("ReportDocument", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private sealed class UserConcurrencyState
+        {
+            public UserConcurrencyState(int concurrencyLimit)
+            {
+                Gate = new SemaphoreSlim(concurrencyLimit, concurrencyLimit);
+            }
+
+            public object SyncRoot { get; } = new();
+
+            public SemaphoreSlim Gate { get; }
+
+            public int ReservedJobs { get; set; }
         }
     }
 

@@ -32,6 +32,34 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public void PostgreSqlConnectionString_ShouldBoundPoolForMultiUserLoad()
+        {
+            string previous = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlMaximumPoolSizeEnvironmentVariable);
+            Environment.SetEnvironmentVariable(DbHelper.PostgreSqlMaximumPoolSizeEnvironmentVariable, "24");
+            try
+            {
+                string connectionString = DbHelper.BuildPostgreSqlConnectionString(new DatabaseConnectionSettings
+                {
+                    Provider = DatabaseConnectionSettings.PostgreSqlProvider,
+                    PostgreSqlHost = "127.0.0.1",
+                    PostgreSqlDatabase = "exportdoc",
+                    PostgreSqlUsername = "exportdoc",
+                    PostgreSqlPassword = "secret"
+                });
+                var builder = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+
+                Assert.True(builder.Pooling);
+                Assert.Equal(2, builder.MinPoolSize);
+                Assert.Equal(24, builder.MaxPoolSize);
+                Assert.Equal(300, builder.ConnectionIdleLifetime);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(DbHelper.PostgreSqlMaximumPoolSizeEnvironmentVariable, previous);
+            }
+        }
+
+        [Fact]
         public void DatabaseModeHelper_ShouldNormalizeAndValidateProvider()
         {
             Assert.Equal(DatabaseConnectionSettings.SqliteProvider, DatabaseModeHelper.NormalizeProvider(" sqlite "));

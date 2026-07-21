@@ -11,6 +11,7 @@ namespace ExportDocManager.DataAccess
 {
     public static class DbHelper
     {
+        public const string PostgreSqlMaximumPoolSizeEnvironmentVariable = "EXPORTDOCMANAGER_DB_MAX_POOL_SIZE";
         private static IAppPathProvider _pathProvider = new RuntimeAppPathProvider();
 
         public static void ConfigurePathProvider(IAppPathProvider pathProvider)
@@ -176,6 +177,9 @@ namespace ExportDocManager.DataAccess
                 Username = NormalizePostgreSqlText(settings.PostgreSqlUsername),
                 Password = settings.PostgreSqlPassword ?? string.Empty,
                 Pooling = true,
+                MinPoolSize = 2,
+                MaxPoolSize = ReadEnvironmentInt(PostgreSqlMaximumPoolSizeEnvironmentVariable, 30, 5, 200),
+                ConnectionIdleLifetime = 300,
                 Timeout = 10,
                 CommandTimeout = 30,
                 ApplicationName = "ExportDocManager"
@@ -201,6 +205,14 @@ namespace ExportDocManager.DataAccess
         public static string NormalizePostgreSqlText(string value)
         {
             return (value ?? string.Empty).Trim();
+        }
+
+        private static int ReadEnvironmentInt(string variableName, int fallback, int minimum, int maximum)
+        {
+            string value = Environment.GetEnvironmentVariable(variableName) ?? string.Empty;
+            return int.TryParse(value.Trim(), out int parsed)
+                ? Math.Clamp(parsed, minimum, maximum)
+                : fallback;
         }
 
         public static string NormalizePostgreSqlAdditionalOptions(string value)

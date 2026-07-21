@@ -182,6 +182,95 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public async Task BackgroundJobRunner_ShouldRejectExcessPerUserQueueAndRecoverCapacity()
+        {
+            var jobs = new ApiBackgroundJobService();
+            var services = new ServiceCollection();
+            using var provider = services.BuildServiceProvider();
+            var runner = new ApiBackgroundJobRunner(
+                jobs,
+                provider.GetRequiredService<IServiceScopeFactory>(),
+                NullLogger<ApiBackgroundJobRunner>.Instance,
+                new ApiBackgroundJobConcurrencyOptions
+                {
+                    GlobalLimit = 1,
+                    PerUserLimit = 1,
+                    BrowserLimit = 1,
+                    GlobalQueueLimit = 4,
+                    PerUserQueueLimit = 2
+                });
+            var started = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            var running = runner.Enqueue("Test", "running", "alice", async (_, context) =>
+            {
+                started.TrySetResult(true);
+                await release.Task.WaitAsync(context.CancellationToken);
+                return string.Empty;
+            });
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var queued = runner.Enqueue("Test", "queued", "alice", (_, _) => Task.FromResult(string.Empty));
+            var rejected = runner.Enqueue("Test", "rejected", "alice", (_, _) => Task.FromResult(string.Empty));
+
+            Assert.Equal(BackgroundJobStatusCatalog.Failed, rejected.Status);
+            Assert.Equal(ApiBackgroundJobQueueStatusCatalog.Rejected, rejected.StatusText);
+            Assert.Contains("当前用户任务队列", rejected.ErrorMessage, StringComparison.Ordinal);
+
+            release.TrySetResult(true);
+            Assert.Equal(BackgroundJobStatusCatalog.Succeeded, (await WaitForTerminalJobAsync(jobs, running.JobId)).Status);
+            Assert.Equal(BackgroundJobStatusCatalog.Succeeded, (await WaitForTerminalJobAsync(jobs, queued.JobId)).Status);
+
+            var afterRelease = runner.Enqueue("Test", "after-release", "alice", (_, _) => Task.FromResult(string.Empty));
+            Assert.Equal(BackgroundJobStatusCatalog.Succeeded, (await WaitForTerminalJobAsync(jobs, afterRelease.JobId)).Status);
+        }
+
+        [Fact]
+        public async Task BackgroundJobService_ShouldBoundTerminalHistoryPerUser()
+        {
+            using var database = TestDatabase.Create("job-retention");
+            var pathProvider = new RuntimeAppPathProvider(database.Root, database.Root);
+            var settings = new DatabaseConnectionSettings { Provider = DatabaseConnectionSettings.PostgreSqlProvider };
+            var service = new ApiBackgroundJobService(
+                pathProvider,
+                settings,
+                database.Factory,
+                new ApiBackgroundJobRetentionOptions
+                {
+                    RetentionDays = 30,
+                    GlobalLimit = 100,
+                    PerUserLimit = 20
+                });
+
+            for (int index = 0; index < 25; index++)
+            {
+                var timestamp = DateTimeOffset.UtcNow.AddMinutes(index);
+                service.Upsert(new BackgroundJobSnapshot
+                {
+                    JobId = $"retained-{index:00}",
+                    Kind = "Test",
+                    Title = $"retained-{index:00}",
+                    Status = BackgroundJobStatusCatalog.Succeeded,
+                    ProgressPercent = 100,
+                    RequestedBy = "alice",
+                    CreatedAt = timestamp,
+                    CompletedAt = timestamp,
+                    CanCancel = false
+                });
+            }
+
+            var page = await service.QueryAsync(new BackgroundJobQuery
+            {
+                RequestedBy = "alice",
+                PageNumber = 1,
+                PageSize = 100
+            });
+            Assert.Equal(20, page.TotalCount);
+            Assert.DoesNotContain(page.Items, item => item.JobId == "retained-00");
+            using var verificationContext = database.Factory.CreateDbContext();
+            Assert.Equal(20, await verificationContext.ApiBackgroundJobs.CountAsync());
+        }
+
+        [Fact]
         public async Task SqliteSingleInstanceHostedService_ShouldRejectSecondLeaseAndReleaseOnStop()
         {
             using var database = TestDatabase.Create("sqlite-single-instance");

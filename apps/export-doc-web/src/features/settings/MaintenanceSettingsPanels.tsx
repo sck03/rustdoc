@@ -511,6 +511,7 @@ function SharedDatabaseOwnershipPanel({
   const [onlyUnassigned, setOnlyUnassigned] = useState(true);
   const [includeInvoices, setIncludeInvoices] = useState(true);
   const [includePayments, setIncludePayments] = useState(true);
+  const [includeOtherBusinessData, setIncludeOtherBusinessData] = useState(true);
 
   const ownershipQuery = useQuery({
     queryKey: queryKeys.sharedDatabaseOwnership(),
@@ -520,8 +521,9 @@ function SharedDatabaseOwnershipPanel({
 
   useEffect(() => {
     const owners = ownershipQuery.data?.owners ?? [];
-    if (!toUserId && owners.length > 0) {
-      setToUserId(String(owners[0].userId));
+    const activeOwners = owners.filter((owner) => owner.isActive);
+    if ((!toUserId || !activeOwners.some((owner) => String(owner.userId) === toUserId)) && activeOwners.length > 0) {
+      setToUserId(String(activeOwners[0].userId));
     }
   }, [ownershipQuery.data, toUserId]);
 
@@ -540,6 +542,7 @@ function SharedDatabaseOwnershipPanel({
           toUserId: Number(toUserId),
           includeInvoices,
           includePayments,
+          includeOtherBusinessData,
           onlyUnassigned,
           departmentId: "",
           companyScope: "",
@@ -549,9 +552,15 @@ function SharedDatabaseOwnershipPanel({
     onSuccess: async (response) => {
       setMessage(null);
       setSuccessMessage(response.message || "归属改派完成。");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.sharedDatabaseOwnership() });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.paymentsRoot() });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.sharedDatabaseOwnership() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.paymentsRoot() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.containerPackingProjects() }),
+        queryClient.invalidateQueries({ queryKey: ["reports", "user-templates"] }),
+      ]);
     },
     onError: (error) => {
       setMessage(readApiError(error));
@@ -564,7 +573,9 @@ function SharedDatabaseOwnershipPanel({
   const canTransfer =
     canManageUsers &&
     Number(toUserId) > 0 &&
-    (includeInvoices || includePayments) &&
+    (includeInvoices || includePayments || includeOtherBusinessData) &&
+    (ownershipQuery.data?.owners ?? []).some((owner) => owner.isActive && String(owner.userId) === toUserId) &&
+    (onlyUnassigned || !fromUserId || fromUserId !== toUserId) &&
     !isBusy;
 
   function handleTransferOwnership() {
@@ -572,7 +583,9 @@ function SharedDatabaseOwnershipPanel({
       ? "当前未归属的数据"
       : owners.find((owner) => String(owner.userId) === fromUserId)?.username || "所选用户的数据";
     const targetLabel = owners.find((owner) => String(owner.userId) === toUserId)?.username || "目标用户";
-    const scopes = [includeInvoices ? "发票" : "", includePayments ? "付款报销" : ""].filter(Boolean).join("和");
+    const scopes = [includeInvoices ? "发票" : "", includePayments ? "付款报销" : "", includeOtherBusinessData ? "其他业务资料" : ""]
+      .filter(Boolean)
+      .join("、");
     if (!window.confirm(`即将把${sourceLabel}中的${scopes}改派给“${targetLabel}”。此操作会修改业务数据归属，是否继续？`)) {
       return;
     }
@@ -622,6 +635,14 @@ function SharedDatabaseOwnershipPanel({
           <span>未归属付款</span>
           <strong>{ownershipQuery.data?.unassignedPayments ?? 0}</strong>
         </div>
+        <div className="detail-item">
+          <span>其他业务资料总数</span>
+          <strong>{ownershipQuery.data?.totalOtherBusinessData ?? 0}</strong>
+        </div>
+        <div className="detail-item">
+          <span>未归属其他资料</span>
+          <strong>{ownershipQuery.data?.unassignedOtherBusinessData ?? 0}</strong>
+        </div>
       </div>
       <div className="backup-action-grid shared-ownership-action-grid">
         <SelectField
@@ -630,7 +651,7 @@ function SharedDatabaseOwnershipPanel({
           disabled={!canManageUsers || isBusy || onlyUnassigned}
           options={[
             { value: "", label: "全部用户" },
-            ...owners.map((owner) => ({ value: String(owner.userId), label: `${owner.username} (${owner.invoiceCount}/${owner.paymentCount})` })),
+            ...owners.map((owner) => ({ value: String(owner.userId), label: `${owner.username} · ${owner.isActive ? "启用" : "停用"} (${owner.invoiceCount}/${owner.paymentCount}/${owner.otherBusinessDataCount})` })),
           ]}
           onChange={setFromUserId}
         />
@@ -638,7 +659,7 @@ function SharedDatabaseOwnershipPanel({
           label="改派给"
           value={toUserId}
           disabled={!canManageUsers || isBusy || owners.length === 0}
-          options={owners.map((owner) => ({ value: String(owner.userId), label: `${owner.username} · ${owner.departmentId || "-"} / ${owner.companyScope || "-"}` }))}
+          options={owners.filter((owner) => owner.isActive).map((owner) => ({ value: String(owner.userId), label: `${owner.username} · ${owner.departmentId || "-"} / ${owner.companyScope || "-"}` }))}
           onChange={setToUserId}
         />
         <label className="settings-check">
@@ -652,6 +673,10 @@ function SharedDatabaseOwnershipPanel({
         <label className="settings-check">
           <input type="checkbox" checked={includePayments} disabled={!canManageUsers || isBusy} onChange={(event) => setIncludePayments(event.target.checked)} />
           <span>付款报销</span>
+        </label>
+        <label className="settings-check">
+          <input type="checkbox" checked={includeOtherBusinessData} disabled={!canManageUsers || isBusy} onChange={(event) => setIncludeOtherBusinessData(event.target.checked)} />
+          <span>其他业务资料</span>
         </label>
         <button
           className="command-button danger-command"
@@ -677,6 +702,7 @@ function SharedDatabaseOwnershipPanel({
               <th>公司范围</th>
               <th>发票</th>
               <th>付款报销</th>
+              <th>其他业务</th>
             </tr>
           </thead>
           <tbody>
@@ -689,11 +715,12 @@ function SharedDatabaseOwnershipPanel({
                   <td>{owner.companyScope || "-"}</td>
                   <td>{owner.invoiceCount}</td>
                   <td>{owner.paymentCount}</td>
+                  <td>{owner.otherBusinessDataCount}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td className="empty-cell" colSpan={6}>
+                <td className="empty-cell" colSpan={7}>
                   {canManageUsers ? (ownershipQuery.isFetching ? "加载中" : "暂无用户") : "无权限"}
                 </td>
               </tr>

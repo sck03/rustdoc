@@ -82,6 +82,52 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task ManagedPlaywrightHost_ShouldDeferRecycleUntilParallelPagesFinish()
+        {
+            string previousConcurrency = Environment.GetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable);
+            string previousRecycleUses = Environment.GetEnvironmentVariable(ManagedPlaywrightBrowserHost.RecycleUsesEnvironmentVariable);
+            Environment.SetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable, "2");
+            Environment.SetEnvironmentVariable(ManagedPlaywrightBrowserHost.RecycleUsesEnvironmentVariable, "1");
+            string root = FindRepositoryRoot();
+            string dataRoot = Path.Combine(root, ".codex-runtime", "BrowserRuntimeManagerTests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dataRoot);
+            var pathProvider = new RuntimeAppPathProvider(root, dataRoot);
+            try
+            {
+                await using var runtime = new BrowserRuntimeManager();
+                await using var host = new ManagedPlaywrightBrowserHost(runtime, new BrowserExecutableResolver(pathProvider), pathProvider);
+                var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var releaseFirst = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var first = host.ExecuteAsync(async (page, cancellationToken) =>
+                {
+                    await page.SetContentAsync("<div id='first'>still-alive</div>");
+                    firstStarted.TrySetResult(true);
+                    await releaseFirst.Task.WaitAsync(cancellationToken);
+                    return await page.Locator("#first").InnerTextAsync();
+                });
+                await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(20));
+
+                string second = await host.ExecuteAsync(async (page, _) =>
+                {
+                    await page.SetContentAsync("<div id='second'>done</div>");
+                    return await page.Locator("#second").InnerTextAsync();
+                });
+
+                Assert.Equal("done", second);
+                Assert.Single(runtime.GetSnapshot().OwnedProcessIds);
+                releaseFirst.TrySetResult(true);
+                Assert.Equal("still-alive", await first.WaitAsync(TimeSpan.FromSeconds(10)));
+                Assert.Empty(runtime.GetSnapshot().OwnedProcessIds);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable, previousConcurrency);
+                Environment.SetEnvironmentVariable(ManagedPlaywrightBrowserHost.RecycleUsesEnvironmentVariable, previousRecycleUses);
+                AtomicFileHelper.TryDeleteDirectory(dataRoot);
+            }
+        }
+
+        [Fact]
         public async Task ChromiumPdfRenderer_ShouldReleaseLeaseAndOwnedProcess()
         {
             string root = FindRepositoryRoot();

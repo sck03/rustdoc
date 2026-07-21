@@ -517,6 +517,8 @@ namespace ExportDocManager.Api.Hosting
                                 "unassignedInvoices",
                                 "totalPayments",
                                 "unassignedPayments",
+                                "totalOtherBusinessData",
+                                "unassignedOtherBusinessData",
                                 "owners",
                                 "storagePolicy"
                             },
@@ -526,6 +528,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["unassignedInvoices"] = new { type = "integer", format = "int32" },
                                 ["totalPayments"] = new { type = "integer", format = "int32" },
                                 ["unassignedPayments"] = new { type = "integer", format = "int32" },
+                                ["totalOtherBusinessData"] = new { type = "integer", format = "int32" },
+                                ["unassignedOtherBusinessData"] = new { type = "integer", format = "int32" },
                                 ["owners"] = new
                                 {
                                     type = "array",
@@ -545,8 +549,10 @@ namespace ExportDocManager.Api.Hosting
                                 "role",
                                 "departmentId",
                                 "companyScope",
+                                "isActive",
                                 "invoiceCount",
-                                "paymentCount"
+                                "paymentCount",
+                                "otherBusinessDataCount"
                             },
                             properties = new Dictionary<string, object>
                             {
@@ -556,20 +562,23 @@ namespace ExportDocManager.Api.Hosting
                                 ["role"] = StringProperty("User role."),
                                 ["departmentId"] = StringProperty("Department scope."),
                                 ["companyScope"] = StringProperty("Company scope."),
+                                ["isActive"] = new { type = "boolean" },
                                 ["invoiceCount"] = new { type = "integer", format = "int32" },
-                                ["paymentCount"] = new { type = "integer", format = "int32" }
+                                ["paymentCount"] = new { type = "integer", format = "int32" },
+                                ["otherBusinessDataCount"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["ApiSharedDatabaseOwnershipTransferRequest"] = new
                         {
                             type = "object",
-                            required = new[] { "toUserId", "includeInvoices", "includePayments", "onlyUnassigned", "confirmationText" },
+                            required = new[] { "toUserId", "includeInvoices", "includePayments", "includeOtherBusinessData", "onlyUnassigned", "confirmationText" },
                             properties = new Dictionary<string, object>
                             {
                                 ["fromUserId"] = new { type = "integer", format = "int32", nullable = true },
                                 ["toUserId"] = new { type = "integer", format = "int32" },
                                 ["includeInvoices"] = new { type = "boolean" },
                                 ["includePayments"] = new { type = "boolean" },
+                                ["includeOtherBusinessData"] = new { type = "boolean" },
                                 ["onlyUnassigned"] = new { type = "boolean" },
                                 ["departmentId"] = StringProperty("Optional department scope override. Defaults to target user department."),
                                 ["companyScope"] = StringProperty("Optional company scope override. Defaults to target user company scope."),
@@ -579,13 +588,14 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiSharedDatabaseOwnershipTransferResponse"] = new
                         {
                             type = "object",
-                            required = new[] { "success", "message", "updatedInvoices", "updatedPayments", "storagePolicy" },
+                            required = new[] { "success", "message", "updatedInvoices", "updatedPayments", "updatedOtherBusinessData", "storagePolicy" },
                             properties = new Dictionary<string, object>
                             {
                                 ["success"] = new { type = "boolean" },
                                 ["message"] = StringProperty("Ownership transfer result message."),
                                 ["updatedInvoices"] = new { type = "integer", format = "int32" },
                                 ["updatedPayments"] = new { type = "integer", format = "int32" },
+                                ["updatedOtherBusinessData"] = new { type = "integer", format = "int32" },
                                 ["storagePolicy"] = StringProperty("Ownership transfer storage and data-domain policy.")
                             }
                         },

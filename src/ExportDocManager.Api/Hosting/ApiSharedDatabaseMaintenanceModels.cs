@@ -12,6 +12,8 @@ namespace ExportDocManager.Api.Hosting
         int UnassignedInvoices,
         int TotalPayments,
         int UnassignedPayments,
+        int TotalOtherBusinessData,
+        int UnassignedOtherBusinessData,
         IReadOnlyList<ApiSharedDatabaseOwnerSummaryItemDto> Owners,
         string StoragePolicy);
 
@@ -22,14 +24,17 @@ namespace ExportDocManager.Api.Hosting
         string Role,
         string DepartmentId,
         string CompanyScope,
+        bool IsActive,
         int InvoiceCount,
-        int PaymentCount);
+        int PaymentCount,
+        int OtherBusinessDataCount);
 
     public sealed record ApiSharedDatabaseOwnershipTransferRequest(
         int? FromUserId,
         int ToUserId,
         bool IncludeInvoices,
         bool IncludePayments,
+        bool IncludeOtherBusinessData,
         bool OnlyUnassigned,
         string DepartmentId,
         string CompanyScope,
@@ -40,6 +45,7 @@ namespace ExportDocManager.Api.Hosting
         string Message,
         int UpdatedInvoices,
         int UpdatedPayments,
+        int UpdatedOtherBusinessData,
         string StoragePolicy);
 
     public sealed record ApiSupportPackageResponse(

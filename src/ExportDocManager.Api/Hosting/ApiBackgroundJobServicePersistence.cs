@@ -61,6 +61,8 @@ namespace ExportDocManager.Api.Hosting
                 {
                     PersistJobs();
                 }
+
+                PruneTerminalHistory();
             }
             catch (IOException)
             {
@@ -127,6 +129,11 @@ namespace ExportDocManager.Api.Hosting
             lock (_persistenceLock)
             {
                 AtomicFileHelper.WriteAllTextAtomic(_storePath, json);
+                long persistedAt = DateTimeOffset.UtcNow.UtcTicks;
+                foreach (var job in jobs)
+                {
+                    _lastPersistedUtcTicks[job.JobId] = persistedAt;
+                }
             }
         }
 
@@ -149,6 +156,8 @@ namespace ExportDocManager.Api.Hosting
             {
                 PersistDatabaseJob(job);
             }
+
+            PruneTerminalHistory();
         }
 
         private void PersistDatabaseJob(BackgroundJobSnapshot snapshot)
@@ -167,6 +176,7 @@ namespace ExportDocManager.Api.Hosting
 
                 ApplySnapshot(record, snapshot);
                 context.SaveChanges();
+                _lastPersistedUtcTicks[snapshot.JobId] = DateTimeOffset.UtcNow.UtcTicks;
             }
         }
 

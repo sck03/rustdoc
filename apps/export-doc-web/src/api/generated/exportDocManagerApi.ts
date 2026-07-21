@@ -2263,6 +2263,8 @@ export interface ApiSharedDatabaseOwnerSummaryItemDto {
   departmentId: string;
   fullName: string;
   invoiceCount: number;
+  isActive: boolean;
+  otherBusinessDataCount: number;
   paymentCount: number;
   role: string;
   userId: number;
@@ -2273,8 +2275,10 @@ export interface ApiSharedDatabaseOwnershipSummaryResponse {
   owners: ApiSharedDatabaseOwnerSummaryItemDto[];
   storagePolicy: string;
   totalInvoices: number;
+  totalOtherBusinessData: number;
   totalPayments: number;
   unassignedInvoices: number;
+  unassignedOtherBusinessData: number;
   unassignedPayments: number;
 }
 
@@ -2284,6 +2288,7 @@ export interface ApiSharedDatabaseOwnershipTransferRequest {
   departmentId?: string;
   fromUserId?: number;
   includeInvoices: boolean;
+  includeOtherBusinessData: boolean;
   includePayments: boolean;
   onlyUnassigned: boolean;
   toUserId: number;
@@ -2294,6 +2299,7 @@ export interface ApiSharedDatabaseOwnershipTransferResponse {
   storagePolicy: string;
   success: boolean;
   updatedInvoices: number;
+  updatedOtherBusinessData: number;
   updatedPayments: number;
 }
 

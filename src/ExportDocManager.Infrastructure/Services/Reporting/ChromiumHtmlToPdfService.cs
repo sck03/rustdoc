@@ -90,7 +90,7 @@ namespace ExportDocManager.Services.Reporting
             }
             finally
             {
-                AtomicFileHelper.TryDeleteDirectory(tempRoot);
+                await DeleteTemporaryDirectoryAsync(tempRoot).ConfigureAwait(false);
             }
         }
 
@@ -314,6 +314,18 @@ namespace ExportDocManager.Services.Reporting
             }
             catch
             {
+            }
+        }
+
+        private static async Task DeleteTemporaryDirectoryAsync(string path)
+        {
+            for (int attempt = 0; attempt < 5 && Directory.Exists(path); attempt++)
+            {
+                AtomicFileHelper.TryDeleteDirectory(path);
+                if (Directory.Exists(path))
+                {
+                    await Task.Delay(100).ConfigureAwait(false);
+                }
             }
         }
 

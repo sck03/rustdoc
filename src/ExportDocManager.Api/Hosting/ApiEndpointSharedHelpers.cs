@@ -41,6 +41,14 @@ namespace ExportDocManager.Api.Hosting
 
         internal static IResult AcceptedBackgroundJob(BackgroundJobSnapshot job)
         {
+            if (job != null &&
+                string.Equals(job.StatusText, ApiBackgroundJobQueueStatusCatalog.Rejected, StringComparison.Ordinal))
+            {
+                return Results.Json(
+                    new ApiErrorResponse(job.ErrorMessage),
+                    statusCode: StatusCodes.Status429TooManyRequests);
+            }
+
             return Results.Accepted($"/api/jobs/{job.JobId}", job);
         }
 

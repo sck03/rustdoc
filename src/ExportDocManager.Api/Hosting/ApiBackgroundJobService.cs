@@ -10,14 +10,19 @@ namespace ExportDocManager.Api.Hosting
     {
         private readonly ConcurrentDictionary<string, BackgroundJobSnapshot> _jobs = new(StringComparer.OrdinalIgnoreCase);
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _cancellationSources = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, long> _lastPersistedUtcTicks = new(StringComparer.OrdinalIgnoreCase);
         private readonly IAppPathProvider _pathProvider;
+        private readonly ApiBackgroundJobRetentionOptions _retentionOptions;
+        private readonly object _historyCleanupLock = new();
 
         public ApiBackgroundJobService()
         {
+            _retentionOptions = new ApiBackgroundJobRetentionOptions().Normalize();
         }
 
         public ApiBackgroundJobService(IAppPathProvider pathProvider)
         {
+            _retentionOptions = new ApiBackgroundJobRetentionOptions().Normalize();
             if (pathProvider == null)
             {
                 return;
@@ -32,9 +37,19 @@ namespace ExportDocManager.Api.Hosting
             IAppPathProvider pathProvider,
             DatabaseConnectionSettings databaseSettings,
             IDbContextFactory<AppDbContext> contextFactory)
+            : this(pathProvider, databaseSettings, contextFactory, new ApiBackgroundJobRetentionOptions())
+        {
+        }
+
+        public ApiBackgroundJobService(
+            IAppPathProvider pathProvider,
+            DatabaseConnectionSettings databaseSettings,
+            IDbContextFactory<AppDbContext> contextFactory,
+            ApiBackgroundJobRetentionOptions retentionOptions)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+            _retentionOptions = (retentionOptions ?? throw new ArgumentNullException(nameof(retentionOptions))).Normalize();
             _useDatabaseStore = DatabaseModeHelper.UsesPostgreSql(
                 databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings)));
             _storePath = _useDatabaseStore
@@ -73,6 +88,7 @@ namespace ExportDocManager.Api.Hosting
                 StatusText = "正在取消",
                 DetailText = job.DetailText,
                 RequestedBy = job.RequestedBy,
+                RequestedByUserId = job.RequestedByUserId,
                 CreatedAt = job.CreatedAt,
                 StartedAt = job.StartedAt,
                 CompletedAt = job.CompletedAt,
@@ -218,6 +234,10 @@ namespace ExportDocManager.Api.Hosting
 
             _jobs.AddOrUpdate(key, normalized, (_, _) => normalized);
             PersistJob(normalized);
+            if (BackgroundJobStatusCatalog.IsTerminal(normalized.Status))
+            {
+                PruneTerminalHistory();
+            }
             return normalized;
         }
 
@@ -234,7 +254,14 @@ namespace ExportDocManager.Api.Hosting
                 var next = Normalize(update(current), current);
                 if (_jobs.TryUpdate(key, next, current))
                 {
-                    PersistJob(next);
+                    if (ShouldPersistUpdate(current, next))
+                    {
+                        PersistJob(next);
+                    }
+                    if (BackgroundJobStatusCatalog.IsTerminal(next.Status))
+                    {
+                        PruneTerminalHistory();
+                    }
                     return next;
                 }
             }
@@ -260,6 +287,84 @@ namespace ExportDocManager.Api.Hosting
             if (_cancellationSources.TryRemove(jobId.Trim(), out var source))
             {
                 source.Dispose();
+            }
+        }
+
+        private bool ShouldPersistUpdate(BackgroundJobSnapshot current, BackgroundJobSnapshot next)
+        {
+            if (BackgroundJobStatusCatalog.IsTerminal(next.Status) ||
+                !string.Equals(current.Status, next.Status, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(current.OutputPath, next.OutputPath, StringComparison.Ordinal) ||
+                !string.Equals(current.ErrorMessage, next.ErrorMessage, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            long nowTicks = DateTimeOffset.UtcNow.UtcTicks;
+            long lastTicks = _lastPersistedUtcTicks.GetOrAdd(next.JobId, 0);
+            if (lastTicks != 0 && nowTicks - lastTicks < TimeSpan.FromSeconds(1).Ticks)
+            {
+                return false;
+            }
+
+            _lastPersistedUtcTicks[next.JobId] = nowTicks;
+            return true;
+        }
+
+        private void PruneTerminalHistory()
+        {
+            lock (_historyCleanupLock)
+            {
+                var terminalJobs = _jobs.Values
+                    .Where(job => BackgroundJobStatusCatalog.IsTerminal(job.Status))
+                    .OrderByDescending(job => job.CompletedAt ?? job.CreatedAt)
+                    .ThenByDescending(job => job.JobId, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (terminalJobs.Count == 0)
+                {
+                    return;
+                }
+
+                DateTimeOffset cutoff = DateTimeOffset.UtcNow.AddDays(-_retentionOptions.RetentionDays);
+                var removeIds = terminalJobs
+                    .Where(job => (job.CompletedAt ?? job.CreatedAt) < cutoff)
+                    .Select(job => job.JobId)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var userGroup in terminalJobs
+                    .Where(job => !removeIds.Contains(job.JobId))
+                    .GroupBy(job => string.IsNullOrWhiteSpace(job.RequestedBy) ? "__system__" : job.RequestedBy.Trim(), StringComparer.OrdinalIgnoreCase))
+                {
+                    foreach (var overflow in userGroup.Skip(_retentionOptions.PerUserLimit))
+                    {
+                        removeIds.Add(overflow.JobId);
+                    }
+                }
+
+                foreach (var overflow in terminalJobs
+                    .Where(job => !removeIds.Contains(job.JobId))
+                    .Skip(_retentionOptions.GlobalLimit))
+                {
+                    removeIds.Add(overflow.JobId);
+                }
+
+                if (removeIds.Count == 0)
+                {
+                    return;
+                }
+
+                var removedIds = new List<string>(removeIds.Count);
+                foreach (string jobId in removeIds)
+                {
+                    if (_jobs.TryRemove(jobId, out var removedJob))
+                    {
+                        _lastPersistedUtcTicks.TryRemove(jobId, out _);
+                        TryDeleteControlledBrowserOutput(removedJob.OutputPath);
+                        removedIds.Add(jobId);
+                    }
+                }
+
+                DeletePersistedJobs(removedIds);
             }
         }
 
