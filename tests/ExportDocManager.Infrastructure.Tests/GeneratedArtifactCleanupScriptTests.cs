@@ -87,6 +87,10 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("-Path (Join-Path $resolvedOutputDir $runtimeEntryName)", prepareScript, StringComparison.Ordinal);
             Assert.Contains("-Root $resolvedOutputDir", prepareScript, StringComparison.Ordinal);
             Assert.Contains("Remove-GeneratedEntry", prepareScript, StringComparison.Ordinal);
+            Assert.Contains("Stop-OutputOwnedProcesses -OutputRoot $resolvedOutputDir", prepareScript, StringComparison.Ordinal);
+            Assert.Contains("Test-PathInsideRoot -Path ([string]$_.ExecutablePath) -Root $OutputRoot", prepareScript, StringComparison.Ordinal);
+            Assert.Contains("$process.Kill($true)", prepareScript, StringComparison.Ordinal);
+            Assert.Contains("$maximumAttempts = 8", prepareScript, StringComparison.Ordinal);
             Assert.Contains("RuntimeDataCleanup = \"unconditional\"", buildScript, StringComparison.Ordinal);
             Assert.DoesNotContain("ExistingRuntimeEntries", buildScript, StringComparison.Ordinal);
             Assert.DoesNotContain("RuntimeDataWillBeCleaned", buildScript, StringComparison.Ordinal);

@@ -107,7 +107,19 @@ namespace ExportDocManager.Api.Hosting
         string ExportTariffRate = "",
         string ConsumptionTaxRate = "",
         string ValueAddedTaxRate = "",
-        string Notes = "");
+        string Notes = "",
+        string RemoteRecordKind = "StandardCode",
+        int? InstanceCount = null,
+        string SummaryUrl = "",
+        string EvidenceUrl = "",
+        DateTime? ObservedAt = null,
+        IReadOnlyList<string> RecommendedKeywords = null,
+        string PersonalPostalTaxCode = "",
+        IReadOnlyList<ApiHsCodeRemoteReferenceEntry> CiqEntries = null,
+        IReadOnlyList<ApiHsCodeRemoteReferenceEntry> ClassificationEntries = null,
+        int DeclarationExampleCount = 0);
+
+    public sealed record ApiHsCodeRemoteReferenceEntry(string Code, string Name);
 
     public sealed record ApiHsCodeImportPathRequest(
         string FilePath);
@@ -186,7 +198,9 @@ namespace ExportDocManager.Api.Hosting
         IReadOnlyList<ApiHsCodeDto> Items,
         int Count,
         string Source,
-        string StoragePolicy);
+        string StoragePolicy,
+        int StandardCodeCount = 0,
+        int DeclarationExampleCount = 0);
 
     public sealed record ApiHsCodeRemoteDetailResolutionResponse(
         IReadOnlyList<ApiHsCodeDto> Items,

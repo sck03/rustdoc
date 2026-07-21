@@ -145,7 +145,7 @@ namespace ExportDocManager.Services.Data
             {
                 var (row, column) = ParseCellReference(cellReference);
                 string value = sheet.Get(row, column).Trim();
-                if (string.IsNullOrWhiteSpace(value))
+                if (string.IsNullOrWhiteSpace(value) || !IsUsableFieldValue(definition.Key, value))
                 {
                     return null;
                 }
@@ -204,6 +204,11 @@ namespace ExportDocManager.Services.Data
                     }
 
                     if (IsGenericPlaceholderValue(value))
+                    {
+                        continue;
+                    }
+
+                    if (!IsUsableFieldValue(definition.Key, value))
                     {
                         continue;
                     }
@@ -959,6 +964,12 @@ namespace ExportDocManager.Services.Data
         {
             string normalized = NormalizeText(value);
             return normalized is "name" or "address" or "名称" or "地址" or "shipper" or "exporter" or "consignee" or "customer";
+        }
+
+        private static bool IsUsableFieldValue(string fieldKey, string value)
+        {
+            return !string.Equals(fieldKey, "DestinationCountry", StringComparison.Ordinal)
+                || ExcelImportFieldValueValidator.IsDestinationCountry(value);
         }
 
         private static bool LooksLikeKnownLabel(string value)

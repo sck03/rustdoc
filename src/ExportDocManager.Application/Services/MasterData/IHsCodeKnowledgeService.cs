@@ -13,6 +13,8 @@ namespace ExportDocManager.Services.MasterData
         int ExampleCount,
         int ConfirmedCount,
         IReadOnlyList<string> ReplacementCandidates,
+        IReadOnlyList<string> MatchReasons,
+        IReadOnlyList<string> ConflictWarnings,
         bool CanUse);
 
     public sealed record HsCodeKnowledgeSearchResponse(
@@ -78,6 +80,8 @@ namespace ExportDocManager.Services.MasterData
         Task RecordFeedbackAsync(HsCodeKnowledgeFeedbackInput input, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<HsCodeHistoryLearningCandidate>> DiscoverHistoryCandidatesAsync(string keyword, int maxResults = 200, CancellationToken cancellationToken = default);
         Task<int> CaptureRemoteExamplesAsync(string query, IEnumerable<HsCode> remoteRows, CancellationToken cancellationToken = default);
+        Task<int> CaptureRemoteEvidenceAsync(string query, HsCodeRemoteSearchBundle bundle, CancellationToken cancellationToken = default);
+        Task<int> CaptureRemoteDetailEvidenceAsync(string query, HsCodeRemoteDetailBundle bundle, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<HsCodeRemoteCandidate>> ListRemoteCandidatesAsync(string reviewStatus, int maxResults = 200, CancellationToken cancellationToken = default);
         Task<bool> ReviewRemoteCandidateAsync(HsCodeRemoteCandidateReviewInput input, CancellationToken cancellationToken = default);
         Task RefreshReplacementRelationsAsync(HsCodeImportPreview preview, CancellationToken cancellationToken = default);

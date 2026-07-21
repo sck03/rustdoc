@@ -282,15 +282,25 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    var results = await hsCodeService.SearchRemoteAsync(keyword.Trim(), cancellationToken);
-                    await knowledgeService.CaptureRemoteExamplesAsync(keyword.Trim(), results, cancellationToken);
+                    var evidence = await hsCodeService.SearchRemoteEvidenceAsync(keyword.Trim(), cancellationToken);
+                    await knowledgeService.CaptureRemoteEvidenceAsync(keyword.Trim(), evidence, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
-                    var items = ApiMasterDataDtoFactory.FromHsCodes(results);
+                    var standardRecords = evidence.Records
+                        .Where(record => record.Kind == HsCodeRemoteRecordKind.StandardCode && !record.IsExpired)
+                        .GroupBy(record => HsCodeTextHelper.NormalizeCode(record.Item.Code), StringComparer.OrdinalIgnoreCase)
+                        .Select(group => group
+                            .OrderByDescending(record => record.InstanceCount.HasValue)
+                            .ThenByDescending(record => !string.IsNullOrWhiteSpace(record.Item.Description))
+                            .First())
+                        .ToList();
+                    var items = standardRecords.Select(ApiMasterDataDtoFactory.FromRemoteRecord).ToList();
                     return Results.Ok(new ApiHsCodeSearchResponse(
                         items,
                         items.Count,
                         "remote",
-                        "远程HS编码查询只读取在线来源并返回内存结果；保存到本地库时才写当前运行数据根数据库。"));
+                        "远程HS编码查询只读取在线来源；标准编码与申报实例分开显示，确认保存时才写当前运行数据根数据库。",
+                        standardRecords.Count,
+                        evidence.Records.Count(record => record.Kind == HsCodeRemoteRecordKind.DeclarationExample)));
                 }
                 catch (OperationCanceledException)
                 {
@@ -355,6 +365,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IHsCodeService hsCodeService,
+                IHsCodeKnowledgeService knowledgeService,
                 ApiHsCodeDto request,
                 CancellationToken cancellationToken) =>
             {
@@ -375,7 +386,7 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    var response = await ResolveRemoteHsCodeDetailAsync(hsCodeService, request, cancellationToken);
+                    var response = await ResolveRemoteHsCodeDetailAsync(hsCodeService, knowledgeService, request, cancellationToken);
                     return Results.Ok(response);
                 }
                 catch (OperationCanceledException)
@@ -760,7 +771,7 @@ namespace ExportDocManager.Api.Hosting
         }
 
         private const string RemoteHsCodeDetailResolutionStoragePolicy =
-            "HS编码联网详情补全只访问在线来源；有效编码写入当前运行数据根数据库用于下次本地查询，过期编码只从本次结果中清理，不新增默认目录或系统 C 盘落点。";
+            "HS编码联网详情补全只访问在线来源并沉淀待审核申报实例；第三方标准编码不会自动写成当前年度有效税则，过期编码只从本次结果中清理，不新增默认目录或系统 C 盘落点。";
 
         private static HsCodeImportMode ParseHsCodeImportMode(string value) =>
             string.Equals(value?.Trim(), "CompleteSnapshot", StringComparison.OrdinalIgnoreCase)
@@ -802,125 +813,66 @@ namespace ExportDocManager.Api.Hosting
 
         private static async Task<ApiHsCodeRemoteDetailResolutionResponse> ResolveRemoteHsCodeDetailAsync(
             IHsCodeService hsCodeService,
+            IHsCodeKnowledgeService knowledgeService,
             ApiHsCodeDto request,
             CancellationToken cancellationToken)
         {
-            var workingItems = new List<HsCode> { ApiMasterDataDtoFactory.ToHsCodeForSave(request) };
-            var removedItems = new List<HsCode>();
-            var updatedCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var removedCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seed = ApiMasterDataDtoFactory.ToHsCodeForSave(request);
+            var recordKind = Enum.TryParse<HsCodeRemoteRecordKind>(request.RemoteRecordKind, true, out var parsedKind)
+                ? parsedKind
+                : HsCodeRemoteRecordKind.StandardCode;
+            var record = new HsCodeRemoteSearchRecord(
+                seed,
+                recordKind,
+                string.Equals(seed.Status, "Obsolete", StringComparison.OrdinalIgnoreCase),
+                request.InstanceCount,
+                request.SummaryUrl ?? string.Empty,
+                string.IsNullOrWhiteSpace(request.EvidenceUrl) ? request.DetailUrl ?? string.Empty : request.EvidenceUrl,
+                request.ObservedAt.HasValue ? new DateTimeOffset(request.ObservedAt.Value) : DateTimeOffset.UtcNow);
+            var evidence = await hsCodeService.FetchRemoteDetailEvidenceAsync(record, cancellationToken);
+            await knowledgeService.CaptureRemoteDetailEvidenceAsync(request.Name, evidence, cancellationToken);
 
-            void UpsertItem(HsCode item)
+            if (!evidence.IsExpired)
             {
-                var normalizedCode = HsCodeTextHelper.NormalizeCode(item?.Code);
-                if (item == null || string.IsNullOrWhiteSpace(normalizedCode) || HsCodeTextHelper.IsExpired(item))
-                {
-                    return;
-                }
-
-                item.Code = normalizedCode;
-                var existing = workingItems.FirstOrDefault(current =>
-                    string.Equals(HsCodeTextHelper.NormalizeCode(current?.Code), normalizedCode, StringComparison.OrdinalIgnoreCase));
-                if (existing == null)
-                {
-                    workingItems.Add(item);
-                }
-                else
-                {
-                    CopyHsCodeFields(existing, item);
-                }
-
-                updatedCodes.Add(normalizedCode);
+                return new ApiHsCodeRemoteDetailResolutionResponse(
+                    [ApiMasterDataDtoFactory.FromRemoteDetail(evidence)],
+                    [],
+                    1,
+                    0,
+                    evidence.DeclarationExamples.Count > 0
+                        ? $"已补全HS详情，并提取 {evidence.DeclarationExamples.Count} 条待审核申报实例。"
+                        : "已补全HS编码详情。",
+                    RemoteHsCodeDetailResolutionStoragePolicy);
             }
 
-            void RemoveItem(HsCode item)
+            var replacementItems = new List<ApiHsCodeDto>();
+            foreach (string recommendedKeyword in evidence.RecommendedKeywords.Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                var normalizedCode = HsCodeTextHelper.NormalizeCode(item?.Code);
-                if (item == null || string.IsNullOrWhiteSpace(normalizedCode))
+                var replacementSearch = await hsCodeService.SearchRemoteEvidenceAsync(recommendedKeyword, cancellationToken);
+                await knowledgeService.CaptureRemoteEvidenceAsync(request.Name, replacementSearch, cancellationToken);
+                foreach (var replacementRecord in replacementSearch.Records
+                             .Where(item => item.Kind == HsCodeRemoteRecordKind.StandardCode && !item.IsExpired)
+                             .GroupBy(item => HsCodeTextHelper.NormalizeCode(item.Item.Code), StringComparer.OrdinalIgnoreCase)
+                             .Select(group => group.First()))
                 {
-                    return;
+                    var replacementDetail = await hsCodeService.FetchRemoteDetailEvidenceAsync(replacementRecord, cancellationToken);
+                    await knowledgeService.CaptureRemoteDetailEvidenceAsync(request.Name, replacementDetail, cancellationToken);
+                    if (replacementDetail.IsExpired) continue;
+                    replacementItems.Add(ApiMasterDataDtoFactory.FromRemoteDetail(replacementDetail));
                 }
-
-                workingItems.RemoveAll(current =>
-                    string.Equals(HsCodeTextHelper.NormalizeCode(current?.Code), normalizedCode, StringComparison.OrdinalIgnoreCase));
-
-                if (removedCodes.Add(normalizedCode))
-                {
-                    item.Code = normalizedCode;
-                    removedItems.Add(item);
-                }
+                if (replacementItems.Count > 0) break;
             }
-
-            void AddItems(List<HsCode> items)
-            {
-                foreach (var item in items ?? Enumerable.Empty<HsCode>())
-                {
-                    UpsertItem(item);
-                }
-            }
-
-            await hsCodeService.ProcessRemainingDetailsAsync(
-                workingItems.ToList(),
-                UpsertItem,
-                RemoveItem,
-                AddItems,
-                cancellationToken);
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var visibleItems = workingItems
-                .Where(item => item != null && !string.IsNullOrWhiteSpace(item.Code) && !HsCodeTextHelper.IsExpired(item))
-                .DistinctBy(item => HsCodeTextHelper.NormalizeCode(item.Code), StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            var message = BuildRemoteHsCodeDetailResolutionMessage(updatedCodes.Count, removedItems.Count);
 
             return new ApiHsCodeRemoteDetailResolutionResponse(
-                ApiMasterDataDtoFactory.FromHsCodes(visibleItems),
-                ApiMasterDataDtoFactory.FromHsCodes(removedItems),
-                updatedCodes.Count,
-                removedItems.Count,
-                message,
+                replacementItems,
+                [ApiMasterDataDtoFactory.FromRemoteRecord(record)],
+                replacementItems.Count,
+                1,
+                replacementItems.Count > 0
+                    ? $"原编码已作废，已按网页推荐链补入 {replacementItems.Count} 条当前编码候选。"
+                    : "原编码已作废，暂未在当前来源找到可验证的替代编码。",
                 RemoteHsCodeDetailResolutionStoragePolicy);
-        }
 
-        private static string BuildRemoteHsCodeDetailResolutionMessage(int updatedCount, int removedCount)
-        {
-            if (removedCount > 0 && updatedCount > 0)
-            {
-                return $"已清理 {removedCount} 条过期HS编码，并补入或更新 {updatedCount} 条可用编码。";
-            }
-
-            if (removedCount > 0)
-            {
-                return $"已清理 {removedCount} 条过期HS编码，暂未找到可替换编码。";
-            }
-
-            if (updatedCount > 0)
-            {
-                return $"已补全 {updatedCount} 条HS编码详情。";
-            }
-
-            return "远程详情暂未补全，可稍后重试。";
-        }
-
-        private static void CopyHsCodeFields(HsCode target, HsCode source)
-        {
-            target.Code = HsCodeTextHelper.NormalizeCode(source.Code);
-            target.Name = source.Name;
-            target.Unit = source.Unit;
-            target.Description = source.Description;
-            target.Elements = source.Elements;
-            target.SupervisionConditions = source.SupervisionConditions;
-            target.InspectionCategory = source.InspectionCategory;
-            target.RebateRate = source.RebateRate;
-            target.NormalTariffRate = source.NormalTariffRate;
-            target.PreferentialTariffRate = source.PreferentialTariffRate;
-            target.ExportTariffRate = source.ExportTariffRate;
-            target.ConsumptionTaxRate = source.ConsumptionTaxRate;
-            target.ValueAddedTaxRate = source.ValueAddedTaxRate;
-            target.Notes = source.Notes;
-            target.UpdateTime = source.UpdateTime;
-            target.DetailUrl = source.DetailUrl;
         }
 
         private static async Task<ApiHsCodeImportResponse> BuildHsCodeImportResponseAsync(

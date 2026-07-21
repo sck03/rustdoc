@@ -107,7 +107,7 @@ export function readRouteInvoiceDraft(state: unknown): ApiInvoiceDetailDto | nul
   }
 
   const invoiceDraft = draft as ApiInvoiceDetailDto;
-  return {
+  return uppercaseInvoiceEnglishText({
     ...createEmptyInvoice(),
     ...invoiceDraft,
     id: 0,
@@ -117,6 +117,66 @@ export function readRouteInvoiceDraft(state: unknown): ApiInvoiceDetailDto | nul
       ...item,
       id: 0,
       invoiceId: 0,
+    })),
+  });
+}
+
+function uppercaseAsciiText(value?: string) {
+  return value?.replace(/[a-z]/g, (character) => character.toUpperCase()) ?? "";
+}
+
+export function uppercaseInvoiceEnglishText(invoice: ApiInvoiceDetailDto): ApiInvoiceDetailDto {
+  return {
+    ...invoice,
+    invoiceNo: uppercaseAsciiText(invoice.invoiceNo),
+    contractNo: uppercaseAsciiText(invoice.contractNo),
+    customerNameEN: uppercaseAsciiText(invoice.customerNameEN),
+    customerAddressEN: uppercaseAsciiText(invoice.customerAddressEN),
+    notifyPartyName: uppercaseAsciiText(invoice.notifyPartyName),
+    notifyPartyAddress: uppercaseAsciiText(invoice.notifyPartyAddress),
+    exporterNameEN: uppercaseAsciiText(invoice.exporterNameEN),
+    exporterNameCN: uppercaseAsciiText(invoice.exporterNameCN),
+    exporterAddressEN: uppercaseAsciiText(invoice.exporterAddressEN),
+    exporterAddressCN: uppercaseAsciiText(invoice.exporterAddressCN),
+    exporterCreditCode: uppercaseAsciiText(invoice.exporterCreditCode),
+    exporterCustomsCode: uppercaseAsciiText(invoice.exporterCustomsCode),
+    customsBrokerName: uppercaseAsciiText(invoice.customsBrokerName),
+    customsBrokerCode: uppercaseAsciiText(invoice.customsBrokerCode),
+    paymentTerms: uppercaseAsciiText(invoice.paymentTerms),
+    portOfLoading: uppercaseAsciiText(invoice.portOfLoading),
+    portOfDestination: uppercaseAsciiText(invoice.portOfDestination),
+    destinationCountry: uppercaseAsciiText(invoice.destinationCountry),
+    tradeTerms: uppercaseAsciiText(invoice.tradeTerms),
+    transportMode: uppercaseAsciiText(invoice.transportMode),
+    currency: uppercaseAsciiText(invoice.currency),
+    supervisionMode: uppercaseAsciiText(invoice.supervisionMode),
+    issuingBank: uppercaseAsciiText(invoice.issuingBank),
+    bankName: uppercaseAsciiText(invoice.bankName),
+    bankAccount: uppercaseAsciiText(invoice.bankAccount),
+    swiftCode: uppercaseAsciiText(invoice.swiftCode),
+    shippingMarks: uppercaseAsciiText(invoice.shippingMarks),
+    specialTerms: uppercaseAsciiText(invoice.specialTerms),
+    letterOfCreditNo: uppercaseAsciiText(invoice.letterOfCreditNo),
+    spare1: uppercaseAsciiText(invoice.spare1),
+    spare2: uppercaseAsciiText(invoice.spare2),
+    spare3: uppercaseAsciiText(invoice.spare3),
+    items: (invoice.items ?? []).map((item) => ({
+      ...item,
+      poNumber: uppercaseAsciiText(item.poNumber),
+      styleNo: uppercaseAsciiText(item.styleNo),
+      styleName: uppercaseAsciiText(item.styleName),
+      styleNameCN: uppercaseAsciiText(item.styleNameCN),
+      fabricComposition: uppercaseAsciiText(item.fabricComposition),
+      brand: uppercaseAsciiText(item.brand),
+      hsCode: uppercaseAsciiText(item.hsCode),
+      origin: uppercaseAsciiText(item.origin),
+      unitEN: uppercaseAsciiText(item.unitEN),
+      unitCN: uppercaseAsciiText(item.unitCN),
+      ctnUnitEN: uppercaseAsciiText(item.ctnUnitEN),
+      ctnUnitCN: uppercaseAsciiText(item.ctnUnitCN),
+      spare1: uppercaseAsciiText(item.spare1),
+      spare2: uppercaseAsciiText(item.spare2),
+      spare3: uppercaseAsciiText(item.spare3),
     })),
   };
 }

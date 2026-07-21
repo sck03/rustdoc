@@ -73,15 +73,18 @@ namespace ExportDocManager.Services.MasterData
                 int nameScore = ScoreText(normalizedQuery, NormalizeSearchText(example.ProductName));
                 int specificationScore = ScoreText(normalizedQuery, NormalizeSearchText(example.Specification));
                 int combinedScore = ScoreText(normalizedQuery, example.SearchText);
-                int textScore = Math.Max(combinedScore, (int)Math.Round(nameScore * 0.72d + specificationScore * 0.28d));
+                var assessment = AssessAttributes(normalizedQuery, NormalizeSearchText($"{example.ProductName} {example.Specification}"));
+                int textScore = Math.Max(combinedScore, (int)Math.Round(nameScore * 0.72d + specificationScore * 0.28d)) - assessment.Penalty;
                 if (textScore < 18) continue;
                 var resolution = ResolveCurrentCode(example, codeMap, relations);
                 int feedbackBoost = feedback
-                    .Where(item => string.Equals(item.CandidateCode, resolution.CurrentCode ?? example.RawReportedHsCode, StringComparison.OrdinalIgnoreCase))
+                    .Where(item =>
+                        string.Equals(item.CandidateCode, resolution.CurrentCode ?? example.RawReportedHsCode, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(NormalizeSearchText(item.QueryText), normalizedQuery, StringComparison.OrdinalIgnoreCase))
                     .Sum(item => item.AcceptedCount * 5 - item.RejectedCount * 4);
                 int score = Math.Clamp(textScore + Math.Min(example.UseCount * 2, 15) +
                     (example.IsManuallyVerified ? 15 : 0) + feedbackBoost, 0, 100);
-                candidates.Add(new KnowledgeCandidate(example, resolution, score));
+                candidates.Add(new KnowledgeCandidate(example, resolution, score, assessment.MatchReasons, assessment.ConflictWarnings));
             }
 
             var grouped = candidates
@@ -102,7 +105,9 @@ namespace ExportDocManager.Services.MasterData
                         group.Count(),
                         group.Sum(item => item.Example.UseCount),
                         best.Resolution.Replacements,
-                        !string.IsNullOrWhiteSpace(currentCode) && string.Equals(standard?.Status, "Active", StringComparison.OrdinalIgnoreCase));
+                        best.MatchReasons,
+                        best.ConflictWarnings,
+                        best.Resolution.CanUse && !string.IsNullOrWhiteSpace(currentCode) && string.Equals(standard?.Status, "Active", StringComparison.OrdinalIgnoreCase));
                 })
                 .OrderByDescending(item => item.CanUse)
                 .ThenByDescending(item => item.Score)
@@ -114,13 +119,22 @@ namespace ExportDocManager.Services.MasterData
                 var existing = grouped.Select(item => item.CurrentCode).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var masterFallback = codes
                     .Where(item => string.Equals(item.Status, "Active", StringComparison.OrdinalIgnoreCase) && !existing.Contains(item.NormalizedCode))
-                    .Select(item => new { Item = item, Score = ScoreText(normalizedQuery, NormalizeSearchText($"{item.Name} {item.Elements} {item.Description}")) })
+                    .Select(item =>
+                    {
+                        var assessment = AssessAttributes(normalizedQuery, NormalizeSearchText($"{item.Name} {item.Elements} {item.Description}"));
+                        return new
+                        {
+                            Item = item,
+                            Score = ScoreText(normalizedQuery, NormalizeSearchText($"{item.Name} {item.Elements} {item.Description}")) - assessment.Penalty,
+                            Assessment = assessment
+                        };
+                    })
                     .Where(item => item.Score >= 22)
                     .OrderByDescending(item => item.Score)
                     .Take(maxResults - grouped.Count)
                     .Select(item => new HsCodeKnowledgeSearchResult(
                         item.Item.NormalizedCode, item.Item.NormalizedCode, item.Item.Name, string.Empty, item.Item.Name,
-                        "Active", item.Score, 0, 0, [], true));
+                        "Active", item.Score, 0, 0, [], item.Assessment.MatchReasons, item.Assessment.ConflictWarnings, true));
                 grouped.AddRange(masterFallback);
             }
 
@@ -156,6 +170,9 @@ namespace ExportDocManager.Services.MasterData
                 throw new InvalidOperationException("申报实例必须填写历史/原始HS编码和商品名称。");
             string fingerprint = BuildFingerprint(rawCode, name, input.Specification);
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            if (!string.IsNullOrWhiteSpace(currentCode) &&
+                !await context.HsCodes.AsNoTracking().AnyAsync(item => item.NormalizedCode == currentCode && item.Status == "Active", cancellationToken))
+                throw new InvalidOperationException("当前有效编码必须存在于本地年度税则且状态为有效。");
             var entity = input.Id > 0
                 ? await context.HsCodeDeclarationExamples.FirstOrDefaultAsync(item => item.Id == input.Id, cancellationToken)
                 : await context.HsCodeDeclarationExamples.FirstOrDefaultAsync(item => item.Fingerprint == fingerprint, cancellationToken);
@@ -197,6 +214,9 @@ namespace ExportDocManager.Services.MasterData
             if (string.IsNullOrWhiteSpace(code)) throw new InvalidOperationException("确认结果必须包含HS编码。");
             string fingerprint = BuildFingerprint(NormalizeSearchText(input.QueryText), code, input.ProductName, input.Specification);
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            if (input.Accepted &&
+                !await context.HsCodes.AsNoTracking().AnyAsync(item => item.NormalizedCode == code && item.Status == "Active", cancellationToken))
+                throw new InvalidOperationException("确认适用前必须选择当前年度税则中的有效编码。");
             var entity = await context.HsCodeSearchFeedback.FirstOrDefaultAsync(item => item.Fingerprint == fingerprint, cancellationToken);
             DateTime now = DateTime.UtcNow;
             if (entity == null)
@@ -216,7 +236,7 @@ namespace ExportDocManager.Services.MasterData
                 var exampleInput = new HsCodeExampleInput(0, code, code,
                     string.IsNullOrWhiteSpace(input.ProductName) ? input.QueryText : input.ProductName,
                     input.Specification, "UserConfirmed", DateTime.Now.Year, "ManuallyVerified", true);
-                await UpsertExampleInContextAsync(context, exampleInput, now, cancellationToken);
+                await UpsertExampleInContextAsync(context, exampleInput, now, cancellationToken, incrementUseCount: false);
             }
             await context.SaveChangesAsync(cancellationToken);
         }
@@ -254,7 +274,7 @@ namespace ExportDocManager.Services.MasterData
                     var resolution = ResolveCurrentCode(new HsCodeDeclarationExample { RawReportedHsCode = first.Code }, codeMap, relations);
                     return new HsCodeHistoryLearningCandidate(fingerprint, first.Code, resolution.CurrentCode ?? string.Empty,
                         first.Name, first.Specification, string.Join("、", group.Select(item => item.Source).Distinct()), group.Count(),
-                        resolution.Status, resolution.Replacements, !known.Contains(fingerprint) && !string.IsNullOrWhiteSpace(resolution.CurrentCode));
+                        resolution.Status, resolution.Replacements, !known.Contains(fingerprint) && resolution.CanUse);
                 })
                 .Where(item => !known.Contains(item.Fingerprint))
                 .OrderByDescending(item => item.CanConfirm).ThenByDescending(item => item.SourceCount).ThenBy(item => item.ProductName)
@@ -264,9 +284,68 @@ namespace ExportDocManager.Services.MasterData
         public async Task<int> CaptureRemoteExamplesAsync(
             string query, IEnumerable<HsCode> remoteRows, CancellationToken cancellationToken = default)
         {
-            var examples = (remoteRows ?? Enumerable.Empty<HsCode>())
-                .Where(item => item != null && string.IsNullOrWhiteSpace(item.DetailUrl) &&
-                    !string.IsNullOrWhiteSpace(item.Code) && !string.IsNullOrWhiteSpace(item.Name))
+            DateTimeOffset observedAt = DateTimeOffset.UtcNow;
+            var records = (remoteRows ?? Enumerable.Empty<HsCode>())
+                .Where(item => item != null)
+                .Select(item => new HsCodeRemoteSearchRecord(
+                    item,
+                    HsCodeRemoteRecordKind.DeclarationExample,
+                    false,
+                    null,
+                    string.Empty,
+                    item.DetailUrl ?? string.Empty,
+                    observedAt))
+                .ToList();
+            return await CaptureRemoteRecordsAsync(query, "i5a6", records, [], cancellationToken);
+        }
+
+        public Task<int> CaptureRemoteEvidenceAsync(
+            string query,
+            HsCodeRemoteSearchBundle bundle,
+            CancellationToken cancellationToken = default)
+        {
+            if (bundle == null) return Task.FromResult(0);
+            return CaptureRemoteRecordsAsync(
+                query,
+                bundle.Source,
+                bundle.Records.Where(record => record.Kind == HsCodeRemoteRecordKind.DeclarationExample),
+                bundle.ReplacementEvidence,
+                cancellationToken);
+        }
+
+        public Task<int> CaptureRemoteDetailEvidenceAsync(
+            string query,
+            HsCodeRemoteDetailBundle bundle,
+            CancellationToken cancellationToken = default)
+        {
+            if (bundle == null) return Task.FromResult(0);
+            IReadOnlyList<HsCodeRemoteReplacementEvidence> replacementEvidence =
+                bundle.RecommendedKeywords.Count == 0
+                    ? []
+                    : [new HsCodeRemoteReplacementEvidence(
+                        HsCodeTextHelper.NormalizeCode(bundle.Item?.Code),
+                        bundle.RecommendedKeywords,
+                        bundle.EvidenceUrl,
+                        bundle.ObservedAt)];
+            return CaptureRemoteRecordsAsync(
+                query,
+                "i5a6",
+                bundle.DeclarationExamples,
+                replacementEvidence,
+                cancellationToken);
+        }
+
+        private async Task<int> CaptureRemoteRecordsAsync(
+            string query,
+            string source,
+            IEnumerable<HsCodeRemoteSearchRecord> remoteRecords,
+            IReadOnlyList<HsCodeRemoteReplacementEvidence> replacementEvidence,
+            CancellationToken cancellationToken)
+        {
+            var examples = (remoteRecords ?? Enumerable.Empty<HsCodeRemoteSearchRecord>())
+                .Where(record => record?.Kind == HsCodeRemoteRecordKind.DeclarationExample &&
+                    record.Item != null && !string.IsNullOrWhiteSpace(record.Item.Code) &&
+                    !string.IsNullOrWhiteSpace(record.Item.Name))
                 .ToList();
             if (examples.Count == 0) return 0;
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -275,8 +354,9 @@ namespace ExportDocManager.Services.MasterData
             var relations = await context.HsCodeReplacementRelations.AsNoTracking().ToListAsync(cancellationToken);
             DateTime now = DateTime.UtcNow;
             int added = 0;
-            foreach (var item in examples)
+            foreach (var record in examples)
             {
+                var item = record.Item;
                 string code = HsCodeTextHelper.NormalizeCode(item.Code);
                 string fingerprint = BuildFingerprint(code, item.Name, item.Description);
                 var existing = await context.HsCodeRemoteCandidates.FirstOrDefaultAsync(row => row.Fingerprint == fingerprint, cancellationToken);
@@ -286,13 +366,21 @@ namespace ExportDocManager.Services.MasterData
                     {
                         Fingerprint = fingerprint, QueryText = (query ?? string.Empty).Trim(), RawReportedHsCode = code,
                         ProductName = item.Name.Trim(), Specification = (item.Description ?? string.Empty).Trim(),
-                        Source = "i5a6", SourceUrl = item.DetailUrl, ReviewStatus = "Pending", FirstSeenAt = now
+                        Source = string.IsNullOrWhiteSpace(source) ? "i5a6" : source.Trim(),
+                        SourceUrl = string.IsNullOrWhiteSpace(record.EvidenceUrl) ? item.DetailUrl : record.EvidenceUrl,
+                        ReviewStatus = "Pending", FirstSeenAt = now
                     };
                     await context.HsCodeRemoteCandidates.AddAsync(existing, cancellationToken);
                     added++;
                 }
                 else existing.SeenCount++;
                 var resolution = ResolveCurrentCode(new HsCodeDeclarationExample { RawReportedHsCode = code }, codeMap, relations);
+                if (string.IsNullOrWhiteSpace(resolution.CurrentCode) || !resolution.CanUse)
+                {
+                    var webResolution = ResolveRecommendedCurrentCode(code, replacementEvidence, codeMap);
+                    if (!string.IsNullOrWhiteSpace(webResolution.CurrentCode) || webResolution.Replacements.Count > 0)
+                        resolution = webResolution;
+                }
                 existing.QueryText = (query ?? string.Empty).Trim(); existing.LastSeenAt = now;
                 existing.SuggestedCurrentHsCode = resolution.CurrentCode; existing.ResolutionStatus = resolution.Status;
             }
@@ -325,7 +413,7 @@ namespace ExportDocManager.Services.MasterData
             bool active = await context.HsCodes.AsNoTracking().AnyAsync(item => item.NormalizedCode == currentCode && item.Status == "Active", cancellationToken);
             if (!active) throw new InvalidOperationException("确认前必须选择当前税则中有效的HS编码。");
             await UpsertExampleInContextAsync(context, new HsCodeExampleInput(0, candidate.RawReportedHsCode, currentCode,
-                candidate.ProductName, candidate.Specification, $"RemoteConfirmed:{candidate.Source}", DateTime.Now.Year, "ManuallyVerified", true), now, cancellationToken);
+                candidate.ProductName, candidate.Specification, $"RemoteConfirmed:{candidate.Source}", null, "ManuallyVerified", true), now, cancellationToken);
             candidate.SuggestedCurrentHsCode = currentCode; candidate.ReviewStatus = "Confirmed"; candidate.ReviewedAt = now;
             await context.SaveChangesAsync(cancellationToken); return true;
         }
@@ -483,17 +571,46 @@ namespace ExportDocManager.Services.MasterData
         {
             string resolved = HsCodeTextHelper.NormalizeCode(example.ResolvedCurrentHsCode);
             if (!string.IsNullOrWhiteSpace(resolved) && codes.TryGetValue(resolved, out var resolvedCode) && string.Equals(resolvedCode.Status, "Active", StringComparison.OrdinalIgnoreCase))
-                return new CurrentCodeResolution(resolved, example.IsManuallyVerified ? "ManuallyVerified" : "ObsoleteMapped", []);
+                return new CurrentCodeResolution(resolved, example.IsManuallyVerified ? "ManuallyVerified" : "SuggestedReplacement", [], example.IsManuallyVerified);
             string raw = HsCodeTextHelper.NormalizeCode(example.RawReportedHsCode);
             if (codes.TryGetValue(raw, out var rawCode) && string.Equals(rawCode.Status, "Active", StringComparison.OrdinalIgnoreCase))
-                return new CurrentCodeResolution(raw, "Active", []);
+                return new CurrentCodeResolution(raw, "Active", [], true);
             var replacements = relations.Where(item => item.OldCode == raw)
                 .OrderByDescending(item => item.IsManuallyVerified).ThenByDescending(item => item.Confidence)
                 .Select(item => item.NewCode).Distinct(StringComparer.OrdinalIgnoreCase)
                 .Where(code => codes.TryGetValue(code, out var candidate) && string.Equals(candidate.Status, "Active", StringComparison.OrdinalIgnoreCase))
                 .ToList();
-            if (replacements.Count == 1) return new CurrentCodeResolution(replacements[0], "ObsoleteMapped", replacements);
-            return new CurrentCodeResolution(null, replacements.Count > 1 ? "Ambiguous" : "ObsoleteUnresolved", replacements);
+            var verifiedReplacements = relations.Where(item => item.OldCode == raw && item.IsManuallyVerified)
+                .Select(item => item.NewCode).Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(code => codes.TryGetValue(code, out var candidate) && string.Equals(candidate.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (verifiedReplacements.Count == 1) return new CurrentCodeResolution(verifiedReplacements[0], "ObsoleteMapped", verifiedReplacements, true);
+            if (replacements.Count == 1) return new CurrentCodeResolution(replacements[0], "SuggestedReplacement", replacements, false);
+            return new CurrentCodeResolution(null, replacements.Count > 1 ? "Ambiguous" : "ObsoleteUnresolved", replacements, false);
+        }
+
+        private static CurrentCodeResolution ResolveRecommendedCurrentCode(
+            string rawCode,
+            IReadOnlyList<HsCodeRemoteReplacementEvidence> evidence,
+            IReadOnlyDictionary<string, HsCode> codes)
+        {
+            var matching = (evidence ?? [])
+                .Where(item => string.Equals(HsCodeTextHelper.NormalizeCode(item.OldCode), HsCodeTextHelper.NormalizeCode(rawCode), StringComparison.OrdinalIgnoreCase))
+                .SelectMany(item => item.RecommendedKeywords ?? [])
+                .Select(HsCodeTextHelper.NormalizeCode)
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var candidates = codes.Values
+                .Where(item => string.Equals(item.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                .Where(item => matching.Any(recommended =>
+                    string.Equals(item.NormalizedCode, recommended, StringComparison.OrdinalIgnoreCase) ||
+                    item.NormalizedCode.StartsWith(recommended, StringComparison.OrdinalIgnoreCase)))
+                .Select(item => item.NormalizedCode)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (candidates.Count == 1) return new CurrentCodeResolution(candidates[0], "WebRecommended", candidates, false);
+            return new CurrentCodeResolution(null, candidates.Count > 1 ? "Ambiguous" : "ObsoleteUnresolved", candidates, false);
         }
 
         private static int ScoreText(string query, string candidate)
@@ -508,6 +625,95 @@ namespace ExportDocManager.Services.MasterData
             int dice = denominator == 0 ? 0 : (int)Math.Round(intersection * 120d / denominator);
             int relatedBoost = RelatedTerms.Any(pair => query.Contains(pair.Key, StringComparison.OrdinalIgnoreCase) && candidate.Contains(pair.Value, StringComparison.OrdinalIgnoreCase)) ? 12 : 0;
             return Math.Clamp(Math.Max(score, dice) + relatedBoost, 0, 90);
+        }
+
+        private static AttributeAssessment AssessAttributes(string query, string candidate)
+        {
+            var reasons = new List<string>();
+            var warnings = new List<string>();
+            int penalty = 0;
+
+            CompareExclusiveAttribute(query, candidate, "性别", 38, reasons, warnings,
+                ["男式", "男童", "男士"], ["女式", "女童", "女士"]);
+            CompareExclusiveAttribute(query, candidate, "织造方式", 24, reasons, warnings,
+                ["针织", "钩编"], ["梭织", "机织"]);
+            CompareCompatibleSetAttribute(query, candidate, "材质", 28, reasons, warnings,
+                ["涤纶", "聚酯", "化纤", "粘胶", "氨纶", "锦纶"], ["棉", "全棉", "纯棉"],
+                ["丝", "真丝"], ["毛", "羊毛"], ["麻"]);
+            CompareExclusiveAttribute(query, candidate, "品类", 32, reasons, warnings,
+                ["T恤衫", "T恤"], ["睡衣", "睡衣裤", "睡裙"], ["衬衫"], ["连衣裙"], ["夹克"], ["长裤", "短裤", "西裤", "裤子"]);
+
+            if (reasons.Count == 0 && warnings.Count == 0) reasons.Add("未检测到明显属性冲突");
+            return new AttributeAssessment(Math.Min(penalty, 90), reasons, warnings);
+
+            void CompareExclusiveAttribute(
+                string left,
+                string right,
+                string label,
+                int conflictPenalty,
+                List<string> matched,
+                List<string> conflicts,
+                params string[][] groups)
+            {
+                int leftGroup = FindGroup(left, groups);
+                int rightGroup = FindGroup(right, groups);
+                if (leftGroup < 0) return;
+                if (rightGroup < 0)
+                {
+                    matched.Add($"{label}：查询为{groups[leftGroup][0]}，候选未明确限定");
+                    return;
+                }
+                if (leftGroup == rightGroup)
+                    matched.Add($"{label}：{groups[leftGroup][0]}一致");
+                else
+                {
+                    penalty += conflictPenalty;
+                    conflicts.Add($"{label}冲突：查询为{groups[leftGroup][0]}，候选为{groups[rightGroup][0]}");
+                }
+            }
+
+            void CompareCompatibleSetAttribute(
+                string left,
+                string right,
+                string label,
+                int conflictPenalty,
+                List<string> matched,
+                List<string> conflicts,
+                params string[][] groups)
+            {
+                var leftGroups = FindGroups(NormalizeMaterial(left), groups);
+                var rightGroups = FindGroups(NormalizeMaterial(right), groups);
+                if (leftGroups.Count == 0) return;
+                if (rightGroups.Count == 0)
+                {
+                    matched.Add($"{label}：查询为{groups[leftGroups[0]][0]}，候选未明确限定");
+                    return;
+                }
+                int common = leftGroups.Intersect(rightGroups).FirstOrDefault(-1);
+                if (common >= 0)
+                    matched.Add($"{label}：包含{groups[common][0]}");
+                else
+                {
+                    penalty += conflictPenalty;
+                    conflicts.Add($"{label}冲突：查询为{groups[leftGroups[0]][0]}，候选为{groups[rightGroups[0]][0]}");
+                }
+            }
+
+            static int FindGroup(string value, string[][] groups)
+            {
+                for (int index = 0; index < groups.Length; index++)
+                    if (groups[index].Any(token => value.Contains(token, StringComparison.OrdinalIgnoreCase))) return index;
+                return -1;
+            }
+
+            static List<int> FindGroups(string value, string[][] groups) => groups
+                .Select((tokens, index) => new { tokens, index })
+                .Where(item => item.tokens.Any(token => value.Contains(token, StringComparison.OrdinalIgnoreCase)))
+                .Select(item => item.index)
+                .ToList();
+
+            static string NormalizeMaterial(string value) =>
+                (value ?? string.Empty).Replace("人棉", "粘胶", StringComparison.OrdinalIgnoreCase);
         }
 
         internal static string NormalizeSearchText(string value)
@@ -561,7 +767,11 @@ namespace ExportDocManager.Services.MasterData
         }
 
         private static async Task UpsertExampleInContextAsync(
-            AppDbContext context, HsCodeExampleInput input, DateTime now, CancellationToken cancellationToken)
+            AppDbContext context,
+            HsCodeExampleInput input,
+            DateTime now,
+            CancellationToken cancellationToken,
+            bool incrementUseCount = true)
         {
             string code = HsCodeTextHelper.NormalizeCode(input.RawReportedHsCode);
             string name = (input.ProductName ?? string.Empty).Trim();
@@ -574,8 +784,12 @@ namespace ExportDocManager.Services.MasterData
             }
             example.RawReportedHsCode = code; example.ResolvedCurrentHsCode = HsCodeTextHelper.NormalizeCode(input.ResolvedCurrentHsCode); example.ProductName = name;
             example.Specification = (input.Specification ?? string.Empty).Trim(); example.SearchText = NormalizeSearchText($"{name} {input.Specification}");
-            example.Source = "UserConfirmed"; example.SourceYear = DateTime.Now.Year; example.ResolutionStatus = "ManuallyVerified";
-            example.IsManuallyVerified = true; example.UseCount++; example.LastUsedAt = now; example.UpdatedAt = now;
+            example.Source = string.IsNullOrWhiteSpace(input.Source) ? "UserConfirmed" : input.Source.Trim();
+            example.SourceYear = input.SourceYear;
+            example.ResolutionStatus = input.IsManuallyVerified ? "ManuallyVerified" : NormalizeResolutionStatus(input.ResolutionStatus, example.ResolvedCurrentHsCode, code);
+            example.IsManuallyVerified = true;
+            if (incrementUseCount) example.UseCount++;
+            example.LastUsedAt = now; example.UpdatedAt = now;
         }
 
         private async Task ResolveExamplesAsync(AppDbContext context, CancellationToken cancellationToken)
@@ -634,8 +848,14 @@ namespace ExportDocManager.Services.MasterData
         }
 
         private sealed record KnowledgeManifest(string SchemaVersion, DateTimeOffset ExportedAt, DateTimeOffset? Since, Dictionary<string, string> Checksums);
-        private sealed record CurrentCodeResolution(string CurrentCode, string Status, IReadOnlyList<string> Replacements);
-        private sealed record KnowledgeCandidate(HsCodeDeclarationExample Example, CurrentCodeResolution Resolution, int Score);
+        private sealed record CurrentCodeResolution(string CurrentCode, string Status, IReadOnlyList<string> Replacements, bool CanUse);
+        private sealed record KnowledgeCandidate(
+            HsCodeDeclarationExample Example,
+            CurrentCodeResolution Resolution,
+            int Score,
+            IReadOnlyList<string> MatchReasons,
+            IReadOnlyList<string> ConflictWarnings);
+        private sealed record AttributeAssessment(int Penalty, IReadOnlyList<string> MatchReasons, IReadOnlyList<string> ConflictWarnings);
         private sealed record HistorySourceRow(string Code, string Name, string Specification, string Source);
     }
 

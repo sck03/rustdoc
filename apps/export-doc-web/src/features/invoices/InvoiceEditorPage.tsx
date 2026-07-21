@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ClipboardList, Edit3, FileText, Minimize2, PackageSearch, Save, ScrollText, Trash2 } from "lucide-react";
+import { ArrowLeft, CaseUpper, ClipboardList, Edit3, FileText, Minimize2, PackageSearch, Save, ScrollText, Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ApiUnitDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
@@ -41,6 +41,7 @@ import {
   readRouteInvoiceDraft,
   readRouteInvoiceImportAction,
   type RouteInvoiceImportAction,
+  uppercaseInvoiceEnglishText,
 } from "./invoiceModel.ts";
 import { createInvoiceItemFromProduct, createProductDraftFromInvoiceItem, hasSameProductCode } from "./invoiceProductLibrary.ts";
 
@@ -458,6 +459,16 @@ export function InvoiceEditorPage({
 
     setInvoice((current) => (current ? { ...current, ...next } : current));
     setSuccessMessage(null);
+  }
+
+  function uppercaseInvoiceText() {
+    if (!isInvoiceEditable) {
+      return;
+    }
+
+    setInvoice((current) => (current ? uppercaseInvoiceEnglishText(current) : current));
+    setMessage(null);
+    setSuccessMessage("英文名称、地址、运输条款和商品英文信息已统一转换为大写。");
   }
 
   function commitInvoiceCustomOption(optionType: string, value: string) {
@@ -1071,6 +1082,15 @@ export function InvoiceEditorPage({
                 <button type="button" className="invoice-section-nav-item" onClick={() => scrollToInvoiceSection("invoice-report-section")}>
                   <ScrollText size={16} aria-hidden="true" />
                   <span>预览导出</span>
+                </button>
+                <button
+                  type="button"
+                  className="invoice-section-nav-item invoice-uppercase-action"
+                  disabled={!isInvoiceEditable}
+                  onClick={uppercaseInvoiceText}
+                >
+                  <CaseUpper size={17} aria-hidden="true" />
+                  <span>英文转大写</span>
                 </button>
               </nav>
 

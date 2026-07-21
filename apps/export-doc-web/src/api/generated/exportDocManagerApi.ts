@@ -1091,25 +1091,35 @@ export interface ApiHsCodeClearAllRequest {
 }
 
 export interface ApiHsCodeDto {
+  ciqEntries?: ApiHsCodeRemoteReferenceEntry[];
+  classificationEntries?: ApiHsCodeRemoteReferenceEntry[];
   code: string;
   consumptionTaxRate?: string;
+  declarationExampleCount?: number;
   description?: string;
   detailUrl?: string;
   effectiveYear?: number;
   elements?: string;
+  evidenceUrl?: string;
   exportTariffRate?: string;
   id: number;
   inspectionCategory?: string;
+  instanceCount?: number;
   lastVerifiedAt?: string;
   name: string;
   normalTariffRate?: string;
   normalizedCode: string;
   notes?: string;
+  observedAt?: string;
+  personalPostalTaxCode?: string;
   preferentialTariffRate?: string;
   rebateRate?: string;
+  recommendedKeywords?: string[];
+  remoteRecordKind?: string;
   replacedByCodes?: string;
   sourceName?: string;
   status?: string;
+  summaryUrl?: string;
   supervisionConditions?: string;
   unit?: string;
   updateTime?: string;
@@ -1202,10 +1212,17 @@ export interface ApiHsCodeRemoteHealthResponse {
   source: string;
 }
 
+export interface ApiHsCodeRemoteReferenceEntry {
+  code: string;
+  name: string;
+}
+
 export interface ApiHsCodeSearchResponse {
   count: number;
+  declarationExampleCount?: number;
   items: ApiHsCodeDto[];
   source: string;
+  standardCodeCount?: number;
   storagePolicy: string;
 }
 
@@ -2816,6 +2833,124 @@ export interface BackgroundJobSnapshot {
   title: string;
 }
 
+export interface HsCodeHistoryLearningCandidate {
+  canConfirm: boolean;
+  currentCode: string;
+  fingerprint: string;
+  productName: string;
+  rawCode: string;
+  replacementCandidates: string[];
+  resolutionStatus: string;
+  source: string;
+  sourceCount: number;
+  specification: string;
+}
+
+export interface HsCodeKnowledgeExample {
+  id: number;
+  isManuallyVerified: boolean;
+  productName: string;
+  rawReportedHsCode: string;
+  resolutionStatus: string;
+  resolvedCurrentHsCode?: string;
+  source: string;
+  sourceYear?: number;
+  specification?: string;
+  updatedAt: string;
+  useCount: number;
+}
+
+export interface HsCodeKnowledgeExampleInput {
+  id: number;
+  isManuallyVerified: boolean;
+  productName: string;
+  rawReportedHsCode: string;
+  resolutionStatus: string;
+  resolvedCurrentHsCode: string;
+  source: string;
+  sourceYear?: number;
+  specification: string;
+}
+
+export interface HsCodeKnowledgeExamplePage {
+  items: HsCodeKnowledgeExample[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface HsCodeKnowledgeFeedbackInput {
+  accepted: boolean;
+  candidateCode: string;
+  productName: string;
+  queryText: string;
+  specification: string;
+}
+
+export interface HsCodeKnowledgeImportResponse {
+  exampleCount: number;
+  feedbackCount: number;
+  fileName: string;
+  hsCodeCount: number;
+  replacementCount: number;
+  result: HsCodeKnowledgeImportResult;
+  warnings: string[];
+}
+
+export interface HsCodeKnowledgeImportResult {
+  addedExamples?: number;
+  addedFeedback?: number;
+  addedHsCodes?: number;
+  addedReplacements?: number;
+  message: string;
+  updatedExamples?: number;
+  updatedHsCodes?: number;
+}
+
+export interface HsCodeKnowledgeSearchItem {
+  canUse: boolean;
+  confirmedCount: number;
+  conflictWarnings: string[];
+  currentCode: string;
+  exampleCount: number;
+  matchReasons: string[];
+  name: string;
+  rawCode: string;
+  replacementCandidates: string[];
+  resolutionStatus: string;
+  score: number;
+  specification: string;
+  standardName: string;
+}
+
+export interface HsCodeKnowledgeSearchResponse {
+  items: HsCodeKnowledgeSearchItem[];
+  localExampleCount: number;
+  message: string;
+  query: string;
+}
+
+export interface HsCodeRemoteCandidate {
+  id: number;
+  lastSeenAt: string;
+  productName: string;
+  queryText: string;
+  rawReportedHsCode: string;
+  resolutionStatus: string;
+  reviewStatus: string;
+  seenCount: number;
+  source: string;
+  sourceUrl?: string;
+  specification?: string;
+  suggestedCurrentHsCode?: string;
+}
+
+export interface HsCodeRemoteCandidateReviewInput {
+  confirmed: boolean;
+  currentCode: string;
+  id: number;
+}
+
 export interface SingleWindowClientDispatchResult {
   attachmentFileCount: number;
   batchId: number;
@@ -3277,6 +3412,10 @@ export interface DeleteHsCodeRequest {
   id: number;
 }
 
+export interface DeleteHsCodeKnowledgeExampleRequest {
+  id: number;
+}
+
 export interface DeleteHsCodesBatchRequest {
   body: ApiHsCodeBatchDeleteRequest;
 }
@@ -3349,6 +3488,11 @@ export interface DeleteUserReportTemplateRequest {
   id: number;
 }
 
+export interface DiscoverHsCodeHistoryCandidatesRequest {
+  keyword?: string;
+  maxResults?: number;
+}
+
 export interface DispatchSingleWindowBatchToClientRequest {
   body: ApiSingleWindowClientDispatchRequest;
 }
@@ -3392,6 +3536,10 @@ export interface DownloadSupportPackageRequest {
 export interface ExportCrmCustomersRequest {
   keyword?: string;
   status?: string;
+}
+
+export interface ExportHsCodeKnowledgeRequest {
+  since?: string;
 }
 
 export interface ExportSuppliersRequest {
@@ -3493,6 +3641,10 @@ export interface ImportCrmCustomersRequest {
   body: ApiCrmCustomerImportRequest;
 }
 
+export interface ImportHsCodeKnowledgeRequest {
+  body: Blob;
+}
+
 export interface ImportHsCodesFromPathRequest {
   body: ApiHsCodeImportPathRequest;
 }
@@ -3583,6 +3735,17 @@ export interface ListExchangeRatesRequest {
 
 export interface ListExportersRequest {
   keyword?: string;
+}
+
+export interface ListHsCodeKnowledgeExamplesRequest {
+  keyword?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListHsCodeRemoteCandidatesRequest {
+  status?: string;
+  maxResults?: number;
 }
 
 export interface ListHsCodesRequest {
@@ -3810,6 +3973,10 @@ export interface RecognizeOcrImageContentRequest {
   body: ApiOcrRecognizeImageContentRequest;
 }
 
+export interface RecordHsCodeKnowledgeFeedbackRequest {
+  body: HsCodeKnowledgeFeedbackInput;
+}
+
 export interface RegisterLicenseRequest {
   body: ApiLicenseRegisterRequest;
 }
@@ -3844,6 +4011,10 @@ export interface RestoreUserReportTemplateVersionRequest {
 
 export interface RetryJobRequest {
   jobId: string;
+}
+
+export interface ReviewHsCodeRemoteCandidateRequest {
+  body: HsCodeRemoteCandidateReviewInput;
 }
 
 export interface ReviewLetterOfCreditComplianceRequest {
@@ -3887,6 +4058,10 @@ export interface SaveCustomsCooSubmitPackageToPathRequest {
   body?: ApiSingleWindowSubmitPackageRequest;
 }
 
+export interface SaveHsCodeKnowledgeExampleRequest {
+  body: HsCodeKnowledgeExampleInput;
+}
+
 export interface SaveInvoiceTransferPackageToPathRequest {
   id: number;
   body: ApiInvoiceTransferPathRequest;
@@ -3918,6 +4093,11 @@ export interface SaveSingleWindowReceiptPackageToPathRequest {
 
 export interface SaveSupportPackageToRuntimeRequest {
   body: ApiSupportPackageRequest;
+}
+
+export interface SearchHsCodeKnowledgeRequest {
+  query?: string;
+  maxResults?: number;
 }
 
 export interface SearchRemoteHsCodesRequest {
@@ -4189,16 +4369,6 @@ export interface ValidateSettingsRequest {
   body: ApiSettingsValidationRequest;
 }
 
-export interface HsCodeKnowledgeSearchItem { currentCode: string; rawCode: string; name: string; specification: string; standardName: string; resolutionStatus: string; score: number; exampleCount: number; confirmedCount: number; replacementCandidates: string[]; canUse: boolean; }
-export interface HsCodeKnowledgeSearchResponse { query: string; items: HsCodeKnowledgeSearchItem[]; localExampleCount: number; message: string; }
-export interface HsCodeKnowledgeExample { id: number; rawReportedHsCode: string; resolvedCurrentHsCode?: string | null; productName: string; specification?: string | null; source: string; sourceYear?: number | null; resolutionStatus: string; isManuallyVerified: boolean; useCount: number; updatedAt: string; }
-export interface HsCodeKnowledgeExamplePage { items: HsCodeKnowledgeExample[]; totalCount: number; pageNumber: number; pageSize: number; }
-export interface HsCodeKnowledgeExampleInput { id: number; rawReportedHsCode: string; resolvedCurrentHsCode: string; productName: string; specification: string; source: string; sourceYear?: number | null; resolutionStatus: string; isManuallyVerified: boolean; }
-export interface HsCodeKnowledgeFeedbackInput { queryText: string; productName: string; specification: string; candidateCode: string; accepted: boolean; }
-export interface HsCodeHistoryLearningCandidate { fingerprint: string; rawCode: string; currentCode: string; productName: string; specification: string; source: string; sourceCount: number; resolutionStatus: string; replacementCandidates: string[]; canConfirm: boolean; }
-export interface HsCodeRemoteCandidate { id: number; queryText: string; rawReportedHsCode: string; suggestedCurrentHsCode?: string | null; productName: string; specification?: string | null; source: string; reviewStatus: string; resolutionStatus: string; seenCount: number; lastSeenAt: string; }
-export interface HsCodeKnowledgeImportResponse { fileName: string; hsCodeCount: number; exampleCount: number; replacementCount: number; feedbackCount: number; warnings: string[]; result: { message: string }; }
-
 export type AccessTokenProvider = string | (() => string | undefined | Promise<string | undefined>);
 type QueryValue = string | number | boolean | null | undefined;
 const desktopAccessTokenHeaderName = "X-ExportDocManager-Desktop-Token";
@@ -4242,46 +4412,6 @@ export class ExportDocManagerApiClient {
     } else {
       throw new Error("A fetch implementation is required to use ExportDocManagerApiClient.");
     }
-  }
-
-  public searchHsCodeKnowledge(query: string, maxResults = 20): Promise<HsCodeKnowledgeSearchResponse> {
-    return this.request("GET", "/api/master-data/hs-knowledge/search", { query: { query, maxResults } });
-  }
-
-  public listHsCodeKnowledgeExamples(keyword = "", pageNumber = 1, pageSize = 50): Promise<HsCodeKnowledgeExamplePage> {
-    return this.request("GET", "/api/master-data/hs-knowledge/examples", { query: { keyword, pageNumber, pageSize } });
-  }
-
-  public saveHsCodeKnowledgeExample(body: HsCodeKnowledgeExampleInput): Promise<HsCodeKnowledgeExample> {
-    return this.request("POST", "/api/master-data/hs-knowledge/examples", { body });
-  }
-
-  public deleteHsCodeKnowledgeExample(id: number): Promise<void> {
-    return this.request("DELETE", `/api/master-data/hs-knowledge/examples/${encodePath(id)}`);
-  }
-
-  public recordHsCodeKnowledgeFeedback(body: HsCodeKnowledgeFeedbackInput): Promise<ApiCommandResponse> {
-    return this.request("POST", "/api/master-data/hs-knowledge/feedback", { body });
-  }
-
-  public discoverHsCodeHistoryCandidates(keyword = "", maxResults = 200): Promise<HsCodeHistoryLearningCandidate[]> {
-    return this.request("GET", "/api/master-data/hs-knowledge/history-candidates", { query: { keyword, maxResults } });
-  }
-
-  public listHsCodeRemoteCandidates(status = "Pending", maxResults = 200): Promise<HsCodeRemoteCandidate[]> {
-    return this.request("GET", "/api/master-data/hs-knowledge/remote-candidates", { query: { status, maxResults } });
-  }
-
-  public reviewHsCodeRemoteCandidate(body: { id: number; currentCode: string; confirmed: boolean }): Promise<ApiCommandResponse> {
-    return this.request("POST", "/api/master-data/hs-knowledge/remote-candidates/review", { body });
-  }
-
-  public importHsCodeKnowledge(file: Blob): Promise<HsCodeKnowledgeImportResponse> {
-    return this.request("POST", "/api/master-data/hs-knowledge/import", { body: file, init: { headers: { "Content-Type": "application/octet-stream" } } });
-  }
-
-  public exportHsCodeKnowledge(since?: string): Promise<Blob> {
-    return this.request("GET", "/api/master-data/hs-knowledge/export", { query: { since } });
   }
 
   public analyzeContainerPacking(request: AnalyzeContainerPackingRequest, init?: RequestInit): Promise<ApiContainerPackingAnalyzeResponse> {
@@ -4656,6 +4786,11 @@ export class ExportDocManagerApiClient {
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
+  public deleteHsCodeKnowledgeExample(request: DeleteHsCodeKnowledgeExampleRequest, init?: RequestInit): Promise<void> {
+    const path = `/api/master-data/hs-knowledge/examples/${encodePath(request.id)}`;
+    return this.request<void>("DELETE", path, { init });
+  }
+
   public deleteHsCodesBatch(request: DeleteHsCodesBatchRequest, init?: RequestInit): Promise<ApiCommandResponse> {
     const path = "/api/master-data/hs-codes/delete-batch";
     return this.request<ApiCommandResponse>("POST", path, {
@@ -4750,6 +4885,17 @@ export class ExportDocManagerApiClient {
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
+  public discoverHsCodeHistoryCandidates(request: DiscoverHsCodeHistoryCandidatesRequest = {}, init?: RequestInit): Promise<HsCodeHistoryLearningCandidate[]> {
+    const path = "/api/master-data/hs-knowledge/history-candidates";
+    return this.request<HsCodeHistoryLearningCandidate[]>("GET", path, {
+      query: {
+        "keyword": request.keyword,
+        "maxResults": request.maxResults,
+      },
+      init,
+    });
+  }
+
   public dispatchSingleWindowBatchToClient(request: DispatchSingleWindowBatchToClientRequest, init?: RequestInit): Promise<SingleWindowClientDispatchResult> {
     const path = "/api/single-window/client/dispatch";
     return this.request<SingleWindowClientDispatchResult>("POST", path, {
@@ -4829,6 +4975,16 @@ export class ExportDocManagerApiClient {
       query: {
         "keyword": request.keyword,
         "status": request.status,
+      },
+      init,
+    });
+  }
+
+  public exportHsCodeKnowledge(request: ExportHsCodeKnowledgeRequest = {}, init?: RequestInit): Promise<Blob> {
+    const path = "/api/master-data/hs-knowledge/export";
+    return this.request<Blob>("GET", path, {
+      query: {
+        "since": request.since,
       },
       init,
     });
@@ -5057,6 +5213,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public importHsCodeKnowledge(request: ImportHsCodeKnowledgeRequest, init?: RequestInit): Promise<HsCodeKnowledgeImportResponse> {
+    const path = "/api/master-data/hs-knowledge/import";
+    return this.request<HsCodeKnowledgeImportResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public importHsCodesFromPath(request: ImportHsCodesFromPathRequest, init?: RequestInit): Promise<ApiHsCodeImportResponse> {
     const path = "/api/master-data/hs-codes/import-path";
     return this.request<ApiHsCodeImportResponse>("POST", path, {
@@ -5262,6 +5426,29 @@ export class ExportDocManagerApiClient {
     return this.request<ApiExporterDto[]>("GET", path, {
       query: {
         "keyword": request.keyword,
+      },
+      init,
+    });
+  }
+
+  public listHsCodeKnowledgeExamples(request: ListHsCodeKnowledgeExamplesRequest = {}, init?: RequestInit): Promise<HsCodeKnowledgeExamplePage> {
+    const path = "/api/master-data/hs-knowledge/examples";
+    return this.request<HsCodeKnowledgeExamplePage>("GET", path, {
+      query: {
+        "keyword": request.keyword,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listHsCodeRemoteCandidates(request: ListHsCodeRemoteCandidatesRequest = {}, init?: RequestInit): Promise<HsCodeRemoteCandidate[]> {
+    const path = "/api/master-data/hs-knowledge/remote-candidates";
+    return this.request<HsCodeRemoteCandidate[]>("GET", path, {
+      query: {
+        "status": request.status,
+        "maxResults": request.maxResults,
       },
       init,
     });
@@ -5706,6 +5893,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public recordHsCodeKnowledgeFeedback(request: RecordHsCodeKnowledgeFeedbackRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+    const path = "/api/master-data/hs-knowledge/feedback";
+    return this.request<ApiCommandResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public registerLicense(request: RegisterLicenseRequest, init?: RequestInit): Promise<ApiLicenseRegisterResponse> {
     const path = "/api/system/license/register";
     return this.request<ApiLicenseRegisterResponse>("POST", path, {
@@ -5764,6 +5959,14 @@ export class ExportDocManagerApiClient {
   public retryJob(request: RetryJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/jobs/${encodePath(request.jobId)}/retry`;
     return this.request<BackgroundJobSnapshot>("POST", path, { init });
+  }
+
+  public reviewHsCodeRemoteCandidate(request: ReviewHsCodeRemoteCandidateRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+    const path = "/api/master-data/hs-knowledge/remote-candidates/review";
+    return this.request<ApiCommandResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public reviewLetterOfCreditCompliance(request: ReviewLetterOfCreditComplianceRequest, init?: RequestInit): Promise<ApiLetterOfCreditReviewResponse> {
@@ -5843,6 +6046,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public saveHsCodeKnowledgeExample(request: SaveHsCodeKnowledgeExampleRequest, init?: RequestInit): Promise<HsCodeKnowledgeExample> {
+    const path = "/api/master-data/hs-knowledge/examples";
+    return this.request<HsCodeKnowledgeExample>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public saveInvoiceTransferPackageToPath(request: SaveInvoiceTransferPackageToPathRequest, init?: RequestInit): Promise<ApiInvoiceTransferExportResponse> {
     const path = `/api/invoices/${encodePath(request.id)}/transfer-package/save-to-path`;
     return this.request<ApiInvoiceTransferExportResponse>("POST", path, {
@@ -5903,6 +6114,17 @@ export class ExportDocManagerApiClient {
     const path = "/api/support-package/save-to-runtime";
     return this.request<ApiSupportPackageResponse>("POST", path, {
       body: request.body,
+      init,
+    });
+  }
+
+  public searchHsCodeKnowledge(request: SearchHsCodeKnowledgeRequest = {}, init?: RequestInit): Promise<HsCodeKnowledgeSearchResponse> {
+    const path = "/api/master-data/hs-knowledge/search";
+    return this.request<HsCodeKnowledgeSearchResponse>("GET", path, {
+      query: {
+        "query": request.query,
+        "maxResults": request.maxResults,
+      },
       init,
     });
   }

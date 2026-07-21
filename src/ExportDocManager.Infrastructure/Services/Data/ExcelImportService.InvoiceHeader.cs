@@ -54,8 +54,16 @@ namespace ExportDocManager.Services.Data
                         ["目的港", "目的地", "port of destination", "port of discharge", "destination"],
                         string.Empty,
                         IsUsablePortValue);
-                invoice.DestinationCountry = GetAnalyzedValue(analysisReport, "DestinationCountry")
-                    ?? GetValueByLabelsOrCell(worksheet, settings.DestinationCountryCell, ["目的国", "destination country", "country"]);
+                invoice.DestinationCountry = GetAnalyzedValue(
+                        analysisReport,
+                        "DestinationCountry",
+                        ExcelImportFieldValueValidator.IsDestinationCountry)
+                    ?? GetValueByLabelsOrCell(
+                        worksheet,
+                        settings.DestinationCountryCell,
+                        ["目的国", "destination country", "country"],
+                        string.Empty,
+                        ExcelImportFieldValueValidator.IsDestinationCountry);
                 invoice.LetterOfCreditNo = GetAnalyzedValue(analysisReport, "LetterOfCreditNo")
                     ?? GetValueByLabelsOrCell(worksheet, settings.LetterOfCreditNoCell, ["信用证号", "l/c no", "lc no", "letter of credit"]);
                 invoice.IssuingBank = GetAnalyzedValue(analysisReport, "IssuingBank")
@@ -113,6 +121,22 @@ namespace ExportDocManager.Services.Data
             {
                 invoice.LetterOfCreditNo = string.Empty;
             }
-        }    }
-}
+        }
 
+        private static void CompleteInvoiceDerivedFields(Invoice invoice)
+        {
+            if (invoice == null || !string.IsNullOrWhiteSpace(invoice.DestinationCountry))
+            {
+                return;
+            }
+
+            if (ExcelImportFieldValueValidator.TryInferDestinationCountry(
+                invoice.PortOfDestination,
+                invoice.CustomerAddressEN,
+                out string country))
+            {
+                invoice.DestinationCountry = country;
+            }
+        }
+    }
+}

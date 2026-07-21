@@ -44,6 +44,9 @@ assert(model.getRequiredWorkspace("/crm/email-templates") === "sales", "email te
 assert(model.getRequiredWorkspace("/crm/opportunities") === "sales", "sales opportunity route access model");
 assert(model.getRequiredWorkspace("/invoices/12") === "document", "document route access model");
 assert(model.findActiveWorkspaceNavGroupKey("/tools/ocr") === "tools", "tools navigation group");
+assert(model.findActiveWorkspaceNavGroupKey("/master-data/hs-knowledge/search") === "hs-knowledge", "knowledge route activates only knowledge group");
+assert(model.workspaceNavGroups.find((group) => group.key === "hs-knowledge")?.label === "知识中心库", "knowledge group label");
+assert(model.workspaceNavGroups.find((group) => group.key === "hs-knowledge")?.items[0]?.label === "HS 编码库", "HS library item label");
 assert(model.createInitialWorkspaceNavGroupState("/settings").has("system"), "active group starts expanded");
 const userGroups = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: true });
 const salesGroups = model.filterWorkspaceNavGroups({ productEdition: "Full", canUseSalesWorkspace: true });

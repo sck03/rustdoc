@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.MasterData
 {
@@ -27,6 +28,10 @@ namespace ExportDocManager.Services.MasterData
         /// </summary>
         Task<List<HsCode>> SearchRemoteAsync(string keyword, CancellationToken cancellationToken = default);
 
+        Task<HsCodeRemoteSearchBundle> SearchRemoteEvidenceAsync(
+            string keyword,
+            CancellationToken cancellationToken = default);
+
         Task<HsCodeRemoteSourceHealth> GetRemoteSourceHealthAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -43,6 +48,10 @@ namespace ExportDocManager.Services.MasterData
         /// Fetches detailed information for a specific HS code from the remote source.
         /// </summary>
         Task<HsCode> FetchDetailAsync(HsCode hsCode, CancellationToken cancellationToken = default);
+
+        Task<HsCodeRemoteDetailBundle> FetchRemoteDetailEvidenceAsync(
+            HsCodeRemoteSearchRecord record,
+            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Saves or updates an HS code to the local database.
@@ -130,6 +139,51 @@ namespace ExportDocManager.Services.MasterData
         DateTimeOffset CheckedAt,
         string Message);
 
+    public enum HsCodeRemoteRecordKind
+    {
+        StandardCode = 0,
+        DeclarationExample = 1
+    }
+
+    public sealed record HsCodeRemoteSearchRecord(
+        HsCode Item,
+        HsCodeRemoteRecordKind Kind,
+        bool IsExpired,
+        int? InstanceCount,
+        string SummaryUrl,
+        string EvidenceUrl,
+        DateTimeOffset ObservedAt);
+
+    public sealed record HsCodeRemoteReplacementEvidence(
+        string OldCode,
+        IReadOnlyList<string> RecommendedKeywords,
+        string EvidenceUrl,
+        DateTimeOffset ObservedAt);
+
+    public sealed record HsCodeRemoteReferenceEntry(string Code, string Name);
+
+    public sealed record HsCodeRemoteSearchBundle(
+        string Query,
+        string Source,
+        IReadOnlyList<HsCodeRemoteSearchRecord> Records,
+        IReadOnlyList<HsCodeRemoteReplacementEvidence> ReplacementEvidence)
+    {
+        public static HsCodeRemoteSearchBundle Empty(string query, string source) =>
+            new(query ?? string.Empty, source ?? string.Empty, [], []);
+    }
+
+    public sealed record HsCodeRemoteDetailBundle(
+        HsCode Item,
+        bool IsExpired,
+        int? InstanceCount,
+        IReadOnlyList<string> RecommendedKeywords,
+        IReadOnlyList<HsCodeRemoteSearchRecord> DeclarationExamples,
+        string PersonalPostalTaxCode,
+        IReadOnlyList<HsCodeRemoteReferenceEntry> CiqEntries,
+        IReadOnlyList<HsCodeRemoteReferenceEntry> ClassificationEntries,
+        string EvidenceUrl,
+        DateTimeOffset ObservedAt);
+
     public interface IHsCodeRemoteProvider
     {
         string Name { get; }
@@ -138,6 +192,48 @@ namespace ExportDocManager.Services.MasterData
         Task<IReadOnlyList<HsCode>> SearchAsync(string keyword, CancellationToken cancellationToken = default);
         Task<HsCode> FetchDetailAsync(HsCode item, CancellationToken cancellationToken = default);
         Task<HsCodeRemoteSourceHealth> CheckHealthAsync(CancellationToken cancellationToken = default);
+
+        async Task<HsCodeRemoteSearchBundle> SearchEvidenceAsync(
+            string keyword,
+            CancellationToken cancellationToken = default)
+        {
+            var observedAt = DateTimeOffset.UtcNow;
+            var rows = await SearchAsync(keyword, cancellationToken).ConfigureAwait(false);
+            return new HsCodeRemoteSearchBundle(
+                keyword ?? string.Empty,
+                Name,
+                (rows ?? [])
+                    .Where(item => item != null)
+                    .Select(item => new HsCodeRemoteSearchRecord(
+                        item,
+                        HsCodeRemoteRecordKind.StandardCode,
+                        HsCodeTextHelper.IsExpired(item),
+                        null,
+                        string.Empty,
+                        item.DetailUrl ?? string.Empty,
+                        observedAt))
+                    .ToList(),
+                []);
+        }
+
+        async Task<HsCodeRemoteDetailBundle> FetchDetailEvidenceAsync(
+            HsCodeRemoteSearchRecord record,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(record);
+            var item = await FetchDetailAsync(record.Item, cancellationToken).ConfigureAwait(false);
+            return new HsCodeRemoteDetailBundle(
+                item,
+                HsCodeTextHelper.IsExpired(item),
+                record.InstanceCount,
+                [],
+                [],
+                string.Empty,
+                [],
+                [],
+                record.EvidenceUrl,
+                DateTimeOffset.UtcNow);
+        }
     }
 
     public sealed class HsCodeRemoteExpiredException : InvalidOperationException

@@ -192,12 +192,14 @@ namespace ExportDocManager.Services.Infrastructure
 
             if (!string.IsNullOrWhiteSpace(keyword))
             {
-                hsCodeQuery = hsCodeQuery.Where(hsCode =>
-                    hsCode.Code.Contains(keyword) ||
-                    (!string.IsNullOrWhiteSpace(normalizedCodeKeyword) &&
-                     hsCode.NormalizedCode.Contains(normalizedCodeKeyword)) ||
-                    hsCode.Name.Contains(keyword) ||
-                    (hsCode.Description != null && hsCode.Description.Contains(keyword)));
+                bool isNumericCodePrefix = !string.IsNullOrWhiteSpace(normalizedCodeKeyword) &&
+                    normalizedCodeKeyword.All(char.IsDigit);
+                hsCodeQuery = isNumericCodePrefix
+                    ? hsCodeQuery.Where(hsCode => hsCode.NormalizedCode.StartsWith(normalizedCodeKeyword))
+                    : hsCodeQuery.Where(hsCode =>
+                        hsCode.Code.Contains(keyword) ||
+                        hsCode.Name.Contains(keyword) ||
+                        (hsCode.Description != null && hsCode.Description.Contains(keyword)));
             }
 
             return hsCodeQuery.OrderByDescending(hsCode => hsCode.UpdateTime).ThenBy(hsCode => hsCode.Code);

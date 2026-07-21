@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { Eye,FileSpreadsheet,Globe2,RefreshCw,Save,Search,Trash2,Upload,X } from "lucide-react";
+import { Eye,ExternalLink,FileSpreadsheet,Globe2,RefreshCw,Save,Search,Trash2,Upload,X } from "lucide-react";
 import { ChangeEvent,FormEvent,Fragment,useEffect,useRef,useState } from "react";
 import {
 ApiHsCodeDto,
@@ -28,12 +28,14 @@ export function HsCodeToolsPanel({
   disabled,
   keyword,
   onLocalDataChanged,
+  onRemoteCandidatesChanged,
   mode = "hub",
 }: {
   client: ExportDocManagerApiClient;
   disabled: boolean;
   keyword: string;
   onLocalDataChanged: () => Promise<void>;
+  onRemoteCandidatesChanged?: () => Promise<void>;
   mode?: "hub" | "import" | "remote";
 }) {
   const desktopAvailable = isDesktopBridgeAvailable();
@@ -41,7 +43,6 @@ export function HsCodeToolsPanel({
   const remoteDetailRequestRef = useRef(0);
   const [remoteKeyword, setRemoteKeyword] = useState(keyword);
   const [remoteResults, setRemoteResults] = useState<ApiHsCodeDto[]>([]);
-  const [autoDetailProgress, setAutoDetailProgress] = useState<{ completed: number; total: number } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [expandedResultKey, setExpandedResultKey] = useState<string | null>(null);
@@ -121,7 +122,7 @@ export function HsCodeToolsPanel({
       client.searchRemoteHsCodes({
         keyword: request.keyword,
       }),
-    onSuccess: (response, request) => {
+    onSuccess: async (response, request) => {
       if (!isCurrentRemoteDetailRequest(request.requestId)) {
         return;
       }
@@ -130,19 +131,26 @@ export function HsCodeToolsPanel({
       const pendingDetailCount = items.filter(shouldFetchRemoteHsCodeDetail).length;
       setRemoteResults(items);
       setExpandedResultKey(null);
-      if (pendingDetailCount > 0) {
-        setAutoDetailProgress({ completed: 0, total: pendingDetailCount });
-        showSuccess(`联网查询完成：${items.length} 条，正在补全详情。`);
-        void enrichRemoteDetails(items, request.requestId);
+      await onRemoteCandidatesChanged?.();
+      if (!isCurrentRemoteDetailRequest(request.requestId)) {
         return;
       }
 
-      setAutoDetailProgress(null);
-      showSuccess(items.length > 0 ? `联网查询完成：${items.length} 条。` : "联网查询完成，未找到记录。");
+      if (pendingDetailCount > 0) {
+        showSuccess(`联网查询完成：找到 ${response.standardCodeCount ?? items.length} 条当前编码，${response.declarationExampleCount ?? 0} 条申报实例已进入候选池；其中 ${pendingDetailCount} 条编码可按需补全详情。`);
+        return;
+      }
+
+      showSuccess(
+        items.length > 0
+          ? `联网查询完成：找到 ${response.standardCodeCount ?? items.length} 条当前编码，${response.declarationExampleCount ?? 0} 条申报实例已进入候选池。`
+          : (response.declarationExampleCount ?? 0) > 0
+            ? `已保存 ${response.declarationExampleCount} 条申报实例到候选池，但暂未解析到当前标准编码。`
+            : "联网查询完成，未找到当前编码或申报实例。",
+      );
     },
     onError: (error, request) => {
       if (isCurrentRemoteDetailRequest(request.requestId)) {
-        setAutoDetailProgress(null);
         showError(readApiError(error));
       }
     },
@@ -154,9 +162,7 @@ export function HsCodeToolsPanel({
       setRemoteResults((current) => applyHsCodeRemoteDetailResolution(current, item, response));
       setExpandedResultKey(null);
       showSuccess(response.message || `已补全 ${item.code} 的远程详情。`);
-      if (response.updatedCount > 0) {
-        await onLocalDataChanged();
-      }
+      await onRemoteCandidatesChanged?.();
     },
     onError: (error) => showError(readApiError(error)),
   });
@@ -165,7 +171,7 @@ export function HsCodeToolsPanel({
     mutationFn: (item: ApiHsCodeDto) => client.createHsCode({ body: normalizeHsCodeDtoForSave(item) }),
     onSuccess: async (response, item) => {
       setRemoteResults((current) => replaceHsCodeResult(current, item, response));
-      showSuccess(`HS编码 ${response.code || item.code} 已保存到本地库。`);
+      showSuccess(`HS编码 ${response.code || item.code} 已保存为本地参考资料，导入年度税则后才会标记为当前有效。`);
       await onLocalDataChanged();
     },
     onError: (error) => showError(readApiError(error)),
@@ -180,7 +186,6 @@ export function HsCodeToolsPanel({
       showSuccess(response.message || "本地HS编码库已清空。");
       remoteDetailRequestRef.current += 1;
       setRemoteResults([]);
-      setAutoDetailProgress(null);
       setClearAllConfirmOpen(false);
       setClearAllConfirmation("");
       await onLocalDataChanged();
@@ -188,24 +193,19 @@ export function HsCodeToolsPanel({
     onError: (error) => showError(readApiError(error)),
   });
 
-  const isAutoDetailLoading = autoDetailProgress !== null;
   const isBusy =
     disabled ||
     importPathMutation.isPending ||
     uploadImportMutation.isPending ||
     commitImportMutation.isPending ||
     remoteSearchMutation.isPending ||
-    isAutoDetailLoading ||
     fetchDetailMutation.isPending ||
     saveRemoteMutation.isPending ||
     clearAllMutation.isPending;
   const canClearAllLocalHsCodes = !isBusy && clearAllConfirmation.trim() === hsCodeClearAllConfirmationText;
-  const remoteResultStatus =
-    remoteResults.length > 0
-      ? autoDetailProgress
-        ? `${remoteResults.length} 条联网结果 · 正在补全 ${autoDetailProgress.completed}/${autoDetailProgress.total}`
-        : `${remoteResults.length} 条联网结果`
-      : "本地库维护";
+  const remoteResultStatus = remoteResults.length > 0
+    ? `${remoteResults.length} 条联网结果`
+    : "本地库维护";
 
   async function importFromDesktopPath() {
     if (isBusy) {
@@ -323,83 +323,12 @@ export function HsCodeToolsPanel({
     remoteDetailRequestRef.current += 1;
     setRemoteResults([]);
     setExpandedResultKey(null);
-    setAutoDetailProgress(null);
     setMessage(null);
     return remoteDetailRequestRef.current;
   }
 
   function isCurrentRemoteDetailRequest(requestId: number) {
     return remoteDetailRequestRef.current === requestId;
-  }
-
-  async function enrichRemoteDetails(items: ApiHsCodeDto[], requestId: number) {
-    const pendingItems = items.filter(shouldFetchRemoteHsCodeDetail);
-    if (pendingItems.length === 0) {
-      if (isCurrentRemoteDetailRequest(requestId)) {
-        setAutoDetailProgress(null);
-      }
-
-      return;
-    }
-
-    let processed = 0;
-    let updatedCount = 0;
-    let removedCount = 0;
-    let failed = 0;
-
-    for (const item of pendingItems) {
-      if (!isCurrentRemoteDetailRequest(requestId)) {
-        return;
-      }
-
-      try {
-        const response = await client.resolveRemoteHsCodeDetail({ body: normalizeHsCodeDtoForRequest(item) });
-        if (!isCurrentRemoteDetailRequest(requestId)) {
-          return;
-        }
-
-        processed += 1;
-        updatedCount += response.updatedCount;
-        removedCount += response.removedCount;
-        setRemoteResults((current) => applyHsCodeRemoteDetailResolution(current, item, response));
-      } catch {
-        if (!isCurrentRemoteDetailRequest(requestId)) {
-          return;
-        }
-
-        processed += 1;
-        failed += 1;
-      }
-
-      if (!isCurrentRemoteDetailRequest(requestId)) {
-        return;
-      }
-
-      setAutoDetailProgress(processed < pendingItems.length ? { completed: processed, total: pendingItems.length } : null);
-    }
-
-    if (!isCurrentRemoteDetailRequest(requestId)) {
-      return;
-    }
-
-    setAutoDetailProgress(null);
-    if (updatedCount > 0) {
-      await onLocalDataChanged();
-    }
-
-    if (updatedCount > 0 && removedCount > 0 && failed > 0) {
-      showSuccess(`联网查询完成：已补全 ${updatedCount} 条，清理 ${removedCount} 条过期编码，${failed} 条可稍后重试。`);
-    } else if (updatedCount > 0 && removedCount > 0) {
-      showSuccess(`联网查询完成：已补全 ${updatedCount} 条，并清理 ${removedCount} 条过期编码。`);
-    } else if (updatedCount > 0 && failed > 0) {
-      showSuccess(`联网查询完成：已补全 ${updatedCount} 条详情，${failed} 条可稍后手动重试。`);
-    } else if (updatedCount > 0) {
-      showSuccess(`联网查询完成：已补全 ${updatedCount} 条详情。`);
-    } else if (removedCount > 0) {
-      showSuccess(`联网查询完成：已清理 ${removedCount} 条过期编码。`);
-    } else if (failed > 0) {
-      showSuccess(`联网查询完成：${items.length} 条，远程详情暂时未能补全，可点刷新重试。`);
-    }
   }
 
   return (
@@ -588,11 +517,11 @@ function HsCodeRemoteResults({ items, expandedResultKey, setExpandedResultKey, i
   fetchDetail: (item: ApiHsCodeDto) => void;
   saveItem: (item: ApiHsCodeDto) => void;
 }) {
-  return <div className="table-frame hs-code-remote-table-frame"><table className="hs-code-remote-table" aria-label="HS 编码联网结果"><thead><tr><th>编码</th><th>名称</th><th>单位</th><th>退税率</th><th>监管条件</th><th className="row-actions-cell">操作</th></tr></thead><tbody>
+  return <div className="table-frame hs-code-remote-table-frame"><table className="hs-code-remote-table" aria-label="HS 编码联网结果"><thead><tr><th>编码</th><th>名称</th><th>来源证据</th><th>单位</th><th>退税率</th><th>监管条件</th><th className="row-actions-cell">操作</th></tr></thead><tbody>
     {items.map((item, index) => {
       const key = buildHsCodeResultKey(item, index);
       const expanded = expandedResultKey === key;
-      return <Fragment key={key}><tr><td className="strong-cell">{item.code || "-"}</td><td>{item.name || "-"}</td><td>{item.unit || "-"}</td><td>{item.rebateRate || "-"}</td><td>{item.supervisionConditions || "-"}</td><td className="row-actions-cell"><button className="icon-button compact-icon-button" type="button" title="查看详情" onClick={() => setExpandedResultKey(expanded ? null : key)}><Eye size={15} /></button><button className="icon-button compact-icon-button" type="button" title="补全详情" disabled={isBusy || !item.detailUrl} onClick={() => fetchDetail(item)}><RefreshCw size={15} /></button><button className="icon-button compact-icon-button" type="button" title="保存到本地库" disabled={isBusy || !item.code} onClick={() => saveItem(item)}><Save size={15} /></button></td></tr>{expanded ? <tr className="hs-code-detail-row"><td colSpan={6}><HsCodeRemoteDetail item={item} /></td></tr> : null}</Fragment>;
+      return <Fragment key={key}><tr><td className="strong-cell">{item.code || "-"}</td><td>{item.name || "-"}</td><td><span className="remote-evidence-kind">{remoteRecordKindLabel(item.remoteRecordKind)}</span><small className="remote-evidence-count">{remoteEvidenceCount(item)}</small></td><td>{item.unit || "-"}</td><td>{item.rebateRate || "-"}</td><td>{item.supervisionConditions || "-"}</td><td className="row-actions-cell"><button className="icon-button compact-icon-button" type="button" title="查看详情" onClick={() => setExpandedResultKey(expanded ? null : key)}><Eye size={15} /></button><button className="icon-button compact-icon-button" type="button" title="补全详情" disabled={isBusy || !item.detailUrl} onClick={() => fetchDetail(item)}><RefreshCw size={15} /></button><button className="icon-button compact-icon-button" type="button" title="保存为本地参考资料" disabled={isBusy || !item.code} onClick={() => saveItem(item)}><Save size={15} /></button></td></tr>{expanded ? <tr className="hs-code-detail-row"><td colSpan={7}><HsCodeRemoteDetail item={item} /></td></tr> : null}</Fragment>;
     })}
   </tbody></table></div>;
 }
@@ -616,8 +545,41 @@ function HsCodeRemoteDetail({ item }: { item: ApiHsCodeDto }) {
         <DetailField label="描述" value={item.description} wide />
         <DetailField label="备注" value={item.notes} wide />
       </div>
+      <div className="hs-code-remote-evidence">
+        <div><span>证据类型</span><strong>{remoteRecordKindLabel(item.remoteRecordKind)}</strong></div>
+        <div><span>实例数量</span><strong>{remoteEvidenceCount(item)}</strong></div>
+        <div><span>观察时间</span><strong>{formatObservedAt(item.observedAt)}</strong></div>
+        {item.personalPostalTaxCode ? <div><span>个人行邮税号</span><strong>{item.personalPostalTaxCode}</strong></div> : null}
+        <div className="hs-code-evidence-links">
+          {item.evidenceUrl ? <a href={item.evidenceUrl} target="_blank" rel="noreferrer">来源详情<ExternalLink size={14} /></a> : null}
+          {item.summaryUrl ? <a href={item.summaryUrl} target="_blank" rel="noreferrer">实例汇总<ExternalLink size={14} /></a> : null}
+        </div>
+      </div>
+      {item.ciqEntries?.length ? <ReferenceList label="CIQ分类" entries={item.ciqEntries.map(entry => `${entry.code} ${entry.name}`)} /> : null}
+      {item.classificationEntries?.length ? <ReferenceList label="所属分类" entries={item.classificationEntries.map(entry => `${entry.code} ${entry.name}`)} /> : null}
     </div>
   );
+}
+
+function ReferenceList({ label, entries }: { label: string; entries: string[] }) {
+  return <div className="hs-code-reference-list"><span>{label}</span><div>{entries.map(entry => <small key={entry}>{entry}</small>)}</div></div>;
+}
+
+function remoteRecordKindLabel(kind?: string) {
+  return kind === "DeclarationExample" ? "申报实例" : "标准税则";
+}
+
+function remoteEvidenceCount(item: ApiHsCodeDto) {
+  if (item.remoteRecordKind === "DeclarationExample") return "申报实例 1 条";
+  if (item.instanceCount != null) return `实例汇总 ${item.instanceCount.toLocaleString()} 条`;
+  if (item.declarationExampleCount != null && item.declarationExampleCount > 0) return `已提取 ${item.declarationExampleCount} 条`;
+  return "尚未提取实例";
+}
+
+function formatObservedAt(value?: string) {
+  if (!value) return "-";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
 }
 
 function DetailField({ label, value, wide = false }: { label: string; value?: string; wide?: boolean }) {

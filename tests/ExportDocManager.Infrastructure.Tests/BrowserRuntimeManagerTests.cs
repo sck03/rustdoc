@@ -136,6 +136,84 @@ namespace ExportDocManager.Infrastructure.Tests
             }
         }
 
+        [Fact]
+        public async Task I5a6BrowserParser_ShouldPreferTableWithDetailLinksAndReadSpecification()
+        {
+            string root = FindRepositoryRoot();
+            string dataRoot = Path.Combine(root, ".codex-runtime", "BrowserRuntimeManagerTests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dataRoot);
+            var pathProvider = new RuntimeAppPathProvider(root, dataRoot);
+            await using var runtime = new BrowserRuntimeManager();
+            await using var host = new ManagedPlaywrightBrowserHost(runtime, new BrowserExecutableResolver(pathProvider), pathProvider);
+            try
+            {
+                var rows = await host.ExecuteAsync(async (page, _) =>
+                {
+                    await page.SetContentAsync("""
+                        <table><tr><td>HS编码</td><td>没有结果的标准编码表</td></tr></table>
+                        <div id="hscasefind"><table>
+                        <tr><td>HS编码</td><td>商品名称</td><td>商品规格</td></tr>
+                        <tr><td><a href="//www.i5a6.com/hscode/detail/6109100010">61091000.10</a></td><td>棉制男T恤</td><td>针织|男式|100%棉</td></tr>
+                        </table></div>
+                        """);
+                    return await I5a6HsCodeProvider.ParseSearchPageAsync(page);
+                });
+                var item = Assert.Single(rows);
+                Assert.Equal("6109100010", item.Code);
+                Assert.Equal("棉制男T恤", item.Name);
+                Assert.Equal("针织|男式|100%棉", item.Description);
+                Assert.Equal("https://www.i5a6.com/hscode/detail/6109100010", item.DetailUrl);
+            }
+            finally
+            {
+                await host.DisposeAsync();
+                AtomicFileHelper.TryDeleteDirectory(dataRoot);
+            }
+        }
+
+        [Fact]
+        public async Task I5a6BrowserParser_ShouldReadMobileDealCards()
+        {
+            string root = FindRepositoryRoot();
+            string dataRoot = Path.Combine(root, ".codex-runtime", "BrowserRuntimeManagerTests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dataRoot);
+            var pathProvider = new RuntimeAppPathProvider(root, dataRoot);
+            await using var runtime = new BrowserRuntimeManager();
+            await using var host = new ManagedPlaywrightBrowserHost(runtime, new BrowserExecutableResolver(pathProvider), pathProvider);
+            try
+            {
+                var rows = await host.ExecuteAsync(async (page, _) =>
+                {
+                    await page.SetContentAsync("""
+                        <a class="react" href="//www.i5a6.com/hscode/detail/6109100010">
+                          <div class="dealcard react">
+                            <div class="dealcard-brand single-line"><b>61091000.10</b></div>
+                            <div class="title text-block">棉制男T恤</div>
+                            <div class="title text-block">针织|男式|100%棉</div>
+                          </div>
+                        </a>
+                        <a class="react" href="//www.i5a6.com/hscode/detail/6109100010">
+                          <div class="dealcard react">
+                            <div class="dealcard-brand single-line"><b>61091000.10</b></div>
+                            <div class="title text-block">棉制针织男T恤衫</div>
+                            <div class="title text-block">针织|男式|62%棉38%涤</div>
+                          </div>
+                        </a>
+                        """);
+                    return await I5a6HsCodeProvider.ParseSearchPageAsync(page);
+                });
+                Assert.Equal(2, rows.Count);
+                Assert.All(rows, item => Assert.Equal("6109100010", item.Code));
+                Assert.Contains(rows, item => item.Name == "棉制男T恤" && item.Description == "针织|男式|100%棉");
+                Assert.Contains(rows, item => item.Name == "棉制针织男T恤衫" && item.Description == "针织|男式|62%棉38%涤");
+            }
+            finally
+            {
+                await host.DisposeAsync();
+                AtomicFileHelper.TryDeleteDirectory(dataRoot);
+            }
+        }
+
         private static string FindRepositoryRoot()
         {
             var directory = new DirectoryInfo(AppContext.BaseDirectory);

@@ -65,6 +65,43 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task ImportFromExcelAsync_ShouldRejectAmountAsDestinationCountryAndRepairSwappedItemNames()
+        {
+            string directory = Path.Combine(
+                AppContext.BaseDirectory,
+                "ExcelImportXlsTests",
+                Guid.NewGuid().ToString("N"));
+            string filePath = Path.Combine(directory, "invoice-country-and-item-language.xls");
+
+            Directory.CreateDirectory(directory);
+            try
+            {
+                await WriteDestinationCountryRegressionWorkbookAsync(filePath);
+
+                var settings = new StubSettingsService();
+                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
+                var service = new ExcelImportService(settings);
+                var result = await service.ImportFromExcelAsync(filePath);
+
+                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+                Assert.NotNull(result.Invoice);
+                Assert.Equal("AUSTRALIA", result.Invoice.DestinationCountry);
+                var item = Assert.Single(result.Invoice.Items);
+                Assert.Equal("bottle opener tee", item.StyleName);
+                Assert.Equal("男式棉制针织圆领衫", item.StyleNameCN);
+                Assert.Equal(5797.62m, item.TotalPrice);
+                Assert.DoesNotContain(result.AnalysisReport.Fields, field => field.FieldKey == "DestinationCountry");
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                {
+                    Directory.Delete(directory, recursive: true);
+                }
+            }
+        }
+
+        [Fact]
         public async Task ImportFromExcelAsync_ShouldReadOpenXmlXlsxWorkbook()
         {
             string directory = Path.Combine(
@@ -781,6 +818,59 @@ namespace ExportDocManager.Infrastructure.Tests
 
             await using var output = File.Create(filePath);
             workbook.Write(output);
+        }
+
+        private static async Task WriteDestinationCountryRegressionWorkbookAsync(string filePath)
+        {
+            var workbook = new HSSFWorkbook();
+            var sheet = workbook.CreateSheet("Sheet1");
+            WriteCell(sheet, 1, 1, "宁波布利杰进出口有限公司出口货物明细单");
+            WriteCell(sheet, 2, 7, "时间");
+            WriteCell(sheet, 2, 8, "2026.04.07");
+            WriteCell(sheet, 3, 1, "发票抬头");
+            WriteCell(sheet, 3, 2, "NINGBO BRIDGE IMP. & EXP. CO., LTD.");
+            WriteCell(sheet, 5, 7, "发票号");
+            WriteCell(sheet, 5, 8, "2026YH024");
+            WriteCell(sheet, 6, 1, "收货人");
+            WriteCell(sheet, 6, 2, "Peak Marketing");
+            WriteCell(sheet, 7, 1, "consignee");
+            WriteCell(sheet, 7, 2, "1/40 Yarraman Place, Virginia, 4014 Queensland,");
+            WriteCell(sheet, 8, 2, "Brisbane, Australia");
+            WriteCell(sheet, 8, 7, "贸易条款");
+            WriteCell(sheet, 8, 8, "fob");
+            WriteCell(sheet, 9, 7, "起运港");
+            WriteCell(sheet, 9, 8, "ningbo");
+            WriteCell(sheet, 10, 7, "目的地");
+            WriteCell(sheet, 10, 8, "australia");
+            WriteCell(sheet, 12, 2, "款号");
+            WriteCell(sheet, 12, 4, "英文品名");
+            WriteCell(sheet, 12, 5, "中文品名");
+            WriteCell(sheet, 12, 6, "数量");
+            WriteCell(sheet, 12, 7, "箱数");
+            WriteCell(sheet, 12, 8, "箱子尺寸");
+            WriteCell(sheet, 12, 9, "体积");
+            WriteCell(sheet, 12, 10, "毛重/箱");
+            WriteCell(sheet, 12, 11, "毛重");
+            WriteCell(sheet, 12, 12, "净重/箱");
+            WriteCell(sheet, 12, 13, "净重");
+            WriteCell(sheet, 12, 14, "单价");
+            WriteCell(sheet, 12, 15, "总价");
+            WriteCell(sheet, 17, 2, "PMSEPT26006");
+            WriteCell(sheet, 17, 4, "男式棉制针织圆领衫");
+            WriteCell(sheet, 17, 5, "bottle opener tee");
+            WriteCell(sheet, 17, 6, "999");
+            WriteCell(sheet, 17, 7, "26");
+            WriteCell(sheet, 17, 8, "60*40*23");
+            WriteCell(sheet, 17, 9, "1.4352");
+            WriteCell(sheet, 17, 10, "13.5");
+            WriteCell(sheet, 17, 11, "351");
+            WriteCell(sheet, 17, 12, "12.5");
+            WriteCell(sheet, 17, 13, "325");
+            WriteCell(sheet, 17, 15, "5797.62");
+
+            await using var stream = File.Create(filePath);
+            workbook.Write(stream, leaveOpen: false);
+            workbook.Close();
         }
 
         private static async Task WriteOpenXmlXlsxWorkbookAsync(string filePath)

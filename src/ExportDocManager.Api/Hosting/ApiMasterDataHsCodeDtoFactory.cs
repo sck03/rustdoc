@@ -1,5 +1,6 @@
 using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.MasterData;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -52,6 +53,39 @@ namespace ExportDocManager.Api.Hosting
                 hsCode.ConsumptionTaxRate ?? string.Empty,
                 hsCode.ValueAddedTaxRate ?? string.Empty,
                 hsCode.Notes ?? string.Empty);
+        }
+
+        public static ApiHsCodeDto FromRemoteRecord(HsCodeRemoteSearchRecord record)
+        {
+            ArgumentNullException.ThrowIfNull(record);
+            var dto = FromHsCode(record.Item);
+            return dto with
+            {
+                RemoteRecordKind = record.Kind.ToString(),
+                InstanceCount = record.InstanceCount,
+                SummaryUrl = record.SummaryUrl ?? string.Empty,
+                EvidenceUrl = record.EvidenceUrl ?? string.Empty,
+                ObservedAt = record.ObservedAt.LocalDateTime
+            };
+        }
+
+        public static ApiHsCodeDto FromRemoteDetail(HsCodeRemoteDetailBundle bundle)
+        {
+            ArgumentNullException.ThrowIfNull(bundle);
+            var dto = FromHsCode(bundle.Item);
+            return dto with
+            {
+                RemoteRecordKind = HsCodeRemoteRecordKind.StandardCode.ToString(),
+                InstanceCount = bundle.InstanceCount,
+                SummaryUrl = string.IsNullOrWhiteSpace(bundle.EvidenceUrl) ? bundle.Item.DetailUrl ?? string.Empty : bundle.EvidenceUrl,
+                EvidenceUrl = bundle.EvidenceUrl ?? string.Empty,
+                ObservedAt = bundle.ObservedAt.LocalDateTime,
+                RecommendedKeywords = bundle.RecommendedKeywords.ToList(),
+                PersonalPostalTaxCode = bundle.PersonalPostalTaxCode ?? string.Empty,
+                CiqEntries = bundle.CiqEntries.Select(item => new ApiHsCodeRemoteReferenceEntry(item.Code, item.Name)).ToList(),
+                ClassificationEntries = bundle.ClassificationEntries.Select(item => new ApiHsCodeRemoteReferenceEntry(item.Code, item.Name)).ToList(),
+                DeclarationExampleCount = bundle.DeclarationExamples.Count
+            };
         }
 
         public static HsCode ToHsCodeForSave(ApiHsCodeDto dto)

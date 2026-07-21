@@ -108,9 +108,9 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
   },
   {
     key: "hs-knowledge",
-    label: "HS 编码库",
+    label: "知识中心库",
     icon: BookOpen,
-    items: [{ label: "知识中心", to: "/master-data/hs-knowledge/search", icon: BookOpen, isActive: isHsKnowledgeRoute, workspace: "document", moduleKey: "document.master-data" }],
+    items: [{ label: "HS 编码库", to: "/master-data/hs-knowledge/search", icon: BookOpen, isActive: isHsKnowledgeRoute, workspace: "document", moduleKey: "document.master-data" }],
   },
   {
     key: "master-data",
@@ -241,7 +241,7 @@ export function getWorkspaceContext(pathname: string): WorkspaceContext {
     return getSingleWindowWorkspaceContext(pathname);
   }
   if (pathname.startsWith("/master-data/hs-knowledge")) {
-    return createWorkspaceContext("HS 编码库", "HS 编码知识中心", "查询、维护和迁移本公司的税则与申报经验", BookOpen);
+    return createWorkspaceContext("知识中心库", "HS 编码知识中心", "查询、维护和迁移本公司的税则与申报经验", BookOpen);
   }
   if (pathname.startsWith("/master-data")) {
     return createWorkspaceContext("基础资料", "主数据维护", "统一维护客户、出口商、商品、港口、单位与 HS 编码", Database);
@@ -368,7 +368,7 @@ function isSalesOpportunityRoute(pathname: string) { return pathname.startsWith(
 function isSupplierRoute(pathname: string) { return pathname.startsWith("/suppliers"); }
 function isQueryRoute(pathname: string) { return pathname.startsWith("/query"); }
 function isPaymentRoute(pathname: string) { return pathname.startsWith("/payments"); }
-function isMasterDataRoute(pathname: string) { return pathname.startsWith("/master-data"); }
+function isMasterDataRoute(pathname: string) { return pathname.startsWith("/master-data") && !isHsKnowledgeRoute(pathname); }
 function isHsKnowledgeRoute(pathname: string) { return pathname.startsWith("/master-data/hs-knowledge"); }
 function isSingleWindowOperationRoute(pathname: string) { return pathname === "/single-window" || pathname.startsWith("/single-window/operation-center") || pathname.startsWith("/single-window/coo") || pathname.startsWith("/single-window/acd"); }
 function isSingleWindowCollaborationRoute(pathname: string) { return pathname.startsWith("/single-window/collaboration"); }

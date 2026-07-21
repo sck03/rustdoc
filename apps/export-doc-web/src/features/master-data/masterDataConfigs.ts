@@ -429,7 +429,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       { name: "rebateRate", label: "退税率" },
       { name: "supervisionConditions", label: "监管条件" },
       { name: "inspectionCategory", label: "检验检疫类别" },
-      { name: "status", label: "状态", format: (value) => value === "SuspectedObsolete" ? "疑似作废" : value === "Obsolete" ? "已作废" : "有效" },
+      { name: "status", label: "状态", format: (value) => value === "SuspectedObsolete" ? "疑似作废" : value === "Obsolete" ? "已作废" : value === "ReferenceOnly" ? "仅供参考" : "有效" },
       { name: "updateTime", label: "更新", format: (value) => typeof value === "string" ? formatDate(value) : "-" },
     ],
     sections: [
@@ -466,7 +466,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       {
         title: "数据来源与有效性",
         fields: [
-          { name: "status", label: "状态（Active / SuspectedObsolete / Obsolete）" },
+          { name: "status", label: "状态（Active / ReferenceOnly / SuspectedObsolete / Obsolete）" },
           { name: "sourceName", label: "数据来源" },
           { name: "effectiveYear", label: "适用年份", type: "number" },
           { name: "replacedByCodes", label: "替代编码（多个用逗号分隔）" },

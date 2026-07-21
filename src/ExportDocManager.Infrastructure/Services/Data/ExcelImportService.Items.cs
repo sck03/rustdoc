@@ -104,6 +104,7 @@ namespace ExportDocManager.Services.Data
                             TotalPrice = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.TotalPriceCol ?? settings.TotalPriceCol))
                         };
 
+                        NormalizeItemDescriptionLanguages(item);
                         NormalizeItemDescriptionAndBrand(item);
                         ApplyDimensionsFromSingleCell(item, GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.DimensionCol ?? 0));
                         if (item.UnitPrice == 0 && item.Quantity != 0 && item.TotalPrice != 0)
@@ -186,6 +187,24 @@ namespace ExportDocManager.Services.Data
                 item.Brand = brand;
             }
         }
+
+        private static void NormalizeItemDescriptionLanguages(Item item)
+        {
+            if (item == null
+                || !ContainsCjkText(item.StyleName)
+                || ContainsCjkText(item.StyleNameCN)
+                || !ContainsLatinText(item.StyleNameCN))
+            {
+                return;
+            }
+
+            (item.StyleName, item.StyleNameCN) = (item.StyleNameCN, item.StyleName);
+        }
+
+        private static bool ContainsCjkText(string value) =>
+            (value ?? string.Empty).Any(character => character is >= '\u3400' and <= '\u9fff');
+
+        private static bool ContainsLatinText(string value) =>
+            (value ?? string.Empty).Any(character => character is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z'));
     }
 }
-

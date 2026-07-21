@@ -47,6 +47,7 @@ export function readString(record: MasterDataRecord, name: string) {
 
 export function normalizeHsCodeDtoForRequest(item: ApiHsCodeDto): ApiHsCodeDto {
   return {
+    ...item,
     code: normalizeText(item.code),
     description: normalizeText(item.description),
     detailUrl: normalizeText(item.detailUrl),
@@ -59,6 +60,16 @@ export function normalizeHsCodeDtoForRequest(item: ApiHsCodeDto): ApiHsCodeDto {
     supervisionConditions: normalizeText(item.supervisionConditions),
     unit: normalizeText(item.unit),
     updateTime: item.updateTime,
+    remoteRecordKind: normalizeText(item.remoteRecordKind),
+    instanceCount: item.instanceCount,
+    summaryUrl: normalizeText(item.summaryUrl),
+    evidenceUrl: normalizeText(item.evidenceUrl),
+    observedAt: item.observedAt,
+    recommendedKeywords: item.recommendedKeywords ?? [],
+    personalPostalTaxCode: normalizeText(item.personalPostalTaxCode),
+    ciqEntries: item.ciqEntries ?? [],
+    classificationEntries: item.classificationEntries ?? [],
+    declarationExampleCount: item.declarationExampleCount ?? 0,
   };
 }
 
@@ -66,11 +77,24 @@ export function normalizeHsCodeDtoForSave(item: ApiHsCodeDto): ApiHsCodeDto {
   return {
     ...normalizeHsCodeDtoForRequest(item),
     id: 0,
+    status: item.remoteRecordKind ? "ReferenceOnly" : item.status,
   };
 }
 
 export function replaceHsCodeResult(items: ApiHsCodeDto[], original: ApiHsCodeDto, next: ApiHsCodeDto) {
-  const normalizedNext = normalizeHsCodeDtoForRequest(next);
+  const normalizedNext = normalizeHsCodeDtoForRequest({
+    ...next,
+    remoteRecordKind: original.remoteRecordKind,
+    instanceCount: original.instanceCount,
+    summaryUrl: original.summaryUrl,
+    evidenceUrl: original.evidenceUrl,
+    observedAt: original.observedAt,
+    recommendedKeywords: original.recommendedKeywords,
+    personalPostalTaxCode: original.personalPostalTaxCode,
+    ciqEntries: original.ciqEntries,
+    classificationEntries: original.classificationEntries,
+    declarationExampleCount: original.declarationExampleCount,
+  });
   return items.map((item) => (isSameHsCodeResult(item, original) ? normalizedNext : item));
 }
 
@@ -111,7 +135,9 @@ export function isRemovedOriginal(item: ApiHsCodeDto, original: ApiHsCodeDto, re
 }
 
 export function shouldFetchRemoteHsCodeDetail(item: ApiHsCodeDto) {
-  return Boolean(normalizeText(item.detailUrl)) && !normalizeText(item.elements);
+  return item.remoteRecordKind !== "DeclarationExample" &&
+    Boolean(normalizeText(item.detailUrl)) &&
+    !normalizeText(item.elements);
 }
 
 export function isSameHsCodeResult(left: ApiHsCodeDto, right: ApiHsCodeDto) {

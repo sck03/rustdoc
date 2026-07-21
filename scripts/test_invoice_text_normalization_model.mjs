@@ -1,0 +1,57 @@
+import { createRequire } from "node:module";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const workspace = path.join(repoRoot, ".codex-runtime", "invoice-text-normalization-tests");
+const entry = path.join(workspace, "entry.ts");
+const bundle = path.join(workspace, "bundle.mjs");
+fs.rmSync(workspace, { recursive: true, force: true });
+fs.mkdirSync(workspace, { recursive: true });
+
+const modelPath = path
+  .join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "invoiceModel.ts")
+  .replaceAll("\\", "/");
+fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; globalThis.__model = model;`, "utf8");
+const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
+await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
+await import(pathToFileURL(bundle).href);
+
+const model = globalThis.__model;
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+const draft = model.uppercaseInvoiceEnglishText({
+  ...model.createEmptyInvoice(),
+  invoiceNo: "2026yh024",
+  customerNameEN: "Peak Marketing",
+  customerAddressEN: "1/40 Yarraman Place, Brisbane, Australia",
+  exporterNameCN: "宁波布利杰进出口有限公司",
+  destinationCountry: "australia",
+  tradeTerms: "fob",
+  items: [{
+    id: 0,
+    invoiceId: 0,
+    styleNo: "tee-a1",
+    styleName: "men's cotton t-shirt",
+    styleNameCN: "棉制男式T恤衫",
+    fabricComposition: "100% cotton",
+    unitEN: "pcs",
+    unitCN: "件",
+    quantity: 10,
+    unitPrice: 2,
+    totalPrice: 20,
+  }],
+});
+assert(draft.invoiceNo === "2026YH024", "invoice number uppercased");
+assert(draft.customerNameEN === "PEAK MARKETING", "customer name uppercased");
+assert(draft.customerAddressEN === "1/40 YARRAMAN PLACE, BRISBANE, AUSTRALIA", "address uppercased");
+assert(draft.destinationCountry === "AUSTRALIA" && draft.tradeTerms === "FOB", "shipping fields uppercased");
+assert(draft.exporterNameCN === "宁波布利杰进出口有限公司", "Chinese exporter name preserved");
+assert(draft.items[0].styleName === "MEN'S COTTON T-SHIRT", "item description uppercased");
+assert(draft.items[0].fabricComposition === "100% COTTON", "item composition uppercased");
+assert(draft.items[0].styleNameCN === "棉制男式T恤衫" && draft.items[0].unitCN === "件", "Chinese item fields preserved");
+
+const imported = model.readRouteInvoiceDraft({ invoiceDraft: { ...draft, customerNameEN: "mixed Case buyer" } });
+assert(imported?.customerNameEN === "MIXED CASE BUYER", "routed Excel draft uppercased automatically");
+process.stdout.write("invoice-text-normalization model tests passed\n");

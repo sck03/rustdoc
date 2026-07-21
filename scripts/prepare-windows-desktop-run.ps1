@@ -133,7 +133,90 @@ function Remove-GeneratedEntry {
         throw "$Purpose must stay inside $fullRoot. Resolved path: $fullPath"
     }
 
-    Remove-Item -LiteralPath $fullPath -Recurse -Force
+    $maximumAttempts = 8
+    for ($attempt = 1; $attempt -le $maximumAttempts; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $fullPath -Recurse -Force -ErrorAction Stop
+            return
+        } catch {
+            if ($attempt -ge $maximumAttempts) {
+                throw "$Purpose could not be removed after $maximumAttempts attempts: $fullPath. $($_.Exception.Message)"
+            }
+
+            Start-Sleep -Milliseconds (250 * $attempt)
+        }
+    }
+}
+
+function ConvertTo-NormalizedWindowsPath {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return ""
+    }
+
+    $normalized = $Path.Replace('/', '\')
+    if ($normalized.StartsWith('\\?\', [System.StringComparison]::Ordinal)) {
+        $normalized = $normalized.Substring(4)
+    }
+
+    return $normalized.TrimEnd('\')
+}
+
+function Test-PathInsideRoot {
+    param(
+        [string]$Path,
+        [Parameter(Mandatory = $true)][string]$Root
+    )
+
+    $normalizedPath = ConvertTo-NormalizedWindowsPath -Path $Path
+    $normalizedRoot = ConvertTo-NormalizedWindowsPath -Path $Root
+    if ([string]::IsNullOrWhiteSpace($normalizedPath) -or [string]::IsNullOrWhiteSpace($normalizedRoot)) {
+        return $false
+    }
+
+    return [string]::Equals($normalizedPath, $normalizedRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+        $normalizedPath.StartsWith($normalizedRoot + '\', [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-OutputOwnedProcesses {
+    param([Parameter(Mandatory = $true)][string]$OutputRoot)
+
+    $currentProcessId = $PID
+    return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.ProcessId -ne $currentProcessId -and
+        (Test-PathInsideRoot -Path ([string]$_.ExecutablePath) -Root $OutputRoot)
+    })
+}
+
+function Stop-OutputOwnedProcesses {
+    param([Parameter(Mandatory = $true)][string]$OutputRoot)
+
+    $processes = Get-OutputOwnedProcesses -OutputRoot $OutputRoot
+    if ($processes.Count -eq 0) {
+        return
+    }
+
+    foreach ($processInfo in $processes) {
+        Write-Host "Stopping stale packaged process $($processInfo.Name) ($($processInfo.ProcessId)) before replacing $OutputRoot."
+        try {
+            $process = [System.Diagnostics.Process]::GetProcessById([int]$processInfo.ProcessId)
+            $process.Kill($true)
+        } catch {
+            Stop-Process -Id $processInfo.ProcessId -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    $deadline = [DateTime]::UtcNow.AddSeconds(8)
+    do {
+        Start-Sleep -Milliseconds 200
+        $remaining = Get-OutputOwnedProcesses -OutputRoot $OutputRoot
+    } while ($remaining.Count -gt 0 -and [DateTime]::UtcNow -lt $deadline)
+
+    if ($remaining.Count -gt 0) {
+        $details = ($remaining | ForEach-Object { "$($_.Name) ($($_.ProcessId))" }) -join ', '
+        throw "Packaged processes are still running under $OutputRoot after cleanup: $details"
+    }
 }
 
 function Get-ChromeForTestingPlatform {
@@ -254,6 +337,11 @@ $mainWebView2Loader = Join-Path $resourcesRoot "WebView2Loader.dll"
 $licenseWebView2Loader = if ($IncludeLicenseKeygen) { Join-Path $resolvedLicenseCargoTargetDir "release\WebView2Loader.dll" } else { $null }
 
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
+
+# The portable output is disposable. A previously launched edition can leave
+# its API/browser children holding App_Data or executable files open, so only
+# processes whose executable belongs to this exact output root are terminated.
+Stop-OutputOwnedProcesses -OutputRoot $resolvedOutputDir
 
 # Customer packages contain stable program files only. The artifacts output is
 # a disposable build directory, so stale runtime data is always removed before

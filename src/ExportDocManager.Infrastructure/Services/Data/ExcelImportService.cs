@@ -122,6 +122,7 @@ namespace ExportDocManager.Services.Data
                     ParseInvoiceMainInfo(worksheet, invoice, result.Errors, settings, analysisReport);
                     ParseCustomerInfo(worksheet, invoice, customer, result.Errors, settings, analysisReport);
                     ParseExporterInfo(worksheet, invoice, exporter, result.Errors, settings, analysisReport);
+                    CompleteInvoiceDerivedFields(invoice);
                     ParseItemsInfo(worksheet, invoice, result.Errors, settings, analysisReport, cancellationToken);
 
                     result.Invoice = invoice;

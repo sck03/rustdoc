@@ -333,6 +333,166 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
+                    ["/api/master-data/hs-knowledge/search"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Search the local HS declaration knowledge base",
+                            operationId = "searchHsCodeKnowledge",
+                            parameters = new object[]
+                            {
+                                QueryParameter("query", "string", null, "Ordinary product name, material, use, or specification."),
+                                QueryParameter("maxResults", "integer", "int32", "Maximum number of candidates.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Ranked local knowledge candidates.", content = JsonContent("HsCodeKnowledgeSearchResponse") },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-knowledge/examples"] = new
+                    {
+                        get = new
+                        {
+                            summary = "List declaration examples",
+                            operationId = "listHsCodeKnowledgeExamples",
+                            parameters = new object[]
+                            {
+                                QueryParameter("keyword", "string", null, "Example keyword."),
+                                QueryParameter("pageNumber", "integer", "int32", "Page number."),
+                                QueryParameter("pageSize", "integer", "int32", "Page size.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Declaration examples.", content = JsonContent("HsCodeKnowledgeExamplePage") },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
+                            }
+                        },
+                        post = new
+                        {
+                            summary = "Save a declaration example",
+                            operationId = "saveHsCodeKnowledgeExample",
+                            requestBody = new { required = true, content = JsonContent("HsCodeKnowledgeExampleInput") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Declaration example saved.", content = JsonContent("HsCodeKnowledgeExample") },
+                                ["400"] = new { description = "Invalid example or inactive current code." },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-knowledge/examples/{id}"] = new
+                    {
+                        delete = new
+                        {
+                            summary = "Delete a declaration example",
+                            operationId = "deleteHsCodeKnowledgeExample",
+                            parameters = new object[] { PathParameter("id", "integer", "int32", "Declaration example id.") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["204"] = new { description = "Declaration example deleted." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["404"] = new { description = "Declaration example not found." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-knowledge/feedback"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Record a local HS search choice",
+                            operationId = "recordHsCodeKnowledgeFeedback",
+                            requestBody = new { required = true, content = JsonContent("HsCodeKnowledgeFeedbackInput") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Feedback recorded.", content = JsonContent("ApiCommandResponse") },
+                                ["400"] = new { description = "Invalid feedback or inactive current code." },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-knowledge/history-candidates"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Discover candidates from historical business data",
+                            operationId = "discoverHsCodeHistoryCandidates",
+                            parameters = new object[]
+                            {
+                                QueryParameter("keyword", "string", null, "Optional filter."),
+                                QueryParameter("maxResults", "integer", "int32", "Maximum number of candidates.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Historical learning candidates.", content = JsonArrayContent("HsCodeHistoryLearningCandidate") },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-knowledge/remote-candidates"] = new
+                    {
+                        get = new
+                        {
+                            summary = "List remote declaration candidates awaiting review",
+                            operationId = "listHsCodeRemoteCandidates",
+                            parameters = new object[]
+                            {
+                                QueryParameter("status", "string", null, "Pending, Confirmed, or Ignored."),
+                                QueryParameter("maxResults", "integer", "int32", "Maximum number of candidates.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Remote candidates.", content = JsonArrayContent("HsCodeRemoteCandidate") },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-knowledge/remote-candidates/review"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Confirm or ignore a remote candidate",
+                            operationId = "reviewHsCodeRemoteCandidate",
+                            requestBody = new { required = true, content = JsonContent("HsCodeRemoteCandidateReviewInput") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Review completed.", content = JsonContent("ApiCommandResponse") },
+                                ["400"] = new { description = "Inactive current code or invalid review." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["404"] = new { description = "Remote candidate not found." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-knowledge/export"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Export the local HS knowledge package",
+                            operationId = "exportHsCodeKnowledge",
+                            parameters = new object[] { QueryParameter("since", "string", "date-time", "Optional incremental export timestamp.") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "HS knowledge package.", content = BinaryContent() },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-knowledge/import"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Import an HS knowledge package",
+                            operationId = "importHsCodeKnowledge",
+                            requestBody = new { required = true, content = BinaryContent() },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "HS knowledge package imported.", content = JsonContent("HsCodeKnowledgeImportResponse") },
+                                ["400"] = new { description = "Invalid or tampered package." },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
+                            }
+                        }
+                    },
                     ["/api/master-data/hs-codes/{code}"] = new
                     {
                         get = new

@@ -12,6 +12,54 @@ namespace ExportDocManager.Infrastructure.Tests
     public class MasterDataServiceTests
     {
         [Fact]
+        public async Task HsCodeReferenceSave_ShouldNotDowngradeOrOverwriteActiveAnnualTariff()
+        {
+            using var factory = new SqliteTestDbContextFactory();
+            var repository = new LocalMasterDataReadRepository(factory);
+            var service = new HsCodeService(factory, repository);
+            await service.SaveAsync(new HsCode
+            {
+                Code = "6109100000",
+                Name = "年度税则名称",
+                Elements = "年度申报要素",
+                Status = "Active",
+                SourceName = "2026年度税则",
+                EffectiveYear = 2026
+            });
+
+            await service.SaveAsync(new HsCode
+            {
+                Code = "6109100000",
+                Name = "第三方网页名称",
+                Elements = "网页申报要素",
+                Status = "ReferenceOnly",
+                SourceName = "i5a6（第三方参考）"
+            });
+
+            var saved = await service.GetByCodeAsync("6109100000");
+            Assert.Equal("Active", saved.Status);
+            Assert.Equal("年度税则名称", saved.Name);
+            Assert.Equal("年度申报要素", saved.Elements);
+            Assert.Equal("2026年度税则", saved.SourceName);
+            Assert.Equal(2026, saved.EffectiveYear);
+        }
+
+        [Fact]
+        public async Task HsCodeNumericKeyword_ShouldMatchOnlyCodePrefix()
+        {
+            using var factory = new SqliteTestDbContextFactory();
+            var repository = new LocalMasterDataReadRepository(factory);
+            var service = new HsCodeService(factory, repository);
+            await service.SaveAsync(new HsCode { Code = "6109100000", Name = "棉制针织T恤衫" });
+            await service.SaveAsync(new HsCode { Code = "2846109010", Name = "其他稀土化合物" });
+
+            var result = await service.GetPagedLocalAsync(1, 50, "6109");
+
+            var item = Assert.Single(result.Items);
+            Assert.Equal("6109100000", item.Code);
+        }
+
+        [Fact]
         public async Task HsCodeImport_ShouldDetectNonStandardHeaderAndPreserveExistingNonEmptyFields()
         {
             using var factory = new SqliteTestDbContextFactory();

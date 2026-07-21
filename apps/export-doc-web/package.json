@@ -16,6 +16,7 @@
     "test:template-print-pixels": "node ../../scripts/test_report_template_print_pixel_regression.mjs",
     "test:print-preview-document": "node ../../scripts/test_print_report_preview_document.mjs",
     "test:invoice-list-models": "node ../../scripts/test_invoice_list_models.mjs",
+    "test:invoice-text-normalization": "node ../../scripts/test_invoice_text_normalization_model.mjs",
     "test:settings-models": "node ../../scripts/test_settings_models.mjs",
     "test:workspace-navigation": "node ../../scripts/test_workspace_navigation_model.mjs",
     "test:email-template-model": "node ../../scripts/test_email_template_model.mjs",
