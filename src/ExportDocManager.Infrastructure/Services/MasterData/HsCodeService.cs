@@ -19,8 +19,6 @@ namespace ExportDocManager.Services.MasterData
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
         private readonly IHsCodeReadRepository _hsCodeReadRepository;
         private readonly SemaphoreSlim _detailFetchSemaphore = new SemaphoreSlim(1, 1);
-        private readonly System.Net.Http.HttpClient _httpClient;
-        private readonly bool _ownsHttpClient;
         private readonly IReadOnlyList<IHsCodeRemoteProvider> _remoteProviders;
 
         // 海关标准计量单位代码映射表 (Customs Unit Code Map)
@@ -45,12 +43,7 @@ namespace ExportDocManager.Services.MasterData
         };
 
         public HsCodeService(IDbContextFactory<AppDbContext> dbContextFactory, IHsCodeReadRepository hsCodeReadRepository)
-            : this(dbContextFactory, hsCodeReadRepository, null, null)
-        {
-        }
-
-        internal HsCodeService(IDbContextFactory<AppDbContext> dbContextFactory, IHsCodeReadRepository hsCodeReadRepository, System.Net.Http.HttpClient httpClient)
-            : this(dbContextFactory, hsCodeReadRepository, httpClient, null)
+            : this(dbContextFactory, hsCodeReadRepository, Enumerable.Empty<IHsCodeRemoteProvider>())
         {
         }
 
@@ -58,23 +51,12 @@ namespace ExportDocManager.Services.MasterData
             IDbContextFactory<AppDbContext> dbContextFactory,
             IHsCodeReadRepository hsCodeReadRepository,
             IEnumerable<IHsCodeRemoteProvider> remoteProviders)
-            : this(dbContextFactory, hsCodeReadRepository, null, remoteProviders)
-        {
-        }
-
-        private HsCodeService(
-            IDbContextFactory<AppDbContext> dbContextFactory,
-            IHsCodeReadRepository hsCodeReadRepository,
-            System.Net.Http.HttpClient httpClient,
-            IEnumerable<IHsCodeRemoteProvider> remoteProviders)
         {
             _dbContextFactory = dbContextFactory;
             _hsCodeReadRepository = hsCodeReadRepository;
             _remoteProviders = (remoteProviders ?? Enumerable.Empty<IHsCodeRemoteProvider>())
                 .OrderBy(provider => provider.Priority)
                 .ToList();
-            _httpClient = httpClient ?? (_remoteProviders.Count == 0 ? CreateHttpClient() : null);
-            _ownsHttpClient = httpClient == null && _httpClient != null;
         }
 
         private IHsCodeReadRepository GetReadRepository()
@@ -128,104 +110,26 @@ namespace ExportDocManager.Services.MasterData
             return await GetReadRepository().GetByCodeAsync(normalizedCode);
         }
 
-        private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-
-        private static System.Net.Http.HttpClient CreateHttpClient()
-        {
-            // Use SocketsHttpHandler for better control over connection pooling and SSL in .NET 5+
-            var handler = new System.Net.Http.SocketsHttpHandler
-            {
-                // Enable all supported decompression methods (GZip, Deflate, Brotli)
-                AutomaticDecompression = System.Net.DecompressionMethods.All,
-                // Limit connection lifetime to handle DNS changes and prevent stale connections
-                PooledConnectionLifetime = TimeSpan.FromMinutes(2),
-                // 使用操作系统标准 TLS 与证书链验证，禁止接受伪造或无效证书。
-                SslOptions = new System.Net.Security.SslClientAuthenticationOptions
-                {
-                    EnabledSslProtocols = System.Security.Authentication.SslProtocols.None
-                }
-            };
-
-            var client = new System.Net.Http.HttpClient(handler);
-            client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
-            // Simulate navigation from within the site (consistent with Referer)
-            client.DefaultRequestHeaders.Add("Referer", "https://www.i5a6.com/");
-            client.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
-            client.DefaultRequestHeaders.Add("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6");
-            client.DefaultRequestHeaders.Add("Upgrade-Insecure-Requests", "1");
-            client.DefaultRequestHeaders.Add("Cache-Control", "max-age=0");
-            
-            // Sec-Fetch headers matching a "same-origin" navigation (since Referer is set)
-            client.DefaultRequestHeaders.Add("Sec-Fetch-Dest", "document");
-            client.DefaultRequestHeaders.Add("Sec-Fetch-Mode", "navigate");
-            client.DefaultRequestHeaders.Add("Sec-Fetch-Site", "same-origin");
-            client.DefaultRequestHeaders.Add("Sec-Fetch-User", "?1");
-            
-            // Avoid Keep-Alive issues
-            client.DefaultRequestHeaders.Connection.Add("close");
-            
-            // Increased timeout to 60s to handle slow network/server response
-            client.Timeout = TimeSpan.FromSeconds(60);
-            return client;
-        }
-
-        private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> action, int maxRetries = 3)
-        {
-            maxRetries = Math.Max(1, maxRetries);
-
-            for (int attempt = 1; ; attempt++)
-            {
-                try
-                {
-                    return await action();
-                }
-                catch (Exception ex) when (attempt < maxRetries)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Attempt {attempt} failed: {ex.Message}. Retrying...");
-                    await Task.Delay(1000 * attempt); // Exponential backoff: 1s, 2s, 3s
-                }
-            }
-        }
-
         public async Task<HsCodeRemoteSourceHealth> GetRemoteSourceHealthAsync(CancellationToken cancellationToken = default)
         {
-            if (_remoteProviders.Count > 0)
+            if (_remoteProviders.Count == 0)
             {
-                var results = new List<HsCodeRemoteSourceHealth>();
-                foreach (var provider in _remoteProviders)
-                    results.Add(await provider.CheckHealthAsync(cancellationToken).ConfigureAwait(false));
-                bool available = results.Any(result => result.Available);
                 return new HsCodeRemoteSourceHealth(
-                    string.Join(", ", results.Select(result => result.Source)),
-                    available,
+                    "未配置",
+                    false,
                     DateTimeOffset.Now,
-                    string.Join("；", results.Select(result => result.Message)));
+                    "未配置 HS 编码联网数据源 Provider。");
             }
 
-            var checkedAt = DateTimeOffset.Now;
-            try
-            {
-                using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, "https://www.i5a6.com/hscode/");
-                using var response = await _httpClient.SendAsync(
-                    request,
-                    System.Net.Http.HttpCompletionOption.ResponseHeadersRead,
-                    cancellationToken);
-                return new HsCodeRemoteSourceHealth(
-                    "i5a6",
-                    response.IsSuccessStatusCode,
-                    checkedAt,
-                    response.IsSuccessStatusCode
-                        ? "第三方HS编码来源当前可访问。"
-                        : $"第三方HS编码来源返回 HTTP {(int)response.StatusCode}。");
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                return new HsCodeRemoteSourceHealth("i5a6", false, checkedAt, $"第三方HS编码来源当前不可用：{ex.Message}");
-            }
+            var results = new List<HsCodeRemoteSourceHealth>();
+            foreach (var provider in _remoteProviders)
+                results.Add(await provider.CheckHealthAsync(cancellationToken).ConfigureAwait(false));
+            bool available = results.Any(result => result.Available);
+            return new HsCodeRemoteSourceHealth(
+                string.Join(", ", results.Select(result => result.Source)),
+                available,
+                DateTimeOffset.Now,
+                string.Join("；", results.Select(result => result.Message)));
         }
 
         private async Task<List<HsCode>> SafeSearchAsync(Func<Task<List<HsCode>>> search, string searchName)
@@ -324,10 +228,6 @@ namespace ExportDocManager.Services.MasterData
         public void Dispose()
         {
             _detailFetchSemaphore.Dispose();
-            if (_ownsHttpClient)
-            {
-                _httpClient.Dispose();
-            }
         }
     }
 }

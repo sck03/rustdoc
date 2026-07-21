@@ -437,6 +437,7 @@ export function InvoiceMarksAndItemsPanel({
   invoice,
   canRedoItemEdit,
   canSaveToProductLibrary,
+  canUseHsKnowledge,
   canUndoItemEdit,
   invoiceItemBlankRowCount,
   isEditable,
@@ -468,6 +469,7 @@ export function InvoiceMarksAndItemsPanel({
   invoice: ApiInvoiceDetailDto;
   canRedoItemEdit: boolean;
   canSaveToProductLibrary: boolean;
+  canUseHsKnowledge: boolean;
   canUndoItemEdit: boolean;
   invoiceItemBlankRowCount: number;
   isEditable: boolean;
@@ -683,9 +685,11 @@ export function InvoiceMarksAndItemsPanel({
         supportFields
       )}
       <InvoiceItemsEditor
+        client={client}
         items={invoice.items}
         canRedoItemEdit={canRedoItemEdit}
         canSaveToProductLibrary={canSaveToProductLibrary}
+        canUseHsKnowledge={canUseHsKnowledge}
         canUndoItemEdit={canUndoItemEdit}
         blankRowCount={invoiceItemBlankRowCount}
         currency={invoice.currency}

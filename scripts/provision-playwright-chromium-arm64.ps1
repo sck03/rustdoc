@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot "lib/build-script-support.ps1")
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 if ([string]::IsNullOrWhiteSpace($DestinationRoot)) { $DestinationRoot = Join-Path $repoRoot "Browsers" }
@@ -21,10 +22,10 @@ if ((Test-Path $destination) -and -not $Force) { Write-Host "Chromium ARM64 alre
 $buildRoot = Join-Path $repoRoot "artifacts/playwright-arm64-build"
 $cacheRoot = Join-Path $repoRoot "artifacts/playwright-arm64-cache"
 $playwrightHostProject = Join-Path $repoRoot "src/ExportDocManager.Api/ExportDocManager.Api.csproj"
-dotnet restore $playwrightHostProject -r linux-arm64 --configfile (Join-Path $repoRoot "NuGet.Config")
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-dotnet build $playwrightHostProject -c Release -r linux-arm64 --no-restore -o $buildRoot
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+Invoke-ExportDocExternal -FilePath "dotnet" -Arguments @(
+    "restore", $playwrightHostProject, "-r", "linux-arm64", "--configfile", (Join-Path $repoRoot "NuGet.Config")) -WorkingDirectory $repoRoot
+Invoke-ExportDocExternal -FilePath "dotnet" -Arguments @(
+    "build", $playwrightHostProject, "-c", "Release", "-r", "linux-arm64", "--no-restore", "-o", $buildRoot) -WorkingDirectory $repoRoot
 $installer = Join-Path $buildRoot "playwright.ps1"
 if (-not (Test-Path $installer -PathType Leaf)) { throw "Microsoft.Playwright installer was not produced: $installer" }
 if (-not (Test-Path (Join-Path $buildRoot "Microsoft.Playwright.dll") -PathType Leaf)) { throw "Microsoft.Playwright.dll was not copied beside the installer." }

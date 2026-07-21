@@ -466,7 +466,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       {
         title: "数据来源与有效性",
         fields: [
-          { name: "status", label: "状态（Active / ReferenceOnly / SuspectedObsolete / Obsolete）" },
+          { name: "status", label: "状态（手工新建仅供参考）", readOnlyOnEdit: true },
           { name: "sourceName", label: "数据来源" },
           { name: "effectiveYear", label: "适用年份", type: "number" },
           { name: "replacedByCodes", label: "替代编码（多个用逗号分隔）" },
@@ -491,7 +491,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       valueAddedTaxRate: "",
       notes: "",
       detailUrl: "",
-      status: "Active",
+      status: "ReferenceOnly",
       sourceName: "",
       effectiveYear: null,
       replacedByCodes: "",

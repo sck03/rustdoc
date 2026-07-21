@@ -27,6 +27,23 @@ namespace ExportDocManager.Services.MasterData
 
             await using var context = await CreateDbContextAsync();
             var existing = await context.HsCodes.FirstOrDefaultAsync(h => h.NormalizedCode == normalizedCode);
+            if (string.Equals(hsCode.Status, HsCodeValidityPolicy.ActiveStatus, StringComparison.OrdinalIgnoreCase))
+            {
+                if (existing == null)
+                {
+                    throw new InvalidOperationException("手工新建的 HS 编码只能保存为“仅供参考”；当前有效编码请通过年度税则导入建立。");
+                }
+
+                if (!string.Equals(existing.Status, HsCodeValidityPolicy.ActiveStatus, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("不能通过普通编辑把参考或作废编码改为当前有效；请使用年度税则导入或知识库迁移。");
+                }
+
+                hsCode.SourceName = string.IsNullOrWhiteSpace(hsCode.SourceName) ? existing.SourceName : hsCode.SourceName;
+                hsCode.EffectiveYear ??= existing.EffectiveYear;
+                hsCode.LastVerifiedAt ??= existing.LastVerifiedAt;
+                HsCodeValidityPolicy.EnsureTrustedActiveMetadata(hsCode);
+            }
             if (existing != null)
             {
                 if (string.Equals(existing.Status, "Active", StringComparison.OrdinalIgnoreCase) &&
@@ -156,7 +173,8 @@ namespace ExportDocManager.Services.MasterData
                 "SUSPECTEDOBSOLETE" or "疑似作废" => "SuspectedObsolete",
                 "OBSOLETE" or "已作废" or "作废" => "Obsolete",
                 "REFERENCEONLY" or "仅供参考" or "参考" => "ReferenceOnly",
-                _ => "Active"
+                "ACTIVE" or "有效" => "Active",
+                _ => "ReferenceOnly"
             };
         }
     }

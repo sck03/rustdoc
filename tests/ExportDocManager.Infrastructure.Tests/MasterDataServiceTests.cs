@@ -17,15 +17,20 @@ namespace ExportDocManager.Infrastructure.Tests
             using var factory = new SqliteTestDbContextFactory();
             var repository = new LocalMasterDataReadRepository(factory);
             var service = new HsCodeService(factory, repository);
-            await service.SaveAsync(new HsCode
+            await using (var context = factory.CreateDbContext())
             {
-                Code = "6109100000",
-                Name = "年度税则名称",
-                Elements = "年度申报要素",
-                Status = "Active",
-                SourceName = "2026年度税则",
-                EffectiveYear = 2026
-            });
+                context.HsCodes.Add(new HsCode
+                {
+                    Code = "6109100000",
+                    Name = "年度税则名称",
+                    Elements = "年度申报要素",
+                    Status = "Active",
+                    SourceName = "2026年度税则",
+                    EffectiveYear = 2026,
+                    LastVerifiedAt = new DateTime(2026, 1, 1)
+                });
+                await context.SaveChangesAsync();
+            }
 
             await service.SaveAsync(new HsCode
             {
@@ -42,6 +47,38 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal("年度申报要素", saved.Elements);
             Assert.Equal("2026年度税则", saved.SourceName);
             Assert.Equal(2026, saved.EffectiveYear);
+        }
+
+        [Fact]
+        public async Task HsCodeManualSave_ShouldCreateReferenceOnlyAndRejectActivePromotion()
+        {
+            using var factory = new SqliteTestDbContextFactory();
+            var service = new HsCodeService(factory, new LocalMasterDataReadRepository(factory));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveAsync(new HsCode
+            {
+                Code = "6109100000",
+                Name = "手工编码",
+                Status = "Active",
+                SourceName = "手工录入",
+                EffectiveYear = 2026,
+                LastVerifiedAt = DateTime.UtcNow
+            }));
+
+            await service.SaveAsync(new HsCode { Code = "6109100000", Name = "参考编码" });
+            var saved = await service.GetByCodeAsync("6109100000");
+            Assert.Equal("ReferenceOnly", saved.Status);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveAsync(new HsCode
+            {
+                Id = saved.Id,
+                Code = saved.Code,
+                Name = saved.Name,
+                Status = "Active",
+                SourceName = "手工录入",
+                EffectiveYear = 2026,
+                LastVerifiedAt = DateTime.UtcNow
+            }));
         }
 
         [Fact]

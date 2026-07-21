@@ -598,6 +598,12 @@ namespace ExportDocManager.Api.Tests
                 PermissionModuleCatalog.DocumentMasterData,
                 ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/master-data/products", HttpMethods.Post));
             Assert.Equal(
+                PermissionModuleCatalog.DocumentInvoices,
+                ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/invoices/hs-knowledge/search", HttpMethods.Get));
+            Assert.Equal(
+                PermissionModuleCatalog.DocumentInvoices,
+                ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/invoices/hs-knowledge/feedback", HttpMethods.Post));
+            Assert.Equal(
                 PermissionModuleCatalog.DocumentPaymentReports,
                 ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/reports/payments/5/pdf", HttpMethods.Post));
             Assert.Equal(

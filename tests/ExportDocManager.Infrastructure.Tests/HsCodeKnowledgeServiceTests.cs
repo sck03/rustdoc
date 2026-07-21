@@ -15,8 +15,8 @@ public sealed class HsCodeKnowledgeServiceTests
         await using (var context = factory.CreateDbContext())
         {
             context.HsCodes.AddRange(
-                new HsCode { Code = "6109100090", Name = "棉制针织男式T恤衫", Status = "Active" },
-                new HsCode { Code = "9999999999", Name = "其它商品", Status = "Active" });
+                ActiveCode("6109100090", "棉制针织男式T恤衫"),
+                ActiveCode("9999999999", "其它商品"));
             await context.SaveChangesAsync();
         }
         var service = new HsCodeKnowledgeService(factory);
@@ -34,7 +34,7 @@ public sealed class HsCodeKnowledgeServiceTests
         using var factory = new SqliteFactory();
         await using (var context = factory.CreateDbContext())
         {
-            context.HsCodes.Add(new HsCode { Code = "6110200090", Name = "棉制钩编套头衫", Status = "Active" });
+            context.HsCodes.Add(ActiveCode("6110200090", "棉制钩编套头衫"));
             await context.SaveChangesAsync();
         }
         var service = new HsCodeKnowledgeService(factory);
@@ -52,7 +52,7 @@ public sealed class HsCodeKnowledgeServiceTests
         using var factory = new SqliteFactory();
         await using (var context = factory.CreateDbContext())
         {
-            context.HsCodes.Add(new HsCode { Code = "6109100090", Name = "棉制T恤衫", Status = "Active" });
+            context.HsCodes.Add(ActiveCode("6109100090", "棉制T恤衫"));
             context.Products.Add(new Product { ProductCode = "TS01", NameCN = "男士全棉圆领短袖", HSCode = "6109100090", Material = "100%棉", Brand = "自有品牌" });
             await context.SaveChangesAsync();
         }
@@ -74,7 +74,7 @@ public sealed class HsCodeKnowledgeServiceTests
         using var factory = new SqliteFactory();
         await using (var context = factory.CreateDbContext())
         {
-            context.HsCodes.Add(new HsCode { Code = "6109100090", Name = "棉制T恤衫", Status = "Active" });
+            context.HsCodes.Add(ActiveCode("6109100090", "棉制T恤衫"));
             await context.SaveChangesAsync();
         }
         var service = new HsCodeKnowledgeService(factory);
@@ -82,12 +82,82 @@ public sealed class HsCodeKnowledgeServiceTests
         await service.CaptureRemoteExamplesAsync("男士全棉短袖", [new HsCode { Code = "6109100090", Name = "男士全棉圆领短袖", Description = "针织，100%棉", DetailUrl = "https://www.i5a6.com/hscode/detail/6109100090" }]);
 
         Assert.Equal(0, await service.CountExamplesAsync(string.Empty));
-        var candidate = Assert.Single(await service.ListRemoteCandidatesAsync("Pending"));
+        var candidate = Assert.Single((await service.ListRemoteCandidatesAsync("Pending", "", 1, 30)).Items);
         Assert.Equal("6109100090", candidate.SuggestedCurrentHsCode);
         Assert.Equal("https://www.i5a6.com/hscode/detail/6109100090", candidate.SourceUrl);
         await service.ReviewRemoteCandidateAsync(new HsCodeRemoteCandidateReviewInput(candidate.Id, "6109100090", true));
-        Assert.Empty(await service.ListRemoteCandidatesAsync("Pending"));
+        Assert.Empty((await service.ListRemoteCandidatesAsync("Pending", "", 1, 30)).Items);
         Assert.Equal(1, await service.CountExamplesAsync(string.Empty));
+    }
+
+    [Fact]
+    public async Task UntrustedActiveCode_ShouldNotBeConfirmableOrUsable()
+    {
+        using var factory = new SqliteFactory();
+        await using (var context = factory.CreateDbContext())
+        {
+            context.HsCodes.Add(new HsCode
+            {
+                Code = "6109100090",
+                Name = "缺少年度的T恤衫编码",
+                Status = "Active",
+                SourceName = "测试来源",
+                LastVerifiedAt = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
+        }
+        var service = new HsCodeKnowledgeService(factory);
+        await service.SaveExampleAsync(new HsCodeExampleInput(
+            0, "6109100090", "", "棉制针织T恤衫", "短袖|圆领", "Legacy", 2024, "Unresolved", false));
+        await service.CaptureRemoteExamplesAsync("棉制针织T恤衫",
+            [new HsCode { Code = "6109100090", Name = "棉制针织T恤衫", Description = "短袖|圆领" }]);
+
+        var result = Assert.Single((await service.SearchAsync("棉制针织T恤衫")).Items);
+        Assert.False(result.CanUse);
+        Assert.True(string.IsNullOrWhiteSpace(result.CurrentCode));
+        var candidate = Assert.Single((await service.ListRemoteCandidatesAsync("Pending", "", 1, 30)).Items);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ReviewRemoteCandidateAsync(new HsCodeRemoteCandidateReviewInput(candidate.Id, "6109100090", true)));
+    }
+
+    [Fact]
+    public async Task RemoteCandidateReview_ShouldSupportPagingBatchHistoryAndReset()
+    {
+        using var factory = new SqliteFactory();
+        await using (var context = factory.CreateDbContext())
+        {
+            context.HsCodes.Add(ActiveCode("6109100000", "棉制针织T恤衫"));
+            await context.SaveChangesAsync();
+        }
+        var service = new HsCodeKnowledgeService(factory);
+        await service.CaptureRemoteExamplesAsync("T恤",
+        [
+            new HsCode { Code = "6109100010", Name = "男式T恤一", Description = "针织|棉" },
+            new HsCode { Code = "6109100020", Name = "男式T恤二", Description = "针织|棉" },
+            new HsCode { Code = "6109100030", Name = "女式T恤三", Description = "针织|棉" }
+        ]);
+
+        var firstPage = await service.ListRemoteCandidatesAsync("Pending", "T恤", 1, 2);
+        var secondPage = await service.ListRemoteCandidatesAsync("Pending", "T恤", 2, 2);
+        Assert.Equal(3, firstPage.TotalCount);
+        Assert.Equal(2, firstPage.Items.Count);
+        Assert.Single(secondPage.Items);
+
+        int reviewed = await service.ReviewRemoteCandidatesAsync(
+        [
+            new HsCodeRemoteCandidateReviewInput(firstPage.Items[0].Id, "6109100000", true),
+            new HsCodeRemoteCandidateReviewInput(firstPage.Items[1].Id, "", false)
+        ]);
+        Assert.Equal(2, reviewed);
+        var confirmed = Assert.Single((await service.ListRemoteCandidatesAsync("Confirmed", "", 1, 30)).Items);
+        var ignored = Assert.Single((await service.ListRemoteCandidatesAsync("Ignored", "", 1, 30)).Items);
+        Assert.NotNull(confirmed.ReviewedAt);
+        Assert.NotNull(ignored.ReviewedAt);
+        Assert.Equal(1, await service.CountExamplesAsync(string.Empty));
+
+        Assert.Equal(2, await service.ResetRemoteCandidatesAsync([confirmed.Id, ignored.Id]));
+        Assert.Equal(3, (await service.ListRemoteCandidatesAsync("Pending", "", 1, 30)).TotalCount);
+        Assert.Equal(0, await service.CountExamplesAsync(string.Empty));
     }
 
     [Fact]
@@ -96,7 +166,7 @@ public sealed class HsCodeKnowledgeServiceTests
         using var factory = new SqliteFactory();
         await using (var context = factory.CreateDbContext())
         {
-            context.HsCodes.Add(new HsCode { Code = "6109100090", Name = "棉制针织或钩编的T恤衫", Status = "Active" });
+            context.HsCodes.Add(ActiveCode("6109100090", "棉制针织或钩编的T恤衫"));
             context.HsCodeReplacementRelations.Add(new HsCodeReplacementRelation { OldCode = "6109100021", NewCode = "6109100090", Source = "2026税则", Confidence = 90 });
             await context.SaveChangesAsync();
         }
@@ -119,8 +189,8 @@ public sealed class HsCodeKnowledgeServiceTests
         await using (var context = factory.CreateDbContext())
         {
             context.HsCodes.AddRange(
-                new HsCode { Code = "6109100011", Name = "棉制T恤衫一", Status = "Active" },
-                new HsCode { Code = "6109100012", Name = "棉制T恤衫二", Status = "Active" });
+                ActiveCode("6109100011", "棉制T恤衫一"),
+                ActiveCode("6109100012", "棉制T恤衫二"));
             context.HsCodeReplacementRelations.AddRange(
                 new HsCodeReplacementRelation { OldCode = "6109100010", NewCode = "6109100011", Source = "test", Confidence = 80 },
                 new HsCodeReplacementRelation { OldCode = "6109100010", NewCode = "6109100012", Source = "test", Confidence = 80 });
@@ -141,7 +211,7 @@ public sealed class HsCodeKnowledgeServiceTests
         using var sourceFactory = new SqliteFactory();
         await using (var context = sourceFactory.CreateDbContext())
         {
-            context.HsCodes.Add(new HsCode { Code = "6109100090", Name = "棉制T恤衫", Status = "Active" });
+            context.HsCodes.Add(ActiveCode("6109100090", "棉制T恤衫"));
             await context.SaveChangesAsync();
         }
         var source = new HsCodeKnowledgeService(sourceFactory);
@@ -162,6 +232,34 @@ public sealed class HsCodeKnowledgeServiceTests
             package[0] ^= 0x5A;
             await File.WriteAllBytesAsync(path, package);
             await Assert.ThrowsAnyAsync<InvalidDataException>(() => target.PreviewPackageAsync(path));
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public async Task Package_ShouldRejectActiveCodeWithoutTrustedMetadata()
+    {
+        using var sourceFactory = new SqliteFactory();
+        await using (var context = sourceFactory.CreateDbContext())
+        {
+            context.HsCodes.Add(new HsCode
+            {
+                Code = "6109100090",
+                Name = "缺少来源的有效编码",
+                Status = "Active",
+                EffectiveYear = 2026,
+                LastVerifiedAt = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
+        }
+        byte[] package = await new HsCodeKnowledgeService(sourceFactory).ExportPackageAsync();
+        string path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.edmhs");
+        await File.WriteAllBytesAsync(path, package);
+        try
+        {
+            using var targetFactory = new SqliteFactory();
+            var target = new HsCodeKnowledgeService(targetFactory);
+            await Assert.ThrowsAsync<InvalidDataException>(() => target.PreviewPackageAsync(path));
         }
         finally { File.Delete(path); }
     }
@@ -189,9 +287,10 @@ public sealed class HsCodeKnowledgeServiceTests
             []);
 
         Assert.Equal(1, await service.CaptureRemoteEvidenceAsync("睡衣", bundle));
-        var candidate = Assert.Single(await service.ListRemoteCandidatesAsync("Pending"));
+        var pending = await service.ListRemoteCandidatesAsync("Pending", "", 1, 30);
+        var candidate = Assert.Single(pending.Items);
         Assert.Equal("针织女式睡衣裤", candidate.ProductName);
-        Assert.DoesNotContain(await service.ListRemoteCandidatesAsync("Pending"), item => item.ProductName == "化纤制针织女睡衣");
+        Assert.DoesNotContain(pending.Items, item => item.ProductName == "化纤制针织女睡衣");
     }
 
     [Fact]
@@ -200,7 +299,7 @@ public sealed class HsCodeKnowledgeServiceTests
         using var factory = new SqliteFactory();
         await using (var context = factory.CreateDbContext())
         {
-            context.HsCodes.Add(new HsCode { Code = "6109100000", Name = "棉制针织T恤衫", Status = "Active" });
+            context.HsCodes.Add(ActiveCode("6109100000", "棉制针织T恤衫"));
             await context.SaveChangesAsync();
         }
         var service = new HsCodeKnowledgeService(factory);
@@ -217,7 +316,7 @@ public sealed class HsCodeKnowledgeServiceTests
 
         await service.CaptureRemoteEvidenceAsync("女式T恤衫", bundle);
 
-        var candidate = Assert.Single(await service.ListRemoteCandidatesAsync("Pending"));
+        var candidate = Assert.Single((await service.ListRemoteCandidatesAsync("Pending", "", 1, 30)).Items);
         Assert.Equal("6109100000", candidate.SuggestedCurrentHsCode);
         Assert.Equal("WebRecommended", candidate.ResolutionStatus);
         Assert.Equal(0, await service.CountExamplesAsync(string.Empty));
@@ -229,13 +328,13 @@ public sealed class HsCodeKnowledgeServiceTests
         using var factory = new SqliteFactory();
         await using (var context = factory.CreateDbContext())
         {
-            context.HsCodes.Add(new HsCode { Code = "6109100000", Name = "棉制针织T恤衫", Status = "Active" });
+            context.HsCodes.Add(ActiveCode("6109100000", "棉制针织T恤衫"));
             await context.SaveChangesAsync();
         }
         var service = new HsCodeKnowledgeService(factory);
         await service.CaptureRemoteExamplesAsync("女式T恤衫",
             [new HsCode { Code = "6109100022", Name = "女式T恤衫", Description = "针织|女式|棉" }]);
-        var candidate = Assert.Single(await service.ListRemoteCandidatesAsync("Pending"));
+        var candidate = Assert.Single((await service.ListRemoteCandidatesAsync("Pending", "", 1, 30)).Items);
 
         await service.ReviewRemoteCandidateAsync(new HsCodeRemoteCandidateReviewInput(candidate.Id, "6109100000", true));
 
@@ -251,7 +350,7 @@ public sealed class HsCodeKnowledgeServiceTests
         using var factory = new SqliteFactory();
         await using (var context = factory.CreateDbContext())
         {
-            context.HsCodes.Add(new HsCode { Code = "6109100000", Name = "棉制针织T恤衫", Status = "Active" });
+            context.HsCodes.Add(ActiveCode("6109100000", "棉制针织T恤衫"));
             await context.SaveChangesAsync();
         }
         var service = new HsCodeKnowledgeService(factory);
@@ -273,8 +372,8 @@ public sealed class HsCodeKnowledgeServiceTests
         await using (var context = factory.CreateDbContext())
         {
             context.HsCodes.AddRange(
-                new HsCode { Code = "6109100001", Name = "棉制针织男式T恤衫", Status = "Active" },
-                new HsCode { Code = "6109100002", Name = "棉制针织女式T恤衫", Status = "Active" });
+                ActiveCode("6109100001", "棉制针织男式T恤衫"),
+                ActiveCode("6109100002", "棉制针织女式T恤衫"));
             await context.SaveChangesAsync();
         }
         var service = new HsCodeKnowledgeService(factory);
@@ -300,4 +399,14 @@ public sealed class HsCodeKnowledgeServiceTests
         public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) => Task.FromResult(CreateDbContext());
         public void Dispose() { _connection.Dispose(); }
     }
+
+    private static HsCode ActiveCode(string code, string name) => new()
+    {
+        Code = code,
+        Name = name,
+        Status = "Active",
+        SourceName = "2026测试税则",
+        EffectiveYear = 2026,
+        LastVerifiedAt = new DateTime(2026, 1, 1)
+    };
 }

@@ -478,6 +478,20 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("GetHsCode");
 
+            endpoints.MapGet("/api/invoices/hs-codes/{code}", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                IHsCodeReadRepository repository,
+                string code,
+                CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                if (string.IsNullOrWhiteSpace(code))
+                    return Results.BadRequest(new ApiErrorResponse("HS编码不能为空。"));
+                var row = await repository.GetByCodeAsync(code, cancellationToken);
+                return row == null ? Results.NotFound() : Results.Ok(ApiMasterDataDtoFactory.FromHsCode(row));
+            }).WithName("GetInvoiceHsCode");
+
             endpoints.MapPut("/api/master-data/hs-codes/{code}", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
@@ -676,6 +690,14 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Ok(await service.SearchAsync(query, maxResults ?? 20, cancellationToken));
             }).WithName("SearchHsCodeKnowledge");
 
+            endpoints.MapGet("/api/invoices/hs-knowledge/search", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                string query, int? maxResults, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                return Results.Ok(await service.SearchAsync(query, maxResults ?? 20, cancellationToken));
+            }).WithName("SearchInvoiceHsCodeKnowledge");
+
             endpoints.MapGet("/api/master-data/hs-knowledge/examples", async (
                 HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
                 string keyword, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
@@ -705,6 +727,22 @@ namespace ExportDocManager.Api.Hosting
                 return await service.DeleteExampleAsync(id, cancellationToken) ? Results.NoContent() : Results.NotFound();
             }).WithName("DeleteHsCodeKnowledgeExample");
 
+            endpoints.MapPost("/api/master-data/hs-knowledge/examples/delete-batch", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                ApiAuthorizationService authorizationService,
+                IHsCodeKnowledgeService service,
+                HsCodeKnowledgeExampleDeleteBatchInput request,
+                CancellationToken cancellationToken) =>
+            {
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                if (user == null) return Results.Unauthorized();
+                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentMasterData, PermissionAccessLevel.Manage))
+                    return WriteForbidden("只有管理权限可以批量删除申报实例。");
+                int deleted = await service.DeleteExamplesAsync(request?.Ids ?? [], cancellationToken);
+                return Results.Ok(new ApiCommandResponse(true, $"已删除 {deleted} 条申报实例。"));
+            }).WithName("DeleteHsCodeKnowledgeExamplesBatch");
+
             endpoints.MapPost("/api/master-data/hs-knowledge/feedback", async (
                 HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
                 HsCodeKnowledgeFeedbackInput request, CancellationToken cancellationToken) =>
@@ -713,6 +751,15 @@ namespace ExportDocManager.Api.Hosting
                 try { await service.RecordFeedbackAsync(request, cancellationToken); return Results.Ok(new ApiCommandResponse(true, "已记录本次选择，本地推荐会逐步优化。")); }
                 catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
             }).WithName("RecordHsCodeKnowledgeFeedback");
+
+            endpoints.MapPost("/api/invoices/hs-knowledge/feedback", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                HsCodeKnowledgeFeedbackInput request, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                try { await service.RecordFeedbackAsync(request, cancellationToken); return Results.Ok(new ApiCommandResponse(true, "已记录本次发票归类选择。")); }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+            }).WithName("RecordInvoiceHsCodeKnowledgeFeedback");
 
             endpoints.MapGet("/api/master-data/hs-knowledge/history-candidates", async (
                 HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
@@ -724,10 +771,15 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/master-data/hs-knowledge/remote-candidates", async (
                 HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
-                string status, int? maxResults, CancellationToken cancellationToken) =>
+                string status, string keyword, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
-                return Results.Ok(await service.ListRemoteCandidatesAsync(status, maxResults ?? 200, cancellationToken));
+                return Results.Ok(await service.ListRemoteCandidatesAsync(
+                    status,
+                    keyword,
+                    pageNumber ?? 1,
+                    pageSize ?? 30,
+                    cancellationToken));
             }).WithName("ListHsCodeRemoteCandidates");
 
             endpoints.MapPost("/api/master-data/hs-knowledge/remote-candidates/review", async (
@@ -738,6 +790,28 @@ namespace ExportDocManager.Api.Hosting
                 try { return await service.ReviewRemoteCandidateAsync(request, cancellationToken) ? Results.Ok(new ApiCommandResponse(true, request.Confirmed ? "已确认并加入正式申报实例库。" : "已忽略该联网候选。")) : Results.NotFound(); }
                 catch (InvalidOperationException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
             }).WithName("ReviewHsCodeRemoteCandidate");
+
+            endpoints.MapPost("/api/master-data/hs-knowledge/remote-candidates/review-batch", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                HsCodeRemoteCandidateBatchReviewInput request, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                try
+                {
+                    int reviewed = await service.ReviewRemoteCandidatesAsync(request?.Items ?? [], cancellationToken);
+                    return Results.Ok(new ApiCommandResponse(true, $"已处理 {reviewed} 条联网候选。"));
+                }
+                catch (InvalidOperationException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+            }).WithName("ReviewHsCodeRemoteCandidatesBatch");
+
+            endpoints.MapPost("/api/master-data/hs-knowledge/remote-candidates/reset", async (
+                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                HsCodeRemoteCandidateResetInput request, CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                int reset = await service.ResetRemoteCandidatesAsync(request?.Ids ?? [], cancellationToken);
+                return Results.Ok(new ApiCommandResponse(true, $"已将 {reset} 条审核记录恢复为待审核。"));
+            }).WithName("ResetHsCodeRemoteCandidates");
 
             endpoints.MapGet("/api/master-data/hs-knowledge/export", async (
                 HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,

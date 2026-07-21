@@ -97,7 +97,7 @@ namespace ExportDocManager.Api.Hosting
         string RebateRate,
         DateTime? UpdateTime,
         string DetailUrl,
-        string Status = "Active",
+        string Status = "ReferenceOnly",
         string SourceName = "",
         int? EffectiveYear = null,
         DateTime? LastVerifiedAt = null,

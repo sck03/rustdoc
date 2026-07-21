@@ -975,6 +975,7 @@ export function InvoiceEditorPage({
       client={client}
       invoice={invoice}
       canSaveToProductLibrary={masterDataPermission.canOperate}
+      canUseHsKnowledge={invoicePermission.canOperate}
       canRedoItemEdit={itemEditHistory.redo.length > 0}
       canUndoItemEdit={itemEditHistory.undo.length > 0}
       invoiceItemBlankRowCount={invoiceItemBlankRowCount}

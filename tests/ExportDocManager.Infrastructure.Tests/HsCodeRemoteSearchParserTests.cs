@@ -1,4 +1,3 @@
-using System.Net;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Utils;
@@ -8,7 +7,7 @@ namespace ExportDocManager.Infrastructure.Tests
     public class HsCodeRemoteSearchParserTests
     {
         [Fact]
-        public async Task SearchI5a6DirectAsync_ShouldReadCurrentExampleTableWhenStandardResultIsEmpty()
+        public void I5a6PageParser_ShouldReadCurrentExampleTableWhenStandardResultIsEmpty()
         {
             const string html = """
                 <html><body>
@@ -25,10 +24,10 @@ namespace ExportDocManager.Infrastructure.Tests
                 </body></html>
                 """;
 
-            using var httpClient = new HttpClient(new StaticHtmlHandler(html));
-            using var service = new HsCodeService(null, null, httpClient);
-
-            var results = await service.SearchI5a6DirectAsync("男T恤");
+            var results = I5a6PageParser.ParseSearchPage(html, "男T恤").Records
+                .Where(item => item.Kind == HsCodeRemoteRecordKind.DeclarationExample)
+                .Select(item => item.Item)
+                .ToList();
 
             Assert.Equal(2, results.Count);
             Assert.Equal("6109100010", results[0].Code);
@@ -38,7 +37,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public async Task SearchI5a6DirectAsync_ShouldReadCurrentMobileDealCards()
+        public void I5a6PageParser_ShouldReadCurrentMobileDealCards()
         {
             const string html = """
                 <html><body>
@@ -53,10 +52,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 </body></html>
                 """;
 
-            using var httpClient = new HttpClient(new StaticHtmlHandler(html));
-            using var service = new HsCodeService(null, null, httpClient);
-
-            var item = Assert.Single(await service.SearchI5a6DirectAsync("男T恤"));
+            var item = Assert.Single(I5a6PageParser.ParseSearchPage(html, "男T恤").Records).Item;
 
             Assert.Equal("6109100010", item.Code);
             Assert.Equal("棉制男T恤", item.Name);
@@ -65,7 +61,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public async Task SearchI5a6DirectAsync_ShouldKeepExamplesFromExpiredSearchPageWhenRecommendationsHaveResults()
+        public void I5a6PageParser_ShouldKeepExamplesAndExposeRecommendedCurrentQuery()
         {
             const string expiredSearchHtml = """
                 <html><body>
@@ -82,19 +78,18 @@ namespace ExportDocManager.Infrastructure.Tests
                 </body></html>
                 """;
             const string recommendedHtml = """
-                <html><body><table>
-                  <tr><td>HS编码</td><td>品名</td></tr>
-                  <tr><td><a href="/hscode/detail/6109100000">61091000.00</a></td><td>针织棉制T恤衫</td></tr>
+                <html><body><div>相关HS编码</div><table>
+                  <tr><td>HS编码</td><td>品名</td><td>实例汇总</td></tr>
+                  <tr><td><a href="/hscode/detail/6109100000">61091000.00</a></td><td>针织棉制T恤衫</td><td>12条</td></tr>
                 </table></body></html>
                 """;
 
-            using var httpClient = new HttpClient(new RoutingStaticHtmlHandler(expiredSearchHtml, recommendedHtml));
-            using var service = new HsCodeService(null, null, httpClient);
+            var initial = I5a6PageParser.ParseSearchPage(expiredSearchHtml, "女式T恤衫");
+            var recommended = I5a6PageParser.ParseSearchPage(recommendedHtml, "61091000");
 
-            var results = await service.SearchI5a6DirectAsync("女式T恤衫");
-
-            Assert.Contains(results, item => item.Code == "6109100010" && item.Name == "女式T恤衫" && item.Description == "针织|女式|100%棉");
-            Assert.Contains(results, item => item.Code == "6109100000" && item.Name == "针织棉制T恤衫");
+            Assert.Contains(initial.Records, item => item.Kind == HsCodeRemoteRecordKind.DeclarationExample && item.Item.Code == "6109100010" && item.Item.Name == "女式T恤衫" && item.Item.Description == "针织|女式|100%棉");
+            Assert.Contains(initial.ReplacementEvidence, item => item.OldCode == "6109100022" && item.RecommendedKeywords.Contains("61091000"));
+            Assert.Contains(recommended.Records, item => item.Kind == HsCodeRemoteRecordKind.StandardCode && item.Item.Code == "6109100000" && item.Item.Name == "针织棉制T恤衫");
         }
 
         [Fact]
@@ -386,37 +381,6 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal("6109100000", item.Item.Code);
             Assert.Equal("棉制针织男式T恤衫", item.Item.Name);
             Assert.Equal("针织|男式|100%棉", item.Item.Description);
-        }
-
-        private sealed class StaticHtmlHandler(string html) : HttpMessageHandler
-        {
-            protected override Task<HttpResponseMessage> SendAsync(
-                HttpRequestMessage request,
-                CancellationToken cancellationToken)
-            {
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent(html),
-                    RequestMessage = request
-                });
-            }
-        }
-
-        private sealed class RoutingStaticHtmlHandler(string expiredHtml, string recommendedHtml) : HttpMessageHandler
-        {
-            protected override Task<HttpResponseMessage> SendAsync(
-                HttpRequestMessage request,
-                CancellationToken cancellationToken)
-            {
-                var content = request.RequestUri?.AbsolutePath.Contains("/61091000", StringComparison.OrdinalIgnoreCase) == true
-                    ? recommendedHtml
-                    : expiredHtml;
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent(content),
-                    RequestMessage = request
-                });
-            }
         }
 
         private sealed class StubRemoteProvider(IReadOnlyList<HsCode> rows) : IHsCodeRemoteProvider

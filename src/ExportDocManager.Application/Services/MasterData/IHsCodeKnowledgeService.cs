@@ -15,6 +15,9 @@ namespace ExportDocManager.Services.MasterData
         IReadOnlyList<string> ReplacementCandidates,
         IReadOnlyList<string> MatchReasons,
         IReadOnlyList<string> ConflictWarnings,
+        string StandardSource,
+        int? EffectiveYear,
+        DateTime? LastVerifiedAt,
         bool CanUse);
 
     public sealed record HsCodeKnowledgeSearchResponse(
@@ -47,6 +50,20 @@ namespace ExportDocManager.Services.MasterData
 
     public sealed record HsCodeRemoteCandidateReviewInput(int Id, string CurrentCode, bool Confirmed);
 
+    public sealed record HsCodeRemoteCandidateBatchReviewInput(
+        IReadOnlyList<HsCodeRemoteCandidateReviewInput> Items);
+
+    public sealed record HsCodeRemoteCandidateResetInput(IReadOnlyList<int> Ids);
+
+    public sealed record HsCodeKnowledgeExampleDeleteBatchInput(IReadOnlyList<int> Ids);
+
+    public sealed record HsCodeRemoteCandidatePage(
+        IReadOnlyList<HsCodeRemoteCandidate> Items,
+        int TotalCount,
+        int PageNumber,
+        int PageSize,
+        string ReviewStatus);
+
     public sealed record HsCodeKnowledgePackagePreview(
         string FileName,
         string SchemaVersion,
@@ -77,13 +94,16 @@ namespace ExportDocManager.Services.MasterData
         Task<int> CountExamplesAsync(string keyword, CancellationToken cancellationToken = default);
         Task<HsCodeDeclarationExample> SaveExampleAsync(HsCodeExampleInput input, CancellationToken cancellationToken = default);
         Task<bool> DeleteExampleAsync(int id, CancellationToken cancellationToken = default);
+        Task<int> DeleteExamplesAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default);
         Task RecordFeedbackAsync(HsCodeKnowledgeFeedbackInput input, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<HsCodeHistoryLearningCandidate>> DiscoverHistoryCandidatesAsync(string keyword, int maxResults = 200, CancellationToken cancellationToken = default);
         Task<int> CaptureRemoteExamplesAsync(string query, IEnumerable<HsCode> remoteRows, CancellationToken cancellationToken = default);
         Task<int> CaptureRemoteEvidenceAsync(string query, HsCodeRemoteSearchBundle bundle, CancellationToken cancellationToken = default);
         Task<int> CaptureRemoteDetailEvidenceAsync(string query, HsCodeRemoteDetailBundle bundle, CancellationToken cancellationToken = default);
-        Task<IReadOnlyList<HsCodeRemoteCandidate>> ListRemoteCandidatesAsync(string reviewStatus, int maxResults = 200, CancellationToken cancellationToken = default);
+        Task<HsCodeRemoteCandidatePage> ListRemoteCandidatesAsync(string reviewStatus, string keyword, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
         Task<bool> ReviewRemoteCandidateAsync(HsCodeRemoteCandidateReviewInput input, CancellationToken cancellationToken = default);
+        Task<int> ReviewRemoteCandidatesAsync(IReadOnlyList<HsCodeRemoteCandidateReviewInput> inputs, CancellationToken cancellationToken = default);
+        Task<int> ResetRemoteCandidatesAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default);
         Task RefreshReplacementRelationsAsync(HsCodeImportPreview preview, CancellationToken cancellationToken = default);
         Task<byte[]> ExportPackageAsync(DateTimeOffset? since = null, CancellationToken cancellationToken = default);
         Task<HsCodeKnowledgePackagePreview> PreviewPackageAsync(string packagePath, CancellationToken cancellationToken = default);

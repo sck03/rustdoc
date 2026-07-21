@@ -1170,7 +1170,7 @@ namespace ExportDocManager.Api.Hosting
                         ["HsCodeKnowledgeSearchItem"] = new
                         {
                             type = "object",
-                            required = new[] { "currentCode", "rawCode", "name", "specification", "standardName", "resolutionStatus", "score", "exampleCount", "confirmedCount", "replacementCandidates", "matchReasons", "conflictWarnings", "canUse" },
+                            required = new[] { "currentCode", "rawCode", "name", "specification", "standardName", "resolutionStatus", "score", "exampleCount", "confirmedCount", "replacementCandidates", "matchReasons", "conflictWarnings", "standardSource", "canUse" },
                             properties = new Dictionary<string, object>
                             {
                                 ["currentCode"] = StringProperty("Current locally valid code, when resolved."),
@@ -1185,6 +1185,9 @@ namespace ExportDocManager.Api.Hosting
                                 ["replacementCandidates"] = new { type = "array", items = new { type = "string" } },
                                 ["matchReasons"] = new { type = "array", items = new { type = "string" } },
                                 ["conflictWarnings"] = new { type = "array", items = new { type = "string" } },
+                                ["standardSource"] = StringProperty("Trusted annual tariff source."),
+                                ["effectiveYear"] = new { type = "integer", format = "int32", nullable = true },
+                                ["lastVerifiedAt"] = new { type = "string", format = "date-time", nullable = true },
                                 ["canUse"] = new { type = "boolean" }
                             }
                         },
@@ -1282,7 +1285,7 @@ namespace ExportDocManager.Api.Hosting
                         ["HsCodeRemoteCandidate"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "queryText", "rawReportedHsCode", "productName", "source", "reviewStatus", "resolutionStatus", "seenCount", "lastSeenAt" },
+                            required = new[] { "id", "queryText", "rawReportedHsCode", "productName", "source", "reviewStatus", "resolutionStatus", "seenCount", "firstSeenAt", "lastSeenAt" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" },
@@ -1296,7 +1299,9 @@ namespace ExportDocManager.Api.Hosting
                                 ["reviewStatus"] = StringProperty("Pending, Confirmed, or Ignored."),
                                 ["resolutionStatus"] = StringProperty("Resolution status."),
                                 ["seenCount"] = new { type = "integer", format = "int32" },
-                                ["lastSeenAt"] = new { type = "string", format = "date-time" }
+                                ["firstSeenAt"] = new { type = "string", format = "date-time" },
+                                ["lastSeenAt"] = new { type = "string", format = "date-time" },
+                                ["reviewedAt"] = new { type = "string", format = "date-time", nullable = true }
                             }
                         },
                         ["HsCodeRemoteCandidateReviewInput"] = new
@@ -1308,6 +1313,46 @@ namespace ExportDocManager.Api.Hosting
                                 ["id"] = new { type = "integer", format = "int32" },
                                 ["currentCode"] = StringProperty("Current active local code."),
                                 ["confirmed"] = new { type = "boolean" }
+                            }
+                        },
+                        ["HsCodeRemoteCandidateBatchReviewInput"] = new
+                        {
+                            type = "object",
+                            required = new[] { "items" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["items"] = new { type = "array", items = RefSchema("HsCodeRemoteCandidateReviewInput") }
+                            }
+                        },
+                        ["HsCodeRemoteCandidateResetInput"] = new
+                        {
+                            type = "object",
+                            required = new[] { "ids" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["ids"] = new { type = "array", items = new { type = "integer", format = "int32" } }
+                            }
+                        },
+                        ["HsCodeKnowledgeExampleDeleteBatchInput"] = new
+                        {
+                            type = "object",
+                            required = new[] { "ids" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["ids"] = new { type = "array", items = new { type = "integer", format = "int32" } }
+                            }
+                        },
+                        ["HsCodeRemoteCandidatePage"] = new
+                        {
+                            type = "object",
+                            required = new[] { "items", "totalCount", "pageNumber", "pageSize", "reviewStatus" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["items"] = new { type = "array", items = RefSchema("HsCodeRemoteCandidate") },
+                                ["totalCount"] = new { type = "integer", format = "int32" },
+                                ["pageNumber"] = new { type = "integer", format = "int32" },
+                                ["pageSize"] = new { type = "integer", format = "int32" },
+                                ["reviewStatus"] = StringProperty("Candidate review status.")
                             }
                         },
                         ["HsCodeKnowledgeImportResult"] = new

@@ -2860,6 +2860,10 @@ export interface HsCodeKnowledgeExample {
   useCount: number;
 }
 
+export interface HsCodeKnowledgeExampleDeleteBatchInput {
+  ids: number[];
+}
+
 export interface HsCodeKnowledgeExampleInput {
   id: number;
   isManuallyVerified: boolean;
@@ -2912,7 +2916,9 @@ export interface HsCodeKnowledgeSearchItem {
   confirmedCount: number;
   conflictWarnings: string[];
   currentCode: string;
+  effectiveYear?: number;
   exampleCount: number;
+  lastVerifiedAt?: string;
   matchReasons: string[];
   name: string;
   rawCode: string;
@@ -2921,6 +2927,7 @@ export interface HsCodeKnowledgeSearchItem {
   score: number;
   specification: string;
   standardName: string;
+  standardSource: string;
 }
 
 export interface HsCodeKnowledgeSearchResponse {
@@ -2931,6 +2938,7 @@ export interface HsCodeKnowledgeSearchResponse {
 }
 
 export interface HsCodeRemoteCandidate {
+  firstSeenAt: string;
   id: number;
   lastSeenAt: string;
   productName: string;
@@ -2938,11 +2946,28 @@ export interface HsCodeRemoteCandidate {
   rawReportedHsCode: string;
   resolutionStatus: string;
   reviewStatus: string;
+  reviewedAt?: string;
   seenCount: number;
   source: string;
   sourceUrl?: string;
   specification?: string;
   suggestedCurrentHsCode?: string;
+}
+
+export interface HsCodeRemoteCandidateBatchReviewInput {
+  items: HsCodeRemoteCandidateReviewInput[];
+}
+
+export interface HsCodeRemoteCandidatePage {
+  items: HsCodeRemoteCandidate[];
+  pageNumber: number;
+  pageSize: number;
+  reviewStatus: string;
+  totalCount: number;
+}
+
+export interface HsCodeRemoteCandidateResetInput {
+  ids: number[];
 }
 
 export interface HsCodeRemoteCandidateReviewInput {
@@ -3416,6 +3441,10 @@ export interface DeleteHsCodeKnowledgeExampleRequest {
   id: number;
 }
 
+export interface DeleteHsCodeKnowledgeExamplesBatchRequest {
+  body: HsCodeKnowledgeExampleDeleteBatchInput;
+}
+
 export interface DeleteHsCodesBatchRequest {
   body: ApiHsCodeBatchDeleteRequest;
 }
@@ -3595,6 +3624,10 @@ export interface GetInvoiceRequest {
   id: number;
 }
 
+export interface GetInvoiceHsCodeRequest {
+  code: string;
+}
+
 export interface GetJobRequest {
   jobId: string;
 }
@@ -3745,7 +3778,9 @@ export interface ListHsCodeKnowledgeExamplesRequest {
 
 export interface ListHsCodeRemoteCandidatesRequest {
   status?: string;
-  maxResults?: number;
+  keyword?: string;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListHsCodesRequest {
@@ -3977,6 +4012,10 @@ export interface RecordHsCodeKnowledgeFeedbackRequest {
   body: HsCodeKnowledgeFeedbackInput;
 }
 
+export interface RecordInvoiceHsCodeKnowledgeFeedbackRequest {
+  body: HsCodeKnowledgeFeedbackInput;
+}
+
 export interface RegisterLicenseRequest {
   body: ApiLicenseRegisterRequest;
 }
@@ -3989,6 +4028,10 @@ export interface RepairSingleWindowExportReviewGroupsRequest {
   businessType: string;
   invoiceId: number;
   body: ApiSingleWindowRepairGroupsRequest;
+}
+
+export interface ResetHsCodeRemoteCandidatesRequest {
+  body: HsCodeRemoteCandidateResetInput;
 }
 
 export interface ResolveRemoteHsCodeDetailRequest {
@@ -4015,6 +4058,10 @@ export interface RetryJobRequest {
 
 export interface ReviewHsCodeRemoteCandidateRequest {
   body: HsCodeRemoteCandidateReviewInput;
+}
+
+export interface ReviewHsCodeRemoteCandidatesBatchRequest {
+  body: HsCodeRemoteCandidateBatchReviewInput;
 }
 
 export interface ReviewLetterOfCreditComplianceRequest {
@@ -4096,6 +4143,11 @@ export interface SaveSupportPackageToRuntimeRequest {
 }
 
 export interface SearchHsCodeKnowledgeRequest {
+  query?: string;
+  maxResults?: number;
+}
+
+export interface SearchInvoiceHsCodeKnowledgeRequest {
   query?: string;
   maxResults?: number;
 }
@@ -4791,6 +4843,14 @@ export class ExportDocManagerApiClient {
     return this.request<void>("DELETE", path, { init });
   }
 
+  public deleteHsCodeKnowledgeExamplesBatch(request: DeleteHsCodeKnowledgeExamplesBatchRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+    const path = "/api/master-data/hs-knowledge/examples/delete-batch";
+    return this.request<ApiCommandResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public deleteHsCodesBatch(request: DeleteHsCodesBatchRequest, init?: RequestInit): Promise<ApiCommandResponse> {
     const path = "/api/master-data/hs-codes/delete-batch";
     return this.request<ApiCommandResponse>("POST", path, {
@@ -5107,6 +5167,11 @@ export class ExportDocManagerApiClient {
   public getInvoice(request: GetInvoiceRequest, init?: RequestInit): Promise<ApiInvoiceDetailDto> {
     const path = `/api/invoices/${encodePath(request.id)}`;
     return this.request<ApiInvoiceDetailDto>("GET", path, { init });
+  }
+
+  public getInvoiceHsCode(request: GetInvoiceHsCodeRequest, init?: RequestInit): Promise<ApiHsCodeDto> {
+    const path = `/api/invoices/hs-codes/${encodePath(request.code)}`;
+    return this.request<ApiHsCodeDto>("GET", path, { init });
   }
 
   public getJob(request: GetJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
@@ -5443,12 +5508,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listHsCodeRemoteCandidates(request: ListHsCodeRemoteCandidatesRequest = {}, init?: RequestInit): Promise<HsCodeRemoteCandidate[]> {
+  public listHsCodeRemoteCandidates(request: ListHsCodeRemoteCandidatesRequest = {}, init?: RequestInit): Promise<HsCodeRemoteCandidatePage> {
     const path = "/api/master-data/hs-knowledge/remote-candidates";
-    return this.request<HsCodeRemoteCandidate[]>("GET", path, {
+    return this.request<HsCodeRemoteCandidatePage>("GET", path, {
       query: {
         "status": request.status,
-        "maxResults": request.maxResults,
+        "keyword": request.keyword,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
       },
       init,
     });
@@ -5901,6 +5968,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public recordInvoiceHsCodeKnowledgeFeedback(request: RecordInvoiceHsCodeKnowledgeFeedbackRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+    const path = "/api/invoices/hs-knowledge/feedback";
+    return this.request<ApiCommandResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public registerLicense(request: RegisterLicenseRequest, init?: RequestInit): Promise<ApiLicenseRegisterResponse> {
     const path = "/api/system/license/register";
     return this.request<ApiLicenseRegisterResponse>("POST", path, {
@@ -5920,6 +5995,14 @@ export class ExportDocManagerApiClient {
   public repairSingleWindowExportReviewGroups(request: RepairSingleWindowExportReviewGroupsRequest, init?: RequestInit): Promise<ApiSingleWindowRepairGroupsResponse> {
     const path = `/api/single-window/export-review/${encodePath(request.businessType)}/${encodePath(request.invoiceId)}/repair`;
     return this.request<ApiSingleWindowRepairGroupsResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public resetHsCodeRemoteCandidates(request: ResetHsCodeRemoteCandidatesRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+    const path = "/api/master-data/hs-knowledge/remote-candidates/reset";
+    return this.request<ApiCommandResponse>("POST", path, {
       body: request.body,
       init,
     });
@@ -5963,6 +6046,14 @@ export class ExportDocManagerApiClient {
 
   public reviewHsCodeRemoteCandidate(request: ReviewHsCodeRemoteCandidateRequest, init?: RequestInit): Promise<ApiCommandResponse> {
     const path = "/api/master-data/hs-knowledge/remote-candidates/review";
+    return this.request<ApiCommandResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public reviewHsCodeRemoteCandidatesBatch(request: ReviewHsCodeRemoteCandidatesBatchRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+    const path = "/api/master-data/hs-knowledge/remote-candidates/review-batch";
     return this.request<ApiCommandResponse>("POST", path, {
       body: request.body,
       init,
@@ -6120,6 +6211,17 @@ export class ExportDocManagerApiClient {
 
   public searchHsCodeKnowledge(request: SearchHsCodeKnowledgeRequest = {}, init?: RequestInit): Promise<HsCodeKnowledgeSearchResponse> {
     const path = "/api/master-data/hs-knowledge/search";
+    return this.request<HsCodeKnowledgeSearchResponse>("GET", path, {
+      query: {
+        "query": request.query,
+        "maxResults": request.maxResults,
+      },
+      init,
+    });
+  }
+
+  public searchInvoiceHsCodeKnowledge(request: SearchInvoiceHsCodeKnowledgeRequest = {}, init?: RequestInit): Promise<HsCodeKnowledgeSearchResponse> {
+    const path = "/api/invoices/hs-knowledge/search";
     return this.request<HsCodeKnowledgeSearchResponse>("GET", path, {
       query: {
         "query": request.query,

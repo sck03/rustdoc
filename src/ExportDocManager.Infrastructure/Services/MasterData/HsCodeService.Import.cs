@@ -65,6 +65,9 @@ namespace ExportDocManager.Services.MasterData
             string normalizedSource = string.IsNullOrWhiteSpace(sourceName)
                 ? Path.GetFileNameWithoutExtension(filePath)
                 : sourceName.Trim();
+            int normalizedEffectiveYear = effectiveYear is >= 2000 and <= 2100
+                ? effectiveYear.Value
+                : DateTime.Now.Year;
             var warnings = new List<string>();
             if (detected.Confidence < 75)
             {
@@ -83,7 +86,7 @@ namespace ExportDocManager.Services.MasterData
                 Path.GetFileName(filePath),
                 mode,
                 normalizedSource,
-                effectiveYear,
+                normalizedEffectiveYear,
                 detected.Worksheet.Position,
                 detected.Worksheet.Name,
                 detected.HeaderRowNumber,

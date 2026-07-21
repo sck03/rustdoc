@@ -22,7 +22,7 @@ namespace ExportDocManager.Models.Entities
         private string _rebateRate;
         private DateTime? _updateTime = DateTime.Now;
         private string _detailUrl;
-        private string _status = "Active";
+        private string _status = "ReferenceOnly";
         private string _sourceName;
         private int? _effectiveYear;
         private DateTime? _lastVerifiedAt;
@@ -143,8 +143,8 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(30)]
         public string Status
         {
-            get => string.IsNullOrWhiteSpace(_status) ? "Active" : _status;
-            set => SetProperty(ref _status, string.IsNullOrWhiteSpace(value) ? "Active" : value.Trim());
+            get => string.IsNullOrWhiteSpace(_status) ? "ReferenceOnly" : _status;
+            set => SetProperty(ref _status, string.IsNullOrWhiteSpace(value) ? "ReferenceOnly" : value.Trim());
         }
 
         [MaxLength(200)]

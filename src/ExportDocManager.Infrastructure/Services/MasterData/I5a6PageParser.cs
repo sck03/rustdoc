@@ -84,7 +84,7 @@ internal static class I5a6PageParser
         item.ExportTariffRate = Prefer(Get("出口关税率", "出口税率"), item.ExportTariffRate);
         item.Description = Prefer(englishName, item.Description);
         bool isExpired = HsCodeTextHelper.IsExpiredText(detailRoot.InnerText);
-        item.Status = isExpired ? "Obsolete" : "Active";
+        item.Status = isExpired ? "Obsolete" : HsCodeValidityPolicy.ReferenceOnlyStatus;
         item.SourceName = "i5a6（第三方参考）";
         item.LastVerifiedAt = timestamp.LocalDateTime;
         item.UpdateTime = timestamp.LocalDateTime;
@@ -338,7 +338,7 @@ internal static class I5a6PageParser
                 Name = name,
                 Description = description,
                 DetailUrl = detailUrl,
-                Status = expired ? "Obsolete" : "Active",
+                Status = expired ? "Obsolete" : HsCodeValidityPolicy.ReferenceOnlyStatus,
                 SourceName = BuildSourceName(source, HsCodeRemoteRecordKind.StandardCode),
                 LastVerifiedAt = observedAt.LocalDateTime,
                 UpdateTime = observedAt.LocalDateTime
@@ -391,7 +391,7 @@ internal static class I5a6PageParser
                     Name = name,
                     Description = specification,
                     DetailUrl = url,
-                    Status = "Active",
+                    Status = HsCodeValidityPolicy.ReferenceOnlyStatus,
                     SourceName = BuildSourceName(source, HsCodeRemoteRecordKind.DeclarationExample),
                     LastVerifiedAt = observedAt.LocalDateTime,
                     UpdateTime = observedAt.LocalDateTime
@@ -421,7 +421,7 @@ internal static class I5a6PageParser
             string specification = NormalizeText(blocks?.ElementAtOrDefault(1)?.InnerText);
             if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name)) continue;
             records.Add(new HsCodeRemoteSearchRecord(
-                new HsCode { Code = code, Name = name, Description = specification, DetailUrl = NormalizeUrl(link.GetAttributeValue("href", string.Empty)), Status = "Active", SourceName = BuildSourceName(source, HsCodeRemoteRecordKind.DeclarationExample), LastVerifiedAt = observedAt.LocalDateTime, UpdateTime = observedAt.LocalDateTime },
+                new HsCode { Code = code, Name = name, Description = specification, DetailUrl = NormalizeUrl(link.GetAttributeValue("href", string.Empty)), Status = HsCodeValidityPolicy.ReferenceOnlyStatus, SourceName = BuildSourceName(source, HsCodeRemoteRecordKind.DeclarationExample), LastVerifiedAt = observedAt.LocalDateTime, UpdateTime = observedAt.LocalDateTime },
                 HsCodeRemoteRecordKind.DeclarationExample,
                 false,
                 null,
@@ -470,7 +470,7 @@ internal static class I5a6PageParser
                     Name = name,
                     Description = specification,
                     DetailUrl = url,
-                    Status = "Active",
+                    Status = HsCodeValidityPolicy.ReferenceOnlyStatus,
                     SourceName = BuildSourceName(source, HsCodeRemoteRecordKind.DeclarationExample),
                     LastVerifiedAt = observedAt.LocalDateTime,
                     UpdateTime = observedAt.LocalDateTime

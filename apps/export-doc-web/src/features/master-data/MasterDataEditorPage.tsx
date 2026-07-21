@@ -73,6 +73,7 @@ export function MasterDataEditorPage({
   const [successMessage, setSuccessMessage] = useState<string | null>(routeSuccessMessage);
   const [productUnitMessage, setProductUnitMessage] = useState<string | null>(null);
   const [autoFilledProductUnits, setAutoFilledProductUnits] = useState<Partial<Record<ProductUnitTargetField, string>>>({});
+  const [productHsCodeKeyword, setProductHsCodeKeyword] = useState("");
   const [persistedRecordSnapshot, setPersistedRecordSnapshot] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const customOptionTypes = useMemo(
@@ -122,11 +123,18 @@ export function MasterDataEditorPage({
     staleTime: 5 * 60 * 1000,
   });
 
+  useEffect(() => {
+    if (config.key !== "products") return undefined;
+    const keyword = normalizeHsCodeKey(record ? readString(record, "hsCode") : "");
+    const timer = window.setTimeout(() => setProductHsCodeKeyword(keyword), 250);
+    return () => window.clearTimeout(timer);
+  }, [config.key, record]);
+
   const productHsCodesQuery = useQuery({
-    queryKey: queryKeys.masterDataList("hs-codes", 1, productHsCodeLookupPageSize, ""),
-    queryFn: () => client.listHsCodes({ pageNumber: 1, pageSize: productHsCodeLookupPageSize }),
-    enabled: config.key === "products",
-    staleTime: 5 * 60 * 1000,
+    queryKey: queryKeys.masterDataList("hs-codes", 1, 20, productHsCodeKeyword),
+    queryFn: () => client.listHsCodes({ pageNumber: 1, pageSize: 20, keyword: productHsCodeKeyword }),
+    enabled: config.key === "products" && productHsCodeKeyword.length >= 4,
+    staleTime: 60 * 1000,
   });
 
   useEffect(() => {
@@ -358,13 +366,24 @@ export function MasterDataEditorPage({
     setSuccessMessage(null);
   }
 
-  function commitProductAssistanceField(field: ProductAssistanceField, value: string) {
+  async function commitProductAssistanceField(field: ProductAssistanceField, value: string) {
     if (!canOperate || config.key !== "products" || field !== "hsCode" || !record) {
       return;
     }
 
-    const hsCode = productHsCodeLookup.get(normalizeHsCodeKey(value));
+    const normalizedValue = normalizeHsCodeKey(value);
+    let hsCode = productHsCodeLookup.get(normalizedValue);
+    if (!hsCode && normalizedValue.length >= 4) {
+      try {
+        const result = await client.listHsCodes({ pageNumber: 1, pageSize: 20, keyword: normalizedValue });
+        hsCode = result.items.find(item => normalizeHsCodeKey(item.code || item.normalizedCode) === normalizedValue && item.status === "Active");
+      } catch (error) {
+        setProductUnitMessage(readApiError(error));
+        return;
+      }
+    }
     if (!hsCode) {
+      setProductUnitMessage("未在已验证的年度税则中找到完全一致的有效 HS 编码。");
       return;
     }
 
@@ -508,4 +527,3 @@ export function MasterDataEditorPage({
 function buildMasterDataSnapshot(config: MasterDataEntityConfig, record: MasterDataRecord, id: number) {
   return JSON.stringify(config.normalizeRecord(record, id));
 }
-

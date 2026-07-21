@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from "react";
-import { ArrowDownToLine, ClipboardCopy, ClipboardPaste, Columns3, Eraser, PackageCheck, PackagePlus, PackageSearch, Redo2, RefreshCw, Search, Undo2 } from "lucide-react";
+import { ArrowDownToLine, ClipboardCopy, ClipboardPaste, Columns3, Eraser, PackageCheck, PackagePlus, PackageSearch, Redo2, RefreshCw, Search, Sparkles, Undo2 } from "lucide-react";
 import type { ApiProductDto } from "../../api/index.ts";
 import type { EditableInvoiceItemField } from "./invoiceItemTableModel.ts";
 import { invoiceItemEditableColumns } from "./invoiceItemTableModel.ts";
@@ -7,17 +7,17 @@ import { formatProductOptionLabel } from "./InvoiceProductLibraryPickerDialog.ts
 
 type Props = {
  canApplySelectedProduct:boolean; canRedoItemEdit:boolean; canSaveFocusedItem:boolean; canUndoItemEdit:boolean; hiddenColumnFields:Set<EditableInvoiceItemField>;
- isFillDownAvailable:boolean; isProductLibraryBusy:boolean; productKeyword:string; productLibraryProducts:ApiProductDto[]; readOnly:boolean;
+ canUseHsKnowledge:boolean; isFillDownAvailable:boolean; isProductLibraryBusy:boolean; productKeyword:string; productLibraryProducts:ApiProductDto[]; readOnly:boolean;
  selectedCellCount:number; selectedProductId:string; visibleColumnCount:number; visibleMessage:string|null;
  onApplySelectedProduct():void; onClearSelectedCells():void; onCopySelectedCells():void; onFillDown():void; onOpenProductPicker():void; onPaste():void;
  onProductKeywordChange(value:string):void; onProductKeywordKeyDown(event:KeyboardEvent<HTMLInputElement>):void; onRedo():void; onRefreshProductLibrary():void;
- onSaveFocusedProduct():void; onSearchProductLibrary():void; onSelectedProductChange(value:string):void; onShowAllColumns():void;
+ onOpenHsKnowledge():void; onSaveFocusedProduct():void; onSearchProductLibrary():void; onSelectedProductChange(value:string):void; onShowAllColumns():void;
  onToggleColumn(field:EditableInvoiceItemField):void; onUndo():void;
 };
 
 export function InvoiceItemsEditorToolbar(props:Props){
- const {canApplySelectedProduct,canRedoItemEdit,canSaveFocusedItem,canUndoItemEdit,hiddenColumnFields,isFillDownAvailable,isProductLibraryBusy,productKeyword,productLibraryProducts,readOnly,selectedCellCount,selectedProductId,visibleColumnCount,visibleMessage}=props;
- const {onApplySelectedProduct:applySelectedProduct,onClearSelectedCells:clearSelectedCells,onCopySelectedCells,onFillDown:fillDownFocusedCell,onOpenProductPicker,onPaste,onProductKeywordChange:setProductKeyword,onProductKeywordKeyDown:handleProductKeywordKeyDown,onRedo:redoItemEdit,onRefreshProductLibrary,onSaveFocusedProduct:saveFocusedItemToProductLibrary,onSearchProductLibrary:searchProductLibrary,onSelectedProductChange:setSelectedProductId,onShowAllColumns:showAllInvoiceItemColumns,onToggleColumn:toggleInvoiceItemColumn,onUndo:undoItemEdit}=props;
+ const {canApplySelectedProduct,canRedoItemEdit,canSaveFocusedItem,canUndoItemEdit,canUseHsKnowledge,hiddenColumnFields,isFillDownAvailable,isProductLibraryBusy,productKeyword,productLibraryProducts,readOnly,selectedCellCount,selectedProductId,visibleColumnCount,visibleMessage}=props;
+ const {onApplySelectedProduct:applySelectedProduct,onClearSelectedCells:clearSelectedCells,onCopySelectedCells,onFillDown:fillDownFocusedCell,onOpenHsKnowledge,onOpenProductPicker,onPaste,onProductKeywordChange:setProductKeyword,onProductKeywordKeyDown:handleProductKeywordKeyDown,onRedo:redoItemEdit,onRefreshProductLibrary,onSaveFocusedProduct:saveFocusedItemToProductLibrary,onSearchProductLibrary:searchProductLibrary,onSelectedProductChange:setSelectedProductId,onShowAllColumns:showAllInvoiceItemColumns,onToggleColumn:toggleInvoiceItemColumn,onUndo:undoItemEdit}=props;
  return (
       <div className="item-editor-toolbar" aria-label="明细编辑工具">
         <div className="item-product-library-toolbar" aria-label="商品库工具">
@@ -94,6 +94,7 @@ export function InvoiceItemsEditorToolbar(props:Props){
           >
             <RefreshCw size={16} aria-hidden="true" />
           </button>
+          {canUseHsKnowledge ? <button className="secondary-button invoice-hs-open-button" type="button" disabled={isProductLibraryBusy} onClick={onOpenHsKnowledge}><Sparkles size={15}/><span>智能 HS</span></button> : null}
         </div>
         <details className="item-column-visibility-menu">
           <summary className="icon-button compact-icon-button" title="显示/隐藏明细列" aria-label="显示/隐藏明细列">
@@ -189,4 +190,3 @@ export function InvoiceItemsEditorToolbar(props:Props){
 
  );
 }
-

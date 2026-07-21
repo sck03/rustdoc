@@ -333,6 +333,55 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
+                    ["/api/invoices/hs-codes/{code}"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Get a trusted HS code for invoice item matching",
+                            operationId = "getInvoiceHsCode",
+                            parameters = new object[] { PathParameter("code", "string", null, "HS code.") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "HS code detail.", content = JsonContent("ApiHsCodeDto") },
+                                ["400"] = new { description = "Missing HS code." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["404"] = new { description = "HS code not found." }
+                            }
+                        }
+                    },
+                    ["/api/invoices/hs-knowledge/search"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Search trusted HS knowledge from an invoice item",
+                            operationId = "searchInvoiceHsCodeKnowledge",
+                            parameters = new object[]
+                            {
+                                QueryParameter("query", "string", null, "Invoice item name, material, use, or specification."),
+                                QueryParameter("maxResults", "integer", "int32", "Maximum number of candidates.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Ranked local knowledge candidates.", content = JsonContent("HsCodeKnowledgeSearchResponse") },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
+                            }
+                        }
+                    },
+                    ["/api/invoices/hs-knowledge/feedback"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Record an invoice HS classification choice",
+                            operationId = "recordInvoiceHsCodeKnowledgeFeedback",
+                            requestBody = new { required = true, content = JsonContent("HsCodeKnowledgeFeedbackInput") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Feedback recorded.", content = JsonContent("ApiCommandResponse") },
+                                ["400"] = new { description = "Invalid feedback or inactive current code." },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
+                            }
+                        }
+                    },
                     ["/api/master-data/hs-knowledge/search"] = new
                     {
                         get = new
@@ -397,6 +446,21 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
+                    ["/api/master-data/hs-knowledge/examples/delete-batch"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Delete declaration examples in a managed batch",
+                            operationId = "deleteHsCodeKnowledgeExamplesBatch",
+                            requestBody = new { required = true, content = JsonContent("HsCodeKnowledgeExampleDeleteBatchInput") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Examples deleted.", content = JsonContent("ApiCommandResponse") },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Manage permission required." }
+                            }
+                        }
+                    },
                     ["/api/master-data/hs-knowledge/feedback"] = new
                     {
                         post = new
@@ -439,11 +503,42 @@ namespace ExportDocManager.Api.Hosting
                             parameters = new object[]
                             {
                                 QueryParameter("status", "string", null, "Pending, Confirmed, or Ignored."),
-                                QueryParameter("maxResults", "integer", "int32", "Maximum number of candidates.")
+                                QueryParameter("keyword", "string", null, "Candidate filter."),
+                                QueryParameter("pageNumber", "integer", "int32", "Page number."),
+                                QueryParameter("pageSize", "integer", "int32", "Page size.")
                             },
                             responses = new Dictionary<string, object>
                             {
-                                ["200"] = new { description = "Remote candidates.", content = JsonArrayContent("HsCodeRemoteCandidate") },
+                                ["200"] = new { description = "Remote candidate page.", content = JsonContent("HsCodeRemoteCandidatePage") },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-knowledge/remote-candidates/review-batch"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Confirm or ignore multiple remote candidates",
+                            operationId = "reviewHsCodeRemoteCandidatesBatch",
+                            requestBody = new { required = true, content = JsonContent("HsCodeRemoteCandidateBatchReviewInput") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Batch review completed.", content = JsonContent("ApiCommandResponse") },
+                                ["400"] = new { description = "Inactive current code or invalid review." },
+                                ["401"] = new { description = "Missing or invalid bearer token." }
+                            }
+                        }
+                    },
+                    ["/api/master-data/hs-knowledge/remote-candidates/reset"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Reset reviewed remote candidates to pending",
+                            operationId = "resetHsCodeRemoteCandidates",
+                            requestBody = new { required = true, content = JsonContent("HsCodeRemoteCandidateResetInput") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Candidates reset.", content = JsonContent("ApiCommandResponse") },
                                 ["401"] = new { description = "Missing or invalid bearer token." }
                             }
                         }

@@ -30,10 +30,11 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ApiUnitDto } from "../../api/index.ts";
+import { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ApiUnitDto, type ExportDocManagerApiClient, type HsCodeKnowledgeSearchItem } from "../../api/index.ts";
 import { normalizeText } from "../../ui/formUtils.ts";
 import { InvoiceItemHistoryOptionCache } from "./invoiceItemHistory.ts";
 import { InvoiceItemShortcutGuide } from "./InvoiceItemShortcutGuide.tsx";
+import { InvoiceHsKnowledgePanel } from "./InvoiceHsKnowledgePanel.tsx";
 import { formatProductOptionLabel, ProductLibraryPickerDialog } from "./InvoiceProductLibraryPickerDialog.tsx";
 import { InvoiceItemCellInput } from "./InvoiceItemCellInput.tsx";
 import { InvoiceItemsEditorToolbar } from "./InvoiceItemsEditorToolbar.tsx";
@@ -144,9 +145,11 @@ function shouldMoveInvoiceItemCellByArrow(input: HTMLInputElement, key: string, 
 }
 
 export function InvoiceItemsEditor({
+  client,
   items,
   canRedoItemEdit,
   canSaveToProductLibrary = true,
+  canUseHsKnowledge = true,
   canUndoItemEdit,
   blankRowCount = 0,
   currency,
@@ -173,9 +176,11 @@ export function InvoiceItemsEditor({
   unitLookupMessage,
   unitOptions,
 }: {
+  client: ExportDocManagerApiClient;
   items: ApiInvoiceItemDto[];
   canRedoItemEdit: boolean;
   canSaveToProductLibrary?: boolean;
+  canUseHsKnowledge?: boolean;
   canUndoItemEdit: boolean;
   blankRowCount?: number;
   currency: string;
@@ -211,6 +216,7 @@ export function InvoiceItemsEditor({
   const [editorMessage, setEditorMessage] = useState<string | null>(null);
   const [unitCandidateDialog, setUnitCandidateDialog] = useState<UnitCandidateDialogState | null>(null);
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
+  const [isHsKnowledgeOpen, setIsHsKnowledgeOpen] = useState(false);
   const [productKeyword, setProductKeyword] = useState("");
   const [selectedProductId, setSelectedProductId] = useState("");
   const [selectedCellKeys, setSelectedCellKeys] = useState<Set<string>>(new Set());
@@ -966,12 +972,14 @@ export function InvoiceItemsEditor({
     <div className={focusedWorkbench ? "item-editor-layout item-editor-layout-focused" : "item-editor-layout"}>
       <InvoiceItemsEditorToolbar
         canApplySelectedProduct={canApplySelectedProduct} canRedoItemEdit={canRedoItemEdit} canSaveFocusedItem={canSaveFocusedItem}
-        canUndoItemEdit={canUndoItemEdit} hiddenColumnFields={hiddenColumnFields} isFillDownAvailable={isFillDownAvailable}
+        canUndoItemEdit={canUndoItemEdit} canUseHsKnowledge={!readOnly && canUseHsKnowledge && focusedRowIndex != null && focusedRowIndex < items.length}
+        hiddenColumnFields={hiddenColumnFields} isFillDownAvailable={isFillDownAvailable}
         isProductLibraryBusy={isProductLibraryBusy} productKeyword={productKeyword} productLibraryProducts={productLibraryProducts}
         readOnly={readOnly} selectedCellCount={selectedCellCount} selectedProductId={selectedProductId}
         visibleColumnCount={visibleColumnCount} visibleMessage={visibleMessage}
         onApplySelectedProduct={applySelectedProduct} onClearSelectedCells={clearSelectedCells} onCopySelectedCells={() => void copySelectedCells()}
         onFillDown={fillDownFocusedCell} onOpenProductPicker={() => { setEditorMessage(null); setIsProductPickerOpen(true); }}
+        onOpenHsKnowledge={() => { setEditorMessage(null); setIsHsKnowledgeOpen(true); }}
         onPaste={() => void pasteFromClipboardButton()} onProductKeywordChange={setProductKeyword} onProductKeywordKeyDown={handleProductKeywordKeyDown}
         onRedo={redoItemEdit} onRefreshProductLibrary={onRefreshProductLibrary} onSaveFocusedProduct={saveFocusedItemToProductLibrary}
         onSearchProductLibrary={searchProductLibrary} onSelectedProductChange={setSelectedProductId} onShowAllColumns={showAllInvoiceItemColumns}
@@ -984,6 +992,18 @@ export function InvoiceItemsEditor({
         unitCandidateDialog={unitCandidateDialog} onApplyProduct={applyPickedProduct} onApplyUnitCandidate={applyUnitCandidate}
         onCloseProductPicker={() => setIsProductPickerOpen(false)} onCloseUnitCandidates={() => setUnitCandidateDialog(null)}
         onRefresh={onRefreshProductLibrary} onSearch={(keyword) => { setProductKeyword(keyword); onSearchProductLibrary(keyword); }}
+      />
+      <InvoiceHsKnowledgePanel
+        client={client}
+        item={focusedRowIndex == null ? null : items[focusedRowIndex] ?? null}
+        open={isHsKnowledgeOpen}
+        onClose={() => setIsHsKnowledgeOpen(false)}
+        onApply={(patch, result: HsCodeKnowledgeSearchItem) => {
+          if (focusedRowIndex == null || readOnly) return;
+          markInvoiceItemMutationFrom(focusedRowIndex);
+          onChangeItem(focusedRowIndex, patch);
+          setEditorMessage(`已回填 HS 编码 ${result.currentCode}；本次确认已进入本地学习记录。`);
+        }}
       />
       <InvoiceItemsTable
         activeFocusedCell={activeFocusedCell} activeFocusedCellOptions={activeFocusedCellOptions} currency={currency}

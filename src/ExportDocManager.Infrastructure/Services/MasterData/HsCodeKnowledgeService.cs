@@ -107,7 +107,10 @@ namespace ExportDocManager.Services.MasterData
                         best.Resolution.Replacements,
                         best.MatchReasons,
                         best.ConflictWarnings,
-                        best.Resolution.CanUse && !string.IsNullOrWhiteSpace(currentCode) && string.Equals(standard?.Status, "Active", StringComparison.OrdinalIgnoreCase));
+                        standard?.SourceName ?? string.Empty,
+                        standard?.EffectiveYear,
+                        standard?.LastVerifiedAt,
+                        best.Resolution.CanUse && !string.IsNullOrWhiteSpace(currentCode) && HsCodeValidityPolicy.IsTrustedActive(standard));
                 })
                 .OrderByDescending(item => item.CanUse)
                 .ThenByDescending(item => item.Score)
@@ -118,7 +121,7 @@ namespace ExportDocManager.Services.MasterData
             {
                 var existing = grouped.Select(item => item.CurrentCode).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var masterFallback = codes
-                    .Where(item => string.Equals(item.Status, "Active", StringComparison.OrdinalIgnoreCase) && !existing.Contains(item.NormalizedCode))
+                    .Where(item => HsCodeValidityPolicy.IsTrustedActive(item) && !existing.Contains(item.NormalizedCode))
                     .Select(item =>
                     {
                         var assessment = AssessAttributes(normalizedQuery, NormalizeSearchText($"{item.Name} {item.Elements} {item.Description}"));
@@ -134,7 +137,8 @@ namespace ExportDocManager.Services.MasterData
                     .Take(maxResults - grouped.Count)
                     .Select(item => new HsCodeKnowledgeSearchResult(
                         item.Item.NormalizedCode, item.Item.NormalizedCode, item.Item.Name, string.Empty, item.Item.Name,
-                        "Active", item.Score, 0, 0, [], item.Assessment.MatchReasons, item.Assessment.ConflictWarnings, true));
+                        "Active", item.Score, 0, 0, [], item.Assessment.MatchReasons, item.Assessment.ConflictWarnings,
+                        item.Item.SourceName ?? string.Empty, item.Item.EffectiveYear, item.Item.LastVerifiedAt, true));
                 grouped.AddRange(masterFallback);
             }
 
@@ -171,8 +175,8 @@ namespace ExportDocManager.Services.MasterData
             string fingerprint = BuildFingerprint(rawCode, name, input.Specification);
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             if (!string.IsNullOrWhiteSpace(currentCode) &&
-                !await context.HsCodes.AsNoTracking().AnyAsync(item => item.NormalizedCode == currentCode && item.Status == "Active", cancellationToken))
-                throw new InvalidOperationException("当前有效编码必须存在于本地年度税则且状态为有效。");
+                !await HasTrustedActiveCodeAsync(context, currentCode, cancellationToken))
+                throw new InvalidOperationException("当前有效编码必须来自已验证的本地年度税则，并包含来源、年度和验证时间。");
             var entity = input.Id > 0
                 ? await context.HsCodeDeclarationExamples.FirstOrDefaultAsync(item => item.Id == input.Id, cancellationToken)
                 : await context.HsCodeDeclarationExamples.FirstOrDefaultAsync(item => item.Fingerprint == fingerprint, cancellationToken);
@@ -207,6 +211,20 @@ namespace ExportDocManager.Services.MasterData
             return true;
         }
 
+        public async Task<int> DeleteExamplesAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default)
+        {
+            var normalizedIds = (ids ?? Array.Empty<int>()).Where(id => id > 0).Distinct().ToList();
+            if (normalizedIds.Count == 0) return 0;
+            await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var entities = await context.HsCodeDeclarationExamples
+                .Where(item => normalizedIds.Contains(item.Id))
+                .ToListAsync(cancellationToken);
+            if (entities.Count == 0) return 0;
+            context.HsCodeDeclarationExamples.RemoveRange(entities);
+            await context.SaveChangesAsync(cancellationToken);
+            return entities.Count;
+        }
+
         public async Task RecordFeedbackAsync(HsCodeKnowledgeFeedbackInput input, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(input);
@@ -215,8 +233,8 @@ namespace ExportDocManager.Services.MasterData
             string fingerprint = BuildFingerprint(NormalizeSearchText(input.QueryText), code, input.ProductName, input.Specification);
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             if (input.Accepted &&
-                !await context.HsCodes.AsNoTracking().AnyAsync(item => item.NormalizedCode == code && item.Status == "Active", cancellationToken))
-                throw new InvalidOperationException("确认适用前必须选择当前年度税则中的有效编码。");
+                !await HasTrustedActiveCodeAsync(context, code, cancellationToken))
+                throw new InvalidOperationException("确认适用前必须选择已验证年度税则中的当前有效编码。");
             var entity = await context.HsCodeSearchFeedback.FirstOrDefaultAsync(item => item.Fingerprint == fingerprint, cancellationToken);
             DateTime now = DateTime.UtcNow;
             if (entity == null)
@@ -388,34 +406,139 @@ namespace ExportDocManager.Services.MasterData
             return added;
         }
 
-        public async Task<IReadOnlyList<HsCodeRemoteCandidate>> ListRemoteCandidatesAsync(
-            string reviewStatus, int maxResults = 200, CancellationToken cancellationToken = default)
+        public async Task<HsCodeRemoteCandidatePage> ListRemoteCandidatesAsync(
+            string reviewStatus,
+            string keyword,
+            int pageNumber,
+            int pageSize,
+            CancellationToken cancellationToken = default)
         {
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             string status = string.IsNullOrWhiteSpace(reviewStatus) ? "Pending" : reviewStatus.Trim();
-            return await context.HsCodeRemoteCandidates.AsNoTracking().Where(item => item.ReviewStatus == status)
-                .OrderByDescending(item => item.LastSeenAt).Take(Math.Clamp(maxResults, 1, 1000)).ToListAsync(cancellationToken);
+            string filter = (keyword ?? string.Empty).Trim();
+            int page = Math.Max(pageNumber, 1);
+            int size = Math.Clamp(pageSize, 1, 200);
+            var query = context.HsCodeRemoteCandidates.AsNoTracking().Where(item => item.ReviewStatus == status);
+            if (!string.IsNullOrWhiteSpace(filter))
+            {
+                query = query.Where(item => item.RawReportedHsCode.Contains(filter) ||
+                    (item.SuggestedCurrentHsCode != null && item.SuggestedCurrentHsCode.Contains(filter)) ||
+                    item.ProductName.Contains(filter) ||
+                    (item.Specification != null && item.Specification.Contains(filter)) ||
+                    item.QueryText.Contains(filter));
+            }
+            int totalCount = await query.CountAsync(cancellationToken);
+            var items = await query.OrderByDescending(item => item.LastSeenAt)
+                .Skip((page - 1) * size)
+                .Take(size)
+                .ToListAsync(cancellationToken);
+            return new HsCodeRemoteCandidatePage(items, totalCount, page, size, status);
         }
 
         public async Task<bool> ReviewRemoteCandidateAsync(HsCodeRemoteCandidateReviewInput input, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(input);
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            return await ReviewRemoteCandidateInContextAsync(context, input, cancellationToken);
+        }
+
+        public async Task<int> ReviewRemoteCandidatesAsync(
+            IReadOnlyList<HsCodeRemoteCandidateReviewInput> inputs,
+            CancellationToken cancellationToken = default)
+        {
+            var normalized = (inputs ?? Array.Empty<HsCodeRemoteCandidateReviewInput>())
+                .Where(item => item != null && item.Id > 0)
+                .GroupBy(item => item.Id)
+                .Select(group => group.Last())
+                .Take(200)
+                .ToList();
+            if (normalized.Count == 0) return 0;
+            await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+            int reviewed = 0;
+            foreach (var input in normalized)
+                if (await ReviewRemoteCandidateInContextAsync(context, input, cancellationToken, saveChanges: false)) reviewed++;
+            await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return reviewed;
+        }
+
+        public async Task<int> ResetRemoteCandidatesAsync(
+            IReadOnlyCollection<int> ids,
+            CancellationToken cancellationToken = default)
+        {
+            var normalizedIds = (ids ?? Array.Empty<int>()).Where(id => id > 0).Distinct().Take(500).ToList();
+            if (normalizedIds.Count == 0) return 0;
+            await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var candidates = await context.HsCodeRemoteCandidates
+                .Where(item => normalizedIds.Contains(item.Id) && item.ReviewStatus != "Pending")
+                .ToListAsync(cancellationToken);
+            foreach (var candidate in candidates)
+            {
+                if (candidate.ReviewStatus == "Confirmed")
+                {
+                    string fingerprint = BuildFingerprint(candidate.RawReportedHsCode, candidate.ProductName, candidate.Specification);
+                    var learnedExample = await context.HsCodeDeclarationExamples.FirstOrDefaultAsync(
+                        item => item.Fingerprint == fingerprint && item.Source.StartsWith("RemoteConfirmed:"),
+                        cancellationToken);
+                    if (learnedExample != null) context.HsCodeDeclarationExamples.Remove(learnedExample);
+                }
+                candidate.ReviewStatus = "Pending";
+                candidate.ReviewedAt = null;
+            }
+            await context.SaveChangesAsync(cancellationToken);
+            return candidates.Count;
+        }
+
+        private static async Task<bool> ReviewRemoteCandidateInContextAsync(
+            AppDbContext context,
+            HsCodeRemoteCandidateReviewInput input,
+            CancellationToken cancellationToken,
+            bool saveChanges = true)
+        {
             var candidate = await context.HsCodeRemoteCandidates.FirstOrDefaultAsync(item => item.Id == input.Id, cancellationToken);
-            if (candidate == null) return false;
+            if (candidate == null || candidate.ReviewStatus != "Pending") return false;
             DateTime now = DateTime.UtcNow;
             if (!input.Confirmed)
             {
-                candidate.ReviewStatus = "Ignored"; candidate.ReviewedAt = now;
-                await context.SaveChangesAsync(cancellationToken); return true;
+                candidate.ReviewStatus = "Ignored";
+                candidate.ReviewedAt = now;
+                if (saveChanges) await context.SaveChangesAsync(cancellationToken);
+                return true;
             }
+
             string currentCode = HsCodeTextHelper.NormalizeCode(input.CurrentCode);
-            bool active = await context.HsCodes.AsNoTracking().AnyAsync(item => item.NormalizedCode == currentCode && item.Status == "Active", cancellationToken);
-            if (!active) throw new InvalidOperationException("确认前必须选择当前税则中有效的HS编码。");
-            await UpsertExampleInContextAsync(context, new HsCodeExampleInput(0, candidate.RawReportedHsCode, currentCode,
-                candidate.ProductName, candidate.Specification, $"RemoteConfirmed:{candidate.Source}", null, "ManuallyVerified", true), now, cancellationToken);
-            candidate.SuggestedCurrentHsCode = currentCode; candidate.ReviewStatus = "Confirmed"; candidate.ReviewedAt = now;
-            await context.SaveChangesAsync(cancellationToken); return true;
+            if (!await HasTrustedActiveCodeAsync(context, currentCode, cancellationToken))
+                throw new InvalidOperationException("确认前必须选择已验证年度税则中的当前有效 HS 编码。");
+            await UpsertExampleInContextAsync(context, new HsCodeExampleInput(
+                0,
+                candidate.RawReportedHsCode,
+                currentCode,
+                candidate.ProductName,
+                candidate.Specification,
+                $"RemoteConfirmed:{candidate.Source}",
+                null,
+                "ManuallyVerified",
+                true), now, cancellationToken);
+            candidate.SuggestedCurrentHsCode = currentCode;
+            candidate.ReviewStatus = "Confirmed";
+            candidate.ReviewedAt = now;
+            if (saveChanges) await context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        private static Task<bool> HasTrustedActiveCodeAsync(
+            AppDbContext context,
+            string normalizedCode,
+            CancellationToken cancellationToken)
+        {
+            return context.HsCodes.AsNoTracking().AnyAsync(item =>
+                item.NormalizedCode == normalizedCode &&
+                item.Status == HsCodeValidityPolicy.ActiveStatus &&
+                item.SourceName != null && item.SourceName != "" &&
+                item.EffectiveYear >= 2000 && item.EffectiveYear <= 2100 &&
+                item.LastVerifiedAt != null,
+                cancellationToken);
         }
 
         public async Task RefreshReplacementRelationsAsync(HsCodeImportPreview preview, CancellationToken cancellationToken = default)
@@ -570,19 +693,19 @@ namespace ExportDocManager.Services.MasterData
             IReadOnlyList<HsCodeReplacementRelation> relations)
         {
             string resolved = HsCodeTextHelper.NormalizeCode(example.ResolvedCurrentHsCode);
-            if (!string.IsNullOrWhiteSpace(resolved) && codes.TryGetValue(resolved, out var resolvedCode) && string.Equals(resolvedCode.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(resolved) && codes.TryGetValue(resolved, out var resolvedCode) && HsCodeValidityPolicy.IsTrustedActive(resolvedCode))
                 return new CurrentCodeResolution(resolved, example.IsManuallyVerified ? "ManuallyVerified" : "SuggestedReplacement", [], example.IsManuallyVerified);
             string raw = HsCodeTextHelper.NormalizeCode(example.RawReportedHsCode);
-            if (codes.TryGetValue(raw, out var rawCode) && string.Equals(rawCode.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            if (codes.TryGetValue(raw, out var rawCode) && HsCodeValidityPolicy.IsTrustedActive(rawCode))
                 return new CurrentCodeResolution(raw, "Active", [], true);
             var replacements = relations.Where(item => item.OldCode == raw)
                 .OrderByDescending(item => item.IsManuallyVerified).ThenByDescending(item => item.Confidence)
                 .Select(item => item.NewCode).Distinct(StringComparer.OrdinalIgnoreCase)
-                .Where(code => codes.TryGetValue(code, out var candidate) && string.Equals(candidate.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                .Where(code => codes.TryGetValue(code, out var candidate) && HsCodeValidityPolicy.IsTrustedActive(candidate))
                 .ToList();
             var verifiedReplacements = relations.Where(item => item.OldCode == raw && item.IsManuallyVerified)
                 .Select(item => item.NewCode).Distinct(StringComparer.OrdinalIgnoreCase)
-                .Where(code => codes.TryGetValue(code, out var candidate) && string.Equals(candidate.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                .Where(code => codes.TryGetValue(code, out var candidate) && HsCodeValidityPolicy.IsTrustedActive(candidate))
                 .ToList();
             if (verifiedReplacements.Count == 1) return new CurrentCodeResolution(verifiedReplacements[0], "ObsoleteMapped", verifiedReplacements, true);
             if (replacements.Count == 1) return new CurrentCodeResolution(replacements[0], "SuggestedReplacement", replacements, false);
@@ -602,7 +725,7 @@ namespace ExportDocManager.Services.MasterData
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var candidates = codes.Values
-                .Where(item => string.Equals(item.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                .Where(HsCodeValidityPolicy.IsTrustedActive)
                 .Where(item => matching.Any(recommended =>
                     string.Equals(item.NormalizedCode, recommended, StringComparison.OrdinalIgnoreCase) ||
                     item.NormalizedCode.StartsWith(recommended, StringComparison.OrdinalIgnoreCase)))
@@ -747,6 +870,9 @@ namespace ExportDocManager.Services.MasterData
         {
             if (codes.Count > 500_000 || examples.Count > 1_000_000 || replacements.Count > 1_000_000 || feedback.Count > 1_000_000)
                 throw new InvalidDataException("HS知识库记录数量超过安全限制。");
+            if (codes.Any(item => string.Equals(item.Status, HsCodeValidityPolicy.ActiveStatus, StringComparison.OrdinalIgnoreCase) &&
+                                  !HsCodeValidityPolicy.IsTrustedActive(item)))
+                throw new InvalidDataException("HS知识库包含缺少来源、适用年度或验证时间的有效编码。");
             if (examples.Any(item => string.IsNullOrWhiteSpace(HsCodeTextHelper.NormalizeCode(item.RawReportedHsCode)) ||
                                      string.IsNullOrWhiteSpace(item.ProductName) || item.ProductName.Length > 300 ||
                                      (item.Specification?.Length ?? 0) > 1500))
@@ -819,7 +945,7 @@ namespace ExportDocManager.Services.MasterData
             target.ValueAddedTaxRate = Prefer(source.ValueAddedTaxRate, target.ValueAddedTaxRate); target.Notes = Prefer(source.Notes, target.Notes);
             target.SourceName = Prefer(source.SourceName, target.SourceName); target.EffectiveYear = Max(source.EffectiveYear, target.EffectiveYear);
             target.LastVerifiedAt = Max(source.LastVerifiedAt, target.LastVerifiedAt); target.UpdateTime = Max(source.UpdateTime, target.UpdateTime);
-            if (string.Equals(source.Status, "Active", StringComparison.OrdinalIgnoreCase)) target.Status = "Active";
+            if (HsCodeValidityPolicy.IsTrustedActive(source)) target.Status = "Active";
         }
 
         private static void MergeExample(HsCodeDeclarationExample source, HsCodeDeclarationExample target)
