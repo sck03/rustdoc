@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using ClosedXML.Excel;
 using ExportDocManager.Api.Hosting;
+using ExportDocManager.Services.Security;
 
 namespace ExportDocManager.Api.Tests
 {
@@ -251,6 +252,43 @@ namespace ExportDocManager.Api.Tests
                 CreateHsCode("4821100000", "纸标签"));
             Assert.Equal(HttpStatusCode.Created, thirdResponse.StatusCode);
             var third = await ApiIntegrationTestHarness.ReadJsonAsync<ApiHsCodeDto>(thirdResponse);
+
+            var templateResponse = await adminClient.PostAsJsonAsync(
+                "/api/permission-templates",
+                new
+                {
+                    code = "HsOperateOnlyBatchDelete",
+                    name = "HS操作员",
+                    description = "可维护但不可批量删除HS编码",
+                    isActive = true,
+                    modules = new[]
+                    {
+                        new { moduleKey = PermissionModuleCatalog.DocumentMasterData, accessLevel = PermissionAccessLevel.Operate }
+                    }
+                });
+            Assert.Equal(HttpStatusCode.OK, templateResponse.StatusCode);
+            var template = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPermissionTemplateDto>(templateResponse);
+            var userResponse = await adminClient.PostAsJsonAsync(
+                "/api/users",
+                new
+                {
+                    username = "hs-operate-only",
+                    fullName = "HS操作员",
+                    role = UserRoleCatalog.User,
+                    permissionTemplateId = template.Id,
+                    departmentId = string.Empty,
+                    companyScope = string.Empty,
+                    isActive = true,
+                    resetPassword = "hs-operate-pass"
+                });
+            Assert.Equal(HttpStatusCode.OK, userResponse.StatusCode);
+            var operatorLogin = await harness.LoginAsync(anonymousClient, "hs-operate-only", "hs-operate-pass");
+            using var operatorClient = harness.CreateClient(operatorLogin.AccessToken);
+
+            var forbiddenBatchDeleteResponse = await operatorClient.PostAsJsonAsync(
+                "/api/master-data/hs-codes/delete-batch",
+                new ApiHsCodeBatchDeleteRequest(new[] { third.Id }));
+            Assert.Equal(HttpStatusCode.Forbidden, forbiddenBatchDeleteResponse.StatusCode);
 
             var invalidDeleteResponse = await adminClient.PostAsJsonAsync(
                 "/api/master-data/hs-codes/delete-batch",

@@ -585,14 +585,24 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/master-data/hs-codes/delete-batch", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
+                ApiAuthorizationService authorizationService,
                 IHsCodeService hsCodeService,
                 IHsCodeReadRepository repository,
                 ApiHsCodeBatchDeleteRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                if (user == null)
                 {
                     return Results.Unauthorized();
+                }
+
+                if (!authorizationService.CanUseModule(
+                        user,
+                        PermissionModuleCatalog.DocumentMasterData,
+                        PermissionAccessLevel.Manage))
+                {
+                    return WriteForbidden("只有管理权限可以批量删除HS编码。");
                 }
 
                 var ids = request?.Ids?
