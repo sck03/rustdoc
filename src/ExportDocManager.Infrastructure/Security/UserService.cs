@@ -299,6 +299,31 @@ namespace ExportDocManager.Services.Security
                     .AnyAsync(payment => payment.OwnerUserId == user.Id, cancellationToken);
             }
 
+            if (!hasBusinessData)
+            {
+                hasBusinessData = await context.CrmCustomers
+                    .AsNoTracking()
+                    .AnyAsync(item => item.OwnerUserId == user.Id, cancellationToken) ||
+                    await context.CrmFollowUps
+                        .AsNoTracking()
+                        .AnyAsync(item => item.OwnerUserId == user.Id, cancellationToken) ||
+                    await context.SupplierCompanies
+                        .AsNoTracking()
+                        .AnyAsync(item => item.OwnerUserId == user.Id, cancellationToken) ||
+                    await context.SalesOpportunities
+                        .AsNoTracking()
+                        .AnyAsync(item => item.OwnerUserId == user.Id, cancellationToken) ||
+                    await context.EmailTemplates
+                        .AsNoTracking()
+                        .AnyAsync(item => item.OwnerUserId == user.Id, cancellationToken) ||
+                    await context.UserReportTemplates
+                        .AsNoTracking()
+                        .AnyAsync(item => item.OwnerUserId == user.Id, cancellationToken) ||
+                    await context.ContainerProjects
+                        .AsNoTracking()
+                        .AnyAsync(item => item.OwnerUserId == user.Id, cancellationToken);
+            }
+
             if (hasBusinessData)
             {
                 throw new InvalidOperationException("该用户已有业务数据归属，请停用账号而不是删除。");

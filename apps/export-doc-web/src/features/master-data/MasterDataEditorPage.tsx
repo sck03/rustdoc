@@ -55,14 +55,14 @@ export function MasterDataEditorPage({
   client,
   config,
   mode,
-  canOperate = true,
-  canManage = true,
+  canOperate,
+  canManage,
 }: {
   client: ExportDocManagerApiClient;
   config: MasterDataEntityConfig;
   mode: "new" | "edit";
-  canOperate?: boolean;
-  canManage?: boolean;
+  canOperate: boolean;
+  canManage: boolean;
 }) {
   const { recordKey } = useParams();
   const navigate = useNavigate();

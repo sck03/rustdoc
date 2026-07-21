@@ -20,12 +20,12 @@ const invoicePageSize = 50;
 
 export function ExcelToolsPanel({
   client,
-  canOperate = true,
-  canReadInvoices = true,
+  canOperate,
+  canReadInvoices,
 }: {
   client: ExportDocManagerApiClient;
-  canOperate?: boolean;
-  canReadInvoices?: boolean;
+  canOperate: boolean;
+  canReadInvoices: boolean;
 }) {
   const queryClient = useQueryClient();
   const desktopAvailable = isDesktopBridgeAvailable();

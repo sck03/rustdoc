@@ -6,23 +6,27 @@ using ExportDocManager.Models;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Security;
 
 namespace ExportDocManager.Services.Tools
 {
     public class ContainerLoadingService : IContainerLoadingService
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
+        private readonly BusinessDataAccessScope _accessScope;
 
-        public ContainerLoadingService(IDbContextFactory<AppDbContext> contextFactory)
+        public ContainerLoadingService(
+            IDbContextFactory<AppDbContext> contextFactory,
+            BusinessDataAccessScope accessScope)
         {
-            _contextFactory = contextFactory;
+            _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+            _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
         }
 
         public async Task<List<ContainerProject>> GetAllProjectsAsync()
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.ContainerProjects
-                .AsNoTracking()
+            return await _accessScope.ApplyContainerProjectScope(context.ContainerProjects.AsNoTracking())
                 .OrderByDescending(p => p.UpdatedAt)
                 .ToListAsync();
         }
@@ -30,14 +34,21 @@ namespace ExportDocManager.Services.Tools
         public async Task<ContainerProject> GetProjectAsync(int projectId)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.ContainerProjects
-                .AsNoTracking()
+            return await _accessScope.ApplyContainerProjectScope(context.ContainerProjects.AsNoTracking())
                 .SingleOrDefaultAsync(project => project.Id == projectId);
         }
 
         public async Task<List<ContainerProjectItem>> GetProjectItemsAsync(int projectId)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
+            bool canAccessProject = await _accessScope
+                .ApplyContainerProjectScope(context.ContainerProjects.AsNoTracking())
+                .AnyAsync(project => project.Id == projectId);
+            if (!canAccessProject)
+            {
+                return new List<ContainerProjectItem>();
+            }
+
             return await context.ContainerProjectItems
                 .AsNoTracking()
                 .Where(i => i.ProjectId == projectId)
@@ -76,8 +87,10 @@ namespace ExportDocManager.Services.Tools
                     {
                         targetProject = new ContainerProject
                         {
-                            CreatedAt = now
+                            CreatedAt = now,
+                            VersionNumber = 1
                         };
+                        _accessScope.ApplyOwner(targetProject);
                         ApplyProjectValues(targetProject, project, now);
 
                         context.ContainerProjects.Add(targetProject);
@@ -85,9 +98,22 @@ namespace ExportDocManager.Services.Tools
                     }
                     else
                     {
-                        targetProject = await context.ContainerProjects
+                        targetProject = await _accessScope.ApplyContainerProjectScope(context.ContainerProjects)
                             .SingleOrDefaultAsync(existingProject => existingProject.Id == project.Id)
-                            ?? throw new InvalidOperationException("要保存的装柜方案不存在，可能已被删除。");
+                            ?? throw new InvalidOperationException("要保存的装柜方案不存在，可能已被删除或不属于当前账号。");
+
+                        if (project.VersionNumber <= 0)
+                        {
+                            throw new InvalidOperationException("装柜方案缺少并发版本，请重新加载后再保存。");
+                        }
+
+                        if (targetProject.VersionNumber != project.VersionNumber)
+                        {
+                            throw new BusinessConcurrencyException("装柜方案已被其他会话修改，请重新加载后再保存。");
+                        }
+
+                        context.Entry(targetProject).Property(item => item.VersionNumber).OriginalValue = project.VersionNumber;
+                        targetProject.VersionNumber++;
 
                         ApplyProjectValues(targetProject, project, now);
 
@@ -102,7 +128,14 @@ namespace ExportDocManager.Services.Tools
                         context.ContainerProjectItems.Add(item);
                     }
 
-                    await context.SaveChangesAsync();
+                    try
+                    {
+                        await context.SaveChangesAsync();
+                    }
+                    catch (DbUpdateConcurrencyException ex)
+                    {
+                        throw new BusinessConcurrencyException("装柜方案已被其他会话修改，请重新加载后再保存。", ex);
+                    }
                     return targetProject;
                 });
 
@@ -112,7 +145,8 @@ namespace ExportDocManager.Services.Tools
         public async Task DeleteProjectAsync(int projectId)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            var project = await context.ContainerProjects.FindAsync(projectId);
+            var project = await _accessScope.ApplyContainerProjectScope(context.ContainerProjects)
+                .SingleOrDefaultAsync(item => item.Id == projectId);
             if (project != null)
             {
                 context.ContainerProjects.Remove(project);
@@ -272,6 +306,10 @@ namespace ExportDocManager.Services.Tools
             target.RequireSameFootprintStacking = source.RequireSameFootprintStacking;
             target.CreatedAt = source.CreatedAt;
             target.UpdatedAt = source.UpdatedAt;
+            target.OwnerUserId = source.OwnerUserId;
+            target.DepartmentId = source.DepartmentId;
+            target.CompanyScope = source.CompanyScope;
+            target.VersionNumber = source.VersionNumber;
         }
 
         private static string NormalizeProjectName(string projectName)

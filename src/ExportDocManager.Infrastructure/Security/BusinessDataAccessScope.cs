@@ -172,6 +172,17 @@ namespace ExportDocManager.Services.Security
             return userId > 0 ? query.Where(item => item.OwnerUserId == userId) : query.Where(_ => false);
         }
 
+        public IQueryable<ContainerProject> ApplyContainerProjectScope(
+            IQueryable<ContainerProject> query,
+            User user = null)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            user ??= _currentUserContext?.CurrentUser;
+            if (!ShouldFilterBusinessData(user)) return query;
+            int userId = user?.Id ?? 0;
+            return userId > 0 ? query.Where(item => item.OwnerUserId == userId) : query.Where(_ => false);
+        }
+
         public IQueryable<SwSubmissionBatch> ApplySubmissionBatchScope(
             IQueryable<SwSubmissionBatch> query,
             AppDbContext context,
@@ -340,6 +351,16 @@ namespace ExportDocManager.Services.Security
             opportunity.OwnerUserId = user.Id;
             opportunity.DepartmentId = NormalizeScope(user.DepartmentId);
             opportunity.CompanyScope = NormalizeScope(user.CompanyScope);
+        }
+
+        public void ApplyOwner(ContainerProject project, User user = null)
+        {
+            ArgumentNullException.ThrowIfNull(project);
+            user ??= _currentUserContext?.CurrentUser;
+            if (user == null || user.Id <= 0 || project.OwnerUserId.HasValue) return;
+            project.OwnerUserId = user.Id;
+            project.DepartmentId = NormalizeScope(user.DepartmentId);
+            project.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
         private static string NormalizeScope(string value)

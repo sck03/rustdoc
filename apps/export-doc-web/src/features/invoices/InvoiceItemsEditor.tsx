@@ -148,8 +148,8 @@ export function InvoiceItemsEditor({
   client,
   items,
   canRedoItemEdit,
-  canSaveToProductLibrary = true,
-  canUseHsKnowledge = true,
+  canSaveToProductLibrary,
+  canUseHsKnowledge,
   canUndoItemEdit,
   blankRowCount = 0,
   currency,
@@ -179,8 +179,8 @@ export function InvoiceItemsEditor({
   client: ExportDocManagerApiClient;
   items: ApiInvoiceItemDto[];
   canRedoItemEdit: boolean;
-  canSaveToProductLibrary?: boolean;
-  canUseHsKnowledge?: boolean;
+  canSaveToProductLibrary: boolean;
+  canUseHsKnowledge: boolean;
   canUndoItemEdit: boolean;
   blankRowCount?: number;
   currency: string;

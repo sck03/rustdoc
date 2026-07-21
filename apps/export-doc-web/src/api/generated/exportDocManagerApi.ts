@@ -261,6 +261,7 @@ export interface ApiContainerPackingProjectDto {
   name: string;
   rules: ApiContainerPackingRulesDto;
   updatedAt: string;
+  versionNumber: number;
 }
 
 export interface ApiContainerPackingProjectListResponse {
@@ -277,6 +278,7 @@ export interface ApiContainerPackingProjectSaveRequest {
   cargoItems: ApiContainerPackingCargoInputDto[];
   container: ApiContainerDimensionsDto;
   containerType: string;
+  expectedVersion: number;
   id: number;
   name: string;
   rules: ApiContainerPackingRulesDto;
@@ -296,6 +298,7 @@ export interface ApiContainerPackingProjectSummaryDto {
   id: number;
   name: string;
   updatedAt: string;
+  versionNumber: number;
 }
 
 export interface ApiContainerPackingRulesDto {

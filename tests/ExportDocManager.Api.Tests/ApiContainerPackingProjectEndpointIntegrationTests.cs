@@ -85,6 +85,7 @@ namespace ExportDocManager.Api.Tests
                 customType.ContainerType.Width,
                 customType.ContainerType.Height);
             updateRequest.Id = createdProject.Id;
+            updateRequest.ExpectedVersion = createdProject.Project.VersionNumber;
             updateRequest.CargoItems[0].Quantity = 3;
 
             var updateProjectResponse = await adminClient.PostAsJsonAsync("/api/tools/container-packing/projects", updateRequest);

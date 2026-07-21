@@ -53,6 +53,7 @@ namespace ExportDocManager.Services.Infrastructure
                 }
                 await EnsureInvoiceTypeSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 await EnsureUserReportTemplateSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
+                await EnsureContainerProjectOwnershipSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 await EnsureHsCodeMetadataSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 await EnsureHsCodeKnowledgeSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 DbSeeder.SeedAuxiliaryData(
@@ -132,6 +133,35 @@ namespace ExportDocManager.Services.Infrastructure
 
         private const string DefaultInvoiceType = "实际数据";
         private const string InvoiceNoTypeIndexName = "IX_Invoices_InvoiceNo_Type";
+
+        private static async Task EnsureContainerProjectOwnershipSchemaAsync(
+            AppDbContext context,
+            bool usesPostgreSql)
+        {
+            if (!context.Database.IsRelational()) return;
+
+            if (usesPostgreSql)
+            {
+                await context.Database.ExecuteSqlRawAsync(
+                    """
+                    ALTER TABLE "ContainerProjects" ADD COLUMN IF NOT EXISTS "OwnerUserId" integer NULL;
+                    ALTER TABLE "ContainerProjects" ADD COLUMN IF NOT EXISTS "DepartmentId" character varying(50) NOT NULL DEFAULT '';
+                    ALTER TABLE "ContainerProjects" ADD COLUMN IF NOT EXISTS "CompanyScope" character varying(50) NOT NULL DEFAULT '';
+                    ALTER TABLE "ContainerProjects" ADD COLUMN IF NOT EXISTS "VersionNumber" integer NOT NULL DEFAULT 1;
+                    CREATE INDEX IF NOT EXISTS "IX_ContainerProjects_OwnerUserId_UpdatedAt"
+                        ON "ContainerProjects" ("OwnerUserId", "UpdatedAt");
+                    """).ConfigureAwait(false);
+                return;
+            }
+
+            await AddSqliteColumnIfMissingAsync(context, "ContainerProjects", "OwnerUserId", "INTEGER NULL").ConfigureAwait(false);
+            await AddSqliteColumnIfMissingAsync(context, "ContainerProjects", "DepartmentId", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+            await AddSqliteColumnIfMissingAsync(context, "ContainerProjects", "CompanyScope", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+            await AddSqliteColumnIfMissingAsync(context, "ContainerProjects", "VersionNumber", "INTEGER NOT NULL DEFAULT 1").ConfigureAwait(false);
+            await context.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS \"IX_ContainerProjects_OwnerUserId_UpdatedAt\" ON \"ContainerProjects\" (\"OwnerUserId\", \"UpdatedAt\")")
+                .ConfigureAwait(false);
+        }
 
         private static async Task EnsureHsCodeMetadataSchemaAsync(AppDbContext context, bool usesPostgreSql)
         {

@@ -30,13 +30,13 @@ import { masterDataConfigs } from "./masterDataConfigs.ts";
 export function MasterDataListPage({
   client,
   config,
-  canOperate = true,
-  canManage = true,
+  canOperate,
+  canManage,
 }: {
   client: ExportDocManagerApiClient;
   config: MasterDataEntityConfig;
-  canOperate?: boolean;
-  canManage?: boolean;
+  canOperate: boolean;
+  canManage: boolean;
 }) {
   const listViewStateStorageKey = useMemo(() => buildMasterDataListViewStateStorageKey(config.key), [config.key]);
   const [initialListViewState] = useState(() => loadListViewState(listViewStateStorageKey));

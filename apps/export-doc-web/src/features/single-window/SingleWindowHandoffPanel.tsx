@@ -20,10 +20,10 @@ type SingleWindowHandoffPanelProps = {
   businessType: "CustomsCoo" | "AgentConsignment";
   client: ExportDocManagerApiClient;
   invoiceId: number;
-  canOperate?: boolean;
+  canOperate: boolean;
 };
 
-export function SingleWindowHandoffPanel({ businessType, client, invoiceId, canOperate = true }: SingleWindowHandoffPanelProps) {
+export function SingleWindowHandoffPanel({ businessType, client, invoiceId, canOperate }: SingleWindowHandoffPanelProps) {
   const queryClient = useQueryClient();
   const [importRootPath, setImportRootPath] = useState("");
   const [receiptRootPath, setReceiptRootPath] = useState("");

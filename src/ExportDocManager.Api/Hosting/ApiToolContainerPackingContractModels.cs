@@ -125,6 +125,8 @@ namespace ExportDocManager.Api.Hosting
     {
         public int Id { get; set; }
 
+        public int ExpectedVersion { get; set; }
+
         public string Name { get; set; } = string.Empty;
 
         public string ContainerType { get; set; } = string.Empty;
@@ -166,6 +168,8 @@ namespace ExportDocManager.Api.Hosting
     public class ApiContainerPackingProjectSummaryDto
     {
         public int Id { get; set; }
+
+        public int VersionNumber { get; set; }
 
         public string Name { get; set; } = string.Empty;
 

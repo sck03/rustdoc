@@ -53,15 +53,16 @@ import { ContainerPackingWorkspace } from "./ContainerPackingWorkspace.tsx";
 
 export function ContainerPackingPanel({
   client,
-  canOperate = true,
-  canManage = true,
+  canOperate,
+  canManage,
 }: {
   client: ExportDocManagerApiClient;
-  canOperate?: boolean;
-  canManage?: boolean;
+  canOperate: boolean;
+  canManage: boolean;
 }) {
   const queryClient = useQueryClient();
   const [currentProjectId, setCurrentProjectId] = useState(0);
+  const [currentProjectVersion, setCurrentProjectVersion] = useState(0);
   const [projectName, setProjectName] = useState("未命名方案");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [container, setContainer] = useState<ContainerPackingFormState>({
@@ -259,6 +260,7 @@ export function ContainerPackingPanel({
       client.saveContainerPackingProject({
         body: buildContainerPackingProjectSaveRequest(
           currentProjectId,
+          currentProjectVersion,
           projectName,
           container,
           cargoRows,
@@ -267,6 +269,7 @@ export function ContainerPackingPanel({
       }),
     onSuccess: (nextResponse) => {
       setCurrentProjectId(nextResponse.id);
+      setCurrentProjectVersion(nextResponse.project.versionNumber);
       setSelectedProjectId(String(nextResponse.id));
       setProjectName(nextResponse.project.name || "未命名方案");
       setMessage(nextResponse.message || "装柜方案已保存。");
@@ -297,6 +300,7 @@ export function ContainerPackingPanel({
     onSuccess: (_, deletedProjectId) => {
       if (currentProjectId === deletedProjectId) {
         setCurrentProjectId(0);
+        setCurrentProjectVersion(0);
         setProjectName("未命名方案");
       }
 
@@ -557,6 +561,7 @@ export function ContainerPackingPanel({
 
   function applyProjectToForm(project: ApiContainerPackingProjectDto) {
     setCurrentProjectId(project.id);
+    setCurrentProjectVersion(project.versionNumber);
     setProjectName(project.name || "未命名方案");
     setSelectedProjectId(String(project.id));
     setContainer({

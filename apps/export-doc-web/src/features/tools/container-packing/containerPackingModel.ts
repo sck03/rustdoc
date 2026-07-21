@@ -294,6 +294,8 @@ export function buildContainerPackingAnalyzeRequest(
 export function buildContainerPackingProjectSaveRequest(
   projectId: number,
 
+  expectedVersion: number,
+
   projectName: string,
 
   container: ContainerPackingFormState,
@@ -310,6 +312,8 @@ export function buildContainerPackingProjectSaveRequest(
 
   return {
     id: Math.max(projectId, 0),
+
+    expectedVersion: Math.max(expectedVersion, 0),
 
     name: projectName.trim(),
 

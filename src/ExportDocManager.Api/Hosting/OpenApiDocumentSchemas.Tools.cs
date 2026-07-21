@@ -410,10 +410,11 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiContainerPackingProjectSaveRequest"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "name", "containerType", "container", "rules", "cargoItems" },
+                            required = new[] { "id", "expectedVersion", "name", "containerType", "container", "rules", "cargoItems" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32", description = "Existing project id. Zero creates a new project." },
+                                ["expectedVersion"] = new { type = "integer", format = "int32", description = "Current project version. Zero is valid only for a new project." },
                                 ["name"] = StringProperty("Project name."),
                                 ["containerType"] = StringProperty("Container type display name, such as 20GP or 40HQ."),
                                 ["container"] = RefSchema("ApiContainerDimensionsDto"),
@@ -437,10 +438,11 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiContainerPackingProjectSummaryDto"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "name", "containerType", "createdAt", "updatedAt" },
+                            required = new[] { "id", "versionNumber", "name", "containerType", "createdAt", "updatedAt" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" },
+                                ["versionNumber"] = new { type = "integer", format = "int32" },
                                 ["name"] = StringProperty("Project name."),
                                 ["containerType"] = StringProperty("Container type display name."),
                                 ["createdAt"] = new { type = "string", format = "date-time" },
@@ -453,6 +455,7 @@ namespace ExportDocManager.Api.Hosting
                             required = new[]
                             {
                                 "id",
+                                "versionNumber",
                                 "name",
                                 "containerType",
                                 "createdAt",
@@ -464,6 +467,7 @@ namespace ExportDocManager.Api.Hosting
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" },
+                                ["versionNumber"] = new { type = "integer", format = "int32" },
                                 ["name"] = StringProperty("Project name."),
                                 ["containerType"] = StringProperty("Container type display name."),
                                 ["createdAt"] = new { type = "string", format = "date-time" },

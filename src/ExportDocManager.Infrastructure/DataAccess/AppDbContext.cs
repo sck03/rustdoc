@@ -268,6 +268,8 @@ namespace ExportDocManager.DataAccess
             paymentEntity.Property(p => p.OtherExpense).HasColumnType("decimal(18, 2)");
 
             modelBuilder.Entity<ContainerProject>()
+                .HasIndex(cp => new { cp.OwnerUserId, cp.UpdatedAt });
+            modelBuilder.Entity<ContainerProject>()
                 .HasIndex(cp => cp.Name);
             modelBuilder.Entity<ContainerProject>()
                 .HasIndex(cp => cp.CreatedAt);
@@ -279,6 +281,7 @@ namespace ExportDocManager.DataAccess
                 .OnDelete(DeleteBehavior.Cascade);
 
             var containerProjectEntity = modelBuilder.Entity<ContainerProject>();
+            containerProjectEntity.Property(project => project.VersionNumber).IsConcurrencyToken();
             containerProjectEntity.Property(project => project.ContainerMaxVolume).HasColumnType("decimal(18, 3)");
             containerProjectEntity.Property(project => project.ContainerMaxWeight).HasColumnType("decimal(18, 2)");
             containerProjectEntity.Property(project => project.DefaultPalletWeight).HasColumnType("decimal(18, 2)");

@@ -7,7 +7,7 @@ namespace ExportDocManager.Api.Hosting
     public static class ApiContainerPackingProjectDtoFactory
     {
         public const string StoragePolicy =
-            "装柜项目/柜型保存仅写入运行目录数据根下的业务数据库表 ContainerProjects、ContainerProjectItems、ContainerTypeDefinitions；不会读写发票、报关单据、付款或报销数据，也不会默认写入系统盘或系统用户数据目录。";
+            "装柜项目/柜型保存仅写入运行目录数据根下的业务数据库表 ContainerProjects、ContainerProjectItems、ContainerTypeDefinitions；PostgreSQL 多人模式下装柜方案按账号隔离并使用版本号防止并发覆盖，柜型仍作为共享参考资料；不会读写发票、报关单据、付款或报销数据，也不会默认写入系统盘或系统用户数据目录。";
 
         public static ApiContainerPackingProjectSummaryDto FromProjectSummary(ContainerProject project)
         {
@@ -16,6 +16,7 @@ namespace ExportDocManager.Api.Hosting
             return new ApiContainerPackingProjectSummaryDto
             {
                 Id = project.Id,
+                VersionNumber = project.VersionNumber,
                 Name = project.Name ?? string.Empty,
                 ContainerType = project.ContainerType ?? string.Empty,
                 CreatedAt = project.CreatedAt,
@@ -32,6 +33,7 @@ namespace ExportDocManager.Api.Hosting
             return new ApiContainerPackingProjectDto
             {
                 Id = project.Id,
+                VersionNumber = project.VersionNumber,
                 Name = project.Name ?? string.Empty,
                 ContainerType = project.ContainerType ?? string.Empty,
                 CreatedAt = project.CreatedAt,
@@ -73,6 +75,7 @@ namespace ExportDocManager.Api.Hosting
             return new ContainerProject
             {
                 Id = Math.Max(request.Id, 0),
+                VersionNumber = Math.Max(request.ExpectedVersion, 0),
                 Name = NormalizeName(request.Name, "未命名方案"),
                 ContainerType = NormalizeName(request.ContainerType, string.Empty),
                 ContainerLength = Math.Max(container.Length, 0),
