@@ -39,7 +39,8 @@ namespace ExportDocManager.Api.Hosting
                 product.PackageUnitCN ?? string.Empty,
                 product.DefaultPrice,
                 product.CreatedAt,
-                product.UpdatedAt);
+                product.UpdatedAt,
+                RowVersionToString(product.RowVersion));
         }
 
         public static Product ToProductForSave(ApiProductDto dto)
@@ -73,7 +74,8 @@ namespace ExportDocManager.Api.Hosting
                 PackageUnitCN = dto.PackageUnitCN ?? string.Empty,
                 DefaultPrice = dto.DefaultPrice,
                 CreatedAt = dto.CreatedAt,
-                UpdatedAt = dto.UpdatedAt
+                UpdatedAt = dto.UpdatedAt,
+                RowVersion = RowVersionFromString(dto.RowVersion)
             };
         }
     }

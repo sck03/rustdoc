@@ -22,7 +22,8 @@ namespace ExportDocManager.Api.Hosting
                 payee.USDAccount ?? string.Empty,
                 payee.ContactPerson ?? string.Empty,
                 payee.Phone ?? string.Empty,
-                payee.Notes ?? string.Empty);
+                payee.Notes ?? string.Empty,
+                RowVersionToString(payee.RowVersion));
         }
 
         public static Payee ToPayeeForSave(ApiPayeeDto dto)
@@ -39,7 +40,8 @@ namespace ExportDocManager.Api.Hosting
                 USDAccount = dto.USDAccount ?? string.Empty,
                 ContactPerson = dto.ContactPerson ?? string.Empty,
                 Phone = dto.Phone ?? string.Empty,
-                Notes = dto.Notes ?? string.Empty
+                Notes = dto.Notes ?? string.Empty,
+                RowVersion = RowVersionFromString(dto.RowVersion)
             };
         }
     }

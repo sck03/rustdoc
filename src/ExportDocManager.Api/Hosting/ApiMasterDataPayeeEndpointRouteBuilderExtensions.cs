@@ -1,4 +1,5 @@
 using ExportDocManager.Models.DTOs;
+using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Security;
@@ -76,8 +77,17 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("新增收款对象不能包含已有ID。"));
                 }
 
-                var payee = ApiMasterDataDtoFactory.ToPayeeForSave(request);
+                Payee payee;
+                try
+                {
+                    payee = ApiMasterDataDtoFactory.ToPayeeForSave(request);
+                }
+                catch (FormatException)
+                {
+                    return BadRowVersion("收款对象");
+                }
                 payee.Id = 0;
+                payee.RowVersion = null;
 
                 try
                 {
@@ -128,7 +138,15 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                var payee = ApiMasterDataDtoFactory.ToPayeeForSave(request);
+                Payee payee;
+                try
+                {
+                    payee = ApiMasterDataDtoFactory.ToPayeeForSave(request);
+                }
+                catch (FormatException)
+                {
+                    return BadRowVersion("收款对象");
+                }
                 payee.Id = id;
 
                 try

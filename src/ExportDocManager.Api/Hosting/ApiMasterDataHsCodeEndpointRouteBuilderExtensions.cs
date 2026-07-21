@@ -436,8 +436,17 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("HS编码不能为空。"));
                 }
 
-                var hsCode = ApiMasterDataDtoFactory.ToHsCodeForSave(request);
+                HsCode hsCode;
+                try
+                {
+                    hsCode = ApiMasterDataDtoFactory.ToHsCodeForSave(request);
+                }
+                catch (FormatException)
+                {
+                    return BadRowVersion("HS编码");
+                }
                 hsCode.Id = 0;
+                hsCode.RowVersion = null;
 
                 try
                 {
@@ -530,7 +539,15 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                var hsCode = ApiMasterDataDtoFactory.ToHsCodeForSave(request);
+                HsCode hsCode;
+                try
+                {
+                    hsCode = ApiMasterDataDtoFactory.ToHsCodeForSave(request);
+                }
+                catch (FormatException)
+                {
+                    return BadRowVersion("HS编码");
+                }
                 hsCode.Id = existing.Id;
                 hsCode.Code = normalizedPathCode;
 

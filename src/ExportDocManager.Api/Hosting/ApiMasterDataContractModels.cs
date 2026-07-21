@@ -41,7 +41,8 @@ namespace ExportDocManager.Api.Hosting
         string USDAccount,
         string ContactPerson,
         string Phone,
-        string Notes);
+        string Notes,
+        string RowVersion = "");
 
     public sealed record ApiProductDto(
         int Id,
@@ -69,20 +70,23 @@ namespace ExportDocManager.Api.Hosting
         string PackageUnitCN,
         decimal DefaultPrice,
         DateTime CreatedAt,
-        DateTime UpdatedAt);
+        DateTime UpdatedAt,
+        string RowVersion = "");
 
     public sealed record ApiPortDto(
         int Id,
         string NameEN,
         string NameCN,
         string Country,
-        string Code);
+        string Code,
+        string RowVersion = "");
 
     public sealed record ApiUnitDto(
         int Id,
         string NameEN,
         string NameCN,
-        string Code);
+        string Code,
+        string RowVersion = "");
 
     public sealed record ApiHsCodeDto(
         int Id,
@@ -117,7 +121,8 @@ namespace ExportDocManager.Api.Hosting
         string PersonalPostalTaxCode = "",
         IReadOnlyList<ApiHsCodeRemoteReferenceEntry> CiqEntries = null,
         IReadOnlyList<ApiHsCodeRemoteReferenceEntry> ClassificationEntries = null,
-        int DeclarationExampleCount = 0);
+        int DeclarationExampleCount = 0,
+        string RowVersion = "");
 
     public sealed record ApiHsCodeRemoteReferenceEntry(string Code, string Name);
 

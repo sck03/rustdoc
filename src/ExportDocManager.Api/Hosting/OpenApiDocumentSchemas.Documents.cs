@@ -1154,7 +1154,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["personalPostalTaxCode"] = StringProperty("Personal postal tax code from remote detail."),
                                 ["ciqEntries"] = new { type = "array", items = RefSchema("ApiHsCodeRemoteReferenceEntry") },
                                 ["classificationEntries"] = new { type = "array", items = RefSchema("ApiHsCodeRemoteReferenceEntry") },
-                                ["declarationExampleCount"] = new { type = "integer", format = "int32" }
+                                ["declarationExampleCount"] = new { type = "integer", format = "int32" },
+                                ["rowVersion"] = StringProperty("Concurrency row version encoded as base64.")
                             }
                         },
                         ["ApiHsCodeRemoteReferenceEntry"] = new

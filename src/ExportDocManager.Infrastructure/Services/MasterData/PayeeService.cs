@@ -43,6 +43,10 @@ namespace ExportDocManager.Services.MasterData
                 await context.SaveChangesAsync();
                 return payee.Id;
             }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new Exception("该收款对象已被其他用户修改，请加载最新数据后再保存。");
+            }
             catch (Exception ex)
             {
                 throw new Exception($"保存支付对象信息失败: {ex.Message}", ex);

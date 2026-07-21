@@ -348,7 +348,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["packageUnitCN"] = StringProperty("Chinese package unit."),
                                 ["defaultPrice"] = DecimalProperty("Default unit price."),
                                 ["createdAt"] = new { type = "string", format = "date-time" },
-                                ["updatedAt"] = new { type = "string", format = "date-time" }
+                                ["updatedAt"] = new { type = "string", format = "date-time" },
+                                ["rowVersion"] = StringProperty("Concurrency row version encoded as base64.")
                             }
                         },
                         ["ApiPortDto"] = new
@@ -361,7 +362,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["nameEN"] = StringProperty("English port name."),
                                 ["nameCN"] = StringProperty("Chinese port name."),
                                 ["country"] = StringProperty("Country."),
-                                ["code"] = StringProperty("Port code.")
+                                ["code"] = StringProperty("Port code."),
+                                ["rowVersion"] = StringProperty("Concurrency row version encoded as base64.")
                             }
                         },
                         ["ApiUnitDto"] = new
@@ -373,7 +375,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["id"] = new { type = "integer", format = "int32" },
                                 ["nameEN"] = StringProperty("English unit name."),
                                 ["nameCN"] = StringProperty("Chinese unit name."),
-                                ["code"] = StringProperty("Unit code.")
+                                ["code"] = StringProperty("Unit code."),
+                                ["rowVersion"] = StringProperty("Concurrency row version encoded as base64.")
                             }
                         },
             };

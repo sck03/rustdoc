@@ -1,4 +1,5 @@
 using ExportDocManager.DataAccess;
+using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
@@ -349,6 +350,64 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Empty(await verifyContext.Customers.ToListAsync());
             Assert.Empty(await verifyContext.Exporters.ToListAsync());
             Assert.Empty(await verifyContext.Payees.ToListAsync());
+        }
+
+        [Fact]
+        public async Task SharedMasterDataUpdates_ShouldRejectStaleConcurrentEditors()
+        {
+            using var factory = new SqliteTestDbContextFactory(new AuditInterceptor());
+            var repository = new LocalMasterDataReadRepository(factory);
+            var productService = new ProductService(factory, repository);
+            var payeeService = new PayeeService(factory, repository);
+            var auxiliaryService = new AuxiliaryService(factory, repository, repository);
+            var hsCodeService = new HsCodeService(factory, repository);
+
+            int productId = await productService.AddProductAsync(new Product { ProductCode = "P-1", NameEN = "Product" });
+            var productFirst = await productService.GetByIdAsync(productId);
+            var productStale = await productService.GetByIdAsync(productId);
+            productFirst.NameEN = "Product First";
+            Assert.True(await productService.UpdateProductAsync(productFirst));
+            productStale.NameEN = "Product Stale";
+            var productConflict = await Assert.ThrowsAsync<Exception>(() => productService.UpdateProductAsync(productStale));
+            Assert.Contains("其他用户", productConflict.Message);
+
+            int payeeId = await payeeService.SavePayeeAsync(new Payee { Category = "Factory", Name = "Payee" });
+            var payeeFirst = (await repository.QueryAsync(new PayeeReadQuery())).Single(item => item.Id == payeeId);
+            var payeeStale = (await repository.QueryAsync(new PayeeReadQuery())).Single(item => item.Id == payeeId);
+            payeeFirst.Name = "Payee First";
+            await payeeService.SavePayeeAsync(payeeFirst);
+            payeeStale.Name = "Payee Stale";
+            var payeeConflict = await Assert.ThrowsAsync<Exception>(() => payeeService.SavePayeeAsync(payeeStale));
+            Assert.Contains("其他用户", payeeConflict.Message);
+
+            var port = new Port { Code = "CNSHA", NameEN = "Shanghai" };
+            await auxiliaryService.SavePortAsync(port);
+            var portFirst = (await repository.QueryAsync(new PortReadQuery())).Single(item => item.Id == port.Id);
+            var portStale = (await repository.QueryAsync(new PortReadQuery())).Single(item => item.Id == port.Id);
+            portFirst.NameEN = "Shanghai First";
+            await auxiliaryService.SavePortAsync(portFirst);
+            portStale.NameEN = "Shanghai Stale";
+            var portConflict = await Assert.ThrowsAsync<InvalidOperationException>(() => auxiliaryService.SavePortAsync(portStale));
+            Assert.Contains("其他用户", portConflict.Message);
+
+            var unit = new Unit { Code = "PCS", NameEN = "Pieces" };
+            await auxiliaryService.SaveUnitAsync(unit);
+            var unitFirst = (await repository.QueryAsync(new UnitReadQuery())).Single(item => item.Id == unit.Id);
+            var unitStale = (await repository.QueryAsync(new UnitReadQuery())).Single(item => item.Id == unit.Id);
+            unitFirst.NameEN = "Pieces First";
+            await auxiliaryService.SaveUnitAsync(unitFirst);
+            unitStale.NameEN = "Pieces Stale";
+            var unitConflict = await Assert.ThrowsAsync<InvalidOperationException>(() => auxiliaryService.SaveUnitAsync(unitStale));
+            Assert.Contains("其他用户", unitConflict.Message);
+
+            await hsCodeService.SaveAsync(new HsCode { Code = "6109100000", Name = "T-Shirts" });
+            var hsFirst = await hsCodeService.GetByCodeAsync("6109100000");
+            var hsStale = await hsCodeService.GetByCodeAsync("6109100000");
+            hsFirst.Name = "T-Shirts First";
+            await hsCodeService.SaveAsync(hsFirst);
+            hsStale.Name = "T-Shirts Stale";
+            var hsConflict = await Assert.ThrowsAsync<InvalidOperationException>(() => hsCodeService.SaveAsync(hsStale));
+            Assert.Contains("其他用户", hsConflict.Message);
         }
 
         private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable

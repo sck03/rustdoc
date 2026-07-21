@@ -220,6 +220,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       contactPerson: "",
       phone: "",
       notes: "",
+      rowVersion: "",
     }),
     normalizeRecord: (record, id) => normalizeTextFields(record, id, payeeTextFields),
     list: async (client, request) =>
@@ -318,6 +319,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       packageUnitEN: "",
       packageUnitCN: "",
       defaultPrice: 0,
+      rowVersion: "",
     }),
     normalizeRecord: normalizeProductRecord,
     list: async (client, request) =>
@@ -359,7 +361,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
         ],
       },
     ],
-    emptyRecord: () => ({ id: 0, nameEN: "", nameCN: "", country: "", code: "" }),
+    emptyRecord: () => ({ id: 0, nameEN: "", nameCN: "", country: "", code: "", rowVersion: "" }),
     normalizeRecord: (record, id) => normalizeTextFields(record, id, portTextFields),
     list: async (client, request) =>
       normalizeArrayPage(
@@ -398,7 +400,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
         ],
       },
     ],
-    emptyRecord: () => ({ id: 0, nameEN: "", nameCN: "", code: "" }),
+    emptyRecord: () => ({ id: 0, nameEN: "", nameCN: "", code: "", rowVersion: "" }),
     normalizeRecord: (record, id) => normalizeTextFields(record, id, unitTextFields),
     list: async (client, request) =>
       normalizeArrayPage(
@@ -495,6 +497,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       sourceName: "",
       effectiveYear: null,
       replacedByCodes: "",
+      rowVersion: "",
     }),
     normalizeRecord: normalizeHsCodeRecord,
     list: async (client, request) => {

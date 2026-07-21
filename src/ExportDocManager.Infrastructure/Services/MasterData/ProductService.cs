@@ -70,17 +70,24 @@ namespace ExportDocManager.Services.MasterData
         {
             ArgumentNullException.ThrowIfNull(product);
 
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var existing = await context.Products.FindAsync(product.Id);
-            if (existing == null) return false;
+            try
+            {
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var existing = await context.Products.FindAsync(product.Id);
+                if (existing == null) return false;
 
-            NormalizeProduct(product);
-            context.Entry(existing).CurrentValues.SetValues(product);
-            existing.UpdatedAt = DateTime.Now;
-            // Ensure Id didn't change (though SetValues usually handles this)
-            
-            await context.SaveChangesAsync();
-            return true;
+                NormalizeProduct(product);
+                context.Entry(existing).CurrentValues.SetValues(product);
+                context.Entry(existing).Property(item => item.RowVersion).OriginalValue = product.RowVersion;
+                existing.UpdatedAt = DateTime.Now;
+                await context.SaveChangesAsync();
+                product.RowVersion = existing.RowVersion?.ToArray();
+                return true;
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new Exception("该商品已被其他用户修改，请加载最新数据后再保存。");
+            }
         }
 
         public async Task<bool> DeleteAsync(int id)

@@ -215,6 +215,9 @@ namespace ExportDocManager.Models.Entities
             set => SetProperty(ref _notes, value?.Trim());
         }
 
+        [ConcurrencyCheck]
+        public byte[] RowVersion { get; set; }
+
         [NotMapped]
         public string DetailUrl
         {

@@ -1,5 +1,5 @@
 import { keepPreviousData,useMutation,useQuery,useQueryClient } from "@tanstack/react-query";
-import { Edit3,Plus,RefreshCw,Search,Trash2 } from "lucide-react";
+import { Edit3,Eye,Plus,RefreshCw,Search,Trash2 } from "lucide-react";
 import { FormEvent,KeyboardEvent as ReactKeyboardEvent,useEffect,useMemo,useRef,useState } from "react";
 import { Link,useLocation,useNavigate } from "react-router-dom";
 import {
@@ -12,6 +12,7 @@ readApiError,
 readRouteSuccessMessage
 } from "../../ui/formUtils.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
 import { listPageSizeOptions,loadListViewState,normalizeListPageSize,saveListViewState } from "../../ui/listViewState.ts";
 
 import {
@@ -46,6 +47,8 @@ export function MasterDataListPage({
   const [pageSize, setPageSize] = useState(initialListViewState.pageSize);
   const [listSuccessMessage, setListSuccessMessage] = useState<string | null>(null);
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<number>>(() => new Set());
+  const [pendingDeleteRecord, setPendingDeleteRecord] = useState<MasterDataRecord | null>(null);
+  const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false);
   const skipNextListViewStateSaveRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -128,6 +131,7 @@ export function MasterDataListPage({
   const deleteMutation = useMutation({
     mutationFn: (record: MasterDataRecord) => config.delete(client, record, config.routeId(record)),
     onSuccess: async (response, deletedRecord) => {
+      setPendingDeleteRecord(null);
       setListSuccessMessage(response.message || `${config.label}已删除。`);
       queryClient.removeQueries({ queryKey: queryKeys.masterDataRecord(config.key, config.routeId(deletedRecord)) });
       const invalidations = [queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot(config.key) })];
@@ -138,6 +142,7 @@ export function MasterDataListPage({
       await Promise.all(invalidations);
     },
     onError: () => {
+      setPendingDeleteRecord(null);
       setListSuccessMessage(null);
     },
   });
@@ -148,12 +153,14 @@ export function MasterDataListPage({
         body: { ids },
       }),
     onSuccess: async (response) => {
+      setBatchDeleteDialogOpen(false);
       setListSuccessMessage(response.message || "选中的HS编码已删除。");
       setSelectedRecordIds(new Set());
       await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("hs-codes") });
       await masterDataQuery.refetch();
     },
     onError: () => {
+      setBatchDeleteDialogOpen(false);
       setListSuccessMessage(null);
     },
   });
@@ -163,13 +170,7 @@ export function MasterDataListPage({
       return;
     }
 
-    const displayName = buildMasterDataDisplayName(config, record);
-    if (!window.confirm(`确定删除当前${config.label} ${displayName} 吗？删除后无法在列表中继续查看。`)) {
-      return;
-    }
-
-    setListSuccessMessage(null);
-    deleteMutation.mutate(record);
+    setPendingDeleteRecord(record);
   }
 
   function toggleSelectedRecord(record: MasterDataRecord, selected: boolean) {
@@ -216,13 +217,7 @@ export function MasterDataListPage({
       return;
     }
 
-    const ids = Array.from(selectedRecordIds);
-    if (!window.confirm(`确定删除选中的 ${ids.length} 条HS编码吗？删除后无法在本地库中继续查看。`)) {
-      return;
-    }
-
-    setListSuccessMessage(null);
-    batchDeleteHsCodesMutation.mutate(ids);
+    setBatchDeleteDialogOpen(true);
   }
 
   const page = masterDataQuery.data ?? null;
@@ -314,6 +309,34 @@ export function MasterDataListPage({
         onPageChange={setPageNumber}
         onPageSizeChange={handlePageSizeChange}
       />
+      {pendingDeleteRecord ? (
+        <ConfirmationDialog
+          title={`删除${config.label}`}
+          description={`确定删除“${buildMasterDataDisplayName(config, pendingDeleteRecord)}”吗？`}
+          details={["删除后无法在列表中继续查看。", "如该资料已被业务单据引用，系统会拒绝删除并说明原因。"]}
+          confirmLabel="确认删除"
+          isBusy={deleteMutation.isPending}
+          onCancel={() => setPendingDeleteRecord(null)}
+          onConfirm={() => {
+            setListSuccessMessage(null);
+            deleteMutation.mutate(pendingDeleteRecord);
+          }}
+        />
+      ) : null}
+      {batchDeleteDialogOpen ? (
+        <ConfirmationDialog
+          title="批量删除 HS 编码"
+          description={`确定删除选中的 ${selectedRecordIds.size} 条 HS 编码吗？`}
+          details={["只删除当前选中的本地编码记录。", "删除后无法在本地编码库中继续查看。"]}
+          confirmLabel={`删除 ${selectedRecordIds.size} 条`}
+          isBusy={batchDeleteHsCodesMutation.isPending}
+          onCancel={() => setBatchDeleteDialogOpen(false)}
+          onConfirm={() => {
+            setListSuccessMessage(null);
+            batchDeleteHsCodesMutation.mutate(Array.from(selectedRecordIds));
+          }}
+        />
+      ) : null}
     </section>
   );
 }
@@ -458,7 +481,7 @@ function MasterDataTable({
                       onOpen(record);
                     }}
                   >
-                    <Edit3 size={15} aria-hidden="true" />
+                    {canOperate ? <Edit3 size={15} aria-hidden="true" /> : <Eye size={15} aria-hidden="true" />}
                   </button>
                   {canManage ? <button
                     className="icon-button compact-icon-button danger-icon"

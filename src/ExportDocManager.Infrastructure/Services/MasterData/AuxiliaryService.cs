@@ -47,16 +47,23 @@ namespace ExportDocManager.Services.MasterData
         {
             ArgumentNullException.ThrowIfNull(port);
             AuxiliaryDataTextHelper.NormalizePort(port);
-            using var context = await _contextFactory.CreateDbContextAsync();
-            if (port.Id == 0)
+            try
             {
-                context.Ports.Add(port);
+                using var context = await _contextFactory.CreateDbContextAsync();
+                if (port.Id == 0)
+                {
+                    context.Ports.Add(port);
+                }
+                else
+                {
+                    context.Ports.Update(port);
+                }
+                await context.SaveChangesAsync();
             }
-            else
+            catch (DbUpdateConcurrencyException)
             {
-                context.Ports.Update(port);
+                throw new InvalidOperationException("该港口已被其他用户修改，请加载最新数据后再保存。");
             }
-            await context.SaveChangesAsync();
         }
 
         public async Task DeletePortAsync(int id)
@@ -91,16 +98,23 @@ namespace ExportDocManager.Services.MasterData
         {
             ArgumentNullException.ThrowIfNull(unit);
             AuxiliaryDataTextHelper.NormalizeUnit(unit);
-            using var context = await _contextFactory.CreateDbContextAsync();
-            if (unit.Id == 0)
+            try
             {
-                context.Units.Add(unit);
+                using var context = await _contextFactory.CreateDbContextAsync();
+                if (unit.Id == 0)
+                {
+                    context.Units.Add(unit);
+                }
+                else
+                {
+                    context.Units.Update(unit);
+                }
+                await context.SaveChangesAsync();
             }
-            else
+            catch (DbUpdateConcurrencyException)
             {
-                context.Units.Update(unit);
+                throw new InvalidOperationException("该单位已被其他用户修改，请加载最新数据后再保存。");
             }
-            await context.SaveChangesAsync();
         }
 
         public async Task DeleteUnitAsync(int id)

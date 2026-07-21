@@ -24,47 +24,65 @@ namespace ExportDocManager.Services.MasterData
 
             hsCode.Code = normalizedCode;
             hsCode.Status = NormalizeHsCodeStatus(hsCode.Status);
+            bool requiresConcurrencyCheck = hsCode.Id > 0;
 
-            await using var context = await CreateDbContextAsync();
-            var existing = await context.HsCodes.FirstOrDefaultAsync(h => h.NormalizedCode == normalizedCode);
-            if (string.Equals(hsCode.Status, HsCodeValidityPolicy.ActiveStatus, StringComparison.OrdinalIgnoreCase))
+            try
             {
-                if (existing == null)
+                await using var context = await CreateDbContextAsync();
+                var existing = await context.HsCodes.FirstOrDefaultAsync(h => h.NormalizedCode == normalizedCode);
+                if (string.Equals(hsCode.Status, HsCodeValidityPolicy.ActiveStatus, StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new InvalidOperationException("手工新建的 HS 编码只能保存为“仅供参考”；当前有效编码请通过年度税则导入建立。");
-                }
+                    if (existing == null)
+                    {
+                        throw new InvalidOperationException("手工新建的 HS 编码只能保存为“仅供参考”；当前有效编码请通过年度税则导入建立。");
+                    }
 
-                if (!string.Equals(existing.Status, HsCodeValidityPolicy.ActiveStatus, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException("不能通过普通编辑把参考或作废编码改为当前有效；请使用年度税则导入或知识库迁移。");
-                }
+                    if (!string.Equals(existing.Status, HsCodeValidityPolicy.ActiveStatus, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException("不能通过普通编辑把参考或作废编码改为当前有效；请使用年度税则导入或知识库迁移。");
+                    }
 
-                hsCode.SourceName = string.IsNullOrWhiteSpace(hsCode.SourceName) ? existing.SourceName : hsCode.SourceName;
-                hsCode.EffectiveYear ??= existing.EffectiveYear;
-                hsCode.LastVerifiedAt ??= existing.LastVerifiedAt;
-                HsCodeValidityPolicy.EnsureTrustedActiveMetadata(hsCode);
-            }
-            if (existing != null)
-            {
-                if (string.Equals(existing.Status, "Active", StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(hsCode.Status, "ReferenceOnly", StringComparison.OrdinalIgnoreCase))
+                    hsCode.SourceName = string.IsNullOrWhiteSpace(hsCode.SourceName) ? existing.SourceName : hsCode.SourceName;
+                    hsCode.EffectiveYear ??= existing.EffectiveYear;
+                    hsCode.LastVerifiedAt ??= existing.LastVerifiedAt;
+                    HsCodeValidityPolicy.EnsureTrustedActiveMetadata(hsCode);
+                }
+                if (existing != null)
                 {
+                    if (string.Equals(existing.Status, "Active", StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(hsCode.Status, "ReferenceOnly", StringComparison.OrdinalIgnoreCase))
+                    {
+                        hsCode.Id = existing.Id;
+                        hsCode.RowVersion = existing.RowVersion?.ToArray();
+                        return;
+                    }
+                    CopyHsCodeValues(hsCode, existing);
+                    if (requiresConcurrencyCheck)
+                    {
+                        context.Entry(existing).Property(item => item.RowVersion).OriginalValue = hsCode.RowVersion;
+                    }
+                    existing.UpdateTime = DateTime.Now;
+                    context.HsCodes.Update(existing);
                     hsCode.Id = existing.Id;
-                    return;
                 }
-                CopyHsCodeValues(hsCode, existing);
-                existing.UpdateTime = DateTime.Now;
-                context.HsCodes.Update(existing);
-                hsCode.Id = existing.Id;
-            }
-            else
-            {
-                hsCode.Id = 0;
-                hsCode.UpdateTime = DateTime.Now;
-                await context.HsCodes.AddAsync(hsCode);
-            }
+                else
+                {
+                    hsCode.Id = 0;
+                    hsCode.RowVersion = null;
+                    hsCode.UpdateTime = DateTime.Now;
+                    await context.HsCodes.AddAsync(hsCode);
+                }
 
-            await context.SaveChangesAsync();
+                await context.SaveChangesAsync();
+                if (existing != null)
+                {
+                    hsCode.RowVersion = existing.RowVersion?.ToArray();
+                }
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new InvalidOperationException("该 HS 编码已被其他用户或年度税则导入任务修改，请加载最新数据后再保存。");
+            }
         }
 
         public async Task DeleteAsync(int id)

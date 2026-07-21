@@ -93,6 +93,50 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public async Task ProductEndpoint_ShouldRejectStaleConcurrentUpdate()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-product-concurrency",
+                "api-product-concurrency.db");
+            using var anonymousClient = harness.CreateClient();
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+
+            var createResponse = await adminClient.PostAsJsonAsync(
+                "/api/master-data/products",
+                CreateProduct("Concurrent Product"));
+            Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+            var created = await ApiIntegrationTestHarness.ReadJsonAsync<ApiProductDto>(createResponse);
+            Assert.False(string.IsNullOrWhiteSpace(created.RowVersion));
+
+            var firstUpdateResponse = await adminClient.PutAsJsonAsync(
+                $"/api/master-data/products/{created.Id}",
+                created with { NameEN = "First Editor" });
+            Assert.Equal(HttpStatusCode.OK, firstUpdateResponse.StatusCode);
+            var firstUpdate = await ApiIntegrationTestHarness.ReadJsonAsync<ApiProductDto>(firstUpdateResponse);
+            Assert.NotEqual(created.RowVersion, firstUpdate.RowVersion);
+
+            var staleUpdateResponse = await adminClient.PutAsJsonAsync(
+                $"/api/master-data/products/{created.Id}",
+                created with { NameEN = "Stale Editor" });
+            Assert.Equal(HttpStatusCode.Conflict, staleUpdateResponse.StatusCode);
+            Assert.Contains("其他用户", await staleUpdateResponse.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+            var latestResponse = await adminClient.GetAsync($"/api/master-data/products/{created.Id}");
+            var latest = await ApiIntegrationTestHarness.ReadJsonAsync<ApiProductDto>(latestResponse);
+            Assert.Equal("First Editor", latest.NameEN);
+        }
+
+        private static ApiProductDto CreateProduct(string name)
+        {
+            return new ApiProductDto(
+                0, "CONCURRENT-1", name, "并发商品", string.Empty, string.Empty, string.Empty,
+                string.Empty, string.Empty, 0m, string.Empty, string.Empty, string.Empty,
+                "PCS", "件", 0m, 0m, 0m, 0m, 0m, 0m, "CTN", "箱", 0m,
+                default, default);
+        }
+
+        [Fact]
         public async Task HsCodeImportEndpoints_ShouldImportExplicitPathAndUploadedWorkbookUnderRuntimeDataRoot()
         {
             await using var harness = await ApiIntegrationTestHarness.StartAsync(

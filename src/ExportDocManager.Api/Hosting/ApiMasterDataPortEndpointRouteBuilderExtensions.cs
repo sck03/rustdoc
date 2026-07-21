@@ -1,4 +1,5 @@
 using ExportDocManager.Models.DTOs;
+using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Security;
@@ -74,8 +75,17 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("新增港口不能包含已有ID。"));
                 }
 
-                var port = ApiMasterDataDtoFactory.ToPortForSave(request);
+                Port port;
+                try
+                {
+                    port = ApiMasterDataDtoFactory.ToPortForSave(request);
+                }
+                catch (FormatException)
+                {
+                    return BadRowVersion("港口");
+                }
                 port.Id = 0;
+                port.RowVersion = null;
 
                 try
                 {
@@ -125,7 +135,15 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                var port = ApiMasterDataDtoFactory.ToPortForSave(request);
+                Port port;
+                try
+                {
+                    port = ApiMasterDataDtoFactory.ToPortForSave(request);
+                }
+                catch (FormatException)
+                {
+                    return BadRowVersion("港口");
+                }
                 port.Id = id;
 
                 try

@@ -209,7 +209,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["usdAccount"] = StringProperty("USD account."),
                                 ["contactPerson"] = StringProperty("Contact person."),
                                 ["phone"] = StringProperty("Phone."),
-                                ["notes"] = StringProperty("Notes.")
+                                ["notes"] = StringProperty("Notes."),
+                                ["rowVersion"] = StringProperty("Concurrency row version encoded as base64.")
                             }
                         },
             };

@@ -1,4 +1,5 @@
 using ExportDocManager.Models.DTOs;
+using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Security;
@@ -74,8 +75,17 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("新增单位不能包含已有ID。"));
                 }
 
-                var unit = ApiMasterDataDtoFactory.ToUnitForSave(request);
+                Unit unit;
+                try
+                {
+                    unit = ApiMasterDataDtoFactory.ToUnitForSave(request);
+                }
+                catch (FormatException)
+                {
+                    return BadRowVersion("单位");
+                }
                 unit.Id = 0;
+                unit.RowVersion = null;
 
                 try
                 {
@@ -125,7 +135,15 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                var unit = ApiMasterDataDtoFactory.ToUnitForSave(request);
+                Unit unit;
+                try
+                {
+                    unit = ApiMasterDataDtoFactory.ToUnitForSave(request);
+                }
+                catch (FormatException)
+                {
+                    return BadRowVersion("单位");
+                }
                 unit.Id = id;
 
                 try

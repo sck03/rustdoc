@@ -1,13 +1,15 @@
 import { useMutation,useQuery,useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft,Edit3,Save,Trash2 } from "lucide-react";
+import { ArrowLeft,Edit3,Eye,Save,Trash2 } from "lucide-react";
 import { FormEvent,useEffect,useMemo,useState } from "react";
 import { useLocation,useNavigate,useParams } from "react-router-dom";
 import {
+ApiError,
 ExportDocManagerApiClient
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { selectExporterSealImageFile } from "../../desktop/desktopBridge.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
+import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
 import {
 normalizeText,
 numberValue,
@@ -75,6 +77,8 @@ export function MasterDataEditorPage({
   const [autoFilledProductUnits, setAutoFilledProductUnits] = useState<Partial<Record<ProductUnitTargetField, string>>>({});
   const [productHsCodeKeyword, setProductHsCodeKeyword] = useState("");
   const [persistedRecordSnapshot, setPersistedRecordSnapshot] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [hasConcurrencyConflict, setHasConcurrencyConflict] = useState(false);
   const queryClient = useQueryClient();
   const customOptionTypes = useMemo(
     () =>
@@ -188,6 +192,7 @@ export function MasterDataEditorPage({
       setPersistedRecordSnapshot(buildMasterDataSnapshot(config, saved, numberValue(saved.id)));
       setMessage(null);
       setSuccessMessage(nextMessage);
+      setHasConcurrencyConflict(false);
       queryClient.setQueryData(queryKeys.masterDataRecord(config.key, config.routeId(saved)), saved);
       await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot(config.key) });
       if (isNew) {
@@ -198,8 +203,15 @@ export function MasterDataEditorPage({
       }
     },
     onError: (error) => {
-      setMessage(readApiError(error));
+      const errorMessage = readApiError(error);
+      setMessage(errorMessage);
       setSuccessMessage(null);
+      setHasConcurrencyConflict(
+        !isNew &&
+        error instanceof ApiError &&
+        error.status === 409 &&
+        errorMessage.includes("其他用户"),
+      );
     },
   });
 
@@ -232,6 +244,7 @@ export function MasterDataEditorPage({
       });
     },
     onError: (error) => {
+      setDeleteDialogOpen(false);
       setMessage(readApiError(error));
       setSuccessMessage(null);
     },
@@ -431,14 +444,15 @@ export function MasterDataEditorPage({
       return;
     }
 
-    const displayName = buildMasterDataDisplayName(config, record) || `#${effectiveRecordKey}`;
-    if (!window.confirm(`确定删除当前${config.label} ${displayName} 吗？删除后无法在列表中继续查看。`)) {
-      return;
-    }
+    setDeleteDialogOpen(true);
+  }
 
+  async function loadLatestRecord() {
+    if (isNew || detailQuery.isFetching) return;
+    setHasConcurrencyConflict(false);
     setMessage(null);
     setSuccessMessage(null);
-    deleteMutation.mutate();
+    await detailQuery.refetch();
   }
 
   function handleBackToMasterDataList() {
@@ -455,7 +469,7 @@ export function MasterDataEditorPage({
           <span>返回列表</span>
         </button>
         <div className="editor-title">
-          <Edit3 size={18} aria-hidden="true" />
+          {canOperate ? <Edit3 size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
           <span>{title}</span>
         </div>
         {!isNew && isRecordKeyValid && canManage ? (
@@ -471,7 +485,16 @@ export function MasterDataEditorPage({
         ) : null}
       </div>
 
-      {message ? <div className="alert">{message}</div> : null}
+      {message ? (
+        <div className="alert master-data-conflict-alert">
+          <span>{message}</span>
+          {hasConcurrencyConflict ? (
+            <button className="command-button secondary" type="button" disabled={detailQuery.isFetching} onClick={() => void loadLatestRecord()}>
+              {detailQuery.isFetching ? "正在加载…" : "加载最新数据"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {productUnitLookupMessage ? <div className="alert">{productUnitLookupMessage}</div> : null}
       {successMessage ? <div className="success-alert">{successMessage}</div> : null}
       {productUnitMessage ? <div className="info-alert">{productUnitMessage}</div> : null}
@@ -519,6 +542,21 @@ export function MasterDataEditorPage({
           ))}
           </fieldset>
         </form>
+      ) : null}
+      {deleteDialogOpen && record ? (
+        <ConfirmationDialog
+          title={`删除${config.label}`}
+          description={`确定删除“${buildMasterDataDisplayName(config, record) || `#${effectiveRecordKey}`}”吗？`}
+          details={["删除后无法在列表中继续查看。", "如该资料已被业务单据引用，系统会拒绝删除并说明原因。"]}
+          confirmLabel="确认删除"
+          isBusy={deleteMutation.isPending}
+          onCancel={() => setDeleteDialogOpen(false)}
+          onConfirm={() => {
+            setMessage(null);
+            setSuccessMessage(null);
+            deleteMutation.mutate();
+          }}
+        />
       ) : null}
     </section>
   );

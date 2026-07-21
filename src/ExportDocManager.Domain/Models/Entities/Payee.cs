@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ExportDocManager.Models.Entities
 {
     public class Payee
@@ -11,6 +13,8 @@ namespace ExportDocManager.Models.Entities
         public string ContactPerson { get; set; }
         public string Phone { get; set; }
         public string Notes { get; set; }
+
+        [ConcurrencyCheck]
+        public byte[] RowVersion { get; set; }
     }
 }
-

@@ -1120,6 +1120,7 @@ export interface ApiHsCodeDto {
   recommendedKeywords?: string[];
   remoteRecordKind?: string;
   replacedByCodes?: string;
+  rowVersion?: string;
   sourceName?: string;
   status?: string;
   summaryUrl?: string;
@@ -1755,6 +1756,7 @@ export interface ApiPayeeDto {
   notes?: string;
   phone?: string;
   rmbAccount?: string;
+  rowVersion?: string;
   usdAccount?: string;
 }
 
@@ -1874,6 +1876,7 @@ export interface ApiPortDto {
   id: number;
   nameCN: string;
   nameEN: string;
+  rowVersion?: string;
 }
 
 export interface ApiPostgreSqlMaintenanceStatusResponse {
@@ -1945,6 +1948,7 @@ export interface ApiProductDto {
   packageUnitEN?: string;
   pcsPerCtn?: number;
   productCode: string;
+  rowVersion?: string;
   supervisionConditions?: string;
   taxRebateRate?: number;
   unitCN?: string;
@@ -2722,6 +2726,7 @@ export interface ApiUnitDto {
   id: number;
   nameCN: string;
   nameEN: string;
+  rowVersion?: string;
 }
 
 export interface ApiUserAccountDto {

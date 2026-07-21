@@ -52,7 +52,8 @@ namespace ExportDocManager.Api.Hosting
                 hsCode.ExportTariffRate ?? string.Empty,
                 hsCode.ConsumptionTaxRate ?? string.Empty,
                 hsCode.ValueAddedTaxRate ?? string.Empty,
-                hsCode.Notes ?? string.Empty);
+                hsCode.Notes ?? string.Empty,
+                RowVersion: RowVersionToString(hsCode.RowVersion));
         }
 
         public static ApiHsCodeDto FromRemoteRecord(HsCodeRemoteSearchRecord record)
@@ -115,7 +116,8 @@ namespace ExportDocManager.Api.Hosting
                 ExportTariffRate = dto.ExportTariffRate ?? string.Empty,
                 ConsumptionTaxRate = dto.ConsumptionTaxRate ?? string.Empty,
                 ValueAddedTaxRate = dto.ValueAddedTaxRate ?? string.Empty,
-                Notes = dto.Notes ?? string.Empty
+                Notes = dto.Notes ?? string.Empty,
+                RowVersion = RowVersionFromString(dto.RowVersion)
             };
         }
     }

@@ -16,5 +16,8 @@ namespace ExportDocManager.Models.Entities
 
         [MaxLength(10)]
         public string Code { get; set; } // Optional Code
+
+        [ConcurrencyCheck]
+        public byte[] RowVersion { get; set; }
     }
 }

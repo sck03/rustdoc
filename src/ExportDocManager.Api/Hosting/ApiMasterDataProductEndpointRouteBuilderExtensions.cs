@@ -1,4 +1,5 @@
 using ExportDocManager.Models.DTOs;
+using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Security;
@@ -73,8 +74,17 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("新增商品不能包含已有ID。"));
                 }
 
-                var product = ApiMasterDataDtoFactory.ToProductForSave(request);
+                Product product;
+                try
+                {
+                    product = ApiMasterDataDtoFactory.ToProductForSave(request);
+                }
+                catch (FormatException)
+                {
+                    return BadRowVersion("商品");
+                }
                 product.Id = 0;
+                product.RowVersion = null;
 
                 try
                 {
@@ -124,7 +134,15 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                var product = ApiMasterDataDtoFactory.ToProductForSave(request);
+                Product product;
+                try
+                {
+                    product = ApiMasterDataDtoFactory.ToProductForSave(request);
+                }
+                catch (FormatException)
+                {
+                    return BadRowVersion("商品");
+                }
                 product.Id = id;
                 product.CreatedAt = existing.CreatedAt;
 

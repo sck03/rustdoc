@@ -54,6 +54,7 @@ namespace ExportDocManager.Services.Infrastructure
                 await EnsureInvoiceTypeSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 await EnsureUserReportTemplateSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 await EnsureContainerProjectOwnershipSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
+                await EnsureSharedMasterDataConcurrencySchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 await EnsureHsCodeMetadataSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 await EnsureHsCodeKnowledgeSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 DbSeeder.SeedAuxiliaryData(
@@ -161,6 +162,33 @@ namespace ExportDocManager.Services.Infrastructure
             await context.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS \"IX_ContainerProjects_OwnerUserId_UpdatedAt\" ON \"ContainerProjects\" (\"OwnerUserId\", \"UpdatedAt\")")
                 .ConfigureAwait(false);
+        }
+
+        private static async Task EnsureSharedMasterDataConcurrencySchemaAsync(
+            AppDbContext context,
+            bool usesPostgreSql)
+        {
+            if (!context.Database.IsRelational()) return;
+
+            if (usesPostgreSql)
+            {
+                await context.Database.ExecuteSqlRawAsync(
+                    """
+                    ALTER TABLE "Products" ADD COLUMN IF NOT EXISTS "RowVersion" bytea NULL;
+                    ALTER TABLE "Payees" ADD COLUMN IF NOT EXISTS "RowVersion" bytea NULL;
+                    ALTER TABLE "Ports" ADD COLUMN IF NOT EXISTS "RowVersion" bytea NULL;
+                    ALTER TABLE "Units" ADD COLUMN IF NOT EXISTS "RowVersion" bytea NULL;
+                    ALTER TABLE "HsCodes" ADD COLUMN IF NOT EXISTS "RowVersion" bytea NULL;
+                    """).ConfigureAwait(false);
+                return;
+            }
+
+            string[] tableNames = ["Products", "Payees", "Ports", "Units", "HsCodes"];
+            foreach (string tableName in tableNames)
+            {
+                await AddSqliteColumnIfMissingAsync(context, tableName, "RowVersion", "BLOB NULL")
+                    .ConfigureAwait(false);
+            }
         }
 
         private static async Task EnsureHsCodeMetadataSchemaAsync(AppDbContext context, bool usesPostgreSql)

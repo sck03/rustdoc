@@ -19,5 +19,8 @@ namespace ExportDocManager.Models.Entities
 
         [MaxLength(20)]
         public string Code { get; set; } // Port Code (e.g., UN/LOCODE)
+
+        [ConcurrencyCheck]
+        public byte[] RowVersion { get; set; }
     }
 }

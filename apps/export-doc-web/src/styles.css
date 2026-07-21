@@ -1775,6 +1775,28 @@ tbody tr:hover {
   align-items: center;
 }
 
+.master-data-conflict-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.master-data-conflict-alert .command-button {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 760px) {
+  .master-data-conflict-alert {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .master-data-conflict-alert .command-button {
+    width: 100%;
+  }
+}
+
 .query-table-frame {
   min-height: 0;
 }

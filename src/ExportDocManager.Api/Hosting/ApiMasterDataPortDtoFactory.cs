@@ -18,7 +18,8 @@ namespace ExportDocManager.Api.Hosting
                 port.NameEN ?? string.Empty,
                 port.NameCN ?? string.Empty,
                 port.Country ?? string.Empty,
-                port.Code ?? string.Empty);
+                port.Code ?? string.Empty,
+                RowVersionToString(port.RowVersion));
         }
 
         public static Port ToPortForSave(ApiPortDto dto)
@@ -31,7 +32,8 @@ namespace ExportDocManager.Api.Hosting
                 NameEN = dto.NameEN ?? string.Empty,
                 NameCN = dto.NameCN ?? string.Empty,
                 Country = dto.Country ?? string.Empty,
-                Code = dto.Code ?? string.Empty
+                Code = dto.Code ?? string.Empty,
+                RowVersion = RowVersionFromString(dto.RowVersion)
             };
         }
     }
