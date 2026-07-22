@@ -127,7 +127,7 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
       <label>评价结论<select name="conclusion" defaultValue={selected?.conclusion ?? "合格"}><option>优先合作</option><option>合格</option><option>观察</option><option>暂停合作</option></select></label>
       <label className="form-field-wide">评价备注<textarea name="notes" maxLength={1000} defaultValue={selected?.notes} placeholder="记录事实、改进事项和下次复核重点" /></label>
       </fieldset>
-      <div className="form-actions">{canOperate ? <button className="primary-button">保存评价</button> : null}{selected && canManage ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除</button> : null}</div>
+      <div className="form-actions">{canOperate ? <button className="primary-button" type="submit">保存评价</button> : null}{selected && canManage ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除</button> : null}</div>
     </form>}
   </section>;
 }

@@ -112,7 +112,7 @@ export function SupplierProductLinksPanel({
       <label>交期（天）<input name="leadTimeDays" type="number" min="0" max="3650" defaultValue={selected?.leadTimeDays ?? 0} /></label>
       <label>供货状态<select name="linkStatus" defaultValue={selected?.status ?? "供货中"}><option>供货中</option><option>备选</option><option>暂停</option><option>停用</option></select></label>
       </fieldset>
-      <div className="form-actions">{canOperate ? <button className="primary-button" disabled={!supplierId || !productOptions.length}>保存供货关系</button> : null}{selected && canManage ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除关联</button> : null}</div>
+      <div className="form-actions">{canOperate ? <button className="primary-button" type="submit" disabled={!supplierId || !productOptions.length}>保存供货关系</button> : null}{selected && canManage ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除关联</button> : null}</div>
     </form> : null}
   </section>;
 }

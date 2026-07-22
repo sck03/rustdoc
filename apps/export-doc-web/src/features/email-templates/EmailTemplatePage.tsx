@@ -247,7 +247,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
     {view === "directory" ? <section className="form-section"><div className="section-header"><div><h3>模板目录</h3><p className="section-description">维护常用的单封业务邮件，不包含群发活动。</p></div><div className="section-header-actions"><span>{visibleTemplates.length} 个</span>{templatePermission.canOperate ? <button className="primary-button" type="button" onClick={startNewTemplate}>新建模板</button> : null}</div></div>
       <form className="toolbar" onSubmit={(event) => { event.preventDefault(); void loadTemplates(); }}>
         <input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索模板名称、主题或正文" />
-        <button className="secondary-button">搜索</button>
+        <button className="secondary-button" type="submit">搜索</button>
         <select aria-label="模板范围" value={scope} onChange={(event) => setScope(event.target.value as EmailTemplateScope)}><option value="all">全部模板</option><option value="editable">可维护模板</option><option value="shared">团队共享</option></select>
         <label className="checkbox-field"><input type="checkbox" checked={includeInactive} onChange={(event) => setIncludeInactive(event.target.checked)} />显示停用模板</label>
       </form>
@@ -265,7 +265,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
         <label className="form-field-wide">邮件正文<textarea disabled={!canEdit} rows={12} maxLength={10000} value={bodyHtml} onChange={(event) => { setBodyHtml(event.target.value); setPreview(null); }} /><span className="field-hint">普通文字可直接输入；需要格式时可使用简单 HTML。</span></label>
         <label className="checkbox-field"><input type="checkbox" disabled={!canEdit} checked={isActive} onChange={(event) => setIsActive(event.target.checked)} />启用模板</label>
         <label className="checkbox-field"><input type="checkbox" disabled={!canEdit} checked={isShared} onChange={(event) => setIsShared(event.target.checked)} />团队共享（局域网账号可见）</label>
-        <div className="form-actions">{canEdit ? <button className="primary-button">保存模板</button> : null}{templatePermission.canOperate ? <button className="secondary-button" type="button" onClick={() => setView("variables")}>设置变量</button> : null}{selected ? <button className="secondary-button" type="button" onClick={() => changeView("history")}>查看版本历史</button> : null}{selected && templatePermission.canOperate ? <button className="secondary-button" type="button" onClick={copyAsNewTemplate}>复制为新模板</button> : null}{canDelete ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除</button> : null}</div>
+        <div className="form-actions">{canEdit ? <button className="primary-button" type="submit">保存模板</button> : null}{templatePermission.canOperate ? <button className="secondary-button" type="button" onClick={() => setView("variables")}>设置变量</button> : null}{selected ? <button className="secondary-button" type="button" onClick={() => changeView("history")}>查看版本历史</button> : null}{selected && templatePermission.canOperate ? <button className="secondary-button" type="button" onClick={copyAsNewTemplate}>复制为新模板</button> : null}{canDelete ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除</button> : null}</div>
       </form> : null}
       {view === "variables" ? <section className="form-section"><div className="section-header"><div><h3>变量设置</h3><p className="section-description">填写预览样例，或把变量插入当前邮件正文。</p></div><span>{variables.length} 项</span></div>
         <div className="context-strip"><strong>{name.trim() || "未命名模板"}</strong><span>{canEdit ? "变量只用于生成当前预览，不会自动发送邮件。" : "这是只读共享模板；可调整预览样例，复制为自己的模板后才能修改正文。"}</span></div>
@@ -276,7 +276,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
         {!canEdit ? <div className="context-strip"><strong>团队共享模板 · 只读</strong><span>可以载入客户变量并套用邮件；需要修改模板内容时请先复制。</span></div> : null}
         {crmPermission.canView ? <form className="toolbar" onSubmit={(event) => { event.preventDefault(); void searchCrmCustomers(); }}>
           <input value={crmCustomerKeyword} onChange={(event) => setCrmCustomerKeyword(event.target.value)} placeholder="搜索 CRM 客户" />
-          <button className="secondary-button">查找客户</button>
+          <button className="secondary-button" type="submit">查找客户</button>
           <select value={crmCustomerId} onChange={(event) => setCrmCustomerId(Number(event.target.value))}><option value={0}>请选择客户</option>{crmCustomers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
           <button className="secondary-button" type="button" disabled={!templatePermission.canOperate} onClick={() => void loadCrmDraft()}>载入客户变量</button>
         </form> : <div className="context-strip"><strong>未开放客户资料</strong><span>当前模板没有 CRM 客户读取权限，可继续使用手工样例变量。</span></div>}

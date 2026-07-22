@@ -45,6 +45,10 @@ function checkElement(opening, children, source) {
   }
 
   const className = attributes.get("className") ?? "";
+  if (tag === "button" && !attributes.has("type")) {
+    fail(opening, source, "原生按钮必须显式声明 type，防止表单内误提交");
+  }
+
   if (tag === "button" && className.includes("icon-button")) {
     const hasAccessibleName = attributes.has("aria-label") || hasVisibleText(children, source);
     if (!hasAccessibleName) fail(opening, source, "纯图标按钮必须提供 aria-label");
