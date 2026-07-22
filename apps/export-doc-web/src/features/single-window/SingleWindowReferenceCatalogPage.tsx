@@ -18,6 +18,7 @@ import {
 import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import {
   buildColumnMapState,
   buildExcelImportRequest,
@@ -60,6 +61,7 @@ export function SingleWindowReferenceCatalogPage({
   client: ExportDocManagerApiClient;
   canManageReferenceCatalog: boolean;
 }) {
+  const requestConfirmation = useConfirmation();
   const queryClient = useQueryClient();
   const jsonImportInputRef = useRef<HTMLInputElement | null>(null);
   const excelImportInputRef = useRef<HTMLInputElement | null>(null);
@@ -298,13 +300,13 @@ export function SingleWindowReferenceCatalogPage({
     setContextMenu(null);
   }
 
-  function deleteContextRow() {
+  async function deleteContextRow() {
     const position = contextMenu?.cell ?? focusedCell;
     if (!position || position.rowIndex < 0 || position.rowIndex >= rows.length) {
       return;
     }
 
-    if (!window.confirm(`确定删除“${activePage.label}”第 ${position.rowIndex + 1} 行吗？`)) {
+    if (!await requestConfirmation({ title: "删除参考词典行", description: `确定删除“${activePage.label}”第 ${position.rowIndex + 1} 行吗？`, details: ["保存词典后修改才会正式生效。"], confirmLabel: "确认删除", tone: "danger" })) {
       return;
     }
 
@@ -496,16 +498,16 @@ export function SingleWindowReferenceCatalogPage({
     saveMutation.mutate(normalizeCatalog(draft));
   }
 
-  function handleReset() {
+  async function handleReset() {
     if (!canManageReferenceCatalog || isBusy) {
       return;
     }
 
-    if (!confirmDiscardChanges("恢复内置参考词典")) {
+    if (!await confirmDiscardChanges("恢复内置参考词典")) {
       return;
     }
 
-    if (!window.confirm("恢复内置会删除当前外置覆盖词典。是否继续？")) {
+    if (!await requestConfirmation({ title: "恢复内置参考词典", description: "确定恢复系统内置参考词典吗？", details: ["当前外置覆盖词典将被删除。"], confirmLabel: "恢复内置词典", tone: "danger" })) {
       return;
     }
 
@@ -537,14 +539,14 @@ export function SingleWindowReferenceCatalogPage({
     }
   }
 
-  function handleJsonImportFile(event: ChangeEvent<HTMLInputElement>) {
+  async function handleJsonImportFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file || !canManageReferenceCatalog || isBusy) {
       return;
     }
 
-    if (!confirmDiscardChanges("导入 JSON 参考词典")) {
+    if (!await confirmDiscardChanges("导入 JSON 参考词典")) {
       return;
     }
 
@@ -577,8 +579,8 @@ export function SingleWindowReferenceCatalogPage({
     previewExcelMutation.mutate(file);
   }
 
-  function handleRefreshCatalog() {
-    if (!confirmDiscardChanges("刷新参考词典")) {
+  async function handleRefreshCatalog() {
+    if (!await confirmDiscardChanges("刷新参考词典")) {
       return;
     }
 
@@ -662,7 +664,7 @@ export function SingleWindowReferenceCatalogPage({
           <button
             className="icon-button"
             type="button"
-            title="刷新"
+            title="刷新" aria-label="刷新"
             disabled={isBusy}
             onClick={handleRefreshCatalog}
           >
@@ -812,7 +814,10 @@ export function SingleWindowReferenceCatalogPage({
       <div
         className="table-frame reference-catalog-table-frame"
         ref={tableFrameRef}
+        role="region"
+        aria-label="单一窗口参考目录编辑表"
         aria-busy={isBusy}
+        tabIndex={0}
         onContextMenu={handleCatalogContextMenu}
         onKeyDown={handleCatalogKeyDown}
         onPaste={handleCatalogPaste}
@@ -859,7 +864,7 @@ export function SingleWindowReferenceCatalogPage({
                     <button
                       className="icon-button danger-icon"
                       type="button"
-                      title="删除"
+                      title="删除" aria-label="删除"
                       disabled={!canManageReferenceCatalog || isBusy}
                       onClick={() => deleteRow(index)}
                     >

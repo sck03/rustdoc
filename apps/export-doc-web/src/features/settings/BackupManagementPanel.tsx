@@ -11,6 +11,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { NumberField, SelectField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { formatBytes, formatRuntimeDate } from "./settingsFormatters.ts";
 
 export default function BackupManagementPanel({
@@ -208,7 +209,7 @@ export default function BackupManagementPanel({
       <div className="section-header">
         <h2>数据备份与还原</h2>
         <div className="toolbar-actions">
-          <button className="icon-button" type="button" title="刷新备份" disabled={!canManageSettings || isBusy} onClick={refreshBackups}>
+          <button className="icon-button" type="button" title="刷新备份" aria-label="刷新备份" disabled={!canManageSettings || isBusy} onClick={refreshBackups}>
             <RefreshCw size={18} aria-hidden="true" />
           </button>
           <button
@@ -322,7 +323,7 @@ export default function BackupManagementPanel({
           <span>还原数据库</span>
         </button>
       </div>
-      <div className="table-frame backup-table-frame">
+      <ResponsiveTableFrame className="backup-table-frame" label="数据库备份列表">
         <table className="backup-table" aria-label="数据库备份列表">
           <thead>
             <tr>
@@ -358,7 +359,7 @@ export default function BackupManagementPanel({
             )}
           </tbody>
         </table>
-      </div>
+      </ResponsiveTableFrame>
     </section>
   );
 }

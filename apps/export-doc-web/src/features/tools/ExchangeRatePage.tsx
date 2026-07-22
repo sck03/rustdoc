@@ -7,6 +7,7 @@ import {
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 export function ExchangeRatePage({ client }: { client: ExportDocManagerApiClient }) {
   const [ratesResult, setRatesResult] = useState<ApiExchangeRateListResponse | null>(null);
@@ -67,13 +68,13 @@ export function ExchangeRatePage({ client }: { client: ExportDocManagerApiClient
           <span>{ratesResult?.sourceUrl || "中国银行汇率源"}</span>
         </div>
         <div className="toolbar-actions">
-          <button className="icon-button" type="button" title="读取可用货币" disabled={isBusy} onClick={loadAvailableCurrencies}>
+          <button className="icon-button" type="button" title="读取可用货币" aria-label="读取可用货币" disabled={isBusy} onClick={loadAvailableCurrencies}>
             <ListChecks size={18} aria-hidden="true" />
           </button>
-          <button className="icon-button" type="button" title="刷新汇率" disabled={isBusy} onClick={() => refreshRates(false)}>
+          <button className="icon-button" type="button" title="刷新汇率" aria-label="刷新汇率" disabled={isBusy} onClick={() => refreshRates(false)}>
             <RefreshCw size={18} aria-hidden="true" />
           </button>
-          <button className="icon-button solid" type="button" title="强制刷新汇率" disabled={isBusy} onClick={() => refreshRates(true)}>
+          <button className="icon-button solid" type="button" title="强制刷新汇率" aria-label="强制刷新汇率" disabled={isBusy} onClick={() => refreshRates(true)}>
             <RotateCcw size={18} aria-hidden="true" />
           </button>
         </div>
@@ -98,7 +99,7 @@ export function ExchangeRatePage({ client }: { client: ExportDocManagerApiClient
               <span>{ratesResult?.statusText || "等待获取"}</span>
             </div>
           </div>
-          <div className="table-frame exchange-rate-table-frame">
+          <ResponsiveTableFrame className="exchange-rate-table-frame" label="汇率查询结果">
             <table className="exchange-rate-table">
               <thead>
                 <tr>
@@ -124,7 +125,7 @@ export function ExchangeRatePage({ client }: { client: ExportDocManagerApiClient
                 ) : null}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTableFrame>
         </section>
 
         <section className="form-section exchange-rate-currency-section" aria-label="可用货币">

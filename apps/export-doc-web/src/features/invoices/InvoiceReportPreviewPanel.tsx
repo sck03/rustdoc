@@ -10,6 +10,7 @@ import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../..
 import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
+import { PermissionNotice } from "../../ui/PageState.tsx";
 import { buildReportPdfDefaultFileName } from "../reports/reportFileNames.ts";
 import { printReportPreviewHtml } from "../reports/printReportPreview.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
@@ -803,9 +804,9 @@ export function InvoiceReportPreviewPanel({
         onPreview={() => previewMutation.mutate()} onPrint={() => void printPreview()} onRefresh={() => void templatesQuery.refetch()}
       />
       {!reportOutputPermission.canOperate ? (
-        <div className="permission-readonly-notice">
+        <PermissionNotice>
           当前模板仅允许查看发票，未授予报表预览和单据输出操作权限。
-        </div>
+        </PermissionNotice>
       ) : null}
       <InvoiceReportTemplateControls
         canConfigureOutput={reportOutputPermission.canOperate}

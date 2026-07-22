@@ -6,6 +6,7 @@ import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
@@ -74,7 +75,7 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
 
       <section className="form-section" aria-label="近期跟进待办">
         <div className="section-header"><h2>近期跟进待办</h2></div>
-        <div className="table-frame">
+        <ResponsiveTableFrame label="近期跟进待办" mobileLayout="scroll" busy={query.isFetching}>
           <table className="dashboard-recent-table responsive-data-table">
             <thead><tr><th>客户</th><th data-table-priority="secondary">联系人</th><th>下次动作</th><th>提醒时间</th></tr></thead>
             <tbody>
@@ -87,32 +88,32 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
               {!query.isFetching && (dashboard?.upcomingFollowUps.length ?? 0) === 0 ? <tr><td className="empty-cell" colSpan={4}>暂无待跟进事项</td></tr> : null}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableFrame>
       </section>
 
       <div className="two-column-layout">
         <section className="form-section" aria-label="商机阶段漏斗">
           <div className="section-header"><h2>商机阶段漏斗</h2></div>
-          <div className="table-frame"><table className="data-table responsive-data-table"><thead><tr><th>阶段</th><th>数量</th></tr></thead><tbody>
+          <ResponsiveTableFrame label="商机阶段漏斗" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>阶段</th><th>数量</th></tr></thead><tbody>
             {(dashboard?.opportunityStages ?? []).map((item) => <tr className="clickable-row" key={item.stage} onClick={() => navigate("/crm/opportunities")}><td><BusinessStatusBadge value={item.stage} /></td><td>{item.count}</td></tr>)}
             {!dashboard?.opportunityStages.length ? <tr><td className="empty-cell" colSpan={2}>暂无商机阶段数据。</td></tr> : null}
-          </tbody></table></div>
+          </tbody></table></ResponsiveTableFrame>
         </section>
         <section className="form-section" aria-label="商机金额汇总">
           <div className="section-header"><h2>进行中商机金额</h2><span>按币种分组</span></div>
-          <div className="table-frame"><table className="data-table responsive-data-table"><thead><tr><th>币种</th><th>商机数</th><th>预计金额</th><th>加权金额</th></tr></thead><tbody>
+          <ResponsiveTableFrame label="进行中商机金额" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>币种</th><th>商机数</th><th>预计金额</th><th>加权金额</th></tr></thead><tbody>
             {(dashboard?.opportunityCurrencies ?? []).map((item) => <tr key={item.currency}><td>{item.currency}</td><td>{item.count}</td><td>{formatAmount(item.estimatedAmount)}</td><td>{formatAmount(item.weightedAmount)}</td></tr>)}
             {!dashboard?.opportunityCurrencies.length ? <tr><td className="empty-cell" colSpan={4}>暂无进行中商机金额。</td></tr> : null}
-          </tbody></table></div>
+          </tbody></table></ResponsiveTableFrame>
         </section>
       </div>
 
       <section className="form-section" aria-label="近期预计成交">
         <div className="section-header"><h2>未来 30 天预计成交</h2></div>
-        <div className="table-frame"><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th data-table-priority="secondary">阶段</th><th>预计金额</th><th data-table-priority="secondary">概率</th><th>预计日期</th></tr></thead><tbody>
+        <ResponsiveTableFrame label="未来 30 天预计成交" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th data-table-priority="secondary">阶段</th><th>预计金额</th><th data-table-priority="secondary">概率</th><th>预计日期</th></tr></thead><tbody>
           {(dashboard?.upcomingOpportunityClosings ?? []).map((item) => <tr className="clickable-row" key={item.id} onClick={() => navigate("/crm/opportunities")}><td><TablePrimaryText value={item.title} /></td><td><TablePrimaryText value={item.customerName} /></td><td data-table-priority="secondary"><BusinessStatusBadge value={item.stage} /></td><td>{item.currency} {formatAmount(item.estimatedAmount)}</td><td data-table-priority="secondary">{item.probabilityPercent}%</td><td>{formatDate(item.expectedCloseAt)}</td></tr>)}
           {!dashboard?.upcomingOpportunityClosings.length ? <tr><td className="empty-cell" colSpan={6}>未来 30 天暂无预计成交商机。</td></tr> : null}
-        </tbody></table></div>
+        </tbody></table></ResponsiveTableFrame>
       </section>
     </section>
   );

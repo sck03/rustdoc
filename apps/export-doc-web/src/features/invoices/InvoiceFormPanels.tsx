@@ -211,13 +211,16 @@ export function InvoicePartiesPanel({
     <section className="form-section" aria-label="客户与出口商">
       <div className="section-header">
         <h2>客户与出口商</h2>
-        <button className="icon-button" type="button" title="刷新客户和出口商" disabled={isBusy} onClick={onRefresh}>
+        <button className="icon-button" type="button" title="刷新客户和出口商" aria-label="刷新客户和出口商" disabled={isBusy} onClick={onRefresh}>
           <RefreshCw size={17} aria-hidden="true" />
         </button>
       </div>
       {message ? <div className="alert">{message}</div> : null}
-      <div className="field-grid">
-        <SelectField
+      <div className="invoice-party-groups">
+        <section className="invoice-party-group" aria-label="客户信息">
+          <div className="invoice-party-group-heading"><strong>客户信息</strong><span>选择客户档案后可继续调整本张发票内容</span></div>
+          <div className="field-grid">
+          <SelectField
           label="客户档案"
           value={invoice.customerId && invoice.customerId > 0 ? String(invoice.customerId) : ""}
           disabled={isBusy || !isEditable}
@@ -227,7 +230,41 @@ export function InvoicePartiesPanel({
           }))}
           onChange={applyCustomer}
         />
-        <SelectField
+          <TextField
+            className="field-grid-span-2"
+            label="客户英文名"
+            value={invoice.customerNameEN}
+            disabled={!isEditable}
+            onChange={(value) => onChange({ customerNameEN: value })}
+          />
+          <TextField
+            className="field-grid-span-all"
+            label="客户地址"
+            value={invoice.customerAddressEN ?? ""}
+            disabled={!isEditable}
+            onChange={(value) => onChange({ customerAddressEN: value })}
+          />
+          </div>
+        </section>
+
+        <section className="invoice-party-group" aria-label="通知人信息">
+          <div className="invoice-party-group-heading"><strong>通知人信息</strong><span>与客户不同的收货通知对象可单独填写</span></div>
+          <div className="field-grid">
+            <TextField className="field-grid-span-all" label="通知人" value={invoice.notifyPartyName ?? ""} disabled={!isEditable} onChange={(value) => onChange({ notifyPartyName: value })} />
+            <TextField
+              className="field-grid-span-all"
+              label="通知人地址"
+              value={invoice.notifyPartyAddress ?? ""}
+              disabled={!isEditable}
+              onChange={(value) => onChange({ notifyPartyAddress: value })}
+            />
+          </div>
+        </section>
+
+        <section className="invoice-party-group invoice-party-group-exporter" aria-label="出口商与收款信息">
+          <div className="invoice-party-group-heading"><strong>出口商与收款信息</strong><span>企业身份、地址、海关信息和银行资料集中维护</span></div>
+          <div className="field-grid">
+          <SelectField
           label="出口商档案"
           value={invoice.exporterId && invoice.exporterId > 0 ? String(invoice.exporterId) : ""}
           disabled={isBusy || !isEditable}
@@ -236,28 +273,6 @@ export function InvoicePartiesPanel({
             label: exporter.exporterNameEN || exporter.exporterNameCN || "-",
           }))}
           onChange={applyExporter}
-        />
-        <TextField
-          className="field-grid-span-2"
-          label="客户英文名"
-          value={invoice.customerNameEN}
-          disabled={!isEditable}
-          onChange={(value) => onChange({ customerNameEN: value })}
-        />
-        <TextField
-          className="field-grid-span-2"
-          label="客户地址"
-          value={invoice.customerAddressEN ?? ""}
-          disabled={!isEditable}
-          onChange={(value) => onChange({ customerAddressEN: value })}
-        />
-        <TextField label="通知人" value={invoice.notifyPartyName ?? ""} disabled={!isEditable} onChange={(value) => onChange({ notifyPartyName: value })} />
-        <TextField
-          className="field-grid-span-2"
-          label="通知人地址"
-          value={invoice.notifyPartyAddress ?? ""}
-          disabled={!isEditable}
-          onChange={(value) => onChange({ notifyPartyAddress: value })}
         />
         <TextField
           className="field-grid-span-2"
@@ -305,6 +320,8 @@ export function InvoicePartiesPanel({
         />
         <TextField label="SWIFT" value={invoice.swiftCode ?? ""} disabled={!isEditable} onChange={(value) => onChange({ swiftCode: value })} />
         <NumberField label="汇率" value={invoice.exchangeRate ?? 0} step="0.0001" disabled={!isEditable} onChange={(value) => onChange({ exchangeRate: value })} />
+          </div>
+        </section>
       </div>
     </section>
   );
@@ -671,7 +688,7 @@ export function InvoiceMarksAndItemsPanel({
               <span>明细工作台</span>
             </button>
           ) : null}
-          <button className="icon-button" type="button" title="新增商品明细" disabled={!isEditable} onClick={onAddItem}>
+          <button className="icon-button" type="button" title="新增商品明细" aria-label="新增商品明细" disabled={!isEditable} onClick={onAddItem}>
             <Plus size={17} aria-hidden="true" />
           </button>
         </div>

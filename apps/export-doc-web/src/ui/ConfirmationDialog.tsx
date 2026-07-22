@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from "react";
 import { AlertTriangle, X } from "lucide-react";
+import { Button, IconButton } from "./Button.tsx";
 
 export function ConfirmationDialog({
   title,
@@ -23,18 +24,51 @@ export function ConfirmationDialog({
   const titleId = useId();
   const descriptionId = useId();
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const previouslyFocusedElement = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     cancelButtonRef.current?.focus();
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape" && !isBusy) {
+        event.preventDefault();
         onCancel();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusableElements = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      previouslyFocusedElement?.focus();
+    };
   }, [isBusy, onCancel]);
 
   return (
@@ -48,6 +82,7 @@ export function ConfirmationDialog({
       }}
     >
       <div
+        ref={dialogRef}
         className={`confirmation-dialog confirmation-dialog-${tone}`}
         role="dialog"
         aria-modal="true"
@@ -62,9 +97,9 @@ export function ConfirmationDialog({
             <h2 id={titleId}>{title}</h2>
             <p id={descriptionId}>{description}</p>
           </div>
-          <button className="icon-button" type="button" title="关闭" disabled={isBusy} onClick={onCancel}>
+          <IconButton label="关闭确认窗口" disabled={isBusy} onClick={onCancel}>
             <X size={18} aria-hidden="true" />
-          </button>
+          </IconButton>
         </header>
 
         {details?.length ? (
@@ -76,17 +111,15 @@ export function ConfirmationDialog({
         ) : null}
 
         <footer className="confirmation-dialog-footer">
-          <button ref={cancelButtonRef} className="command-button secondary" type="button" disabled={isBusy} onClick={onCancel}>
-            取消
-          </button>
-          <button
-            className="command-button confirmation-dialog-confirm"
-            type="button"
+          <Button ref={cancelButtonRef} variant="secondary" disabled={isBusy} onClick={onCancel}>取消</Button>
+          <Button
+            variant="primary"
+            className="confirmation-dialog-confirm"
             disabled={isBusy}
             onClick={onConfirm}
           >
             {isBusy ? "处理中…" : confirmLabel}
-          </button>
+          </Button>
         </footer>
       </div>
     </div>

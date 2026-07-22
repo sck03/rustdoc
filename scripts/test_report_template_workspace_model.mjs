@@ -18,6 +18,8 @@ const modelPath = path.join(
   "reports",
   "reportTemplateDesignerModel.ts",
 );
+const reportWorkspaceCss = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "reportWorkspace.css"), "utf8");
+const responsiveOverridesCss = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "responsiveOverrides.css"), "utf8");
 const modelImportSpecifier = `./${path.relative(workspaceRoot, modelPath).replaceAll("\\", "/")}`;
 
 fs.mkdirSync(workspaceRoot, { recursive: true });
@@ -84,10 +86,29 @@ assertEqual(resolvePreviewSourceId(9, [1, 2]), 9, "已有预览源应保持不�
 assertEqual(resolvePreviewSourceId(0, [0, -1, 6, 7]), 6, "应选择第一个有效预览源");
 assertEqual(resolvePreviewSourceId(0, []), 0, "无预览源时应保持未选择");
 
+assertMatch(
+  reportWorkspaceCss,
+  /\.report-template-sidebar\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1\.8fr\)\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/,
+  "宽屏模板选择、我的模板、模板操作和模板包应保持四栏",
+);
+assertMatch(reportWorkspaceCss, /\.template-selection-panel\s*\{\s*grid-column:\s*1;\s*grid-row:\s*1;/, "选择区应固定在宽屏第一列");
+assertMatch(reportWorkspaceCss, /\.template-package-panel\s*\{\s*grid-column:\s*4;\s*grid-row:\s*1;/, "模板包应固定在宽屏第四列而不是换行");
+assertMatch(
+  responsiveOverridesCss,
+  /@media\s*\(min-width:\s*861px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.report-template-sidebar\s*\{\s*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)[\s\S]*?\.template-selection-panel\s*\{\s*grid-column:\s*span 3/,
+  "中等宽度应让选择区独占首行，其余三个模板面板同排",
+);
+
 console.log("report-template-workspace-model tests passed");
 
 function assertEqual(actual, expected, message) {
   if (actual !== expected) {
     throw new Error(`${message}: expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}`);
+  }
+}
+
+function assertMatch(actual, expected, message) {
+  if (!expected.test(actual)) {
+    throw new Error(`${message}: pattern ${expected} not found`);
   }
 }

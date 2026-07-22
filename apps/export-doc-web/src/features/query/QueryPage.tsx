@@ -10,6 +10,7 @@ import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../..
 import { readStoredJson, writeStoredJson } from "../../ui/browserStorage.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { formatAmount, formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
@@ -315,10 +316,10 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
           </label>
         </div>
         <div className="toolbar-actions">
-          <button className="icon-button" type="button" title="刷新" disabled={isBusy} onClick={() => void invoiceQuery.refetch()}>
+          <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void invoiceQuery.refetch()}>
             <RefreshCw size={18} aria-hidden="true" />
           </button>
-          <button className="icon-button solid" type="submit" title="查询" disabled={isBusy}>
+          <button className="icon-button solid" type="submit" title="查询" aria-label="查询" disabled={isBusy}>
             <Search size={18} aria-hidden="true" />
           </button>
         </div>
@@ -348,7 +349,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
               </DesktopIconButton>
             ) : null}
             {isDesktop ? renderOpenPathAction(exportPath, "打开导出文件", (text) => setActionMessage({ kind: "error", text })) : null}
-            <button className="icon-button solid" type="button" title="导出 Excel" disabled={!canExport} onClick={handleExport}>
+            <button className="icon-button solid" type="button" title="导出 Excel" aria-label="导出 Excel" disabled={!canExport} onClick={handleExport}>
               <Download size={18} aria-hidden="true" />
             </button>
           </div>
@@ -392,7 +393,7 @@ function QueryResultTable({
   }
 
   return (
-    <div className="table-frame query-table-frame" aria-busy={isBusy}>
+    <ResponsiveTableFrame label="发票综合查询结果" className="query-table-frame" busy={isBusy} mobileLayout="scroll">
       <table className="query-table">
         <thead>
           <tr>
@@ -447,7 +448,7 @@ function QueryResultTable({
           )}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableFrame>
   );
 }
 

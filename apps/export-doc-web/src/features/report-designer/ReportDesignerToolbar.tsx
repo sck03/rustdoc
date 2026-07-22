@@ -84,10 +84,10 @@ export function ReportDesignerToolbar({
           <FilePlus2 size={17} aria-hidden="true" />
           <span>分页符</span>
         </button>
-        <button className="icon-button" type="button" title="撤销" disabled={!canUndo} onClick={onUndo}>
+        <button className="icon-button" type="button" title="撤销" aria-label="撤销" disabled={!canUndo} onClick={onUndo}>
           <Undo2 size={18} aria-hidden="true" />
         </button>
-        <button className="icon-button" type="button" title="重做" disabled={!canRedo} onClick={onRedo}>
+        <button className="icon-button" type="button" title="重做" aria-label="重做" disabled={!canRedo} onClick={onRedo}>
           <Redo2 size={18} aria-hidden="true" />
         </button>
         <button className="command-button secondary" type="button" onClick={onReset}>

@@ -9,11 +9,15 @@ import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { OperationFeedback, errorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { PermissionNotice } from "../../ui/PageState.tsx";
 
 type SupplierTaskView = "overview" | "directory" | "profile" | "contacts" | "products" | "assessments" | "import";
 
 export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiClient }) {
   const supplierPermission = useModulePermission("sales.suppliers");
+  const requestConfirmation = useConfirmation();
   const [suppliers, setSuppliers] = useState<ApiSupplierDto[]>([]);
   const [contacts, setContacts] = useState<ApiSupplierContactDto[]>([]);
   const [supplierId, setSupplierId] = useState(0);
@@ -66,7 +70,7 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
   }
 
   async function deleteSupplier() {
-    if (!supplierPermission.canManage || !selectedSupplier || !window.confirm(`删除供应商“${selectedSupplier.name}”及其联系人？`)) return;
+    if (!supplierPermission.canManage || !selectedSupplier || !await requestConfirmation({ title: "删除供应商", description: `确定删除供应商“${selectedSupplier.name}”吗？`, details: ["该供应商的联系人将一并删除。", "已生成的历史业务记录不会被改写。"], confirmLabel: "确认删除", tone: "danger" })) return;
     try { await client.deleteSupplier({ id: selectedSupplier.id }); await loadSuppliers(); setView("directory"); setFeedback(successFeedback("供应商已删除。")); }
     catch (error) { setFeedback(errorFeedback(readApiError(error))); }
   }
@@ -84,7 +88,7 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
   }
 
   async function deleteContact() {
-    if (!supplierPermission.canManage || !selectedContact || !window.confirm(`删除联系人“${selectedContact.name}”？`)) return;
+    if (!supplierPermission.canManage || !selectedContact || !await requestConfirmation({ title: "删除供应商联系人", description: `确定删除联系人“${selectedContact.name}”吗？`, confirmLabel: "确认删除", tone: "danger" })) return;
     try {
       await client.deleteSupplierContact({ supplierId, id: selectedContact.id });
       const rows = await client.listSupplierContacts({ supplierId });
@@ -130,7 +134,7 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
   return <section className="work-surface">
     <div className="section-heading-row"><div><h2>供应商与联系人</h2><p>独立维护常用供应商资料，不与客户 CRM 或单证客户混用。</p></div></div>
     <OperationFeedback feedback={feedback} />
-    {!supplierPermission.canOperate ? <div className="permission-readonly-notice">当前权限模板仅允许查看供应商、联系人、供货关系和评价；新增、导入、修改与状态调整已禁用。</div> : null}
+    {!supplierPermission.canOperate ? <PermissionNotice>当前权限模板仅允许查看供应商、联系人、供货关系和评价；新增、导入、修改与状态调整已禁用。</PermissionNotice> : null}
     <TaskViewTabs value={view} label="供应商工作区" onChange={setView} items={[
       { id: "overview", label: "采购概览" }, { id: "directory", label: "供应商目录" }, { id: "profile", label: newSupplier ? "新建供应商" : "供应商资料", disabled: newSupplier && !supplierPermission.canOperate },
       { id: "contacts", label: "供应商联系人", disabled: !selectedSupplier || newSupplier },
@@ -149,9 +153,9 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
         </select> : null}
       </div>
       {importPreview ? <><p>共 {importPreview.totalRows} 行，有效 {importPreview.validRows} 行，重复 {importPreview.duplicateRows} 行。</p>
-        <div className="table-frame"><table className="data-table"><thead><tr><th>行</th><th>供应商</th><th>分类</th><th>联系人</th><th>结果</th></tr></thead><tbody>
+        <ResponsiveTableFrame label="供应商导入预览" mobileLayout="scroll"><table className="data-table"><thead><tr><th>行</th><th>供应商</th><th>分类</th><th>联系人</th><th>结果</th></tr></thead><tbody>
           {importPreview.rows.slice(0, 30).map((row) => <tr key={row.rowNumber}><td>{row.rowNumber}</td><td>{row.name || "-"}</td><td>{row.category || "-"}</td><td>{row.contactName || "-"}</td><td>{row.error || (row.isDuplicate ? "重复，跳过" : "可导入")}</td></tr>)}
-        </tbody></table></div></> : null}
+        </tbody></table></ResponsiveTableFrame></> : null}
     </section> : null}
     {view === "directory" ? <section className="form-section"><div className="section-header"><div><h3>供应商目录</h3><p className="section-description">查找供货单位并进入资料、联系人或供应产品。</p></div><div className="section-header-actions"><span>共 {page?.totalCount ?? 0} 家</span>{supplierPermission.canOperate ? <button className="primary-button" type="button" onClick={() => { setNewSupplier(true); setView("profile"); }}>新建供应商</button> : null}</div></div>
       <form className="toolbar" onSubmit={(event) => { event.preventDefault(); setKeyword(keywordInput.trim()); setPageNumber(1); }}>
@@ -159,10 +163,10 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
         <select value={status} onChange={(event) => { setStatus(event.target.value); setPageNumber(1); }}><option value="">全部状态</option><option>合作中</option><option>考察中</option><option>暂停</option><option>停用</option></select>
         <button className="secondary-button">搜索</button>
       </form>
-      <div className="table-frame"><table className="data-table responsive-data-table"><thead><tr>{supplierPermission.canOperate ? <th><input type="checkbox" aria-label="选择本页" checked={(page?.items.length ?? 0) > 0 && page!.items.every((item) => selectedIds.includes(item.id))} onChange={(event) => setSelectedIds(event.target.checked ? Array.from(new Set([...selectedIds, ...(page?.items.map((item) => item.id) ?? [])])) : selectedIds.filter((id) => !page?.items.some((item) => item.id === id)))} /></th> : null}<th>供应商</th><th data-table-priority="secondary">分类</th><th data-table-priority="secondary">主要产品</th><th>状态</th><th /></tr></thead><tbody>
+      <ResponsiveTableFrame label="供应商目录" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr>{supplierPermission.canOperate ? <th><input type="checkbox" aria-label="选择本页" checked={(page?.items.length ?? 0) > 0 && page!.items.every((item) => selectedIds.includes(item.id))} onChange={(event) => setSelectedIds(event.target.checked ? Array.from(new Set([...selectedIds, ...(page?.items.map((item) => item.id) ?? [])])) : selectedIds.filter((id) => !page?.items.some((item) => item.id === id)))} /></th> : null}<th>供应商</th><th data-table-priority="secondary">分类</th><th data-table-priority="secondary">主要产品</th><th>状态</th><th /></tr></thead><tbody>
         {(page?.items ?? []).map((item) => <tr key={item.id}>{supplierPermission.canOperate ? <td><input type="checkbox" aria-label={`选择供应商 ${item.name}`} checked={selectedIds.includes(item.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /></td> : null}<td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.category || "-"}</td><td data-table-priority="secondary">{item.mainProducts || "-"}</td><td><BusinessStatusBadge value={item.status} /></td><td><button className="secondary-button" type="button" onClick={() => { setSupplierId(item.id); setNewSupplier(false); setView("profile"); }}>打开</button></td></tr>)}
         {!page?.items.length ? <tr><td className="empty-cell" colSpan={supplierPermission.canOperate ? 6 : 5}><div className="empty-cell-content"><strong>暂无供应商</strong><span>{supplierPermission.canOperate ? "先建立供应商资料，再按需添加联系人和关联供应产品。" : "当前没有可查看的供应商。"}</span>{supplierPermission.canOperate ? <div className="form-actions"><button className="primary-button" type="button" onClick={() => { setNewSupplier(true); setView("profile"); }}>建立第一家供应商</button><button className="secondary-button" type="button" onClick={() => setView("import")}>从文件导入</button></div> : null}</div></td></tr> : null}
-      </tbody></table></div>
+      </tbody></table></ResponsiveTableFrame>
       <div className="form-actions"><button className="secondary-button" disabled={!page?.hasPreviousPage} onClick={() => setPageNumber((v) => v - 1)}>上一页</button><span>第 {page?.pageNumber ?? 1} / {Math.max(page?.totalPages ?? 1, 1)} 页</span><button className="secondary-button" disabled={!page?.hasNextPage} onClick={() => setPageNumber((v) => v + 1)}>下一页</button></div>
     </section> : null}
     {view === "profile" ? <form className="form-grid" key={newSupplier ? "new" : selectedSupplier?.id ?? "empty"} onSubmit={saveSupplier}>
@@ -180,10 +184,10 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
       <div className="section-header"><div><h3>{contactView === "directory" ? "供应商联系人目录" : selectedContact ? "编辑供应商联系人" : "新增供应商联系人"}</h3><p className="section-description">联系人只归属 {selectedSupplier.name}，不写入客户 CRM。</p></div><span>{contacts.length} 位</span></div>
       {contactView === "directory" ? <>
         <div className="section-header-actions supplier-contact-directory-actions"><button className="secondary-button" type="button" onClick={() => setView("profile")}>返回供应商资料</button>{supplierPermission.canOperate ? <button className="primary-button" type="button" onClick={() => { setContactId(0); setContactView("editor"); }}>新增联系人</button> : null}</div>
-        <div className="table-frame"><table className="data-table responsive-data-table"><thead><tr><th>联系人</th><th data-table-priority="secondary">职位</th><th>邮箱</th><th data-table-priority="secondary">电话</th><th>类型</th><th /></tr></thead><tbody>
+        <ResponsiveTableFrame label="供应商联系人" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>联系人</th><th data-table-priority="secondary">职位</th><th>邮箱</th><th data-table-priority="secondary">电话</th><th>类型</th><th /></tr></thead><tbody>
           {contacts.map((item) => <tr key={item.id}><td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.title || "-"}</td><td><TablePrimaryText value={item.email} /></td><td data-table-priority="secondary">{item.phone || "-"}</td><td>{item.isPrimary ? <BusinessStatusBadge value="主要联系人" /> : "普通联系人"}</td><td><button className="secondary-button" type="button" onClick={() => { setContactId(item.id); setContactView("editor"); }}>{supplierPermission.canOperate ? "编辑" : "查看"}</button></td></tr>)}
           {!contacts.length ? <tr><td className="empty-cell" colSpan={6}><div className="empty-cell-content"><strong>尚未建立供应商联系人</strong><span>{supplierPermission.canOperate ? "需要记录询价、交期或付款沟通对象时，再添加联系人。" : "当前供应商还没有联系人。"}</span>{supplierPermission.canOperate ? <button className="primary-button" type="button" onClick={() => { setContactId(0); setContactView("editor"); }}>添加第一位联系人</button> : null}</div></td></tr> : null}
-        </tbody></table></div>
+        </tbody></table></ResponsiveTableFrame>
       </> : <form className="form-grid" key={selectedContact?.id ?? `new-${supplierId}`} onSubmit={saveContact}>
         <div className="section-heading-row"><h4>{selectedContact ? "编辑联系人资料" : "新增联系人资料"}</h4><button className="secondary-button" type="button" onClick={() => setContactView("directory")}>返回联系人目录</button></div>
         <div className="form-field-wide context-strip"><strong>{selectedSupplier.name}</strong><span>联系人只归属当前供应商，不写入客户 CRM。</span></div>

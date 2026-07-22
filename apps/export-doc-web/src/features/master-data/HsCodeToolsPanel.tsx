@@ -10,6 +10,7 @@ import { isDesktopBridgeAvailable,selectExcelFile } from "../../desktop/desktopB
 import {
 readApiError
 } from "../../ui/formUtils.ts";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 
 import {
@@ -370,7 +371,7 @@ export function HsCodeToolsPanel({
                 <strong>{workspace === "import" ? "智能导入向导" : "联网查询"}</strong>
                 <span>{workspace === "import" ? "先分析文件，确认差异后才写入本地库" : "联网结果不会自动覆盖本地资料"}</span>
               </div>
-              {mode === "hub" ? <button className="icon-button" type="button" title="关闭" disabled={isBusy} onClick={closeWorkspace}><X size={18} /></button> : null}
+              {mode === "hub" ? <button className="icon-button" type="button" title="关闭" aria-label="关闭" disabled={isBusy} onClick={closeWorkspace}><X size={18} /></button> : null}
             </header>
 
             {workspace === "import" ? (
@@ -478,11 +479,11 @@ function HsCodeImportPreview({
       </div>
       {preview.warnings.map((warning) => <div className="warning-note" key={warning}>{warning}</div>)}
       <details className="hs-code-column-mapping"><summary>查看识别到的字段映射</summary><div>{preview.columns.map((column) => <span key={column.field}>{column.header} → {hsCodeImportFieldLabel(column.field)}（{column.confidence}%）</span>)}</div></details>
-      <div className="table-frame hs-code-preview-table-frame">
+      <ResponsiveTableFrame label="HS 编码导入预览" className="hs-code-preview-table-frame" mobileLayout="scroll">
         <table><thead><tr><th>处理</th><th>Excel 行</th><th>编码</th><th>名称</th><th>说明</th></tr></thead><tbody>
           {preview.items.map((row, index) => <tr key={`${row.changeType}-${row.item.code}-${row.rowNumber}-${index}`}><td><span className={`hs-code-change-badge change-${row.changeType.toLowerCase()}`}>{labels[row.changeType] ?? row.changeType}</span></td><td>{row.rowNumber || "-"}</td><td>{row.item.code || "-"}</td><td>{row.item.name || "-"}</td><td>{row.message}{row.replacementCandidates.length ? ` 候选：${row.replacementCandidates.join("、")}` : ""}</td></tr>)}
         </tbody></table>
-      </div>
+      </ResponsiveTableFrame>
       <div className="hs-code-preview-actions"><button className="command-button secondary" type="button" disabled={busy} onClick={onBack}>重新选择</button><button className="command-button" type="button" disabled={busy || preview.conflictCount + preview.invalidCount > 0 && preview.addCount + preview.updateCount + preview.suspectedObsoleteCount === 0} onClick={onCommit}>{busy ? "正在导入" : "确认导入"}</button></div>
     </div>
   );
@@ -517,13 +518,13 @@ function HsCodeRemoteResults({ items, expandedResultKey, setExpandedResultKey, i
   fetchDetail: (item: ApiHsCodeDto) => void;
   saveItem: (item: ApiHsCodeDto) => void;
 }) {
-  return <div className="table-frame hs-code-remote-table-frame"><table className="hs-code-remote-table" aria-label="HS 编码联网结果"><thead><tr><th>编码</th><th>名称</th><th>来源证据</th><th>单位</th><th>退税率</th><th>监管条件</th><th className="row-actions-cell">操作</th></tr></thead><tbody>
+  return <ResponsiveTableFrame label="HS 编码联网结果" className="hs-code-remote-table-frame" mobileLayout="scroll"><table className="hs-code-remote-table" aria-label="HS 编码联网结果"><thead><tr><th>编码</th><th>名称</th><th>来源证据</th><th>单位</th><th>退税率</th><th>监管条件</th><th className="row-actions-cell">操作</th></tr></thead><tbody>
     {items.map((item, index) => {
       const key = buildHsCodeResultKey(item, index);
       const expanded = expandedResultKey === key;
-      return <Fragment key={key}><tr><td className="strong-cell">{item.code || "-"}</td><td>{item.name || "-"}</td><td><span className="remote-evidence-kind">{remoteRecordKindLabel(item.remoteRecordKind)}</span><small className="remote-evidence-count">{remoteEvidenceCount(item)}</small></td><td>{item.unit || "-"}</td><td>{item.rebateRate || "-"}</td><td>{item.supervisionConditions || "-"}</td><td className="row-actions-cell"><button className="icon-button compact-icon-button" type="button" title="查看详情" onClick={() => setExpandedResultKey(expanded ? null : key)}><Eye size={15} /></button><button className="icon-button compact-icon-button" type="button" title="补全详情" disabled={isBusy || !item.detailUrl} onClick={() => fetchDetail(item)}><RefreshCw size={15} /></button><button className="icon-button compact-icon-button" type="button" title="保存为本地参考资料" disabled={isBusy || !item.code} onClick={() => saveItem(item)}><Save size={15} /></button></td></tr>{expanded ? <tr className="hs-code-detail-row"><td colSpan={7}><HsCodeRemoteDetail item={item} /></td></tr> : null}</Fragment>;
+      return <Fragment key={key}><tr><td className="strong-cell">{item.code || "-"}</td><td>{item.name || "-"}</td><td><span className="remote-evidence-kind">{remoteRecordKindLabel(item.remoteRecordKind)}</span><small className="remote-evidence-count">{remoteEvidenceCount(item)}</small></td><td>{item.unit || "-"}</td><td>{item.rebateRate || "-"}</td><td>{item.supervisionConditions || "-"}</td><td className="row-actions-cell"><button className="icon-button compact-icon-button" type="button" title="查看详情" aria-label="查看详情" onClick={() => setExpandedResultKey(expanded ? null : key)}><Eye size={15} /></button><button className="icon-button compact-icon-button" type="button" title="补全详情" aria-label="补全详情" disabled={isBusy || !item.detailUrl} onClick={() => fetchDetail(item)}><RefreshCw size={15} /></button><button className="icon-button compact-icon-button" type="button" title="保存为本地参考资料" aria-label="保存为本地参考资料" disabled={isBusy || !item.code} onClick={() => saveItem(item)}><Save size={15} /></button></td></tr>{expanded ? <tr className="hs-code-detail-row"><td colSpan={7}><HsCodeRemoteDetail item={item} /></td></tr> : null}</Fragment>;
     })}
-  </tbody></table></div>;
+  </tbody></table></ResponsiveTableFrame>;
 }
 
 function HsCodeRemoteDetail({ item }: { item: ApiHsCodeDto }) {

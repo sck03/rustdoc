@@ -17,6 +17,7 @@ import { DesktopIconButton,readDesktopError,renderOpenPathAction } from "../../u
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { PermissionNotice } from "../../ui/PageState.tsx";
 import { listPageSizeOptions,normalizeListPageSize } from "../../ui/listViewState.ts";
 
 import {
@@ -137,7 +138,7 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
           <button
             className="icon-button"
             type="button"
-            title="刷新"
+            title="刷新" aria-label="刷新"
             disabled={isBusy}
             onClick={() => void operationCenterQuery.refetch()}
           >
@@ -147,7 +148,7 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
       </div>
 
       {message ? <div className="alert">{message}</div> : null}
-      {!permission.canOperate ? <div className="permission-readonly-notice">当前权限模板仅允许查看批次和回执；提交包导入、派发、收件和目录维护已禁用。</div> : null}
+      {!permission.canOperate ? <PermissionNotice>当前权限模板仅允许查看批次和回执；提交包导入、派发、收件和目录维护已禁用。</PermissionNotice> : null}
 
       <SubmitPackageImportPanel client={client} queryClient={queryClient} canOperate={permission.canOperate} />
 

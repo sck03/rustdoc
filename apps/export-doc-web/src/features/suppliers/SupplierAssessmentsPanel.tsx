@@ -6,6 +6,8 @@ import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { TaskViewTabs } from "../../ui/TaskViewTabs.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { SupplierAssessmentAnalytics } from "./SupplierAssessmentAnalytics.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 type AssessmentView = "directory" | "analytics" | "editor";
 
@@ -16,6 +18,7 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
   canOperate: boolean;
   canManage: boolean;
 }) {
+  const requestConfirmation = useConfirmation();
   const [rows, setRows] = useState<ApiSupplierAssessmentDto[]>([]);
   const [selectedId, setSelectedId] = useState(0);
   const [view, setView] = useState<AssessmentView>("directory");
@@ -65,7 +68,7 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
   }
 
   async function remove() {
-    if (!canManage || !selected || !window.confirm(`删除 ${selected.assessedAt.slice(0, 10)} 的供应商评价？`)) return;
+    if (!canManage || !selected || !await requestConfirmation({ title: "删除供应商评价", description: `确定删除 ${selected.assessedAt.slice(0, 10)} 的供应商评价吗？`, confirmLabel: "确认删除", tone: "danger" })) return;
     try {
       await client.deleteSupplierAssessment({ supplierId, id: selected.id });
       await load();
@@ -93,7 +96,7 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
       <div className="section-header-actions supplier-assessment-actions">
         {canOperate ? <button className="primary-button" type="button" onClick={() => { setSelectedId(0); setView("editor"); }}>记录新评价</button> : null}
       </div>
-      <div className="table-frame"><table className="data-table responsive-data-table"><thead><tr>
+      <ResponsiveTableFrame label="供应商评价记录" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr>
         <th>日期与类型</th><th>综合分</th><th data-table-priority="secondary">质量</th><th data-table-priority="secondary">交期</th>
         <th data-table-priority="secondary">服务</th><th data-table-priority="secondary">价格</th><th>结论</th><th>备注</th><th />
       </tr></thead><tbody>
@@ -109,7 +112,7 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
           <span>完成样品、订单或阶段合作后，再用四项评分留下可复核依据。</span>
           {canOperate ? <button className="primary-button" type="button" onClick={() => { setSelectedId(0); setView("editor"); }}>记录第一次评价</button> : null}
         </div></td></tr> : null}
-      </tbody></table></div>
+      </tbody></table></ResponsiveTableFrame>
     </> : view === "analytics" ? <SupplierAssessmentAnalytics rows={rows} supplierName={supplierName}
       onCreate={canOperate ? () => { setSelectedId(0); setView("editor"); } : undefined} /> : <form className="form-grid" key={selected?.id ?? `new-${supplierId}`} onSubmit={save}>
       <div className="section-heading-row"><h4>{selected ? canOperate ? "编辑评价" : "查看评价" : "记录新评价"}</h4><button className="secondary-button" type="button" onClick={() => setView("directory")}>返回评价记录</button></div>

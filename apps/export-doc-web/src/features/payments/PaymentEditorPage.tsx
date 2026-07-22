@@ -6,8 +6,10 @@ import { ApiPaymentDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
-import { normalizeText, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
+import { isConcurrencyConflict, normalizeText, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { ConcurrencyConflictNotice, InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import {
   hasCustomOptionValue,
   loadCustomOptionMap,
@@ -26,6 +28,7 @@ export function PaymentEditorPage({
 }) {
   const paymentPermission = useModulePermission("document.payments");
   const masterDataPermission = useModulePermission("document.master-data");
+  const requestConfirmation = useConfirmation();
   const { paymentId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,6 +36,7 @@ export function PaymentEditorPage({
   const [payment, setPayment] = useState<ApiPaymentDto | null>(() => (mode === "new" ? createEmptyPayment() : null));
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(routeSuccessMessage);
+  const [concurrencyMessage, setConcurrencyMessage] = useState<string | null>(null);
   const [persistedPaymentSnapshot, setPersistedPaymentSnapshot] = useState<string | null>(null);
 
   const parsedPaymentId = Number(paymentId);
@@ -70,6 +74,7 @@ export function PaymentEditorPage({
       setPayment(nextPayment);
       setPersistedPaymentSnapshot(buildPaymentSnapshot(nextPayment, 0));
       setMessage(null);
+      setConcurrencyMessage(null);
       setSuccessMessage(null);
       return;
     }
@@ -121,7 +126,9 @@ export function PaymentEditorPage({
       }
     },
     onError: (error) => {
-      setMessage(readApiError(error));
+      const nextMessage = readApiError(error);
+      setMessage(isConcurrencyConflict(error) ? null : nextMessage);
+      setConcurrencyMessage(isConcurrencyConflict(error) ? nextMessage : null);
       setSuccessMessage(null);
     },
   });
@@ -260,13 +267,13 @@ export function PaymentEditorPage({
     return () => window.removeEventListener("keydown", handleDocumentKeyDown);
   }, [isBusy, isNew, isPaymentIdValid, parsedPaymentId, payment]);
 
-  function handleDeletePayment() {
+  async function handleDeletePayment() {
     if (isNew || !isPaymentIdValid || !payment || deletePaymentMutation.isPending) {
       return;
     }
 
     const title = payment.invoiceNo?.trim() || payment.payeeName?.trim() || `#${parsedPaymentId}`;
-    if (!window.confirm(`确定删除当前付款/报销记录 ${title} 吗？删除后无法在列表中继续查看。`)) {
+    if (!await requestConfirmation({ title: "删除付款/报销记录", description: `确定删除当前记录“${title}”吗？`, details: ["删除后无法在列表中继续查看。"], confirmLabel: "确认删除", tone: "danger" })) {
       return;
     }
 
@@ -275,15 +282,30 @@ export function PaymentEditorPage({
     deletePaymentMutation.mutate();
   }
 
-  function handleBackToPaymentList() {
-    if (confirmDiscardChanges("返回付款列表")) {
+  async function handleBackToPaymentList() {
+    if (await confirmDiscardChanges("返回付款列表")) {
       navigate("/payments");
     }
   }
 
-  function handleOpenPayeeManagement() {
-    if (confirmDiscardChanges("打开收款方资料库")) {
+  async function handleOpenPayeeManagement() {
+    if (await confirmDiscardChanges("打开收款方资料库")) {
       navigate("/master-data/payees");
+    }
+  }
+
+  async function handleReloadLatestPayment() {
+    if (!await requestConfirmation({
+      title: "加载最新付款版本",
+      description: "服务器上的付款记录已被其他用户修改。",
+      details: ["当前页面尚未保存的修改将被替换。", "加载后请重新检查并继续编辑。"],
+      confirmLabel: "加载最新版本",
+    })) return;
+    const result = await paymentQuery.refetch();
+    if (result.data) {
+      setConcurrencyMessage(null);
+      setMessage(null);
+      setSuccessMessage("已加载服务器上的最新付款记录，请检查后继续编辑。");
     }
   }
 
@@ -311,13 +333,14 @@ export function PaymentEditorPage({
         ) : null}
       </div>
 
-      {message ? <div className="alert">{message}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+      {concurrencyMessage ? <ConcurrencyConflictNotice message={concurrencyMessage} isBusy={paymentQuery.isFetching} onReload={() => void handleReloadLatestPayment()} /> : null}
+      {message ? <InlineNotice tone="error" title="操作未完成">{message}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {!paymentPermission.canOperate ? (
-        <div className="permission-readonly-notice">当前模板仅允许查看付款报销，表单修改、保存和删除已禁用。</div>
+        <PermissionNotice>当前模板仅允许查看付款报销，表单修改、保存和删除已禁用。</PermissionNotice>
       ) : null}
 
-      {!payment && isBusy ? <div className="loading-panel">加载中</div> : null}
+      {!payment && isBusy ? <PageState tone="loading" title="正在加载付款报销" description="正在读取付款信息、关联发票和报表配置。" /> : null}
 
       {payment ? (
         <form className="entity-form" onSubmit={handleSubmit} onKeyDownCapture={handleEnterAsTabFormKeyDown}>

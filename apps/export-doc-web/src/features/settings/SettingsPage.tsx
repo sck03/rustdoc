@@ -31,6 +31,9 @@ import type { SettingPatch, SettingsRecord } from "./settingsTypes.ts";
 import { isDesktopBridgeAvailable, selectDirectory } from "../../desktop/desktopBridge.ts";
 import { filterSettingsCategories, settingsCategories, type SettingsCategoryConfig, type SettingsCategoryKey } from "./settingsCategoryCatalog.ts";
 import { readSettingsCategoryFromSearch, readSettingsPanelLabelFromSearch } from "./settingsNavigationModel.ts";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { InlineNotice, PageState } from "../../ui/PageState.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 const LazyMaintenanceSettingsPanels = lazy(() => import("./MaintenanceSettingsPanels.tsx"));
 const LazyRuntimeDatabaseSettingsPanel = lazy(() => import("./RuntimeDatabaseSettingsPanel.tsx"));
@@ -94,6 +97,7 @@ export function SettingsPage({
   canManageUsers: boolean;
   canUseDocumentWorkspace: boolean;
 }) {
+  const requestConfirmation = useConfirmation();
   const location = useLocation();
   const availableSettingsCategories = filterSettingsCategories({
     canUseDocumentWorkspace,
@@ -520,12 +524,17 @@ export function SettingsPage({
     }
   }
 
-  function handleRestoreSystemDefaults() {
+  async function handleRestoreSystemDefaults() {
     if (!canManageSettings || isBusy) {
       return;
     }
 
-    if (!window.confirm("确定要恢复系统设置的默认值吗？此操作会先修改当前页面草稿，保存后才会写入配置。")) {
+    if (!await requestConfirmation({
+      title: "恢复系统默认设置",
+      description: "确定要把当前系统设置草稿恢复为默认值吗？",
+      details: ["此操作只修改当前页面草稿。", "点击保存后才会写入正式配置。", "受保护的密码和密钥不会被直接清空。"],
+      confirmLabel: "恢复默认值",
+    })) {
       return;
     }
 
@@ -601,9 +610,9 @@ export function SettingsPage({
 
   return (
     <section className="editor-surface settings-surface" aria-label="设置">
-      {message ? <div className="alert">{message}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
-      {!settings && isBusy ? <div className="loading-panel">加载中</div> : null}
+      {message ? <InlineNotice tone="error" title="设置未保存">{message}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
+      {!settings && isBusy ? <PageState tone="loading" title="正在加载系统设置" description="请稍候，系统正在读取运行目录、数据库和业务配置。" /> : null}
 
       {settings ? (
         <form className="entity-form settings-center-form" onSubmit={handleSubmit} onKeyDownCapture={handleEnterAsTabFormKeyDown}>
@@ -614,7 +623,7 @@ export function SettingsPage({
             </div>
             <div className="toolbar-actions settings-command-actions">
               <SecretToggle checked={updateSecrets} disabled={!canManageSettings} onChange={setUpdateSecrets} />
-              <button className="icon-button" type="button" title="刷新" disabled={isBusy} onClick={() => void settingsQuery.refetch()}>
+              <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void settingsQuery.refetch()}>
                 <RefreshCw size={18} aria-hidden="true" />
               </button>
               <button className="command-button secondary" type="button" disabled={isBusy || !canManageSettings} onClick={handleRestoreSystemDefaults}>
@@ -642,7 +651,7 @@ export function SettingsPage({
               onSelect={setActiveCategory}
             />
             <div className="settings-category-panel">
-              <Suspense fallback={<div className="loading-panel">正在加载设置分类</div>}>
+              <Suspense fallback={<PageState tone="loading" title="正在加载设置分类" />}>
               {currentCategory === "runtime" ? (
                 <LazyRuntimeDatabaseSettingsPanel
                   settings={settings}
@@ -728,7 +737,7 @@ export function SettingsPage({
               ) : null}
               {currentCategory === "maintenance" ? (
                 <>
-                  <Suspense fallback={<div className="loading-panel">正在加载维护工具</div>}>
+                  <Suspense fallback={<PageState tone="loading" title="正在加载维护工具" />}>
                     <LazyMaintenanceSettingsPanels
                       client={client}
                       canManageSettings={canManageSettings}
@@ -830,7 +839,7 @@ function SettingsValidationPanel({
           : `错误 ${errorCount} 项，警告 ${warningCount} 项。`}
       </div>
       {messages.length > 0 ? (
-        <div className="table-frame backup-table-frame">
+        <ResponsiveTableFrame className="backup-table-frame" label="设置校验消息">
           <table className="backup-table" aria-label="设置校验消息">
             <thead>
               <tr>
@@ -851,7 +860,7 @@ function SettingsValidationPanel({
               ))}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableFrame>
       ) : null}
     </div>
   );

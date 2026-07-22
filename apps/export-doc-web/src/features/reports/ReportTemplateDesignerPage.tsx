@@ -11,6 +11,7 @@ import {
 import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 import { hasReportDesignerSchema } from "../report-designer/reportDesignerTemplateParser.ts";
 import {
@@ -65,6 +66,7 @@ export function ReportTemplateDesignerPage({
   canManageTemplates: boolean;
   canDesignTemplates: boolean;
 }) {
+  const requestConfirmation = useConfirmation();
   const invoiceOutputPermission = useModulePermission("document.invoice-reports");
   const paymentOutputPermission = useModulePermission("document.payment-reports");
   const location = useLocation();
@@ -527,12 +529,12 @@ export function ReportTemplateDesignerPage({
     }
   }
 
-  function handleRenameTemplate() {
+  async function handleRenameTemplate() {
     if (!canRenameTemplate) {
       return;
     }
 
-    if (hasChanges && !window.confirm("当前模板有未保存修改，确定继续重命名？")) {
+    if (hasChanges && !await requestConfirmation({ title: "重命名模板", description: "当前模板有未保存修改，确定继续重命名吗？", details: ["用户模板会先保存当前内容；内置文件模板将按现有重命名规则处理。"], confirmLabel: "继续重命名" })) {
       return;
     }
 
@@ -543,13 +545,12 @@ export function ReportTemplateDesignerPage({
     }
   }
 
-  function handleDeleteTemplate() {
+  async function handleDeleteTemplate() {
     if (!canDeleteTemplate) {
       return;
     }
 
-    const suffix = hasChanges ? "当前模板有未保存修改，" : "";
-    if (!window.confirm(`${suffix}确定删除当前模板？`)) {
+    if (!await requestConfirmation({ title: "删除报表模板", description: "确定删除当前模板吗？", details: hasChanges ? ["当前模板有未保存修改，这些修改将丢失。"] : undefined, confirmLabel: "确认删除", tone: "danger" })) {
       return;
     }
 
@@ -631,7 +632,7 @@ export function ReportTemplateDesignerPage({
       return;
     }
 
-    if (hasChanges && !window.confirm("当前模板有未保存修改，确定继续导入模板包？")) {
+    if (hasChanges && !await requestConfirmation({ title: "导入模板包", description: "当前模板有未保存修改，确定继续导入吗？", details: ["未保存的编辑内容将丢失。"], confirmLabel: "继续导入" })) {
       return;
     }
 
@@ -664,13 +665,13 @@ export function ReportTemplateDesignerPage({
     }
   }
 
-  function handleImportPackageByPath() {
+  async function handleImportPackageByPath() {
     const packagePath = packageImportPath.trim();
     if (!canImportPackageByPath || !packagePath) {
       return;
     }
 
-    if (hasChanges && !window.confirm("当前模板有未保存修改，确定继续导入模板包？")) {
+    if (hasChanges && !await requestConfirmation({ title: "导入模板包", description: "当前模板有未保存修改，确定继续导入吗？", details: ["未保存的编辑内容将丢失。"], confirmLabel: "继续导入" })) {
       return;
     }
 
@@ -683,14 +684,14 @@ export function ReportTemplateDesignerPage({
     }
   }
 
-  function handlePackageUploadFile(event: ChangeEvent<HTMLInputElement>) {
+  async function handlePackageUploadFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file || !canUploadPackage) {
       return;
     }
 
-    if (hasChanges && !window.confirm("当前模板有未保存修改，确定继续上传并导入模板包？")) {
+    if (hasChanges && !await requestConfirmation({ title: "上传并导入模板包", description: "当前模板有未保存修改，确定继续吗？", details: ["未保存的编辑内容将丢失。"], confirmLabel: "继续上传并导入" })) {
       return;
     }
 
@@ -708,12 +709,12 @@ export function ReportTemplateDesignerPage({
     }
   }
 
-  function handleApplyNewReportDesignerContent(nextContent: string) {
+  async function handleApplyNewReportDesignerContent(nextContent: string) {
     if (!selectedTemplatePath || !selectedTemplateContentActive || (isUserTemplate && !currentUserTemplate?.canEdit)) {
       return;
     }
 
-    if (!confirmStructuredTemplateOverwrite()) {
+    if (!await confirmStructuredTemplateOverwrite()) {
       return;
     }
 
@@ -724,7 +725,7 @@ export function ReportTemplateDesignerPage({
     setMessageType("success");
   }
 
-  function handleSaveNewReportDesignerContent(nextContent: string) {
+  async function handleSaveNewReportDesignerContent(nextContent: string) {
     if (!selectedTemplatePath || !selectedTemplateContentActive) {
       return;
     }
@@ -735,7 +736,7 @@ export function ReportTemplateDesignerPage({
       return;
     }
 
-    if (!confirmStructuredTemplateOverwrite()) {
+    if (!await confirmStructuredTemplateOverwrite()) {
       return;
     }
 
@@ -751,12 +752,12 @@ export function ReportTemplateDesignerPage({
     }
   }
 
-  function confirmStructuredTemplateOverwrite() {
+  async function confirmStructuredTemplateOverwrite() {
     if (!content.trim() || hasReportDesignerSchema(content)) {
       return true;
     }
 
-    return window.confirm("当前模板未包含新版设计器结构。继续会用结构化模板 HTML 覆盖当前旧 HTML，确定继续？");
+    return requestConfirmation({ title: "转换为新版设计器结构", description: "当前模板未包含新版设计器结构。继续后将使用结构化模板 HTML 覆盖当前旧 HTML。", details: ["建议在转换前导出模板包备份。"], confirmLabel: "确认转换" });
   }
 
   function handleFormatSource() {
@@ -866,18 +867,18 @@ export function ReportTemplateDesignerPage({
                 onNewTemplateShareScopeChange={setNewUserTemplateShareScope}
                 onCreate={handleCreateUserTemplate}
                 onShareScopeChange={(shareScope) => updateUserTemplateStatusMutation.mutate({ shareScope })}
-                onToggleActive={() => {
+                onToggleActive={async () => {
                   if (!currentUserTemplate) {
                     return;
                   }
 
                   const action = currentUserTemplate.isActive ? "停用" : "重新启用";
-                  if (window.confirm(`确定${action}“${currentUserTemplate.name}”？`)) {
+                  if (await requestConfirmation({ title: `${action}模板`, description: `确定${action}“${currentUserTemplate.name}”吗？`, confirmLabel: `确认${action}` })) {
                     updateUserTemplateStatusMutation.mutate({ isActive: !currentUserTemplate.isActive });
                   }
                 }}
-                onRestoreVersion={(versionNumber) => {
-                  if (window.confirm(`确定恢复到 V${versionNumber}？当前未保存修改将被替换。`)) {
+                onRestoreVersion={async (versionNumber) => {
+                  if (await requestConfirmation({ title: `恢复到 V${versionNumber}`, description: `确定恢复到 V${versionNumber} 吗？`, details: ["当前未保存修改将被替换。", "现有历史版本仍会保留。"], confirmLabel: "确认恢复" })) {
                     restoreUserTemplateVersionMutation.mutate(versionNumber);
                   }
                 }}

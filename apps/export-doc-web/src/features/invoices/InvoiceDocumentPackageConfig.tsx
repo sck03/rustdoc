@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, FolderOpen, Plus, Trash2 } from "lucide-react";
 import type { BatchExportConfigDraft, BatchExportItemSetting } from "./invoiceReportPreviewModel.ts";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 type Option={value:string;label:string};
 type Props={canEdit:boolean;desktopAvailable:boolean;draft:BatchExportConfigDraft;templateOptions:Option[];onAdd():void;onChooseTemplate(index:number):void|Promise<void>;onMove(index:number,direction:-1|1):void;onRemove(index:number):void;onUpdate(changes:Partial<BatchExportConfigDraft>):void;onUpdateItem(index:number,changes:Partial<BatchExportItemSetting>):void};
 export function InvoiceDocumentPackageConfig(props:Props){const {canEdit:canEditPackageConfig,desktopAvailable,draft:packageConfigDraft,templateOptions:packageConfigTemplateOptions,onAdd:addPackageConfigItem,onChooseTemplate:choosePackageConfigTemplateFile,onMove:movePackageConfigItem,onRemove:removePackageConfigItem,onUpdate:updatePackageConfig,onUpdateItem:updatePackageConfigItem}=props;return (
@@ -49,7 +50,7 @@ export function InvoiceDocumentPackageConfig(props:Props){const {canEdit:canEdit
                 <span>新增单证</span>
               </button>
             </div>
-            <div className="table-frame batch-export-items-frame document-package-config-frame">
+            <ResponsiveTableFrame className="batch-export-items-frame document-package-config-frame" label="单据包配置项">
               <table className="batch-export-items-table" aria-label="单据包配置项">
                 <thead>
                   <tr>
@@ -111,7 +112,7 @@ export function InvoiceDocumentPackageConfig(props:Props){const {canEdit:canEdit
                               <button
                                 className="icon-button compact-icon-button batch-export-path-button"
                                 type="button"
-                                title="选择模板文件"
+                                title="选择模板文件" aria-label="选择模板文件"
                                 disabled={!canEditPackageConfig}
                                 onClick={() => void choosePackageConfigTemplateFile(index)}
                               >
@@ -135,7 +136,7 @@ export function InvoiceDocumentPackageConfig(props:Props){const {canEdit:canEdit
                             <button
                               className="icon-button compact-icon-button"
                               type="button"
-                              title="上移"
+                              title="上移" aria-label="上移"
                               disabled={!canEditPackageConfig || index === 0}
                               onClick={() => movePackageConfigItem(index, -1)}
                             >
@@ -144,7 +145,7 @@ export function InvoiceDocumentPackageConfig(props:Props){const {canEdit:canEdit
                             <button
                               className="icon-button compact-icon-button"
                               type="button"
-                              title="下移"
+                              title="下移" aria-label="下移"
                               disabled={!canEditPackageConfig || index >= packageConfigDraft.items.length - 1}
                               onClick={() => movePackageConfigItem(index, 1)}
                             >
@@ -153,7 +154,7 @@ export function InvoiceDocumentPackageConfig(props:Props){const {canEdit:canEdit
                             <button
                               className="icon-button compact-icon-button"
                               type="button"
-                              title="删除"
+                              title="删除" aria-label="删除"
                               disabled={!canEditPackageConfig || packageConfigDraft.items.length <= 1}
                               onClick={() => removePackageConfigItem(index)}
                             >
@@ -172,10 +173,9 @@ export function InvoiceDocumentPackageConfig(props:Props){const {canEdit:canEdit
                   )}
                 </tbody>
               </table>
-            </div>
+            </ResponsiveTableFrame>
           </div>
         </details>
 
 
 );}
-

@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import type { ApiCrmContactDto, ApiCrmCustomerDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { errorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 
 type Props = {
   client: ExportDocManagerApiClient;
@@ -17,6 +18,7 @@ type Props = {
 };
 
 export function CrmPartyManagementPanel(props: Props) {
+  const requestConfirmation = useConfirmation();
   const { client, customers, contacts, customerId, onSelectCustomer, onReloadCustomers, onReloadContacts, onFeedback, canOperate, canManage } = props;
   const selectedCustomer = customers.find((item) => item.id === customerId);
   const [isNewCustomer, setIsNewCustomer] = useState(false);
@@ -55,7 +57,7 @@ export function CrmPartyManagementPanel(props: Props) {
   }
 
   async function deleteCustomer() {
-    if (!canManage || !selectedCustomer || !window.confirm(`删除 CRM 客户“${selectedCustomer.name}”？`)) return;
+    if (!canManage || !selectedCustomer || !await requestConfirmation({ title: "删除 CRM 客户", description: `确定删除 CRM 客户“${selectedCustomer.name}”吗？`, details: ["存在业务引用时服务端会拒绝删除。"], confirmLabel: "确认删除", tone: "danger" })) return;
     try {
       await client.deleteCrmCustomer({ id: selectedCustomer.id });
       await onReloadCustomers();
@@ -91,7 +93,7 @@ export function CrmPartyManagementPanel(props: Props) {
   }
 
   async function deleteContact() {
-    if (!canManage || !selectedContact || !window.confirm(`删除联系人“${selectedContact.name}”？历史跟进仍会保留。`)) return;
+    if (!canManage || !selectedContact || !await requestConfirmation({ title: "删除客户联系人", description: `确定删除联系人“${selectedContact.name}”吗？`, details: ["历史跟进记录仍会保留。"], confirmLabel: "确认删除", tone: "danger" })) return;
     try {
       await client.deleteCrmContact({ customerId, id: selectedContact.id });
       setContactId(0);

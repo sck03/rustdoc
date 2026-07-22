@@ -47,6 +47,7 @@ assert(model.findActiveWorkspaceNavGroupKey("/tools/ocr") === "tools", "tools na
 assert(model.findActiveWorkspaceNavGroupKey("/master-data/hs-knowledge/search") === "hs-knowledge", "knowledge route activates only knowledge group");
 assert(model.workspaceNavGroups.find((group) => group.key === "hs-knowledge")?.label === "知识中心库", "knowledge group label");
 assert(model.workspaceNavGroups.find((group) => group.key === "hs-knowledge")?.items[0]?.label === "HS 编码库", "HS library item label");
+assert(model.workspaceNavGroups.find((group) => group.key === "single-window")?.items[0]?.label === "操作中心", "single-window operation center label");
 assert(model.createInitialWorkspaceNavGroupState("/settings").has("system"), "active group starts expanded");
 const userGroups = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: true });
 const salesGroups = model.filterWorkspaceNavGroups({ productEdition: "Full", canUseSalesWorkspace: true });

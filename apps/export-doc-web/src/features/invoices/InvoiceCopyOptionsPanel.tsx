@@ -15,7 +15,7 @@ export function InvoiceCopyOptionsPanel({ draft, isBusy, onCancel, onChange, onS
     { key: "clearAmounts", label: "清空金额" },
   ];
   return <section className="form-section" aria-label="复制发票选项">
-    <div className="section-header"><h2>复制发票</h2><button className="icon-button" type="button" title="取消复制" disabled={isBusy} onClick={onCancel}><X size={17} aria-hidden="true" /></button></div>
+    <div className="section-header"><h2>复制发票</h2><button className="icon-button" type="button" title="取消复制" aria-label="取消复制" disabled={isBusy} onClick={onCancel}><X size={17} aria-hidden="true" /></button></div>
     <form className="settings-form" onSubmit={onSubmit}>
       <div className="field-grid">
         <label><span>来源发票</span><input value={draft.source.invoiceNo || "-"} disabled /></label>

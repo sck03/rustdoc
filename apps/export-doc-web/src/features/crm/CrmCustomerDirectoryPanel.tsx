@@ -4,6 +4,7 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { OperationFeedback, errorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 export function CrmCustomerDirectoryPanel({ client, canOperate, onCreateCustomer, onSelectCustomer }: {
   client: ExportDocManagerApiClient;
@@ -67,11 +68,11 @@ export function CrmCustomerDirectoryPanel({ client, canOperate, onCreateCustomer
       </select> : null}
     </form>
     <OperationFeedback feedback={feedback} />
-    <div className="table-frame"><table className="data-table responsive-data-table"><thead><tr>{canOperate ? <th><input type="checkbox" aria-label="选择本页 CRM 客户" checked={(page?.items.length ?? 0) > 0 && page!.items.every((item) => selectedIds.includes(item.id))} onChange={(event) => setSelectedIds(event.target.checked ? Array.from(new Set([...selectedIds, ...(page?.items.map((item) => item.id) ?? [])])) : selectedIds.filter((id) => !page?.items.some((item) => item.id === id)))} /></th> : null}<th>客户</th><th data-table-priority="secondary">国家/地区</th><th>状态</th><th data-table-priority="secondary">来源</th><th /></tr></thead>
+    <ResponsiveTableFrame label="CRM 客户目录" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr>{canOperate ? <th><input type="checkbox" aria-label="选择本页 CRM 客户" checked={(page?.items.length ?? 0) > 0 && page!.items.every((item) => selectedIds.includes(item.id))} onChange={(event) => setSelectedIds(event.target.checked ? Array.from(new Set([...selectedIds, ...(page?.items.map((item) => item.id) ?? [])])) : selectedIds.filter((id) => !page?.items.some((item) => item.id === id)))} /></th> : null}<th>客户</th><th data-table-priority="secondary">国家/地区</th><th>状态</th><th data-table-priority="secondary">来源</th><th /></tr></thead>
       <tbody>{(page?.items ?? []).map((item) => <tr key={item.id}>{canOperate ? <td><input type="checkbox" aria-label={`选择客户 ${item.name}`} checked={selectedIds.includes(item.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id))} /></td> : null}<td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.countryRegion || "-"}</td><td><BusinessStatusBadge value={item.status} /></td><td data-table-priority="secondary">{item.source || "-"}</td><td><button className="secondary-button" type="button" onClick={() => onSelectCustomer(item)}>打开</button></td></tr>)}
         {!page?.items.length ? <tr><td className="empty-cell" colSpan={canOperate ? 6 : 5}><div className="empty-cell-content"><strong>暂无销售客户</strong><span>{canOperate ? "先建立客户和主要联系人，之后即可记录跟进与商机。" : "当前没有可查看的销售客户。"}</span>{canOperate ? <button className="primary-button" type="button" onClick={onCreateCustomer}>建立第一位客户</button> : null}</div></td></tr> : null}
       </tbody>
-    </table></div>
+    </table></ResponsiveTableFrame>
     <div className="form-actions">
       <button className="secondary-button" type="button" disabled={!page?.hasPreviousPage} onClick={() => setPageNumber((value) => Math.max(1, value - 1))}>上一页</button>
       <span>第 {page?.pageNumber ?? 1} / {Math.max(page?.totalPages ?? 1, 1)} 页</span>

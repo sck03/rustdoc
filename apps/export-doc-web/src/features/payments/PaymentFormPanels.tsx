@@ -93,7 +93,7 @@ export function PaymentBasicInfoPanel({
           <button
             className="icon-button"
             type="button"
-            title="刷新收付款基础资料"
+            title="刷新收付款基础资料" aria-label="刷新收付款基础资料"
             disabled={isBusy || isReferenceDataBusy}
             onClick={onRefreshReferenceData}
           >

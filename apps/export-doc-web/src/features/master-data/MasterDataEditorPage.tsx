@@ -2,10 +2,7 @@ import { useMutation,useQuery,useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft,Edit3,Eye,Save,Trash2 } from "lucide-react";
 import { FormEvent,useEffect,useMemo,useState } from "react";
 import { useLocation,useNavigate,useParams } from "react-router-dom";
-import {
-ApiError,
-ExportDocManagerApiClient
-} from "../../api/index.ts";
+import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { selectExporterSealImageFile } from "../../desktop/desktopBridge.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
@@ -13,10 +10,12 @@ import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
 import {
 normalizeText,
 numberValue,
+isConcurrencyConflict,
 readApiError,
 readRouteSuccessMessage
 } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { ConcurrencyConflictNotice, InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import {
 hasCustomOptionValue,
 loadCustomOptionMap,
@@ -208,9 +207,7 @@ export function MasterDataEditorPage({
       setSuccessMessage(null);
       setHasConcurrencyConflict(
         !isNew &&
-        error instanceof ApiError &&
-        error.status === 409 &&
-        errorMessage.includes("其他用户"),
+        isConcurrencyConflict(error),
       );
     },
   });
@@ -455,8 +452,8 @@ export function MasterDataEditorPage({
     await detailQuery.refetch();
   }
 
-  function handleBackToMasterDataList() {
-    if (confirmDiscardChanges(`返回${config.label}列表`)) {
+  async function handleBackToMasterDataList() {
+    if (await confirmDiscardChanges(`返回${config.label}列表`)) {
       navigate(`/master-data/${config.key}`);
     }
   }
@@ -485,26 +482,16 @@ export function MasterDataEditorPage({
         ) : null}
       </div>
 
-      {message ? (
-        <div className="alert master-data-conflict-alert">
-          <span>{message}</span>
-          {hasConcurrencyConflict ? (
-            <button className="command-button secondary" type="button" disabled={detailQuery.isFetching} onClick={() => void loadLatestRecord()}>
-              {detailQuery.isFetching ? "正在加载…" : "加载最新数据"}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      {productUnitLookupMessage ? <div className="alert">{productUnitLookupMessage}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+      {message && hasConcurrencyConflict ? <ConcurrencyConflictNotice message={message} isBusy={detailQuery.isFetching} onReload={() => void loadLatestRecord()} /> : null}
+      {message && !hasConcurrencyConflict ? <InlineNotice tone="error" title="操作未完成">{message}</InlineNotice> : null}
+      {productUnitLookupMessage ? <InlineNotice tone="warning" title="单位资料未能完整加载">{productUnitLookupMessage}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {productUnitMessage ? <div className="info-alert">{productUnitMessage}</div> : null}
       {!canOperate ? (
-        <div className="permission-readonly-notice">
-          当前主数据记录为只读；字段修改、候选项新增和保存已禁用。
-        </div>
+        <PermissionNotice>当前主数据记录为只读；字段修改、候选项新增和保存已禁用。</PermissionNotice>
       ) : null}
 
-      {!record && isBusy ? <div className="loading-panel">加载中</div> : null}
+      {!record && isBusy ? <PageState tone="loading" title="正在加载主数据" description="正在读取记录详情和可选参考资料。" /> : null}
 
       {record ? (
         <form className="entity-form" onSubmit={handleSubmit} onKeyDownCapture={handleEnterAsTabFormKeyDown}>

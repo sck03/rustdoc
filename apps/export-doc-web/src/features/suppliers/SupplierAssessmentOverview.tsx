@@ -4,6 +4,7 @@ import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { OperationFeedback, errorFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 type OverviewFilter = "all" | "attention" | "preferred";
 
@@ -62,7 +63,7 @@ export function SupplierAssessmentOverview({ client, onOpenSupplier }: {
       <button className={filter === "attention" ? "primary-button" : "secondary-button"} type="button" onClick={() => setFilter("attention")}>需要关注</button>
       <button className={filter === "preferred" ? "primary-button" : "secondary-button"} type="button" onClick={() => setFilter("preferred")}>优先合作</button>
     </div>
-    <div className="table-frame"><table className="data-table responsive-data-table"><thead><tr>
+    <ResponsiveTableFrame label="供应商评价总览" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr>
       <th>供应商</th><th>最新评价</th><th>综合分</th><th data-table-priority="secondary">质量 / 交期 / 服务 / 价格</th><th>结论</th><th />
     </tr></thead><tbody>
       {rows.map((item) => <tr key={item.supplierCompanyId}>
@@ -74,7 +75,7 @@ export function SupplierAssessmentOverview({ client, onOpenSupplier }: {
         <td><button className="secondary-button" type="button" onClick={() => onOpenSupplier(item.supplierCompanyId)}>查看评价</button></td>
       </tr>)}
       {!rows.length ? <tr><td className="empty-cell" colSpan={6}><div className="empty-cell-content"><strong>当前筛选没有供应商</strong><span>切换筛选查看其它最新评价结论。</span></div></td></tr> : null}
-    </tbody></table></div>
+    </tbody></table></ResponsiveTableFrame>
     {overview.unassessedSuppliers ? <p className="section-description">另有 {overview.unassessedSuppliers} 家供应商尚无评价，未参与均分和结论统计。</p> : null}
   </section>;
 }

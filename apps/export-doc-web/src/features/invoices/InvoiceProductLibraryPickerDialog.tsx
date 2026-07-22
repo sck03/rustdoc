@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { PackageCheck, PackagePlus, PackageSearch, RefreshCw, Search, X } from "lucide-react";
 import type { ApiProductDto } from "../../api/index.ts";
 import { formatPlainNumber, normalizeText, numberValue } from "../../ui/formUtils.ts";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 export function ProductLibraryPickerDialog({
   focusedRowIndex,
@@ -121,7 +122,7 @@ export function ProductLibraryPickerDialog({
           </div>
         </form>
 
-        <div className="table-frame product-library-table-frame" aria-busy={isBusy}>
+        <ResponsiveTableFrame className="product-library-table-frame" label="商品资料查询结果" busy={isBusy}>
           <table className="product-library-table">
             <thead>
               <tr>
@@ -176,7 +177,7 @@ export function ProductLibraryPickerDialog({
               )}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableFrame>
 
         <div className="single-window-lock-footer">
           <span className="product-library-selection">{selectedProduct ? formatProductOptionLabel(selectedProduct) : "未选择商品"}</span>

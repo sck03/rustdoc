@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 export function DashboardPage({ client }: { client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
@@ -117,7 +118,7 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
           <div className="section-header">
             <h2>最新订单</h2>
           </div>
-          <div className="table-frame dashboard-table-frame">
+          <ResponsiveTableFrame className="dashboard-table-frame" label="最新订单" mobileLayout="cards" busy={isBusy}>
             <table className="dashboard-recent-table">
               <thead>
                 <tr>
@@ -142,13 +143,13 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
                         }
                       }}
                     >
-                      <td className="strong-cell">{invoice.invoiceNo}</td>
-                      <td>
+                      <td className="strong-cell" data-label="发票号">{invoice.invoiceNo}</td>
+                      <td data-label="状态">
                         <span className="status-pill">{invoice.statusText || invoice.status}</span>
                       </td>
-                      <td>{invoice.customerNameEN || "-"}</td>
-                      <td>{formatDate(invoice.invoiceDate)}</td>
-                      <td className="amount-cell">{formatAmount(invoice.totalAmount)}</td>
+                      <td data-label="客户">{invoice.customerNameEN || "-"}</td>
+                      <td data-label="日期" data-table-priority="secondary">{formatDate(invoice.invoiceDate)}</td>
+                      <td className="amount-cell" data-label="金额">{formatAmount(invoice.totalAmount)}</td>
                     </tr>
                   ))
                 ) : (
@@ -160,7 +161,7 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
                 )}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTableFrame>
         </section>
 
         <section className="form-section dashboard-todo-section" aria-label="待办事项">

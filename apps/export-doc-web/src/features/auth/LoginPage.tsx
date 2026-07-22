@@ -57,14 +57,6 @@ export function LoginPage({
           </div>
 
           <label className="login-field">
-            <span>API 地址</span>
-            <span className="login-input-shell">
-              <Server size={17} aria-hidden="true" />
-              <input value={apiBaseUrl} onChange={(event) => onApiBaseUrlChange(event.target.value)} />
-            </span>
-          </label>
-
-          <label className="login-field">
             <span>账号</span>
             <span className="login-input-shell">
               <UserRound size={17} aria-hidden="true" />
@@ -96,6 +88,23 @@ export function LoginPage({
             <span>{isBusy ? "正在登录" : "登录"}</span>
             <ArrowRight size={18} aria-hidden="true" />
           </button>
+
+          <details className="login-connection-settings">
+            <summary>连接设置</summary>
+            <label className="login-field">
+              <span>API 地址</span>
+              <span className="login-input-shell">
+                <Server size={17} aria-hidden="true" />
+                <input
+                  aria-label="服务器 API 地址"
+                  value={apiBaseUrl}
+                  onChange={(event) => onApiBaseUrlChange(event.target.value)}
+                  spellCheck={false}
+                />
+              </span>
+            </label>
+            <small>仅在无法连接服务器或管理员要求切换服务地址时修改。</small>
+          </details>
         </form>
       </div>
     </main>

@@ -36,7 +36,7 @@ export function DirectorySetting({ settings, path, label, disabled, canSelectDir
       <div className="settings-path-control">
         <input className="settings-path-input" value={readSettingString(settings, path)} disabled={disabled} onChange={(event) => onChange(path, event.target.value)} />
         {canSelectDirectory ? (
-          <button className="icon-button compact-icon-button settings-path-button" type="button" title="选择默认导出目录" disabled={disabled} onClick={onSelectDirectory}>
+          <button className="icon-button compact-icon-button settings-path-button" type="button" title="选择默认导出目录" aria-label="选择默认导出目录" disabled={disabled} onClick={onSelectDirectory}>
             <FolderOpen size={15} aria-hidden="true" />
           </button>
         ) : null}

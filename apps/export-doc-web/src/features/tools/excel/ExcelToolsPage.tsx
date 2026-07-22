@@ -1,6 +1,7 @@
 import { ExportDocManagerApiClient } from "../../../api/index.ts";
 import { useModulePermission } from "../../../app/PermissionAccessContext.tsx";
 import { ExcelToolsPanel } from "./ExcelToolsPanel.tsx";
+import { PermissionNotice } from "../../../ui/PageState.tsx";
 
 export function ExcelToolsPage({ client }: { client: ExportDocManagerApiClient }) {
   const excelPermission = useModulePermission("document.excel");
@@ -9,9 +10,7 @@ export function ExcelToolsPage({ client }: { client: ExportDocManagerApiClient }
   return (
     <section className="work-surface excel-tools-surface" aria-label="Excel 模板与托单">
       {!excelPermission.canOperate ? (
-        <div className="permission-readonly-notice">
-          当前权限模板仅允许查看 Excel 工具说明；模板导出、托单转换和发票托单输出已禁用。
-        </div>
+        <PermissionNotice>当前权限模板仅允许查看 Excel 工具说明；模板导出、托单转换和发票托单输出已禁用。</PermissionNotice>
       ) : null}
       <ExcelToolsPanel
         client={client}

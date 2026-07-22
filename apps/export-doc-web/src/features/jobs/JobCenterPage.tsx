@@ -14,6 +14,8 @@ import {
 import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { SelectField } from "../../ui/FormFields.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { PermissionNotice } from "../../ui/PageState.tsx";
 import { listPageSizeOptions, loadListViewState, normalizeListPageSize, saveListViewState } from "../../ui/listViewState.ts";
 import { PathField, PathTextAreaField } from "../../ui/PathField.tsx";
 import { formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
@@ -302,9 +304,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   return (
     <section className="work-surface job-center-surface" aria-label="任务中心">
       {!jobPermission.canOperate ? (
-        <div className="permission-readonly-notice">
-          当前权限模板仅允许查看任务；新建、取消和重试已禁用，删除与批量清理需要管理权限。
-        </div>
+        <PermissionNotice>当前权限模板仅允许查看任务；新建、取消和重试已禁用，删除与批量清理需要管理权限。</PermissionNotice>
       ) : null}
       {jobPermission.canOperate ? <section className="job-create-panel" aria-label="新建任务">
         {canCreateInvoiceReportZip ? <details>
@@ -332,9 +332,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
             defaultExportDirectory={defaultExportDirectory}
           />
         </details> : (
-          <div className="permission-readonly-notice">
-            当前权限可使用普通后台任务，但未同时授予发票单据输出权限，批量报表 ZIP 已隐藏。
-          </div>
+          <PermissionNotice>当前权限可使用普通后台任务，但未同时授予发票单据输出权限，批量报表 ZIP 已隐藏。</PermissionNotice>
         )}
         <details>
           <summary>
@@ -388,7 +386,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
           <button
             className="icon-button"
             type="button"
-            title="刷新"
+            title="刷新" aria-label="刷新"
             disabled={isBusy}
             onClick={() => void jobsQuery.refetch()}
           >
@@ -699,7 +697,7 @@ function JobTable({
   }
 
   return (
-    <div className="table-frame" aria-busy={isBusy}>
+    <ResponsiveTableFrame label="后台任务列表" busy={isBusy} mobileLayout="scroll">
       <table className="job-table">
         <thead>
           <tr>
@@ -751,7 +749,7 @@ function JobTable({
                     <span>{desktopAvailable ? (job.outputPath || "-") : (job.outputPath ? fileNameFromPath(job.outputPath) : "-")}</span>
                     {desktopAvailable && job.outputPath?.trim() ? renderOpenPathAction(job.outputPath, "打开任务输出", onMessage) : null}
                     {!desktopAvailable && job.status.toLowerCase() === "succeeded" && job.outputPath ? (
-                      <button className="icon-button compact-icon-button" type="button" title="下载任务结果" onClick={() => onDownload(job)}>
+                      <button className="icon-button compact-icon-button" type="button" title="下载任务结果" aria-label="下载任务结果" onClick={() => onDownload(job)}>
                         <Download size={16} aria-hidden="true" />
                       </button>
                     ) : null}
@@ -764,7 +762,7 @@ function JobTable({
                     <button
                       className="icon-button compact-icon-button"
                       type="button"
-                      title="重试任务"
+                      title="重试任务" aria-label="重试任务"
                       disabled={!canOperate || isBusy || !job.canRetry}
                       onClick={() => onRetry(job.jobId)}
                     >
@@ -773,7 +771,7 @@ function JobTable({
                     <button
                       className="icon-button compact-icon-button"
                       type="button"
-                      title="取消任务"
+                      title="取消任务" aria-label="取消任务"
                       disabled={!canOperate || isBusy || !job.canCancel}
                       onClick={() => onCancel(job.jobId)}
                     >
@@ -782,7 +780,7 @@ function JobTable({
                     <button
                       className="icon-button compact-icon-button"
                       type="button"
-                      title="删除任务记录"
+                      title="删除任务记录" aria-label="删除任务记录"
                       disabled={!canManage || isBusy || !canDelete}
                       onClick={() => onDelete(job.jobId)}
                     >
@@ -796,7 +794,7 @@ function JobTable({
           )}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableFrame>
   );
 }
 

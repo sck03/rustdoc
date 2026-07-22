@@ -12,6 +12,8 @@ import { isDesktopBridgeAvailable, selectEmailAttachmentFiles } from "../../desk
 import { readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { PathTextAreaField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { PermissionNotice } from "../../ui/PageState.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { readEmailDraftNavigationState } from "./emailDraftNavigation.ts";
 
 type MessageState = {
@@ -133,14 +135,14 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
         </div>
         <div className="toolbar-actions">
           {!status?.isConfigured ? (
-            <button className="icon-button" type="button" title="配置邮件服务" onClick={() => navigate("/settings?section=email")}>
+            <button className="icon-button" type="button" title="配置邮件服务" aria-label="配置邮件服务" onClick={() => navigate("/settings?section=email")}>
               <Settings size={18} aria-hidden="true" />
             </button>
           ) : null}
           <button
             className="icon-button"
             type="button"
-            title="刷新状态"
+            title="刷新状态" aria-label="刷新状态"
             disabled={isBusy}
             onClick={() => {
               setMessage(null);
@@ -150,17 +152,17 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
             <RefreshCw size={18} aria-hidden="true" />
           </button>
           {isDesktopRuntime ? (
-            <button className="icon-button" type="button" title="选择附件" disabled={isBusy || !emailPermission.canOperate} onClick={() => void pickAttachments()}>
+            <button className="icon-button" type="button" title="选择附件" aria-label="选择附件" disabled={isBusy || !emailPermission.canOperate} onClick={() => void pickAttachments()}>
               <Paperclip size={18} aria-hidden="true" />
             </button>
           ) : null}
-          <button className="icon-button solid" type="button" title="发送邮件" disabled={!canSend} onClick={handleSend}>
+          <button className="icon-button solid" type="button" title="发送邮件" aria-label="发送邮件" disabled={!canSend} onClick={handleSend}>
             <Send size={18} aria-hidden="true" />
           </button>
         </div>
       </div>
 
-      {!emailPermission.canOperate ? <div className="permission-readonly-notice">当前模板仅允许查看邮件服务状态，邮件编辑和发送已禁用。</div> : null}
+      {!emailPermission.canOperate ? <PermissionNotice>当前模板仅允许查看邮件服务状态，邮件编辑和发送已禁用。</PermissionNotice> : null}
       {message ? <div className={message.kind === "error" ? "alert" : "success-alert"}>{message.text}</div> : null}
       <section className="form-section" aria-label="邮件状态">
         <div className="detail-grid email-status-detail-grid">
@@ -208,12 +210,12 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
             disabled={isBusy || !emailPermission.canOperate}
             onChange={(value) => setAttachmentsText(value)}
             actions={
-              <button className="icon-button" type="button" title="选择附件" disabled={isBusy || !emailPermission.canOperate} onClick={() => void pickAttachments()}>
+              <button className="icon-button" type="button" title="选择附件" aria-label="选择附件" disabled={isBusy || !emailPermission.canOperate} onClick={() => void pickAttachments()}>
                 <Paperclip size={16} aria-hidden="true" />
               </button>
             }
           />
-          <div className="table-frame email-attachment-table-frame">
+          <ResponsiveTableFrame className="email-attachment-table-frame" label="邮件附件列表">
             <table className="email-attachment-table">
               <thead>
                 <tr>
@@ -232,7 +234,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
                       <button
                         className="icon-button compact-icon-button"
                         type="button"
-                        title="移除附件"
+                        title="移除附件" aria-label="移除附件"
                         disabled={isBusy || !emailPermission.canOperate}
                         onClick={() => removeAttachment(path)}
                       >
@@ -250,7 +252,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
                 ) : null}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTableFrame>
         </section> : (
           <section className="form-section email-attachment-section" aria-label="邮件附件">
             <div className="section-header">

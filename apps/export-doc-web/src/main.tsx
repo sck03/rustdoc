@@ -7,8 +7,15 @@ import { installFrontendErrorLogger } from "./desktop/frontendErrorLogger.ts";
 import { queryClient } from "./queryClient.ts";
 import { FrontendErrorBoundary } from "./ui/FrontendErrorBoundary.tsx";
 import { UnsavedChangesProvider } from "./ui/unsavedChangesGuard.tsx";
+import { ConfirmationProvider } from "./ui/ConfirmationProvider.tsx";
 import "./styles.css";
+import "./workspaceFeatures.css";
+import "./reportWorkspace.css";
+import "./businessFeatures.css";
+import "./responsiveOverrides.css";
 import "./theme.css";
+import "./ui/commercialComponents.css";
+import "./features/master-data/hsKnowledge.css";
 
 installFrontendErrorLogger();
 
@@ -16,11 +23,13 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <HashRouter>
-        <UnsavedChangesProvider>
-          <FrontendErrorBoundary>
-            <App />
-          </FrontendErrorBoundary>
-        </UnsavedChangesProvider>
+        <ConfirmationProvider>
+          <UnsavedChangesProvider>
+            <FrontendErrorBoundary>
+              <App />
+            </FrontendErrorBoundary>
+          </UnsavedChangesProvider>
+        </ConfirmationProvider>
       </HashRouter>
     </QueryClientProvider>
   </React.StrictMode>,

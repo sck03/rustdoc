@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { ArrowDown, ArrowUp, FolderOpen, Plus, Trash2 } from "lucide-react";
 import { isDesktopBridgeAvailable, selectReportTemplateFile } from "../../desktop/desktopBridge.ts";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 type SettingsRecord = Record<string, unknown>;
 
@@ -133,7 +134,7 @@ export function BatchExportSettingsPanel({
           <span>{items.length} 个导出项</span>
           <span>{templatesLoading ? "模板加载中" : `${templates.length} 个可用模板`}</span>
         </div>
-        <div className="table-frame batch-export-items-frame">
+        <ResponsiveTableFrame className="batch-export-items-frame" label="单据包导出项">
           <table className="batch-export-items-table" aria-label="单据包导出项">
             <thead>
               <tr>
@@ -195,7 +196,7 @@ export function BatchExportSettingsPanel({
                           <button
                             className="icon-button compact-icon-button batch-export-path-button"
                             type="button"
-                            title="选择模板文件"
+                            title="选择模板文件" aria-label="选择模板文件"
                             disabled={disabled}
                             onClick={() => chooseTemplateFile(index)}
                           >
@@ -219,7 +220,7 @@ export function BatchExportSettingsPanel({
                         <button
                           className="icon-button compact-icon-button"
                           type="button"
-                          title="上移"
+                          title="上移" aria-label="上移"
                           disabled={disabled || index === 0}
                           onClick={() => moveItem(index, -1)}
                         >
@@ -228,7 +229,7 @@ export function BatchExportSettingsPanel({
                         <button
                           className="icon-button compact-icon-button"
                           type="button"
-                          title="下移"
+                          title="下移" aria-label="下移"
                           disabled={disabled || index >= items.length - 1}
                           onClick={() => moveItem(index, 1)}
                         >
@@ -237,7 +238,7 @@ export function BatchExportSettingsPanel({
                         <button
                           className="icon-button compact-icon-button"
                           type="button"
-                          title="删除"
+                          title="删除" aria-label="删除"
                           disabled={disabled}
                           onClick={() => removeItem(index)}
                         >
@@ -256,7 +257,7 @@ export function BatchExportSettingsPanel({
               )}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableFrame>
       </fieldset>
     </section>
   );
@@ -361,7 +362,7 @@ export function PaymentTemplateSettingsPanel({
           <span>{items.length} 个付款/报销模板</span>
           <span>{templatesLoading ? "模板加载中" : `${templates.length} 个可用模板`}</span>
         </div>
-        <div className="table-frame batch-export-items-frame">
+        <ResponsiveTableFrame className="batch-export-items-frame" label="付款和报销模板">
           <table className="batch-export-items-table" aria-label="付款/报销模板">
             <thead>
               <tr>
@@ -423,7 +424,7 @@ export function PaymentTemplateSettingsPanel({
                           <button
                             className="icon-button compact-icon-button batch-export-path-button"
                             type="button"
-                            title="选择模板文件"
+                            title="选择模板文件" aria-label="选择模板文件"
                             disabled={disabled}
                             onClick={() => chooseTemplateFile(index)}
                           >
@@ -447,7 +448,7 @@ export function PaymentTemplateSettingsPanel({
                         <button
                           className="icon-button compact-icon-button"
                           type="button"
-                          title="上移"
+                          title="上移" aria-label="上移"
                           disabled={disabled || index === 0}
                           onClick={() => moveItem(index, -1)}
                         >
@@ -456,7 +457,7 @@ export function PaymentTemplateSettingsPanel({
                         <button
                           className="icon-button compact-icon-button"
                           type="button"
-                          title="下移"
+                          title="下移" aria-label="下移"
                           disabled={disabled || index >= items.length - 1}
                           onClick={() => moveItem(index, 1)}
                         >
@@ -465,7 +466,7 @@ export function PaymentTemplateSettingsPanel({
                         <button
                           className="icon-button compact-icon-button"
                           type="button"
-                          title="删除"
+                          title="删除" aria-label="删除"
                           disabled={disabled}
                           onClick={() => removeItem(index)}
                         >
@@ -484,7 +485,7 @@ export function PaymentTemplateSettingsPanel({
               )}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableFrame>
       </fieldset>
     </section>
   );

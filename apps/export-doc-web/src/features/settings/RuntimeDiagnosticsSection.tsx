@@ -4,6 +4,7 @@ import type { ApiHealthResponse, ExportDocManagerApiClient } from "../../api/ind
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { formatRuntimeDate } from "./settingsFormatters.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { PageState } from "../../ui/PageState.tsx";
 import {
   buildRuntimePathGroups,
   runtimePathAccessModeLabel,
@@ -68,7 +69,7 @@ export function RuntimeDiagnosticsSection({
             <FolderCheck size={17} aria-hidden="true" />
             <span>{templateStorageMutation.isPending ? "正在检查" : "检查模板目录"}</span>
           </button>
-          <button className="icon-button" type="button" title="刷新运行诊断" disabled={isBusy} onClick={onRefresh}>
+          <button className="icon-button" type="button" title="刷新运行诊断" aria-label="刷新运行诊断" disabled={isBusy} onClick={onRefresh}>
             <RefreshCw size={18} aria-hidden="true" />
           </button>
         </div>
@@ -133,7 +134,7 @@ export function RuntimeDiagnosticsSection({
           ))}
         </div>
       ) : !errorMessage ? (
-        <div className="loading-panel">{isBusy ? "正在读取运行目录" : "暂无运行目录信息"}</div>
+        <PageState tone={isBusy ? "loading" : "empty"} title={isBusy ? "正在读取运行目录" : "暂无运行目录信息"} description={isBusy ? "系统正在检查数据、日志、缓存和依赖目录。" : "刷新诊断信息后可查看运行目录可用性。"} />
       ) : null}
     </section>
   );

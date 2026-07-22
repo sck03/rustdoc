@@ -1,0 +1,31 @@
+import { createRequire } from "node:module";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const workspace = path.join(repoRoot, ".codex-runtime", "frontend-concurrency-feedback-tests");
+const entry = path.join(workspace, "entry.ts");
+const bundle = path.join(workspace, "bundle.mjs");
+fs.rmSync(workspace, { recursive: true, force: true });
+fs.mkdirSync(workspace, { recursive: true });
+const formUtilsPath = path.join(repoRoot, "apps", "export-doc-web", "src", "ui", "formUtils.ts").replaceAll("\\", "/");
+const apiPath = path.join(repoRoot, "apps", "export-doc-web", "src", "api", "index.ts").replaceAll("\\", "/");
+fs.writeFileSync(entry, `import { isConcurrencyConflict, readApiError } from ${JSON.stringify(formUtilsPath)}; import { ApiError } from ${JSON.stringify(apiPath)}; globalThis.__model = { isConcurrencyConflict, readApiError, ApiError };`, "utf8");
+const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
+await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
+await import(pathToFileURL(bundle).href);
+
+const { isConcurrencyConflict, readApiError, ApiError } = globalThis.__model;
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+const staleInvoice = new ApiError(409, "Conflict", JSON.stringify({ message: "该发票数据已被其他用户修改，请刷新后重试。" }));
+const staleSession = new ApiError(409, "Conflict", JSON.stringify({ message: "装柜方案已被其他会话修改，请重新加载后再保存。" }));
+const businessConflict = new ApiError(409, "Conflict", JSON.stringify({ message: "同一发票号记录已存在。" }));
+const validation = new ApiError(400, "Bad Request", JSON.stringify({ message: "发票号不能为空。" }));
+assert(isConcurrencyConflict(staleInvoice), "409 other-user update should be concurrency conflict");
+assert(isConcurrencyConflict(staleSession), "409 other-session update should be concurrency conflict");
+assert(!isConcurrencyConflict(businessConflict), "ordinary 409 business conflict should not show stale-data reload action");
+assert(!isConcurrencyConflict(validation), "validation error should not be concurrency conflict");
+assert(readApiError(staleInvoice).includes("其他用户"), "API message should remain user-facing Chinese text");
+process.stdout.write("frontend concurrency feedback tests passed\n");

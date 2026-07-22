@@ -24,6 +24,7 @@ import type {
 import { ExportDocManagerApiClient } from "../../../api/index.ts";
 import { queryKeys } from "../../../api/queryKeys.ts";
 import { readApiError } from "../../../ui/formUtils.ts";
+import { useConfirmation } from "../../../ui/ConfirmationProvider.tsx";
 import {
   type ContainerPackingAnalyzeMode,
   type ContainerPackingAnalyzeVariables,
@@ -60,6 +61,7 @@ export function ContainerPackingPanel({
   canOperate: boolean;
   canManage: boolean;
 }) {
+  const requestConfirmation = useConfirmation();
   const queryClient = useQueryClient();
   const [currentProjectId, setCurrentProjectId] = useState(0);
   const [currentProjectVersion, setCurrentProjectVersion] = useState(0);
@@ -424,12 +426,12 @@ export function ContainerPackingPanel({
     markAnalysisInputsChanged();
   }
 
-  function clearCargoRows() {
+  async function clearCargoRows() {
     if (cargoRows.length === 0) {
       return;
     }
 
-    if (!window.confirm("确定清空所有货物吗?")) {
+    if (!await requestConfirmation({ title: "清空货物列表", description: "确定清空当前装柜方案中的所有货物吗？", details: ["尚未保存的装载分析结果也会被清空。"], confirmLabel: "确认清空", tone: "danger" })) {
       return;
     }
 
@@ -505,7 +507,7 @@ export function ContainerPackingPanel({
     loadProjectMutation.mutate(projectId);
   }
 
-  function handleDeleteProject() {
+  async function handleDeleteProject() {
     if (!canManage) {
       return;
     }
@@ -524,11 +526,12 @@ export function ContainerPackingPanel({
     const deleteProjectName =
       selectedProject?.name ||
       (projectId === currentProjectId ? projectName : "");
-    const confirmed = window.confirm(
-      deleteProjectName.trim()
-        ? `确定删除方案 '${deleteProjectName.trim()}' 吗?`
-        : "确定删除当前装柜方案吗?",
-    );
+    const confirmed = await requestConfirmation({
+      title: "删除装柜方案",
+      description: deleteProjectName.trim() ? `确定删除方案“${deleteProjectName.trim()}”吗？` : "确定删除当前装柜方案吗？",
+      confirmLabel: "确认删除",
+      tone: "danger",
+    });
     if (!confirmed) {
       return;
     }

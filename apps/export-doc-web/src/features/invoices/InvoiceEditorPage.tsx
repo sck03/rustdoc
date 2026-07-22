@@ -1,13 +1,15 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CaseUpper, ClipboardList, Edit3, FileText, Minimize2, PackageSearch, Save, ScrollText, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit3, Minimize2, PackageSearch, Save, Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ApiUnitDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
-import { normalizeText, readApiError, readNumber, readRouteSuccessMessage } from "../../ui/formUtils.ts";
+import { isConcurrencyConflict, normalizeText, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { ConcurrencyConflictNotice, InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import {
   hasCustomOptionValue,
   invoiceCustomOptionTypes,
@@ -44,6 +46,16 @@ import {
   uppercaseInvoiceEnglishText,
 } from "./invoiceModel.ts";
 import { createInvoiceItemFromProduct, createProductDraftFromInvoiceItem, hasSameProductCode } from "./invoiceProductLibrary.ts";
+import { InvoiceEditorNavigation } from "./InvoiceEditorNavigation.tsx";
+import {
+  areInvoiceItemsEqual,
+  areInvoiceItemValuesEqual,
+  buildInvoiceSnapshot,
+  cloneInvoiceItems,
+  mergeRouteInvoiceImportDraft,
+  readInvoiceItemBlankRowCount,
+  readInvoiceItemTableNumber,
+} from "./invoiceEditorHelpers.ts";
 
 const maxInvoiceItemHistoryDepth = 50;
 
@@ -68,6 +80,7 @@ export function InvoiceEditorPage({
   const masterDataPermission = useModulePermission("document.master-data");
   const singleWindowPermission = useModulePermission("document.single-window");
   const reportDesignPermission = useModulePermission("document.reports");
+  const requestConfirmation = useConfirmation();
   const { invoiceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -87,6 +100,7 @@ export function InvoiceEditorPage({
   );
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(routeSuccessMessage);
+  const [concurrencyMessage, setConcurrencyMessage] = useState<string | null>(null);
   const [isLetterOfCreditBusy, setIsLetterOfCreditBusy] = useState(false);
   const [itemEditHistory, setItemEditHistory] = useState<InvoiceItemEditHistory>(emptyInvoiceItemEditHistory);
   const [persistedInvoiceStatus, setPersistedInvoiceStatus] = useState<string>(() =>
@@ -162,6 +176,7 @@ export function InvoiceEditorPage({
       setPersistedInvoiceStatus(normalizeInvoiceStatus(nextInvoice.status));
       setItemEditHistory(emptyInvoiceItemEditHistory);
       setMessage(null);
+      setConcurrencyMessage(null);
       setProductLibraryMessage(null);
       setSuccessMessage(routeSuccessMessage);
       return;
@@ -251,7 +266,9 @@ export function InvoiceEditorPage({
       }
     },
     onError: (error) => {
-      setMessage(readApiError(error));
+      const nextMessage = readApiError(error);
+      setMessage(isConcurrencyConflict(error) ? null : nextMessage);
+      setConcurrencyMessage(isConcurrencyConflict(error) ? nextMessage : null);
       setSuccessMessage(null);
     },
   });
@@ -347,7 +364,12 @@ export function InvoiceEditorPage({
 
       const candidates = await client.listProducts({ keyword: productCode });
       const existing = candidates.find((product) => hasSameProductCode(product, productCode)) ?? null;
-      if (existing && !window.confirm(`商品库中已存在编码为 ${productCode} 的商品，是否更新？`)) {
+      if (existing && !await requestConfirmation({
+        title: "更新商品库",
+        description: `商品库中已存在编码为 ${productCode} 的商品，是否用当前发票明细更新？`,
+        details: ["只更新商品主数据，不会修改其他历史发票。"],
+        confirmLabel: "更新商品",
+      })) {
         return { cancelled: true, isUpdate: true, productCode };
       }
 
@@ -513,22 +535,23 @@ export function InvoiceEditorPage({
     return () => window.removeEventListener("keydown", handleDocumentKeyDown);
   }, [invoice, isBusy, isInvoiceEditable, isNew, parsedInvoiceId]);
 
-  function handleCloneInvoiceType() {
+  async function handleCloneInvoiceType() {
     if (!invoicePermission.canOperate || !invoice || isNew || !isInvoiceIdValid) {
       return;
     }
 
     const sourceType = normalizeInvoiceType(invoice.type);
     const targetType = getCounterpartInvoiceType(invoice.type);
-    if (!confirmDiscardChanges(`从已保存的${sourceType}生成${targetType}`)) {
+    if (!await confirmDiscardChanges(`从已保存的${sourceType}生成${targetType}`)) {
       return;
     }
 
-    if (
-      !window.confirm(
-        `将从已保存的${sourceType}生成同一发票号的${targetType}，目标口径已存在时不会覆盖。是否继续？`,
-      )
-    ) {
+    if (!await requestConfirmation({
+      title: `生成${targetType}`,
+      description: `将从已保存的${sourceType}生成同一发票号的${targetType}。`,
+      details: ["目标口径已经存在时不会覆盖。", "当前发票的未保存修改不会带入。"],
+      confirmLabel: `生成${targetType}`,
+    })) {
       return;
     }
 
@@ -537,13 +560,19 @@ export function InvoiceEditorPage({
     cloneInvoiceTypeMutation.mutate({ targetType });
   }
 
-  function handleUnverifyInvoice() {
+  async function handleUnverifyInvoice() {
     if (!invoicePermission.canOperate || !invoice || isNew || !isInvoiceIdValid || !canUnverifyInvoiceStatus(invoice.status)) {
       return;
     }
 
     const currentStatus = normalizeInvoiceStatus(invoice.status);
-    if (!window.confirm(`确定要反审核当前发票吗？当前状态 ${currentStatus} 将退回草稿并允许继续编辑。`)) {
+    if (!await requestConfirmation({
+      title: "反审核发票",
+      description: `当前状态“${currentStatus}”将退回草稿并允许继续编辑。`,
+      details: ["反审核后请重新检查并保存修改。"],
+      confirmLabel: "确认反审核",
+      tone: "warning",
+    })) {
       return;
     }
 
@@ -552,13 +581,19 @@ export function InvoiceEditorPage({
     unverifyInvoiceMutation.mutate();
   }
 
-  function handleDeleteInvoice() {
+  async function handleDeleteInvoice() {
     if (!invoicePermission.canManage || isNew || !isInvoiceIdValid || !invoice || deleteInvoiceMutation.isPending) {
       return;
     }
 
     const title = invoice.invoiceNo?.trim() || invoice.customerNameEN?.trim() || `#${parsedInvoiceId}`;
-    if (!window.confirm(`确定删除当前发票 ${title} 吗？删除后无法在列表中继续查看。`)) {
+    if (!await requestConfirmation({
+      title: "删除发票",
+      description: `确定删除当前发票“${title}”吗？`,
+      details: ["删除后无法在发票列表中继续查看。", "如有关联业务数据，服务端会拒绝删除并说明原因。"],
+      confirmLabel: "确认删除",
+      tone: "danger",
+    })) {
       return;
     }
 
@@ -928,25 +963,40 @@ export function InvoiceEditorPage({
     saveCurrentInvoiceDraft();
   }
 
-  function handleBackToInvoiceList() {
-    if (confirmDiscardChanges("返回发票列表")) {
+  async function handleBackToInvoiceList() {
+    if (await confirmDiscardChanges("返回发票列表")) {
       navigate("/invoices");
     }
   }
 
-  function handleOpenCustomsCoo() {
+  async function handleOpenCustomsCoo() {
     if (!singleWindowPermission.canView) return;
 
-    if (confirmDiscardChanges("打开海关原产地证编辑")) {
+    if (await confirmDiscardChanges("打开海关原产地证编辑")) {
       navigate(`/single-window/coo/${parsedInvoiceId}`);
     }
   }
 
-  function handleOpenAgentConsignment() {
+  async function handleOpenAgentConsignment() {
     if (!singleWindowPermission.canView) return;
 
-    if (confirmDiscardChanges("打开代理报关委托书编辑")) {
+    if (await confirmDiscardChanges("打开代理报关委托书编辑")) {
       navigate(`/single-window/acd/${parsedInvoiceId}`);
+    }
+  }
+
+  async function handleReloadLatestInvoice() {
+    if (!await requestConfirmation({
+      title: "加载最新发票版本",
+      description: "服务器上的发票已被其他用户修改。",
+      details: ["当前页面尚未保存的修改将被替换。", "加载后请重新检查并继续编辑。"],
+      confirmLabel: "加载最新版本",
+    })) return;
+    const result = await invoiceQuery.refetch();
+    if (result.data) {
+      setConcurrencyMessage(null);
+      setMessage(null);
+      setSuccessMessage("已加载服务器上的最新发票，请检查后继续编辑。");
     }
   }
 
@@ -1016,6 +1066,16 @@ export function InvoiceEditorPage({
         <div className="editor-title">
           <Edit3 size={18} aria-hidden="true" />
           <span>{isNew ? "新建发票" : invoice?.invoiceNo || "编辑发票"}</span>
+          {invoice ? (
+            <span
+              className="editor-save-state"
+              data-state={saveInvoiceMutation.isPending ? "saving" : hasUnsavedInvoiceChanges ? "dirty" : "saved"}
+              role="status"
+              aria-live="polite"
+            >
+              {saveInvoiceMutation.isPending ? "保存中" : hasUnsavedInvoiceChanges ? "有未保存修改" : "已保存"}
+            </span>
+          ) : null}
         </div>
         {!isNew && isInvoiceIdValid && invoicePermission.canManage ? (
           <button
@@ -1030,15 +1090,16 @@ export function InvoiceEditorPage({
         ) : null}
       </div>
 
-      {message ? <div className="alert">{message}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+      {concurrencyMessage ? <ConcurrencyConflictNotice message={concurrencyMessage} isBusy={invoiceQuery.isFetching} onReload={() => void handleReloadLatestInvoice()} /> : null}
+      {message ? <InlineNotice tone="error" title="操作未完成">{message}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {!invoicePermission.canOperate ? (
-        <div className="permission-readonly-notice">
+        <PermissionNotice>
           当前权限模板仅允许查看发票；表头、商品明细、状态、信用证导入和保存操作已禁用。
-        </div>
+        </PermissionNotice>
       ) : null}
 
-      {!invoice && isBusy ? <div className="loading-panel">加载中</div> : null}
+      {!invoice && isBusy ? <PageState tone="loading" title="正在加载发票" description="请稍候，系统正在读取发票和商品明细。" /> : null}
 
       {invoice ? (
         <form
@@ -1067,33 +1128,15 @@ export function InvoiceEditorPage({
             </div>
           ) : (
             <>
-              <nav className="invoice-editor-section-nav" aria-label="发票编辑分区">
-                <button type="button" className="invoice-section-nav-item" onClick={() => scrollToInvoiceSection("invoice-header-section")}>
-                  <FileText size={16} aria-hidden="true" />
-                  <span>发票表头</span>
-                </button>
-                <button type="button" className="invoice-section-nav-item invoice-section-nav-primary" onClick={() => scrollToInvoiceSection("invoice-items-section")}>
-                  <PackageSearch size={16} aria-hidden="true" />
-                  <span>商品明细</span>
-                </button>
-                <button type="button" className="invoice-section-nav-item" onClick={() => scrollToInvoiceSection("invoice-analysis-section")}>
-                  <ClipboardList size={16} aria-hidden="true" />
-                  <span>利润/信用证</span>
-                </button>
-                <button type="button" className="invoice-section-nav-item" onClick={() => scrollToInvoiceSection("invoice-report-section")}>
-                  <ScrollText size={16} aria-hidden="true" />
-                  <span>预览导出</span>
-                </button>
-                <button
-                  type="button"
-                  className="invoice-section-nav-item invoice-uppercase-action"
-                  disabled={!isInvoiceEditable}
-                  onClick={uppercaseInvoiceText}
-                >
-                  <CaseUpper size={17} aria-hidden="true" />
-                  <span>英文转大写</span>
-                </button>
-              </nav>
+              <InvoiceEditorNavigation
+                invoiceNo={invoice.invoiceNo || ""}
+                editable={isInvoiceEditable}
+                busy={isBusy}
+                saving={saveInvoiceMutation.isPending}
+                hasUnsavedChanges={hasUnsavedInvoiceChanges}
+                onNavigate={scrollToInvoiceSection}
+                onUppercase={uppercaseInvoiceText}
+              />
 
               <div id="invoice-header-section" className="invoice-editor-section-anchor">
                 <InvoiceBasicInfoPanel
@@ -1193,87 +1236,4 @@ export function InvoiceEditorPage({
       ) : null}
     </section>
   );
-}
-
-function cloneInvoiceItems(items: ApiInvoiceItemDto[]) {
-  return items.map((item) => ({ ...item }));
-}
-
-function mergeRouteInvoiceImportDraft(
-  existing: ApiInvoiceDetailDto,
-  importedDraft: ApiInvoiceDetailDto,
-  action: RouteInvoiceImportAction,
-  invoiceId: number,
-) {
-  const importedItems = (importedDraft.items ?? []).map((item) => ({
-    ...createEmptyInvoiceItem(invoiceId),
-    ...item,
-    id: 0,
-    invoiceId,
-  }));
-
-  if (action === "AppendItems") {
-    const items = [...(existing.items ?? []), ...importedItems];
-    return {
-      ...existing,
-      items,
-      ...calculateInvoiceTotals(items),
-    };
-  }
-
-  return {
-    ...existing,
-    ...importedDraft,
-    id: existing.id,
-    ownerUserId: existing.ownerUserId,
-    departmentId: existing.departmentId,
-    companyScope: existing.companyScope,
-    rowVersion: existing.rowVersion,
-    items: importedItems,
-    ...calculateInvoiceTotals(importedItems),
-  };
-}
-
-function buildInvoiceSnapshot(invoice: ApiInvoiceDetailDto, id: number) {
-  return JSON.stringify(normalizeInvoiceForSave(invoice, id));
-}
-
-function readInvoiceItemBlankRowCount(settings?: Record<string, unknown>) {
-  const system = settings && typeof settings === "object" ? settings.system : null;
-  const systemSettings = system && typeof system === "object" ? (system as Record<string, unknown>) : null;
-  const rawValue = systemSettings?.itemEntryBlankRowCount;
-  const value = typeof rawValue === "number" ? rawValue : Number(rawValue);
-  if (!Number.isFinite(value)) {
-    return 20;
-  }
-
-  return Math.max(1, Math.min(500, Math.trunc(value)));
-}
-
-function areInvoiceItemValuesEqual(left: unknown, right: unknown) {
-  if (typeof left === "number" || typeof right === "number") {
-    const leftNumber = typeof left === "number" && Number.isFinite(left) ? left : Number(left);
-    const rightNumber = typeof right === "number" && Number.isFinite(right) ? right : Number(right);
-    return Number.isFinite(leftNumber) && Number.isFinite(rightNumber)
-      ? leftNumber === rightNumber
-      : String(left ?? "") === String(right ?? "");
-  }
-
-  return String(left ?? "") === String(right ?? "");
-}
-
-function areInvoiceItemsEqual(left: ApiInvoiceItemDto[], right: ApiInvoiceItemDto[]) {
-  if (left === right) {
-    return true;
-  }
-
-  return JSON.stringify(left) === JSON.stringify(right);
-}
-
-function readInvoiceItemTableNumber(value: string) {
-  if (!value.trim()) {
-    return undefined;
-  }
-
-  return readNumber(value);
 }

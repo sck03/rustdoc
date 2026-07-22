@@ -305,7 +305,7 @@ export function ShippingMarkEditorDialog({
             <Square size={18} aria-hidden="true" />
             <h2 id="shipping-mark-editor-title">唛头图片</h2>
           </div>
-          <button className="icon-button" type="button" title="关闭" onClick={onClose} disabled={isSaving}>
+          <button className="icon-button" type="button" title="关闭" aria-label="关闭" onClick={onClose} disabled={isSaving}>
             <X size={17} aria-hidden="true" />
           </button>
         </div>

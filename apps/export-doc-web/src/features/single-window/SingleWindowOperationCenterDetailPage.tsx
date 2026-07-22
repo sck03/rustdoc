@@ -16,6 +16,7 @@ selectDirectory
 import { DesktopIconButton,readDesktopError,renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { PageState, PermissionNotice } from "../../ui/PageState.tsx";
 
 import {
 buildClientBoxPath,
@@ -62,8 +63,8 @@ export function SingleWindowOperationCenterDetailPage({ client }: { client: Expo
       </div>
 
       {message ? <div className="alert">{message}</div> : null}
-      {!permission.canOperate ? <div className="permission-readonly-notice">当前权限模板仅允许查看批次、包和回执记录；客户端派发及回执处理已禁用。</div> : null}
-      {!detail && detailQuery.isFetching ? <div className="loading-panel">加载中</div> : null}
+      {!permission.canOperate ? <PermissionNotice>当前权限模板仅允许查看批次、包和回执记录；客户端派发及回执处理已禁用。</PermissionNotice> : null}
+      {!detail && detailQuery.isFetching ? <PageState tone="loading" title="正在加载批次详情" description="请稍候，系统正在读取提交包和回执记录。" /> : null}
 
       {detail ? <OperationCenterDetail client={client} detail={detail} canOperate={permission.canOperate} /> : null}
     </section>
@@ -306,7 +307,7 @@ export function OperationCenterClientBridgePanel({
           <button
             className="icon-button"
             type="button"
-            title="刷新客户端目录档案"
+            title="刷新客户端目录档案" aria-label="刷新客户端目录档案"
             disabled={isProfileBusy}
             onClick={() => void profileQuery.refetch()}
           >
@@ -324,9 +325,9 @@ export function OperationCenterClientBridgePanel({
       </div>
 
       {!canOperate ? (
-        <div className="permission-readonly-notice">
+        <PermissionNotice>
           当前权限仅允许查看客户端目录和交换箱；保存与派发已禁用。
-        </div>
+        </PermissionNotice>
       ) : null}
       {profileQuery.isError ? <div className="alert">{readApiError(profileQuery.error)}</div> : null}
       {profileMessage ? <div className={saveProfileMutation.isError ? "alert" : "success-alert"}>{profileMessage}</div> : null}

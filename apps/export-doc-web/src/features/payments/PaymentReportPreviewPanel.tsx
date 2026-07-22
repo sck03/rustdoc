@@ -11,6 +11,7 @@ import { SelectField } from "../../ui/FormFields.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
+import { PermissionNotice } from "../../ui/PageState.tsx";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
 import { buildReportPdfDefaultFileName } from "../reports/reportFileNames.ts";
 import { printReportPreviewHtml } from "../reports/printReportPreview.ts";
@@ -271,7 +272,7 @@ export function PaymentReportPreviewPanel({
           <button
             className="icon-button"
             type="button"
-            title="刷新模板"
+            title="刷新模板" aria-label="刷新模板"
             disabled={isBusy}
             onClick={() => void templatesQuery.refetch()}
           >
@@ -327,7 +328,7 @@ export function PaymentReportPreviewPanel({
 
       {templateMessage ? <div className="alert">{templateMessage}</div> : null}
       {!reportOutputPermission.canOperate ? (
-        <div className="permission-readonly-notice">当前模板未授予付款报销单据预览和输出操作权限。</div>
+        <PermissionNotice>当前模板未授予付款报销单据预览和输出操作权限。</PermissionNotice>
       ) : null}
       {errorMessage ? <div className="alert">{errorMessage}</div> : null}
       {statusMessage ? (

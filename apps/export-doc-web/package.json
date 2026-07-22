@@ -21,6 +21,10 @@
     "test:workspace-navigation": "node ../../scripts/test_workspace_navigation_model.mjs",
     "test:email-template-model": "node ../../scripts/test_email_template_model.mjs",
     "test:business-status-model": "node ../../scripts/test_business_status_model.mjs",
+    "test:concurrency-feedback": "node ../../scripts/test_frontend_concurrency_feedback.mjs",
+    "test:accessibility-contracts": "node ../../scripts/test_frontend_accessibility_contracts.mjs",
+    "test:visual-baselines": "node ../../scripts/test_frontend_visual_baselines.mjs",
+    "test:visual-baselines:update": "node ../../scripts/update_frontend_visual_baselines.mjs",
     "test:audit-log-maintenance-model": "node ../../scripts/test_audit_log_maintenance_model.mjs",
     "test:report-template-workspace-model": "node ../../scripts/test_report_template_workspace_model.mjs",
     "test:supplier-assessment-analytics": "node ../../scripts/test_supplier_assessment_analytics_model.mjs",
@@ -40,10 +44,14 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@types/three": "^0.184.1",
     "@vitejs/plugin-react": "^5.2.0",
+    "axe-core": "^4.12.1",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
     "typescript": "^5.5.4",
     "vite": "^7.3.6"
   }

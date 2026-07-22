@@ -6,6 +6,7 @@ SingleWindowReceiptParseResult
 } from "../../api/index.ts";
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { formatPlainNumber } from "../../ui/formUtils.ts";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 import {
 formatBatchStatus,
@@ -40,7 +41,7 @@ export function ReceiptCollectionResultSummary({
           actions={renderOpenPathAction(result.receiptRootPath, "打开回执目录", onOpenError)}
         />
       </div>
-      <div className="table-frame compact-table receipt-package-result-table" aria-busy="false">
+      <ResponsiveTableFrame label="单一窗口收件包结果" className="compact-table receipt-package-result-table" mobileLayout="scroll">
         <table>
           <thead>
             <tr>
@@ -67,7 +68,7 @@ export function ReceiptCollectionResultSummary({
             )}
           </tbody>
         </table>
-      </div>
+      </ResponsiveTableFrame>
     </>
   );
 }
@@ -155,7 +156,7 @@ export function PackageImportResult({
 
 export function ParsedReceiptTable({ data }: { data: SingleWindowReceiptParseResult[] }) {
   return (
-    <div className="table-frame compact-table receipt-package-result-table" aria-busy="false">
+    <ResponsiveTableFrame label="单一窗口回执解析结果" className="compact-table receipt-package-result-table" mobileLayout="scroll">
       <table>
         <thead>
           <tr>
@@ -196,8 +197,7 @@ export function ParsedReceiptTable({ data }: { data: SingleWindowReceiptParseRes
           )}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableFrame>
   );
 }
-
 

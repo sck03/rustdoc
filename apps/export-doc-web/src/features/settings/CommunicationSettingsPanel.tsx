@@ -3,6 +3,7 @@ import { Cloud, MailCheck, Sparkles } from "lucide-react";
 import type { ApiSettingsSecretsDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { CheckboxSetting, NumberSetting, TextAreaSetting, TextSetting } from "./SettingsFieldControls.tsx";
 import type { SettingsRecord } from "./settingsTypes.ts";
+import { PageState } from "../../ui/PageState.tsx";
 
 const LazyBackupManagementPanel = lazy(() => import("./BackupManagementPanel.tsx"));
 
@@ -55,7 +56,7 @@ export function CommunicationSettingsPanel({ client, settings, secrets, canManag
           </div>
         </fieldset>
       </section>
-      <Suspense fallback={<div className="loading-panel">正在加载备份工具</div>}>
+      <Suspense fallback={<PageState tone="loading" title="正在加载备份工具" />}>
         <LazyBackupManagementPanel client={client} canManageSettings={canManageSettings} onPathError={onPathError} />
       </Suspense>
     </>

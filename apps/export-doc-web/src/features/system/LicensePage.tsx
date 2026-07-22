@@ -87,7 +87,7 @@ export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
           <button
             className="icon-button"
             type="button"
-            title="刷新授权状态"
+            title="刷新授权状态" aria-label="刷新授权状态"
             disabled={isBusy}
             onClick={() => {
               setMessage(null);
@@ -99,7 +99,7 @@ export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
           <button
             className="icon-button"
             type="button"
-            title="复制机器码"
+            title="复制机器码" aria-label="复制机器码"
             disabled={!status?.machineId}
             onClick={() => void copyMachineId()}
           >
@@ -108,7 +108,7 @@ export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
           <button
             className="icon-button solid"
             type="button"
-            title="注册"
+            title="注册" aria-label="注册"
             disabled={!canRegister}
             onClick={handleRegister}
           >

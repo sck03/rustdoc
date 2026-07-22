@@ -96,7 +96,7 @@ export function InvoiceHsKnowledgePanel({
             <h2 id="invoice-hs-panel-title">智能匹配 HS 编码</h2>
             <p>只允许回填带年度、来源和验证时间的当前有效编码。</p>
           </div>
-          <button className="icon-button" type="button" title="关闭" onClick={onClose}><X size={18}/></button>
+          <button className="icon-button" type="button" title="关闭" aria-label="关闭" onClick={onClose}><X size={18}/></button>
         </header>
         <form className="invoice-hs-search" onSubmit={search}>
           <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="商品名称、材质、用途、规格" />

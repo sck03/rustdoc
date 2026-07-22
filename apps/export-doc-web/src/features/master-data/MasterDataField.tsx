@@ -83,7 +83,7 @@ export function MasterDataField({
         onChange={onChange}
         actions={
           isDesktopBridgeAvailable() ? (
-            <button className="icon-button compact-icon-button" type="button" title="选择图片" disabled={disabled} onClick={onSelectPath}>
+            <button className="icon-button compact-icon-button" type="button" title="选择图片" aria-label="选择图片" disabled={disabled} onClick={onSelectPath}>
               <FolderOpen size={15} aria-hidden="true" />
             </button>
           ) : null

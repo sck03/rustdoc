@@ -2,6 +2,7 @@ import { useId } from "react";
 import { Trash2 } from "lucide-react";
 import type { ApiCustomsCooAttachmentDto, ApiCustomsCooNonpartyCorpDto, ApiCustomsCooOptionDto } from "../../api/index.ts";
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { CooItemSelectInput } from "./CustomsCooFields.tsx";
 import { normalizeCooOptions, numberOrZero } from "./customsCooModel.ts";
 
@@ -15,7 +16,7 @@ export function CooNonpartyEditor({
   onRemoveCorp: (index: number) => void;
 }) {
   return (
-    <div className="table-frame compact-table">
+    <ResponsiveTableFrame label="非生产企业信息" className="compact-table" mobileLayout="scroll">
       <table className="coo-nonparty-table">
         <thead>
           <tr>
@@ -38,7 +39,7 @@ export function CooNonpartyEditor({
             data.map((corp, index) => (
               <tr key={`${corp.id || "new"}-${index}`}>
                 <td className="item-action-cell">
-                  <button className="icon-button compact-icon-button" type="button" title="删除第三方企业" onClick={() => onRemoveCorp(index)}>
+                  <button className="icon-button compact-icon-button" type="button" title="删除第三方企业" aria-label="删除第三方企业" onClick={() => onRemoveCorp(index)}>
                     <Trash2 size={16} aria-hidden="true" />
                   </button>
                 </td>
@@ -62,7 +63,7 @@ export function CooNonpartyEditor({
           )}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableFrame>
   );
 }
 
@@ -82,7 +83,7 @@ export function CooAttachmentTable({
   onPathError: (message: string) => void;
 }) {
   return (
-    <div className="table-frame compact-table">
+    <ResponsiveTableFrame label="原产地证附件" className="compact-table" mobileLayout="scroll">
       <table className="coo-attachment-table">
         <thead>
           <tr>
@@ -115,7 +116,7 @@ export function CooAttachmentTable({
                   <button
                     className="icon-button compact-icon-button danger"
                     type="button"
-                    title="删除附件"
+                    title="删除附件" aria-label="删除附件"
                     disabled={disabled}
                     onClick={() => onRemoveAttachment(index)}
                   >
@@ -210,7 +211,7 @@ export function CooAttachmentTable({
           )}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableFrame>
   );
 }
 
@@ -274,4 +275,3 @@ function CooItemNumberInput({
     />
   );
 }
-

@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileCheck2, Paperclip, Plus } from "lucide-react";
+import { FileCheck2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ApiCustomsCooAttachmentDto,
@@ -18,14 +18,15 @@ import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { selectCustomsCooAttachmentFiles } from "../../desktop/desktopBridge.ts";
 import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
-import { DateField, TextAreaField, TextField } from "../../ui/FormFields.tsx";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { CustomsCooProducerProfileDialog } from "./CustomsCooProducerProfileDialog.tsx";
-import { CooDatalistField, CooSelectField } from "./CustomsCooFields.tsx";
-import { CooItemsEditor } from "./CustomsCooItemsEditor.tsx";
-import { CooAttachmentTable, CooNonpartyEditor } from "./CustomsCooTables.tsx";
+import { CustomsCooIdentitySections } from "./CustomsCooIdentitySections.tsx";
+import { CustomsCooTradeSections } from "./CustomsCooTradeSections.tsx";
+import { CustomsCooGoodsWorkspace } from "./CustomsCooGoodsWorkspace.tsx";
 import { CooSummary, buildCustomsCooSectionNavItems } from "./CustomsCooSummary.tsx";
 import { SingleWindowHandoffPanel } from "./SingleWindowHandoffPanel.tsx";
 import { SingleWindowLockedFieldsDialog } from "./SingleWindowLockedFieldsDialog.tsx";
@@ -66,9 +67,6 @@ import {
   normalizeText,
   numberOrZero,
   parseIssuingAuthorityCode,
-  shouldShowCooHeaderField,
-  shouldShowCooModificationFields,
-  shouldShowCooNonpartyCorps,
   toIssuingAuthorityOptions,
   type CooScopedClearRequest,
 } from "./customsCooModel.ts";
@@ -111,6 +109,7 @@ type CooAuthorityAutoState = {
 };
 
 export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }) {
+  const requestConfirmation = useConfirmation();
   const permission = useModulePermission("document.single-window");
   const { invoiceId } = useParams();
   const navigate = useNavigate();
@@ -303,7 +302,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
 
       let savedDocument: ApiCustomsCooDocumentDto | null = null;
       if (documentQuery.data && !areEditorDocumentsEqual(document, documentQuery.data)) {
-        if (!window.confirm("当前草稿有未保存修改，先保存后再查看锁定字段吗？")) {
+        if (!await requestConfirmation({ title: "保存后查看锁定字段", description: "当前草稿有未保存修改，需要先保存后再读取锁定字段。", confirmLabel: "保存并继续" })) {
           return null;
         }
 
@@ -437,7 +436,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     message: "当前海关原产地证草稿有未保存的修改。",
   });
 
-  function handleRepairReviewGroups(groupKeys: string[]) {
+  async function handleRepairReviewGroups(groupKeys: string[]) {
     if (!permission.canOperate || !document || !isInvoiceIdValid || groupKeys.length === 0) {
       return;
     }
@@ -448,7 +447,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
 
     if (
       shouldSaveCurrentDraft &&
-      !window.confirm("当前海关原产地证草稿有未保存修改，先保存当前草稿再执行自动修复吗？")
+      !await requestConfirmation({ title: "保存并自动修复", description: "当前海关原产地证草稿有未保存修改，需要先保存当前草稿再执行自动修复。", confirmLabel: "保存并修复" })
     ) {
       return;
     }
@@ -683,12 +682,12 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     setSuccessMessage(null);
   }
 
-  function handleRestoreDefaults() {
+  async function handleRestoreDefaults() {
     if (!document || !isInvoiceIdValid) {
       return;
     }
 
-    if (!window.confirm("这会按当前发票重新套用建议值，原来的手工覆盖内容会被替换。要继续吗？")) {
+    if (!await requestConfirmation({ title: "重新套用建议值", description: "系统将按当前发票重新生成建议值。", details: ["原来的手工覆盖内容会被替换。"], confirmLabel: "重新套用" })) {
       return;
     }
 
@@ -707,12 +706,12 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     fillEmptyMutation.mutate(cloneEditorDocument(document));
   }
 
-  function handleClearManualOverrides() {
+  async function handleClearManualOverrides() {
     if (!document || !isInvoiceIdValid) {
       return;
     }
 
-    if (!window.confirm("这会清空手工补充的覆盖字段，但会保留系统回写值。要继续吗？")) {
+    if (!await requestConfirmation({ title: "清空手工覆盖", description: "确定清空手工补充的覆盖字段吗？", details: ["系统回写值会保留。", "保存后才会写入草稿。"], confirmLabel: "清空覆盖" })) {
       return;
     }
 
@@ -728,12 +727,12 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     );
   }
 
-  function handleClearScopedGroup(groupKey: string) {
+  async function handleClearScopedGroup(groupKey: string) {
     if (!document || !isInvoiceIdValid) {
       return;
     }
 
-    if (!window.confirm(`这会把“${groupKey}”分组里的手工覆盖值恢复到当前发票建议值。要继续吗？`)) {
+    if (!await requestConfirmation({ title: "恢复分组建议值", description: `确定把“${groupKey}”分组里的手工覆盖值恢复到当前发票建议值吗？`, confirmLabel: "确认恢复" })) {
       return;
     }
 
@@ -742,12 +741,12 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     scopedClearMutation.mutate({ snapshot: cloneEditorDocument(document), groupKey });
   }
 
-  function handleClearScopedCategory(groupKey: string, categoryKey: string, categoryLabel: string) {
+  async function handleClearScopedCategory(groupKey: string, categoryKey: string, categoryLabel: string) {
     if (!document || !isInvoiceIdValid) {
       return;
     }
 
-    if (!window.confirm(`这会只恢复“${groupKey}”分组里的“${categoryLabel}”到当前发票建议值。要继续吗？`)) {
+    if (!await requestConfirmation({ title: "恢复分类建议值", description: `确定只恢复“${groupKey}”分组里的“${categoryLabel}”吗？`, confirmLabel: "确认恢复" })) {
       return;
     }
 
@@ -929,14 +928,14 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     setSuccessMessage("已撤销上一次工具动作，保存后写入草稿。");
   }
 
-  function handleBackToInvoice() {
-    if (confirmDiscardChanges("返回发票")) {
+  async function handleBackToInvoice() {
+    if (await confirmDiscardChanges("返回发票")) {
       navigate(isInvoiceIdValid ? `/invoices/${parsedInvoiceId}` : "/invoices");
     }
   }
 
-  function handleRefreshDocument() {
-    if (confirmDiscardChanges("刷新草稿")) {
+  async function handleRefreshDocument() {
+    if (await confirmDiscardChanges("刷新草稿")) {
       void documentQuery.refetch();
     }
   }
@@ -986,8 +985,8 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
 
       {loadMessage || message || catalogMessage ? <div className="alert">{loadMessage || message || catalogMessage}</div> : null}
       {successMessage ? <div className="success-alert">{successMessage}</div> : null}
-      {!permission.canOperate ? <div className="permission-readonly-notice">当前权限模板仅允许查看单一窗口草稿和预检结果；修改、修复、保存与交接操作已禁用。</div> : null}
-      {!document && isBusy ? <div className="loading-panel">加载中</div> : null}
+      {!permission.canOperate ? <PermissionNotice>当前权限模板仅允许查看单一窗口草稿和预检结果；修改、修复、保存与交接操作已禁用。</PermissionNotice> : null}
+      {!document && isBusy ? <PageState tone="loading" title="正在加载原产地证草稿" description="正在读取表头、商品明细、附件和预检状态。" /> : null}
 
       {document ? (
         <form id="customs-coo-form" className="entity-form customs-coo-form" onSubmit={handleSubmit} onKeyDownCapture={handleEnterAsTabFormKeyDown}>
@@ -1006,200 +1005,41 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
 
           <fieldset className="permission-fieldset" disabled={!permission.canOperate}>
 
-          <section id="coo-section-basic" className="form-section single-window-editor-section" aria-label="证书基础">
-            <div className="section-header">
-              <h2>证书基础</h2>
-            </div>
-            <div className="field-grid">
-              <CooSelectField label="申请类型" value={document.applyType} options={editorOptions.applyTypeOptions} onChange={(value) => patchDocument({ applyType: value })} />
-              <CooSelectField label="证书类别" value={document.certStatus} options={editorOptions.certStatusOptions} onChange={(value) => patchDocument({ certStatus: value })} />
-              <TextField label="原产地证编号" value={document.certNo} onChange={(value) => patchDocument({ certNo: value })} />
-              <CooSelectField label="证书类型" value={document.certType} options={editorOptions.certTypeOptions} onChange={(value) => patchDocument({ certType: value })} />
-              <TextField label="企业名称(中文)" value={document.etpsName} onChange={(value) => patchDocument({ etpsName: value })} />
-              <TextField label="企业编号" value={document.entMgrNo} onChange={(value) => patchDocument({ entMgrNo: value })} />
-              <TextField label="出口商代码" value={document.ciqRegNo} onChange={(value) => patchDocument({ ciqRegNo: value })} />
-              <TextField label="录入企业代码" value={document.aplRegNo} onChange={(value) => patchDocument({ aplRegNo: value })} />
-            </div>
-          </section>
+          <CustomsCooIdentitySections
+            document={document}
+            editorOptions={editorOptions}
+            issuingAuthorityOptions={issuingAuthorityCooOptions}
+            onPatch={patchDocument}
+            onOrgCodeChange={handleOrgCodeChange}
+            onFetchPlaceChange={handleFetchPlaceChange}
+            onApplicationAddressChange={handleAplAddChange}
+          />
 
-          <section id="coo-section-parties" className="form-section single-window-editor-section" aria-label="申报与对象">
-            <div className="section-header">
-              <h2>申报与对象</h2>
-            </div>
-            <div className="field-grid">
-              <TextField label="申报员姓名" value={document.applName} onChange={(value) => patchDocument({ applName: value })} />
-              <TextField label="申报员身份证号" value={document.applicant} onChange={(value) => patchDocument({ applicant: value })} />
-              <TextField label="申报员电话" value={document.applTel} onChange={(value) => patchDocument({ applTel: value })} />
-              <CooDatalistField label="签证机构代码(4位)" value={document.orgCode} options={issuingAuthorityCooOptions} onChange={handleOrgCodeChange} />
-              <CooDatalistField label="领证机构代码(4位)" value={document.fetchPlace} options={issuingAuthorityCooOptions} onChange={handleFetchPlaceChange} />
-              <CooDatalistField label="申请地址(机构所在地)" value={document.aplAdd} options={[]} onChange={handleAplAddChange} />
-              <DateField label="发票日期" value={document.invDate} onChange={(value) => patchDocument({ invDate: value })} />
-              <TextField label="发票号" value={document.invNo} onChange={(value) => patchDocument({ invNo: value })} />
-              <DateField label="申请日期" value={document.aplDate} onChange={(value) => patchDocument({ aplDate: value })} />
-              <TextField label="进口国/地区英文" value={document.destCountry} onChange={(value) => patchDocument({ destCountry: value })} />
-              <TextField label="进口国代码" value={document.destCountryCode} onChange={(value) => patchDocument({ destCountryCode: value })} />
-              <TextField label="进口国中文名" value={document.destCountryName} onChange={(value) => patchDocument({ destCountryName: value })} />
-            </div>
-            <div className="field-grid field-grid-wide">
-              <TextAreaField label="出口商" value={document.exporter} onChange={(value) => patchDocument({ exporter: value })} />
-              <TextAreaField label="收货人" value={document.consignee} onChange={(value) => patchDocument({ consignee: value })} />
-            </div>
-            {shouldShowCooHeaderField(document, "ExporterTel") ||
-            shouldShowCooHeaderField(document, "ConsigneeTel") ||
-            shouldShowCooHeaderField(document, "EtpsConcEr") ? (
-              <div className="field-grid">
-                {shouldShowCooHeaderField(document, "ExporterTel") ? <TextField label="出口商电话" value={document.exporterTel} onChange={(value) => patchDocument({ exporterTel: value })} /> : null}
-                {shouldShowCooHeaderField(document, "ExporterFax") ? <TextField label="出口商传真" value={document.exporterFax} onChange={(value) => patchDocument({ exporterFax: value })} /> : null}
-                {shouldShowCooHeaderField(document, "ExporterEmail") ? <TextField label="出口商邮箱" value={document.exporterEmail} onChange={(value) => patchDocument({ exporterEmail: value })} /> : null}
-                {shouldShowCooHeaderField(document, "ConsigneeTel") ? <TextField label="进口商电话" value={document.consigneeTel} onChange={(value) => patchDocument({ consigneeTel: value })} /> : null}
-                {shouldShowCooHeaderField(document, "ConsigneeFax") ? <TextField label="进口商传真" value={document.consigneeFax} onChange={(value) => patchDocument({ consigneeFax: value })} /> : null}
-                {shouldShowCooHeaderField(document, "ConsigneeEmail") ? <TextField label="进口商邮箱" value={document.consigneeEmail} onChange={(value) => patchDocument({ consigneeEmail: value })} /> : null}
-                {shouldShowCooHeaderField(document, "EtpsConcEr") ? <TextField label="企业联系人" value={document.etpsConcEr} onChange={(value) => patchDocument({ etpsConcEr: value })} /> : null}
-                {shouldShowCooHeaderField(document, "EtpsTel") ? <TextField label="企业联系电话" value={document.etpsTel} onChange={(value) => patchDocument({ etpsTel: value })} /> : null}
-              </div>
-            ) : null}
-          </section>
+          <CustomsCooTradeSections document={document} editorOptions={editorOptions} onPatch={patchDocument} />
 
-          <section id="coo-section-trade" className="form-section single-window-editor-section" aria-label="运输与贸易">
-            <div className="section-header">
-              <h2>运输与贸易</h2>
-            </div>
-            <div className="field-grid field-grid-wide">
-              <TextAreaField label="特殊条款（商品描述）" value={document.goodsSpecClause} onChange={(value) => patchDocument({ goodsSpecClause: value })} />
-              <TextAreaField label="唛头" value={document.mark} onChange={(value) => patchDocument({ mark: value })} />
-            </div>
-            <div className="field-grid">
-              <TextField label="启运港" value={document.loadPort} onChange={(value) => patchDocument({ loadPort: value })} />
-              <TextField label="卸货港" value={document.unloadPort} onChange={(value) => patchDocument({ unloadPort: value })} />
-              <TextField label="运输方式" value={document.transMeans} onChange={(value) => patchDocument({ transMeans: value })} />
-              <TextField label="船名/航次" value={document.transName} onChange={(value) => patchDocument({ transName: value })} />
-              <TextField label="中转国代码" value={document.transCountryCode} onChange={(value) => patchDocument({ transCountryCode: value })} />
-              <TextField label="中转国名称" value={document.transCountryName} onChange={(value) => patchDocument({ transCountryName: value })} />
-              <TextField label="转运港" value={document.transPort} onChange={(value) => patchDocument({ transPort: value })} />
-              <TextField label="目的港" value={document.destPort} onChange={(value) => patchDocument({ destPort: value })} />
-              <DateField label="出运日期" value={document.intendExpDate} onChange={(value) => patchDocument({ intendExpDate: value })} />
-              {shouldShowCooHeaderField(document, "PredictFlag") ? <CooSelectField label="预计离港标志" value={document.predictFlag} options={editorOptions.predictFlagOptions} onChange={(value) => patchDocument({ predictFlag: value })} /> : null}
-              <DateField label="出口报关日期" value={document.expDeclDate} onChange={(value) => patchDocument({ expDeclDate: value })} />
-              <CooSelectField label="贸易方式代码" value={document.tradeModeCode} options={editorOptions.cooTradeModeOptions} onChange={(value) => patchDocument({ tradeModeCode: value })} />
-              <TextField label="FOB值" value={document.fobValue} onChange={(value) => patchDocument({ fobValue: value })} />
-              <TextField label="总金额" value={document.totalAmt} onChange={(value) => patchDocument({ totalAmt: value })} />
-              <TextField label="合同号" value={document.contractNo} onChange={(value) => patchDocument({ contractNo: value })} />
-              <TextField label="信用证号" value={document.lcNo} onChange={(value) => patchDocument({ lcNo: value })} />
-              <TextField label="价格条款" value={document.priceTerms} onChange={(value) => patchDocument({ priceTerms: value })} />
-              <CooSelectField label="币制" value={document.curr} options={editorOptions.currencyOptions} onChange={(value) => patchDocument({ curr: value.toUpperCase() })} />
-            </div>
-            <div className="field-grid field-grid-wide">
-              <TextAreaField label="运输细节" value={document.transDetails} onChange={(value) => patchDocument({ transDetails: value })} />
-              <TextAreaField label="申请书备注" value={document.note} onChange={(value) => patchDocument({ note: value })} />
-              <TextAreaField label="发票特殊条款" value={document.specInvTerms} onChange={(value) => patchDocument({ specInvTerms: value })} />
-            </div>
-          </section>
-
-          <section id="coo-section-special" className="form-section single-window-editor-section" aria-label="补充与特殊项">
-            <div className="section-header">
-              <h2>补充与特殊项</h2>
-            </div>
-            <div className="field-grid field-grid-wide">
-              {shouldShowCooHeaderField(document, "Remark") ? <TextAreaField label="证书备注" value={document.remark} onChange={(value) => patchDocument({ remark: value })} /> : null}
-              {shouldShowCooHeaderField(document, "Producer") ? <TextAreaField label="证书货物生产商描述" value={document.producer} onChange={(value) => patchDocument({ producer: value })} /> : null}
-              {shouldShowCooHeaderField(document, "PrcsAssembly") ? <TextAreaField label="加工装配工序" value={document.prcsAssembly} onChange={(value) => patchDocument({ prcsAssembly: value })} /> : null}
-            </div>
-            <div className="field-grid">
-              <CooSelectField label="生产商保密" value={document.producerSertFlag} options={editorOptions.producerSecretOptions} onChange={(value) => patchDocument({ producerSertFlag: value })} />
-              {shouldShowCooHeaderField(document, "ExhibitFlag") ? <CooSelectField label="是否展览证书" value={document.exhibitFlag} options={editorOptions.exhibitFlagOptions} onChange={(value) => patchDocument({ exhibitFlag: value })} /> : null}
-              {shouldShowCooHeaderField(document, "ThirdPartyInvFlag") ? <CooSelectField label="第三方发票标志" value={document.thirdPartyInvFlag} options={editorOptions.thirdPartyInvoiceOptions} onChange={(value) => patchDocument({ thirdPartyInvFlag: value })} /> : null}
-              {shouldShowCooHeaderField(document, "OriCountryCode") ? <TextField label="原产国代码" value={document.oriCountryCode} onChange={(value) => patchDocument({ oriCountryCode: value })} /> : null}
-              {shouldShowCooHeaderField(document, "OriCountry") ? <TextField label="原产国名称" value={document.oriCountry} onChange={(value) => patchDocument({ oriCountry: value })} /> : null}
-              <DateField label="签发有效日期" value={document.chkValidDate} onChange={(value) => patchDocument({ chkValidDate: value })} />
-              <TextField label="报关单号" value={document.entryId} onChange={(value) => patchDocument({ entryId: value })} />
-              <CooSelectField label="企业承诺代码" value={document.aplPromiseCode} options={editorOptions.promiseOptions} onChange={(value) => patchDocument({ aplPromiseCode: value })} />
-            </div>
-          </section>
-
-          {shouldShowCooModificationFields(document) ? (
-          <section id="coo-section-modification" className="form-section single-window-editor-section" aria-label="更改与重发">
-            <div className="section-header">
-              <h2>更改与重发</h2>
-            </div>
-            <div className="field-grid">
-              <TextField label="原证书号" value={document.oldCertNo} onChange={(value) => patchDocument({ oldCertNo: value })} />
-              <TextField label="更改栏目" value={document.modColm} onChange={(value) => patchDocument({ modColm: value })} />
-              <DateField label="原证申请日期" value={document.oldDeclDate} onChange={(value) => patchDocument({ oldDeclDate: value })} />
-              <DateField label="原证签发日期" value={document.oldIssueDate} onChange={(value) => patchDocument({ oldIssueDate: value })} />
-            </div>
-            <div className="field-grid field-grid-wide">
-              <TextAreaField label="更改/重发原因" value={document.modReason} onChange={(value) => patchDocument({ modReason: value })} />
-              <TextAreaField label="原有情况描述" value={document.oldSituDesc} onChange={(value) => patchDocument({ oldSituDesc: value })} />
-              <TextAreaField label="更改情况描述" value={document.modSituDesc} onChange={(value) => patchDocument({ modSituDesc: value })} />
-            </div>
-          </section>
-          ) : null}
-
-          <section id="coo-section-items" className="form-section single-window-editor-section" aria-label="商品明细">
-            <div className="section-header">
-              <h2>商品明细</h2>
-              <span className="section-count">{document.items.length} 行</span>
-              <button className="icon-button" type="button" title="新增商品" onClick={addItem}>
-                <Plus size={17} aria-hidden="true" />
-              </button>
-            </div>
-            <CooItemsEditor
-              items={document.items}
-              certType={document.certType}
-              editorOptions={editorOptions}
-              disabled={isBusy}
-              savingProducerRowIndex={savingProducerProfileRowIndex}
-              onChangeItem={patchItem}
-              onRemoveItem={removeItem}
-              onGenerateGoodsDescription={handleGenerateGoodsDescription}
-              onCopyOriginAndEnterpriseToFollowingRows={handleCopyOriginAndEnterpriseToFollowingRows}
-              onOpenProducerProfile={handleOpenProducerProfiles}
-              onSaveProducerProfile={handleSaveProducerProfile}
-            />
-          </section>
-
-          {shouldShowCooNonpartyCorps(document) ? (
-          <section id="coo-section-nonparty" className="form-section single-window-editor-section" aria-label="第三方企业">
-            <div className="section-header">
-              <h2>第三方企业</h2>
-              <button className="icon-button" type="button" title="新增第三方企业" onClick={addNonpartyCorp}>
-                <Plus size={17} aria-hidden="true" />
-              </button>
-            </div>
-            <CooNonpartyEditor
-              data={document.nonpartyCorps}
-              onChangeCorp={patchNonpartyCorp}
-              onRemoveCorp={removeNonpartyCorp}
-            />
-          </section>
-          ) : null}
-
-          <section id="coo-section-attachments" className="form-section single-window-editor-section" aria-label="附件">
-            <div className="section-header">
-              <h2>附件</h2>
-              <button
-                className="icon-button"
-                type="button"
-                title="选择附件"
-                disabled={isBusy || !document}
-                onClick={() => void addAttachmentsFromDialog()}
-              >
-                <Paperclip size={17} aria-hidden="true" />
-              </button>
-              <span className="section-count">{document.attachments.length} 条</span>
-            </div>
-            <CooAttachmentTable
-              data={document.attachments}
-              certTypeOptions={editorOptions.certTypeOptions}
-              disabled={isBusy}
-              onChangeAttachment={patchAttachment}
-              onRemoveAttachment={removeAttachment}
-              onPathError={(value) => {
-                setMessage(value);
-                setSuccessMessage(null);
-              }}
-            />
-          </section>
+          <CustomsCooGoodsWorkspace
+            document={document}
+            editorOptions={editorOptions}
+            disabled={isBusy}
+            savingProducerRowIndex={savingProducerProfileRowIndex}
+            onAddItem={addItem}
+            onChangeItem={patchItem}
+            onRemoveItem={removeItem}
+            onGenerateGoodsDescription={handleGenerateGoodsDescription}
+            onCopyOriginAndEnterpriseToFollowingRows={handleCopyOriginAndEnterpriseToFollowingRows}
+            onOpenProducerProfile={handleOpenProducerProfiles}
+            onSaveProducerProfile={handleSaveProducerProfile}
+            onAddNonpartyCorp={addNonpartyCorp}
+            onChangeNonpartyCorp={patchNonpartyCorp}
+            onRemoveNonpartyCorp={removeNonpartyCorp}
+            onSelectAttachments={() => void addAttachmentsFromDialog()}
+            onChangeAttachment={patchAttachment}
+            onRemoveAttachment={removeAttachment}
+            onAttachmentPathError={(value) => {
+              setMessage(value);
+              setSuccessMessage(null);
+            }}
+          />
           </fieldset>
 
           <section id="coo-section-review" className="form-section single-window-editor-section" aria-label="导出前预检">

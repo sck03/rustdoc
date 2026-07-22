@@ -6,6 +6,7 @@ SingleWindowOperationTicketRow,
 SingleWindowWorkstationRow
 } from "../../api/index.ts";
 import { formatPlainNumber } from "../../ui/formUtils.ts";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 import {
 formatBusinessType,
@@ -49,7 +50,7 @@ export function DetailItem({
 
 export function PackageRecordTable({ data }: { data: SingleWindowOperationCenterPackageRecord[] }) {
   return (
-    <div className="table-frame compact-table" aria-busy="false">
+    <ResponsiveTableFrame label="单一窗口包记录" className="compact-table" mobileLayout="scroll">
       <table className="single-window-package-table">
         <thead>
           <tr>
@@ -88,13 +89,13 @@ export function PackageRecordTable({ data }: { data: SingleWindowOperationCenter
           )}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableFrame>
   );
 }
 
 export function ReceiptRecordTable({ data }: { data: SingleWindowOperationCenterReceiptRecord[] }) {
   return (
-    <div className="table-frame compact-table" aria-busy="false">
+    <ResponsiveTableFrame label="单一窗口回执记录" className="compact-table" mobileLayout="scroll">
       <table className="single-window-receipt-table">
         <thead>
           <tr>
@@ -137,13 +138,13 @@ export function ReceiptRecordTable({ data }: { data: SingleWindowOperationCenter
           )}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableFrame>
   );
 }
 
 export function TicketTable({ data, isBusy }: { data: SingleWindowOperationTicketRow[]; isBusy: boolean }) {
   return (
-    <div className="table-frame single-window-board-table" aria-busy={isBusy}>
+    <ResponsiveTableFrame label="单一窗口任务工单" className="single-window-board-table" busy={isBusy} mobileLayout="scroll">
       <table className="single-window-ticket-table">
         <thead>
           <tr>
@@ -190,13 +191,13 @@ export function TicketTable({ data, isBusy }: { data: SingleWindowOperationTicke
           )}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableFrame>
   );
 }
 
 export function WorkstationTable({ data, isBusy }: { data: SingleWindowWorkstationRow[]; isBusy: boolean }) {
   return (
-    <div className="table-frame single-window-board-table" aria-busy={isBusy}>
+    <ResponsiveTableFrame label="单一窗口工作站" className="single-window-board-table" busy={isBusy} mobileLayout="scroll">
       <table className="single-window-workstation-table">
         <thead>
           <tr>
@@ -235,8 +236,7 @@ export function WorkstationTable({ data, isBusy }: { data: SingleWindowWorkstati
           )}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableFrame>
   );
 }
-
 

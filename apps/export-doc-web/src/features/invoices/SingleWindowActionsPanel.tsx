@@ -3,6 +3,8 @@ import type { ApiInvoiceListItemDto, SingleWindowExportReview } from "../../api/
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { formatDate } from "../../ui/formUtils.ts";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
+import { PageState, PermissionNotice } from "../../ui/PageState.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import type { SingleWindowBusinessType } from "./invoiceListFileNames.ts";
 import { flattenSingleWindowReviewIssues, formatReviewSeverity, formatReviewSeverityKey, formatSingleWindowBusinessType, formatSingleWindowNavigationTarget, getAutoRepairGroupKeys } from "./invoiceListModels.ts";
 
@@ -70,7 +72,7 @@ export function SingleWindowActionsPanel({
           <h2>单一窗口办理</h2>
           <span>{invoice.invoiceNo || `ID ${invoice.id}`}</span>
         </div>
-        <button className="icon-button" type="button" title="关闭单一窗口办理" disabled={isBusy} onClick={onCancel}>
+        <button className="icon-button" type="button" title="关闭单一窗口办理" aria-label="关闭单一窗口办理" disabled={isBusy} onClick={onCancel}>
           <X size={17} aria-hidden="true" />
         </button>
       </div>
@@ -90,9 +92,9 @@ export function SingleWindowActionsPanel({
         </div>
       ) : null}
       {!canOperate ? (
-        <div className="permission-readonly-notice">
+        <PermissionNotice>
           当前单一窗口权限仅允许查看和预检；修复、导出提交包及导入回执包已禁用。
-        </div>
+        </PermissionNotice>
       ) : null}
 
       <div className="detail-grid single-window-list-detail-grid">
@@ -153,7 +155,7 @@ export function SingleWindowActionsPanel({
         </button>
       </div>
 
-      {isReviewBusy && !currentReview ? <div className="loading-panel">预检加载中</div> : null}
+      {isReviewBusy && !currentReview ? <PageState tone="loading" title="正在执行导出前预检" description="系统正在核对发票、申报字段和提交包要求。" /> : null}
       {currentReview ? (
         <section className="single-window-list-review" aria-label="发票列表导出前预检">
           <div className="section-header">
@@ -192,7 +194,7 @@ export function SingleWindowActionsPanel({
             </div>
           </div>
           {currentReview.sourceDiffSummary ? <div className="info-alert">{currentReview.sourceDiffSummary}</div> : null}
-          <div className="table-frame compact-table">
+          <ResponsiveTableFrame className="compact-table" label="单一窗口预检问题">
             <table className="single-window-list-review-table">
               <thead>
                 <tr>
@@ -229,7 +231,7 @@ export function SingleWindowActionsPanel({
                 )}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTableFrame>
         </section>
       ) : null}
     </section>

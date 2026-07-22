@@ -15,6 +15,7 @@ import { LoginPage } from "./features/auth/LoginPage.tsx";
 import { readDesktopError } from "./ui/DesktopPathActions.tsx";
 import { readStoredJson, removeStoredValue, writeStoredJson } from "./ui/browserStorage.ts";
 import { readApiError } from "./ui/formUtils.ts";
+import { PageState } from "./ui/PageState.tsx";
 import { useConfirmUnsavedChanges } from "./ui/unsavedChangesGuard.tsx";
 import { WorkspaceShell } from "./app/WorkspaceShell.tsx";
 import { hasModulePermission, hasRouteModulePermission, PermissionAccessProvider } from "./app/PermissionAccessContext.tsx";
@@ -319,8 +320,8 @@ function App() {
     }
   }
 
-  function handleLogout() {
-    if (!confirmDiscardChanges("退出登录")) {
+  async function handleLogout() {
+    if (!await confirmDiscardChanges("退出登录")) {
       return;
     }
 
@@ -512,7 +513,7 @@ function App() {
 function RouteLoadingPanel() {
   return (
     <section className="work-surface">
-      <div className="loading-panel">正在加载页面...</div>
+      <PageState tone="loading" title="正在加载页面" description="正在准备当前业务模块，请稍候。" />
     </section>
   );
 }
@@ -520,10 +521,7 @@ function RouteLoadingPanel() {
 function NoModuleAccessPage() {
   return (
     <section className="work-surface">
-      <div className="empty-guidance">
-        <strong>当前账号尚未分配可用模块</strong>
-        <span>请联系系统管理员启用权限模板或重新分配岗位权限。账号本身仍可安全退出登录。</span>
-      </div>
+      <PageState tone="permission" title="当前账号尚未分配可用模块" description="请联系系统管理员启用权限模板或重新分配岗位权限。账号本身仍可安全退出登录。" />
     </section>
   );
 }

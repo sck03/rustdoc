@@ -15,6 +15,8 @@ import { TextField } from "../../ui/FormFields.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
+import { PermissionNotice } from "../../ui/PageState.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 type SingleWindowHandoffPanelProps = {
   businessType: "CustomsCoo" | "AgentConsignment";
@@ -234,7 +236,7 @@ export function SingleWindowHandoffPanel({ businessType, client, invoiceId, canO
           <button
             className="icon-button"
             type="button"
-            title="刷新客户端目录档案"
+            title="刷新客户端目录档案" aria-label="刷新客户端目录档案"
             disabled={!canOperate || isProfileBusy}
             onClick={() => void profileQuery.refetch()}
           >
@@ -265,7 +267,7 @@ export function SingleWindowHandoffPanel({ businessType, client, invoiceId, canO
         </div>
       </div>
 
-      {!canOperate ? <div className="permission-readonly-notice">当前权限仅允许查看客户端目录档案；生成、派发、收集和保存目录已禁用。</div> : null}
+      {!canOperate ? <PermissionNotice>当前权限仅允许查看客户端目录档案；生成、派发、收集和保存目录已禁用。</PermissionNotice> : null}
       {profileQuery.isError ? <div className="alert">{readApiError(profileQuery.error)}</div> : null}
       {profileMessage ? <div className={saveProfileMutation.isError ? "alert" : "success-alert"}>{profileMessage}</div> : null}
       {packageMessage ? <div className={exportPackageMutation.isError ? "alert" : "success-alert"}>{packageMessage}</div> : null}
@@ -421,7 +423,7 @@ function ReceiptCollectionResultDetail({
           actions={renderOpenPathAction(result.receiptRootPath, "打开回执根目录", onOpenError)}
         />
       </div>
-      <div className="table-frame compact-table handoff-receipt-files">
+      <ResponsiveTableFrame className="compact-table handoff-receipt-files" label="单一窗口回执文件">
         <table>
           <thead>
             <tr>
@@ -448,7 +450,7 @@ function ReceiptCollectionResultDetail({
             )}
           </tbody>
         </table>
-      </div>
+      </ResponsiveTableFrame>
     </>
   );
 }

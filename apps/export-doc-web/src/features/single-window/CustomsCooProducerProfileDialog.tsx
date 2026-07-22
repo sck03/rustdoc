@@ -10,6 +10,8 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 type ProducerProfileDraft = ApiCustomsCooProducerProfileInputDto & {
   id: number;
@@ -28,6 +30,7 @@ export function CustomsCooProducerProfileDialog({
   onApply: (profile: ApiCustomsCooProducerProfileInputDto) => void;
   onClose: () => void;
 }) {
+  const requestConfirmation = useConfirmation();
   const queryClient = useQueryClient();
   const [keyword, setKeyword] = useState("");
   const [committedKeyword, setCommittedKeyword] = useState("");
@@ -99,8 +102,8 @@ export function CustomsCooProducerProfileDialog({
     setCommittedKeyword(keyword.trim());
   }
 
-  function beginCreate() {
-    if (!confirmDiscardDraft("新增资料")) {
+  async function beginCreate() {
+    if (!await confirmDiscardDraft("新增资料")) {
       return;
     }
 
@@ -112,10 +115,10 @@ export function CustomsCooProducerProfileDialog({
     setSuccessMessage(null);
   }
 
-  function selectProfile(profile: ApiCustomsCooProducerProfileDto) {
+  async function selectProfile(profile: ApiCustomsCooProducerProfileDto) {
     const isSameProfile = selectedId === profile.id && draft.id === profile.id;
     const actionLabel = isSameProfile ? "重新载入当前资料" : "切换资料";
-    if (!confirmDiscardDraft(actionLabel)) {
+    if (!await confirmDiscardDraft(actionLabel)) {
       return;
     }
 
@@ -131,8 +134,8 @@ export function CustomsCooProducerProfileDialog({
     setSuccessMessage(null);
   }
 
-  function handleClose() {
-    if (confirmDiscardDraft("关闭弹窗")) {
+  async function handleClose() {
+    if (await confirmDiscardDraft("关闭弹窗")) {
       onClose();
     }
   }
@@ -148,51 +151,51 @@ export function CustomsCooProducerProfileDialog({
     saveMutation.mutate(draft);
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!selectedId || selectedId <= 0 || isBusy) {
       return;
     }
 
-    if (!confirmDiscardDraft("删除资料")) {
+    if (!await confirmDiscardDraft("删除资料")) {
       return;
     }
 
     const displayName = buildProfileDisplayName(draft);
-    if (!window.confirm(`确定要删除生产企业资料“${displayName}”吗？`)) {
+    if (!await requestConfirmation({ title: "删除生产企业资料", description: `确定要删除生产企业资料“${displayName}”吗？`, confirmLabel: "确认删除", tone: "danger" })) {
       return;
     }
 
     deleteMutation.mutate(selectedId);
   }
 
-  function handleApplyDraft() {
+  async function handleApplyDraft() {
     if (!hasProducerIdentity(draft) && !draft.producer.trim()) {
       setMessage("当前编辑区没有可回填的生产企业资料。");
       setSuccessMessage(null);
       return;
     }
 
-    if (isDraftDirty && !window.confirm("生产企业资料有未保存的修改。\n\n继续套用只会回填当前货项，不会保存到资料库。是否继续？")) {
+    if (isDraftDirty && !await requestConfirmation({ title: "套用未保存资料", description: "生产企业资料有未保存的修改。", details: ["继续套用只会回填当前货项，不会保存到资料库。"], confirmLabel: "继续套用" })) {
       return;
     }
 
     onApply(normalizeProfileInput(draft));
   }
 
-  function applyListProfile(profile: ApiCustomsCooProducerProfileDto) {
-    if (!confirmDiscardDraft("套用列表资料")) {
+  async function applyListProfile(profile: ApiCustomsCooProducerProfileDto) {
+    if (!await confirmDiscardDraft("套用列表资料")) {
       return;
     }
 
     onApply(normalizeProfileInput(toDraft(profile)));
   }
 
-  function confirmDiscardDraft(actionLabel: string) {
+  async function confirmDiscardDraft(actionLabel: string) {
     if (!isDraftDirty) {
       return true;
     }
 
-    return window.confirm(`生产企业资料有未保存的修改。\n\n继续${actionLabel}会丢失这些修改。是否继续？`);
+    return requestConfirmation({ title: "放弃未保存修改", description: `继续${actionLabel}会丢失生产企业资料的未保存修改。`, confirmLabel: `继续${actionLabel}` });
   }
 
   return (
@@ -209,7 +212,7 @@ export function CustomsCooProducerProfileDialog({
             <h2 id="producer-profile-title">生产企业资料</h2>
             <span>{profiles.length}</span>
           </div>
-          <button className="icon-button" type="button" title="关闭" onClick={handleClose} disabled={isBusy}>
+          <button className="icon-button" type="button" title="关闭" aria-label="关闭" onClick={handleClose} disabled={isBusy}>
             <X size={18} aria-hidden="true" />
           </button>
         </header>
@@ -229,7 +232,7 @@ export function CustomsCooProducerProfileDialog({
             <button
               className="icon-button"
               type="button"
-              title="刷新"
+              title="刷新" aria-label="刷新"
               disabled={isBusy}
               onClick={() => void profilesQuery.refetch()}
             >
@@ -246,7 +249,7 @@ export function CustomsCooProducerProfileDialog({
         {successMessage ? <div className="success-alert">{successMessage}</div> : null}
 
         <div className="producer-profile-layout">
-          <div className="table-frame producer-profile-table-frame">
+          <ResponsiveTableFrame className="producer-profile-table-frame" label="生产企业资料">
             <table className="producer-profile-table">
               <thead>
                 <tr>
@@ -277,7 +280,7 @@ export function CustomsCooProducerProfileDialog({
                         <button
                           className="icon-button compact-icon-button"
                           type="button"
-                          title="套用到当前货项"
+                          title="套用到当前货项" aria-label="套用到当前货项"
                           disabled={isBusy}
                           onClick={(event) => {
                             event.stopPropagation();
@@ -289,7 +292,7 @@ export function CustomsCooProducerProfileDialog({
                         <button
                           className="icon-button compact-icon-button"
                           type="button"
-                          title="编辑资料"
+                          title="编辑资料" aria-label="编辑资料"
                           disabled={isBusy}
                           onClick={(event) => {
                             event.stopPropagation();
@@ -312,7 +315,7 @@ export function CustomsCooProducerProfileDialog({
                 )}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTableFrame>
 
           <form className="producer-profile-editor" id="producer-profile-form" onSubmit={handleSave} onKeyDownCapture={handleEnterAsTabFormKeyDown}>
             <div className="producer-profile-editor-header">

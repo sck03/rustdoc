@@ -8,6 +8,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { PermissionNotice } from "../../ui/PageState.tsx";
 import { listPageSizeOptions,normalizeListPageSize } from "../../ui/listViewState.ts";
 
 import {
@@ -137,7 +138,7 @@ export function SingleWindowCollaborationPage({ client }: { client: ExportDocMan
           <button
             className="icon-button"
             type="button"
-            title="刷新"
+            title="刷新" aria-label="刷新"
             disabled={isBusy}
             onClick={() => void collaborationQuery.refetch()}
           >
@@ -148,9 +149,9 @@ export function SingleWindowCollaborationPage({ client }: { client: ExportDocMan
 
       {message ? <div className="alert">{message}</div> : null}
       {!permission.canOperate ? (
-        <div className="permission-readonly-notice">
+        <PermissionNotice>
           当前权限仅允许查询协同工单和工位状态；协作处理与状态推进已禁用。
-        </div>
+        </PermissionNotice>
       ) : null}
 
       <div className="single-window-board-grid">

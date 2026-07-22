@@ -13,6 +13,10 @@ export function readApiError(error: unknown): string {
   return error instanceof Error ? error.message : "请求失败";
 }
 
+export function isConcurrencyConflict(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 409 && /其他用户|其他会话|并发版本|加载最新|刷新后重试/.test(readApiError(error));
+}
+
 export function readRouteSuccessMessage(state: unknown) {
   if (state && typeof state === "object" && "successMessage" in state) {
     const value = (state as { successMessage?: unknown }).successMessage;

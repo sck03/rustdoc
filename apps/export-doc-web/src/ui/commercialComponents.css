@@ -1,0 +1,139 @@
+.list-page-layout,
+.editor-page-layout,
+.list-page-content,
+.editor-page-content {
+  min-width: 0;
+}
+
+.list-page-layout,
+.editor-page-layout {
+  container-type: inline-size;
+}
+
+.responsive-table-frame {
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.responsive-table-frame table {
+  width: 100%;
+}
+
+@media (max-width: 760px) {
+  .responsive-table-frame [data-table-priority="secondary"] {
+    display: none;
+  }
+
+  .responsive-table-frame[data-mobile-layout="scroll"] th:first-child,
+  .responsive-table-frame[data-mobile-layout="scroll"] td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #ffffff;
+    box-shadow: 7px 0 12px rgba(24, 55, 51, 0.05);
+  }
+
+  .responsive-table-frame[data-mobile-layout="cards"] table,
+  .responsive-table-frame[data-mobile-layout="cards"] tbody,
+  .responsive-table-frame[data-mobile-layout="cards"] tr,
+  .responsive-table-frame[data-mobile-layout="cards"] td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .responsive-table-frame[data-mobile-layout="cards"] thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .responsive-table-frame[data-mobile-layout="cards"] tbody {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .responsive-table-frame[data-mobile-layout="cards"] tbody tr {
+    padding: 10px 12px;
+    background: #ffffff;
+    border: 1px solid var(--edm-line);
+    border-radius: 11px;
+    box-shadow: var(--edm-shadow-sm);
+  }
+
+  .responsive-table-frame[data-mobile-layout="cards"] tbody td {
+    display: grid;
+    grid-template-columns: minmax(92px, 36%) minmax(0, 1fr);
+    gap: 10px;
+    padding: 7px 0;
+    border: 0;
+    border-bottom: 1px solid #edf2f0;
+    text-align: left;
+  }
+
+  .responsive-table-frame[data-mobile-layout="cards"] tbody td::before {
+    color: var(--edm-ink-500);
+    font-size: 11px;
+    font-weight: 750;
+    content: attr(data-label);
+  }
+
+  .responsive-table-frame[data-mobile-layout="cards"] tbody td:last-child {
+    border-bottom: 0;
+  }
+}
+.concurrency-conflict-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  color: #664500;
+  background: #fff8e8;
+  border: 1px solid #e7c66f;
+  border-left: 4px solid #d99a14;
+  border-radius: 12px;
+}
+
+.concurrency-conflict-notice > div { display: grid; gap: 3px; }
+.concurrency-conflict-notice strong { color: #5d3d00; }
+.concurrency-conflict-notice span { color: #674d17; }
+.concurrency-conflict-notice small { color: #806b3c; }
+
+@media (max-width: 680px) {
+  .concurrency-conflict-notice { grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+  .concurrency-conflict-notice .command-button { grid-column: 1 / -1; width: 100%; justify-content: center; }
+}
+.inline-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 11px 13px;
+  border: 1px solid #cbd9e5;
+  border-radius: 8px;
+  background: #f5f9fc;
+  color: #344655;
+}
+
+.inline-notice[data-tone="error"] { border-color: #efb7b4; background: #fff4f3; color: #8d2823; }
+.inline-notice[data-tone="success"] { border-color: #a9d8c4; background: #f0faf5; color: #176347; }
+.inline-notice[data-tone="warning"] { border-color: #ebcf91; background: #fff9e9; color: #775418; }
+.inline-notice[data-tone="info"] { border-color: #b8d4e8; background: #f2f8fc; color: #285c7d; }
+
+.inline-notice-content { display: grid; gap: 2px; min-width: 0; }
+.inline-notice-content strong { color: currentColor; font-size: 13px; font-weight: 800; }
+.inline-notice-content span { min-width: 0; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+.inline-notice-action { align-self: center; }
+
+@media (max-width: 560px) {
+  .inline-notice { grid-template-columns: auto minmax(0, 1fr); }
+  .inline-notice-action { grid-column: 1 / -1; }
+  .inline-notice-action > button { width: 100%; }
+}

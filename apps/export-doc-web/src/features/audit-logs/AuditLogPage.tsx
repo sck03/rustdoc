@@ -7,6 +7,7 @@ import { isDesktopBridgeAvailable, selectSaveExcelPath } from "../../desktop/des
 import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { readStoredJsonObject, writeStoredJson } from "../../ui/browserStorage.ts";
 import { listPageSizeOptions, normalizeListPageSize } from "../../ui/listViewState.ts";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -431,10 +432,10 @@ export function AuditLogPage({
           </label>
         </div>
         <div className="toolbar-actions">
-          <button className="icon-button" type="button" title="刷新" disabled={isBusy} onClick={() => void logsQuery.refetch()}>
+          <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void logsQuery.refetch()}>
             <RefreshCw size={18} aria-hidden="true" />
           </button>
-          <button className="icon-button solid" type="submit" title="查询" disabled={isBusy}>
+          <button className="icon-button solid" type="submit" title="查询" aria-label="查询" disabled={isBusy}>
             <Search size={18} aria-hidden="true" />
           </button>
         </div>
@@ -467,7 +468,7 @@ export function AuditLogPage({
       ) : null}
 
       <div className="audit-log-layout">
-        <div className="table-frame audit-log-table-frame">
+        <ResponsiveTableFrame label="审计日志列表" className="audit-log-table-frame" busy={logsQuery.isFetching} mobileLayout="scroll">
           <table className="audit-log-table">
             <thead>
               <tr>
@@ -514,7 +515,7 @@ export function AuditLogPage({
               ) : null}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableFrame>
 
         <aside className="audit-log-detail" aria-label="审计日志详情">
           <div className="section-header">

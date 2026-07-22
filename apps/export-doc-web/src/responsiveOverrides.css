@@ -1,0 +1,1080 @@
+/* Responsive overrides loaded after workspace feature styles. */
+@media (max-width: 860px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .identity-management-intro {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .identity-management-tabs,
+  .permission-level-guide {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-nav {
+    max-height: none;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 10px 12px;
+    overflow: visible;
+  }
+
+  .nav-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .nav-group {
+    flex: 0 0 184px;
+  }
+
+  .nav-sub-list {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .nav-group-button,
+  .nav-item {
+    width: 100%;
+  }
+
+  .workspace-header,
+  .toolbar,
+  .editor-toolbar,
+  .settings-command-strip,
+  .pagination-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .toolbar-actions {
+    justify-content: flex-end;
+  }
+
+  .single-window-document-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .single-window-toolbar-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .single-window-command-band {
+    flex-direction: column;
+  }
+
+  .single-window-section-nav {
+    position: static;
+  }
+
+  .single-window-section-nav-item {
+    flex: 1 1 calc(50% - 8px);
+  }
+
+  .settings-ai-grid,
+  .settings-single-window-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .single-window-tool-group-primary {
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  .settings-center-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-category-nav {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .settings-category-item {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .single-window-lock-backdrop {
+    padding: 10px;
+  }
+
+  .single-window-lock-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
+    min-height: min(520px, calc(100vh - 20px));
+    min-height: min(520px, calc(100dvh - 20px));
+    padding: 12px;
+  }
+
+  .single-window-lock-header,
+  .single-window-lock-toolbar,
+  .single-window-lock-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .single-window-lock-footer .command-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .session-strip {
+    flex-wrap: wrap;
+  }
+
+  .api-base {
+    max-width: 100%;
+  }
+
+  .login-panel {
+    margin: 18px 12px;
+    width: calc(100vw - 24px);
+  }
+
+  .work-surface {
+    padding: 12px;
+  }
+
+  .dashboard-page {
+    padding: 12px;
+  }
+
+  .dashboard-metric-grid,
+  .dashboard-work-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-table-frame,
+  .dashboard-todo-list {
+    min-height: 280px;
+  }
+
+  .job-tool-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .job-tool-link-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .job-excel-analysis-meta,
+  .job-excel-analysis-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .container-packing-project-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .tool-panel-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tool-panel-actions {
+    justify-content: flex-start;
+  }
+
+  .container-packing-render-mode {
+    width: 100%;
+  }
+
+  .container-packing-render-buttons {
+    flex: 1;
+  }
+
+  .container-packing-field-grid,
+  .container-packing-rules-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .packing-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .container-packing-visual-header,
+  .container-packing-3d-header,
+  .container-packing-projection-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .container-packing-3d-toolbar {
+    justify-content: flex-start;
+  }
+
+  .container-packing-view-buttons {
+    width: 100%;
+  }
+
+  .container-packing-3d-status {
+    justify-content: flex-start;
+  }
+
+  .container-packing-3d-stage,
+  .container-packing-3d-canvas {
+    height: 300px;
+    min-height: 280px;
+    max-height: 360px;
+  }
+
+  .container-packing-visual-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-zip-options {
+    grid-template-columns: 1fr;
+  }
+
+  .job-excel-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .job-excel-conflict-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-surface {
+    padding: 12px;
+  }
+
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field-grid-span-2 {
+    grid-column: auto;
+  }
+
+  .update-endpoint-field,
+  .update-public-key-field {
+    grid-column: auto;
+  }
+
+  .hs-code-tool-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hs-code-import-actions .command-button,
+  .hs-code-remote-form .command-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .hs-code-remote-search {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .settings-textarea-field {
+    grid-column: auto;
+  }
+
+  .communication-settings-grid .email-body-template-field,
+  .communication-settings-grid .webdav-password-setting,
+  .communication-settings-grid .webdav-enabled-setting {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .backup-action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .maintenance-section-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .exchange-currency-manager {
+    grid-template-columns: 1fr;
+  }
+
+  .exchange-currency-action-stack {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+
+  .audit-log-maintenance-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-log-advanced-maintenance-content {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .audit-log-browser-download {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .audit-log-browser-download .command-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .audit-log-advanced-maintenance-content .command-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .confirmation-dialog-backdrop {
+    padding: 10px;
+  }
+
+  .confirmation-dialog {
+    width: calc(100vw - 20px);
+    padding: 15px;
+  }
+
+  .confirmation-dialog-footer {
+    flex-direction: column-reverse;
+  }
+
+  .confirmation-dialog-footer .command-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .query-export-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .query-inline-actions {
+    justify-content: flex-start;
+  }
+
+  .user-management-layout,
+  .permission-template-layout,
+  .permission-module-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-log-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-log-detail {
+    min-height: 280px;
+  }
+
+  .smart-ocr-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .smart-ocr-side-panel {
+    grid-template-rows: auto auto;
+  }
+
+  .smart-ocr-preview-panel .section-header span,
+  .smart-ocr-result-panel .section-header span {
+    max-width: 100%;
+  }
+
+  .smart-ocr-preview-viewport,
+  .smart-ocr-preview-empty {
+    min-height: 300px;
+  }
+
+  .smart-ocr-result-panel textarea {
+    min-height: 280px;
+  }
+
+  .exchange-rate-detail-grid,
+  .exchange-rate-layout,
+  .update-center-detail-grid,
+  .update-center-layout,
+  .update-package-detail-grid,
+  .mandatory-update-detail-grid,
+  .email-status-detail-grid,
+  .email-tool-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .startup-update-banner {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .startup-update-banner .command-button {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .exchange-rate-table-frame,
+  .currency-chip-list,
+  .update-release-notes,
+  .email-attachment-table-frame {
+    min-height: 280px;
+  }
+
+  .email-status-detail-grid .detail-item-wide {
+    grid-column: auto;
+  }
+
+  .field-grid-wide {
+    grid-template-columns: 1fr;
+  }
+
+  .report-preview-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .report-template-selector,
+  .report-template-tools {
+    width: 100%;
+    max-width: none;
+  }
+
+  .report-template-selector {
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .report-template-inline-field {
+    flex: 1 1 240px;
+  }
+
+  .report-template-inline-field select {
+    flex: 1 1 180px;
+    width: auto;
+    max-width: none;
+  }
+
+  .report-template-tools,
+  .report-export-actions {
+    justify-content: flex-start;
+  }
+
+  .report-template-tools .command-button,
+  .report-export-actions .command-button {
+    flex: 1 1 140px;
+    justify-content: center;
+  }
+
+  .report-template-action-group {
+    flex: 1 1 260px;
+    justify-content: flex-start;
+  }
+
+  .report-template-action-group + .report-template-action-group {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .report-export-advanced summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .report-export-advanced summary small {
+    white-space: normal;
+  }
+
+  .report-pdf-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .document-package-rules-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .document-package-template-row {
+    grid-template-columns: 1fr;
+  }
+
+  .document-email-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .document-email-actions {
+    justify-content: stretch;
+  }
+
+  .document-email-actions .command-button,
+  .document-email-actions .toggle-field {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .report-template-grid {
+    grid-template-columns: 1fr;
+    min-width: 0;
+    overflow-x: visible;
+  }
+
+  .report-template-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .template-selection-panel {
+    grid-column: auto;
+    grid-row: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .template-actions-panel,
+  .template-package-panel {
+    grid-column: auto;
+  }
+
+  .template-management-section,
+  .template-package-content,
+  .template-package-command-section,
+  .template-inline-details-content,
+  .template-package-advanced-content {
+    grid-template-columns: 1fr;
+  }
+
+  .template-management-actions,
+  .template-management-panel > .command-button {
+    flex: 1 1 140px;
+  }
+
+  .report-template-workspace-tabs {
+    width: 100%;
+  }
+
+  .report-template-preview-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .report-template-preview-actions {
+    justify-content: stretch;
+  }
+
+  .report-template-preview-actions .command-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .report-template-editor textarea,
+  .report-template-preview iframe {
+    min-height: 420px;
+  }
+
+  .segmented-control {
+    width: 100%;
+  }
+
+  .new-report-designer {
+    min-height: auto;
+    padding: 10px;
+  }
+
+  .new-report-designer-header {
+    grid-template-columns: 1fr;
+  }
+
+  .new-report-designer-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .new-report-designer-sidebar,
+  .new-report-designer-right-rail {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .new-report-designer-canvas {
+    min-height: 480px;
+  }
+
+  .section-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .shipping-mark-mode-row,
+  .shipping-mark-image-actions,
+  .shipping-mark-toolbar,
+  .shipping-mark-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .shipping-mark-mode-control,
+  .shipping-mark-image-actions .command-button {
+    width: 100%;
+  }
+
+  .shipping-mark-image-actions .command-button {
+    justify-content: center;
+  }
+
+  .shipping-mark-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
+    min-height: min(560px, calc(100vh - 20px));
+    min-height: min(560px, calc(100dvh - 20px));
+  }
+
+  .shipping-mark-canvas-shell {
+    padding: 8px;
+  }
+
+  .shipping-mark-canvas {
+    width: 100%;
+  }
+
+  .single-window-toolbar .search-form,
+  .filter-bar {
+    width: 100%;
+    max-width: none;
+  }
+
+  .inline-filter {
+    flex: 1 1 150px;
+  }
+
+  .inline-filter select {
+    width: 100%;
+  }
+
+  .detail-grid,
+  .single-window-client-folder-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-center-list-action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-center-list-action-grid .path-field,
+  .operation-center-list-action-grid .detail-item-wide {
+    grid-column: auto;
+  }
+
+  .runtime-detail-grid .detail-item-wide {
+    grid-column: auto;
+  }
+
+  .customs-coo-summary-grid,
+  .single-window-document-summary-grid,
+  .handoff-result-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .single-window-export-review-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-consignment-workbench,
+  .agent-consignment-documents-grid,
+  .agent-consignment-receipt-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .coo-items-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .coo-items-rail {
+    max-height: 320px;
+  }
+
+  .coo-items-list {
+    max-height: 268px;
+  }
+
+  .coo-item-detail-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .coo-item-detail-actions {
+    justify-content: flex-start;
+  }
+
+  .single-window-review-subheader .toolbar-actions {
+    justify-content: flex-start;
+  }
+
+  .receipt-package-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-item-wide {
+    grid-column: auto;
+  }
+}
+
+@media (min-width: 861px) and (max-width: 1180px) {
+  .maintenance-section-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .single-window-tool-group,
+  .single-window-section-tools {
+    flex-basis: calc(50% - 8px);
+  }
+
+  .coo-items-workbench {
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  }
+
+  .single-window-tool-group-primary {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  .settings-ai-grid,
+  .settings-single-window-grid {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
+  .settings-ai-grid .settings-textarea-field {
+    grid-column: 1 / -1;
+  }
+
+  .report-template-grid {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+  }
+
+  .report-template-sidebar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .template-selection-panel {
+    grid-column: span 3;
+    grid-row: auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .template-actions-panel,
+  .template-package-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .report-template-preview-toolbar {
+    grid-template-columns: minmax(220px, 280px) minmax(260px, 1fr);
+  }
+
+  .report-template-preview-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .new-report-designer-grid {
+    grid-template-columns: 230px minmax(620px, 1fr);
+    height: auto;
+  }
+
+  .new-report-designer-right-rail {
+    grid-column: 1 / -1;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .single-window-board-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.login-screen {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 44px;
+  overflow: hidden;
+  color: #14242a;
+  background:
+    linear-gradient(118deg, rgba(255, 255, 255, 0.86) 0%, rgba(243, 248, 246, 0.62) 48%, rgba(251, 243, 224, 0.78) 100%),
+    linear-gradient(136deg, #f3f7f5 0%, #e7eef8 46%, #fff4df 100%);
+}
+
+.login-screen::before {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(118deg, transparent 0 22%, rgba(15, 118, 110, 0.12) 22% 23%, transparent 23% 100%),
+    linear-gradient(151deg, transparent 0 62%, rgba(37, 99, 235, 0.12) 62% 63%, transparent 63% 100%),
+    linear-gradient(28deg, transparent 0 68%, rgba(245, 158, 11, 0.16) 68% 69%, transparent 69% 100%);
+  transform: rotate(-3deg);
+}
+
+.login-3d-layer,
+.login-grid-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.login-3d-layer {
+  opacity: 0.92;
+}
+
+.login-3d-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.login-grid-overlay {
+  opacity: 0.34;
+  background-image:
+    linear-gradient(rgba(20, 36, 42, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20, 36, 42, 0.07) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.9), transparent 72%);
+}
+
+.login-composition {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 432px);
+  gap: 42px;
+  align-items: center;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+}
+
+.login-brand-copy {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.login-brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #24424a;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.login-app-icon,
+.login-card-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: #ffffff;
+  background: #0f766e;
+  border-radius: 8px;
+  box-shadow: 0 14px 30px rgba(15, 118, 110, 0.2);
+}
+
+.login-app-icon {
+  width: 54px;
+  height: 54px;
+}
+
+.login-brand-copy h1 {
+  max-width: 560px;
+  margin: 0;
+  color: #102027;
+  font-size: 42px;
+  line-height: 1.12;
+}
+
+.login-brand-copy p {
+  margin: 0;
+  color: #496168;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.login-card {
+  display: grid;
+  gap: 18px;
+  width: 100%;
+  padding: 26px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(151, 166, 177, 0.42);
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(31, 41, 55, 0.18);
+  backdrop-filter: blur(18px);
+}
+
+.login-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.login-kicker {
+  margin: 0 0 4px;
+  color: #66757d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.login-card-header h2 {
+  font-size: 22px;
+}
+
+.login-card-mark {
+  width: 42px;
+  height: 42px;
+  background: #1d4ed8;
+  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.18);
+}
+
+.login-field {
+  gap: 8px;
+  color: #3d4d55;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.login-input-shell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  color: #60727a;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #c7d4da;
+  border-radius: 8px;
+}
+
+.login-input-shell:focus-within {
+  color: #0f766e;
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+}
+
+.login-input-shell input,
+.login-input-shell input:focus {
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  color: #14242a;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  outline: 0;
+}
+
+.login-alert {
+  padding: 10px 12px;
+  color: #8a1f13;
+  background: #fff0ed;
+  border: 1px solid #f1b4aa;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.login-submit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px 0 18px;
+  color: #ffffff;
+  background: #0f766e;
+  border-radius: 8px;
+  box-shadow: 0 16px 34px rgba(15, 118, 110, 0.2);
+  font-weight: 800;
+}
+
+.login-submit-button:hover:not(:disabled) {
+  background: #0d635d;
+}
+
+@media (max-width: 860px) {
+  .login-screen {
+    align-items: start;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 22px 14px;
+    overflow-y: auto;
+  }
+
+  .login-3d-layer {
+    opacity: 0.58;
+  }
+
+  .login-grid-overlay {
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), transparent 78%);
+  }
+
+  .login-composition {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    align-self: start;
+  }
+
+  .login-brand-copy {
+    gap: 12px;
+    padding-top: 8px;
+  }
+
+  .login-brand-copy h1 {
+    max-width: none;
+    font-size: 32px;
+  }
+
+  .login-brand-copy p {
+    font-size: 15px;
+  }
+
+  .login-card {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-screen {
+    padding: 16px 10px;
+  }
+
+  .login-brand-lockup {
+    font-size: 13px;
+  }
+
+  .login-app-icon {
+    width: 46px;
+    height: 46px;
+  }
+
+  .login-card {
+    gap: 15px;
+    padding: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-3d-layer {
+    opacity: 0.66;
+  }
+}

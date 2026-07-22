@@ -12,6 +12,8 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { formatBytes, formatRuntimeDate } from "./settingsFormatters.ts";
 import { parseStringArray } from "./settingsValueUtils.ts";
 import { RuntimeDiagnosticsSection } from "./RuntimeDiagnosticsSection.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 type MaintenanceSectionKey = "postgresql" | "ownership" | "diagnostics" | "support";
 
@@ -218,7 +220,7 @@ function PostgreSqlMaintenancePanel({
           <button
             className="icon-button"
             type="button"
-            title="刷新 PostgreSQL 备份"
+            title="刷新 PostgreSQL 备份" aria-label="刷新 PostgreSQL 备份"
             disabled={!canManageSettings || isBusy}
             onClick={() => {
               setMessage(null);
@@ -339,7 +341,7 @@ function PostgreSqlMaintenancePanel({
           {renderOpenPathAction(lastRestorePlanPath, "打开还原计划目录", onPathError)}
         </div>
       ) : null}
-      <div className="table-frame backup-table-frame">
+      <ResponsiveTableFrame className="backup-table-frame" label="PostgreSQL 团队库物理备份列表">
         <table className="backup-table" aria-label="PostgreSQL 团队库物理备份列表">
           <thead>
             <tr>
@@ -373,7 +375,7 @@ function PostgreSqlMaintenancePanel({
             )}
           </tbody>
         </table>
-      </div>
+      </ResponsiveTableFrame>
     </section>
   );
 }
@@ -387,6 +389,7 @@ function SupportPackagePanel({
   canManageSettings: boolean;
   onPathError: (message: string) => void;
 }) {
+  const requestConfirmation = useConfirmation();
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [lastPackage, setLastPackage] = useState<ApiSupportPackageResponse | null>(null);
@@ -423,8 +426,8 @@ function SupportPackagePanel({
   });
   const supportPackageCanCreate = canManageSettings && !createMutation.isPending;
 
-  function handleCreateSupportPackage() {
-    if (includeOptionalFiles && !window.confirm("支持包将包含所选的数据库备份或样张文件。请确认其中不含不应交给技术支持的敏感业务资料。是否继续？")) {
+  async function handleCreateSupportPackage() {
+    if (includeOptionalFiles && !await requestConfirmation({ title: "生成包含可选文件的支持包", description: "支持包将包含所选的数据库备份或样张文件。", details: ["请确认其中不含不应交给技术支持的敏感业务资料。"], confirmLabel: "确认生成" })) {
       return;
     }
 
@@ -503,6 +506,7 @@ function SharedDatabaseOwnershipPanel({
   client: ExportDocManagerApiClient;
   canManageUsers: boolean;
 }) {
+  const requestConfirmation = useConfirmation();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -578,7 +582,7 @@ function SharedDatabaseOwnershipPanel({
     (onlyUnassigned || !fromUserId || fromUserId !== toUserId) &&
     !isBusy;
 
-  function handleTransferOwnership() {
+  async function handleTransferOwnership() {
     const sourceLabel = onlyUnassigned
       ? "当前未归属的数据"
       : owners.find((owner) => String(owner.userId) === fromUserId)?.username || "所选用户的数据";
@@ -586,7 +590,7 @@ function SharedDatabaseOwnershipPanel({
     const scopes = [includeInvoices ? "发票" : "", includePayments ? "付款报销" : "", includeOtherBusinessData ? "其他业务资料" : ""]
       .filter(Boolean)
       .join("、");
-    if (!window.confirm(`即将把${sourceLabel}中的${scopes}改派给“${targetLabel}”。此操作会修改业务数据归属，是否继续？`)) {
+    if (!await requestConfirmation({ title: "改派业务数据归属", description: `即将把${sourceLabel}中的${scopes}改派给“${targetLabel}”。`, details: ["此操作会修改业务数据归属，并写入审计记录。"], confirmLabel: "确认改派", tone: "danger" })) {
       return;
     }
 
@@ -604,7 +608,7 @@ function SharedDatabaseOwnershipPanel({
           <button
             className="icon-button"
             type="button"
-            title="刷新归属统计"
+            title="刷新归属统计" aria-label="刷新归属统计"
             disabled={!canManageUsers || isBusy}
             onClick={() => {
               setMessage(null);
@@ -692,7 +696,7 @@ function SharedDatabaseOwnershipPanel({
           <span>执行改派</span>
         </button>
       </div>
-      <div className="table-frame backup-table-frame">
+      <ResponsiveTableFrame className="backup-table-frame" label="共享库归属统计">
         <table className="backup-table" aria-label="共享库归属统计">
           <thead>
             <tr>
@@ -727,7 +731,7 @@ function SharedDatabaseOwnershipPanel({
             )}
           </tbody>
         </table>
-      </div>
+      </ResponsiveTableFrame>
     </section>
   );
 }

@@ -39,7 +39,7 @@ export function ReportTemplateAdminPanel({
   onDelete: () => void;
 }) {
   return (
-    <details className="template-management-panel template-actions-panel" aria-label="模板管理">
+    <details className="template-management-panel template-actions-panel template-admin-panel" aria-label="模板管理">
       <summary>
         <span>模板操作</span>
         <small>{currentTemplateLabel}</small>

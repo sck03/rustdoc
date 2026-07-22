@@ -1,5 +1,6 @@
 import { Code2, Eye, LayoutTemplate, RefreshCw, Save } from "lucide-react";
 import { type DesignerMode, type TemplateWorkspaceMode } from "./reportTemplateDesignerModel.ts";
+import { Button, IconButton } from "../../ui/Button.tsx";
 
 export function ReportTemplateWorkspaceHeader({
   title,
@@ -25,7 +26,7 @@ export function ReportTemplateWorkspaceHeader({
   onPreview: () => void;
 }) {
   return (
-    <>
+    <div className="report-template-sticky-header">
       <div className="editor-toolbar">
         <div className="editor-title">
           <Code2 size={18} aria-hidden="true" />
@@ -54,17 +55,11 @@ export function ReportTemplateWorkspaceHeader({
               <span>源码</span>
             </button>
           </div>
-          <button className="icon-button" type="button" title="刷新" disabled={isBusy} onClick={onRefresh}>
+          <IconButton label="刷新报表模板" disabled={isBusy} onClick={onRefresh}>
             <RefreshCw size={18} aria-hidden="true" />
-          </button>
-          <button className="command-button secondary" type="button" disabled={!canPreview} onClick={onPreview}>
-            <Eye size={17} aria-hidden="true" />
-            <span>预览</span>
-          </button>
-          <button className="command-button" type="submit" disabled={!canSave}>
-            <Save size={17} aria-hidden="true" />
-            <span>保存</span>
-          </button>
+          </IconButton>
+          <Button variant="secondary" icon={<Eye size={17} aria-hidden="true" />} disabled={!canPreview} onClick={onPreview}>预览</Button>
+          <Button variant="primary" type="submit" icon={<Save size={17} aria-hidden="true" />} disabled={!canSave}>保存</Button>
         </div>
       </div>
 
@@ -90,6 +85,6 @@ export function ReportTemplateWorkspaceHeader({
           <span>预览</span>
         </button>
       </div>
-    </>
+    </div>
   );
 }

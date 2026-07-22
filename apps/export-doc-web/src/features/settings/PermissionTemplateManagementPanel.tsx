@@ -9,6 +9,8 @@ import type {
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 
 type TemplateDraft = {
   id: number;
@@ -40,6 +42,7 @@ export function PermissionTemplateManagementPanel({
   client: ExportDocManagerApiClient;
   canManageUsers: boolean;
 }) {
+  const requestConfirmation = useConfirmation();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<TemplateDraft>(() => createEmptyDraft());
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -172,9 +175,9 @@ export function PermissionTemplateManagementPanel({
     });
   }
 
-  function deleteSelected() {
+  async function deleteSelected() {
     if (draft.id <= 0 || draft.isSystem) return;
-    if (!window.confirm(`确定删除权限模板“${draft.name}”吗？正在被账号使用的模板不会被删除。`)) return;
+    if (!await requestConfirmation({ title: "删除权限模板", description: `确定删除权限模板“${draft.name}”吗？`, details: ["正在被账号使用的模板不会被删除。"], confirmLabel: "确认删除", tone: "danger" })) return;
     deleteMutation.mutate(draft.id);
   }
 
@@ -194,11 +197,11 @@ export function PermissionTemplateManagementPanel({
           <p className="section-description">按岗位选择业务模块即可；界面导航和服务端接口会执行同一套权限规则。</p>
         </div>
         <div className="toolbar-actions">
-          <button className="icon-button" type="button" title="刷新模板" disabled={isBusy} onClick={() => void catalogQuery.refetch()}><RefreshCw size={18} /></button>
-          <button className="icon-button" type="button" title="新建模板" disabled={isBusy} onClick={beginNew}><Plus size={18} /></button>
-          <button className="icon-button" type="button" title="复制当前模板" disabled={isBusy || draft.id <= 0} onClick={copySelected}><Copy size={18} /></button>
+          <button className="icon-button" type="button" title="刷新模板" aria-label="刷新模板" disabled={isBusy} onClick={() => void catalogQuery.refetch()}><RefreshCw size={18} /></button>
+          <button className="icon-button" type="button" title="新建模板" aria-label="新建模板" disabled={isBusy} onClick={beginNew}><Plus size={18} /></button>
+          <button className="icon-button" type="button" title="复制当前模板" aria-label="复制当前模板" disabled={isBusy || draft.id <= 0} onClick={copySelected}><Copy size={18} /></button>
           <button className="command-button" type="button" disabled={isBusy || isAdminTemplate} onClick={saveTemplate}><Save size={17} /><span>保存模板</span></button>
-          <button className="icon-button" type="button" title="删除模板" disabled={isBusy || draft.id <= 0 || draft.isSystem} onClick={deleteSelected}><Trash2 size={18} /></button>
+          <button className="icon-button" type="button" title="删除模板" aria-label="删除模板" disabled={isBusy || draft.id <= 0 || draft.isSystem} onClick={deleteSelected}><Trash2 size={18} /></button>
         </div>
       </div>
 
@@ -206,8 +209,8 @@ export function PermissionTemplateManagementPanel({
       <div className="permission-business-note">
         这里只显示业务模块。基础资料读取、候选项和单据输出等技术权限会由系统自动补齐，无需管理员理解或逐项配置。
       </div>
-      {message ? <div className="alert">{message}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+      {message ? <InlineNotice tone="error" title="权限模板操作失败">{message}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
 
       <div className="permission-template-layout">
         <div className="permission-template-list" role="listbox" aria-label="权限模板目录">
@@ -225,7 +228,7 @@ export function PermissionTemplateManagementPanel({
         </div>
 
         <div className="permission-template-editor">
-          {isAdminTemplate ? <div className="permission-readonly-notice">系统管理员模板固定拥有全部功能，不能在此修改。</div> : null}
+          {isAdminTemplate ? <PermissionNotice>系统管理员模板固定拥有全部功能，不能在此修改。</PermissionNotice> : null}
           <div className="field-grid permission-template-meta-grid">
             <label><span>模板名称</span><input value={draft.name} disabled={isBusy || isAdminTemplate} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>
             <label className="permission-template-count"><span>已开放业务模块</span><strong>{enabledBusinessModuleCount} 个</strong><small>技术支撑权限由系统自动处理</small></label>

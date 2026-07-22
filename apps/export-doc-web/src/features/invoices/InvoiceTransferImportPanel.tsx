@@ -11,7 +11,7 @@ export function InvoiceTransferImportPanel({ draft, isBusy, uploadMode = false, 
   const preview = draft.previewResponse?.preview ?? null;
   const hasConflict = Boolean(preview?.invoiceExists);
   return <section className="form-section" aria-label="导入发票单据包">
-    <div className="section-header"><h2>导入单据包</h2><button className="icon-button" type="button" title="关闭导入" disabled={isBusy} onClick={onCancel}><X size={17} aria-hidden="true" /></button></div>
+    <div className="section-header"><h2>导入单据包</h2><button className="icon-button" type="button" title="关闭导入" aria-label="关闭导入" disabled={isBusy} onClick={onCancel}><X size={17} aria-hidden="true" /></button></div>
     <form className="settings-form" onSubmit={onSubmit}>
       <div className="field-grid">{uploadMode ? <label><span>单据包文件</span><input type="file" accept=".edpkg" disabled={isBusy} onChange={(event) => onUploadFileChange?.(event.target.files?.[0] ?? null)} /></label> : <label><span>单据包路径</span><input value={draft.packagePath} disabled={isBusy} onChange={(event) => onChange({ packagePath: event.target.value, previewResponse: null })} /></label>}</div>
       {!uploadMode ? <div className="toolbar-actions"><button className="command-button secondary" type="button" disabled={isBusy} onClick={() => onPreview(draft.packagePath)}><FileArchive size={17} aria-hidden="true" /><span>{isBusy ? "处理中" : "预览"}</span></button></div> : <div className="field-help">{uploadFile ? `已选择：${uploadFile.name}` : "选择文件后自动预览。"}</div>}

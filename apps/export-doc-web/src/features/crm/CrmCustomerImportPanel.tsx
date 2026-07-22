@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ApiCrmCustomerImportPreviewDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { OperationFeedback, errorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 export function CrmCustomerImportPanel({ client, canOperate, onImported }: {
   client: ExportDocManagerApiClient;
@@ -43,9 +44,9 @@ export function CrmCustomerImportPanel({ client, canOperate, onImported }: {
     <OperationFeedback feedback={feedback} />
     {preview ? <>
       <p>共 {preview.totalRows} 行，有效 {preview.validRows} 行，重复 {preview.duplicateRows} 行。</p>
-      <div className="table-frame"><table className="data-table"><thead><tr><th>行</th><th>客户</th><th>国家</th><th>联系人</th><th>结果</th></tr></thead>
+      <ResponsiveTableFrame label="CRM 客户导入预览" mobileLayout="scroll"><table className="data-table"><thead><tr><th>行</th><th>客户</th><th>国家</th><th>联系人</th><th>结果</th></tr></thead>
         <tbody>{preview.rows.slice(0, 30).map((row) => <tr key={row.rowNumber}><td>{row.rowNumber}</td><td>{row.name || "-"}</td><td>{row.countryRegion || "-"}</td><td>{row.contactName || "-"}</td><td>{row.error || (row.isDuplicate ? "重复，跳过" : "可导入")}</td></tr>)}</tbody>
-      </table></div>
+      </table></ResponsiveTableFrame>
     </> : null}
   </section>;
 }

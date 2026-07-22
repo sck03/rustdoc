@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useConfirmation } from "./ConfirmationProvider.tsx";
 
 const defaultUnsavedChangesMessage = "当前页面有未保存的修改。";
 
@@ -10,7 +11,7 @@ type UnsavedChangesEntry = {
 };
 
 type UnsavedChangesContextValue = {
-  confirmDiscardChanges: (actionLabel?: string) => boolean;
+  confirmDiscardChanges: (actionLabel?: string) => Promise<boolean>;
   hasUnsavedChanges: boolean;
   removeEntry: (id: string) => void;
   setEntry: (entry: UnsavedChangesEntry) => void;
@@ -24,6 +25,7 @@ type UnsavedChangesGuardOptions = {
 const UnsavedChangesContext = createContext<UnsavedChangesContextValue | null>(null);
 
 export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
+  const requestConfirmation = useConfirmation();
   const entriesRef = useRef<Map<string, UnsavedChangesEntry>>(new Map());
   const activeEntryRef = useRef<UnsavedChangesEntry | null>(null);
   const [activeEntry, setActiveEntry] = useState<UnsavedChangesEntry | null>(null);
@@ -59,14 +61,20 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
     [publishActiveEntry],
   );
 
-  const confirmDiscardChanges = useCallback((actionLabel?: string) => {
+  const confirmDiscardChanges = useCallback(async (actionLabel?: string) => {
     const entry = activeEntryRef.current;
     if (!entry) {
       return true;
     }
 
-    return window.confirm(buildUnsavedChangesPrompt(entry.message, actionLabel));
-  }, []);
+    return requestConfirmation({
+      title: "放弃未保存的修改？",
+      description: normalizeUnsavedChangesMessage(entry.message),
+      details: [actionLabel?.trim() ? `继续${actionLabel.trim()}会丢失这些修改。` : "继续操作会丢失这些修改。"],
+      confirmLabel: actionLabel?.trim() || "放弃修改",
+      tone: "warning",
+    });
+  }, [requestConfirmation]);
 
   useEffect(() => {
     function handleBeforeUnload(event: BeforeUnloadEvent) {
@@ -83,7 +91,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    function handleDocumentClick(event: MouseEvent) {
+    async function handleDocumentClick(event: MouseEvent) {
       const entry = activeEntryRef.current;
       if (!entry || !shouldCheckAnchorNavigation(event)) {
         return;
@@ -94,18 +102,17 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (window.confirm(buildUnsavedChangesPrompt(entry.message, "离开当前编辑页"))) {
-        return;
-      }
-
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
+      if (await confirmDiscardChanges("离开当前编辑页")) {
+        window.location.href = anchor.href;
+      }
     }
 
     document.addEventListener("click", handleDocumentClick, true);
     return () => document.removeEventListener("click", handleDocumentClick, true);
-  }, []);
+  }, [confirmDiscardChanges]);
 
   const value = useMemo(
     () => ({
@@ -156,16 +163,6 @@ export function useConfirmUnsavedChanges() {
 
 function normalizeUnsavedChangesMessage(message: string) {
   return message.trim() || defaultUnsavedChangesMessage;
-}
-
-function buildUnsavedChangesPrompt(message: string, actionLabel?: string) {
-  const normalizedMessage = normalizeUnsavedChangesMessage(message);
-  const normalizedActionLabel = actionLabel?.trim();
-  if (!normalizedActionLabel) {
-    return `${normalizedMessage}\n\n继续操作会丢失这些修改。是否继续？`;
-  }
-
-  return `${normalizedMessage}\n\n继续${normalizedActionLabel}会丢失这些修改。是否继续？`;
 }
 
 function shouldCheckAnchorNavigation(event: MouseEvent) {

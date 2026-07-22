@@ -8,7 +8,7 @@ export function InvoiceReportPreviewHeader(p:Props){const {canPreview,errorMessa
           <button
             className="icon-button"
             type="button"
-            title="刷新模板"
+            title="刷新模板" aria-label="刷新模板"
             disabled={!p.canRefreshTemplates || isBusy}
             onClick={p.onRefresh}
           >

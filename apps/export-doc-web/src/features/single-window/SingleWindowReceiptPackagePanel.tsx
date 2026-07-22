@@ -20,6 +20,7 @@ import { DesktopIconButton,readDesktopError,renderOpenPathAction } from "../../u
 import { PathField,PathTextAreaField } from "../../ui/PathField.tsx";
 import { formatPlainNumber,readApiError } from "../../ui/formUtils.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
+import { PermissionNotice } from "../../ui/PageState.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 
 import {
@@ -396,9 +397,9 @@ export function ReceiptPackagePanel({
       ) : null}
       {desktopMessage ? <div className="alert">{desktopMessage}</div> : null}
       {!canOperate ? (
-        <div className="permission-readonly-notice">
+        <PermissionNotice>
           当前权限仅允许查看回执处理记录；收集、打包、导入及目录修改已禁用。
-        </div>
+        </PermissionNotice>
       ) : null}
 
       <div className="receipt-package-grid">

@@ -6,6 +6,8 @@ import { ApiPaymentDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 import { formatAmount, formatDate, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
 import { listPageSizeOptions, loadListViewState, normalizeListPageSize, saveListViewState } from "../../ui/listViewState.ts";
 
@@ -85,7 +87,7 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
           <button
             className="icon-button"
             type="button"
-            title="重置搜索"
+            title="重置搜索" aria-label="重置搜索"
             disabled={isBusy || (!keyword && !committedKeyword)}
             onClick={handleResetSearch}
           >
@@ -94,7 +96,7 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
           <button
             className="icon-button"
             type="button"
-            title="刷新"
+            title="刷新" aria-label="刷新"
             disabled={isBusy}
             onClick={() => void paymentsQuery.refetch()}
           >
@@ -109,8 +111,8 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
         </div>
       </div>
 
-      {message ? <div className="alert">{message}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+      {message ? <InlineNotice tone="error" title="付款记录加载失败">{message}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
 
       <PaymentTable
         data={payments?.items ?? []}
@@ -149,7 +151,7 @@ function PaymentTable({
   }
 
   return (
-    <div className="table-frame" aria-busy={isBusy}>
+    <ResponsiveTableFrame label="付款报销列表" busy={isBusy} mobileLayout="scroll">
       <table className="payment-table">
         <thead>
           <tr>
@@ -198,6 +200,6 @@ function PaymentTable({
           )}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableFrame>
   );
 }

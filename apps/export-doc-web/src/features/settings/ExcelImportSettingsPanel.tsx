@@ -164,10 +164,10 @@ export function ExcelImportSettingsPanel({
             <Save size={17} aria-hidden="true" />
             <span>保存方案</span>
           </button>
-          <button className="icon-button" type="button" title="恢复默认映射" disabled={disabled} onClick={restoreDefaultMapping}>
+          <button className="icon-button" type="button" title="恢复默认映射" aria-label="恢复默认映射" disabled={disabled} onClick={restoreDefaultMapping}>
             <RotateCcw size={18} aria-hidden="true" />
           </button>
-          <button className="icon-button" type="button" title="删除方案" disabled={disabled || !selectedSchemeName} onClick={deleteSelectedScheme}>
+          <button className="icon-button" type="button" title="删除方案" aria-label="删除方案" disabled={disabled || !selectedSchemeName} onClick={deleteSelectedScheme}>
             <Trash2 size={18} aria-hidden="true" />
           </button>
         </div>

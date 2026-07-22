@@ -5,6 +5,8 @@ import { ApiUserAccountDto, ApiUserListResponse, ApiUserSaveRequest, ExportDocMa
 import { queryKeys } from "../../api/queryKeys.ts";
 import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 type UserDraft = {
   id: number;
@@ -190,27 +192,27 @@ export function UserManagementPanel({
           <p className="section-description">创建和维护登录账号，并通过岗位与权限模板控制界面导航和业务操作。</p>
         </div>
         <div className="toolbar-actions">
-          <button className="icon-button" type="button" title="刷新用户" disabled={isBusy} onClick={() => void usersQuery.refetch()}>
+          <button className="icon-button" type="button" title="刷新用户" aria-label="刷新用户" disabled={isBusy} onClick={() => void usersQuery.refetch()}>
             <RefreshCw size={18} aria-hidden="true" />
           </button>
-          <button className="icon-button" type="button" title="新建用户" disabled={isBusy} onClick={beginNew}>
+          <button className="icon-button" type="button" title="新建用户" aria-label="新建用户" disabled={isBusy} onClick={beginNew}>
             <Plus size={18} aria-hidden="true" />
           </button>
           <button className="command-button" type="button" disabled={isBusy} onClick={saveUser}>
             <Save size={17} aria-hidden="true" />
             <span>保存</span>
           </button>
-          <button className="icon-button" type="button" title="删除用户" disabled={isBusy || draft.id <= 0} onClick={deleteSelectedUser}>
+          <button className="icon-button" type="button" title="删除用户" aria-label="删除用户" disabled={isBusy || draft.id <= 0} onClick={deleteSelectedUser}>
             <Trash2 size={18} aria-hidden="true" />
           </button>
         </div>
       </div>
 
-      {message ? <div className="alert">{message}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+      {message ? <InlineNotice tone="error" title="用户操作失败">{message}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
 
       <div className="user-management-layout">
-        <div className="table-frame user-management-table-frame">
+        <ResponsiveTableFrame className="user-management-table-frame" label="用户账号列表">
           <table className="user-management-table">
             <thead>
               <tr>
@@ -254,7 +256,7 @@ export function UserManagementPanel({
               )}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableFrame>
 
         <div className="field-grid user-management-form-grid">
           <label>

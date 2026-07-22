@@ -7,6 +7,7 @@ import { isDesktopBridgeAvailable, readOcrImageFileAsDataUrl, selectOcrImageFile
 import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { PermissionNotice } from "../../ui/PageState.tsx";
 
 type OcrImageSource =
   | {
@@ -345,19 +346,19 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
           }
         />
         <div className="toolbar-actions smart-ocr-action-bar">
-          <button className="icon-button" type="button" title="粘贴图片" disabled={isBusy || !ocrPermission.canOperate} onClick={() => void pasteImageFromClipboard()}>
+          <button className="icon-button" type="button" title="粘贴图片" aria-label="粘贴图片" disabled={isBusy || !ocrPermission.canOperate} onClick={() => void pasteImageFromClipboard()}>
             <ClipboardPaste size={18} aria-hidden="true" />
           </button>
-          <button className="icon-button" type="button" title="复制文本" disabled={!canCopy} onClick={() => void copyText()}>
+          <button className="icon-button" type="button" title="复制文本" aria-label="复制文本" disabled={!canCopy} onClick={() => void copyText()}>
             <Copy size={18} aria-hidden="true" />
           </button>
-          <button className="icon-button solid" type="button" title="开始识别" disabled={!canRecognize} onClick={() => void recognizeCurrentImage()}>
+          <button className="icon-button solid" type="button" title="开始识别" aria-label="开始识别" disabled={!canRecognize} onClick={() => void recognizeCurrentImage()}>
             <Play size={18} aria-hidden="true" />
           </button>
         </div>
       </div>
 
-      {!ocrPermission.canOperate ? <div className="permission-readonly-notice">当前模板仅允许进入 OCR 模块，图片载入和识别操作已禁用。</div> : null}
+      {!ocrPermission.canOperate ? <PermissionNotice>当前模板仅允许进入 OCR 模块，图片载入和识别操作已禁用。</PermissionNotice> : null}
       {message ? <div className={messageType === "error" ? "alert" : "success-alert"}>{message}</div> : null}
 
       <div className="smart-ocr-layout">
@@ -368,14 +369,14 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
               <span>{sourceLabel}</span>
             </div>
             <div className="smart-ocr-preview-tools">
-              <button className="icon-button compact-icon-button" type="button" title="缩小" disabled={!imagePreviewUrl} onClick={() => adjustZoom(0.8)}>
+              <button className="icon-button compact-icon-button" type="button" title="缩小" aria-label="缩小" disabled={!imagePreviewUrl} onClick={() => adjustZoom(0.8)}>
                 <ZoomOut size={16} aria-hidden="true" />
               </button>
               <span className="smart-ocr-zoom-readout">{zoomLabel}</span>
-              <button className="icon-button compact-icon-button" type="button" title="放大" disabled={!imagePreviewUrl} onClick={() => adjustZoom(1.25)}>
+              <button className="icon-button compact-icon-button" type="button" title="放大" aria-label="放大" disabled={!imagePreviewUrl} onClick={() => adjustZoom(1.25)}>
                 <ZoomIn size={16} aria-hidden="true" />
               </button>
-              <button className="icon-button compact-icon-button" type="button" title="重置缩放" disabled={!imagePreviewUrl} onClick={resetZoom}>
+              <button className="icon-button compact-icon-button" type="button" title="重置缩放" aria-label="重置缩放" disabled={!imagePreviewUrl} onClick={resetZoom}>
                 <RotateCcw size={16} aria-hidden="true" />
               </button>
             </div>

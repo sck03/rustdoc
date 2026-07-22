@@ -126,7 +126,7 @@ export function ReportDesignerDetailTableColumnsProperties({
                 <button
                   className="icon-button compact-icon-button"
                   type="button"
-                  title="上移列"
+                  title="上移列" aria-label="上移列"
                   disabled={index === 0}
                   onClick={() => onCommit(moveDetailTableColumn(block, column.id, "up"))}
                 >
@@ -135,7 +135,7 @@ export function ReportDesignerDetailTableColumnsProperties({
                 <button
                   className="icon-button compact-icon-button"
                   type="button"
-                  title="下移列"
+                  title="下移列" aria-label="下移列"
                   disabled={index >= block.columns.length - 1}
                   onClick={() => onCommit(moveDetailTableColumn(block, column.id, "down"))}
                 >
@@ -144,7 +144,7 @@ export function ReportDesignerDetailTableColumnsProperties({
                 <button
                   className="icon-button compact-icon-button"
                   type="button"
-                  title="复制列"
+                  title="复制列" aria-label="复制列"
                   onClick={() => onCommit(duplicateDetailTableColumn(block, column.id))}
                 >
                   <Copy size={16} aria-hidden="true" />
@@ -152,7 +152,7 @@ export function ReportDesignerDetailTableColumnsProperties({
                 <button
                   className="icon-button compact-icon-button danger-icon"
                   type="button"
-                  title="删除列"
+                  title="删除列" aria-label="删除列"
                   disabled={block.columns.length <= 1}
                   onClick={() => onCommit(removeDetailTableColumn(block, column.id))}
                 >

@@ -19,6 +19,8 @@ import { DesktopIconButton,readDesktopError,renderOpenPathAction } from "../../u
 import { PathField } from "../../ui/PathField.tsx";
 import { formatPlainNumber,readApiError } from "../../ui/formUtils.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
+import { PermissionNotice } from "../../ui/PageState.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 
 import { ClientDispatchResultDetail } from "./SingleWindowOperationCenterDetailPage.tsx";
@@ -93,7 +95,7 @@ export function OperationCenterTable({
   }
 
   return (
-    <div className="table-frame" aria-busy={isBusy}>
+    <ResponsiveTableFrame label="单一窗口操作批次" busy={isBusy}>
       <table className="single-window-operation-table">
         <thead>
           <tr>
@@ -144,7 +146,7 @@ export function OperationCenterTable({
                   <button
                     className="icon-button compact-icon-button"
                     type="button"
-                    title="打开批次详情"
+                    title="打开批次详情" aria-label="打开批次详情"
                     onClick={(event) => {
                       event.stopPropagation();
                       onOpen(row.batchId);
@@ -158,7 +160,7 @@ export function OperationCenterTable({
           )}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableFrame>
   );
 }
 
@@ -417,7 +419,7 @@ export function OperationCenterListActionsPanel({
           <button
             className="icon-button"
             type="button"
-            title="刷新客户端目录档案"
+            title="刷新客户端目录档案" aria-label="刷新客户端目录档案"
             disabled={isBusy}
             onClick={() => void profileQuery.refetch()}
           >
@@ -446,7 +448,7 @@ export function OperationCenterListActionsPanel({
         </div>
       </div>
 
-      {!canOperate ? <div className="permission-readonly-notice">当前权限仅允许查看批次详情；目录保存、派发和回执处理已禁用。</div> : null}
+      {!canOperate ? <PermissionNotice>当前权限仅允许查看批次详情；目录保存、派发和回执处理已禁用。</PermissionNotice> : null}
       {profileQuery.isError ? <div className="alert">{readApiError(profileQuery.error)}</div> : null}
       {message ? <div className={messageKind === "error" ? "alert" : "success-alert"}>{message}</div> : null}
       {desktopMessage ? <div className="alert">{desktopMessage}</div> : null}

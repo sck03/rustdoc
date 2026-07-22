@@ -2,6 +2,8 @@ import { lazy, Suspense, useRef, useState, type FormEvent } from "react";
 import { FileDown, FolderOpen, PackageCheck, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import type { ApiContainerPackingAnalysisDto, ApiContainerPackingProjectSummaryDto, ApiContainerTypeDto } from "../../../api/index.ts";
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
+import { PageState, PermissionNotice } from "../../../ui/PageState.tsx";
+import { ResponsiveTableFrame } from "../../../ui/ResponsiveTable.tsx";
 import type { ContainerPackingCargoRow, ContainerPackingFormState, ContainerPackingRenderModeValue, ContainerPackingRulesFormState, ContainerPackingZoneValue } from "./containerPackingModel.ts";
 import { containerPackingRenderModeOptions, containerPackingZoneOptions, formatPackingPercent } from "./containerPackingModel.ts";
 import { ContainerPackingVisualization, type ContainerPackingVisualizationDimensions } from "./ContainerPackingVisualization.tsx";
@@ -149,6 +151,15 @@ export function ContainerPackingWorkspace(props: Props) {
           <button
             className="command-button secondary"
             type="button"
+            disabled={!analysis}
+            onClick={() => pdfRootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          >
+            <PackageCheck size={16} aria-hidden="true" />
+            <span>查看效果图</span>
+          </button>
+          <button
+            className="command-button secondary"
+            type="button"
             disabled={!analysis || pdfExportState === "exporting"}
             onClick={() => void handleExportPdf()}
           >
@@ -173,10 +184,10 @@ export function ContainerPackingWorkspace(props: Props) {
       ) : null}
       {pdfExportMessage ? <div className={pdfExportMessage.kind === "error" ? "alert" : "success-alert"}>{pdfExportMessage.text}</div> : null}
       {!canOperate ? (
-        <div className="permission-readonly-notice">
+        <PermissionNotice>
           当前权限模板仅允许查看装箱方案；输入、分析、保存和柜型维护已禁用。
           {!canManage ? " 删除方案和自定义柜型同样需要管理权限。" : ""}
-        </div>
+        </PermissionNotice>
       ) : null}
       <div
         className="container-packing-status-bar"
@@ -477,7 +488,7 @@ export function ContainerPackingWorkspace(props: Props) {
         </div>
       </div>
 
-      <div className="table-frame container-packing-cargo-frame">
+      <ResponsiveTableFrame className="container-packing-cargo-frame" label="装柜货物清单">
         <table className="container-packing-cargo-table">
           <thead>
             <tr>
@@ -659,7 +670,7 @@ export function ContainerPackingWorkspace(props: Props) {
                     <button
                       className="icon-button compact-icon-button"
                       type="button"
-                      title="删除货物"
+                      title="删除货物" aria-label="删除货物"
                       onClick={() => removeCargoRow(row.id)}
                     >
                       <Trash2 size={15} aria-hidden="true" />
@@ -670,8 +681,16 @@ export function ContainerPackingWorkspace(props: Props) {
             )}
           </tbody>
         </table>
-      </div>
+      </ResponsiveTableFrame>
       </fieldset>
+
+      {!analysis ? <section className="container-packing-preview-placeholder" aria-label="装柜效果图状态">
+        <PageState
+          title="3D 与伪 3D 效果图等待分析"
+          description="货物或柜型修改后，点击“立即刷新”或“分析”生成装载方案；生成后会同时显示可旋转 3D、俯视、侧视和柜门图。"
+          action={<button className="command-button" type="button" disabled={!canAnalyze || isAnalyzing} onClick={runContainerPackingAnalysis}>{isAnalyzing ? "正在分析…" : "立即生成效果图"}</button>}
+        />
+      </section> : null}
 
       {analysis ? (
         <div className="container-packing-result" ref={pdfRootRef} data-container-packing-pdf>

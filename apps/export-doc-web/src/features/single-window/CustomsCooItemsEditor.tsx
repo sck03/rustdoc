@@ -106,7 +106,7 @@ export function CooItemsEditor({
             <button
               className="icon-button compact-icon-button"
               type="button"
-              title={getCooGoodsDescriptionActionTitle(item)}
+              title={getCooGoodsDescriptionActionTitle(item)} aria-label={getCooGoodsDescriptionActionTitle(item)}
               disabled={disabled}
               onClick={() => onGenerateGoodsDescription(activeIndex)}
             >
@@ -115,7 +115,7 @@ export function CooItemsEditor({
             <button
               className="icon-button compact-icon-button"
               type="button"
-              title="复制原产标准和生产企业到后续项"
+              title="复制原产标准和生产企业到后续项" aria-label="复制原产标准和生产企业到后续项"
               disabled={disabled || activeIndex >= items.length - 1}
               onClick={() => onCopyOriginAndEnterpriseToFollowingRows(activeIndex)}
             >
@@ -124,7 +124,7 @@ export function CooItemsEditor({
             <button
               className="icon-button compact-icon-button"
               type="button"
-              title="选择生产企业资料"
+              title="选择生产企业资料" aria-label="选择生产企业资料"
               disabled={disabled}
               onClick={() => onOpenProducerProfile(activeIndex)}
             >
@@ -133,7 +133,7 @@ export function CooItemsEditor({
             <button
               className="icon-button compact-icon-button"
               type="button"
-              title="保存当前生产企业资料"
+              title="保存当前生产企业资料" aria-label="保存当前生产企业资料"
               disabled={disabled || savingProducerRowIndex === activeIndex}
               onClick={() => onSaveProducerProfile(activeIndex)}
             >
@@ -142,7 +142,7 @@ export function CooItemsEditor({
             <button
               className="icon-button compact-icon-button danger"
               type="button"
-              title="删除商品"
+              title="删除商品" aria-label="删除商品"
               disabled={disabled}
               onClick={() => onRemoveItem(activeIndex)}
             >

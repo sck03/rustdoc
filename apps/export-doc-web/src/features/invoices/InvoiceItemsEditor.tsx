@@ -40,6 +40,7 @@ import { InvoiceItemCellInput } from "./InvoiceItemCellInput.tsx";
 import { InvoiceItemsEditorToolbar } from "./InvoiceItemsEditorToolbar.tsx";
 import { InvoiceItemsTable } from "./InvoiceItemsTable.tsx";
 import { InvoiceItemsAssist, type UnitCandidateDialogState } from "./InvoiceItemsAssist.tsx";
+import { invoiceItemHeaderHeightPx, invoiceItemRowHeightPx, invoiceItemUnitLookupTargets, invoiceItemVirtualizationThreshold, isInvoiceItemArrowNavigationKey, isInvoiceItemCellInputTarget, isInvoiceItemVerticalNavigationKey, shouldMoveInvoiceItemCellByArrow } from "./invoiceItemsEditorInteraction.ts";
 import { isUnitLookupSourceField, buildUnitCandidateLookup, findChineseUnitCandidates, normalizeUnitEnglishKey, createCellKey, parseCellKey, readSelectedCells, canFillDownSelectedCells, buildCellRangeKeys, getInvoiceItemColumnIndex, normalizeInvoiceItemBlankRowCount, calculateInvoiceItemVirtualRange, buildSelectedCellsClipboardText, calculateInvoiceItemTableMinWidth, getInvoiceItemColumnWidth, readItemClipboardValue, readItemTextValue, sanitizeClipboardCell, writeClipboardText, parseInvoiceItemClipboardRows, createEmptyInvoiceItem, calculateInvoiceTotals, isMeaningfulInvoiceItem } from "./invoiceItemsEditorModel.ts";
 import {
   EditableInvoiceItemField,
@@ -49,100 +50,12 @@ import {
 } from "./invoiceItemTableModel.ts";
 export { type EditableInvoiceItemField, type InvoiceItemColumnDefinition, invoiceItemEditableColumns } from "./invoiceItemTableModel.ts";
 export { calculateInvoiceTotals, createEmptyInvoiceItem, isMeaningfulInvoiceItem, normalizeInvoiceItemForSave, recalculateInvoiceItem } from "./invoiceItemsEditorModel.ts";
-const invoiceItemArrowNavigationKeys = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
-const blankWhenZeroInvoiceItemNumberFields = new Set<EditableInvoiceItemField>([
-  "pcsPerCtn",
-  "cartons",
-  "length",
-  "width",
-  "height",
-  "volume",
-  "gwPerCtn",
-  "gwTotal",
-  "nwPerCtn",
-  "nwTotal",
-  "purchasePrice",
-  "purchaseTotal",
-  "taxRebateRate",
-]);
-
-const invoiceItemHeaderHeightPx = 42;
-const invoiceItemRowHeightPx = 42;
-const invoiceItemVirtualizationThreshold = 90;
-const invoiceItemVirtualOverscanRows = 8;
-
 type FocusedInvoiceItemCell = {
   rowIndex: number;
   field: EditableInvoiceItemField;
 };
 
 export type InvoiceItemCellSelection = FocusedInvoiceItemCell;
-
-type UnitLookupSourceField = "unitEN" | "ctnUnitEN";
-type UnitLookupTargetField = "unitCN" | "ctnUnitCN";
-
-type UnitLookupTarget = {
-  sourceField: UnitLookupSourceField;
-  targetField: UnitLookupTargetField;
-  targetLabel: string;
-};
-
-const invoiceItemUnitLookupTargets: Record<UnitLookupSourceField, UnitLookupTarget> = {
-  unitEN: {
-    sourceField: "unitEN",
-    targetField: "unitCN",
-    targetLabel: "中文单位",
-  },
-  ctnUnitEN: {
-    sourceField: "ctnUnitEN",
-    targetField: "ctnUnitCN",
-    targetLabel: "包装中文单位",
-  },
-};
-
-function isInvoiceItemVerticalNavigationKey(event: KeyboardEvent<HTMLElement>) {
-  const nativeEvent = event.nativeEvent as globalThis.KeyboardEvent;
-  if (nativeEvent.isComposing || event.ctrlKey || event.altKey || event.metaKey) {
-    return false;
-  }
-
-  return event.key === "Enter" || event.key === "Tab";
-}
-
-function isInvoiceItemCellInputTarget(target: EventTarget | null): target is HTMLInputElement {
-  return target instanceof HTMLInputElement && target.classList.contains("item-cell-input");
-}
-
-function isInvoiceItemArrowNavigationKey(event: KeyboardEvent<HTMLElement>) {
-  const nativeEvent = event.nativeEvent as globalThis.KeyboardEvent;
-  if (nativeEvent.isComposing || event.ctrlKey || event.altKey || event.metaKey) {
-    return false;
-  }
-
-  return invoiceItemArrowNavigationKeys.has(event.key);
-}
-
-function shouldMoveInvoiceItemCellByArrow(input: HTMLInputElement, key: string, extendSelection: boolean) {
-  if (extendSelection || key === "ArrowUp" || key === "ArrowDown") {
-    return true;
-  }
-
-  if (key !== "ArrowLeft" && key !== "ArrowRight") {
-    return false;
-  }
-
-  if (input.type === "number") {
-    return true;
-  }
-
-  const selectionStart = input.selectionStart ?? 0;
-  const selectionEnd = input.selectionEnd ?? selectionStart;
-  if (selectionStart !== selectionEnd) {
-    return false;
-  }
-
-  return key === "ArrowLeft" ? selectionStart <= 0 : selectionEnd >= input.value.length;
-}
 
 export function InvoiceItemsEditor({
   client,

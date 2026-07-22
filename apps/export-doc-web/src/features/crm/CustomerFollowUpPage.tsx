@@ -15,6 +15,9 @@ import { OperationFeedback, errorFeedback, successFeedback, warningFeedback, typ
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { FormGuidance, PageState, PermissionNotice } from "../../ui/PageState.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 type CustomerFollowUpPageProps = {
   client: ExportDocManagerApiClient;
@@ -24,6 +27,7 @@ type CustomerTaskView = "followups" | "followup-editor" | "directory" | "profile
 
 export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
   const crmPermission = useModulePermission("sales.crm");
+  const requestConfirmation = useConfirmation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [customers, setCustomers] = useState<ApiCrmCustomerDto[]>([]);
   const [contacts, setContacts] = useState<ApiCrmContactDto[]>([]);
@@ -168,7 +172,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
   }
 
   async function deleteFollowUp(item: ApiCrmFollowUpDto) {
-    if (!crmPermission.canManage || !window.confirm(`删除“${item.customerName}”的这条跟进记录？`)) return;
+    if (!crmPermission.canManage || !await requestConfirmation({ title: "删除跟进记录", description: `确定删除“${item.customerName}”的这条跟进记录吗？`, confirmLabel: "确认删除", tone: "danger" })) return;
     try {
       await client.deleteCrmFollowUp({ id: item.id });
       await refresh();
@@ -194,7 +198,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
       </div>
 
       <OperationFeedback feedback={feedback} />
-      {!crmPermission.canOperate ? <div className="permission-readonly-notice">当前权限模板仅允许查看客户、联系人和跟进记录；新增、修改、完成状态和导入操作已禁用。</div> : null}
+      {!crmPermission.canOperate ? <PermissionNotice>当前权限模板仅允许查看客户、联系人和跟进记录；新增、修改、完成状态和导入操作已禁用。</PermissionNotice> : null}
 
       <TaskViewTabs value={view} label="客户业务工作区" onChange={changeView} items={[
         { id: "followups", label: "跟进记录" }, { id: "followup-editor", label: editingFollowUp ? crmPermission.canOperate ? "编辑跟进" : "查看跟进" : "新增跟进", disabled: !editingFollowUp && !crmPermission.canOperate },
@@ -227,11 +231,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
         <div className="section-heading-row"><h3>{editingFollowUp ? crmPermission.canOperate ? "编辑跟进" : "查看跟进" : "新增跟进"}</h3>
           <button className="secondary-button" type="button" onClick={() => { setEditingFollowUp(null); changeView("followups"); }}>返回跟进记录</button>
         </div>
-        {!customers.length ? <div className="empty-guidance form-field-wide">
-          <strong>先建立一位销售客户</strong>
-          <span>跟进记录必须归属客户。客户资料与原单证客户相互独立。</span>
-          {crmPermission.canOperate ? <button className="primary-button" type="button" onClick={() => changeView("profile")}>建立客户资料</button> : null}
-        </div> : null}
+        {!customers.length ? <FormGuidance className="form-field-wide" title="先建立一位销售客户" description="跟进记录必须归属客户。客户资料与原单证客户相互独立。" action={crmPermission.canOperate ? <button className="primary-button" type="button" onClick={() => changeView("profile")}>建立客户资料</button> : undefined} /> : null}
         <fieldset className="permission-fieldset form-field-wide" disabled={!crmPermission.canOperate}>
         <label>
           客户
@@ -282,7 +282,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
         <div><h3>跟进记录</h3><p className="section-description">集中查看沟通结果、下一步动作和待办提醒。</p></div>
         {crmPermission.canOperate ? <button className="primary-button" type="button" onClick={() => { setEditingFollowUp(null); changeView("followup-editor"); }}>记录新跟进</button> : null}
       </div>
-      <div className="table-scroll-region">
+      <ResponsiveTableFrame label="客户跟进记录" className="table-scroll-region" mobileLayout="scroll" busy={loading}>
         <table className="data-table responsive-data-table follow-up-data-table">
           <thead>
             <tr>
@@ -319,15 +319,9 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
             ))}
           </tbody>
         </table>
-        {!loading && rows.length === 0 ? <div className="empty-state empty-guidance">
-          <strong>{customers.length ? "还没有跟进记录" : "先建立客户，再开始跟进"}</strong>
-          <span>{customers.length ? "记录一次邮件、电话或拜访结果，系统会帮助保留下次动作。" : "销售客户独立维护，不会修改原单证客户、发票或报表资料。"}</span>
-          {crmPermission.canOperate ? <button className="primary-button" type="button" onClick={() => changeView(customers.length ? "followup-editor" : "profile")}>
-            {customers.length ? "记录第一次跟进" : "建立客户资料"}
-          </button> : null}
-        </div> : null}
-        {loading ? <div className="loading-panel">正在加载客户跟进...</div> : null}
-      </div>
+        {!loading && rows.length === 0 ? <PageState tone="empty" title={customers.length ? "还没有跟进记录" : "先建立客户，再开始跟进"} description={customers.length ? "记录一次邮件、电话或拜访结果，系统会帮助保留下次动作。" : "销售客户独立维护，不会修改原单证客户、发票或报表资料。"} action={crmPermission.canOperate ? <button className="primary-button" type="button" onClick={() => changeView(customers.length ? "followup-editor" : "profile")}>{customers.length ? "记录第一次跟进" : "建立客户资料"}</button> : undefined} /> : null}
+        {loading ? <PageState tone="loading" title="正在加载客户跟进" description="正在读取沟通结果、下一步动作和提醒状态。" /> : null}
+      </ResponsiveTableFrame>
       </section> : null}
     </section>
   );

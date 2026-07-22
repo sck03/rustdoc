@@ -7,11 +7,15 @@ import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { OperationFeedback, errorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { FormGuidance, PermissionNotice } from "../../ui/PageState.tsx";
 
 const stages = ["线索", "需求确认", "已报价", "谈判中", "已成交", "已失单"];
 
 export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiClient }) {
   const opportunityPermission = useModulePermission("sales.opportunities");
+  const requestConfirmation = useConfirmation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState<Awaited<ReturnType<ExportDocManagerApiClient["querySalesOpportunities"]>> | null>(null);
@@ -94,7 +98,7 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
   }
 
   async function remove() {
-    if (!opportunityPermission.canManage || !selected || !window.confirm(`删除商机“${selected.title}”？`)) return;
+    if (!opportunityPermission.canManage || !selected || !await requestConfirmation({ title: "删除商机", description: `确定删除商机“${selected.title}”吗？`, details: ["客户和产品资料将保留。"], confirmLabel: "确认删除", tone: "danger" })) return;
     try { await client.deleteSalesOpportunity({ id: selected.id }); setSelected(null); changeView("directory"); setRevision((value) => value + 1); setFeedback(successFeedback("商机已删除，客户和产品保持不变。")); }
     catch (error) { setFeedback(errorFeedback(readApiError(error))); }
   }
@@ -102,7 +106,7 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
   return <section className="work-surface">
     <div className="section-heading-row"><div><h2>商机与报价跟踪</h2><p>记录销售阶段和最近报价信息，不替代正式报价文件、发票或单证。</p></div></div>
     <OperationFeedback feedback={feedback} />
-    {!opportunityPermission.canOperate ? <div className="permission-readonly-notice">当前权限模板仅允许查看商机；新建、修改和阶段更新已禁用。</div> : null}
+    {!opportunityPermission.canOperate ? <PermissionNotice>当前权限模板仅允许查看商机；新建、修改和阶段更新已禁用。</PermissionNotice> : null}
     <TaskViewTabs value={view} label="商机工作区" onChange={changeView} items={[
       { id: "directory", label: "商机目录" }, { id: "editor", label: selected ? opportunityPermission.canOperate ? "编辑商机" : "查看商机" : "新建商机", disabled: !selected && !opportunityPermission.canOperate },
       { id: "history", label: "版本历史", disabled: !selected },
@@ -113,15 +117,15 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
         <select value={stage} onChange={(event) => { setStage(event.target.value); setPageNumber(1); }}><option value="">全部阶段</option>{stages.map((item) => <option key={item}>{item}</option>)}</select>
         <button className="secondary-button">搜索</button>
       </form>
-      <div className="table-frame"><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th data-table-priority="secondary">产品</th><th>金额</th><th data-table-priority="secondary">概率</th><th>阶段</th><th /></tr></thead><tbody>
+      <ResponsiveTableFrame label="销售商机列表" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th data-table-priority="secondary">产品</th><th>金额</th><th data-table-priority="secondary">概率</th><th>阶段</th><th /></tr></thead><tbody>
         {(page?.items ?? []).map((item) => <tr key={item.id}><td><TablePrimaryText value={item.title} secondary={item.quotationNo || "未填报价编号"} /></td><td><TablePrimaryText value={item.customerName} /></td><td data-table-priority="secondary"><TablePrimaryText value={item.productCode || item.productName} /></td><td>{item.currency} {item.estimatedAmount.toFixed(2)}</td><td data-table-priority="secondary">{item.probabilityPercent}%</td><td><BusinessStatusBadge value={item.stage} /></td><td><button className="secondary-button" type="button" onClick={() => { setSelected(item); changeView("editor"); }}>{opportunityPermission.canOperate ? "编辑" : "查看"}</button></td></tr>)}
         {!page?.items.length ? <tr><td className="empty-cell" colSpan={7}><div className="empty-cell-content"><strong>暂无商机记录</strong><span>{opportunityPermission.canOperate ? "从一位销售客户开始，记录阶段、预计金额和下一步动作。" : "当前没有可查看的商机记录。"}</span>{opportunityPermission.canOperate ? <button className="primary-button" type="button" onClick={() => { setSelected(null); changeView("editor"); }}>建立第一条商机</button> : null}</div></td></tr> : null}
-      </tbody></table></div>
+      </tbody></table></ResponsiveTableFrame>
       <div className="form-actions"><button className="secondary-button" disabled={!page?.hasPreviousPage} onClick={() => setPageNumber((value) => value - 1)}>上一页</button><span>第 {page?.pageNumber ?? 1} / {Math.max(page?.totalPages ?? 1, 1)} 页</span><button className="secondary-button" disabled={!page?.hasNextPage} onClick={() => setPageNumber((value) => value + 1)}>下一页</button></div>
     </section> : null}
     {view === "editor" ? <form className="form-grid" key={selected?.id ?? "new"} onSubmit={save}>
       <div className="section-header"><h3>{selected ? opportunityPermission.canOperate ? "编辑商机" : "查看商机" : "新建商机"}</h3><span>轻量销售跟踪</span></div>
-      {!customers.length ? <div className="empty-guidance form-field-wide"><strong>先建立一位销售客户</strong><span>商机必须归属 CRM 客户，不会写入原单证客户资料。</span>{opportunityPermission.canOperate ? <button className="primary-button" type="button" onClick={() => navigate("/crm/follow-ups?view=profile")}>建立客户资料</button> : null}</div> : null}
+      {!customers.length ? <FormGuidance className="form-field-wide" title="先建立一位销售客户" description="商机必须归属 CRM 客户，不会写入原单证客户资料。" action={opportunityPermission.canOperate ? <button className="primary-button" type="button" onClick={() => navigate("/crm/follow-ups?view=profile")}>建立客户资料</button> : undefined} /> : null}
       <fieldset className="permission-fieldset form-field-wide" disabled={!opportunityPermission.canOperate}>
       <fieldset className="form-section-block">
         <legend>基本信息</legend>
@@ -150,10 +154,10 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
       <div className="form-actions">{opportunityPermission.canOperate ? <button className="primary-button">保存商机</button> : null}{selected ? <button className="secondary-button" type="button" onClick={() => changeView("history")}>查看版本历史</button> : null}{selected && opportunityPermission.canManage ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除商机</button> : null}</div>
     </form> : null}
     {selected && view === "history" ? <section className="form-section"><div className="section-header"><h3>阶段与报价版本历史</h3><span>{history.length} 个版本</span></div>
-      <div className="table-frame"><table className="data-table"><thead><tr><th>版本</th><th>类型</th><th>阶段</th><th>报价编号</th><th>金额</th><th>概率</th><th>变更说明</th><th>操作信息</th></tr></thead><tbody>
+      <ResponsiveTableFrame label="商机版本历史" mobileLayout="scroll"><table className="data-table"><thead><tr><th>版本</th><th>类型</th><th>阶段</th><th>报价编号</th><th>金额</th><th>概率</th><th>变更说明</th><th>操作信息</th></tr></thead><tbody>
         {history.map((item) => <tr key={item.id}><td>V{item.versionNumber}</td><td>{item.changeType}</td><td><BusinessStatusBadge value={item.stage} /></td><td>{item.quotationNo || "-"}</td><td>{item.currency} {item.estimatedAmount.toFixed(2)}</td><td>{item.probabilityPercent}%</td><td>{item.changeNote || "-"}</td><td>{item.changedBy || "-"}<br /><small>{new Date(item.createdAt).toLocaleString("zh-CN", { hour12: false })}</small></td></tr>)}
         {!history.length ? <tr><td className="empty-cell" colSpan={8}>暂无版本历史。</td></tr> : null}
-      </tbody></table></div>
+      </tbody></table></ResponsiveTableFrame>
     </section> : null}
   </section>;
 }

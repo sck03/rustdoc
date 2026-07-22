@@ -13,6 +13,8 @@ readRouteSuccessMessage
 } from "../../ui/formUtils.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { listPageSizeOptions,loadListViewState,normalizeListPageSize,saveListViewState } from "../../ui/listViewState.ts";
 
 import {
@@ -239,9 +241,9 @@ export function MasterDataListPage({
     <section className="work-surface master-data-surface" aria-label={config.listLabel}>
       <MasterDataTabs activeKey={config.key} />
       {!canOperate ? (
-        <div className="permission-readonly-notice">
+        <PermissionNotice>
           当前权限模板仅允许查看主数据；新建、导入、联网保存和修改已禁用，删除需要管理权限。
-        </div>
+        </PermissionNotice>
       ) : null}
       <div className="toolbar">
         <form className="search-form" onSubmit={handleSearch}>
@@ -268,7 +270,7 @@ export function MasterDataListPage({
           <button
             className="icon-button"
             type="button"
-            title="刷新"
+            title="刷新" aria-label="刷新"
             disabled={isBusy}
             onClick={() => void masterDataQuery.refetch()}
           >
@@ -281,8 +283,8 @@ export function MasterDataListPage({
         </div>
       </div>
 
-      {message ? <div className="alert">{message}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+      {message ? <InlineNotice tone="error" title="操作未完成">{message}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
 
 
       <MasterDataTable
@@ -414,8 +416,8 @@ function MasterDataTable({
   const tableColumnCount = config.columns.length + 1 + (enableSelection ? 1 : 0);
 
   return (
-    <div className="table-frame" aria-busy={isBusy}>
-      <table className="master-data-table">
+    <ResponsiveTableFrame label={`${config.label}列表`} mobileLayout="cards" busy={isBusy}>
+      <table className="master-data-table responsive-data-table">
         <thead>
           <tr>
             {enableSelection ? (
@@ -454,7 +456,7 @@ function MasterDataTable({
                 onKeyDown={(event) => handleRowKeyDown(event, record)}
               >
                 {enableSelection ? (
-                  <td className="selection-cell" onClick={(event) => event.stopPropagation()}>
+                  <td className="selection-cell" data-label="选择" onClick={(event) => event.stopPropagation()}>
                     <input
                       type="checkbox"
                       aria-label={`选择HS编码 ${buildMasterDataDisplayName(config, record)}`}
@@ -465,11 +467,16 @@ function MasterDataTable({
                   </td>
                 ) : null}
                 {config.columns.map((column, columnIndex) => (
-                  <td className={`${column.className ?? ""} ${columnIndex === 0 ? "strong-cell" : ""}`.trim()} key={column.name}>
+                  <td
+                    className={`${column.className ?? ""} ${columnIndex === 0 ? "strong-cell" : ""}`.trim()}
+                    data-label={column.label}
+                    data-table-priority={columnIndex >= 3 ? "secondary" : "primary"}
+                    key={column.name}
+                  >
                     {formatColumnValue(column, record)}
                   </td>
                 ))}
-                <td className="row-actions-cell">
+                <td className="row-actions-cell" data-label="操作">
                   <button
                     className="icon-button compact-icon-button"
                     type="button"
@@ -502,6 +509,6 @@ function MasterDataTable({
           )}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableFrame>
   );
 }

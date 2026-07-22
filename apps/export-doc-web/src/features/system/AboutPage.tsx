@@ -29,7 +29,7 @@ export function AboutPage({ client }: { client: ExportDocManagerApiClient }) {
           <span>{isDesktopRuntime ? "本地优先桌面工作区" : "局域网与容器协同工作区"}</span>
         </div>
         <div className="toolbar-actions">
-          <button className="icon-button" type="button" title="刷新" disabled={isBusy} onClick={refresh}>
+          <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={refresh}>
             <RefreshCw size={18} aria-hidden="true" />
           </button>
         </div>

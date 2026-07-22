@@ -4,9 +4,11 @@ import {
   ChevronRight,
   FileText,
   LogOut,
+  Menu,
   PanelLeftClose,
   PanelLeftOpen,
   Server,
+  X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { ApiUserDto } from "../api/index.ts";
@@ -18,6 +20,7 @@ import {
   type WorkspaceNavGroupConfig,
 } from "./workspaceNavigation.ts";
 import { getProductEditionPresentation } from "./productEdition.ts";
+import { IconButton } from "../ui/Button.tsx";
 
 type WorkspaceShellProps = {
   pathname: string;
@@ -37,6 +40,7 @@ export function WorkspaceShell({
   children,
 }: WorkspaceShellProps) {
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const visibleGroups = useMemo(
     () => filterWorkspaceNavGroups({ ...user.capabilities, isDesktopRuntime }),
     [isDesktopRuntime, user.capabilities],
@@ -60,6 +64,19 @@ export function WorkspaceShell({
     });
   }, [activeGroupKey]);
 
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    const compactWorkspace = window.matchMedia("(min-width: 861px) and (max-width: 1180px)");
+    const applyWorkspaceWidth = (matches: boolean) => setIsNavCollapsed(matches);
+    applyWorkspaceWidth(compactWorkspace.matches);
+    const handleChange = (event: MediaQueryListEvent) => applyWorkspaceWidth(event.matches);
+    compactWorkspace.addEventListener("change", handleChange);
+    return () => compactWorkspace.removeEventListener("change", handleChange);
+  }, []);
+
   function toggleGroup(groupKey: string) {
     setExpandedGroups((current) => {
       const next = new Set(current);
@@ -79,7 +96,7 @@ export function WorkspaceShell({
 
   return (
     <div className={isNavCollapsed ? "app-shell app-shell-nav-collapsed" : "app-shell"}>
-      <aside className="workspace-nav">
+      <aside className={isMobileNavOpen ? "workspace-nav workspace-nav-mobile-open" : "workspace-nav"}>
         <div className="brand-mark">
           <span className="brand-icon">
             <FileText size={20} aria-hidden="true" />
@@ -90,7 +107,17 @@ export function WorkspaceShell({
           </span>
         </div>
 
-        <div className="workspace-product-badge" aria-label="产品运行模式">
+        <button
+          className="mobile-nav-toggle"
+          type="button"
+          aria-label={isMobileNavOpen ? "关闭主导航" : "打开主导航"}
+          aria-expanded={isMobileNavOpen}
+          onClick={() => setIsMobileNavOpen((current) => !current)}
+        >
+          {isMobileNavOpen ? <X size={19} aria-hidden="true" /> : <Menu size={19} aria-hidden="true" />}
+        </button>
+
+        <div className="workspace-product-badge" role="status" aria-label="产品运行模式">
           <span className="workspace-product-badge-dot" aria-hidden="true" />
           <span>{isDesktopRuntime ? "本地优先 · 桌面运行" : "局域网 / 容器协同"}</span>
         </div>
@@ -153,9 +180,9 @@ export function WorkspaceShell({
                 <small>{renderUserWorkspaceLabel(user)}</small>
               </span>
             </span>
-            <button className="icon-button workspace-logout-button" type="button" title="退出登录" aria-label="退出登录" onClick={onLogout}>
+            <IconButton className="workspace-logout-button" label="退出登录" onClick={onLogout}>
               <LogOut size={18} aria-hidden="true" />
-            </button>
+            </IconButton>
           </div>
         </header>
 

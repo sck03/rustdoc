@@ -23,6 +23,7 @@ import {
   selectSingleWindowPackageFile,
 } from "../../desktop/desktopBridge.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { formatAmount, formatDate, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
 import { listPageSizeOptions, loadListViewState, normalizeListPageSize, saveListViewState } from "../../ui/listViewState.ts";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
@@ -807,9 +808,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
   return (
     <section className="work-surface" aria-label="发票列表">
       {!invoicePermission.canOperate ? (
-        <div className="permission-readonly-notice">
-          当前权限模板仅允许查看发票；新建、复制、导入和单据包维护已禁用。
-        </div>
+        <PermissionNotice>当前权限模板仅允许查看发票；新建、复制、导入和单据包维护已禁用。</PermissionNotice>
       ) : null}
       <div className="toolbar">
         <form className="search-form" onSubmit={handleSearch}>
@@ -825,7 +824,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
           <button
             className="icon-button"
             type="button"
-            title="重置搜索"
+            title="重置搜索" aria-label="重置搜索"
             disabled={isBusy || (!keyword && !committedKeyword)}
             onClick={handleResetSearch}
           >
@@ -852,7 +851,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
           <button
             className="icon-button"
             type="button"
-            title="刷新"
+            title="刷新" aria-label="刷新"
             disabled={isBusy}
             onClick={() => void invoicesQuery.refetch()}
           >
@@ -865,18 +864,20 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
         </div>
       </div>
 
-      {message ? <div className="alert">{message}</div> : null}
-      {routeSuccessMessage ? <div className="success-alert">{routeSuccessMessage}</div> : null}
+      {message ? <InlineNotice tone="error" title="发票操作未完成">{message}</InlineNotice> : null}
+      {routeSuccessMessage ? <InlineNotice tone="success">{routeSuccessMessage}</InlineNotice> : null}
       {transferSuccessMessage ? (
-        <div className="success-alert">
-          <span>{transferSuccessMessage}</span>
-          {lastExportedPackagePath && isDesktopBridgeAvailable() ? (
+        <InlineNotice
+          tone="success"
+          action={lastExportedPackagePath && isDesktopBridgeAvailable() ? (
             <button className="text-button compact-text-button" type="button" onClick={() => void handleOpenLastExportedPackage()}>
               <FolderOpen size={15} aria-hidden="true" />
               <span>打开</span>
             </button>
-          ) : null}
-        </div>
+          ) : undefined}
+        >
+          {transferSuccessMessage}
+        </InlineNotice>
       ) : null}
       {copyDraft ? (
         <InvoiceCopyOptionsPanel

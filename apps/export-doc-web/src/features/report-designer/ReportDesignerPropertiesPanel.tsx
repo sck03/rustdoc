@@ -100,16 +100,16 @@ function SelectedBlockProperties({
         <strong>{blockLabel(block)}</strong>
       </div>
       <div className="new-report-block-action-row" aria-label="组件操作">
-        <button className="icon-button compact-icon-button" type="button" title="上移" disabled={!canMoveUp} onClick={onMoveUp}>
+        <button className="icon-button compact-icon-button" type="button" title="上移" aria-label="上移" disabled={!canMoveUp} onClick={onMoveUp}>
           <ArrowUp size={16} aria-hidden="true" />
         </button>
-        <button className="icon-button compact-icon-button" type="button" title="下移" disabled={!canMoveDown} onClick={onMoveDown}>
+        <button className="icon-button compact-icon-button" type="button" title="下移" aria-label="下移" disabled={!canMoveDown} onClick={onMoveDown}>
           <ArrowDown size={16} aria-hidden="true" />
         </button>
-        <button className="icon-button compact-icon-button" type="button" title="复制" onClick={onDuplicate}>
+        <button className="icon-button compact-icon-button" type="button" title="复制" aria-label="复制" onClick={onDuplicate}>
           <Copy size={16} aria-hidden="true" />
         </button>
-        <button className="icon-button compact-icon-button danger-icon" type="button" title="删除" onClick={onDelete}>
+        <button className="icon-button compact-icon-button danger-icon" type="button" title="删除" aria-label="删除" onClick={onDelete}>
           <Trash2 size={16} aria-hidden="true" />
         </button>
       </div>

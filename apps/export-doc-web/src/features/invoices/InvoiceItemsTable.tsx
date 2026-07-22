@@ -110,7 +110,7 @@ export function InvoiceItemsTable(props:Props){
                       <button
                         className="icon-button compact-icon-button"
                         type="button"
-                        title="删除明细"
+                        title="删除明细" aria-label="删除明细"
                         disabled={readOnly || isPlaceholderRow}
                         onFocus={() => focusItemCell({ rowIndex: index, field: firstEditableInvoiceItemField })}
                         onClick={() => {

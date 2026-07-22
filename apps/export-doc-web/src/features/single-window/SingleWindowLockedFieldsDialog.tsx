@@ -1,5 +1,6 @@
 import { LockKeyholeOpen, X } from "lucide-react";
 import { ApiSingleWindowLockedFieldDto } from "../../api/index.ts";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 export function SingleWindowLockedFieldsDialog({
   title,
@@ -32,7 +33,7 @@ export function SingleWindowLockedFieldsDialog({
             <h2 id="single-window-lock-title">{title}</h2>
             <span>{fields.length}</span>
           </div>
-          <button className="icon-button" type="button" title="关闭" onClick={onClose} disabled={isBusy}>
+          <button className="icon-button" type="button" title="关闭" aria-label="关闭" onClick={onClose} disabled={isBusy}>
             <X size={18} aria-hidden="true" />
           </button>
         </header>
@@ -48,7 +49,7 @@ export function SingleWindowLockedFieldsDialog({
         {fields.length === 0 ? (
           <div className="info-alert">当前没有人工锁定字段。</div>
         ) : (
-          <div className="table-frame single-window-lock-table-frame">
+          <ResponsiveTableFrame className="single-window-lock-table-frame" label="锁定字段列表">
             <table className="single-window-lock-table">
               <thead>
                 <tr>
@@ -81,7 +82,7 @@ export function SingleWindowLockedFieldsDialog({
                 ))}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTableFrame>
         )}
 
         <footer className="single-window-lock-footer">

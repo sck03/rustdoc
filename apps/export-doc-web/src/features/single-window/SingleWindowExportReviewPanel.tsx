@@ -5,6 +5,8 @@ import {
   SingleWindowExportIssueGroup,
   SingleWindowExportReview,
 } from "../../api/index.ts";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { PageState } from "../../ui/PageState.tsx";
 
 export function SingleWindowExportReviewPanel({
   review,
@@ -32,7 +34,7 @@ export function SingleWindowExportReviewPanel({
   }, [repairableGroupKeys, review]);
 
   if (!review && isBusy) {
-    return <div className="loading-panel">预检加载中</div>;
+    return <PageState tone="loading" title="正在加载预检结果" description="系统正在整理字段分组和需要处理的问题。" />;
   }
 
   if (!review) {
@@ -116,7 +118,7 @@ export function SingleWindowExportReviewPanel({
       </div>
 
       <div className="single-window-export-review-layout">
-        <div className="table-frame compact-table">
+        <ResponsiveTableFrame label="单一窗口预检分组" className="compact-table" mobileLayout="scroll">
           <table className="single-window-export-review-group-table">
             <thead>
               <tr>
@@ -160,9 +162,9 @@ export function SingleWindowExportReviewPanel({
               )}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableFrame>
 
-        <div className="table-frame compact-table">
+        <ResponsiveTableFrame label="单一窗口预检问题" className="compact-table" mobileLayout="scroll">
           <table className="single-window-export-review-issue-table">
             <thead>
               <tr>
@@ -197,7 +199,7 @@ export function SingleWindowExportReviewPanel({
               )}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableFrame>
       </div>
     </div>
   );

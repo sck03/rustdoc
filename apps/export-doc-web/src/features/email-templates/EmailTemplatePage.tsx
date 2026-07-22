@@ -14,6 +14,8 @@ import {
   type OperationFeedbackState,
 } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { FormGuidance, PermissionNotice } from "../../ui/PageState.tsx";
 import {
   areEmailTemplateDraftsEqual,
   createEmailTemplateCopyName,
@@ -21,6 +23,7 @@ import {
   type EmailTemplateDraft,
 } from "./emailTemplateModel.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 
 type EmailTemplateTaskView = "directory" | "editor" | "variables" | "preview" | "history";
 type EmailTemplateScope = "all" | "editable" | "shared";
@@ -29,6 +32,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
   const templatePermission = useModulePermission("sales.email-templates");
   const crmPermission = useModulePermission("sales.crm");
   const emailPermission = useModulePermission("common.email");
+  const requestConfirmation = useConfirmation();
   const navigate = useNavigate();
   const [templates, setTemplates] = useState<ApiEmailTemplateDto[]>([]);
   const [versions, setVersions] = useState<ApiEmailTemplateVersionDto[]>([]);
@@ -130,15 +134,15 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
   }
 
   async function remove() {
-    if (!canDelete || !selected || !window.confirm(`删除邮件模板“${selected.name}”？`)) return;
+    if (!canDelete || !selected || !await requestConfirmation({ title: "删除邮件模板", description: `确定删除邮件模板“${selected.name}”吗？`, confirmLabel: "确认删除", tone: "danger" })) return;
     try { await client.deleteEmailTemplate({ id: selected.id }); await loadTemplates(); setView("directory"); setFeedback(successFeedback("邮件模板已删除。")); }
     catch (error) { setFeedback(errorFeedback(readApiError(error))); }
   }
 
   async function restoreVersion(version: ApiEmailTemplateVersionDto) {
     if (!templatePermission.canOperate || !selected || !version.canRestore || version.versionNumber === selected.versionNumber) return;
-    if (!confirmDiscardChanges(`恢复 V${version.versionNumber}`)) return;
-    if (!window.confirm(`将模板“${selected.name}”恢复到 V${version.versionNumber}？\n系统会保留现有历史，并生成一个新的当前版本。`)) return;
+    if (!await confirmDiscardChanges(`恢复 V${version.versionNumber}`)) return;
+    if (!await requestConfirmation({ title: `恢复到 V${version.versionNumber}`, description: `将模板“${selected.name}”恢复到历史版本。`, details: ["系统会保留现有历史，并生成一个新的当前版本。"], confirmLabel: "确认恢复" })) return;
     try {
       const restored = await client.restoreEmailTemplateVersion({ id: selected.id, versionNumber: version.versionNumber });
       selectTemplateId(restored.id); applyDraft(toDraft(restored)); setSavedDraft(toDraft(restored)); setPreview(null);
@@ -176,14 +180,14 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
     setBodyHtml(draft.bodyHtml); setIsActive(draft.isActive); setIsShared(draft.isShared);
   }
 
-  function startNewTemplate() {
+  async function startNewTemplate() {
     if (!templatePermission.canOperate) return;
-    if (!confirmDiscardChanges("新建模板")) return;
+    if (!await confirmDiscardChanges("新建模板")) return;
     selectTemplateId(0); clearEditor(); setView("editor"); setFeedback(null);
   }
 
-  function openTemplate(template: ApiEmailTemplateDto) {
-    if (template.id !== selectedId && !confirmDiscardChanges(`打开模板“${template.name}”`)) return;
+  async function openTemplate(template: ApiEmailTemplateDto) {
+    if (template.id !== selectedId && !await confirmDiscardChanges(`打开模板“${template.name}”`)) return;
     selectTemplateId(template.id); setView("editor"); setFeedback(null);
   }
 
@@ -198,13 +202,13 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
     setPreview(null); setView("editor"); setFeedback(infoFeedback("已复制为新模板草稿，确认名称后点击保存。原模板保持不变。"));
   }
 
-  function changeView(next: EmailTemplateTaskView) {
+  async function changeView(next: EmailTemplateTaskView) {
     if (next === "preview") { void previewAndOpen(); return; }
     if (next === "history") {
       if (!selected) { setFeedback(warningFeedback("请先从模板目录打开一个已保存模板。")); return; }
       setView(next); void loadVersions(selected.id).catch((error) => setFeedback(errorFeedback(readApiError(error)))); return;
     }
-    if (next === "directory" && !confirmDiscardChanges("返回模板目录")) return;
+    if (next === "directory" && !await confirmDiscardChanges("返回模板目录")) return;
     setView(next);
   }
 
@@ -234,7 +238,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
   return <section className="work-surface">
     <div className="section-heading-row"><div><h2>邮件模板</h2><p>维护单封业务邮件内容；不包含群发、活动、追踪或自动发送。</p></div></div>
     <OperationFeedback feedback={feedback} />
-    {!templatePermission.canOperate ? <div className="permission-readonly-notice">当前权限模板仅允许查看邮件模板；新建、复制、预览生成、恢复和修改已禁用。</div> : null}
+    {!templatePermission.canOperate ? <PermissionNotice>当前权限模板仅允许查看邮件模板；新建、复制、预览生成、恢复和修改已禁用。</PermissionNotice> : null}
     <TaskViewTabs value={view} label="邮件模板工作区" onChange={changeView} items={[
       { id: "directory", label: "模板目录" }, { id: "editor", label: selected ? canEdit ? "编辑模板" : "查看模板" : "新建模板", disabled: !selected && !templatePermission.canOperate },
       { id: "variables", label: "变量设置", disabled: !templatePermission.canOperate }, { id: "preview", label: "预览与套用", disabled: !templatePermission.canOperate },
@@ -247,14 +251,14 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
         <select aria-label="模板范围" value={scope} onChange={(event) => setScope(event.target.value as EmailTemplateScope)}><option value="all">全部模板</option><option value="editable">可维护模板</option><option value="shared">团队共享</option></select>
         <label className="checkbox-field"><input type="checkbox" checked={includeInactive} onChange={(event) => setIncludeInactive(event.target.checked)} />显示停用模板</label>
       </form>
-      <div className="table-frame"><table className="data-table responsive-data-table"><thead><tr><th>名称</th><th data-table-priority="secondary">分类</th><th>主题</th><th data-table-priority="secondary">状态与范围</th><th /></tr></thead><tbody>
+      <ResponsiveTableFrame label="邮件模板列表" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>名称</th><th data-table-priority="secondary">分类</th><th>主题</th><th data-table-priority="secondary">状态与范围</th><th /></tr></thead><tbody>
         {visibleTemplates.map((item) => <tr key={item.id}><td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.category}</td><td><TablePrimaryText value={item.subject} /></td><td data-table-priority="secondary"><div className="table-row-actions"><BusinessStatusBadge value={item.isActive ? "启用" : "停用"} />{item.isShared ? <BusinessStatusBadge value="团队共享" /> : null}</div></td><td><button className="secondary-button" type="button" onClick={() => openTemplate(item)}>{templatePermission.canOperate && item.canEdit ? "编辑" : "查看"}</button></td></tr>)}
         {!visibleTemplates.length ? <tr><td className="empty-cell" colSpan={5}><div className="empty-cell-content"><strong>{templates.length ? "当前范围没有模板" : "暂无邮件模板"}</strong><span>{templates.length ? "可切换模板范围，或调整搜索和停用状态条件。" : templatePermission.canOperate ? "先建立一封常用询价、报价或跟进邮件，之后可载入客户变量快速套用。" : "当前没有可查看的邮件模板。"}</span>{!templates.length && templatePermission.canOperate ? <button className="primary-button" type="button" onClick={startNewTemplate}>建立第一个模板</button> : null}</div></td></tr> : null}
-      </tbody></table></div>
+      </tbody></table></ResponsiveTableFrame>
     </section> : null}
     {view === "editor" ? <form className="form-grid" onSubmit={save}>
         <div className="section-header"><h3>{selected ? "编辑模板" : "新建模板"}</h3><span>{isDirty ? "有未保存修改" : "已同步"}</span></div>
-        {!canEdit ? <div className="empty-guidance form-field-wide"><strong>{templatePermission.canOperate ? "这是其他账号共享的模板" : "当前模板为只读"}</strong><span>{templatePermission.canOperate ? "可以预览、套用或复制为自己的模板，但不能直接修改原模板。" : "可以查看正文和版本历史，但当前权限不能生成预览或修改模板。"}</span></div> : null}
+        {!canEdit ? <FormGuidance className="form-field-wide" title={templatePermission.canOperate ? "这是其他账号共享的模板" : "当前模板为只读"} description={templatePermission.canOperate ? "可以预览、套用或复制为自己的模板，但不能直接修改原模板。" : "可以查看正文和版本历史，但当前权限不能生成预览或修改模板。"} /> : null}
         <label>模板名称<input required disabled={!canEdit} maxLength={150} value={name} onChange={(event) => setName(event.target.value)} /></label>
         <label>分类<input disabled={!canEdit} maxLength={50} value={category} onChange={(event) => setCategory(event.target.value)} /></label>
         <label className="form-field-wide">邮件主题<input disabled={!canEdit} maxLength={300} value={subject} onChange={(event) => setSubject(event.target.value)} /></label>
@@ -281,10 +285,10 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
         <div className="form-actions"><button className="secondary-button" type="button" onClick={() => setView("variables")}>调整预览变量</button>{selected && !canEdit && templatePermission.canOperate ? <button className="secondary-button" type="button" onClick={copyAsNewTemplate}>复制后修改</button> : null}<button className="secondary-button" type="button" onClick={() => void renderPreview()}>刷新预览</button>{emailPermission.canOperate ? <button className="primary-button" type="button" onClick={() => void applyToEmail()}>套用到单封邮件</button> : null}</div>
       </section> : null}
       {view === "history" ? <section className="form-section"><div className="section-header"><div><h3>版本历史</h3><p className="section-description">每次实际保存都会追加快照；恢复旧版本时仍保留当前历史。</p></div><span>{selected ? `当前 V${selected.versionNumber}` : "未选择模板"}</span></div>
-        <div className="table-frame"><table className="data-table responsive-data-table"><thead><tr><th>版本</th><th>变更</th><th data-table-priority="secondary">操作账号</th><th data-table-priority="secondary">时间</th><th /></tr></thead><tbody>
+        <ResponsiveTableFrame label="邮件模板版本历史" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>版本</th><th>变更</th><th data-table-priority="secondary">操作账号</th><th data-table-priority="secondary">时间</th><th /></tr></thead><tbody>
           {versions.map((item) => <tr key={item.id}><td><strong>V{item.versionNumber}</strong>{item.versionNumber === selected?.versionNumber ? " · 当前" : ""}</td><td>{item.changeType}</td><td data-table-priority="secondary">{item.changedBy || "本地用户"}</td><td data-table-priority="secondary">{new Date(item.createdAt).toLocaleString("zh-CN")}</td><td><button className="secondary-button" type="button" onClick={() => setSelectedVersionNumber(item.versionNumber)}>查看</button></td></tr>)}
           {!versions.length ? <tr><td className="empty-cell" colSpan={5}>暂无可用版本历史。</td></tr> : null}
-        </tbody></table></div>
+        </tbody></table></ResponsiveTableFrame>
         {selectedVersion ? <div className="form-grid"><div className="context-strip form-field-wide"><strong>V{selectedVersion.versionNumber} · {selectedVersion.changeType}</strong><span>{selectedVersion.category} · {selectedVersion.isActive ? "启用" : "停用"} · {selectedVersion.isShared ? "团队共享" : "个人模板"}</span></div><label className="form-field-wide">历史主题<input readOnly value={selectedVersion.subject} /></label><label className="form-field-wide">历史正文<textarea rows={10} readOnly value={selectedVersion.bodyHtml} /></label><div className="form-actions form-field-wide"><button className="secondary-button" type="button" onClick={() => setView("editor")}>返回模板详情</button>{templatePermission.canOperate && selectedVersion.canRestore && selectedVersion.versionNumber !== selected?.versionNumber ? <button className="primary-button" type="button" onClick={() => void restoreVersion(selectedVersion)}>恢复此版本</button> : null}</div></div> : null}
       </section> : null}
   </section>;

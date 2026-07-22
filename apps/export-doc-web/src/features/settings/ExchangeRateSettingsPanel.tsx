@@ -161,10 +161,10 @@ export function ExchangeRateCurrencySettingsPanel({
           onDoubleClick={addSelectedCurrency}
         />
         <div className="exchange-currency-action-stack" aria-label="货币选择操作">
-          <button className="icon-button compact-icon-button" type="button" title="添加到常用货币" disabled={!canAddCurrency} onClick={addSelectedCurrency}>
+          <button className="icon-button compact-icon-button" type="button" title="添加到常用货币" aria-label="添加到常用货币" disabled={!canAddCurrency} onClick={addSelectedCurrency}>
             <Plus size={16} aria-hidden="true" />
           </button>
-          <button className="icon-button compact-icon-button" type="button" title="移出常用货币" disabled={!canRemoveCurrency} onClick={removeSelectedCurrency}>
+          <button className="icon-button compact-icon-button" type="button" title="移出常用货币" aria-label="移出常用货币" disabled={!canRemoveCurrency} onClick={removeSelectedCurrency}>
             <Minus size={16} aria-hidden="true" />
           </button>
         </div>
@@ -179,10 +179,10 @@ export function ExchangeRateCurrencySettingsPanel({
           onDoubleClick={removeSelectedCurrency}
         />
         <div className="exchange-currency-action-stack" aria-label="常用货币排序操作">
-          <button className="icon-button compact-icon-button" type="button" title="上移常用货币" disabled={!canMoveCurrencyUp} onClick={() => moveSelectedCurrency(-1)}>
+          <button className="icon-button compact-icon-button" type="button" title="上移常用货币" aria-label="上移常用货币" disabled={!canMoveCurrencyUp} onClick={() => moveSelectedCurrency(-1)}>
             <ArrowUp size={16} aria-hidden="true" />
           </button>
-          <button className="icon-button compact-icon-button" type="button" title="下移常用货币" disabled={!canMoveCurrencyDown} onClick={() => moveSelectedCurrency(1)}>
+          <button className="icon-button compact-icon-button" type="button" title="下移常用货币" aria-label="下移常用货币" disabled={!canMoveCurrencyDown} onClick={() => moveSelectedCurrency(1)}>
             <ArrowDown size={16} aria-hidden="true" />
           </button>
         </div>

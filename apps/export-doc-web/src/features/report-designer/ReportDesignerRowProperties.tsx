@@ -144,16 +144,16 @@ export function RowBlockProperties({
             <div className="new-report-detail-column-title">
               <strong>列 {index + 1}</strong>
               <div className="new-report-detail-column-actions" aria-label={`行列 ${index + 1} 操作`}>
-                <button className="icon-button compact-icon-button" type="button" title="左移列" disabled={index === 0} onClick={() => moveColumn(column.id, "up")}>
+                <button className="icon-button compact-icon-button" type="button" title="左移列" aria-label="左移列" disabled={index === 0} onClick={() => moveColumn(column.id, "up")}>
                   <ArrowUp size={16} aria-hidden="true" />
                 </button>
-                <button className="icon-button compact-icon-button" type="button" title="右移列" disabled={index >= block.columns.length - 1} onClick={() => moveColumn(column.id, "down")}>
+                <button className="icon-button compact-icon-button" type="button" title="右移列" aria-label="右移列" disabled={index >= block.columns.length - 1} onClick={() => moveColumn(column.id, "down")}>
                   <ArrowDown size={16} aria-hidden="true" />
                 </button>
-                <button className="icon-button compact-icon-button" type="button" title="复制列" onClick={() => duplicateColumn(column.id)}>
+                <button className="icon-button compact-icon-button" type="button" title="复制列" aria-label="复制列" onClick={() => duplicateColumn(column.id)}>
                   <Copy size={16} aria-hidden="true" />
                 </button>
-                <button className="icon-button compact-icon-button danger-icon" type="button" title="删除列" disabled={block.columns.length <= 1} onClick={() => removeColumn(column.id)}>
+                <button className="icon-button compact-icon-button danger-icon" type="button" title="删除列" aria-label="删除列" disabled={block.columns.length <= 1} onClick={() => removeColumn(column.id)}>
                   <Trash2 size={16} aria-hidden="true" />
                 </button>
               </div>

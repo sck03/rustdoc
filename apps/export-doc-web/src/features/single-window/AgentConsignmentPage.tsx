@@ -6,7 +6,6 @@ import {
   ApiAgentConsignmentDocumentDto,
   ApiSingleWindowLockedFieldDto,
   ExportDocManagerApiClient,
-  SingleWindowReferenceCatalogModel,
 } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -14,6 +13,8 @@ import { FieldShell, SelectField, TextAreaField, TextField } from "../../ui/Form
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { SingleWindowHandoffPanel } from "./SingleWindowHandoffPanel.tsx";
 import { SingleWindowLockedFieldsDialog } from "./SingleWindowLockedFieldsDialog.tsx";
 import { SingleWindowExportReviewPanel } from "./SingleWindowExportReviewPanel.tsx";
@@ -21,6 +22,17 @@ import { SingleWindowScopedClearControls } from "./SingleWindowScopedClearContro
 import { SingleWindowDocumentActionBar } from "./SingleWindowDocumentActionBar.tsx";
 import { SingleWindowSectionNav } from "./SingleWindowSectionNav.tsx";
 import { SingleWindowTabs } from "./SingleWindowNavigation.tsx";
+import {
+  type AgentScopedClearRequest,
+  buildAgentConsignmentDocumentSnapshot,
+  buildAgentConsignmentEditorOptions,
+  buildAgentConsignmentSectionNavItems,
+  formatAgentDateTime,
+  formatScopedClearResultMessage,
+  normalizeAgentConsignmentDocumentForSave,
+  readAgentDisplayText,
+  readAgentDisplayValue,
+} from "./agentConsignmentModel.ts";
 import {
   agentScopedClearOptionsByGroup,
   applyAgentDefaultsForScope,
@@ -44,15 +56,10 @@ const agentOperTypeOptions = [
 const agentPackingConditionOptions = ["纸箱", "托盘", "木箱", "裸装", "散装", "其他包装"];
 const agentPaperInfoOptions = ["已收齐", "待补充", "发票", "装箱单", "合同", "提单", "报关委托书", "海关原产地证", "其他"];
 
-type AgentScopedClearRequest = {
-  snapshot: ApiAgentConsignmentDocumentDto;
-  groupKey: string;
-  categoryKey?: string;
-  categoryLabel?: string;
-};
 
 export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiClient }) {
   const permission = useModulePermission("document.single-window");
+  const requestConfirmation = useConfirmation();
   const { invoiceId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -232,7 +239,7 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
 
       let savedDocument: ApiAgentConsignmentDocumentDto | null = null;
       if (documentQuery.data && !areEditorDocumentsEqual(document, documentQuery.data)) {
-        if (!window.confirm("当前草稿有未保存修改，先保存后再查看锁定字段吗？")) {
+        if (!await requestConfirmation({ title: "保存后查看锁定字段", description: "当前草稿有未保存修改，需要先保存后再读取锁定字段。", confirmLabel: "保存并继续" })) {
           return null;
         }
 
@@ -337,7 +344,7 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
     message: "当前代理委托草稿有未保存的修改。",
   });
 
-  function handleRepairReviewGroups(groupKeys: string[]) {
+  async function handleRepairReviewGroups(groupKeys: string[]) {
     if (!permission.canOperate || !document || !isInvoiceIdValid || groupKeys.length === 0) {
       return;
     }
@@ -348,7 +355,7 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
 
     if (
       shouldSaveCurrentDraft &&
-      !window.confirm("当前代理委托草稿有未保存修改，先保存当前草稿再执行自动修复吗？")
+      !await requestConfirmation({ title: "保存并自动修复", description: "当前代理委托草稿有未保存修改，需要先保存当前草稿再执行自动修复。", confirmLabel: "保存并修复" })
     ) {
       return;
     }
@@ -367,12 +374,12 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
     setSuccessMessage(null);
   }
 
-  function handleRestoreDefaults() {
+  async function handleRestoreDefaults() {
     if (!document || !isInvoiceIdValid) {
       return;
     }
 
-    if (!window.confirm("这会按当前发票重新套用建议值，原来的手工覆盖内容会被替换。要继续吗？")) {
+    if (!await requestConfirmation({ title: "重新套用建议值", description: "系统将按当前发票重新生成建议值。", details: ["原来的手工覆盖内容会被替换。"], confirmLabel: "重新套用" })) {
       return;
     }
 
@@ -391,12 +398,12 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
     fillEmptyMutation.mutate(cloneEditorDocument(document));
   }
 
-  function handleClearManualOverrides() {
+  async function handleClearManualOverrides() {
     if (!document || !isInvoiceIdValid) {
       return;
     }
 
-    if (!window.confirm("这会清空手工补充的覆盖字段，但会保留系统回写值。要继续吗？")) {
+    if (!await requestConfirmation({ title: "清空手工覆盖", description: "确定清空手工补充的覆盖字段吗？", details: ["系统回写值会保留。", "保存后才会写入草稿。"], confirmLabel: "清空覆盖" })) {
       return;
     }
 
@@ -412,12 +419,12 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
     );
   }
 
-  function handleClearScopedGroup(groupKey: string) {
+  async function handleClearScopedGroup(groupKey: string) {
     if (!document || !isInvoiceIdValid) {
       return;
     }
 
-    if (!window.confirm(`这会把“${groupKey}”分组里的手工覆盖值恢复到当前发票建议值。要继续吗？`)) {
+    if (!await requestConfirmation({ title: "恢复分组建议值", description: `确定把“${groupKey}”分组里的手工覆盖值恢复到当前发票建议值吗？`, confirmLabel: "确认恢复" })) {
       return;
     }
 
@@ -426,12 +433,12 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
     scopedClearMutation.mutate({ snapshot: cloneEditorDocument(document), groupKey });
   }
 
-  function handleClearScopedCategory(groupKey: string, categoryKey: string, categoryLabel: string) {
+  async function handleClearScopedCategory(groupKey: string, categoryKey: string, categoryLabel: string) {
     if (!document || !isInvoiceIdValid) {
       return;
     }
 
-    if (!window.confirm(`这会只恢复“${groupKey}”分组里的“${categoryLabel}”到当前发票建议值。要继续吗？`)) {
+    if (!await requestConfirmation({ title: "恢复分类建议值", description: `确定只恢复“${groupKey}”分组里的“${categoryLabel}”吗？`, confirmLabel: "确认恢复" })) {
       return;
     }
 
@@ -494,14 +501,14 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
     setSuccessMessage("已撤销上一次工具动作，保存后写入草稿。");
   }
 
-  function handleBackToInvoice() {
-    if (confirmDiscardChanges("返回发票")) {
+  async function handleBackToInvoice() {
+    if (await confirmDiscardChanges("返回发票")) {
       navigate(isInvoiceIdValid ? `/invoices/${parsedInvoiceId}` : "/invoices");
     }
   }
 
-  function handleRefreshDocument() {
-    if (confirmDiscardChanges("刷新草稿")) {
+  async function handleRefreshDocument() {
+    if (await confirmDiscardChanges("刷新草稿")) {
       void documentQuery.refetch();
     }
   }
@@ -552,8 +559,8 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
       {loadMessage || message ? <div className="alert">{loadMessage || message}</div> : null}
       {referenceMessage ? <div className="alert">报关代理委托候选项加载失败：{referenceMessage}</div> : null}
       {successMessage ? <div className="success-alert">{successMessage}</div> : null}
-      {!permission.canOperate ? <div className="permission-readonly-notice">当前权限模板仅允许查看单一窗口草稿和预检结果；修改、修复、保存与交接操作已禁用。</div> : null}
-      {!document && isBusy ? <div className="loading-panel">加载中</div> : null}
+      {!permission.canOperate ? <PermissionNotice>当前权限模板仅允许查看单一窗口草稿和预检结果；修改、修复、保存与交接操作已禁用。</PermissionNotice> : null}
+      {!document && isBusy ? <PageState tone="loading" title="正在加载代理委托草稿" description="正在读取委托信息、商品明细和预检状态。" /> : null}
 
       {document ? (
         <form id="agent-consignment-form" className="entity-form agent-consignment-form" onSubmit={handleSubmit} onKeyDownCapture={handleEnterAsTabFormKeyDown}>
@@ -649,7 +656,7 @@ function AgentConsignmentSummary({ document }: { document: ApiAgentConsignmentDo
       <SummaryItem label="人工锁定字段" value={document.manualLockedFieldCount} />
       <SummaryItem label="来源差异" value={document.sourceDiffCount} />
       <SummaryItem label="预警" value={document.warningCount} />
-      <SummaryItem label="最后生成" value={formatDateTime(document.lastGeneratedAt)} />
+      <SummaryItem label="最后生成" value={formatAgentDateTime(document.lastGeneratedAt)} />
       <SummaryItem label="来源差异摘要" value={document.sourceDiffSummary} wide />
       <SummaryItem label="预警摘要" value={document.warningSummary} wide />
     </div>
@@ -866,11 +873,11 @@ function AgentConsignmentReceiptPanel({ document }: { document: ApiAgentConsignm
     <div className="agent-consignment-receipt-grid">
       <div className="agent-consignment-receipt-card">
         <span>委托编号</span>
-        <strong>{readDisplayText(document.consignNo)}</strong>
+        <strong>{readAgentDisplayText(document.consignNo)}</strong>
       </div>
       <div className="agent-consignment-receipt-card">
         <span>对方状态</span>
-        <strong>{readDisplayText(document.counterpartyStatus)}</strong>
+        <strong>{readAgentDisplayText(document.counterpartyStatus)}</strong>
       </div>
     </div>
   );
@@ -896,18 +903,8 @@ function AgentConsignmentCard({
   );
 }
 
-function buildAgentConsignmentSectionNavItems(document: ApiAgentConsignmentDocumentDto) {
-  return [
-    { id: "acd-section-status", label: "草稿", badge: `${document.warningCount} 预警` },
-    { id: "acd-section-basic", label: "报文申报" },
-    { id: "acd-section-documents", label: "单证费用" },
-    { id: "acd-section-receipt", label: "回执" },
-    { id: "acd-section-review", label: "预检" },
-  ];
-}
-
 function SummaryItem({ label, value, wide }: { label: string; value?: string | number; wide?: boolean }) {
-  const displayValue = readDisplayValue(value);
+  const displayValue = readAgentDisplayValue(value);
 
   return (
     <div className={wide ? "detail-item detail-item-wide" : "detail-item"}>
@@ -960,88 +957,4 @@ function AgentCandidateField({
       )}
     </FieldShell>
   );
-}
-
-function buildAgentConsignmentEditorOptions(catalog?: SingleWindowReferenceCatalogModel) {
-  return {
-    tradeModeOptions: (catalog?.acdTradeModes ?? [])
-      .filter((item) => item.code?.trim() && item.name?.trim())
-      .sort((left, right) => left.code.localeCompare(right.code, "zh-CN"))
-      .map((item) => ({
-        value: item.code.trim(),
-        label: item.description?.trim()
-          ? `${item.code.trim()}：${item.name.trim()} - ${item.description.trim()}`
-          : `${item.code.trim()}：${item.name.trim()}`,
-      })),
-    countryOptions: (catalog?.acdCountries ?? [])
-      .filter((item) => item.code?.trim() && item.chineseName?.trim())
-      .sort((left, right) => left.code.localeCompare(right.code, "zh-CN"))
-      .map((item) => ({
-        value: item.code.trim(),
-        label: `${item.code.trim()}：${item.chineseName.trim()}${
-          item.englishName?.trim() ? ` / ${item.englishName.trim()}` : ""
-        }`,
-      })),
-    currencyOptions: (catalog?.currencies ?? [])
-      .filter((item) => item.acdCode?.trim() && item.alphaCode?.trim())
-      .sort((left, right) => left.acdCode.localeCompare(right.acdCode, "zh-CN"))
-      .map((item) => ({
-        value: item.acdCode.trim(),
-        label: `${item.acdCode.trim()}：${item.alphaCode.trim()}${
-          item.code?.trim() ? ` / ${item.code.trim()}` : ""
-        }`,
-      })),
-  };
-}
-
-function normalizeAgentConsignmentDocumentForSave(
-  document: ApiAgentConsignmentDocumentDto,
-  invoiceId: number,
-): ApiAgentConsignmentDocumentDto {
-  return {
-    ...document,
-    id: numberOrZero(document.id),
-    sourceInvoiceId: invoiceId,
-  };
-}
-
-function buildAgentConsignmentDocumentSnapshot(document: ApiAgentConsignmentDocumentDto, invoiceId: number) {
-  return JSON.stringify(normalizeAgentConsignmentDocumentForSave(document, invoiceId));
-}
-
-function formatScopedClearResultMessage(request: AgentScopedClearRequest, changedCount: number) {
-  if (request.categoryKey && request.categoryLabel) {
-    return changedCount > 0
-      ? `已把“${request.groupKey}”里的“${request.categoryLabel}”恢复到当前发票建议值，保存后写入草稿。`
-      : `“${request.groupKey}”里的“${request.categoryLabel}”当前已经是建议值，无需恢复。`;
-  }
-
-  return changedCount > 0
-    ? `已把“${request.groupKey}”分组恢复到当前发票建议值，保存后写入草稿。`
-    : `“${request.groupKey}”分组当前已经是建议值，无需恢复。`;
-}
-
-function formatDateTime(value?: string) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
-}
-
-function readDisplayText(value?: string) {
-  return value?.trim() ? value : "-";
-}
-
-function readDisplayValue(value?: string | number) {
-  if (typeof value === "number") {
-    return formatPlainNumber(value);
-  }
-
-  return readDisplayText(value);
-}
-
-function numberOrZero(value?: number) {
-  return Number.isFinite(value) ? Number(value) : 0;
 }
