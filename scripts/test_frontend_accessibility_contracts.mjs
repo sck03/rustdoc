@@ -27,6 +27,14 @@ for (const file of walk(root)) {
       failures.push(`${sourceRelativePath}: 高级导出内容必须按展开状态延迟挂载，避免隐藏模板和邮件表单占用渲染资源`);
     }
   }
+
+  if (sourceRelativePath === "ui/FrontendErrorBoundary.tsx") {
+    for (const requiredRecoveryText of ["重试当前界面", "重新加载程序界面", "incidentId", "reportFrontendError"]) {
+      if (!sourceText.includes(requiredRecoveryText)) {
+        failures.push(`${sourceRelativePath}: 全局异常页缺少恢复操作或可追踪异常编号：${requiredRecoveryText}`);
+      }
+    }
+  }
 }
 
 if (failures.length) {

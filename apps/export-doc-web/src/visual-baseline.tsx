@@ -4,6 +4,7 @@ import { HashRouter } from "react-router-dom";
 import { WorkspaceShell } from "./app/WorkspaceShell.tsx";
 import { LoginPage } from "./features/auth/LoginPage.tsx";
 import { ConfirmationDialog } from "./ui/ConfirmationDialog.tsx";
+import { FrontendFatalErrorState } from "./ui/FrontendErrorBoundary.tsx";
 import { ConcurrencyConflictNotice, FormGuidance, InlineNotice, PageState, PermissionNotice } from "./ui/PageState.tsx";
 import "./styles.css";
 import "./workspaceFeatures.css";
@@ -29,6 +30,9 @@ function BaselineApp() {
     return <LoginPage apiBaseUrl="http://127.0.0.1:5188" username="admin" password="" isBusy={false} message={null}
       product={{ edition: "Full", productName: "出口单证管理系统", englishName: "EXPORT DOCUMENT MANAGER", editionName: "全功能版", loginTagline: "单证、客户与供应链协同", defaultRoute: "/dashboard" }}
       onApiBaseUrlChange={() => undefined} onUsernameChange={() => undefined} onPasswordChange={() => undefined} onSubmit={(event) => event.preventDefault()} />;
+  }
+  if (page === "state-fatal") {
+    return <FrontendFatalErrorState incidentId="WEB-20260722-TEST1" onRetry={() => undefined} onReload={() => undefined} />;
   }
   const user = {
     username: "admin", fullName: "系统管理员", role: "Admin",
