@@ -43,6 +43,25 @@ for (const file of walk(root)) {
     failures.push(`${sourceRelativePath}: 高级导出工作区缺少稳定的布局容器`);
   }
 
+  if (sourceRelativePath === "features/invoices/InvoiceEditorPage.tsx") {
+    if (!sourceText.includes("useInvoiceItemsWorkspace")) {
+      failures.push(`${sourceRelativePath}: 商品库与明细表操作必须保持独立工作区 Hook`);
+    }
+    for (const leakedItemOperation of ["recalculateInvoiceItem", "createProductDraftFromInvoiceItem", "maxInvoiceItemHistoryDepth"]) {
+      if (sourceText.includes(leakedItemOperation)) {
+        failures.push(`${sourceRelativePath}: 明细编辑实现不应重新回流发票页面协调器：${leakedItemOperation}`);
+      }
+    }
+  }
+
+  if (sourceRelativePath === "features/invoices/useInvoiceItemsWorkspace.ts") {
+    for (const workspaceContract of ["maxInvoiceItemHistoryDepth = 50", "recalculateInvoiceItem", "masterDataRoot(\"products\")"]) {
+      if (!sourceText.includes(workspaceContract)) {
+        failures.push(`${sourceRelativePath}: 发票明细工作区缺少历史、重算或商品库闭环：${workspaceContract}`);
+      }
+    }
+  }
+
   if (sourceRelativePath === "ui/FrontendErrorBoundary.tsx") {
     for (const requiredRecoveryText of ["重试当前界面", "重新加载程序界面", "incidentId", "reportFrontendError"]) {
       if (!sourceText.includes(requiredRecoveryText)) {

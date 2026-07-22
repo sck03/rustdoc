@@ -1,8 +1,8 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Edit3, Minimize2, PackageSearch, Save, Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ApiUnitDto, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
@@ -22,13 +22,6 @@ import {
   InvoicePartiesPanel,
   InvoiceShippingTermsPanel,
 } from "./InvoiceFormPanels.tsx";
-import {
-  type InvoiceItemCellSelection,
-  calculateInvoiceTotals,
-  createEmptyInvoiceItem,
-  recalculateInvoiceItem,
-} from "./InvoiceItemsEditor.tsx";
-import { type EditableInvoiceItemField, invoiceItemEditableColumns } from "./invoiceItemTableModel.ts";
 import { InvoiceLetterOfCreditPanel } from "./InvoiceLetterOfCreditPanel.tsx";
 import { InvoiceProfitAnalysisPanel } from "./InvoiceProfitAnalysisPanel.tsx";
 import { InvoiceReportPreviewPanel } from "./InvoiceReportPreviewPanel.tsx";
@@ -45,29 +38,13 @@ import {
   type RouteInvoiceImportAction,
   uppercaseInvoiceEnglishText,
 } from "./invoiceModel.ts";
-import { createInvoiceItemFromProduct, createProductDraftFromInvoiceItem, hasSameProductCode } from "./invoiceProductLibrary.ts";
 import { InvoiceEditorNavigation } from "./InvoiceEditorNavigation.tsx";
 import {
-  areInvoiceItemsEqual,
-  areInvoiceItemValuesEqual,
   buildInvoiceSnapshot,
-  cloneInvoiceItems,
   mergeRouteInvoiceImportDraft,
   readInvoiceItemBlankRowCount,
-  readInvoiceItemTableNumber,
 } from "./invoiceEditorHelpers.ts";
-
-const maxInvoiceItemHistoryDepth = 50;
-
-type InvoiceItemEditHistory = {
-  redo: ApiInvoiceItemDto[][];
-  undo: ApiInvoiceItemDto[][];
-};
-
-const emptyInvoiceItemEditHistory: InvoiceItemEditHistory = {
-  redo: [],
-  undo: [],
-};
+import { useInvoiceItemsWorkspace } from "./useInvoiceItemsWorkspace.ts";
 
 export function InvoiceEditorPage({
   client,
@@ -102,12 +79,9 @@ export function InvoiceEditorPage({
   const [successMessage, setSuccessMessage] = useState<string | null>(routeSuccessMessage);
   const [concurrencyMessage, setConcurrencyMessage] = useState<string | null>(null);
   const [isLetterOfCreditBusy, setIsLetterOfCreditBusy] = useState(false);
-  const [itemEditHistory, setItemEditHistory] = useState<InvoiceItemEditHistory>(emptyInvoiceItemEditHistory);
   const [persistedInvoiceStatus, setPersistedInvoiceStatus] = useState<string>(() =>
     mode === "new" ? normalizeInvoiceStatus(routeInvoiceDraft?.status) : "",
   );
-  const [productLibraryKeyword, setProductLibraryKeyword] = useState("");
-  const [productLibraryMessage, setProductLibraryMessage] = useState<string | null>(null);
   const [persistedInvoiceSnapshot, setPersistedInvoiceSnapshot] = useState<string | null>(null);
   const [appliedRouteInvoiceImportKey, setAppliedRouteInvoiceImportKey] = useState<string | null>(null);
 
@@ -122,6 +96,16 @@ export function InvoiceEditorPage({
           routeInvoiceDraft.items?.length ?? 0
         }`
       : null;
+  const isInvoiceEditable = invoicePermission.canOperate
+    && (isNew || isInvoiceEditableStatus(persistedInvoiceStatus || invoice?.status));
+  const itemsWorkspace = useInvoiceItemsWorkspace({
+    client,
+    invoice,
+    setInvoice,
+    setSuccessMessage,
+    isEditable: isInvoiceEditable,
+    canSaveToProductLibrary: masterDataPermission.canOperate,
+  });
 
   const invoiceQuery = useQuery({
     queryKey: queryKeys.invoice(parsedInvoiceId),
@@ -141,12 +125,6 @@ export function InvoiceEditorPage({
         exporters: nextExporters,
       };
     },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const productsQuery = useQuery({
-    queryKey: queryKeys.masterDataList("products", 1, 200, productLibraryKeyword),
-    queryFn: () => client.listProducts({ keyword: productLibraryKeyword || undefined }),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -174,10 +152,9 @@ export function InvoiceEditorPage({
       setInvoice(nextInvoice);
       setPersistedInvoiceSnapshot(buildInvoiceSnapshot(nextInvoice, 0));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(nextInvoice.status));
-      setItemEditHistory(emptyInvoiceItemEditHistory);
+      itemsWorkspace.reset();
       setMessage(null);
       setConcurrencyMessage(null);
-      setProductLibraryMessage(null);
       setSuccessMessage(routeSuccessMessage);
       return;
     }
@@ -186,9 +163,8 @@ export function InvoiceEditorPage({
       setInvoice(null);
       setPersistedInvoiceSnapshot(null);
       setPersistedInvoiceStatus("");
-      setItemEditHistory(emptyInvoiceItemEditHistory);
+      itemsWorkspace.reset();
       setMessage("发票 ID 无效。");
-      setProductLibraryMessage(null);
       setSuccessMessage(null);
       return;
     }
@@ -210,9 +186,8 @@ export function InvoiceEditorPage({
       setInvoice(nextInvoice);
       setPersistedInvoiceSnapshot(buildInvoiceSnapshot(invoiceQuery.data, parsedInvoiceId));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(invoiceQuery.data.status));
-      setItemEditHistory(emptyInvoiceItemEditHistory);
+      itemsWorkspace.reset();
       setMessage(null);
-      setProductLibraryMessage(null);
       if (appliedImportAction && routeInvoiceImportKey) {
         setAppliedRouteInvoiceImportKey(routeInvoiceImportKey);
         setSuccessMessage(
@@ -250,7 +225,7 @@ export function InvoiceEditorPage({
       setInvoice(response.invoice);
       setPersistedInvoiceSnapshot(buildInvoiceSnapshot(response.invoice, response.id));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(response.invoice.status));
-      setItemEditHistory(emptyInvoiceItemEditHistory);
+      itemsWorkspace.resetEditHistory();
       setMessage(null);
       setSuccessMessage(response.isUpdate ? "发票已保存。" : "发票已创建。");
       queryClient.setQueryData(queryKeys.invoice(response.id), response.invoice);
@@ -355,47 +330,6 @@ export function InvoiceEditorPage({
     },
   });
 
-  const saveProductMutation = useMutation({
-    mutationFn: async ({ item }: { item: ApiInvoiceItemDto }) => {
-      const productCode = normalizeText(item.styleNo);
-      if (!productCode) {
-        throw new Error("商品编码(款号)不能为空。");
-      }
-
-      const candidates = await client.listProducts({ keyword: productCode });
-      const existing = candidates.find((product) => hasSameProductCode(product, productCode)) ?? null;
-      if (existing && !await requestConfirmation({
-        title: "更新商品库",
-        description: `商品库中已存在编码为 ${productCode} 的商品，是否用当前发票明细更新？`,
-        details: ["只更新商品主数据，不会修改其他历史发票。"],
-        confirmLabel: "更新商品",
-      })) {
-        return { cancelled: true, isUpdate: true, productCode };
-      }
-
-      const body = createProductDraftFromInvoiceItem(item, existing);
-      if (existing) {
-        await client.updateProduct({ id: existing.id, body });
-        return { cancelled: false, isUpdate: true, productCode };
-      }
-
-      await client.createProduct({ body });
-      return { cancelled: false, isUpdate: false, productCode };
-    },
-    onSuccess: async (result) => {
-      if (result.cancelled) {
-        setProductLibraryMessage("已取消商品库更新。");
-        return;
-      }
-
-      setProductLibraryMessage(result.isUpdate ? `商品库已更新：${result.productCode}` : `商品已保存到商品库：${result.productCode}`);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("products") });
-    },
-    onError: (error) => {
-      setProductLibraryMessage(readApiError(error));
-    },
-  });
-
   const saveCustomOptionMutation = useMutation({
     mutationFn: ({ optionType, value }: { optionType: string; value: string }) =>
       client.saveCustomOption({
@@ -409,7 +343,7 @@ export function InvoiceEditorPage({
 
   const customers = partiesQuery.data?.customers ?? [];
   const exporters = partiesQuery.data?.exporters ?? [];
-  const products = productsQuery.data ?? [];
+  const products = itemsWorkspace.products;
   const units: ApiUnitDto[] = unitsQuery.data ?? [];
   const invoiceCustomOptions = customOptionsQuery.data ?? {};
   const selectedCustomerEmail =
@@ -425,14 +359,13 @@ export function InvoiceEditorPage({
     isLetterOfCreditBusy;
   const isPartyBusy = partiesQuery.isFetching;
   const partyMessage = partiesQuery.isError ? readApiError(partiesQuery.error) : null;
-  const productMessage = productsQuery.isError ? readApiError(productsQuery.error) : productLibraryMessage;
+  const productMessage = itemsWorkspace.productLibraryMessage;
   const unitLookupMessage = unitsQuery.isError ? readApiError(unitsQuery.error) : null;
-  const isProductLibraryBusy = productsQuery.isFetching || saveProductMutation.isPending;
+  const isProductLibraryBusy = itemsWorkspace.isProductLibraryBusy;
   const invoiceItemBlankRowCount = readInvoiceItemBlankRowCount(settingsQuery.data?.settings);
   const targetInvoiceType = getCounterpartInvoiceType(invoice?.type);
   const cloneInvoiceTypeLabel = `生成${targetInvoiceType}`;
   const canUnverifyInvoice = !isNew && isInvoiceIdValid && canUnverifyInvoiceStatus(invoice?.status);
-  const isInvoiceEditable = invoicePermission.canOperate && (isNew || isInvoiceEditableStatus(persistedInvoiceStatus || invoice?.status));
   const currentInvoiceDraft = useMemo(
     () => (invoice ? normalizeInvoiceForSave(invoice, isNew || !isInvoiceIdValid ? 0 : parsedInvoiceId) : undefined),
     [invoice, isInvoiceIdValid, isNew, parsedInvoiceId],
@@ -455,23 +388,6 @@ export function InvoiceEditorPage({
 
   function loadParties() {
     void partiesQuery.refetch();
-  }
-
-  function searchProductLibrary(keyword: string) {
-    const nextKeyword = normalizeText(keyword);
-    setProductLibraryMessage(null);
-    setProductLibraryKeyword((current) => {
-      if (current === nextKeyword) {
-        void productsQuery.refetch();
-      }
-
-      return nextKeyword;
-    });
-  }
-
-  function refreshProductLibrary() {
-    setProductLibraryMessage(null);
-    void productsQuery.refetch();
   }
 
   function patchInvoice(next: Partial<ApiInvoiceDetailDto>) {
@@ -602,362 +518,6 @@ export function InvoiceEditorPage({
     deleteInvoiceMutation.mutate();
   }
 
-  function setInvoiceItems(
-    buildItems: (items: ApiInvoiceItemDto[], invoiceId: number) => ApiInvoiceItemDto[],
-    options: { trackHistory?: boolean } = { trackHistory: true },
-  ) {
-    setInvoice((current) => {
-      if (!isInvoiceEditable) {
-        return current;
-      }
-
-      if (!current) {
-        return current;
-      }
-
-      const currentItems = current.items ?? [];
-      const nextItems = buildItems(currentItems, current.id);
-      if (areInvoiceItemsEqual(currentItems, nextItems)) {
-        return current;
-      }
-
-      if (options.trackHistory !== false) {
-        const previousItems = cloneInvoiceItems(currentItems);
-        setItemEditHistory((history) => ({
-          undo: [...history.undo, previousItems].slice(-maxInvoiceItemHistoryDepth),
-          redo: [],
-        }));
-      }
-
-      return {
-        ...current,
-        items: nextItems,
-        ...calculateInvoiceTotals(nextItems),
-      };
-    });
-    setSuccessMessage(null);
-  }
-
-  function addInvoiceItem() {
-    setInvoiceItems((items, invoiceId) => [...items, createEmptyInvoiceItem(invoiceId)]);
-  }
-
-  function applyProductLibraryItem(product: ApiProductDto, insertAfterIndex: number | null) {
-    if (!product) {
-      setProductLibraryMessage("请选择要套用的商品。");
-      return;
-    }
-
-    setInvoiceItems((items, invoiceId) => {
-      const targetIndex =
-        insertAfterIndex == null || insertAfterIndex < 0 || insertAfterIndex >= items.length
-          ? items.length
-          : Math.min(items.length, insertAfterIndex + 1);
-      const productItem = createInvoiceItemFromProduct(product, invoiceId);
-      return [
-        ...items.slice(0, targetIndex),
-        productItem,
-        ...items.slice(targetIndex),
-      ];
-    });
-    setProductLibraryMessage(`已从商品库新增明细：${normalizeText(product.productCode) || product.id}`);
-  }
-
-  function saveInvoiceItemToProductLibrary(index: number) {
-    if (!masterDataPermission.canOperate) {
-      setProductLibraryMessage("当前权限只能读取商品库，不能新增或更新商品资料。");
-      return;
-    }
-
-    const item = invoice?.items?.[index];
-    if (!item) {
-      setProductLibraryMessage("请先选择一行要保存的商品明细。");
-      return;
-    }
-
-    if (!normalizeText(item.styleNo)) {
-      setProductLibraryMessage("商品编码(款号)不能为空。");
-      return;
-    }
-
-    setProductLibraryMessage(null);
-    saveProductMutation.mutate({ item: { ...item } });
-  }
-
-  function duplicateInvoiceItem(index: number) {
-    setInvoiceItems((items, invoiceId) => {
-      const source = items[index];
-      if (!source) {
-        return items;
-      }
-
-      const duplicated: ApiInvoiceItemDto = {
-        ...createEmptyInvoiceItem(invoiceId),
-        ...source,
-        id: 0,
-        invoiceId,
-      };
-
-      return [
-        ...items.slice(0, index + 1),
-        duplicated,
-        ...items.slice(index + 1),
-      ];
-    });
-  }
-
-  function moveInvoiceItem(index: number, direction: -1 | 1) {
-    setInvoiceItems((items) => {
-      const targetIndex = index + direction;
-      if (index < 0 || index >= items.length || targetIndex < 0 || targetIndex >= items.length) {
-        return items;
-      }
-
-      const nextItems = [...items];
-      const current = nextItems[index];
-      nextItems[index] = nextItems[targetIndex];
-      nextItems[targetIndex] = current;
-      return nextItems;
-    });
-  }
-
-  function fillDownInvoiceItemField(index: number, field: EditableInvoiceItemField) {
-    setInvoiceItems((items, invoiceId) => {
-      const source = items[index - 1];
-      const target = items[index];
-      if (!source || !target) {
-        return items;
-      }
-
-      const patch = { [field]: source[field] } as Partial<ApiInvoiceItemDto>;
-      return items.map((item, itemIndex) =>
-        itemIndex === index
-          ? recalculateInvoiceItem({ ...createEmptyInvoiceItem(invoiceId), ...item, ...patch }, [field])
-          : item,
-      );
-    });
-  }
-
-  function fillDownInvoiceItemCells(cells: InvoiceItemCellSelection[]) {
-    if (cells.length < 2) {
-      return;
-    }
-
-    setInvoiceItems((items, invoiceId) => {
-      const rowsByField = new Map<EditableInvoiceItemField, Set<number>>();
-      for (const cell of cells) {
-        if (cell.rowIndex < 0 || cell.rowIndex >= items.length) {
-          continue;
-        }
-
-        const rows = rowsByField.get(cell.field) ?? new Set<number>();
-        rows.add(cell.rowIndex);
-        rowsByField.set(cell.field, rows);
-      }
-
-      const patchesByRow = new Map<number, Partial<ApiInvoiceItemDto>>();
-      const changedFieldsByRow = new Map<number, Set<EditableInvoiceItemField>>();
-
-      rowsByField.forEach((rowSet, field) => {
-        const rowIndices = Array.from(rowSet).sort((left, right) => left - right);
-        if (rowIndices.length < 2) {
-          return;
-        }
-
-        const source = items[rowIndices[0]];
-        if (!source) {
-          return;
-        }
-
-        const sourceValue = source[field];
-        rowIndices.slice(1).forEach((rowIndex) => {
-          const target = items[rowIndex];
-          if (!target || areInvoiceItemValuesEqual(target[field], sourceValue)) {
-            return;
-          }
-
-          const patch = patchesByRow.get(rowIndex) ?? {};
-          (patch as Record<string, unknown>)[field] = sourceValue;
-          patchesByRow.set(rowIndex, patch);
-
-          const changedFields = changedFieldsByRow.get(rowIndex) ?? new Set<EditableInvoiceItemField>();
-          changedFields.add(field);
-          changedFieldsByRow.set(rowIndex, changedFields);
-        });
-      });
-
-      if (patchesByRow.size === 0) {
-        return items;
-      }
-
-      return items.map((item, itemIndex) => {
-        const patch = patchesByRow.get(itemIndex);
-        const changedFields = changedFieldsByRow.get(itemIndex);
-        return patch && changedFields
-          ? recalculateInvoiceItem(
-              {
-                ...createEmptyInvoiceItem(invoiceId),
-                ...item,
-                ...patch,
-              },
-              Array.from(changedFields),
-            )
-          : item;
-      });
-    });
-  }
-
-  function pasteInvoiceItemTable(
-    startRowIndex: number,
-    startField: EditableInvoiceItemField,
-    rows: string[][],
-    targetFields = invoiceItemEditableColumns.map((column) => column.field),
-  ) {
-    const targetColumns = targetFields
-      .map((field) => invoiceItemEditableColumns.find((column) => column.field === field))
-      .filter((column): column is (typeof invoiceItemEditableColumns)[number] => Boolean(column));
-    const startColumnIndex = targetColumns.findIndex((column) => column.field === startField);
-    if (startColumnIndex < 0 || rows.length === 0) {
-      return;
-    }
-
-    setInvoiceItems((items, invoiceId) => {
-      const nextItems = [...items];
-      rows.forEach((row, rowOffset) => {
-        const targetIndex = Math.max(0, startRowIndex) + rowOffset;
-        const current = nextItems[targetIndex] ?? createEmptyInvoiceItem(invoiceId);
-        const patch: Partial<ApiInvoiceItemDto> = {};
-        const changedFields: string[] = [];
-
-        row.forEach((cell, colOffset) => {
-          const column = targetColumns[startColumnIndex + colOffset];
-          if (!column) {
-            return;
-          }
-
-          (patch as Partial<Record<EditableInvoiceItemField, string | number | undefined>>)[column.field] =
-            column.kind === "number" ? readInvoiceItemTableNumber(cell) : cell.trim();
-          changedFields.push(column.field);
-        });
-
-        if (changedFields.length === 0) {
-          return;
-        }
-
-        nextItems[targetIndex] = recalculateInvoiceItem(
-          {
-            ...createEmptyInvoiceItem(invoiceId),
-            ...current,
-            ...patch,
-            id: current.id ?? 0,
-            invoiceId,
-          },
-          changedFields,
-        );
-      });
-
-      return nextItems;
-    });
-  }
-
-  function patchInvoiceItem(index: number, next: Partial<ApiInvoiceItemDto>) {
-    const changedFields = Object.keys(next);
-    setInvoiceItems((items, invoiceId) => {
-      if (index < 0) {
-        return items;
-      }
-
-      const nextItems = [...items];
-      while (nextItems.length <= index) {
-        nextItems.push(createEmptyInvoiceItem(invoiceId));
-      }
-
-      return nextItems.map((item, itemIndex) =>
-        itemIndex === index
-          ? recalculateInvoiceItem({ ...createEmptyInvoiceItem(invoiceId), ...item, ...next }, changedFields)
-          : item,
-      );
-    });
-  }
-
-  function clearInvoiceItemCells(cells: InvoiceItemCellSelection[]) {
-    if (cells.length === 0) {
-      return;
-    }
-
-    setInvoiceItems((items, invoiceId) => {
-      const cellsByRow = new Map<number, Set<EditableInvoiceItemField>>();
-      cells.forEach((cell) => {
-        if (cell.rowIndex < 0 || cell.rowIndex >= items.length) {
-          return;
-        }
-
-        const fields = cellsByRow.get(cell.rowIndex) ?? new Set<EditableInvoiceItemField>();
-        fields.add(cell.field);
-        cellsByRow.set(cell.rowIndex, fields);
-      });
-
-      if (cellsByRow.size === 0) {
-        return items;
-      }
-
-      return items.map((item, itemIndex) => {
-        const fields = cellsByRow.get(itemIndex);
-        if (!fields || fields.size === 0) {
-          return item;
-        }
-
-        const patch: Partial<ApiInvoiceItemDto> = {};
-        const changedFields = Array.from(fields);
-        changedFields.forEach((field) => {
-          const column = invoiceItemEditableColumns.find((entry) => entry.field === field);
-          (patch as Partial<Record<EditableInvoiceItemField, string | number | undefined>>)[field] =
-            column?.kind === "number" ? undefined : "";
-        });
-
-        return recalculateInvoiceItem({ ...createEmptyInvoiceItem(invoiceId), ...item, ...patch }, changedFields);
-      });
-    });
-  }
-
-  function removeInvoiceItem(index: number) {
-    setInvoiceItems((items) => items.filter((_, itemIndex) => itemIndex !== index));
-  }
-
-  function applyInvoiceItemsSnapshot(items: ApiInvoiceItemDto[]) {
-    setInvoiceItems(() => cloneInvoiceItems(items), { trackHistory: false });
-  }
-
-  function undoInvoiceItemEdit() {
-    if (!invoice || itemEditHistory.undo.length === 0) {
-      return;
-    }
-
-    const previousItems = itemEditHistory.undo[itemEditHistory.undo.length - 1];
-    const currentItems = cloneInvoiceItems(invoice.items ?? []);
-    applyInvoiceItemsSnapshot(previousItems);
-    setItemEditHistory({
-      undo: itemEditHistory.undo.slice(0, -1),
-      redo: [...itemEditHistory.redo, currentItems].slice(-maxInvoiceItemHistoryDepth),
-    });
-    setSuccessMessage(null);
-  }
-
-  function redoInvoiceItemEdit() {
-    if (!invoice || itemEditHistory.redo.length === 0) {
-      return;
-    }
-
-    const nextItems = itemEditHistory.redo[itemEditHistory.redo.length - 1];
-    const currentItems = cloneInvoiceItems(invoice.items ?? []);
-    applyInvoiceItemsSnapshot(nextItems);
-    setItemEditHistory({
-      undo: [...itemEditHistory.undo, currentItems].slice(-maxInvoiceItemHistoryDepth),
-      redo: itemEditHistory.redo.slice(0, -1),
-    });
-    setSuccessMessage(null);
-  }
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     saveCurrentInvoiceDraft();
@@ -1026,29 +586,29 @@ export function InvoiceEditorPage({
       invoice={invoice}
       canSaveToProductLibrary={masterDataPermission.canOperate}
       canUseHsKnowledge={invoicePermission.canOperate}
-      canRedoItemEdit={itemEditHistory.redo.length > 0}
-      canUndoItemEdit={itemEditHistory.undo.length > 0}
+      canRedoItemEdit={itemsWorkspace.canRedoItemEdit}
+      canUndoItemEdit={itemsWorkspace.canUndoItemEdit}
       invoiceItemBlankRowCount={invoiceItemBlankRowCount}
       isEditable={isInvoiceEditable}
       isFocusedWorkbench={isInvoiceItemsWorkbenchMode}
       isProductLibraryBusy={isProductLibraryBusy}
       onChange={patchInvoice}
-      onAddItem={addInvoiceItem}
-      onApplyProductLibraryItem={applyProductLibraryItem}
-      onChangeItem={patchInvoiceItem}
-      onClearItemCells={clearInvoiceItemCells}
-      onDuplicateItem={duplicateInvoiceItem}
-      onFillDownItemCells={fillDownInvoiceItemCells}
-      onFillDownItemField={fillDownInvoiceItemField}
-      onMoveItem={moveInvoiceItem}
+      onAddItem={itemsWorkspace.addItem}
+      onApplyProductLibraryItem={itemsWorkspace.applyProductLibraryItem}
+      onChangeItem={itemsWorkspace.patchItem}
+      onClearItemCells={itemsWorkspace.clearItemCells}
+      onDuplicateItem={itemsWorkspace.duplicateItem}
+      onFillDownItemCells={itemsWorkspace.fillDownItemCells}
+      onFillDownItemField={itemsWorkspace.fillDownItemField}
+      onMoveItem={itemsWorkspace.moveItem}
       onOpenFocusedWorkbench={openInvoiceItemsWorkbench}
-      onPasteItemTable={pasteInvoiceItemTable}
-      onRedoItemEdit={redoInvoiceItemEdit}
-      onRefreshProductLibrary={refreshProductLibrary}
-      onRemoveItem={removeInvoiceItem}
-      onSaveItemToProductLibrary={saveInvoiceItemToProductLibrary}
-      onSearchProductLibrary={searchProductLibrary}
-      onUndoItemEdit={undoInvoiceItemEdit}
+      onPasteItemTable={itemsWorkspace.pasteItemTable}
+      onRedoItemEdit={itemsWorkspace.redoItemEdit}
+      onRefreshProductLibrary={itemsWorkspace.refreshProductLibrary}
+      onRemoveItem={itemsWorkspace.removeItem}
+      onSaveItemToProductLibrary={itemsWorkspace.saveItemToProductLibrary}
+      onSearchProductLibrary={itemsWorkspace.searchProductLibrary}
+      onUndoItemEdit={itemsWorkspace.undoItemEdit}
       productLibraryMessage={productMessage}
       productLibraryProducts={products}
       unitLookupMessage={unitLookupMessage}
