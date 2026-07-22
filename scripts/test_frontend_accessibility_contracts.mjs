@@ -112,6 +112,14 @@ for (const file of walk(root)) {
     }
   }
 
+  if (sourceRelativePath === "ui/ResponsiveTable.tsx") {
+    for (const responsiveTableContract of ["isScrollableRegion", 'role={isScrollableRegion ? "region" : undefined}', "tabIndex={isScrollableRegion ? 0 : undefined}"]) {
+      if (!sourceText.includes(responsiveTableContract)) {
+        failures.push(`${sourceRelativePath}: 响应式表格缺少滚动区域可访问性契约：${responsiveTableContract}`);
+      }
+    }
+  }
+
   if (sourceRelativePath === "ui/FrontendErrorBoundary.tsx") {
     for (const requiredRecoveryText of ["重试当前界面", "重新加载程序界面", "incidentId", "reportFrontendError"]) {
       if (!sourceText.includes(requiredRecoveryText)) {

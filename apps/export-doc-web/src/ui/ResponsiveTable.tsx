@@ -13,12 +13,15 @@ export function ResponsiveTableFrame({
   className?: string;
   busy?: boolean;
 }) {
+  const isScrollableRegion = mobileLayout === "scroll";
+
   return <div
     className={`table-frame responsive-table-frame ${className}`.trim()}
     data-mobile-layout={mobileLayout}
+    role={isScrollableRegion ? "region" : undefined}
     aria-label={label}
     aria-busy={busy}
-    tabIndex={0}
+    tabIndex={isScrollableRegion ? 0 : undefined}
   >
     {children}
   </div>;
