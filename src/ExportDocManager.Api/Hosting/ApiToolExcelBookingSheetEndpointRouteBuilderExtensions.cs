@@ -298,7 +298,8 @@ namespace ExportDocManager.Api.Hosting
                 retryRequestJson: SerializeBackgroundJobRetryRequest(new ApiExcelOutputRequest
                 {
                     DestinationPath = destinationPath
-                }));
+                }),
+                initialOutputPath: destinationPath);
         }
 
         internal static BackgroundJobSnapshot EnqueueBookingSheetConvertJob(
@@ -345,7 +346,8 @@ namespace ExportDocManager.Api.Hosting
                         SourcePath = sourcePath,
                         DestinationPath = destinationPath
                     })
-                    : string.Empty);
+                    : string.Empty,
+                initialOutputPath: destinationPath);
         }
 
         internal static BackgroundJobSnapshot EnqueueInvoiceBookingSheetExportJob(
@@ -382,7 +384,8 @@ namespace ExportDocManager.Api.Hosting
                 {
                     InvoiceId = invoiceId,
                     DestinationPath = destinationPath
-                }));
+                }),
+                initialOutputPath: destinationPath);
         }
     }
 }

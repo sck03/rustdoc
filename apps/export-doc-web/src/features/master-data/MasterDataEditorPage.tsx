@@ -114,7 +114,7 @@ export function MasterDataEditorPage({
 
   const productUnitProductsQuery = useQuery({
     queryKey: queryKeys.masterDataList("products", 1, productHsCodeLookupPageSize, ""),
-    queryFn: () => client.listProducts({}),
+    queryFn: () => client.listProducts({ pageNumber: 1, pageSize: productHsCodeLookupPageSize }).then(result => result.items),
     enabled: config.key === "products",
     staleTime: 5 * 60 * 1000,
   });

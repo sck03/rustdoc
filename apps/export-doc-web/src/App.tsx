@@ -431,6 +431,13 @@ function App() {
 
   const isBusy = loginState === "loading" || desktopContextLoading;
   const loginProduct = getProductEditionPresentation(desktopProductEdition);
+  const routeAccessAllowed = !session || isRouteAccessAllowed({
+    pathname: location.pathname,
+    user: session.user,
+    canManageSystem,
+    isDesktopRuntime,
+    isFullEdition,
+  });
 
   if (!session) {
     return (
@@ -463,7 +470,7 @@ function App() {
         notice={workspaceNotice}
         onDismissNotice={() => setWorkspaceNotice(null)}
       >
-      <Suspense fallback={<RouteLoadingPanel />}>
+      {routeAccessAllowed ? <Suspense fallback={<RouteLoadingPanel />}>
           <Routes>
               <Route path="/" element={<Navigate to={getDefaultWorkspaceRoute(session.user.capabilities)} replace />} />
               <Route path="/dashboard" element={session.user.capabilities.canUseDocumentWorkspace
@@ -577,7 +584,7 @@ function App() {
               />
               <Route path="*" element={<Navigate to={getDefaultWorkspaceRoute(session.user.capabilities)} replace />} />
           </Routes>
-      </Suspense>
+      </Suspense> : <NoModuleAccessPage />}
       </WorkspaceShell>
     </PermissionAccessProvider>
   );
@@ -597,6 +604,38 @@ function NoModuleAccessPage() {
       <PageState tone="permission" title="当前账号尚未分配可用模块" description="请联系系统管理员启用权限模板或重新分配岗位权限。账号本身仍可安全退出登录。" />
     </section>
   );
+}
+
+function isRouteAccessAllowed({
+  pathname,
+  user,
+  canManageSystem,
+  isDesktopRuntime,
+  isFullEdition,
+}: {
+  pathname: string;
+  user: ApiUserDto;
+  canManageSystem: boolean;
+  isDesktopRuntime: boolean;
+  isFullEdition: boolean;
+}) {
+  const requiredWorkspace = getRequiredWorkspace(pathname);
+  const workspaceAllowed = requiredWorkspace === "sales"
+    ? user.capabilities.canUseSalesWorkspace
+    : requiredWorkspace === "document"
+      ? user.capabilities.canUseDocumentWorkspace
+      : true;
+  const requiredModule = getRequiredModule(pathname);
+  const moduleAllowed = !requiredModule || hasRouteModulePermission(
+    user.capabilities.moduleAccess,
+    user.capabilities.enabledModules,
+    requiredModule,
+    getRequiredRouteAccessLevel(pathname),
+  );
+  const adminAllowed = !isAdminOnlyRoute(pathname) || canManageSystem;
+  const runtimeAllowed = !isDesktopOnlyRoute(pathname) || isDesktopRuntime;
+  const editionAllowed = !isFullEditionOnlyRoute(pathname) || isFullEdition;
+  return workspaceAllowed && moduleAllowed && adminAllowed && runtimeAllowed && editionAllowed;
 }
 
 function readStoredSession(): SessionState | null {

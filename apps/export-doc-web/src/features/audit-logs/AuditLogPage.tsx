@@ -507,7 +507,7 @@ export function AuditLogPage({
                   <td className="audit-log-preview-cell">{log.newValuesPreview || log.newValues || "-"}</td>
                 </tr>
               ))}
-              {!logs.length ? (
+              {!isBusy && !message && !logs.length ? (
                 <tr>
                   <td className="empty-cell" colSpan={7}>
                     {isBusy ? "加载中" : "暂无审计日志"}

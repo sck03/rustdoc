@@ -1647,6 +1647,45 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public async Task ApiBackgroundJobRunner_ShouldDeleteControlledPartialOutputWhenJobFails()
+        {
+            string appRoot = CreateTempDirectory("edm-job-cleanup-app");
+            string dataRoot = Path.Combine(Path.GetTempPath(), $"edm-job-cleanup-data-{Guid.NewGuid():N}");
+            try
+            {
+                var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
+                var jobService = new ApiBackgroundJobService(pathProvider);
+                var services = new ServiceCollection();
+                using var provider = services.BuildServiceProvider();
+                var runner = new ApiBackgroundJobRunner(
+                    jobService,
+                    provider.GetRequiredService<IServiceScopeFactory>(),
+                    NullLogger<ApiBackgroundJobRunner>.Instance);
+                string outputDirectory = Path.Combine(pathProvider.ExportRoot, "Browser", "Test", Guid.NewGuid().ToString("N"));
+                string outputPath = Path.Combine(outputDirectory, "partial.pdf");
+
+                var job = runner.Enqueue("Test", "失败清理", "admin", (_, context) =>
+                {
+                    Directory.CreateDirectory(outputDirectory);
+                    File.WriteAllText(outputPath, "partial");
+                    context.Report(30, "生成中");
+                    throw new InvalidOperationException("expected failure");
+                }, initialOutputPath: outputPath);
+
+                var final = await WaitForJobStatusAsync(jobService, job.JobId, BackgroundJobStatusCatalog.Failed);
+                Assert.Equal(string.Empty, final.OutputPath);
+                Assert.False(File.Exists(outputPath));
+                Assert.False(Directory.Exists(outputDirectory));
+                await Task.Delay(250);
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        [Fact]
         public async Task ApiBackgroundJobRunner_ShouldRunWithRequestedUserContext()
         {
             var jobService = new ApiBackgroundJobService();

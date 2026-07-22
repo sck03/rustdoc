@@ -10,6 +10,8 @@ export type InvoiceItemsEditorProps = {
   onFillDownItemField(index: number, field: EditableInvoiceItemField): void; onMoveItem(index: number, direction: -1 | 1): void;
   onPasteItemTable(startRowIndex: number, startField: EditableInvoiceItemField, rows: string[][], targetFields?: EditableInvoiceItemField[]): void;
   onRedoItemEdit(): void; onRefreshProductLibrary(): void; onRemoveItem(index: number): void; onSaveItemToProductLibrary(index: number): void;
-  onSearchProductLibrary(keyword: string): void; onUndoItemEdit(): void; productLibraryMessage: string | null; productLibraryProducts: ApiProductDto[];
+  onSearchProductLibrary(keyword: string): void; onOpenProductLibrary(): void; onUndoItemEdit(): void; productLibraryMessage: string | null; productLibraryProducts: ApiProductDto[];
+  productLibraryPageNumber: number; productLibraryPageSize: number; productLibraryTotalCount: number; productLibraryTotalPages: number;
+  onProductLibraryPageChange(pageNumber: number): void; onProductLibraryPageSizeChange(pageSize: number): void;
   unitLookupMessage?: string | null; unitOptions?: ApiUnitDto[];
 };

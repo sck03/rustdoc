@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { ApiSupplierAssessmentDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
-import { OperationFeedback, errorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { OperationFeedback, errorFeedback, requestErrorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { TaskViewTabs } from "../../ui/TaskViewTabs.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -25,15 +25,18 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
   const selected = rows.find((item) => item.id === selectedId);
 
-  async function load(preferredId?: number) {
-    const result = await client.listSupplierAssessments({ supplierId });
+  async function load(preferredId?: number, signal?: AbortSignal) {
+    const result = await client.listSupplierAssessments({ supplierId }, { signal });
+    if (signal?.aborted) return;
     setRows(result);
     setSelectedId(preferredId && result.some((item) => item.id === preferredId) ? preferredId : result[0]?.id ?? 0);
   }
 
   useEffect(() => {
+    const controller = new AbortController();
     setView("directory");
-    void load().catch((error) => setFeedback(errorFeedback(readApiError(error))));
+    void load(undefined, controller.signal).catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); });
+    return () => controller.abort();
   }, [client, supplierId]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -63,7 +66,7 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
       setView("editor");
       setFeedback(successFeedback(id ? "供应商评价已更新。" : "供应商评价已记录。"));
     } catch (error) {
-      setFeedback(errorFeedback(readApiError(error)));
+      setFeedback(requestErrorFeedback(error));
     }
   }
 
@@ -75,7 +78,7 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
       setView("directory");
       setFeedback(successFeedback("供应商评价已删除。"));
     } catch (error) {
-      setFeedback(errorFeedback(readApiError(error)));
+      setFeedback(requestErrorFeedback(error));
     }
   }
 

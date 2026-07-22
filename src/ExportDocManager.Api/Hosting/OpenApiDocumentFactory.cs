@@ -361,6 +361,47 @@ namespace ExportDocManager.Api.Hosting
             };
         }
 
+        private static object MasterDataPagedListPath(
+            string summary,
+            string operationId,
+            string itemSchemaName,
+            string createSummary,
+            string createOperationId)
+        {
+            return new
+            {
+                get = new
+                {
+                    summary,
+                    operationId,
+                    parameters = new object[]
+                    {
+                        QueryParameter("keyword", "string", null, "Optional keyword filter."),
+                        QueryParameter("pageNumber", "integer", "int32", "Page number starting from 1."),
+                        QueryParameter("pageSize", "integer", "int32", "Page size capped by the API endpoint.")
+                    },
+                    responses = new Dictionary<string, object>
+                    {
+                        ["200"] = new { description = "Paged master data query results.", content = JsonContent($"ApiPagedResponseOf{itemSchemaName}") },
+                        ["401"] = new { description = "Missing or invalid bearer token." }
+                    }
+                },
+                post = new
+                {
+                    summary = createSummary,
+                    operationId = createOperationId,
+                    requestBody = new { required = true, content = JsonContent(itemSchemaName) },
+                    responses = new Dictionary<string, object>
+                    {
+                        ["201"] = new { description = "Created master data row.", content = JsonContent(itemSchemaName) },
+                        ["400"] = new { description = "Invalid master data payload." },
+                        ["401"] = new { description = "Missing or invalid bearer token." },
+                        ["409"] = new { description = "Master data row could not be saved." }
+                    }
+                }
+            };
+        }
+
         private static object SingleWindowSubmitPackageDownloadPath(
             string summary,
             string operationId)

@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { ApiCrmContactDto, ApiCrmCustomerDto, ExportDocManagerApiClient } from "../../api/index.ts";
-import { readApiError } from "../../ui/formUtils.ts";
-import { errorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { requestErrorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 
 type Props = {
@@ -10,7 +9,7 @@ type Props = {
   contacts: ApiCrmContactDto[];
   customerId: number;
   onSelectCustomer: (id: number) => void;
-  onReloadCustomers: (preferredId?: number) => Promise<void>;
+  onReloadCustomers: (preferred?: ApiCrmCustomerDto) => Promise<void>;
   onReloadContacts: () => Promise<void>;
   onFeedback: (feedback: OperationFeedbackState) => void;
   canOperate: boolean;
@@ -50,10 +49,10 @@ export function CrmPartyManagementPanel(props: Props) {
       const saved = id > 0
         ? await client.updateCrmCustomer({ id, body })
         : await client.createCrmCustomer({ body });
-      await onReloadCustomers(saved.id);
+      await onReloadCustomers(saved);
       setIsNewCustomer(false);
       onFeedback(successFeedback(id > 0 ? "CRM 客户已更新。" : "CRM 客户已建立；单证客户资料未被修改。"));
-    } catch (error) { onFeedback(errorFeedback(readApiError(error))); }
+    } catch (error) { onFeedback(requestErrorFeedback(error)); }
   }
 
   async function deleteCustomer() {
@@ -62,7 +61,7 @@ export function CrmPartyManagementPanel(props: Props) {
       await client.deleteCrmCustomer({ id: selectedCustomer.id });
       await onReloadCustomers();
       onFeedback(successFeedback("CRM 客户已删除。"));
-    } catch (error) { onFeedback(errorFeedback(readApiError(error))); }
+    } catch (error) { onFeedback(requestErrorFeedback(error)); }
   }
 
   async function saveContact(event: FormEvent<HTMLFormElement>) {
@@ -89,7 +88,7 @@ export function CrmPartyManagementPanel(props: Props) {
       await onReloadContacts();
       setContactId(saved.id);
       onFeedback(successFeedback(id > 0 ? "联系人已更新。" : "联系人已添加。"));
-    } catch (error) { onFeedback(errorFeedback(readApiError(error))); }
+    } catch (error) { onFeedback(requestErrorFeedback(error)); }
   }
 
   async function deleteContact() {
@@ -99,7 +98,7 @@ export function CrmPartyManagementPanel(props: Props) {
       setContactId(0);
       await onReloadContacts();
       onFeedback(successFeedback("联系人已删除，历史跟进仍保留。"));
-    } catch (error) { onFeedback(errorFeedback(readApiError(error))); }
+    } catch (error) { onFeedback(requestErrorFeedback(error)); }
   }
 
   return (

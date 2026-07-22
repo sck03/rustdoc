@@ -31,6 +31,7 @@ namespace ExportDocManager.Api.Hosting
             _pathProvider = pathProvider;
             _storePath = Path.Combine(pathProvider.CacheRoot, "BackgroundJobs", "jobs.json");
             LoadPersistedJobs();
+            PruneOrphanControlledBrowserOutputs();
         }
 
         public ApiBackgroundJobService(
@@ -56,6 +57,7 @@ namespace ExportDocManager.Api.Hosting
                 ? string.Empty
                 : Path.Combine(pathProvider.CacheRoot, "BackgroundJobs", "jobs.json");
             LoadPersistedJobs();
+            PruneOrphanControlledBrowserOutputs();
         }
 
         public Task<bool> RequestCancelAsync(
@@ -169,36 +171,6 @@ namespace ExportDocManager.Api.Hosting
             }
 
             return Task.FromResult(removedCount);
-        }
-
-        private void TryDeleteControlledBrowserOutput(string outputPath)
-        {
-            if (_pathProvider == null || string.IsNullOrWhiteSpace(outputPath))
-            {
-                return;
-            }
-
-            try
-            {
-                string fullPath = Path.GetFullPath(outputPath);
-                string root = Path.GetFullPath(Path.Combine(_pathProvider.ExportRoot, "Browser"))
-                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                    + Path.DirectorySeparatorChar;
-                if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-
-                string directory = Path.GetDirectoryName(fullPath) ?? string.Empty;
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
-            catch
-            {
-                // Cleanup is best effort; job history deletion must not fail because a file is locked.
-            }
         }
 
         public BackgroundJobSnapshot Upsert(BackgroundJobSnapshot job)

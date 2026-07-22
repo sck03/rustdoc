@@ -90,6 +90,7 @@ namespace ExportDocManager.Api.Hosting
             }
             catch (OperationCanceledException) when (cancellationSource.IsCancellationRequested)
             {
+                _jobs.CleanupControlledOutputForJob(jobId);
                 _jobs.Update(jobId, current => new BackgroundJobSnapshot
                 {
                     JobId = current.JobId,
@@ -104,7 +105,7 @@ namespace ExportDocManager.Api.Hosting
                     CreatedAt = current.CreatedAt,
                     StartedAt = current.StartedAt,
                     CompletedAt = DateTimeOffset.UtcNow,
-                    OutputPath = current.OutputPath,
+                    OutputPath = string.Empty,
                     ErrorMessage = string.Empty,
                     CanCancel = false,
                     CanRetry = HasRetryDescriptor(current),
@@ -115,6 +116,7 @@ namespace ExportDocManager.Api.Hosting
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Background job failed. JobId={JobId}", jobId);
+                _jobs.CleanupControlledOutputForJob(jobId);
                 _jobs.Update(jobId, current => new BackgroundJobSnapshot
                 {
                     JobId = current.JobId,
@@ -129,7 +131,7 @@ namespace ExportDocManager.Api.Hosting
                     CreatedAt = current.CreatedAt,
                     StartedAt = current.StartedAt,
                     CompletedAt = DateTimeOffset.UtcNow,
-                    OutputPath = current.OutputPath,
+                    OutputPath = string.Empty,
                     ErrorMessage = ex.Message,
                     CanCancel = false,
                     CanRetry = HasRetryDescriptor(current),

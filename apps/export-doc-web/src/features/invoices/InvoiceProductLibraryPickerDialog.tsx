@@ -3,6 +3,7 @@ import { PackageCheck, PackagePlus, PackageSearch, RefreshCw, Search, X } from "
 import type { ApiProductDto } from "../../api/index.ts";
 import { formatPlainNumber, normalizeText, numberValue } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 
 export function ProductLibraryPickerDialog({
   focusedRowIndex,
@@ -10,43 +11,44 @@ export function ProductLibraryPickerDialog({
   isBusy,
   itemsCount,
   products,
+  pageNumber,
+  pageSize,
+  totalCount,
+  totalPages,
   readOnly,
   onApply,
   onClose,
   onRefresh,
   onSearch,
+  onPageChange,
+  onPageSizeChange,
 }: {
   focusedRowIndex: number | null;
   initialKeyword: string;
   isBusy: boolean;
   itemsCount: number;
   products: ApiProductDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
   readOnly: boolean;
   onApply: (product: ApiProductDto) => void;
   onClose: () => void;
   onRefresh: () => void;
   onSearch: (keyword: string) => void;
+  onPageChange: (pageNumber: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
 }) {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [keyword, setKeyword] = useState(initialKeyword);
   const [selectedProductId, setSelectedProductId] = useState(() => products[0]?.id ?? 0);
-  const [productSnapshot, setProductSnapshot] = useState<ApiProductDto[]>(() => products);
-
-  const displayedProducts = filterProductLibraryProducts(
-    products.length > 0 ? products : productSnapshot,
-    keyword,
-  );
+  const displayedProducts = products;
 
   useEffect(() => {
     searchInputRef.current?.focus();
     searchInputRef.current?.select();
   }, []);
-
-  useEffect(() => {
-    if (products.length > 0) {
-      setProductSnapshot(products);
-    }
-  }, [products]);
 
   useEffect(() => {
     if (displayedProducts.some((product) => product.id === selectedProductId)) {
@@ -90,7 +92,7 @@ export function ProductLibraryPickerDialog({
           <div className="single-window-lock-title">
             <PackageSearch size={18} aria-hidden="true" />
             <h2 id="product-library-picker-title">商品库选择</h2>
-            <span>{displayedProducts.length}</span>
+            <span>{totalCount} 条</span>
           </div>
           <button className="icon-button compact-icon-button" type="button" title="关闭" aria-label="关闭商品库选择" onClick={onClose}>
             <X size={16} aria-hidden="true" />
@@ -178,6 +180,7 @@ export function ProductLibraryPickerDialog({
             </tbody>
           </table>
         </ResponsiveTableFrame>
+        <ListPaginationControls pageNumber={pageNumber} totalPages={totalPages} totalCount={totalCount} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={isBusy} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
 
         <div className="single-window-lock-footer">
           <span className="product-library-selection">{selectedProduct ? formatProductOptionLabel(selectedProduct) : "未选择商品"}</span>
@@ -205,23 +208,4 @@ function formatProductUnits(product: ApiProductDto) {
   const unit = [normalizeText(product.unitEN), normalizeText(product.unitCN)].filter(Boolean).join("/");
   const packageUnit = [normalizeText(product.packageUnitEN), normalizeText(product.packageUnitCN)].filter(Boolean).join("/");
   return [unit, packageUnit].filter(Boolean).join(" | ");
-}
-
-function filterProductLibraryProducts(products: ApiProductDto[], keyword: string) {
-  const keywordValue = normalizeText(keyword).toLowerCase();
-  if (!keywordValue) {
-    return products;
-  }
-
-  return products.filter((product) =>
-    [
-      product.productCode,
-      product.nameEN,
-      product.nameCN,
-      product.hsCode,
-      product.material,
-      product.brand,
-      product.origin,
-    ].some((value) => normalizeText(value).toLowerCase().includes(keywordValue)),
-  );
 }

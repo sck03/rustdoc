@@ -57,6 +57,7 @@ namespace ExportDocManager.Services.Infrastructure
                 await EnsureSharedMasterDataConcurrencySchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 await EnsureHsCodeMetadataSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 await EnsureHsCodeKnowledgeSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
+                await EnsureQueryPerformanceIndexesAsync(context).ConfigureAwait(false);
                 DbSeeder.SeedAuxiliaryData(
                     context,
                     _databaseSettings,
@@ -348,6 +349,29 @@ namespace ExportDocManager.Services.Infrastructure
                 CREATE UNIQUE INDEX IF NOT EXISTS "IX_HsCodeRemoteCandidates_Fingerprint" ON "HsCodeRemoteCandidates" ("Fingerprint");
                 CREATE INDEX IF NOT EXISTS "IX_HsCodeRemoteCandidates_ReviewStatus_LastSeenAt" ON "HsCodeRemoteCandidates" ("ReviewStatus", "LastSeenAt");
                 CREATE INDEX IF NOT EXISTS "IX_HsCodeRemoteCandidates_RawReportedHsCode" ON "HsCodeRemoteCandidates" ("RawReportedHsCode");
+                """).ConfigureAwait(false);
+        }
+
+        private static async Task EnsureQueryPerformanceIndexesAsync(AppDbContext context)
+        {
+            if (!context.Database.IsRelational()) return;
+
+            await context.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_Invoices_OwnerUserId_InvoiceDate_Id"
+                    ON "Invoices" ("OwnerUserId", "InvoiceDate", "Id");
+                CREATE INDEX IF NOT EXISTS "IX_Invoices_CompanyScope_DepartmentId_InvoiceDate_Id"
+                    ON "Invoices" ("CompanyScope", "DepartmentId", "InvoiceDate", "Id");
+                CREATE INDEX IF NOT EXISTS "IX_Items_InvoiceId_StyleNo"
+                    ON "Items" ("InvoiceId", "StyleNo");
+                CREATE INDEX IF NOT EXISTS "IX_Items_InvoiceId_StyleName"
+                    ON "Items" ("InvoiceId", "StyleName");
+                CREATE INDEX IF NOT EXISTS "IX_Items_InvoiceId_HSCode"
+                    ON "Items" ("InvoiceId", "HSCode");
+                CREATE INDEX IF NOT EXISTS "IX_Products_ProductCode_NameEN_UpdatedAt_Id"
+                    ON "Products" ("ProductCode", "NameEN", "UpdatedAt", "Id");
+                CREATE INDEX IF NOT EXISTS "IX_HsCodeDeclarationExamples_IsManuallyVerified_UpdatedAt"
+                    ON "HsCodeDeclarationExamples" ("IsManuallyVerified", "UpdatedAt");
                 """).ConfigureAwait(false);
         }
 

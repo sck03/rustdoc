@@ -302,6 +302,18 @@ namespace ExportDocManager.Services.Infrastructure
             foreach (var token in TextSearchHelper.Tokenize(keyword))
             {
                 var normalizedToken = token.ToUpperInvariant();
+                if (normalizedToken.Any(char.IsDigit))
+                {
+                    invoiceQuery = invoiceQuery.Where(invoice =>
+                        (invoice.InvoiceNo != null && invoice.InvoiceNo.StartsWith(normalizedToken)) ||
+                        (invoice.ContractNo != null && invoice.ContractNo.StartsWith(normalizedToken)) ||
+                        invoice.Items.Any(item =>
+                            (item.PoNumber != null && item.PoNumber.StartsWith(normalizedToken)) ||
+                            (item.StyleNo != null && item.StyleNo.StartsWith(normalizedToken)) ||
+                            (item.HSCode != null && item.HSCode.StartsWith(normalizedToken))));
+                    continue;
+                }
+
                 invoiceQuery = invoiceQuery.Where(invoice =>
                     (invoice.InvoiceNo != null && invoice.InvoiceNo.ToUpper().Contains(normalizedToken)) ||
                     (invoice.ContractNo != null && invoice.ContractNo.ToUpper().Contains(normalizedToken)) ||

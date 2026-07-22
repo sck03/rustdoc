@@ -252,7 +252,8 @@ namespace ExportDocManager.Api.Hosting
                     TemplatePath = templatePath,
                     WithSeal = withSeal,
                     DestinationPath = destinationPath
-                }));
+                }),
+                initialOutputPath: destinationPath);
         }
 
         private static string BuildInvoiceReportZipPdfFileName(int index, int invoiceId)

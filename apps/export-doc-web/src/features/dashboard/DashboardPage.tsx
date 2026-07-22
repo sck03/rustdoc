@@ -14,7 +14,7 @@ import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
-import { InlineNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 
 export function DashboardPage({ client }: { client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
@@ -29,37 +29,37 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
   const metrics = [
     {
       label: "本月出口额",
-      value: formatAmount(dashboard?.monthlyExportAmount),
+      value: dashboard ? formatAmount(dashboard.monthlyExportAmount) : "—",
       icon: CalendarDays,
       tone: "teal",
     },
     {
       label: "本月预估利润",
-      value: formatAmount(dashboard?.monthlyProfit),
+      value: dashboard ? formatAmount(dashboard.monthlyProfit) : "—",
       icon: TrendingUp,
       tone: "green",
     },
     {
       label: "本月退税额",
-      value: formatAmount(dashboard?.monthlyTaxRefund),
+      value: dashboard ? formatAmount(dashboard.monthlyTaxRefund) : "—",
       icon: WalletCards,
       tone: "violet",
     },
     {
       label: "待处理订单",
-      value: formatCount(dashboard?.pendingCount),
+      value: dashboard ? formatCount(dashboard.pendingCount) : "—",
       icon: ClipboardList,
       tone: "amber",
     },
     {
       label: "已出运",
-      value: formatCount(dashboard?.shippedCount),
+      value: dashboard ? formatCount(dashboard.shippedCount) : "—",
       icon: Ship,
       tone: "blue",
     },
     {
       label: "总订单量",
-      value: formatCount(dashboard?.totalActiveCount),
+      value: dashboard ? formatCount(dashboard.totalActiveCount) : "—",
       icon: BadgeCheck,
       tone: "slate",
     },
@@ -96,6 +96,7 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
       </div>
 
       {errorMessage ? <InlineNotice tone="error" title="仪表盘数据加载失败">{errorMessage}</InlineNotice> : null}
+      {dashboardQuery.isLoading ? <PageState tone="loading" title="正在加载仪表盘" description="正在读取订单、金额和待办摘要。" /> : null}
 
       <div className="dashboard-metric-grid">
         {metrics.map((metric) => {
@@ -153,13 +154,13 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
                       <td className="amount-cell" data-label="金额">{formatAmount(invoice.totalAmount)}</td>
                     </tr>
                   ))
-                ) : (
+                ) : !dashboardQuery.isLoading && !errorMessage ? (
                   <tr>
                     <td className="empty-cell" colSpan={5}>
                       {isBusy ? "加载中" : "暂无订单"}
                     </td>
                   </tr>
-                )}
+                ) : null}
               </tbody>
             </table>
           </ResponsiveTableFrame>
@@ -183,9 +184,9 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
                   <ArrowUpRight size={16} aria-hidden="true" />
                 </button>
               ))
-            ) : (
-              <div className="small-empty">{isBusy ? "加载中" : "暂无待办"}</div>
-            )}
+              ) : !dashboardQuery.isLoading && !errorMessage ? (
+                <div className="small-empty">{isBusy ? "加载中" : "暂无待办"}</div>
+            ) : null}
           </div>
         </section>
       </div>

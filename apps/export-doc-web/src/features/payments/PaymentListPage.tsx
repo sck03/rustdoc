@@ -117,6 +117,7 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
       <PaymentTable
         data={payments?.items ?? []}
         isBusy={isBusy}
+        hasError={Boolean(paymentsQuery.isError)}
         onOpen={(paymentId) => navigate(`/payments/${paymentId}`)}
       />
 
@@ -137,10 +138,12 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
 function PaymentTable({
   data,
   isBusy,
+  hasError,
   onOpen,
 }: {
   data: ApiPaymentDto[];
   isBusy: boolean;
+  hasError: boolean;
   onOpen: (paymentId: number) => void;
 }) {
   function handleRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, paymentId: number) {
@@ -168,7 +171,7 @@ function PaymentTable({
           </tr>
         </thead>
         <tbody>
-          {data.length === 0 ? (
+          {data.length === 0 && !hasError ? (
             <tr>
               <td colSpan={10} className="empty-cell">
                 {isBusy ? "加载中" : "暂无数据"}

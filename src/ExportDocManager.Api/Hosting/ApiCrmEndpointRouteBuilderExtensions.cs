@@ -185,6 +185,17 @@ namespace ExportDocManager.Api.Hosting
                     ? Results.Ok((await service.ListFollowUpsAsync(crmCustomerId, includeCompleted, limit ?? 100, ct)).Select(ToApiDto))
                     : denied).WithName("ListCrmFollowUps");
 
+            endpoints.MapGet("/api/crm/follow-ups/page", async (HttpContext context, IApiSessionTokenService tokens,
+                ApiAuthorizationService auth, ICrmService service, int? crmCustomerId, bool includeCompleted,
+                int? pageNumber, int? pageSize, CancellationToken ct) =>
+            {
+                if (!HasSalesAccess(context, tokens, auth, out var denied)) return denied;
+                var page = await service.QueryFollowUpsAsync(crmCustomerId, includeCompleted, pageNumber ?? 1, pageSize ?? 20, ct);
+                return Results.Ok(new ApiPagedResponse<ApiCrmFollowUpDto>(
+                    page.Items.Select(ToApiDto).ToArray(), page.TotalCount, page.PageNumber, page.PageSize,
+                    page.TotalPages, page.HasPreviousPage, page.HasNextPage));
+            }).WithName("QueryCrmFollowUps");
+
             endpoints.MapPost("/api/crm/follow-ups", async (HttpContext context, IApiSessionTokenService tokens,
                 ApiAuthorizationService auth, ICrmService service, ApiCrmFollowUpSaveRequest request, CancellationToken ct) =>
             {

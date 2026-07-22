@@ -11,13 +11,15 @@ import { CrmPartyManagementPanel } from "./CrmPartyManagementPanel.tsx";
 import { CrmCustomerDirectoryPanel } from "./CrmCustomerDirectoryPanel.tsx";
 import { CrmCustomerImportPanel } from "./CrmCustomerImportPanel.tsx";
 import { TaskViewTabs } from "../../ui/TaskViewTabs.tsx";
-import { OperationFeedback, errorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { OperationFeedback, errorFeedback, requestErrorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { FormGuidance, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 
 type CustomerFollowUpPageProps = {
   client: ExportDocManagerApiClient;
@@ -31,10 +33,12 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [customers, setCustomers] = useState<ApiCrmCustomerDto[]>([]);
   const [contacts, setContacts] = useState<ApiCrmContactDto[]>([]);
-  const [rows, setRows] = useState<ApiCrmFollowUpDto[]>([]);
   const [customerId, setCustomerId] = useState(0);
+  const [customerKeyword, setCustomerKeyword] = useState("");
   const [includeCompleted, setIncludeCompleted] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [followUpPageNumber, setFollowUpPageNumber] = useState(1);
+  const [followUpPageSize, setFollowUpPageSize] = useState(20);
+  const [followUpRevision, setFollowUpRevision] = useState(0);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
   const [editingFollowUp, setEditingFollowUp] = useState<ApiCrmFollowUpDto | null>(null);
@@ -56,49 +60,66 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
     [customerId, customers],
   );
 
+  const followUpQuery = usePagedDirectoryQuery(
+    ["crm-follow-ups", includeCompleted, followUpPageNumber, followUpPageSize, followUpRevision],
+    (signal) => client.queryCrmFollowUps({ includeCompleted, pageNumber: followUpPageNumber, pageSize: followUpPageSize }, { signal }),
+  );
+  const followUpPage = followUpQuery.data ?? null;
+  const rows = followUpPage?.items ?? [];
+  const loading = followUpQuery.isFetching;
+
   useEffect(() => {
-    let stale = false;
-    setLoading(true);
-    Promise.all([
-      client.listCrmCustomers(),
-      client.listCrmFollowUps({ includeCompleted, limit: 200 }),
-    ])
-      .then(([customerRows, followUps]) => {
-        if (stale) return;
+    const controller = new AbortController();
+    void client.queryCrmCustomers({ keyword: "", status: "", pageNumber: 1, pageSize: 100 }, { signal: controller.signal })
+      .then((customerPage) => {
+        if (controller.signal.aborted) return;
+        const customerRows = customerPage.items;
         setCustomers(customerRows);
-        setRows(followUps);
         setCustomerId((current) => current || customerRows[0]?.id || 0);
       })
       .catch((error) => {
-        if (!stale) setFeedback(errorFeedback(readApiError(error)));
+        if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error)));
       })
-      .finally(() => {
-        if (!stale) setLoading(false);
-      });
-    return () => {
-      stale = true;
-    };
-  }, [client, includeCompleted]);
+    return () => controller.abort();
+  }, [client]);
 
   useEffect(() => {
     if (!customerId) {
       setContacts([]);
       return;
     }
-    void client.listCrmContacts({ customerId }).then(setContacts).catch((error) => setFeedback(errorFeedback(readApiError(error))));
+    const controller = new AbortController();
+    void client.listCrmContacts({ customerId }, { signal: controller.signal }).then(setContacts).catch((error) => {
+      if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error)));
+    });
+    return () => controller.abort();
   }, [client, customerId]);
 
   async function refresh() {
-    setRows(await client.listCrmFollowUps({ includeCompleted, limit: 200 }));
+    setFollowUpRevision((value) => value + 1);
   }
 
-  async function reloadCustomers(preferredId?: number) {
-    const nextCustomers = await client.listCrmCustomers();
+  async function reloadCustomers(preferred?: ApiCrmCustomerDto) {
+    const page = await client.queryCrmCustomers({ keyword: customerKeyword.trim(), status: "", pageNumber: 1, pageSize: 100 });
+    const nextCustomers = preferred && !page.items.some((item) => item.id === preferred.id)
+      ? [preferred, ...page.items]
+      : page.items;
     setCustomers(nextCustomers);
-    const nextId = preferredId && nextCustomers.some((item) => item.id === preferredId)
-      ? preferredId
+    const nextId = preferred && nextCustomers.some((item) => item.id === preferred.id)
+      ? preferred.id
       : nextCustomers[0]?.id ?? 0;
     setCustomerId(nextId);
+  }
+
+  async function searchCustomerOptions() {
+    try {
+      const page = await client.queryCrmCustomers({ keyword: customerKeyword.trim(), status: "", pageNumber: 1, pageSize: 100 });
+      const current = customers.find((item) => item.id === customerId);
+      setCustomers(current && !page.items.some((item) => item.id === current.id) ? [current, ...page.items] : page.items);
+      if (!customerId && page.items.length > 0) setCustomerId(page.items[0].id);
+    } catch (error) {
+      setFeedback(requestErrorFeedback(error));
+    }
   }
 
   async function reloadContacts() {
@@ -140,7 +161,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
       await refresh();
       changeView("followups");
     } catch (error) {
-      setFeedback(errorFeedback(readApiError(error)));
+      setFeedback(requestErrorFeedback(error));
     } finally {
       setSaving(false);
     }
@@ -167,7 +188,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
       await refresh();
       setFeedback(successFeedback(item.isCompleted ? "跟进记录已恢复为待跟进。" : "跟进记录已标记完成。"));
     } catch (error) {
-      setFeedback(errorFeedback(readApiError(error)));
+      setFeedback(requestErrorFeedback(error));
     }
   }
 
@@ -177,7 +198,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
       await client.deleteCrmFollowUp({ id: item.id });
       await refresh();
       setFeedback(successFeedback("跟进记录已删除。"));
-    } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
+    } catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
 
   return (
@@ -191,7 +212,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
           <input
             type="checkbox"
             checked={includeCompleted}
-            onChange={(event) => setIncludeCompleted(event.target.checked)}
+            onChange={(event) => { setIncludeCompleted(event.target.checked); setFollowUpPageNumber(1); }}
           />
           显示已完成
         </label> : null}
@@ -223,7 +244,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
         client={client}
         canOperate={crmPermission.canOperate}
         onCreateCustomer={() => changeView("profile")}
-        onSelectCustomer={(customer) => { setCustomerId(customer.id); changeView("profile"); }}
+        onSelectCustomer={(customer) => { setCustomers((current) => current.some((item) => item.id === customer.id) ? current : [customer, ...current]); setCustomerId(customer.id); changeView("profile"); }}
       /> : null}
       {view === "import" ? <CrmCustomerImportPanel client={client} canOperate={crmPermission.canOperate} onImported={() => reloadCustomers()} /> : null}
 
@@ -235,6 +256,10 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
         <fieldset className="permission-fieldset form-field-wide" disabled={!crmPermission.canOperate}>
         <label>
           客户
+          <div className="toolbar compact-search-toolbar">
+            <input aria-label="搜索跟进客户" value={customerKeyword} onChange={(event) => setCustomerKeyword(event.target.value)} placeholder="输入客户名称后查找" />
+            <button className="secondary-button" type="button" onClick={() => void searchCustomerOptions()}>查找</button>
+          </div>
           <select value={customerId} onChange={(event) => setCustomerId(Number(event.target.value))}>
             {customers.length === 0 ? <option value={0}>请先建立销售客户</option> : null}
             {customers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -319,9 +344,11 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
             ))}
           </tbody>
         </table>
-        {!loading && rows.length === 0 ? <PageState tone="empty" title={customers.length ? "还没有跟进记录" : "先建立客户，再开始跟进"} description={customers.length ? "记录一次邮件、电话或拜访结果，系统会帮助保留下次动作。" : "销售客户独立维护，不会修改原单证客户、发票或报表资料。"} action={crmPermission.canOperate ? <button className="primary-button" type="button" onClick={() => changeView(customers.length ? "followup-editor" : "profile")}>{customers.length ? "记录第一次跟进" : "建立客户资料"}</button> : undefined} /> : null}
+        {!loading && !followUpQuery.isError && rows.length === 0 ? <PageState tone="empty" title={customers.length ? "还没有跟进记录" : "先建立客户，再开始跟进"} description={customers.length ? "记录一次邮件、电话或拜访结果，系统会帮助保留下次动作。" : "销售客户独立维护，不会修改原单证客户、发票或报表资料。"} action={crmPermission.canOperate ? <button className="primary-button" type="button" onClick={() => changeView(customers.length ? "followup-editor" : "profile")}>{customers.length ? "记录第一次跟进" : "建立客户资料"}</button> : undefined} /> : null}
         {loading ? <PageState tone="loading" title="正在加载客户跟进" description="正在读取沟通结果、下一步动作和提醒状态。" /> : null}
       </ResponsiveTableFrame>
+      {followUpQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(followUpQuery.error))} /> : null}
+      <ListPaginationControls pageNumber={followUpPageNumber} totalPages={followUpPage?.totalPages ?? 1} totalCount={followUpPage?.totalCount ?? 0} pageSize={followUpPageSize} pageSizeOptions={[20, 30, 50, 100]} isBusy={loading} onPageChange={setFollowUpPageNumber} onPageSizeChange={(value) => { setFollowUpPageSize(value); setFollowUpPageNumber(1); }} />
       </section> : null}
     </section>
   );

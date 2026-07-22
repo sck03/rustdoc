@@ -207,7 +207,8 @@ namespace ExportDocManager.Api.Hosting
                         SourceFiles = sourceFiles.ToList(),
                         DestinationPath = destinationPath
                     })
-                    : string.Empty);
+                    : string.Empty,
+                initialOutputPath: destinationPath);
         }
 
         private static void TryDeleteDirectory(string directoryPath)

@@ -323,11 +323,22 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
     }),
     normalizeRecord: normalizeProductRecord,
     list: async (client, request) =>
-      normalizeArrayPage(
-        (await client.listProducts({ keyword: request.keyword || undefined })) as unknown as MasterDataRecord[],
-        request.pageNumber,
-        request.pageSize,
-      ),
+      {
+        const result = await client.listProducts({
+          keyword: request.keyword || undefined,
+          pageNumber: request.pageNumber,
+          pageSize: request.pageSize,
+        });
+        return {
+          items: result.items as unknown as MasterDataRecord[],
+          pageNumber: result.pageNumber,
+          pageSize: result.pageSize,
+          totalCount: result.totalCount,
+          totalPages: result.totalPages,
+          hasPreviousPage: result.hasPreviousPage,
+          hasNextPage: result.hasNextPage,
+        };
+      },
     get: async (client, recordKey) =>
       (await client.getProduct({ id: parseNumericRouteKey(recordKey) })) as unknown as MasterDataRecord,
     create: async (client, record) => (await client.createProduct({ body: record as unknown as ApiProductDto })) as unknown as MasterDataRecord,

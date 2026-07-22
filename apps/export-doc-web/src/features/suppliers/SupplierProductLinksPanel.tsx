@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ApiSupplierProductLinkDto, ApiSupplierProductOptionDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
-import { OperationFeedback, errorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { OperationFeedback, errorFeedback, requestErrorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
@@ -30,27 +30,33 @@ export function SupplierProductLinksPanel({
   const [keyword, setKeyword] = useState("");
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
   const [view, setView] = useState<"directory" | "editor">("directory");
+  const productSearchController = useRef<AbortController | null>(null);
   const selected = links.find((item) => item.id === selectedId);
   const productOptions = useMemo(() => {
     if (!selected || options.some((item) => item.id === selected.productId)) return options;
     return [{ id: selected.productId, productCode: selected.productCode, nameCN: selected.productNameCN, nameEN: selected.productNameEN }, ...options];
   }, [options, selected]);
 
-  async function loadLinks(preferredId?: number) {
+  async function loadLinks(preferredId?: number, signal?: AbortSignal) {
     if (!supplierId) { setLinks([]); setSelectedId(0); return; }
-    const rows = await client.listSupplierProductLinks({ supplierId });
+    const rows = await client.listSupplierProductLinks({ supplierId }, { signal });
+    if (signal?.aborted) return;
     setLinks(rows);
     setSelectedId(preferredId && rows.some((item) => item.id === preferredId) ? preferredId : 0);
   }
 
-  async function searchProducts(searchKeyword = keyword) {
-    setOptions(await client.searchSupplierProductOptions({ keyword: searchKeyword.trim() }));
+  async function searchProducts(searchKeyword = keyword, signal?: AbortSignal) {
+    const result = await client.searchSupplierProductOptions({ keyword: searchKeyword.trim() }, { signal });
+    if (!signal?.aborted) setOptions(result);
   }
 
   useEffect(() => {
     setFeedback(null);
     setView("directory");
-    void Promise.all([loadLinks(), searchProducts("")]).catch((error) => setFeedback(errorFeedback(readApiError(error))));
+    const controller = new AbortController();
+    void Promise.all([loadLinks(undefined, controller.signal), searchProducts("", controller.signal)])
+      .catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); });
+    return () => controller.abort();
   }, [client, supplierId]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -76,7 +82,7 @@ export function SupplierProductLinksPanel({
       await loadLinks(saved.id);
       setView("editor");
       setFeedback(successFeedback(id ? "供货关系已更新。" : "供货关系已建立。"));
-    } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
+    } catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
 
   async function remove() {
@@ -86,7 +92,7 @@ export function SupplierProductLinksPanel({
       await loadLinks();
       setView("directory");
       setFeedback(successFeedback("供货关系已删除，产品资料保持不变。"));
-    } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
+    } catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
 
   return <section className="form-section supplier-product-workspace">
@@ -104,7 +110,7 @@ export function SupplierProductLinksPanel({
       <div className="form-field-wide context-strip"><strong>{supplierName}</strong><span>这里只建立供应商与现有产品的关系，不会修改产品主数据。</span></div>
       {!productOptions.length ? <FormGuidance className="form-field-wide" title="先建立产品资料" description="供货关系必须关联现有产品。建立产品后返回此处即可继续。" action={canOperate ? <button className="secondary-button" type="button" onClick={() => navigate("/master-data/products")}>打开产品资料</button> : undefined} /> : null}
       <fieldset className="permission-fieldset form-field-wide" disabled={!canOperate}>
-      <label className="form-field-wide">查找产品<div className="toolbar"><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="输入产品货号或名称" /><button className="secondary-button" type="button" onClick={() => void searchProducts()}>查找</button></div></label>
+      <label className="form-field-wide">查找产品<div className="toolbar"><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="输入产品货号或名称" /><button className="secondary-button" type="button" onClick={() => { productSearchController.current?.abort(); const controller = new AbortController(); productSearchController.current = controller; void searchProducts(keyword, controller.signal).catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); }); }}>查找</button></div></label>
       <label className="form-field-wide">产品<select name="productId" required defaultValue={selected?.productId ?? ""}><option value="">请选择产品</option>{productOptions.map((item) => <option key={item.id} value={item.id}>{item.productCode || "无货号"} · {item.nameCN || item.nameEN || "未命名"}</option>)}</select></label>
       <label>供应商货号<input name="supplierProductCode" defaultValue={selected?.supplierProductCode} /></label>
       <label>参考价<input name="referencePrice" type="number" min="0" step="0.0001" defaultValue={selected?.referencePrice ?? 0} /></label>

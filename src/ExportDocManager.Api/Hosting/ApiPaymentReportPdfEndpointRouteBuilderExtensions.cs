@@ -186,7 +186,8 @@ namespace ExportDocManager.Api.Hosting
                         WithSeal = withSeal,
                         DestinationPath = destinationPath
                     }
-                }));
+                }),
+                initialOutputPath: destinationPath);
         }
 
         internal sealed class ApiPaymentReportPdfJobRetryRequest

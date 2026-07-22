@@ -90,7 +90,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var keyword = TextSearchHelper.NormalizeFilter(query?.Keyword);
-            return await context.Products
+            IQueryable<Product> productQuery = context.Products
                 .AsNoTracking()
                 .AsQueryable()
                 .ApplyKeywordSearch(
@@ -103,8 +103,44 @@ namespace ExportDocManager.Services.Infrastructure
                     product => product.Brand)
                 .OrderBy(product => product.ProductCode)
                 .ThenBy(product => product.NameEN)
+                .ThenByDescending(product => product.UpdatedAt);
+
+            if (query?.ReturnAll != true)
+            {
+                productQuery = productQuery.Take(Math.Clamp(query?.MaxCount ?? 200, 1, 500));
+            }
+
+            return await productQuery.ToListAsync(cancellationToken);
+        }
+
+        public async Task<PagedResult<Product>> QueryPageAsync(ProductReadQuery query, CancellationToken cancellationToken = default)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var normalizedQuery = query ?? new ProductReadQuery();
+            int pageNumber = Math.Max(1, normalizedQuery.PageNumber);
+            int pageSize = Math.Clamp(normalizedQuery.PageSize <= 0 ? 50 : normalizedQuery.PageSize, 1, 200);
+            var keyword = TextSearchHelper.NormalizeFilter(normalizedQuery.Keyword);
+            var productQuery = context.Products
+                .AsNoTracking()
+                .ApplyKeywordSearch(
+                    keyword,
+                    product => product.ProductCode,
+                    product => product.NameEN,
+                    product => product.NameCN,
+                    product => product.HSCode,
+                    product => product.Material,
+                    product => product.Brand)
+                .OrderBy(product => product.ProductCode)
+                .ThenBy(product => product.NameEN)
                 .ThenByDescending(product => product.UpdatedAt)
+                .ThenBy(product => product.Id);
+
+            int totalCount = await productQuery.CountAsync(cancellationToken);
+            var items = await productQuery
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync(cancellationToken);
+            return new PagedResult<Product>(items, totalCount, pageNumber, pageSize);
         }
 
         public async Task<IReadOnlyList<Port>> QueryAsync(PortReadQuery query, CancellationToken cancellationToken = default)

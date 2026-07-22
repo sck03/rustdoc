@@ -77,12 +77,19 @@ export function InvoiceItemsEditor({
   onPasteItemTable,
   onRedoItemEdit,
   onRefreshProductLibrary,
+  onOpenProductLibrary,
   onRemoveItem,
   onSaveItemToProductLibrary,
   onSearchProductLibrary,
   onUndoItemEdit,
   productLibraryMessage,
   productLibraryProducts,
+  productLibraryPageNumber,
+  productLibraryPageSize,
+  productLibraryTotalCount,
+  productLibraryTotalPages,
+  onProductLibraryPageChange,
+  onProductLibraryPageSizeChange,
   unitLookupMessage,
   unitOptions,
 }: InvoiceItemsEditorProps) {
@@ -847,7 +854,7 @@ export function InvoiceItemsEditor({
         readOnly={readOnly} selectedCellCount={selectedCellCount} selectedProductId={selectedProductId}
         visibleColumnCount={visibleColumnCount} visibleMessage={visibleMessage}
         onApplySelectedProduct={applySelectedProduct} onClearSelectedCells={clearSelectedCells} onCopySelectedCells={() => void copySelectedCells()}
-        onFillDown={fillDownFocusedCell} onOpenProductPicker={() => { setEditorMessage(null); setIsProductPickerOpen(true); }}
+        onFillDown={fillDownFocusedCell} onOpenProductPicker={() => { setEditorMessage(null); onOpenProductLibrary(); setIsProductPickerOpen(true); }}
         onOpenHsKnowledge={() => { setEditorMessage(null); setIsHsKnowledgeOpen(true); }}
         onPaste={() => void pasteFromClipboardButton()} onProductKeywordChange={setProductKeyword} onProductKeywordKeyDown={handleProductKeywordKeyDown}
         onRedo={redoItemEdit} onRefreshProductLibrary={onRefreshProductLibrary} onSaveFocusedProduct={saveFocusedItemToProductLibrary}
@@ -857,9 +864,9 @@ export function InvoiceItemsEditor({
       <InvoiceItemShortcutGuide />
       <InvoiceItemsEditorDialogs client={client} focusedRowIndex={focusedRowIndex} isBusy={isProductLibraryBusy}
         isProductPickerOpen={isProductPickerOpen} isHsKnowledgeOpen={isHsKnowledgeOpen} items={items} productKeyword={productKeyword}
-        products={productLibraryProducts} readOnly={readOnly} unitCandidateDialog={unitCandidateDialog} onApplyProduct={applyPickedProduct}
+        products={productLibraryProducts} productLibraryPageNumber={productLibraryPageNumber} productLibraryPageSize={productLibraryPageSize} productLibraryTotalCount={productLibraryTotalCount} productLibraryTotalPages={productLibraryTotalPages} readOnly={readOnly} unitCandidateDialog={unitCandidateDialog} onApplyProduct={applyPickedProduct}
         onApplyUnitCandidate={applyUnitCandidate} onCloseProductPicker={() => setIsProductPickerOpen(false)} onCloseUnitCandidates={() => setUnitCandidateDialog(null)}
-        onRefresh={onRefreshProductLibrary} onSearch={(keyword) => { setProductKeyword(keyword); onSearchProductLibrary(keyword); }}
+        onRefresh={onRefreshProductLibrary} onSearch={(keyword) => { setProductKeyword(keyword); onSearchProductLibrary(keyword); }} onProductLibraryPageChange={onProductLibraryPageChange} onProductLibraryPageSizeChange={onProductLibraryPageSizeChange}
         onCloseHsKnowledge={() => setIsHsKnowledgeOpen(false)} onApplyHs={(patch, result) => { if (focusedRowIndex == null || readOnly) return; markInvoiceItemMutationFrom(focusedRowIndex); onChangeItem(focusedRowIndex, patch); setEditorMessage(`已回填 HS 编码 ${result.currentCode}；本次确认已进入本地学习记录。`); }} />
       <InvoiceItemsTable
         activeFocusedCell={activeFocusedCell} activeFocusedCellOptions={activeFocusedCellOptions} currency={currency}

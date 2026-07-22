@@ -15,6 +15,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 IProductReadRepository repository,
                 string keyword,
+                int? pageNumber,
+                int? pageSize,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -22,11 +24,20 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Unauthorized();
                 }
 
-                var rows = await repository.QueryAsync(
-                    new ProductReadQuery { Keyword = keyword ?? string.Empty },
+                var result = await repository.QueryPageAsync(
+                    new ProductReadQuery
+                    {
+                        Keyword = keyword ?? string.Empty,
+                        PageNumber = pageNumber ?? 1,
+                        PageSize = pageSize ?? 50
+                    },
                     cancellationToken);
 
-                return Results.Ok(ApiMasterDataDtoFactory.FromProducts(rows));
+                return Results.Ok(new ExportDocManager.Models.PagedResult<ApiProductDto>(
+                    result.Items.Select(ApiMasterDataDtoFactory.FromProduct).ToList(),
+                    result.TotalCount,
+                    result.PageNumber,
+                    result.PageSize));
             })
             .WithName("ListProducts");
 

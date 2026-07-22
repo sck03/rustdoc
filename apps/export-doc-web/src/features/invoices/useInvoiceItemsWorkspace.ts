@@ -1,5 +1,5 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
@@ -45,10 +45,19 @@ export function useInvoiceItemsWorkspace({
   const [editHistory, setEditHistory] = useState<InvoiceItemEditHistory>(emptyInvoiceItemEditHistory);
   const [productLibraryKeyword, setProductLibraryKeyword] = useState("");
   const [productLibraryMessage, setProductLibraryMessage] = useState<string | null>(null);
+  const [productLibraryEnabled, setProductLibraryEnabled] = useState(false);
+  const [productLibraryPageNumber, setProductLibraryPageNumber] = useState(1);
+  const [productLibraryPageSize, setProductLibraryPageSize] = useState(30);
 
   const productsQuery = useQuery({
-    queryKey: queryKeys.masterDataList("products", 1, 200, productLibraryKeyword),
-    queryFn: () => client.listProducts({ keyword: productLibraryKeyword || undefined }),
+    queryKey: queryKeys.masterDataList("products", productLibraryPageNumber, productLibraryPageSize, productLibraryKeyword),
+    queryFn: () => client.listProducts({
+      keyword: productLibraryKeyword || undefined,
+      pageNumber: productLibraryPageNumber,
+      pageSize: productLibraryPageSize,
+    }),
+    enabled: productLibraryEnabled,
+    placeholderData: keepPreviousData,
     staleTime: 5 * 60 * 1000,
   });
   const saveProductMutation = useMutation({
@@ -56,7 +65,7 @@ export function useInvoiceItemsWorkspace({
       const productCode = normalizeText(item.styleNo);
       if (!productCode) throw new Error("商品编码(款号)不能为空。");
 
-      const candidates = await client.listProducts({ keyword: productCode });
+      const candidates = (await client.listProducts({ keyword: productCode, pageNumber: 1, pageSize: 50 })).items;
       const existing = candidates.find((product) => hasSameProductCode(product, productCode)) ?? null;
       if (existing && !await requestConfirmation({
         title: "更新商品库",
@@ -98,15 +107,28 @@ export function useInvoiceItemsWorkspace({
   function searchProductLibrary(keyword: string) {
     const nextKeyword = normalizeText(keyword);
     setProductLibraryMessage(null);
-    setProductLibraryKeyword((current) => {
-      if (current === nextKeyword) void productsQuery.refetch();
-      return nextKeyword;
-    });
+    setProductLibraryEnabled(true);
+    setProductLibraryPageNumber(1);
+    setProductLibraryKeyword(nextKeyword);
   }
 
   function refreshProductLibrary() {
     setProductLibraryMessage(null);
+    if (!productLibraryEnabled) {
+      setProductLibraryEnabled(true);
+      return;
+    }
     void productsQuery.refetch();
+  }
+
+  function openProductLibrary() {
+    setProductLibraryMessage(null);
+    setProductLibraryEnabled(true);
+  }
+
+  function changeProductLibraryPageSize(pageSize: number) {
+    setProductLibraryPageSize(pageSize);
+    setProductLibraryPageNumber(1);
   }
 
   function setInvoiceItems(
@@ -346,7 +368,11 @@ export function useInvoiceItemsWorkspace({
   }
 
   return {
-    products: productsQuery.data ?? [],
+    products: productsQuery.data?.items ?? [],
+    productLibraryPageNumber: productsQuery.data?.pageNumber ?? productLibraryPageNumber,
+    productLibraryPageSize: productsQuery.data?.pageSize ?? productLibraryPageSize,
+    productLibraryTotalCount: productsQuery.data?.totalCount ?? 0,
+    productLibraryTotalPages: productsQuery.data?.totalPages ?? 1,
     productLibraryMessage: productsQuery.isError ? readApiError(productsQuery.error) : productLibraryMessage,
     isProductLibraryBusy: productsQuery.isFetching || saveProductMutation.isPending,
     canUndoItemEdit: editHistory.undo.length > 0,
@@ -355,6 +381,9 @@ export function useInvoiceItemsWorkspace({
     resetEditHistory,
     searchProductLibrary,
     refreshProductLibrary,
+    openProductLibrary,
+    setProductLibraryPageNumber,
+    changeProductLibraryPageSize,
     addItem,
     applyProductLibraryItem,
     saveItemToProductLibrary,

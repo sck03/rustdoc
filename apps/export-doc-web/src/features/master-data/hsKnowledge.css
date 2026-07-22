@@ -148,7 +148,7 @@
 .knowledge-intro{justify-content:flex-start}.knowledge-intro>div{min-width:0;max-width:720px;text-align:left}
 
 .remote-candidate-actions {
-  flex: 0 1 560px;
+  min-width: 0;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
@@ -197,6 +197,11 @@
   outline-offset: 1px;
 }
 
+.remote-candidate-picker-error {
+  grid-column: 1 / -1;
+  color: #9a3f31;
+}
+
 .knowledge-source-link {
   display: inline-flex;
   gap: 4px;
@@ -229,6 +234,8 @@
 
 @media (max-width: 760px) {
   .remote-candidate-actions {
+    width: 100%;
+    align-self: start;
     justify-content: flex-start;
   }
 

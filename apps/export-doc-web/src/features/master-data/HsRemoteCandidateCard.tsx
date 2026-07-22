@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import type { ExportDocManagerApiClient, HsCodeRemoteCandidate } from "../../api/index.ts";
 import { Button } from "../../ui/Button.tsx";
+import { useDebouncedValue } from "../../ui/useDebouncedValue.ts";
 
 export function HsRemoteCandidateCard({
   client,
@@ -58,8 +59,13 @@ export function HsRemoteCandidateCard({
 }
 
 function RemoteCandidatePicker({ client, candidate, draft, disabled, onDraft, onConfirm }: { client: ExportDocManagerApiClient; candidate: HsCodeRemoteCandidate; draft:string; disabled:boolean; onDraft:(value:string)=>void; onConfirm:(code:string)=>void }) {
-  const lookup = useQuery({ queryKey:["hs-active-code-picker",candidate.id,draft.trim()], queryFn:()=>client.listHsCodes({pageNumber:1,pageSize:30,keyword:draft.trim()}), enabled:draft.trim().length>=4 });
+  const debouncedDraft = useDebouncedValue(draft.trim(), 350);
+  const lookup = useQuery({
+    queryKey:["hs-active-code-picker",candidate.id,debouncedDraft],
+    queryFn:({signal})=>client.listHsCodes({pageNumber:1,pageSize:30,keyword:debouncedDraft},{signal}),
+    enabled:debouncedDraft.length>=4,
+  });
   const activeItems=(lookup.data?.items??[]).filter(item=>item.status==="Active"&&item.sourceName&&item.effectiveYear&&item.lastVerifiedAt);
   const selected=activeItems.find(item=>(item.code||item.normalizedCode).replace(/[^0-9A-Za-z]/g,"")===draft.replace(/[^0-9A-Za-z]/g,""));
-  return <div className="remote-candidate-picker"><input aria-label="选择当前有效HS编码" list={`active-hs-codes-${candidate.id}`} value={draft} onChange={event=>onDraft(event.target.value)} placeholder="输入有效编码检索"/><datalist id={`active-hs-codes-${candidate.id}`}>{activeItems.map(item=><option key={item.normalizedCode} value={item.code||item.normalizedCode}>{item.name} · {item.effectiveYear}年</option>)}</datalist><Button variant="primary" disabled={disabled||!selected} onClick={()=>selected&&onConfirm(selected.code||selected.normalizedCode)}>{lookup.isFetching?"检索中":selected?"确认加入":"选择有效编码"}</Button></div>;
+  return <div className="remote-candidate-picker" aria-busy={lookup.isFetching}><input aria-label="选择当前有效HS编码" list={`active-hs-codes-${candidate.id}`} value={draft} onChange={event=>onDraft(event.target.value)} placeholder="输入有效编码检索"/><datalist id={`active-hs-codes-${candidate.id}`}>{activeItems.map(item=><option key={item.normalizedCode} value={item.code||item.normalizedCode}>{item.name} · {item.effectiveYear}年</option>)}</datalist><Button variant="primary" disabled={disabled||!selected} onClick={()=>selected&&onConfirm(selected.code||selected.normalizedCode)}>{lookup.isFetching?"检索中":selected?"确认加入":"选择有效编码"}</Button>{lookup.isError?<small className="remote-candidate-picker-error">有效编码检索失败，请稍后重试。</small>:null}</div>;
 }

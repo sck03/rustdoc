@@ -283,6 +283,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
         data={jobs}
         focusedJobId={focusedJobId}
         isBusy={isBusy}
+        hasError={Boolean(errorMessage)}
         canOperate={jobPermission.canOperate}
         canManage={jobPermission.canManage}
         onMessage={operations.handleChildMessage}
@@ -546,6 +547,7 @@ function JobTable({
   data,
   focusedJobId,
   isBusy,
+  hasError,
   canOperate,
   canManage,
   onMessage,
@@ -558,6 +560,7 @@ function JobTable({
   data: BackgroundJobSnapshot[];
   focusedJobId: string;
   isBusy: boolean;
+  hasError: boolean;
   canOperate: boolean;
   canManage: boolean;
   onMessage: (message: string | null) => void;
@@ -584,7 +587,7 @@ function JobTable({
           </tr>
         </thead>
         <tbody>
-          {data.length === 0 ? (
+          {data.length === 0 && !hasError ? (
             <tr>
               <td colSpan={9} className="empty-cell">
                 {isBusy ? "加载中" : "暂无任务"}

@@ -65,6 +65,39 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal(1, result.TotalCount);
         }
 
+        [Fact]
+        public async Task ProductQueryPageAsync_ShouldPageAndFilterInDatabaseOrder()
+        {
+            using var factory = new TestDbContextFactory();
+            await using (var context = await factory.CreateDbContextAsync())
+            {
+                for (int index = 1; index <= 25; index++)
+                {
+                    context.Products.Add(new Product
+                    {
+                        ProductCode = $"SKU-{index:00}",
+                        NameEN = index % 2 == 0 ? $"COTTON SHIRT {index:00}" : $"POLYESTER SHIRT {index:00}",
+                        NameCN = "衬衫"
+                    });
+                }
+                await context.SaveChangesAsync();
+            }
+
+            IProductReadRepository repository = new LocalMasterDataReadRepository(factory);
+            var result = await repository.QueryPageAsync(new ProductReadQuery
+            {
+                Keyword = "COTTON",
+                PageNumber = 2,
+                PageSize = 5
+            });
+
+            Assert.Equal(12, result.TotalCount);
+            Assert.Equal(2, result.PageNumber);
+            Assert.Equal(5, result.Items.Count);
+            Assert.Equal("SKU-12", result.Items[0].ProductCode);
+            Assert.All(result.Items, item => Assert.Contains("COTTON", item.NameEN, StringComparison.Ordinal));
+        }
+
         private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
         {
             private readonly DbContextOptions<AppDbContext> _options;

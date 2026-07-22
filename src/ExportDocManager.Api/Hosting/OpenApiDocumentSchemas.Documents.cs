@@ -1283,6 +1283,18 @@ namespace ExportDocManager.Api.Hosting
                                 ["canConfirm"] = new { type = "boolean" }
                             }
                         },
+                        ["HsCodeHistoryCandidatePage"] = new
+                        {
+                            type = "object",
+                            required = new[] { "items", "totalCount", "pageNumber", "pageSize" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["items"] = new { type = "array", items = new Dictionary<string, string> { ["$ref"] = "#/components/schemas/HsCodeHistoryLearningCandidate" } },
+                                ["totalCount"] = new { type = "integer", format = "int32" },
+                                ["pageNumber"] = new { type = "integer", format = "int32" },
+                                ["pageSize"] = new { type = "integer", format = "int32" }
+                            }
+                        },
                         ["HsCodeRemoteCandidate"] = new
                         {
                             type = "object",

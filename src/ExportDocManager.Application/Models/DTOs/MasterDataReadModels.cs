@@ -11,7 +11,15 @@ namespace ExportDocManager.Models.DTOs
 
     public sealed record PayeeReadQuery : SharedKeywordReadQuery;
 
-    public sealed record ProductReadQuery : SharedKeywordReadQuery;
+    public sealed record ProductReadQuery : SharedDatabasePagedQuery
+    {
+        public string Keyword { get; init; } = string.Empty;
+
+        /// <summary>用于下拉/辅助查询的轻量上限；分页列表使用 PageSize。</summary>
+        public int MaxCount { get; init; } = 200;
+
+        public bool ReturnAll { get; init; }
+    }
 
     public sealed record PortReadQuery : SharedKeywordReadQuery;
 

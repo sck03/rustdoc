@@ -790,10 +790,10 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/master-data/hs-knowledge/history-candidates", async (
                 HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
-                string keyword, int? maxResults, CancellationToken cancellationToken) =>
+                string keyword, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
-                return Results.Ok(await service.DiscoverHistoryCandidatesAsync(keyword, maxResults ?? 200, cancellationToken));
+                return Results.Ok(await service.DiscoverHistoryCandidatesAsync(keyword, pageNumber ?? 1, pageSize ?? 30, cancellationToken));
             }).WithName("DiscoverHsCodeHistoryCandidates");
 
             endpoints.MapGet("/api/master-data/hs-knowledge/remote-candidates", async (

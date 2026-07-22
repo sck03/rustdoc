@@ -13,6 +13,9 @@ namespace ExportDocManager.Services.MasterData
     {
         private const string PackageSchemaVersion = "1.0";
         private const long MaximumPackageBytes = 100L * 1024 * 1024;
+        private const int SearchExampleCandidateLimit = 2000;
+        private const int SearchMasterCandidateLimit = 1000;
+        private const int DatabaseInClauseBatchSize = 400;
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = false };
         private static readonly IReadOnlyDictionary<string, string> Synonyms = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -43,11 +46,6 @@ namespace ExportDocManager.Services.MasterData
             string normalizedQuery = NormalizeSearchText(rawQuery);
             maxResults = Math.Clamp(maxResults, 1, 50);
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            var codes = await context.HsCodes.AsNoTracking().ToListAsync(cancellationToken);
-            var codeMap = codes.Where(item => !string.IsNullOrWhiteSpace(item.NormalizedCode))
-                .GroupBy(item => item.NormalizedCode, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-            var relations = await context.HsCodeReplacementRelations.AsNoTracking().ToListAsync(cancellationToken);
             string primaryToken = BuildNgrams(normalizedQuery).OrderByDescending(token => token.Length).FirstOrDefault() ?? normalizedQuery;
             var relatedPair = RelatedTerms.FirstOrDefault(pair => normalizedQuery.Contains(pair.Key, StringComparison.OrdinalIgnoreCase));
             string relatedToken = string.IsNullOrWhiteSpace(relatedPair.Key) ? string.Empty : NormalizeSearchText(relatedPair.Value);
@@ -58,14 +56,43 @@ namespace ExportDocManager.Services.MasterData
                     : exampleQuery.Where(item => item.SearchText.Contains(primaryToken) || item.SearchText.Contains(relatedToken));
             var examples = await exampleQuery.OrderByDescending(item => item.IsManuallyVerified)
                 .ThenByDescending(item => item.UseCount).ThenByDescending(item => item.UpdatedAt)
-                .Take(5000).ToListAsync(cancellationToken);
+                .Take(SearchExampleCandidateLimit).ToListAsync(cancellationToken);
             if (examples.Count == 0)
             {
                 examples = await context.HsCodeDeclarationExamples.AsNoTracking()
                     .OrderByDescending(item => item.IsManuallyVerified).ThenByDescending(item => item.UpdatedAt)
-                    .Take(5000).ToListAsync(cancellationToken);
+                    .Take(SearchExampleCandidateLimit).ToListAsync(cancellationToken);
             }
-            var feedback = await context.HsCodeSearchFeedback.AsNoTracking().ToListAsync(cancellationToken);
+
+            var rawCodes = examples
+                .SelectMany(item => new[] { item.RawReportedHsCode, item.ResolvedCurrentHsCode })
+                .Select(HsCodeTextHelper.NormalizeCode)
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var relations = await LoadReplacementRelationsAsync(context, rawCodes, cancellationToken);
+            var lookupCodes = rawCodes
+                .Concat(relations.Select(item => item.NewCode))
+                .Select(HsCodeTextHelper.NormalizeCode)
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var codes = await LoadHsCodesByNormalizedCodesAsync(context, lookupCodes, cancellationToken);
+            var masterCandidates = await BuildMasterCandidateQuery(context, primaryToken, relatedToken)
+                .Take(SearchMasterCandidateLimit)
+                .ToListAsync(cancellationToken);
+            codes.AddRange(masterCandidates.Where(candidate => codes.All(code => code.Id != candidate.Id)));
+            var codeMap = codes.Where(item => !string.IsNullOrWhiteSpace(item.NormalizedCode))
+                .GroupBy(item => item.NormalizedCode, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var feedback = await LoadFeedbackByCandidateCodesAsync(context, lookupCodes, cancellationToken);
+            var feedbackBoosts = feedback
+                .Where(item => string.Equals(NormalizeSearchText(item.QueryText), normalizedQuery, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(item => HsCodeTextHelper.NormalizeCode(item.CandidateCode), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Sum(item => item.AcceptedCount * 5 - item.RejectedCount * 4),
+                    StringComparer.OrdinalIgnoreCase);
             var candidates = new List<KnowledgeCandidate>();
             foreach (var example in examples)
             {
@@ -77,11 +104,8 @@ namespace ExportDocManager.Services.MasterData
                 int textScore = Math.Max(combinedScore, (int)Math.Round(nameScore * 0.72d + specificationScore * 0.28d)) - assessment.Penalty;
                 if (textScore < 18) continue;
                 var resolution = ResolveCurrentCode(example, codeMap, relations);
-                int feedbackBoost = feedback
-                    .Where(item =>
-                        string.Equals(item.CandidateCode, resolution.CurrentCode ?? example.RawReportedHsCode, StringComparison.OrdinalIgnoreCase) &&
-                        string.Equals(NormalizeSearchText(item.QueryText), normalizedQuery, StringComparison.OrdinalIgnoreCase))
-                    .Sum(item => item.AcceptedCount * 5 - item.RejectedCount * 4);
+                string feedbackCode = HsCodeTextHelper.NormalizeCode(resolution.CurrentCode ?? example.RawReportedHsCode);
+                int feedbackBoost = feedbackBoosts.GetValueOrDefault(feedbackCode);
                 int score = Math.Clamp(textScore + Math.Min(example.UseCount * 2, 15) +
                     (example.IsManuallyVerified ? 15 : 0) + feedbackBoost, 0, 100);
                 candidates.Add(new KnowledgeCandidate(example, resolution, score, assessment.MatchReasons, assessment.ConflictWarnings));
@@ -120,7 +144,7 @@ namespace ExportDocManager.Services.MasterData
             if (grouped.Count < maxResults)
             {
                 var existing = grouped.Select(item => item.CurrentCode).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var masterFallback = codes
+                var masterFallback = masterCandidates
                     .Where(item => HsCodeValidityPolicy.IsTrustedActive(item) && !existing.Contains(item.NormalizedCode))
                     .Select(item =>
                     {
@@ -259,10 +283,11 @@ namespace ExportDocManager.Services.MasterData
             await context.SaveChangesAsync(cancellationToken);
         }
 
-        public async Task<IReadOnlyList<HsCodeHistoryLearningCandidate>> DiscoverHistoryCandidatesAsync(
-            string keyword, int maxResults = 200, CancellationToken cancellationToken = default)
+        public async Task<HsCodeHistoryCandidatePage> DiscoverHistoryCandidatesAsync(
+            string keyword, int pageNumber = 1, int pageSize = 30, CancellationToken cancellationToken = default)
         {
-            maxResults = Math.Clamp(maxResults, 1, 1000);
+            pageNumber = Math.Max(pageNumber, 1);
+            pageSize = Math.Clamp(pageSize, 1, 100);
             string filter = NormalizeSearchText(keyword);
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             var codes = await context.HsCodes.AsNoTracking().ToListAsync(cancellationToken);
@@ -281,7 +306,7 @@ namespace ExportDocManager.Services.MasterData
             rows.AddRange((await context.CustomsCooItems.AsNoTracking().Where(item => item.HSCode != "").Take(5000).ToListAsync(cancellationToken))
                 .Select(item => new HistorySourceRow(item.HSCode, Prefer(item.GoodsName, item.GoodsNameE), item.GoodsDesc, "历史报关资料")));
 
-            return rows.Where(item => !string.IsNullOrWhiteSpace(item.Code) && !string.IsNullOrWhiteSpace(item.Name))
+            var candidates = rows.Where(item => !string.IsNullOrWhiteSpace(item.Code) && !string.IsNullOrWhiteSpace(item.Name))
                 .Select(item => item with { Code = HsCodeTextHelper.NormalizeCode(item.Code), Name = item.Name.Trim(), Specification = (item.Specification ?? string.Empty).Trim() })
                 .Where(item => string.IsNullOrWhiteSpace(filter) || NormalizeSearchText($"{item.Name} {item.Specification} {item.Code}").Contains(filter, StringComparison.OrdinalIgnoreCase))
                 .GroupBy(item => new { item.Code, Name = NormalizeSearchText(item.Name), Specification = NormalizeSearchText(item.Specification) })
@@ -296,7 +321,10 @@ namespace ExportDocManager.Services.MasterData
                 })
                 .Where(item => !known.Contains(item.Fingerprint))
                 .OrderByDescending(item => item.CanConfirm).ThenByDescending(item => item.SourceCount).ThenBy(item => item.ProductName)
-                .Take(maxResults).ToList();
+                .ToList();
+            int totalCount = candidates.Count;
+            var items = candidates.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();
+            return new HsCodeHistoryCandidatePage(items, totalCount, pageNumber, pageSize);
         }
 
         public async Task<int> CaptureRemoteExamplesAsync(
@@ -370,6 +398,15 @@ namespace ExportDocManager.Services.MasterData
             var codes = await context.HsCodes.AsNoTracking().ToListAsync(cancellationToken);
             var codeMap = codes.Where(item => !string.IsNullOrWhiteSpace(item.NormalizedCode)).GroupBy(item => item.NormalizedCode, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
             var relations = await context.HsCodeReplacementRelations.AsNoTracking().ToListAsync(cancellationToken);
+            var fingerprints = examples
+                .Select(record => BuildFingerprint(
+                    HsCodeTextHelper.NormalizeCode(record.Item.Code),
+                    record.Item.Name,
+                    record.Item.Description))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var existingCandidates = await LoadRemoteCandidatesByFingerprintsAsync(context, fingerprints, cancellationToken);
+            var candidatesByFingerprint = existingCandidates.ToDictionary(item => item.Fingerprint, StringComparer.OrdinalIgnoreCase);
             DateTime now = DateTime.UtcNow;
             int added = 0;
             foreach (var record in examples)
@@ -377,8 +414,7 @@ namespace ExportDocManager.Services.MasterData
                 var item = record.Item;
                 string code = HsCodeTextHelper.NormalizeCode(item.Code);
                 string fingerprint = BuildFingerprint(code, item.Name, item.Description);
-                var existing = await context.HsCodeRemoteCandidates.FirstOrDefaultAsync(row => row.Fingerprint == fingerprint, cancellationToken);
-                if (existing == null)
+                if (!candidatesByFingerprint.TryGetValue(fingerprint, out var existing))
                 {
                     existing = new HsCodeRemoteCandidate
                     {
@@ -389,6 +425,7 @@ namespace ExportDocManager.Services.MasterData
                         ReviewStatus = "Pending", FirstSeenAt = now
                     };
                     await context.HsCodeRemoteCandidates.AddAsync(existing, cancellationToken);
+                    candidatesByFingerprint[fingerprint] = existing;
                     added++;
                 }
                 else existing.SeenCount++;
@@ -421,11 +458,14 @@ namespace ExportDocManager.Services.MasterData
             var query = context.HsCodeRemoteCandidates.AsNoTracking().Where(item => item.ReviewStatus == status);
             if (!string.IsNullOrWhiteSpace(filter))
             {
-                query = query.Where(item => item.RawReportedHsCode.Contains(filter) ||
-                    (item.SuggestedCurrentHsCode != null && item.SuggestedCurrentHsCode.Contains(filter)) ||
-                    item.ProductName.Contains(filter) ||
-                    (item.Specification != null && item.Specification.Contains(filter)) ||
-                    item.QueryText.Contains(filter));
+                string normalizedCodePrefix = HsCodeTextHelper.NormalizeCodeSearchKeyword(filter);
+                bool isCodePrefix = !string.IsNullOrWhiteSpace(normalizedCodePrefix) && normalizedCodePrefix.All(char.IsDigit);
+                query = isCodePrefix
+                    ? query.Where(item => item.RawReportedHsCode.StartsWith(normalizedCodePrefix) ||
+                        (item.SuggestedCurrentHsCode != null && item.SuggestedCurrentHsCode.StartsWith(normalizedCodePrefix)))
+                    : query.Where(item => item.ProductName.Contains(filter) ||
+                        (item.Specification != null && item.Specification.Contains(filter)) ||
+                        item.QueryText.Contains(filter));
             }
             int totalCount = await query.CountAsync(cancellationToken);
             var items = await query.OrderByDescending(item => item.LastSeenAt)
@@ -685,6 +725,97 @@ namespace ExportDocManager.Services.MasterData
                     (item.ResolvedCurrentHsCode != null && item.ResolvedCurrentHsCode.Contains(value)) ||
                     item.ProductName.Contains(value) || (item.Specification != null && item.Specification.Contains(value)));
             return query;
+        }
+
+        private static IQueryable<HsCode> BuildMasterCandidateQuery(
+            AppDbContext context,
+            string primaryToken,
+            string relatedToken)
+        {
+            var query = context.HsCodes.AsNoTracking().Where(item =>
+                item.Status == HsCodeValidityPolicy.ActiveStatus &&
+                item.SourceName != null && item.SourceName != "" &&
+                item.EffectiveYear != null &&
+                item.LastVerifiedAt != null);
+            if (string.IsNullOrWhiteSpace(primaryToken) && string.IsNullOrWhiteSpace(relatedToken))
+                return query.OrderByDescending(item => item.EffectiveYear).ThenBy(item => item.NormalizedCode);
+
+            return query.Where(item =>
+                    (!string.IsNullOrWhiteSpace(primaryToken) &&
+                        (item.Name.Contains(primaryToken) ||
+                         (item.Elements != null && item.Elements.Contains(primaryToken)) ||
+                         (item.Description != null && item.Description.Contains(primaryToken)))) ||
+                    (!string.IsNullOrWhiteSpace(relatedToken) &&
+                        (item.Name.Contains(relatedToken) ||
+                         (item.Elements != null && item.Elements.Contains(relatedToken)) ||
+                         (item.Description != null && item.Description.Contains(relatedToken)))))
+                .OrderByDescending(item => item.EffectiveYear)
+                .ThenByDescending(item => item.LastVerifiedAt)
+                .ThenBy(item => item.NormalizedCode);
+        }
+
+        private static async Task<List<HsCode>> LoadHsCodesByNormalizedCodesAsync(
+            AppDbContext context,
+            IReadOnlyCollection<string> codes,
+            CancellationToken cancellationToken)
+        {
+            var result = new List<HsCode>();
+            foreach (var batch in codes.Chunk(DatabaseInClauseBatchSize))
+            {
+                string[] values = batch.ToArray();
+                result.AddRange(await context.HsCodes.AsNoTracking()
+                    .Where(item => values.Contains(item.NormalizedCode))
+                    .ToListAsync(cancellationToken));
+            }
+            return result;
+        }
+
+        private static async Task<List<HsCodeReplacementRelation>> LoadReplacementRelationsAsync(
+            AppDbContext context,
+            IReadOnlyCollection<string> oldCodes,
+            CancellationToken cancellationToken)
+        {
+            var result = new List<HsCodeReplacementRelation>();
+            foreach (var batch in oldCodes.Chunk(DatabaseInClauseBatchSize))
+            {
+                string[] values = batch.ToArray();
+                result.AddRange(await context.HsCodeReplacementRelations.AsNoTracking()
+                    .Where(item => values.Contains(item.OldCode))
+                    .ToListAsync(cancellationToken));
+            }
+            return result;
+        }
+
+        private static async Task<List<HsCodeSearchFeedback>> LoadFeedbackByCandidateCodesAsync(
+            AppDbContext context,
+            IReadOnlyCollection<string> candidateCodes,
+            CancellationToken cancellationToken)
+        {
+            var result = new List<HsCodeSearchFeedback>();
+            foreach (var batch in candidateCodes.Chunk(DatabaseInClauseBatchSize))
+            {
+                string[] values = batch.ToArray();
+                result.AddRange(await context.HsCodeSearchFeedback.AsNoTracking()
+                    .Where(item => values.Contains(item.CandidateCode))
+                    .ToListAsync(cancellationToken));
+            }
+            return result;
+        }
+
+        private static async Task<List<HsCodeRemoteCandidate>> LoadRemoteCandidatesByFingerprintsAsync(
+            AppDbContext context,
+            IReadOnlyCollection<string> fingerprints,
+            CancellationToken cancellationToken)
+        {
+            var result = new List<HsCodeRemoteCandidate>();
+            foreach (var batch in fingerprints.Chunk(DatabaseInClauseBatchSize))
+            {
+                string[] values = batch.ToArray();
+                result.AddRange(await context.HsCodeRemoteCandidates
+                    .Where(item => values.Contains(item.Fingerprint))
+                    .ToListAsync(cancellationToken));
+            }
+            return result;
         }
 
         private static CurrentCodeResolution ResolveCurrentCode(

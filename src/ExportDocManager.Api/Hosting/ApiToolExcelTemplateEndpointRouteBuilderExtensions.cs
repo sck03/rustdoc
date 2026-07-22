@@ -91,7 +91,8 @@ namespace ExportDocManager.Api.Hosting
                 retryRequestJson: SerializeBackgroundJobRetryRequest(new ApiExcelOutputRequest
                 {
                     DestinationPath = destinationPath
-                }));
+                }),
+                initialOutputPath: destinationPath);
         }
     }
 }

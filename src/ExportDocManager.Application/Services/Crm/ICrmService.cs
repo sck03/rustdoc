@@ -78,6 +78,7 @@ namespace ExportDocManager.Services.Crm
         Task<CrmContactRecord> SaveContactAsync(CrmContactSaveRequest request, CancellationToken cancellationToken = default);
         Task<bool> DeleteContactAsync(int crmCustomerId, int id, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<CrmFollowUpRecord>> ListFollowUpsAsync(int? crmCustomerId, bool includeCompleted, int limit, CancellationToken cancellationToken = default);
+        Task<PagedResult<CrmFollowUpRecord>> QueryFollowUpsAsync(int? crmCustomerId, bool includeCompleted, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
         Task<CrmFollowUpRecord> SaveFollowUpAsync(CrmFollowUpSaveRequest request, CancellationToken cancellationToken = default);
         Task<bool> DeleteFollowUpAsync(int id, CancellationToken cancellationToken = default);
         Task<CrmDashboardRecord> GetDashboardAsync(CancellationToken cancellationToken = default);

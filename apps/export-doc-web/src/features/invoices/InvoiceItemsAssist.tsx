@@ -4,8 +4,8 @@ import { ProductLibraryPickerDialog } from "./InvoiceProductLibraryPickerDialog.
 
 type UnitLookupSourceField="unitEN"|"ctnUnitEN"; type UnitLookupTargetField="unitCN"|"ctnUnitCN";
 export type UnitCandidateDialogState={sourceField:UnitLookupSourceField;targetField:UnitLookupTargetField;targetLabel:string;rowIndex:number;unitEn:string;unitEnKey:string;candidates:string[]};
-type Props={focusedRowIndex:number|null;isBusy:boolean;isProductPickerOpen:boolean;itemsCount:number;productKeyword:string;products:ApiProductDto[];readOnly:boolean;unitCandidateDialog:UnitCandidateDialogState|null;onApplyProduct(product:ApiProductDto):void;onApplyUnitCandidate(candidate:string):void;onCloseProductPicker():void;onCloseUnitCandidates():void;onRefresh():void;onSearch(keyword:string):void};
-export function InvoiceItemsAssist(props:Props){const {focusedRowIndex,isBusy,isProductPickerOpen,itemsCount,productKeyword,products,readOnly,unitCandidateDialog,onApplyProduct,onApplyUnitCandidate:applyUnitCandidate,onCloseProductPicker,onCloseUnitCandidates,onRefresh,onSearch}=props;return <>
+type Props={focusedRowIndex:number|null;isBusy:boolean;isProductPickerOpen:boolean;itemsCount:number;productKeyword:string;products:ApiProductDto[];productLibraryPageNumber:number;productLibraryPageSize:number;productLibraryTotalCount:number;productLibraryTotalPages:number;readOnly:boolean;unitCandidateDialog:UnitCandidateDialogState|null;onApplyProduct(product:ApiProductDto):void;onApplyUnitCandidate(candidate:string):void;onCloseProductPicker():void;onCloseUnitCandidates():void;onRefresh():void;onSearch(keyword:string):void;onProductLibraryPageChange(pageNumber:number):void;onProductLibraryPageSizeChange(pageSize:number):void};
+export function InvoiceItemsAssist(props:Props){const {focusedRowIndex,isBusy,isProductPickerOpen,itemsCount,productKeyword,products,productLibraryPageNumber,productLibraryPageSize,productLibraryTotalCount,productLibraryTotalPages,readOnly,unitCandidateDialog,onApplyProduct,onApplyUnitCandidate:applyUnitCandidate,onCloseProductPicker,onCloseUnitCandidates,onRefresh,onSearch,onProductLibraryPageChange,onProductLibraryPageSizeChange}=props;return <>
       <div className="item-editor-assist-area">
         {unitCandidateDialog ? (
           <div className="item-unit-candidate-panel" role="dialog" aria-label="选择中文单位">
@@ -46,11 +46,17 @@ export function InvoiceItemsAssist(props:Props){const {focusedRowIndex,isBusy,is
           isBusy={isBusy}
           itemsCount={itemsCount}
           products={products}
+          pageNumber={productLibraryPageNumber}
+          pageSize={productLibraryPageSize}
+          totalCount={productLibraryTotalCount}
+          totalPages={productLibraryTotalPages}
           readOnly={readOnly}
           onApply={onApplyProduct}
           onClose={onCloseProductPicker}
           onRefresh={onRefresh}
           onSearch={onSearch}
+          onPageChange={onProductLibraryPageChange}
+          onPageSizeChange={onProductLibraryPageSizeChange}
         />
       ) : null}
 

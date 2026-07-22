@@ -133,6 +133,9 @@ export function deriveReportTemplateWorkspaceState({
       : matchesTemplatePath(contentTemplatePath, selectedTemplatePath));
   const isBusy = busyFlags.some(Boolean);
   const hasChanges = content !== loadedContent;
+  const hasUnappliedDesignerChanges =
+    designerMode === "new" && Boolean(designerDraftContent.trim()) && designerDraftContent !== content;
+  const hasUnsavedChanges = hasChanges || hasUnappliedDesignerChanges;
   const canPreviewRendered =
     Boolean(selectedTemplatePath) && (reportType === "PaymentVoucher" ? previewPaymentId > 0 : previewInvoiceId > 0);
   const canRenderTemplatePreview =
@@ -156,7 +159,7 @@ export function deriveReportTemplateWorkspaceState({
     : canManageTemplates && Boolean(selectedTemplatePath) && !isBusy;
   const canSave =
     Boolean(selectedTemplatePath) &&
-    hasChanges &&
+    hasUnsavedChanges &&
     !isBusy &&
     (isUserTemplate ? currentUserTemplate.canEdit && canDesignTemplates : canManageTemplates);
 
@@ -171,6 +174,8 @@ export function deriveReportTemplateWorkspaceState({
     selectedTemplateContentActive,
     isBusy,
     hasChanges,
+    hasUnappliedDesignerChanges,
+    hasUnsavedChanges,
     canRenderTemplatePreview,
     canCreateTemplate,
     canCreateUserTemplate,

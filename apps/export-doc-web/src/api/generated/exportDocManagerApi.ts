@@ -1677,6 +1677,16 @@ export interface ApiPagedResponseOfApiCrmCustomerDto {
   totalPages: number;
 }
 
+export interface ApiPagedResponseOfApiCrmFollowUpDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiCrmFollowUpDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface ApiPagedResponseOfApiHsCodeDto {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
@@ -1701,6 +1711,16 @@ export interface ApiPagedResponseOfApiPaymentDto {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   items: ApiPaymentDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface ApiPagedResponseOfApiProductDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiProductDto[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
@@ -2847,6 +2867,13 @@ export interface BackgroundJobSnapshot {
   title: string;
 }
 
+export interface HsCodeHistoryCandidatePage {
+  items: HsCodeHistoryLearningCandidate[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
 export interface HsCodeHistoryLearningCandidate {
   canConfirm: boolean;
   currentCode: string;
@@ -3533,7 +3560,8 @@ export interface DeleteUserReportTemplateRequest {
 
 export interface DiscoverHsCodeHistoryCandidatesRequest {
   keyword?: string;
-  maxResults?: number;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface DispatchSingleWindowBatchToClientRequest {
@@ -3834,6 +3862,8 @@ export interface ListPortsRequest {
 
 export interface ListProductsRequest {
   keyword?: string;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListQueriedInvoicesRequest {
@@ -3996,6 +4026,13 @@ export interface PreviewUploadedInvoiceTransferPackageRequest {
 export interface QueryCrmCustomersRequest {
   keyword?: string;
   status?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface QueryCrmFollowUpsRequest {
+  crmCustomerId?: number;
+  includeCompleted?: boolean;
   pageNumber?: number;
   pageSize?: number;
 }
@@ -4959,12 +4996,13 @@ export class ExportDocManagerApiClient {
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public discoverHsCodeHistoryCandidates(request: DiscoverHsCodeHistoryCandidatesRequest = {}, init?: RequestInit): Promise<HsCodeHistoryLearningCandidate[]> {
+  public discoverHsCodeHistoryCandidates(request: DiscoverHsCodeHistoryCandidatesRequest = {}, init?: RequestInit): Promise<HsCodeHistoryCandidatePage> {
     const path = "/api/master-data/hs-knowledge/history-candidates";
-    return this.request<HsCodeHistoryLearningCandidate[]>("GET", path, {
+    return this.request<HsCodeHistoryCandidatePage>("GET", path, {
       query: {
         "keyword": request.keyword,
-        "maxResults": request.maxResults,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
       },
       init,
     });
@@ -5221,6 +5259,11 @@ export class ExportDocManagerApiClient {
   public getProduct(request: GetProductRequest, init?: RequestInit): Promise<ApiProductDto> {
     const path = `/api/master-data/products/${encodePath(request.id)}`;
     return this.request<ApiProductDto>("GET", path, { init });
+  }
+
+  public getReadiness(init?: RequestInit): Promise<void> {
+    const path = "/readyz";
+    return this.request<void>("GET", path, { init });
   }
 
   public getReportTemplateContent(request: GetReportTemplateContentRequest = {}, init?: RequestInit): Promise<ApiReportTemplateContentDto> {
@@ -5616,11 +5659,13 @@ export class ExportDocManagerApiClient {
     return this.request<ApiPostgreSqlPhysicalBackupListResponse>("GET", path, { init });
   }
 
-  public listProducts(request: ListProductsRequest = {}, init?: RequestInit): Promise<ApiProductDto[]> {
+  public listProducts(request: ListProductsRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiProductDto> {
     const path = "/api/master-data/products";
-    return this.request<ApiProductDto[]>("GET", path, {
+    return this.request<ApiPagedResponseOfApiProductDto>("GET", path, {
       query: {
         "keyword": request.keyword,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
       },
       init,
     });
@@ -5925,6 +5970,19 @@ export class ExportDocManagerApiClient {
       query: {
         "keyword": request.keyword,
         "status": request.status,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public queryCrmFollowUps(request: QueryCrmFollowUpsRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiCrmFollowUpDto> {
+    const path = "/api/crm/follow-ups/page";
+    return this.request<ApiPagedResponseOfApiCrmFollowUpDto>("GET", path, {
+      query: {
+        "crmCustomerId": request.crmCustomerId,
+        "includeCompleted": request.includeCompleted,
         "pageNumber": request.pageNumber,
         "pageSize": request.pageSize,
       },

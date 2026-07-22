@@ -628,6 +628,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
       <InvoiceTable
         data={invoices?.items ?? []}
         isBusy={isBusy}
+        hasError={Boolean(invoicesQuery.isError)}
         canOperate={invoicePermission.canOperate}
         canExportBookingSheet={excelPermission.canOperate}
         canUseSingleWindow={singleWindowPermission.canView}

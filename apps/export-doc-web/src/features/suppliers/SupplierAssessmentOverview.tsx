@@ -10,7 +10,7 @@ type OverviewFilter = "all" | "attention" | "preferred";
 
 export function SupplierAssessmentOverview({ client, onOpenSupplier }: {
   client: ExportDocManagerApiClient;
-  onOpenSupplier: (supplierId: number) => void;
+  onOpenSupplier: (supplierId: number, supplierName: string) => void | Promise<void>;
 }) {
   const [overview, setOverview] = useState<ApiSupplierAssessmentOverviewDto | null>(null);
   const [filter, setFilter] = useState<OverviewFilter>("all");
@@ -72,7 +72,7 @@ export function SupplierAssessmentOverview({ client, onOpenSupplier }: {
         <td><strong>{item.averageScore.toFixed(2)}</strong> / 5</td>
         <td data-table-priority="secondary">{item.qualityScore} / {item.deliveryScore} / {item.serviceScore} / {item.priceScore}</td>
         <td><BusinessStatusBadge value={item.conclusion} /></td>
-        <td><button className="secondary-button" type="button" onClick={() => onOpenSupplier(item.supplierCompanyId)}>查看评价</button></td>
+        <td><button className="secondary-button" type="button" onClick={() => void onOpenSupplier(item.supplierCompanyId, item.supplierName)}>查看评价</button></td>
       </tr>)}
       {!rows.length ? <tr><td className="empty-cell" colSpan={6}><div className="empty-cell-content"><strong>当前筛选没有供应商</strong><span>切换筛选查看其它最新评价结论。</span></div></td></tr> : null}
     </tbody></table></ResponsiveTableFrame>

@@ -50,7 +50,7 @@ namespace ExportDocManager.Api.Hosting
                         "deletePayee",
                         "ApiPayeeDto",
                         "Payee id."),
-                    ["/api/master-data/products"] = MasterDataListPath(
+                    ["/api/master-data/products"] = MasterDataPagedListPath(
                         "List products",
                         "listProducts",
                         "ApiProductDto",
@@ -485,11 +485,12 @@ namespace ExportDocManager.Api.Hosting
                             parameters = new object[]
                             {
                                 QueryParameter("keyword", "string", null, "Optional filter."),
-                                QueryParameter("maxResults", "integer", "int32", "Maximum number of candidates.")
+                                QueryParameter("pageNumber", "integer", "int32", "One-based page number."),
+                                QueryParameter("pageSize", "integer", "int32", "Page size, up to 100.")
                             },
                             responses = new Dictionary<string, object>
                             {
-                                ["200"] = new { description = "Historical learning candidates.", content = JsonArrayContent("HsCodeHistoryLearningCandidate") },
+                                ["200"] = new { description = "Paged historical learning candidates.", content = JsonContent("HsCodeHistoryCandidatePage") },
                                 ["401"] = new { description = "Missing or invalid bearer token." }
                             }
                         }

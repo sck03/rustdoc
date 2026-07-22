@@ -62,7 +62,8 @@ namespace ExportDocManager.Api.Hosting
             string requestedBy,
             Func<IServiceProvider, ApiBackgroundJobExecutionContext, Task<string>> executeAsync,
             string retryOperation = "",
-            string retryRequestJson = "")
+            string retryRequestJson = "",
+            string initialOutputPath = "")
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(kind);
             ArgumentException.ThrowIfNullOrWhiteSpace(title);
@@ -71,12 +72,14 @@ namespace ExportDocManager.Api.Hosting
             string normalizedKind = kind.Trim();
             string normalizedRetryOperation = retryOperation?.Trim() ?? string.Empty;
             string normalizedRetryRequestJson = retryRequestJson?.Trim() ?? string.Empty;
+            string normalizedInitialOutputPath = initialOutputPath?.Trim() ?? string.Empty;
             string jobId = $"{normalizedKind.ToLowerInvariant()}-{Guid.NewGuid():N}";
             var now = DateTimeOffset.UtcNow;
             var currentUser = _currentUserContext?.CurrentUser;
             string normalizedRequestedBy = requestedBy?.Trim() ?? string.Empty;
             if (!TryReserveQueueSlot(normalizedRequestedBy, out var userState, out string rejectionMessage))
             {
+                _jobs.CleanupControlledOutputPath(normalizedInitialOutputPath);
                 return CreateQueueRejectedJob(
                     jobId,
                     normalizedKind,
@@ -104,6 +107,7 @@ namespace ExportDocManager.Api.Hosting
                         ? currentUser.Id
                         : 0,
                 CreatedAt = now,
+                OutputPath = normalizedInitialOutputPath,
                 CanCancel = true,
                 CanRetry = false,
                 RetryOperation = normalizedRetryOperation,

@@ -291,6 +291,7 @@ export function MasterDataListPage({
         config={config}
         data={page?.items ?? []}
         isBusy={isBusy}
+        hasError={Boolean(message)}
         canOperate={canOperate}
         canManage={canManage}
         enableSelection={config.key === "hs-codes" && canManage}
@@ -368,6 +369,7 @@ function MasterDataTable({
   data,
   enableSelection = false,
   isBusy,
+  hasError,
   canOperate,
   canManage,
   onDelete,
@@ -380,6 +382,7 @@ function MasterDataTable({
   data: MasterDataRecord[];
   enableSelection?: boolean;
   isBusy: boolean;
+  hasError: boolean;
   canOperate: boolean;
   canManage: boolean;
   onDelete: (record: MasterDataRecord) => void;
@@ -440,7 +443,7 @@ function MasterDataTable({
           </tr>
         </thead>
         <tbody>
-          {data.length === 0 ? (
+          {data.length === 0 && !hasError ? (
             <tr>
               <td colSpan={tableColumnCount} className="empty-cell">
                 {isBusy ? "加载中" : "暂无数据"}

@@ -33,6 +33,7 @@ import { filterSettingsCategories, settingsCategories, type SettingsCategoryConf
 import { readSettingsCategoryFromSearch, readSettingsPanelLabelFromSearch } from "./settingsNavigationModel.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
+import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { useSettingsMaintenanceActions } from "./useSettingsMaintenanceActions.ts";
 import { useSettingsDraftSync } from "./useSettingsDraftSync.ts";
@@ -161,6 +162,11 @@ export function SettingsPage({
     setHasUnsavedChanges,
     setValidationResult,
     setSingleWindowAuthorityAutoState,
+  });
+
+  useUnsavedChangesGuard({
+    isDirty: hasUnsavedChanges,
+    message: "系统设置页面有未保存修改，离开后这些配置将丢失。",
   });
 
   useEffect(() => {

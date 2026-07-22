@@ -280,7 +280,8 @@ namespace ExportDocManager.Api.Tests
             {
                 "ApiBackgroundJobService.cs",
                 "ApiBackgroundJobServiceQuery.cs",
-                "ApiBackgroundJobServicePersistence.cs"
+                "ApiBackgroundJobServicePersistence.cs",
+                "ApiBackgroundJobServiceCleanup.cs"
             })
             {
                 Assert.True(

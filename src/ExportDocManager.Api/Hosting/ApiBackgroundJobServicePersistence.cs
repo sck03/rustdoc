@@ -53,6 +53,7 @@ namespace ExportDocManager.Api.Hosting
                     }
 
                     var normalized = NormalizeRestoredJob(job, restartTime, out bool changed);
+                    normalized = CleanupRestoredFailedOutput(normalized, ref changed);
                     _jobs[normalized.JobId] = normalized;
                     needsRewrite |= changed;
                 }
@@ -145,6 +146,7 @@ namespace ExportDocManager.Api.Hosting
             foreach (var record in context.ApiBackgroundJobs.AsNoTracking().ToList())
             {
                 var normalized = NormalizeRestoredJob(ToSnapshot(record), restartTime, out bool changed);
+                normalized = CleanupRestoredFailedOutput(normalized, ref changed);
                 _jobs[normalized.JobId] = normalized;
                 if (changed)
                 {
@@ -312,6 +314,41 @@ namespace ExportDocManager.Api.Hosting
         {
             return !string.IsNullOrWhiteSpace(job?.RetryOperation)
                 && !string.IsNullOrWhiteSpace(job.RetryRequestJson);
+        }
+
+        private BackgroundJobSnapshot CleanupRestoredFailedOutput(BackgroundJobSnapshot job, ref bool changed)
+        {
+            if (job == null ||
+                string.Equals(job.Status, BackgroundJobStatusCatalog.Succeeded, StringComparison.OrdinalIgnoreCase) ||
+                !BackgroundJobStatusCatalog.IsTerminal(job.Status) ||
+                string.IsNullOrWhiteSpace(job.OutputPath))
+            {
+                return job;
+            }
+
+            TryDeleteControlledBrowserOutput(job.OutputPath);
+            changed = true;
+            return new BackgroundJobSnapshot
+            {
+                JobId = job.JobId,
+                Kind = job.Kind,
+                Title = job.Title,
+                Status = job.Status,
+                ProgressPercent = job.ProgressPercent,
+                StatusText = job.StatusText,
+                DetailText = job.DetailText,
+                RequestedBy = job.RequestedBy,
+                RequestedByUserId = job.RequestedByUserId,
+                CreatedAt = job.CreatedAt,
+                StartedAt = job.StartedAt,
+                CompletedAt = job.CompletedAt,
+                OutputPath = string.Empty,
+                ErrorMessage = job.ErrorMessage,
+                CanCancel = job.CanCancel,
+                CanRetry = job.CanRetry,
+                RetryOperation = job.RetryOperation,
+                RetryRequestJson = job.RetryRequestJson
+            };
         }
     }
 }

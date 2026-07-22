@@ -22,6 +22,8 @@ namespace ExportDocManager.Services.Infrastructure
     public interface IProductReadRepository
     {
         Task<IReadOnlyList<Product>> QueryAsync(ProductReadQuery query, CancellationToken cancellationToken = default);
+
+        Task<PagedResult<Product>> QueryPageAsync(ProductReadQuery query, CancellationToken cancellationToken = default);
     }
 
     public interface IPortReadRepository

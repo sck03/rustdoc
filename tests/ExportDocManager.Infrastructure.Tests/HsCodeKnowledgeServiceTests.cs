@@ -58,13 +58,16 @@ public sealed class HsCodeKnowledgeServiceTests
         }
         var service = new HsCodeKnowledgeService(factory);
 
-        var candidate = Assert.Single(await service.DiscoverHistoryCandidatesAsync("圆领短袖"));
+        var firstPage = await service.DiscoverHistoryCandidatesAsync("圆领短袖", 1, 30);
+        var candidate = Assert.Single(firstPage.Items);
+        Assert.Equal(1, firstPage.TotalCount);
+        Assert.Equal(1, firstPage.PageNumber);
         Assert.True(candidate.CanConfirm);
         Assert.Equal(0, await service.CountExamplesAsync(string.Empty));
 
         await service.SaveExampleAsync(new HsCodeExampleInput(0, candidate.RawCode, candidate.CurrentCode, candidate.ProductName,
             candidate.Specification, "HistoryConfirmed", 2026, "ManuallyVerified", true));
-        Assert.Empty(await service.DiscoverHistoryCandidatesAsync("圆领短袖"));
+        Assert.Empty((await service.DiscoverHistoryCandidatesAsync("圆领短袖", 1, 30)).Items);
         Assert.Equal(1, await service.CountExamplesAsync(string.Empty));
     }
 
@@ -158,6 +161,23 @@ public sealed class HsCodeKnowledgeServiceTests
         Assert.Equal(2, await service.ResetRemoteCandidatesAsync([confirmed.Id, ignored.Id]));
         Assert.Equal(3, (await service.ListRemoteCandidatesAsync("Pending", "", 1, 30)).TotalCount);
         Assert.Equal(0, await service.CountExamplesAsync(string.Empty));
+    }
+
+    [Fact]
+    public async Task RemoteCandidateCodeFilter_ShouldMatchHsCodePrefixOnly()
+    {
+        using var factory = new SqliteFactory();
+        var service = new HsCodeKnowledgeService(factory);
+        await service.CaptureRemoteExamplesAsync("编码前缀",
+        [
+            new HsCode { Code = "6109100000", Name = "前缀匹配" },
+            new HsCode { Code = "2846109010", Name = "中间包含但不应匹配" }
+        ]);
+
+        var result = await service.ListRemoteCandidatesAsync("Pending", "6109", 1, 30);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal("6109100000", item.RawReportedHsCode);
     }
 
     [Fact]

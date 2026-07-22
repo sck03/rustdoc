@@ -25,6 +25,7 @@ export function useReportTemplateSelectionActions({
   setPreviewInvoiceId,
   setPreviewPaymentId,
   clearFeedback,
+  confirmDiscardChanges,
 }: {
   reportType: ReportTypeOption;
   setReportType: Dispatch<SetStateAction<ReportTypeOption>>;
@@ -43,6 +44,7 @@ export function useReportTemplateSelectionActions({
   setPreviewInvoiceId: Dispatch<SetStateAction<number>>;
   setPreviewPaymentId: Dispatch<SetStateAction<number>>;
   clearFeedback: () => void;
+  confirmDiscardChanges: (actionLabel?: string) => Promise<boolean>;
 }) {
   function clearLoadedTemplateContent() {
     setContent("");
@@ -52,8 +54,11 @@ export function useReportTemplateSelectionActions({
     clearFeedback();
   }
 
-  function handleReportTypeChange(value: string) {
+  async function handleReportTypeChange(value: string) {
     const nextReportType = value === "PaymentVoucher" ? "PaymentVoucher" : "ExportDocument";
+    if (nextReportType === reportType || !await confirmDiscardChanges("切换报表类型")) {
+      return;
+    }
     setReportType(nextReportType);
     setSelectedUserTemplateId(0);
     setSelectedTemplatePath("");
@@ -66,14 +71,20 @@ export function useReportTemplateSelectionActions({
     setTemplatePreviewSampleProfile(readPreferredPreviewSampleProfile(nextReportType));
   }
 
-  function handleTemplateChange(value: string) {
+  async function handleTemplateChange(value: string) {
+    if (!await confirmDiscardChanges("切换默认模板")) {
+      return;
+    }
     setSelectedUserTemplateId(0);
     setSelectedTemplatePath(value);
     clearLoadedTemplateContent();
   }
 
-  function handleUserTemplateChange(value: string) {
+  async function handleUserTemplateChange(value: string) {
     const id = readNumber(value);
+    if (!await confirmDiscardChanges("切换我的或共享模板")) {
+      return;
+    }
     setSelectedUserTemplateId(id);
     if (id <= 0) {
       setSelectedTemplatePath("");

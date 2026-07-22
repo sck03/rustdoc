@@ -345,6 +345,28 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
+                    ["/api/crm/follow-ups/page"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Query paged customer follow-ups",
+                            operationId = "queryCrmFollowUps",
+                            security = BearerSecurity(),
+                            parameters = new[]
+                            {
+                                QueryParameter("crmCustomerId", "integer", "int32", "Optional CRM customer id."),
+                                QueryParameter("includeCompleted", "boolean", null, "Include completed follow-ups."),
+                                QueryParameter("pageNumber", "integer", "int32", "Page number."),
+                                QueryParameter("pageSize", "integer", "int32", "Rows per page, from 1 to 100.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Paged CRM follow-ups.", content = JsonContent("ApiPagedResponseOfApiCrmFollowUpDto") },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Sales workspace is not available." }
+                            }
+                        }
+                    },
                     ["/api/crm/follow-ups/{id}"] = new
                     {
                         put = new

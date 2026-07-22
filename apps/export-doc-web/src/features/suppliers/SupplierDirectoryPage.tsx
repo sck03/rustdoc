@@ -6,12 +6,14 @@ import { SupplierAssessmentsPanel } from "./SupplierAssessmentsPanel.tsx";
 import { SupplierAssessmentOverview } from "./SupplierAssessmentOverview.tsx";
 import { TaskViewTabs } from "../../ui/TaskViewTabs.tsx";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
-import { OperationFeedback, errorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { OperationFeedback, errorFeedback, requestErrorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { PermissionNotice } from "../../ui/PageState.tsx";
+import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 
 type SupplierTaskView = "overview" | "directory" | "profile" | "contacts" | "products" | "assessments" | "import";
 
@@ -25,9 +27,11 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
   const [newSupplier, setNewSupplier] = useState(false);
   const [keywordInput, setKeywordInput] = useState("");
   const [keyword, setKeyword] = useState("");
+  const [supplierOptionKeyword, setSupplierOptionKeyword] = useState("");
   const [status, setStatus] = useState("");
   const [pageNumber, setPageNumber] = useState(1);
-  const [page, setPage] = useState<Awaited<ReturnType<ExportDocManagerApiClient["querySuppliers"]>> | null>(null);
+  const [pageSize, setPageSize] = useState(20);
+  const [revision, setRevision] = useState(0);
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [importPreview, setImportPreview] = useState<ApiSupplierImportPreviewDto | null>(null);
@@ -37,23 +41,43 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
   const selectedSupplier = suppliers.find((item) => item.id === supplierId);
   const selectedContact = contacts.find((item) => item.id === contactId);
 
-  async function loadSuppliers(preferredId?: number) {
-    const rows = await client.listSuppliers();
+  async function loadSupplierOptions(preferred?: ApiSupplierDto, searchKeyword = supplierOptionKeyword, signal?: AbortSignal) {
+    const page = await client.querySuppliers({ keyword: searchKeyword.trim(), status: "", pageNumber: 1, pageSize: 100 }, { signal });
+    if (signal?.aborted) return;
+    const rows = preferred && !page.items.some((item) => item.id === preferred.id) ? [preferred, ...page.items] : page.items;
     setSuppliers(rows);
-    setSupplierId(preferredId && rows.some((item) => item.id === preferredId) ? preferredId : rows[0]?.id ?? 0);
+    setSupplierId(preferred?.id && rows.some((item) => item.id === preferred.id) ? preferred.id : rows[0]?.id ?? 0);
   }
 
-  useEffect(() => { void loadSuppliers().catch((error) => setFeedback(errorFeedback(readApiError(error)))); }, [client]);
+  async function openSupplier(item: ApiSupplierDto) {
+    setSuppliers((current) => current.some((supplier) => supplier.id === item.id) ? current : [item, ...current]);
+    setSupplierId(item.id);
+    setNewSupplier(false);
+    setView("profile");
+  }
+
+  const pageQuery = usePagedDirectoryQuery(
+    ["suppliers", keyword, status, pageNumber, pageSize, revision],
+    (signal) => client.querySuppliers({ keyword, status, pageNumber, pageSize }, { signal }),
+  );
+  const page = pageQuery.data ?? null;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadSupplierOptions(undefined, "", controller.signal)
+      .catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); });
+    return () => controller.abort();
+  }, [client]);
   useEffect(() => {
     if (!supplierId) { setContacts([]); return; }
+    const controller = new AbortController();
     setContactView("directory");
-    void client.listSupplierContacts({ supplierId }).then((rows) => {
+    void client.listSupplierContacts({ supplierId }, { signal: controller.signal }).then((rows) => {
+      if (controller.signal.aborted) return;
       setContacts(rows); setContactId((current) => rows.some((item) => item.id === current) ? current : rows[0]?.id ?? 0);
-    }).catch((error) => setFeedback(errorFeedback(readApiError(error))));
+    }).catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); });
+    return () => controller.abort();
   }, [client, supplierId]);
-  useEffect(() => {
-    void client.querySuppliers({ keyword, status, pageNumber, pageSize: 20 }).then(setPage).catch((error) => setFeedback(errorFeedback(readApiError(error))));
-  }, [client, keyword, status, pageNumber, suppliers]);
 
   async function saveSupplier(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,14 +89,14 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
       expectedVersion: id > 0 ? selectedSupplier?.versionNumber ?? 0 : 0 };
     try {
       const saved = id ? await client.updateSupplier({ id, body }) : await client.createSupplier({ body });
-      await loadSuppliers(saved.id); setNewSupplier(false); setFeedback(successFeedback(id ? "供应商已更新。" : "供应商已建立。"));
-    } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
+      await loadSupplierOptions(saved); setRevision((value) => value + 1); setNewSupplier(false); setFeedback(successFeedback(id ? "供应商已更新。" : "供应商已建立。"));
+    } catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
 
   async function deleteSupplier() {
     if (!supplierPermission.canManage || !selectedSupplier || !await requestConfirmation({ title: "删除供应商", description: `确定删除供应商“${selectedSupplier.name}”吗？`, details: ["该供应商的联系人将一并删除。", "已生成的历史业务记录不会被改写。"], confirmLabel: "确认删除", tone: "danger" })) return;
-    try { await client.deleteSupplier({ id: selectedSupplier.id }); await loadSuppliers(); setView("directory"); setFeedback(successFeedback("供应商已删除。")); }
-    catch (error) { setFeedback(errorFeedback(readApiError(error))); }
+    try { await client.deleteSupplier({ id: selectedSupplier.id }); await loadSupplierOptions(undefined, ""); setRevision((value) => value + 1); setView("directory"); setFeedback(successFeedback("供应商已删除。")); }
+    catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
 
   async function saveContact(event: FormEvent<HTMLFormElement>) {
@@ -84,7 +108,7 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
     try {
       const saved = id ? await client.updateSupplierContact({ supplierId, id, body }) : await client.createSupplierContact({ supplierId, body });
       const rows = await client.listSupplierContacts({ supplierId }); setContacts(rows); setContactId(saved.id); setContactView("editor"); setFeedback(successFeedback(id ? "联系人已更新。" : "联系人已添加。"));
-    } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
+    } catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
 
   async function deleteContact() {
@@ -94,7 +118,7 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
       const rows = await client.listSupplierContacts({ supplierId });
       setContacts(rows); setContactId(rows[0]?.id ?? 0); setContactView("directory"); setFeedback(successFeedback("联系人已删除。"));
     }
-    catch (error) { setFeedback(errorFeedback(readApiError(error))); }
+    catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
 
   async function previewImport(file?: File) {
@@ -109,7 +133,7 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
     try {
       const result = await client.importSuppliers({ body: { rows: importPreview.rows } });
       setFeedback(successFeedback(`已导入 ${result.createdSuppliers} 家供应商、${result.createdContacts} 位联系人，跳过 ${result.skippedRows} 行。`));
-      setImportPreview(null); await loadSuppliers();
+      setImportPreview(null); await loadSupplierOptions(undefined, ""); setRevision((value) => value + 1);
     } catch (error) { setFeedback(errorFeedback(readApiError(error))); } finally { setBusy(false); }
   }
 
@@ -118,8 +142,8 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
     if (!selectedIds.length) { setFeedback(warningFeedback("请先勾选供应商。")); return; }
     try {
       const result = await client.updateSupplierBatchStatus({ body: { ids: selectedIds, status: targetStatus } });
-      setSelectedIds([]); await loadSuppliers(supplierId); setFeedback(successFeedback(`已更新 ${result.affectedCount} 家供应商为“${result.status}”。`));
-    } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
+      setSelectedIds([]); await loadSupplierOptions(selectedSupplier); setRevision((value) => value + 1); setFeedback(successFeedback(`已更新 ${result.affectedCount} 家供应商为“${result.status}”。`));
+    } catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
 
   async function exportRows() {
@@ -142,7 +166,15 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
       { id: "assessments", label: "供应商评价", disabled: !selectedSupplier || newSupplier },
       { id: "import", label: "导入导出" },
     ]} />
-    {view === "overview" ? <SupplierAssessmentOverview client={client} onOpenSupplier={(id) => { setSupplierId(id); setNewSupplier(false); setView("assessments"); }} /> : null}
+    {view === "overview" ? <SupplierAssessmentOverview client={client} onOpenSupplier={async (id, name) => {
+      try {
+        const result = await client.querySuppliers({ keyword: name, status: "", pageNumber: 1, pageSize: 100 });
+        const item = result.items.find((supplier) => supplier.id === id);
+        if (!item) { setFeedback(errorFeedback("未能读取该供应商的最新资料，请从供应商目录重新查找。")); return; }
+        setSuppliers((current) => current.some((supplier) => supplier.id === item.id) ? current : [item, ...current]);
+        setSupplierId(item.id); setNewSupplier(false); setView("assessments");
+      } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
+    }} /> : null}
     {view === "import" ? <section className="form-section"><div className="section-header"><h3>导入、导出与批量维护</h3><span>CSV/XLSX 最多 5000 行、10 MB</span></div>
       <div className="form-actions">
         {supplierPermission.canOperate ? <label className="secondary-button">选择导入文件<input type="file" hidden accept=".csv,.xlsx,.xlsm" onChange={(event) => void previewImport(event.target.files?.[0])} /></label> : null}
@@ -163,15 +195,16 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
         <select value={status} onChange={(event) => { setStatus(event.target.value); setPageNumber(1); }}><option value="">全部状态</option><option>合作中</option><option>考察中</option><option>暂停</option><option>停用</option></select>
         <button className="secondary-button" type="submit">搜索</button>
       </form>
-      <ResponsiveTableFrame label="供应商目录" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr>{supplierPermission.canOperate ? <th><input type="checkbox" aria-label="选择本页" checked={(page?.items.length ?? 0) > 0 && page!.items.every((item) => selectedIds.includes(item.id))} onChange={(event) => setSelectedIds(event.target.checked ? Array.from(new Set([...selectedIds, ...(page?.items.map((item) => item.id) ?? [])])) : selectedIds.filter((id) => !page?.items.some((item) => item.id === id)))} /></th> : null}<th>供应商</th><th data-table-priority="secondary">分类</th><th data-table-priority="secondary">主要产品</th><th>状态</th><th /></tr></thead><tbody>
-        {(page?.items ?? []).map((item) => <tr key={item.id}>{supplierPermission.canOperate ? <td><input type="checkbox" aria-label={`选择供应商 ${item.name}`} checked={selectedIds.includes(item.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /></td> : null}<td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.category || "-"}</td><td data-table-priority="secondary">{item.mainProducts || "-"}</td><td><BusinessStatusBadge value={item.status} /></td><td><button className="secondary-button" type="button" onClick={() => { setSupplierId(item.id); setNewSupplier(false); setView("profile"); }}>打开</button></td></tr>)}
-        {!page?.items.length ? <tr><td className="empty-cell" colSpan={supplierPermission.canOperate ? 6 : 5}><div className="empty-cell-content"><strong>暂无供应商</strong><span>{supplierPermission.canOperate ? "先建立供应商资料，再按需添加联系人和关联供应产品。" : "当前没有可查看的供应商。"}</span>{supplierPermission.canOperate ? <div className="form-actions"><button className="primary-button" type="button" onClick={() => { setNewSupplier(true); setView("profile"); }}>建立第一家供应商</button><button className="secondary-button" type="button" onClick={() => setView("import")}>从文件导入</button></div> : null}</div></td></tr> : null}
+      {pageQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(pageQuery.error))} /> : null}
+      <ResponsiveTableFrame label="供应商目录" mobileLayout="scroll" busy={pageQuery.isFetching}><table className="data-table responsive-data-table"><thead><tr>{supplierPermission.canOperate ? <th><input type="checkbox" aria-label="选择本页" checked={(page?.items.length ?? 0) > 0 && page!.items.every((item) => selectedIds.includes(item.id))} onChange={(event) => setSelectedIds(event.target.checked ? Array.from(new Set([...selectedIds, ...(page?.items.map((item) => item.id) ?? [])])) : selectedIds.filter((id) => !page?.items.some((item) => item.id === id)))} /></th> : null}<th>供应商</th><th data-table-priority="secondary">分类</th><th data-table-priority="secondary">主要产品</th><th>状态</th><th /></tr></thead><tbody>
+        {(page?.items ?? []).map((item) => <tr key={item.id}>{supplierPermission.canOperate ? <td><input type="checkbox" aria-label={`选择供应商 ${item.name}`} checked={selectedIds.includes(item.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /></td> : null}<td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.category || "-"}</td><td data-table-priority="secondary">{item.mainProducts || "-"}</td><td><BusinessStatusBadge value={item.status} /></td><td><button className="secondary-button" type="button" onClick={() => void openSupplier(item)}>打开</button></td></tr>)}
+        {!pageQuery.isFetching && !pageQuery.isError && !page?.items.length ? <tr><td className="empty-cell" colSpan={supplierPermission.canOperate ? 6 : 5}><div className="empty-cell-content"><strong>暂无供应商</strong><span>{supplierPermission.canOperate ? "先建立供应商资料，再按需添加联系人和关联供应产品。" : "当前没有可查看的供应商。"}</span>{supplierPermission.canOperate ? <div className="form-actions"><button className="primary-button" type="button" onClick={() => { setNewSupplier(true); setView("profile"); }}>建立第一家供应商</button><button className="secondary-button" type="button" onClick={() => setView("import")}>从文件导入</button></div> : null}</div></td></tr> : null}
       </tbody></table></ResponsiveTableFrame>
-      <div className="form-actions"><button className="secondary-button" type="button" disabled={!page?.hasPreviousPage} onClick={() => setPageNumber((v) => v - 1)}>上一页</button><span>第 {page?.pageNumber ?? 1} / {Math.max(page?.totalPages ?? 1, 1)} 页</span><button className="secondary-button" type="button" disabled={!page?.hasNextPage} onClick={() => setPageNumber((v) => v + 1)}>下一页</button></div>
+      <ListPaginationControls pageNumber={pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={pageQuery.isFetching} onPageChange={setPageNumber} onPageSizeChange={(value) => { setPageSize(value); setPageNumber(1); }} />
     </section> : null}
     {view === "profile" ? <form className="form-grid" key={newSupplier ? "new" : selectedSupplier?.id ?? "empty"} onSubmit={saveSupplier}>
         <div className="section-heading-row"><h3>{newSupplier ? "新建供应商" : supplierPermission.canOperate ? "供应商资料" : "查看供应商"}</h3>{supplierPermission.canOperate ? <button className="secondary-button" type="button" onClick={() => setNewSupplier(true)}>新建</button> : null}</div>
-        {!newSupplier ? <label>选择供应商<select value={supplierId} onChange={(e) => setSupplierId(Number(e.target.value))}>{suppliers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label> : null}
+        {!newSupplier ? <label className="form-field-wide">选择供应商<div className="toolbar compact-search-toolbar"><input aria-label="搜索供应商资料" value={supplierOptionKeyword} onChange={(event) => setSupplierOptionKeyword(event.target.value)} placeholder="输入名称、分类或主要产品" /><button className="secondary-button" type="button" onClick={() => void loadSupplierOptions(selectedSupplier).catch((error) => setFeedback(errorFeedback(readApiError(error))))}>查找</button></div><select value={supplierId} onChange={(e) => setSupplierId(Number(e.target.value))}>{suppliers.length ? null : <option value={0}>没有匹配的供应商</option>}{suppliers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label> : null}
         <fieldset className="permission-fieldset form-field-wide" disabled={!supplierPermission.canOperate}>
         <label>名称<input name="name" required defaultValue={newSupplier ? "" : selectedSupplier?.name} /></label><label>国家/地区<input name="countryRegion" defaultValue={newSupplier ? "" : selectedSupplier?.countryRegion} /></label>
         <label>分类<input name="category" defaultValue={newSupplier ? "" : selectedSupplier?.category} /></label><label>网站<input name="website" defaultValue={newSupplier ? "" : selectedSupplier?.website} /></label>

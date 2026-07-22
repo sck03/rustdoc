@@ -474,12 +474,19 @@ export function InvoiceMarksAndItemsPanel({
   onPasteItemTable,
   onRedoItemEdit,
   onRefreshProductLibrary,
+  onOpenProductLibrary,
   onRemoveItem,
   onSaveItemToProductLibrary,
   onSearchProductLibrary,
   onUndoItemEdit,
   productLibraryMessage,
   productLibraryProducts,
+  productLibraryPageNumber,
+  productLibraryPageSize,
+  productLibraryTotalCount,
+  productLibraryTotalPages,
+  onProductLibraryPageChange,
+  onProductLibraryPageSizeChange,
   unitLookupMessage,
   unitOptions,
 }: {
@@ -511,12 +518,19 @@ export function InvoiceMarksAndItemsPanel({
   ) => void;
   onRedoItemEdit: () => void;
   onRefreshProductLibrary: () => void;
+  onOpenProductLibrary: () => void;
   onRemoveItem: (index: number) => void;
   onSaveItemToProductLibrary: (index: number) => void;
   onSearchProductLibrary: (keyword: string) => void;
   onUndoItemEdit: () => void;
   productLibraryMessage: string | null;
   productLibraryProducts: ApiProductDto[];
+  productLibraryPageNumber: number;
+  productLibraryPageSize: number;
+  productLibraryTotalCount: number;
+  productLibraryTotalPages: number;
+  onProductLibraryPageChange: (pageNumber: number) => void;
+  onProductLibraryPageSizeChange: (pageSize: number) => void;
   unitLookupMessage: string | null;
   unitOptions: ApiUnitDto[];
 }) {
@@ -724,12 +738,19 @@ export function InvoiceMarksAndItemsPanel({
         onPasteItemTable={onPasteItemTable}
         onRedoItemEdit={onRedoItemEdit}
         onRefreshProductLibrary={onRefreshProductLibrary}
+        onOpenProductLibrary={onOpenProductLibrary}
         onRemoveItem={onRemoveItem}
         onSaveItemToProductLibrary={onSaveItemToProductLibrary}
         onSearchProductLibrary={onSearchProductLibrary}
         onUndoItemEdit={onUndoItemEdit}
         productLibraryMessage={productLibraryMessage}
         productLibraryProducts={productLibraryProducts}
+        productLibraryPageNumber={productLibraryPageNumber}
+        productLibraryPageSize={productLibraryPageSize}
+        productLibraryTotalCount={productLibraryTotalCount}
+        productLibraryTotalPages={productLibraryTotalPages}
+        onProductLibraryPageChange={onProductLibraryPageChange}
+        onProductLibraryPageSizeChange={onProductLibraryPageSizeChange}
         focusedWorkbench={isFocusedWorkbench}
         unitLookupMessage={unitLookupMessage}
         unitOptions={unitOptions}

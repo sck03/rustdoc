@@ -85,9 +85,14 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<Invoice>().HasIndex(i => i.ExporterId);
             modelBuilder.Entity<Invoice>().HasIndex(i => i.OwnerUserId);
             modelBuilder.Entity<Invoice>().HasIndex(i => new { i.CompanyScope, i.DepartmentId });
+            modelBuilder.Entity<Invoice>().HasIndex(i => new { i.OwnerUserId, i.InvoiceDate, i.Id });
+            modelBuilder.Entity<Invoice>().HasIndex(i => new { i.CompanyScope, i.DepartmentId, i.InvoiceDate, i.Id });
 
             modelBuilder.Entity<Item>().HasIndex(i => i.InvoiceId);
             modelBuilder.Entity<Item>().HasIndex(i => i.StyleNo); // Frequently searched
+            modelBuilder.Entity<Item>().HasIndex(i => new { i.InvoiceId, i.StyleNo });
+            modelBuilder.Entity<Item>().HasIndex(i => new { i.InvoiceId, i.StyleName });
+            modelBuilder.Entity<Item>().HasIndex(i => new { i.InvoiceId, i.HSCode });
 
             modelBuilder.Entity<Customer>().HasIndex(c => c.CustomerNameEN);
             modelBuilder.Entity<CrmCustomer>().HasIndex(item => item.Name);
@@ -189,6 +194,7 @@ namespace ExportDocManager.DataAccess
             
             modelBuilder.Entity<Product>().HasIndex(p => p.ProductCode);
             modelBuilder.Entity<Product>().HasIndex(p => p.NameEN);
+            modelBuilder.Entity<Product>().HasIndex(p => new { p.ProductCode, p.NameEN, p.UpdatedAt, p.Id });
 
             modelBuilder.Entity<HsCode>().HasIndex(h => h.Code);
             modelBuilder.Entity<HsCode>().HasIndex(h => h.NormalizedCode);
@@ -199,6 +205,7 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<HsCodeDeclarationExample>().HasIndex(item => item.RawReportedHsCode);
             modelBuilder.Entity<HsCodeDeclarationExample>().HasIndex(item => item.ResolvedCurrentHsCode);
             modelBuilder.Entity<HsCodeDeclarationExample>().HasIndex(item => new { item.ResolutionStatus, item.UpdatedAt });
+            modelBuilder.Entity<HsCodeDeclarationExample>().HasIndex(item => new { item.IsManuallyVerified, item.UpdatedAt });
             modelBuilder.Entity<HsCodeReplacementRelation>()
                 .HasIndex(item => new { item.OldCode, item.NewCode, item.EffectiveYear })
                 .IsUnique();

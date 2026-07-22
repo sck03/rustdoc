@@ -9,6 +9,7 @@ import {
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 import { hasReportDesignerSchema } from "../report-designer/reportDesignerTemplateParser.ts";
 import {
@@ -222,6 +223,16 @@ export function ReportTemplateDesignerPage({
     setMessage(null);
     setMessageType(null);
   }, []);
+  const hasAppliedTemplateChanges = content !== loadedContent;
+  const hasUnappliedDesignerChanges =
+    designerMode === "new" && Boolean(designerDraftContent.trim()) && designerDraftContent !== content;
+  const hasUnsavedTemplateChanges = Boolean(
+    selectedTemplatePath && (hasAppliedTemplateChanges || hasUnappliedDesignerChanges),
+  );
+  const { confirmDiscardChanges } = useUnsavedChangesGuard({
+    isDirty: hasUnsavedTemplateChanges,
+    message: "当前报表模板有未保存的修改。",
+  });
   const {
     clearLoadedTemplateContent,
     handleReportTypeChange,
@@ -246,6 +257,7 @@ export function ReportTemplateDesignerPage({
     setPreviewInvoiceId,
     setPreviewPaymentId,
     clearFeedback: clearSelectionFeedback,
+    confirmDiscardChanges,
   });
 
   const { saveDefaultTemplateMutation: saveMutation, saveUserTemplateMutation } = useReportTemplateSaveMutations({
@@ -413,6 +425,8 @@ export function ReportTemplateDesignerPage({
     selectedTemplateContentActive,
     isBusy,
     hasChanges,
+    hasUnappliedDesignerChanges: workspaceHasUnappliedDesignerChanges,
+    hasUnsavedChanges,
     canRenderTemplatePreview,
     canCreateTemplate,
     canCreateUserTemplate,
@@ -502,12 +516,12 @@ export function ReportTemplateDesignerPage({
       return;
     }
 
-    if (hasChanges && !await requestConfirmation({ title: "重命名模板", description: "当前模板有未保存修改，确定继续重命名吗？", details: ["用户模板会先保存当前内容；内置文件模板将按现有重命名规则处理。"], confirmLabel: "继续重命名" })) {
+    if (hasUnsavedChanges && !await requestConfirmation({ title: "重命名模板", description: "当前模板有未保存修改，确定继续重命名吗？", details: ["用户模板会先保存当前内容；内置文件模板将按现有重命名规则处理。"], confirmLabel: "继续重命名" })) {
       return;
     }
 
     if (isUserTemplate) {
-      saveUserTemplateMutation.mutate(content);
+      saveUserTemplateMutation.mutate(previewContent);
     } else {
       renameTemplateMutation.mutate();
     }
@@ -518,7 +532,7 @@ export function ReportTemplateDesignerPage({
       return;
     }
 
-    if (!await requestConfirmation({ title: "删除报表模板", description: "确定删除当前模板吗？", details: hasChanges ? ["当前模板有未保存修改，这些修改将丢失。"] : undefined, confirmLabel: "确认删除", tone: "danger" })) {
+    if (!await requestConfirmation({ title: "删除报表模板", description: "确定删除当前模板吗？", details: hasUnsavedChanges ? ["当前模板有未保存修改，这些修改将丢失。"] : undefined, confirmLabel: "确认删除", tone: "danger" })) {
       return;
     }
 
@@ -531,13 +545,36 @@ export function ReportTemplateDesignerPage({
 
   function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (canSave) {
-      if (isUserTemplate) {
-        saveUserTemplateMutation.mutate(undefined);
-      } else {
-        saveMutation.mutate(undefined);
-      }
+    if (!canSave) {
+      return;
     }
+    if (workspaceHasUnappliedDesignerChanges) {
+      void handleSaveNewReportDesignerContent(previewContent);
+    } else if (isUserTemplate) {
+      saveUserTemplateMutation.mutate(undefined);
+    } else {
+      saveMutation.mutate(undefined);
+    }
+  }
+
+  function handleDesignerModeChange(mode: DesignerMode) {
+    if (mode === designerMode) {
+      return;
+    }
+    if (designerMode === "new" && workspaceHasUnappliedDesignerChanges) {
+      setContent(designerDraftContent);
+      setContentTemplatePath(selectedTemplatePath);
+      setPreview(null);
+    }
+    setWorkspaceMode("design");
+    setDesignerMode(mode);
+  }
+
+  async function handleRefreshTemplates() {
+    if (!await confirmDiscardChanges("刷新报表模板")) {
+      return;
+    }
+    await Promise.all([templatesQuery.refetch(), userTemplatesQuery.refetch()]);
   }
 
   async function handleApplyNewReportDesignerContent(nextContent: string) {
@@ -655,15 +692,9 @@ export function ReportTemplateDesignerPage({
           isBusy={isBusy}
           canPreview={canRenderTemplatePreview}
           canSave={canSave}
-          onDesignerModeChange={(mode) => {
-            setWorkspaceMode("design");
-            setDesignerMode(mode);
-          }}
+          onDesignerModeChange={handleDesignerModeChange}
           onWorkspaceModeChange={setWorkspaceMode}
-          onRefresh={() => {
-            void templatesQuery.refetch();
-            void userTemplatesQuery.refetch();
-          }}
+          onRefresh={() => void handleRefreshTemplates()}
           onPreview={handleRenderTemplatePreview}
         />
 
@@ -758,10 +789,10 @@ export function ReportTemplateDesignerPage({
               onExport={() => packageWorkspace.exportPackage(canExportPackage)}
               onExportByPath={() => packageWorkspace.exportByPath(canExportPackageByPath)}
               onDownload={() => packageWorkspace.downloadPackage(canDownloadPackage)}
-              onImport={() => packageWorkspace.importPackage(canImportPackage, hasChanges)}
-              onImportByPath={() => packageWorkspace.importByPath(canImportPackageByPath, hasChanges)}
+              onImport={() => packageWorkspace.importPackage(canImportPackage, hasUnsavedChanges)}
+              onImportByPath={() => packageWorkspace.importByPath(canImportPackageByPath, hasUnsavedChanges)}
               onUpload={() => packageWorkspace.chooseUpload(canUploadPackage)}
-              onUploadFileChange={(event) => packageWorkspace.uploadFile(event, canUploadPackage, hasChanges)}
+              onUploadFileChange={(event) => packageWorkspace.uploadFile(event, canUploadPackage, hasUnsavedChanges)}
               onExportPathChange={packageWorkspace.setExportPath}
               onImportPathChange={packageWorkspace.setImportPath}
               onChooseExportPath={packageWorkspace.chooseExportPath}

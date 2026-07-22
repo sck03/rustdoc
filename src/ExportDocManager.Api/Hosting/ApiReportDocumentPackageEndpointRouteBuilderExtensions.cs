@@ -320,7 +320,8 @@ namespace ExportDocManager.Api.Hosting
                         CreateZip = createZip,
                         DestinationPath = destinationPath
                     }
-                }));
+                }),
+                initialOutputPath: destinationPath);
         }
 
         internal static async Task<string> CopyInvoiceDocumentSetToExportFolderAsync(

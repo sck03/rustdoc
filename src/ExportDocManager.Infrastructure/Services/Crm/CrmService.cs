@@ -272,6 +272,33 @@ namespace ExportDocManager.Services.Crm
                 .ToArray();
         }
 
+        public async Task<PagedResult<CrmFollowUpRecord>> QueryFollowUpsAsync(
+            int? crmCustomerId, bool includeCompleted, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var query = _accessScope.ApplyCrmFollowUpScope(context.CrmFollowUps.AsNoTracking());
+            if (crmCustomerId is > 0) query = query.Where(item => item.CrmCustomerId == crmCustomerId.Value);
+            if (!includeCompleted) query = query.Where(item => !item.IsCompleted);
+            pageNumber = Math.Max(1, pageNumber);
+            pageSize = Math.Clamp(pageSize, 1, 100);
+            var totalCount = await query.CountAsync(cancellationToken);
+            var rows = await query
+                .OrderBy(item => item.IsCompleted)
+                .ThenBy(item => item.NextFollowUpAt ?? DateTimeOffset.MaxValue)
+                .ThenByDescending(item => item.FollowedUpAt)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(item => new CrmFollowUpRecord(
+                    item.Id, item.CrmCustomerId,
+                    context.CrmCustomers.Where(customer => customer.Id == item.CrmCustomerId).Select(customer => customer.Name).FirstOrDefault() ?? string.Empty,
+                    item.CrmContactId,
+                    context.CrmContacts.Where(contact => contact.Id == item.CrmContactId).Select(contact => contact.Name).FirstOrDefault() ?? string.Empty,
+                    item.Type, item.Summary, item.NextAction, item.FollowedUpAt, item.NextFollowUpAt,
+                    item.IsCompleted, item.CreatedAt, item.UpdatedAt, item.VersionNumber))
+                .ToListAsync(cancellationToken);
+            return new PagedResult<CrmFollowUpRecord>(rows, totalCount, pageNumber, pageSize);
+        }
+
         public async Task<CrmFollowUpRecord> SaveFollowUpAsync(CrmFollowUpSaveRequest request, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(request);

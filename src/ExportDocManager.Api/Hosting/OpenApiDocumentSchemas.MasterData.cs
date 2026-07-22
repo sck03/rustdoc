@@ -352,6 +352,21 @@ namespace ExportDocManager.Api.Hosting
                                 ["rowVersion"] = StringProperty("Concurrency row version encoded as base64.")
                             }
                         },
+                        ["ApiPagedResponseOfApiProductDto"] = new
+                        {
+                            type = "object",
+                            required = new[] { "items", "totalCount", "pageNumber", "pageSize", "totalPages", "hasPreviousPage", "hasNextPage" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["items"] = new { type = "array", items = RefSchema("ApiProductDto") },
+                                ["totalCount"] = new { type = "integer", format = "int32" },
+                                ["pageNumber"] = new { type = "integer", format = "int32" },
+                                ["pageSize"] = new { type = "integer", format = "int32" },
+                                ["totalPages"] = new { type = "integer", format = "int32" },
+                                ["hasPreviousPage"] = new { type = "boolean" },
+                                ["hasNextPage"] = new { type = "boolean" }
+                            }
+                        },
                         ["ApiPortDto"] = new
                         {
                             type = "object",

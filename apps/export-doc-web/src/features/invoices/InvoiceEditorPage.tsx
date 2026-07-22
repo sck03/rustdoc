@@ -605,12 +605,19 @@ export function InvoiceEditorPage({
       onPasteItemTable={itemsWorkspace.pasteItemTable}
       onRedoItemEdit={itemsWorkspace.redoItemEdit}
       onRefreshProductLibrary={itemsWorkspace.refreshProductLibrary}
+      onOpenProductLibrary={itemsWorkspace.openProductLibrary}
       onRemoveItem={itemsWorkspace.removeItem}
       onSaveItemToProductLibrary={itemsWorkspace.saveItemToProductLibrary}
       onSearchProductLibrary={itemsWorkspace.searchProductLibrary}
       onUndoItemEdit={itemsWorkspace.undoItemEdit}
       productLibraryMessage={productMessage}
       productLibraryProducts={products}
+      productLibraryPageNumber={itemsWorkspace.productLibraryPageNumber}
+      productLibraryPageSize={itemsWorkspace.productLibraryPageSize}
+      productLibraryTotalCount={itemsWorkspace.productLibraryTotalCount}
+      productLibraryTotalPages={itemsWorkspace.productLibraryTotalPages}
+      onProductLibraryPageChange={itemsWorkspace.setProductLibraryPageNumber}
+      onProductLibraryPageSizeChange={itemsWorkspace.changeProductLibraryPageSize}
       unitLookupMessage={unitLookupMessage}
       unitOptions={units}
     />

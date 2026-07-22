@@ -8,14 +8,9 @@ import { queryClient } from "./queryClient.ts";
 import { FrontendErrorBoundary } from "./ui/FrontendErrorBoundary.tsx";
 import { UnsavedChangesProvider } from "./ui/unsavedChangesGuard.tsx";
 import { ConfirmationProvider } from "./ui/ConfirmationProvider.tsx";
-import "./styles.css";
-import "./workspaceFeatures.css";
-import "./reportWorkspace.css";
-import "./businessFeatures.css";
-import "./responsiveOverrides.css";
-import "./theme.css";
-import "./ui/commercialComponents.css";
-import "./features/master-data/hsKnowledge.css";
+import "./styles/foundation.css";
+import "./styles/workspaces.css";
+import "./styles/responsive.css";
 
 installFrontendErrorLogger();
 

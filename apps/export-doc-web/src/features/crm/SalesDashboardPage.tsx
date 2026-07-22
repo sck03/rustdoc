@@ -8,7 +8,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
-import { InlineNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 
 export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
@@ -21,12 +21,12 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
     .filter((item) => item.stage === "已报价" || item.stage === "谈判中")
     .reduce((total, item) => total + item.count, 0);
   const metrics = [
-    { label: "销售客户", value: dashboard?.customerCount ?? 0, icon: ContactRound, tone: "teal", to: "/crm/follow-ups?view=directory" },
-    { label: "联系人", value: dashboard?.contactCount ?? 0, icon: UsersRound, tone: "blue", to: "/crm/follow-ups?view=profile" },
-    { label: "待跟进", value: dashboard?.pendingFollowUpCount ?? 0, icon: CalendarRange, tone: "amber", to: "/crm/follow-ups?view=followups" },
-    { label: "已逾期", value: dashboard?.overdueFollowUpCount ?? 0, icon: AlarmClock, tone: "violet", to: "/crm/follow-ups?view=followups" },
-    { label: "进行中商机", value: openOpportunityCount, icon: TrendingUp, tone: "teal", to: "/crm/opportunities?view=directory" },
-    { label: "报价/谈判", value: quotedOpportunityCount, icon: CircleDollarSign, tone: "amber", to: "/crm/opportunities?view=directory" },
+    { label: "销售客户", value: dashboard ? dashboard.customerCount : "—", icon: ContactRound, tone: "teal", to: "/crm/follow-ups?view=directory" },
+    { label: "联系人", value: dashboard ? dashboard.contactCount : "—", icon: UsersRound, tone: "blue", to: "/crm/follow-ups?view=profile" },
+    { label: "待跟进", value: dashboard ? dashboard.pendingFollowUpCount : "—", icon: CalendarRange, tone: "amber", to: "/crm/follow-ups?view=followups" },
+    { label: "已逾期", value: dashboard ? dashboard.overdueFollowUpCount : "—", icon: AlarmClock, tone: "violet", to: "/crm/follow-ups?view=followups" },
+    { label: "进行中商机", value: dashboard ? openOpportunityCount : "—", icon: TrendingUp, tone: "teal", to: "/crm/opportunities?view=directory" },
+    { label: "报价/谈判", value: dashboard ? quotedOpportunityCount : "—", icon: CircleDollarSign, tone: "amber", to: "/crm/opportunities?view=directory" },
   ];
   const isFirstRun = Boolean(dashboard)
     && dashboard!.customerCount === 0
@@ -48,6 +48,7 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
       </div>
 
       {query.isError ? <InlineNotice tone="error" title="销售工作台加载失败">{readApiError(query.error)}</InlineNotice> : null}
+      {query.isLoading ? <PageState tone="loading" title="正在加载销售概览" description="正在读取客户、跟进和商机摘要。" /> : null}
       {isFirstRun ? <section className="sales-first-run" aria-label="销售工作区开始使用">
         <div className="sales-first-run-heading">
           <div><span>首次使用</span><h2>从一位客户开始</h2><p>只需完成下面三步，销售概览就会自动形成，不需要先配置复杂流程。</p></div>
@@ -87,7 +88,7 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
                 <td>{item.nextAction || item.summary}</td>
                 <td>{formatDateTime(item.nextFollowUpAt)}</td>
               </tr>)}
-              {!query.isFetching && (dashboard?.upcomingFollowUps.length ?? 0) === 0 ? <tr><td className="empty-cell" colSpan={4}>暂无待跟进事项</td></tr> : null}
+              {!query.isFetching && !query.isError && (dashboard?.upcomingFollowUps.length ?? 0) === 0 ? <tr><td className="empty-cell" colSpan={4}>暂无待跟进事项</td></tr> : null}
             </tbody>
           </table>
         </ResponsiveTableFrame>
@@ -98,14 +99,14 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
           <div className="section-header"><h2>商机阶段漏斗</h2></div>
           <ResponsiveTableFrame label="商机阶段漏斗" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>阶段</th><th>数量</th></tr></thead><tbody>
             {(dashboard?.opportunityStages ?? []).map((item) => <tr className="clickable-row" key={item.stage} tabIndex={0} onClick={() => navigate("/crm/opportunities")} onKeyDown={(event) => handleRowKeyDown(event, () => navigate("/crm/opportunities"))}><td><BusinessStatusBadge value={item.stage} /></td><td>{item.count}</td></tr>)}
-            {!dashboard?.opportunityStages.length ? <tr><td className="empty-cell" colSpan={2}>暂无商机阶段数据。</td></tr> : null}
+            {!query.isFetching && !query.isError && !dashboard?.opportunityStages.length ? <tr><td className="empty-cell" colSpan={2}>暂无商机阶段数据。</td></tr> : null}
           </tbody></table></ResponsiveTableFrame>
         </section>
         <section className="form-section" aria-label="商机金额汇总">
           <div className="section-header"><h2>进行中商机金额</h2><span>按币种分组</span></div>
           <ResponsiveTableFrame label="进行中商机金额" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>币种</th><th>商机数</th><th>预计金额</th><th>加权金额</th></tr></thead><tbody>
             {(dashboard?.opportunityCurrencies ?? []).map((item) => <tr key={item.currency}><td>{item.currency}</td><td>{item.count}</td><td>{formatAmount(item.estimatedAmount)}</td><td>{formatAmount(item.weightedAmount)}</td></tr>)}
-            {!dashboard?.opportunityCurrencies.length ? <tr><td className="empty-cell" colSpan={4}>暂无进行中商机金额。</td></tr> : null}
+            {!query.isFetching && !query.isError && !dashboard?.opportunityCurrencies.length ? <tr><td className="empty-cell" colSpan={4}>暂无进行中商机金额。</td></tr> : null}
           </tbody></table></ResponsiveTableFrame>
         </section>
       </div>
@@ -114,7 +115,7 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
         <div className="section-header"><h2>未来 30 天预计成交</h2></div>
         <ResponsiveTableFrame label="未来 30 天预计成交" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th data-table-priority="secondary">阶段</th><th>预计金额</th><th data-table-priority="secondary">概率</th><th>预计日期</th></tr></thead><tbody>
           {(dashboard?.upcomingOpportunityClosings ?? []).map((item) => <tr className="clickable-row" key={item.id} tabIndex={0} onClick={() => navigate("/crm/opportunities")} onKeyDown={(event) => handleRowKeyDown(event, () => navigate("/crm/opportunities"))}><td><TablePrimaryText value={item.title} /></td><td><TablePrimaryText value={item.customerName} /></td><td data-table-priority="secondary"><BusinessStatusBadge value={item.stage} /></td><td>{item.currency} {formatAmount(item.estimatedAmount)}</td><td data-table-priority="secondary">{item.probabilityPercent}%</td><td>{formatDate(item.expectedCloseAt)}</td></tr>)}
-          {!dashboard?.upcomingOpportunityClosings.length ? <tr><td className="empty-cell" colSpan={6}>未来 30 天暂无预计成交商机。</td></tr> : null}
+          {!query.isFetching && !query.isError && !dashboard?.upcomingOpportunityClosings.length ? <tr><td className="empty-cell" colSpan={6}>未来 30 天暂无预计成交商机。</td></tr> : null}
         </tbody></table></ResponsiveTableFrame>
       </section>
     </section>

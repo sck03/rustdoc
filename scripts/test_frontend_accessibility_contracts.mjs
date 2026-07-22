@@ -55,9 +55,47 @@ for (const file of walk(root)) {
   }
 
   if (sourceRelativePath === "features/invoices/useInvoiceItemsWorkspace.ts") {
-    for (const workspaceContract of ["maxInvoiceItemHistoryDepth = 50", "recalculateInvoiceItem", "masterDataRoot(\"products\")"]) {
+    for (const workspaceContract of ["maxInvoiceItemHistoryDepth = 50", "recalculateInvoiceItem", "masterDataRoot(\"products\")", "productLibraryEnabled", "productLibraryPageSize", "placeholderData: keepPreviousData"]) {
       if (!sourceText.includes(workspaceContract)) {
         failures.push(`${sourceRelativePath}: 发票明细工作区缺少历史、重算或商品库闭环：${workspaceContract}`);
+      }
+    }
+  }
+
+  if (sourceRelativePath === "features/invoices/InvoiceProductLibraryPickerDialog.tsx") {
+    for (const productLibraryContract of ["ListPaginationControls", "totalCount", "onPageSizeChange"]) {
+      if (!sourceText.includes(productLibraryContract)) {
+        failures.push(`${sourceRelativePath}: 商品库选择器必须使用服务端分页并展示准确总数：${productLibraryContract}`);
+      }
+    }
+  }
+
+  if (sourceRelativePath === "features/master-data/HsCodeKnowledgePage.tsx") {
+    for (const hsKnowledgeContract of ["useDebouncedValue", "placeholderData: keepPreviousData", "ListPaginationControls", "confirmSelected"]) {
+      if (!sourceText.includes(hsKnowledgeContract)) {
+        failures.push(`${sourceRelativePath}: HS 实例、候选和历史列表缺少防抖/分页/准确反馈闭环：${hsKnowledgeContract}`);
+      }
+    }
+  }
+
+  if (["features/suppliers/SupplierDirectoryPage.tsx", "features/opportunities/SalesOpportunityPage.tsx", "features/crm/CrmCustomerDirectoryPanel.tsx"].includes(sourceRelativePath)) {
+    for (const listContract of ["usePagedDirectoryQuery", "(signal)", "ListPaginationControls"]) {
+      if (!sourceText.includes(listContract)) {
+        failures.push(`${sourceRelativePath}: 业务目录分页必须统一使用可取消查询和公共分页组件：${listContract}`);
+      }
+    }
+  }
+
+  if (sourceRelativePath === "ui/usePagedDirectoryQuery.ts") {
+    for (const pagedQueryContract of ["keepPreviousData", "queryFn: ({ signal })", "query(signal)"]) {
+      if (!sourceText.includes(pagedQueryContract)) failures.push(`${sourceRelativePath}: 公共分页查询必须保留旧页并取消过期请求：${pagedQueryContract}`);
+    }
+  }
+
+  if (sourceRelativePath === "features/reports/ReportTemplateDesignerPage.tsx") {
+    for (const reportDraftContract of ["useUnsavedChangesGuard", "designerDraftContent", "hasUnsavedChanges", "handleRefreshTemplates"]) {
+      if (!sourceText.includes(reportDraftContract)) {
+        failures.push(`${sourceRelativePath}: 报表设计器必须识别画布草稿并保护未保存切换：${reportDraftContract}`);
       }
     }
   }
@@ -156,6 +194,13 @@ for (const file of walk(root)) {
         failures.push(`${sourceRelativePath}: 权限或授权跳转必须在已登录工作区显示可关闭通知：${requiredWorkspaceNoticeContract}`);
       }
     }
+  }
+
+  if (sourceRelativePath === "main.tsx") {
+    for (const cssLayer of ["./styles/foundation.css", "./styles/workspaces.css", "./styles/responsive.css"]) {
+      if (!sourceText.includes(cssLayer)) failures.push(`${sourceRelativePath}: CSS 入口缺少分层加载：${cssLayer}`);
+    }
+    if (sourceText.includes('import "./responsiveOverrides.css"')) failures.push(`${sourceRelativePath}: 响应式覆盖不应绕过最终 responsive 层`);
   }
 
   if (sourceRelativePath === "app/WorkspaceShell.tsx") {
