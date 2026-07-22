@@ -124,6 +124,9 @@ try {
               return tops.every((top) => Math.abs(top - tops[0]) <= 1);
             })()
           : true;
+        const compactNavigationWidth = ${JSON.stringify(pageName)} !== "login" && ${viewport.width} >= 861 && ${viewport.width} <= 1180
+          ? document.querySelector(".workspace-nav")?.getBoundingClientRect().width ?? 1000
+          : null;
         return {
           title: document.title,
           scrollWidth: root.scrollWidth,
@@ -134,6 +137,7 @@ try {
           truncatedCriticalText,
           partyControlOverflow,
           reportPanelsSameRow,
+          compactNavigationWidth,
           invoiceDetailColumnCount: ${JSON.stringify(pageName)} === "invoice" ? document.querySelectorAll(".item-editor-table thead th").length : null,
           workspaceNavigation: ${JSON.stringify(pageName)} === "login" ? true : visible(".workspace-nav"),
           expectedStickyControl: ${JSON.stringify(pageName)} === "invoice" ? visible(".invoice-editor-sticky-actions")
@@ -153,6 +157,7 @@ try {
         && value.truncatedCriticalText.length === 0
         && value.partyControlOverflow === 0
         && value.reportPanelsSameRow
+        && (value.compactNavigationWidth === null || value.compactNavigationWidth <= 80)
         && (value.invoiceDetailColumnCount === null || value.invoiceDetailColumnCount >= 20)
         && value.workspaceNavigation && value.expectedStickyControl && value.expectedDialog
         && pixelComparison.passed;

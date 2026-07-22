@@ -998,6 +998,10 @@ tbody tr:hover {
     grid-template-columns: 238px minmax(0, 1fr);
   }
 
+  .app-shell-nav-collapsed {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+
   .workspace-header,
   .work-surface,
   .editor-surface,
