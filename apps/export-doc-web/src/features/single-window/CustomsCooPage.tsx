@@ -9,9 +9,7 @@ import {
   ApiCustomsCooItemDto,
   ApiCustomsCooNonpartyCorpDto,
   ApiCustomsCooOptionDto,
-  ApiCustomsCooProducerProfileInputDto,
   ApiSingleWindowIssuingAuthorityOptionDto,
-  ApiSingleWindowLockedFieldDto,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
@@ -35,6 +33,9 @@ import { SingleWindowScopedClearControls } from "./SingleWindowScopedClearContro
 import { SingleWindowDocumentActionBar } from "./SingleWindowDocumentActionBar.tsx";
 import { SingleWindowSectionNav } from "./SingleWindowSectionNav.tsx";
 import { SingleWindowTabs } from "./SingleWindowNavigation.tsx";
+import { useSingleWindowLockedFields } from "./useSingleWindowLockedFields.ts";
+import { useCustomsCooProducerProfiles } from "./useCustomsCooProducerProfiles.ts";
+import { useCustomsCooAuthoritySelection } from "./useCustomsCooAuthoritySelection.ts";
 import {
   applyCooDefaultsForScope,
   applyCooDefaultsToEmptyFields,
@@ -44,29 +45,22 @@ import {
   cooScopedClearOptionsByGroup,
 } from "./singleWindowEditorTools.ts";
 import {
-  applyProducerProfileToCooItem,
   buildCooDocumentSnapshot,
   buildCooGoodsDescription,
-  buildProducerProfileInputFromCooItem,
-  buildProducerProfileRowLabel,
   copyCooOriginAndEnterpriseFields,
-  countProducerProfileChanges,
   createAttachmentFromPath,
   createEmptyCooItem,
   createEmptyNonpartyCorp,
-  findIssuingAuthority,
   formatScopedClearResultMessage,
   getCooGoodsDescriptionFailureMessage,
   isMeaningfulCooItem,
   isMeaningfulNonpartyCorp,
   normalizeAttachment,
-  normalizeAuthorityCompareText,
   normalizeCooDocumentForSave,
   normalizeCooItem,
   normalizeNonpartyCorp,
   normalizeText,
   numberOrZero,
-  parseIssuingAuthorityCode,
   toIssuingAuthorityOptions,
   type CooScopedClearRequest,
 } from "./customsCooModel.ts";
@@ -103,11 +97,6 @@ const emptyCooEditorOptions: ApiCustomsCooEditorOptionsResponse = {
   storagePolicy: "",
 };
 
-type CooAuthorityAutoState = {
-  fetchPlace: string;
-  aplAdd: string;
-};
-
 export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }) {
   const requestConfirmation = useConfirmation();
   const permission = useModulePermission("document.single-window");
@@ -123,13 +112,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
   const [undoDocument, setUndoDocument] = useState<ApiCustomsCooDocumentDto | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [lockedFieldsOpen, setLockedFieldsOpen] = useState(false);
-  const [lockedFields, setLockedFields] = useState<ApiSingleWindowLockedFieldDto[]>([]);
-  const [selectedLockedFieldKeys, setSelectedLockedFieldKeys] = useState<Set<string>>(() => new Set());
-  const [producerProfileRowIndex, setProducerProfileRowIndex] = useState<number | null>(null);
-  const [savingProducerProfileRowIndex, setSavingProducerProfileRowIndex] = useState<number | null>(null);
   const [persistedDocumentSnapshot, setPersistedDocumentSnapshot] = useState<string | null>(null);
-  const [authorityAutoState, setAuthorityAutoState] = useState<CooAuthorityAutoState>({ fetchPlace: "", aplAdd: "" });
 
   const documentQuery = useQuery({
     queryKey: documentQueryKey,
@@ -167,7 +150,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
       setPersistedDocumentSnapshot(buildCooDocumentSnapshot(documentQuery.data, parsedInvoiceId));
       setUndoDocument(null);
       setMessage(null);
-      setAuthorityAutoState({ fetchPlace: "", aplAdd: "" });
+      authoritySelection.reset();
     }
   }, [documentQuery.data, parsedInvoiceId]);
 
@@ -294,103 +277,35 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     },
   });
 
-  const lockedFieldsMutation = useMutation({
-    mutationFn: async () => {
-      if (!document || !isInvoiceIdValid) {
-        return null;
-      }
-
-      let savedDocument: ApiCustomsCooDocumentDto | null = null;
-      if (documentQuery.data && !areEditorDocumentsEqual(document, documentQuery.data)) {
-        if (!await requestConfirmation({ title: "保存后查看锁定字段", description: "当前草稿有未保存修改，需要先保存后再读取锁定字段。", confirmLabel: "保存并继续" })) {
-          return null;
-        }
-
-        const saveResponse = await client.saveCustomsCooDocument({
-          invoiceId: parsedInvoiceId,
-          body: normalizeCooDocumentForSave(document, parsedInvoiceId),
-        });
-        savedDocument = saveResponse.document;
-      }
-
-      const lockedFieldsResponse = await client.getCustomsCooLockedFields({ invoiceId: parsedInvoiceId });
-      return { savedDocument, lockedFieldsResponse };
-    },
-    onSuccess: (result) => {
-      if (!result) {
-        return;
-      }
-
-      if (result.savedDocument) {
-        setDocument(result.savedDocument);
-        setPersistedDocumentSnapshot(buildCooDocumentSnapshot(result.savedDocument, parsedInvoiceId));
-        setUndoDocument(null);
-        queryClient.setQueryData(documentQueryKey, result.savedDocument);
-        void Promise.all([
-          queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() }),
-          queryClient.invalidateQueries({ queryKey: reviewQueryKey }),
-        ]);
-      }
-
-      setLockedFields(result.lockedFieldsResponse.fields);
-      setSelectedLockedFieldKeys(new Set());
-      setLockedFieldsOpen(true);
-      setMessage(null);
-      setSuccessMessage(null);
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const unlockFieldsMutation = useMutation({
-    mutationFn: (fieldKeys: string[]) =>
-      client.unlockCustomsCooFields({
+  const lockedFieldsWorkspace = useSingleWindowLockedFields({
+    document,
+    isDocumentValid: isInvoiceIdValid,
+    hasUnsavedChanges: Boolean(document && documentQuery.data && !areEditorDocumentsEqual(document, documentQuery.data)),
+    saveDocument: async () => {
+      const response = await client.saveCustomsCooDocument({
         invoiceId: parsedInvoiceId,
-        body: { fieldKeys },
-      }),
-    onSuccess: (response) => {
-      setDocument(response.document);
-      setPersistedDocumentSnapshot(buildCooDocumentSnapshot(response.document, parsedInvoiceId));
+        body: normalizeCooDocumentForSave(document!, parsedInvoiceId),
+      });
+      return response.document;
+    },
+    loadLockedFields: () => client.getCustomsCooLockedFields({ invoiceId: parsedInvoiceId }),
+    unlockFields: (fieldKeys) => client.unlockCustomsCooFields({ invoiceId: parsedInvoiceId, body: { fieldKeys } }),
+    applyPersistedDocument: (nextDocument) => {
+      setDocument(nextDocument);
+      setPersistedDocumentSnapshot(buildCooDocumentSnapshot(nextDocument, parsedInvoiceId));
       setUndoDocument(null);
-      setLockedFields(response.lockedFields);
-      setSelectedLockedFieldKeys(new Set());
-      queryClient.setQueryData(documentQueryKey, response.document);
-      setMessage(null);
-      setSuccessMessage(response.message || "字段已恢复为当前建议值。");
+      queryClient.setQueryData(documentQueryKey, nextDocument);
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() }),
         queryClient.invalidateQueries({ queryKey: reviewQueryKey }),
       ]);
     },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
+    clearMessages: () => { setMessage(null); setSuccessMessage(null); },
+    showError: (nextMessage) => { setMessage(nextMessage); setSuccessMessage(null); },
+    showSuccess: (nextMessage) => { setMessage(null); setSuccessMessage(nextMessage); },
   });
 
-  const saveProducerProfileMutation = useMutation({
-    mutationFn: (request: { rowIndex: number; profile: ApiCustomsCooProducerProfileInputDto }) =>
-      client.createCustomsCooProducerProfile({
-        body: { profile: request.profile },
-      }),
-    onMutate: (request) => {
-      setSavingProducerProfileRowIndex(request.rowIndex);
-    },
-    onSuccess: async (response) => {
-      setMessage(null);
-      setSuccessMessage(response.message || "当前生产企业已保存到资料库。");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowCustomsCooProducerProfilesRoot() });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-    onSettled: () => {
-      setSavingProducerProfileRowIndex(null);
-    },
-  });
+  const producerProfiles = useCustomsCooProducerProfiles({ client, queryClient, document, setDocument: (next) => setDocument(next), setUndoDocument, setMessage, setSuccessMessage });
 
   const isBusy =
     documentQuery.isFetching ||
@@ -400,9 +315,8 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     scopedClearMutation.isPending ||
     repairReviewMutation.isPending ||
     saveMutation.isPending ||
-    lockedFieldsMutation.isPending ||
-    unlockFieldsMutation.isPending ||
-    saveProducerProfileMutation.isPending;
+    lockedFieldsWorkspace.isPending ||
+    producerProfiles.isPending;
   const loadMessage = !isInvoiceIdValid
     ? "发票 ID 无效。"
     : documentQuery.isError
@@ -416,6 +330,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
       : null;
   const editorOptions = editorOptionsQuery.data ?? emptyCooEditorOptions;
   const issuingAuthorityOptions = issuingAuthoritiesQuery.data?.options ?? [];
+  const authoritySelection = useCustomsCooAuthoritySelection(document, issuingAuthorityOptions, patchDocument);
   const issuingAuthorityCooOptions = useMemo(
     () => toIssuingAuthorityOptions(issuingAuthorityOptions),
     [issuingAuthorityOptions],
@@ -464,62 +379,6 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     setDocument((current) => (current ? { ...current, ...next } : current));
     setUndoDocument(null);
     setSuccessMessage(null);
-  }
-
-  function handleOrgCodeChange(value: string) {
-    if (!document) {
-      return;
-    }
-
-    const orgCode = parseIssuingAuthorityCode(value, issuingAuthorityOptions);
-    const authority = findIssuingAuthority(orgCode, issuingAuthorityOptions);
-    const nextDocument: Partial<ApiCustomsCooDocumentDto> = { orgCode };
-    const nextAutoState: CooAuthorityAutoState = { ...authorityAutoState };
-
-    if (authority) {
-      if (
-        !document.fetchPlace.trim() ||
-        normalizeAuthorityCompareText(document.fetchPlace) === normalizeAuthorityCompareText(authorityAutoState.fetchPlace)
-      ) {
-        nextDocument.fetchPlace = authority.code;
-        nextAutoState.fetchPlace = authority.code;
-      }
-
-      if (
-        authority.applicationAddress &&
-        (!document.aplAdd.trim() ||
-          normalizeAuthorityCompareText(document.aplAdd) === normalizeAuthorityCompareText(authorityAutoState.aplAdd))
-      ) {
-        nextDocument.aplAdd = authority.applicationAddress;
-        nextAutoState.aplAdd = authority.applicationAddress;
-      }
-    }
-
-    setAuthorityAutoState(nextAutoState);
-    patchDocument(nextDocument);
-  }
-
-  function handleFetchPlaceChange(value: string) {
-    const fetchPlace = parseIssuingAuthorityCode(value, issuingAuthorityOptions);
-    if (
-      authorityAutoState.fetchPlace &&
-      normalizeAuthorityCompareText(fetchPlace) !== normalizeAuthorityCompareText(authorityAutoState.fetchPlace)
-    ) {
-      setAuthorityAutoState((current) => ({ ...current, fetchPlace: "" }));
-    }
-
-    patchDocument({ fetchPlace });
-  }
-
-  function handleAplAddChange(value: string) {
-    if (
-      authorityAutoState.aplAdd &&
-      normalizeAuthorityCompareText(value) !== normalizeAuthorityCompareText(authorityAutoState.aplAdd)
-    ) {
-      setAuthorityAutoState((current) => ({ ...current, aplAdd: "" }));
-    }
-
-    patchDocument({ aplAdd: value });
   }
 
   function patchItem(index: number, next: Partial<ApiCustomsCooItemDto>) {
@@ -760,97 +619,6 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     });
   }
 
-  function handleOpenLockedFields() {
-    if (!document || !isInvoiceIdValid) {
-      return;
-    }
-
-    setMessage(null);
-    setSuccessMessage(null);
-    lockedFieldsMutation.mutate();
-  }
-
-  function toggleLockedField(key: string) {
-    setSelectedLockedFieldKeys((current) => {
-      const next = new Set(current);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-
-      return next;
-    });
-  }
-
-  function toggleAllLockedFields() {
-    setSelectedLockedFieldKeys((current) =>
-      current.size === lockedFields.length ? new Set() : new Set(lockedFields.map((field) => field.key)),
-    );
-  }
-
-  function handleUnlockSelectedFields() {
-    const fieldKeys = Array.from(selectedLockedFieldKeys);
-    if (fieldKeys.length === 0 || !isInvoiceIdValid) {
-      return;
-    }
-
-    unlockFieldsMutation.mutate(fieldKeys);
-  }
-
-  function handleOpenProducerProfiles(index: number) {
-    if (!document || !document.items[index]) {
-      return;
-    }
-
-    setProducerProfileRowIndex(index);
-    setMessage(null);
-    setSuccessMessage(null);
-  }
-
-  function handleApplyProducerProfile(profile: ApiCustomsCooProducerProfileInputDto) {
-    if (!document || producerProfileRowIndex === null || !document.items[producerProfileRowIndex]) {
-      return;
-    }
-
-    const snapshot = cloneEditorDocument(document);
-    const currentItem = document.items[producerProfileRowIndex];
-    const nextItem = applyProducerProfileToCooItem(currentItem, profile);
-    const changedCount = countProducerProfileChanges(currentItem, nextItem);
-    if (changedCount === 0) {
-      setProducerProfileRowIndex(null);
-      setMessage(null);
-      setSuccessMessage("当前货项已经是这条生产企业资料。");
-      return;
-    }
-
-    setDocument({
-      ...document,
-      items: document.items.map((item, index) => (index === producerProfileRowIndex ? nextItem : item)),
-    });
-    setUndoDocument(snapshot);
-    setProducerProfileRowIndex(null);
-    setMessage(null);
-    setSuccessMessage(`已将生产企业资料回填到第 ${producerProfileRowIndex + 1} 行，保存后写入草稿。`);
-  }
-
-  function handleSaveProducerProfile(index: number) {
-    if (!document || !document.items[index]) {
-      return;
-    }
-
-    const profile = buildProducerProfileInputFromCooItem(document.items[index], document);
-    if (!profile.ciqRegNo.trim() && !profile.prdcEtpsName.trim()) {
-      setMessage("请先填写当前货项的生产企业代码或生产企业名称。");
-      setSuccessMessage(null);
-      return;
-    }
-
-    setMessage(null);
-    setSuccessMessage(null);
-    saveProducerProfileMutation.mutate({ rowIndex: index, profile });
-  }
-
   function handleGenerateGoodsDescription(index: number) {
     if (!document || !document.items[index]) {
       return;
@@ -978,7 +746,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
         onRestoreDefaults={handleRestoreDefaults}
         onFillEmptyFields={handleFillEmptyFields}
         onClearManualOverrides={handleClearManualOverrides}
-        onOpenLockedFields={handleOpenLockedFields}
+        onOpenLockedFields={lockedFieldsWorkspace.open}
         onUndo={handleUndoToolAction}
         onBuildReview={() => void reviewQuery.refetch()}
       />
@@ -1010,9 +778,9 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
             editorOptions={editorOptions}
             issuingAuthorityOptions={issuingAuthorityCooOptions}
             onPatch={patchDocument}
-            onOrgCodeChange={handleOrgCodeChange}
-            onFetchPlaceChange={handleFetchPlaceChange}
-            onApplicationAddressChange={handleAplAddChange}
+            onOrgCodeChange={authoritySelection.changeOrgCode}
+            onFetchPlaceChange={authoritySelection.changeFetchPlace}
+            onApplicationAddressChange={authoritySelection.changeApplicationAddress}
           />
 
           <CustomsCooTradeSections document={document} editorOptions={editorOptions} onPatch={patchDocument} />
@@ -1021,14 +789,14 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
             document={document}
             editorOptions={editorOptions}
             disabled={isBusy}
-            savingProducerRowIndex={savingProducerProfileRowIndex}
+            savingProducerRowIndex={producerProfiles.savingRowIndex}
             onAddItem={addItem}
             onChangeItem={patchItem}
             onRemoveItem={removeItem}
             onGenerateGoodsDescription={handleGenerateGoodsDescription}
             onCopyOriginAndEnterpriseToFollowingRows={handleCopyOriginAndEnterpriseToFollowingRows}
-            onOpenProducerProfile={handleOpenProducerProfiles}
-            onSaveProducerProfile={handleSaveProducerProfile}
+            onOpenProducerProfile={producerProfiles.open}
+            onSaveProducerProfile={producerProfiles.save}
             onAddNonpartyCorp={addNonpartyCorp}
             onChangeNonpartyCorp={patchNonpartyCorp}
             onRemoveNonpartyCorp={removeNonpartyCorp}
@@ -1065,25 +833,25 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
         </form>
       ) : null}
 
-      {lockedFieldsOpen ? (
+      {lockedFieldsWorkspace.isOpen ? (
         <SingleWindowLockedFieldsDialog
           title="海关原产地证字段锁定"
-          fields={lockedFields}
-          selectedKeys={selectedLockedFieldKeys}
-          isBusy={unlockFieldsMutation.isPending}
-          onClose={() => setLockedFieldsOpen(false)}
-          onToggleField={toggleLockedField}
-          onToggleAll={toggleAllLockedFields}
-          onUnlockSelected={handleUnlockSelectedFields}
+          fields={lockedFieldsWorkspace.fields}
+          selectedKeys={lockedFieldsWorkspace.selectedFieldKeys}
+          isBusy={lockedFieldsWorkspace.isPending}
+          onClose={lockedFieldsWorkspace.close}
+          onToggleField={lockedFieldsWorkspace.toggleField}
+          onToggleAll={lockedFieldsWorkspace.toggleAll}
+          onUnlockSelected={lockedFieldsWorkspace.unlockSelected}
         />
       ) : null}
-      {producerProfileRowIndex !== null && document?.items[producerProfileRowIndex] ? (
+      {producerProfiles.currentProfile ? (
         <CustomsCooProducerProfileDialog
           client={client}
-          currentProfile={buildProducerProfileInputFromCooItem(document.items[producerProfileRowIndex], document)}
-          rowLabel={buildProducerProfileRowLabel(document.items[producerProfileRowIndex], producerProfileRowIndex)}
-          onApply={handleApplyProducerProfile}
-          onClose={() => setProducerProfileRowIndex(null)}
+          currentProfile={producerProfiles.currentProfile}
+          rowLabel={producerProfiles.rowLabel}
+          onApply={producerProfiles.apply}
+          onClose={producerProfiles.close}
         />
       ) : null}
     </section>

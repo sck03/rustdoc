@@ -11,7 +11,6 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardPaste, Download, FileSpreadsheet, Plus, RefreshCw, RotateCcw, Save, Trash2, Upload } from "lucide-react";
 import {
-  ApiSingleWindowReferenceCatalogExcelImportPreviewResponse,
   ExportDocManagerApiClient,
   SingleWindowReferenceCatalogModel,
 } from "../../api/index.ts";
@@ -21,8 +20,6 @@ import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import {
-  buildColumnMapState,
-  buildExcelImportRequest,
   CatalogCellPosition,
   CatalogColumn,
   CatalogKey,
@@ -37,13 +34,13 @@ import {
   parseAliases,
   parsePastedTableRows,
   readAliases,
-  readPositiveInteger,
   readRowString,
   setRows,
   validateCatalog,
 } from "./referenceCatalogModel.ts";
 import { ReferenceCatalogSummary } from "./ReferenceCatalogSummary.tsx";
 import { SingleWindowTabs } from "./SingleWindowNavigation.tsx";
+import { useReferenceCatalogExcelWorkspace } from "./useReferenceCatalogExcelWorkspace.ts";
 
 type CatalogContextMenuState = {
   x: number;
@@ -65,20 +62,12 @@ export function SingleWindowReferenceCatalogPage({
   const requestConfirmation = useConfirmation();
   const queryClient = useQueryClient();
   const jsonImportInputRef = useRef<HTMLInputElement | null>(null);
-  const excelImportInputRef = useRef<HTMLInputElement | null>(null);
   const tableFrameRef = useRef<HTMLDivElement | null>(null);
   const [activeKey, setActiveKey] = useState<CatalogKey>("countries");
   const [draft, setDraft] = useState<SingleWindowReferenceCatalogModel | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [excelImportFile, setExcelImportFile] = useState<File | null>(null);
-  const [excelSheetName, setExcelSheetName] = useState("");
-  const [excelHeaderRowNumber, setExcelHeaderRowNumber] = useState("1");
-  const [excelDataStartRowNumber, setExcelDataStartRowNumber] = useState("2");
-  const [excelColumnMap, setExcelColumnMap] = useState<Record<string, string>>({});
-  const [excelImportMode, setExcelImportMode] = useState<"append" | "replace">("append");
-  const [excelPreview, setExcelPreview] = useState<ApiSingleWindowReferenceCatalogExcelImportPreviewResponse | null>(null);
   const [focusedCell, setFocusedCell] = useState<CatalogCellPosition | null>(null);
   const [contextMenu, setContextMenu] = useState<CatalogContextMenuState | null>(null);
   const [aliasEditor, setAliasEditor] = useState<AliasEditorState | null>(null);
@@ -159,7 +148,6 @@ export function SingleWindowReferenceCatalogPage({
       setHasUnsavedChanges(false);
       setMessage(null);
       setSuccessMessage(response.message || "单一窗口参考词典 JSON 已导入。");
-      setExcelPreview(null);
       queryClient.setQueryData(queryKeys.singleWindowReferenceCatalog(), {
         catalog: nextCatalog,
         storagePolicy: response.storagePolicy,
@@ -172,63 +160,38 @@ export function SingleWindowReferenceCatalogPage({
     },
   });
 
-  const previewExcelMutation = useMutation({
-    mutationFn: (file: File) =>
-      client.previewSingleWindowReferenceCatalogExcelImport({
-        ...buildExcelImportRequest(activeKey, file, excelSheetName, excelHeaderRowNumber, excelDataStartRowNumber, excelColumnMap),
-        body: file,
-      }),
-    onSuccess: (response) => {
-      setExcelPreview(response);
-      setExcelSheetName(response.sheetName || "");
-      setExcelHeaderRowNumber(String(response.headerRowNumber || 1));
-      setExcelDataStartRowNumber(String(response.dataStartRowNumber || 2));
-      setExcelColumnMap(buildColumnMapState(response));
-      setMessage(null);
-      setSuccessMessage(response.message || "Excel 预览已生成。");
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
   const activePage = useMemo(
     () => catalogPages.find((page) => page.key === activeKey) ?? catalogPages[0],
     [activeKey],
   );
-  const isBusy =
+  const externalBusy =
     catalogQuery.isFetching ||
     saveMutation.isPending ||
     resetMutation.isPending ||
-    importJsonMutation.isPending ||
-    previewExcelMutation.isPending;
+    importJsonMutation.isPending;
   const rows = getRows(draft, activePage.key);
+  const excelWorkspace = useReferenceCatalogExcelWorkspace({
+    client,
+    activeKey,
+    activePage,
+    draft,
+    rows,
+    canManage: canManageReferenceCatalog,
+    externalBusy,
+    markDraft,
+    clearMessages: () => { setMessage(null); setSuccessMessage(null); },
+    showError: (nextMessage) => { setMessage(nextMessage); setSuccessMessage(null); },
+    showSuccess: (nextMessage) => { setMessage(null); setSuccessMessage(nextMessage); },
+  });
+  const isBusy = excelWorkspace.isBusy;
   const validationErrors = draft ? validateCatalog(draft) : [];
   const canSave = canManageReferenceCatalog && Boolean(draft) && validationErrors.length === 0 && !isBusy;
-  const canPreviewExcel =
-    canManageReferenceCatalog &&
-    Boolean(excelImportFile) &&
-    readPositiveInteger(excelDataStartRowNumber, 2) > readPositiveInteger(excelHeaderRowNumber, 1) &&
-    !isBusy;
-  const canApplyExcelPreview =
-    canManageReferenceCatalog &&
-    Boolean(draft) &&
-    Boolean(excelPreview) &&
-    excelPreview?.catalogKey === activePage.key &&
-    (excelPreview?.rowCount ?? 0) > 0 &&
-    !isBusy;
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: canManageReferenceCatalog && hasUnsavedChanges,
     message: "当前单一窗口参考词典有未保存的修改。",
   });
 
   useEffect(() => {
-    setExcelPreview(null);
-    setExcelSheetName("");
-    setExcelHeaderRowNumber("1");
-    setExcelDataStartRowNumber("2");
-    setExcelColumnMap({});
     setFocusedCell(null);
     setContextMenu(null);
     setAliasEditor(null);
@@ -556,30 +519,6 @@ export function SingleWindowReferenceCatalogPage({
     importJsonMutation.mutate(file);
   }
 
-  function chooseExcelImportFile() {
-    if (canManageReferenceCatalog && !isBusy) {
-      excelImportInputRef.current?.click();
-    }
-  }
-
-  function handleExcelImportFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = "";
-    if (!file || !canManageReferenceCatalog || isBusy) {
-      return;
-    }
-
-    setExcelImportFile(file);
-    setExcelPreview(null);
-    setExcelSheetName("");
-    setExcelHeaderRowNumber("1");
-    setExcelDataStartRowNumber("2");
-    setExcelColumnMap({});
-    setMessage(null);
-    setSuccessMessage(null);
-    previewExcelMutation.mutate(file);
-  }
-
   async function handleRefreshCatalog() {
     if (!await confirmDiscardChanges("刷新参考词典")) {
       return;
@@ -590,57 +529,16 @@ export function SingleWindowReferenceCatalogPage({
     void catalogQuery.refetch();
   }
 
-  function previewExcelImport() {
-    if (excelImportFile && canPreviewExcel) {
-      setMessage(null);
-      setSuccessMessage(null);
-      previewExcelMutation.mutate(excelImportFile);
-    }
-  }
-
-  function updateExcelColumn(fieldKey: string, value: string) {
-    setExcelColumnMap((current) => ({
-      ...current,
-      [fieldKey]: value,
-    }));
-    setExcelPreview(null);
-    setSuccessMessage(null);
-  }
-
-  function applyExcelPreview() {
-    if (!draft || !excelPreview || excelPreview.catalogKey !== activePage.key) {
-      return;
-    }
-
-    const importedRows = getRows(excelPreview.catalog, activePage.key);
-    if (importedRows.length === 0) {
-      setMessage("Excel 预览没有可导入行。");
-      setSuccessMessage(null);
-      return;
-    }
-
-    const baseRows = excelImportMode === "append" ? rows : [];
-    const nextRows = deduplicatePageRows([...baseRows, ...importedRows], activePage);
-    const mergedCount = baseRows.length + importedRows.length - nextRows.length;
-    markDraft(setRows(draft, activePage.key, nextRows));
-    setMessage(null);
-    setSuccessMessage(
-      `已${excelImportMode === "append" ? "追加" : "替换"} ${importedRows.length} 行到“${activePage.label}”，${
-        mergedCount > 0 ? `并合并 ${mergedCount} 行重复项。` : "未发现重复项。"
-      }`,
-    );
-  }
-
   return (
     <section className="work-surface single-window-surface single-window-reference-catalog-surface" aria-label="单一窗口参考词典">
       <SingleWindowTabs activeKey="reference-catalog" />
       <input ref={jsonImportInputRef} hidden type="file" accept=".json,application/json" onChange={handleJsonImportFile} />
       <input
-        ref={excelImportInputRef}
+        ref={excelWorkspace.inputRef}
         hidden
         type="file"
         accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12"
-        onChange={handleExcelImportFile}
+        onChange={excelWorkspace.handleFile}
       />
 
       {!canManageReferenceCatalog ? <InlineNotice tone="info">当前账号可查看参考词典，保存和恢复需要管理员权限。</InlineNotice> : null}
@@ -679,7 +577,7 @@ export function SingleWindowReferenceCatalogPage({
             <Upload size={17} aria-hidden="true" />
             <span>导入JSON</span>
           </button>
-          <button className="command-button secondary" type="button" disabled={!canManageReferenceCatalog || isBusy} onClick={chooseExcelImportFile}>
+          <button className="command-button secondary" type="button" disabled={!canManageReferenceCatalog || isBusy} onClick={excelWorkspace.chooseFile}>
             <FileSpreadsheet size={17} aria-hidden="true" />
             <span>Excel导入</span>
           </button>
@@ -708,19 +606,19 @@ export function SingleWindowReferenceCatalogPage({
 
       <ReferenceCatalogSummary catalog={draft} activeKey={activePage.key} hasUnsavedChanges={hasUnsavedChanges} />
 
-      {canManageReferenceCatalog && (excelImportFile || excelPreview) ? (
+      {canManageReferenceCatalog && (excelWorkspace.file || excelWorkspace.preview) ? (
         <div className="reference-catalog-excel-panel" aria-label="Excel 导入">
           <div className="reference-catalog-excel-header">
             <div>
-              <strong>{excelImportFile?.name || "Excel 导入"}</strong>
-              <span>{excelPreview ? `${excelPreview.sheetName} / ${excelPreview.rowCount} 行` : activePage.label}</span>
+              <strong>{excelWorkspace.file?.name || "Excel 导入"}</strong>
+              <span>{excelWorkspace.preview ? `${excelWorkspace.preview.sheetName} / ${excelWorkspace.preview.rowCount} 行` : activePage.label}</span>
             </div>
             <div className="toolbar-actions">
-              <button className="command-button secondary" type="button" disabled={!canPreviewExcel} onClick={previewExcelImport}>
+              <button className="command-button secondary" type="button" disabled={!excelWorkspace.canPreview} onClick={excelWorkspace.previewFile}>
                 <RefreshCw size={16} aria-hidden="true" />
                 <span>预览</span>
               </button>
-              <button className="command-button" type="button" disabled={!canApplyExcelPreview} onClick={applyExcelPreview}>
+              <button className="command-button" type="button" disabled={!excelWorkspace.canApply} onClick={excelWorkspace.applyPreview}>
                 <FileSpreadsheet size={16} aria-hidden="true" />
                 <span>应用到草稿</span>
               </button>
@@ -730,16 +628,12 @@ export function SingleWindowReferenceCatalogPage({
             <label>
               <span>工作表</span>
               <select
-                value={excelSheetName}
-                disabled={isBusy || !excelPreview?.sheetNames?.length}
-                onChange={(event) => {
-                  setExcelSheetName(event.target.value);
-                  setExcelPreview(null);
-                  setSuccessMessage(null);
-                }}
+                value={excelWorkspace.sheetName}
+                disabled={isBusy || !excelWorkspace.preview?.sheetNames?.length}
+                onChange={(event) => excelWorkspace.setSheetName(event.target.value)}
               >
-                {excelPreview?.sheetNames?.length ? (
-                  excelPreview.sheetNames.map((sheetName) => (
+                {excelWorkspace.preview?.sheetNames?.length ? (
+                  excelWorkspace.preview.sheetNames.map((sheetName) => (
                     <option key={sheetName} value={sheetName}>
                       {sheetName}
                     </option>
@@ -754,19 +648,9 @@ export function SingleWindowReferenceCatalogPage({
               <input
                 type="number"
                 min={1}
-                value={excelHeaderRowNumber}
+                value={excelWorkspace.headerRowNumber}
                 disabled={isBusy}
-                onChange={(event) => {
-                  const nextHeaderRow = event.target.value;
-                  setExcelHeaderRowNumber(nextHeaderRow);
-                  const nextHeader = readPositiveInteger(nextHeaderRow, 1);
-                  const nextDataStart = readPositiveInteger(excelDataStartRowNumber, 2);
-                  if (nextDataStart <= nextHeader) {
-                    setExcelDataStartRowNumber(String(nextHeader + 1));
-                  }
-                  setExcelPreview(null);
-                  setSuccessMessage(null);
-                }}
+                onChange={(event) => excelWorkspace.setHeaderRowNumber(event.target.value)}
               />
             </label>
             <label>
@@ -774,24 +658,14 @@ export function SingleWindowReferenceCatalogPage({
               <input
                 type="number"
                 min={1}
-                value={excelDataStartRowNumber}
+                value={excelWorkspace.dataStartRowNumber}
                 disabled={isBusy}
-                onChange={(event) => {
-                  const nextDataStartRow = event.target.value;
-                  setExcelDataStartRowNumber(nextDataStartRow);
-                  const nextDataStart = readPositiveInteger(nextDataStartRow, 2);
-                  const nextHeader = readPositiveInteger(excelHeaderRowNumber, 1);
-                  if (nextDataStart <= nextHeader) {
-                    setExcelHeaderRowNumber(String(Math.max(1, nextDataStart - 1)));
-                  }
-                  setExcelPreview(null);
-                  setSuccessMessage(null);
-                }}
+                onChange={(event) => excelWorkspace.setDataStartRowNumber(event.target.value)}
               />
             </label>
             <label>
               <span>导入方式</span>
-              <select value={excelImportMode} disabled={isBusy} onChange={(event) => setExcelImportMode(event.target.value === "replace" ? "replace" : "append")}>
+              <select value={excelWorkspace.importMode} disabled={isBusy} onChange={(event) => excelWorkspace.setImportMode(event.target.value === "replace" ? "replace" : "append")}>
                 <option value="append">追加并去重</option>
                 <option value="replace">替换当前页</option>
               </select>
@@ -802,9 +676,9 @@ export function SingleWindowReferenceCatalogPage({
                 <input
                   type="number"
                   min={0}
-                  value={excelColumnMap[column.key] ?? ""}
+                  value={excelWorkspace.columnMap[column.key] ?? ""}
                   disabled={isBusy}
-                  onChange={(event) => updateExcelColumn(column.key, event.target.value)}
+                  onChange={(event) => excelWorkspace.updateColumn(column.key, event.target.value)}
                 />
               </label>
             ))}

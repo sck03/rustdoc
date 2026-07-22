@@ -30,16 +30,16 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ApiUnitDto, type ExportDocManagerApiClient, type HsCodeKnowledgeSearchItem } from "../../api/index.ts";
+import { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto } from "../../api/index.ts";
 import { normalizeText } from "../../ui/formUtils.ts";
 import { InvoiceItemHistoryOptionCache } from "./invoiceItemHistory.ts";
 import { InvoiceItemShortcutGuide } from "./InvoiceItemShortcutGuide.tsx";
-import { InvoiceHsKnowledgePanel } from "./InvoiceHsKnowledgePanel.tsx";
 import { formatProductOptionLabel, ProductLibraryPickerDialog } from "./InvoiceProductLibraryPickerDialog.tsx";
 import { InvoiceItemCellInput } from "./InvoiceItemCellInput.tsx";
 import { InvoiceItemsEditorToolbar } from "./InvoiceItemsEditorToolbar.tsx";
 import { InvoiceItemsTable } from "./InvoiceItemsTable.tsx";
-import { InvoiceItemsAssist, type UnitCandidateDialogState } from "./InvoiceItemsAssist.tsx";
+import { InvoiceItemsEditorDialogs } from "./InvoiceItemsEditorDialogs.tsx";
+import { useInvoiceItemsEditorInteraction } from "./useInvoiceItemsEditorInteraction.ts";
 import { invoiceItemHeaderHeightPx, invoiceItemRowHeightPx, invoiceItemUnitLookupTargets, invoiceItemVirtualizationThreshold, isInvoiceItemArrowNavigationKey, isInvoiceItemCellInputTarget, isInvoiceItemVerticalNavigationKey, shouldMoveInvoiceItemCellByArrow } from "./invoiceItemsEditorInteraction.ts";
 import { isUnitLookupSourceField, buildUnitCandidateLookup, findChineseUnitCandidates, normalizeUnitEnglishKey, createCellKey, parseCellKey, readSelectedCells, canFillDownSelectedCells, buildCellRangeKeys, getInvoiceItemColumnIndex, normalizeInvoiceItemBlankRowCount, calculateInvoiceItemVirtualRange, buildSelectedCellsClipboardText, calculateInvoiceItemTableMinWidth, getInvoiceItemColumnWidth, readItemClipboardValue, readItemTextValue, sanitizeClipboardCell, writeClipboardText, parseInvoiceItemClipboardRows, createEmptyInvoiceItem, calculateInvoiceTotals, isMeaningfulInvoiceItem } from "./invoiceItemsEditorModel.ts";
 import {
@@ -50,12 +50,9 @@ import {
 } from "./invoiceItemTableModel.ts";
 export { type EditableInvoiceItemField, type InvoiceItemColumnDefinition, invoiceItemEditableColumns } from "./invoiceItemTableModel.ts";
 export { calculateInvoiceTotals, createEmptyInvoiceItem, isMeaningfulInvoiceItem, normalizeInvoiceItemForSave, recalculateInvoiceItem } from "./invoiceItemsEditorModel.ts";
-type FocusedInvoiceItemCell = {
-  rowIndex: number;
-  field: EditableInvoiceItemField;
-};
-
-export type InvoiceItemCellSelection = FocusedInvoiceItemCell;
+import type { InvoiceItemCellSelection, InvoiceItemsEditorProps } from "./invoiceItemsEditorTypes.ts";
+export type { InvoiceItemCellSelection } from "./invoiceItemsEditorTypes.ts";
+type FocusedInvoiceItemCell = InvoiceItemCellSelection;
 
 export function InvoiceItemsEditor({
   client,
@@ -88,53 +85,12 @@ export function InvoiceItemsEditor({
   productLibraryProducts,
   unitLookupMessage,
   unitOptions,
-}: {
-  client: ExportDocManagerApiClient;
-  items: ApiInvoiceItemDto[];
-  canRedoItemEdit: boolean;
-  canSaveToProductLibrary: boolean;
-  canUseHsKnowledge: boolean;
-  canUndoItemEdit: boolean;
-  blankRowCount?: number;
-  currency: string;
-  focusedWorkbench?: boolean;
-  isProductLibraryBusy: boolean;
-  readOnly?: boolean;
-  onAddItem: () => void;
-  onApplyProductLibraryItem: (product: ApiProductDto, insertAfterIndex: number | null) => void;
-  onChangeItem: (index: number, next: Partial<ApiInvoiceItemDto>) => void;
-  onClearItemCells: (cells: InvoiceItemCellSelection[]) => void;
-  onDuplicateItem: (index: number) => void;
-  onFillDownItemCells: (cells: InvoiceItemCellSelection[]) => void;
-  onFillDownItemField: (index: number, field: EditableInvoiceItemField) => void;
-  onMoveItem: (index: number, direction: -1 | 1) => void;
-  onPasteItemTable: (
-    startRowIndex: number,
-    startField: EditableInvoiceItemField,
-    rows: string[][],
-    targetFields?: EditableInvoiceItemField[],
-  ) => void;
-  onRedoItemEdit: () => void;
-  onRefreshProductLibrary: () => void;
-  onRemoveItem: (index: number) => void;
-  onSaveItemToProductLibrary: (index: number) => void;
-  onSearchProductLibrary: (keyword: string) => void;
-  onUndoItemEdit: () => void;
-  productLibraryMessage: string | null;
-  productLibraryProducts: ApiProductDto[];
-  unitLookupMessage?: string | null;
-  unitOptions?: ApiUnitDto[];
-}) {
+}: InvoiceItemsEditorProps) {
   const [focusedCell, setFocusedCell] = useState<FocusedInvoiceItemCell | null>(null);
   const [editorMessage, setEditorMessage] = useState<string | null>(null);
-  const [unitCandidateDialog, setUnitCandidateDialog] = useState<UnitCandidateDialogState | null>(null);
-  const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
-  const [isHsKnowledgeOpen, setIsHsKnowledgeOpen] = useState(false);
-  const [productKeyword, setProductKeyword] = useState("");
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const { unitCandidateDialog, setUnitCandidateDialog, isProductPickerOpen, setIsProductPickerOpen, isHsKnowledgeOpen, setIsHsKnowledgeOpen, productKeyword, setProductKeyword, selectedProductId, setSelectedProductId, hiddenColumnFields, setHiddenColumnFields } = useInvoiceItemsEditorInteraction();
   const [selectedCellKeys, setSelectedCellKeys] = useState<Set<string>>(new Set());
   const [selectionAnchor, setSelectionAnchor] = useState<FocusedInvoiceItemCell | null>(null);
-  const [hiddenColumnFields, setHiddenColumnFields] = useState<Set<EditableInvoiceItemField>>(new Set());
   const [pendingFocusCell, setPendingFocusCell] = useState<FocusedInvoiceItemCell | null>(null);
   const [tableViewport, setTableViewport] = useState({ scrollTop: 0, height: 0 });
   const tableFrameRef = useRef<HTMLDivElement | null>(null);
@@ -899,25 +855,12 @@ export function InvoiceItemsEditor({
         onToggleColumn={toggleInvoiceItemColumn} onUndo={undoItemEdit}
       />
       <InvoiceItemShortcutGuide />
-      <InvoiceItemsAssist
-        focusedRowIndex={focusedRowIndex} isBusy={isProductLibraryBusy} isProductPickerOpen={isProductPickerOpen}
-        itemsCount={items.length} productKeyword={productKeyword} products={productLibraryProducts} readOnly={readOnly}
-        unitCandidateDialog={unitCandidateDialog} onApplyProduct={applyPickedProduct} onApplyUnitCandidate={applyUnitCandidate}
-        onCloseProductPicker={() => setIsProductPickerOpen(false)} onCloseUnitCandidates={() => setUnitCandidateDialog(null)}
+      <InvoiceItemsEditorDialogs client={client} focusedRowIndex={focusedRowIndex} isBusy={isProductLibraryBusy}
+        isProductPickerOpen={isProductPickerOpen} isHsKnowledgeOpen={isHsKnowledgeOpen} items={items} productKeyword={productKeyword}
+        products={productLibraryProducts} readOnly={readOnly} unitCandidateDialog={unitCandidateDialog} onApplyProduct={applyPickedProduct}
+        onApplyUnitCandidate={applyUnitCandidate} onCloseProductPicker={() => setIsProductPickerOpen(false)} onCloseUnitCandidates={() => setUnitCandidateDialog(null)}
         onRefresh={onRefreshProductLibrary} onSearch={(keyword) => { setProductKeyword(keyword); onSearchProductLibrary(keyword); }}
-      />
-      <InvoiceHsKnowledgePanel
-        client={client}
-        item={focusedRowIndex == null ? null : items[focusedRowIndex] ?? null}
-        open={isHsKnowledgeOpen}
-        onClose={() => setIsHsKnowledgeOpen(false)}
-        onApply={(patch, result: HsCodeKnowledgeSearchItem) => {
-          if (focusedRowIndex == null || readOnly) return;
-          markInvoiceItemMutationFrom(focusedRowIndex);
-          onChangeItem(focusedRowIndex, patch);
-          setEditorMessage(`已回填 HS 编码 ${result.currentCode}；本次确认已进入本地学习记录。`);
-        }}
-      />
+        onCloseHsKnowledge={() => setIsHsKnowledgeOpen(false)} onApplyHs={(patch, result) => { if (focusedRowIndex == null || readOnly) return; markInvoiceItemMutationFrom(focusedRowIndex); onChangeItem(focusedRowIndex, patch); setEditorMessage(`已回填 HS 编码 ${result.currentCode}；本次确认已进入本地学习记录。`); }} />
       <InvoiceItemsTable
         activeFocusedCell={activeFocusedCell} activeFocusedCellOptions={activeFocusedCellOptions} currency={currency}
         displayItems={displayItems} invoiceItemTableMinWidth={invoiceItemTableMinWidth} itemsCount={items.length}

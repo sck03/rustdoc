@@ -1,14 +1,11 @@
-import { ChangeEvent, FormEvent, useCallback, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { ApiReportTemplatePreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
 import {
   isDesktopBridgeAvailable,
-  selectReportTemplatePackageFile,
-  selectSaveReportTemplatePackagePath,
 } from "../../desktop/desktopBridge.ts";
-import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
@@ -34,11 +31,10 @@ import { useReportTemplateWorkspaceQueries } from "./useReportTemplateWorkspaceQ
 import { useReportTemplateSaveMutations } from "./useReportTemplateSaveMutations.ts";
 import { useUserReportTemplateLifecycleMutations } from "./useUserReportTemplateLifecycleMutations.ts";
 import { useDefaultReportTemplateLifecycleMutations } from "./useDefaultReportTemplateLifecycleMutations.ts";
-import { useReportTemplatePackageMutations } from "./useReportTemplatePackageMutations.ts";
+import { useReportTemplatePackageWorkspace } from "./useReportTemplatePackageWorkspace.ts";
 import { useReportTemplatePreviewMutations } from "./useReportTemplatePreviewMutations.ts";
 import {
   buildNewTemplateFileName,
-  buildTemplatePackageFileName,
   buildUserTemplateKey,
   fileNameFromPath,
   normalizePreviewSampleProfile,
@@ -50,7 +46,6 @@ import {
   reportTypeOptions,
   type DesignerMode,
   type ReportTypeOption,
-  type TemplateImportStrategyOption,
   type TemplatePreviewMode,
   type TemplateWorkspaceMode,
 } from "./reportTemplateDesignerModel.ts";
@@ -85,7 +80,6 @@ export function ReportTemplateDesignerPage({
     () => readPreviewSourceIdFromSearch(routeSearch, requestedReportType ?? initialReportType),
     [initialReportType, requestedReportType, routeSearch],
   );
-  const packageUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [reportType, setReportType] = useState<ReportTypeOption>(() => initialReportType);
   const [selectedTemplatePath, setSelectedTemplatePath] = useState("");
   const [selectedUserTemplateId, setSelectedUserTemplateId] = useState(0);
@@ -111,9 +105,6 @@ export function ReportTemplateDesignerPage({
   const [newUserTemplateName, setNewUserTemplateName] = useState("");
   const [newUserTemplateShareScope, setNewUserTemplateShareScope] = useState("Private");
   const [renameTemplateFileName, setRenameTemplateFileName] = useState("");
-  const [packageExportPath, setPackageExportPath] = useState(() => buildTemplatePackageFileName());
-  const [packageImportPath, setPackageImportPath] = useState("");
-  const [packageImportStrategy, setPackageImportStrategy] = useState<TemplateImportStrategyOption>("Merge");
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<"success" | "error" | null>(null);
   const desktopAvailable = isDesktopBridgeAvailable();
@@ -153,6 +144,15 @@ export function ReportTemplateDesignerPage({
     [selectedTemplatePath, templates],
   );
   const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
+  const packageWorkspace = useReportTemplatePackageWorkspace({
+    client,
+    reportType,
+    selectedTemplatePath,
+    defaultExportDirectory,
+    requestConfirmation,
+    clearPreview: () => setPreview(null),
+    showMessage: (nextMessage, nextType) => { setMessage(nextMessage); setMessageType(nextType); },
+  });
   const previewSampleProfiles = useMemo(() => getReportDesignerPreviewSampleProfiles(reportType), [reportType]);
 
   const handleSelectionChanged = useCallback(() => {
@@ -381,38 +381,6 @@ export function ReportTemplateDesignerPage({
       },
     });
 
-  const { exportPackageMutation, downloadPackageMutation, importPackageMutation, uploadPackageMutation } =
-    useReportTemplatePackageMutations({
-    client,
-    reportType,
-    selectedTemplatePath,
-    packageExportPath,
-    importStrategy: packageImportStrategy,
-    onExported: (response) => {
-      setPackageExportPath(response.packagePath);
-      setPackageImportPath(response.packagePath);
-      setMessage(`模板包已导出：${response.packagePath}`);
-      setMessageType("success");
-    },
-    onDownloaded: () => {
-      setMessage("模板包已下载。");
-      setMessageType("success");
-    },
-    onImported: (response, source) => {
-      setPreview(null);
-      setMessage(
-        source === "upload"
-          ? `模板包已上传并导入：${response.templateCount} 个模板配置。`
-          : `模板包已导入：${response.templateCount} 个模板配置。`,
-      );
-      setMessageType("success");
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setMessageType("error");
-    },
-  });
-
   const { samplePreviewMutation, invoicePreviewMutation, paymentPreviewMutation } = useReportTemplatePreviewMutations({
     client,
     reportType,
@@ -482,10 +450,10 @@ export function ReportTemplateDesignerPage({
       createTemplateMutation.isPending,
       renameTemplateMutation.isPending,
       deleteTemplateMutation.isPending,
-      exportPackageMutation.isPending,
-      downloadPackageMutation.isPending,
-      importPackageMutation.isPending,
-      uploadPackageMutation.isPending,
+      packageWorkspace.exportPackageMutation.isPending,
+      packageWorkspace.downloadPackageMutation.isPending,
+      packageWorkspace.importPackageMutation.isPending,
+      packageWorkspace.uploadPackageMutation.isPending,
       saveMutation.isPending,
       saveUserTemplateMutation.isPending,
       createUserTemplateMutation.isPending,
@@ -502,8 +470,8 @@ export function ReportTemplateDesignerPage({
     newUserTemplateName,
     renameTemplateFileName,
     desktopAvailable,
-    packageExportPath,
-    packageImportPath,
+    packageExportPath: packageWorkspace.exportPath,
+    packageImportPath: packageWorkspace.importPath,
     templateContentFetching: templateContentQuery.isFetching,
   });
   const { effectiveMessage, effectiveMessageType } = deriveReportTemplateFeedback({
@@ -559,143 +527,6 @@ export function ReportTemplateDesignerPage({
     } else {
       deleteTemplateMutation.mutate();
     }
-  }
-
-  async function choosePackageExportPath() {
-    try {
-      const selectedPath = await requestPackageExportPath();
-      if (selectedPath) {
-        setPackageExportPath(selectedPath);
-        setMessage(null);
-        setMessageType(null);
-      }
-    } catch (error) {
-      setMessage(readDesktopError(error));
-      setMessageType("error");
-    }
-  }
-
-  async function requestPackageExportPath() {
-    const defaultFileName = fileNameFromPath(packageExportPath.trim()) || buildTemplatePackageFileName();
-    return selectSaveReportTemplatePackagePath(defaultFileName, defaultExportDirectory);
-  }
-
-  async function choosePackageImportPath() {
-    try {
-      const selectedPath = await selectReportTemplatePackageFile();
-      if (selectedPath) {
-        setPackageImportPath(selectedPath);
-        setMessage(null);
-        setMessageType(null);
-      }
-    } catch (error) {
-      setMessage(readDesktopError(error));
-      setMessageType("error");
-    }
-  }
-
-  async function handleExportPackage() {
-    if (!canExportPackage) {
-      return;
-    }
-
-    if (desktopAvailable) {
-      try {
-        const selectedPath = await requestPackageExportPath();
-        if (!selectedPath) {
-          return;
-        }
-
-        setPackageExportPath(selectedPath);
-        exportPackageMutation.mutate(selectedPath);
-      } catch (error) {
-        setMessage(readDesktopError(error));
-        setMessageType("error");
-      }
-      return;
-    }
-
-    const packagePath = packageExportPath.trim();
-    if (packagePath) {
-      exportPackageMutation.mutate(packagePath);
-    }
-  }
-
-  function handleDownloadPackage() {
-    if (canDownloadPackage) {
-      downloadPackageMutation.mutate();
-    }
-  }
-
-  async function handleImportPackage() {
-    if (!canImportPackage) {
-      return;
-    }
-
-    if (hasChanges && !await requestConfirmation({ title: "导入模板包", description: "当前模板有未保存修改，确定继续导入吗？", details: ["未保存的编辑内容将丢失。"], confirmLabel: "继续导入" })) {
-      return;
-    }
-
-    if (desktopAvailable) {
-      try {
-        const selectedPath = await selectReportTemplatePackageFile();
-        if (!selectedPath) {
-          return;
-        }
-
-        setPackageImportPath(selectedPath);
-        importPackageMutation.mutate(selectedPath);
-      } catch (error) {
-        setMessage(readDesktopError(error));
-        setMessageType("error");
-      }
-      return;
-    }
-
-    const packagePath = packageImportPath.trim();
-    if (packagePath) {
-      importPackageMutation.mutate(packagePath);
-    }
-  }
-
-  function handleExportPackageByPath() {
-    const packagePath = packageExportPath.trim();
-    if (canExportPackageByPath && packagePath) {
-      exportPackageMutation.mutate(packagePath);
-    }
-  }
-
-  async function handleImportPackageByPath() {
-    const packagePath = packageImportPath.trim();
-    if (!canImportPackageByPath || !packagePath) {
-      return;
-    }
-
-    if (hasChanges && !await requestConfirmation({ title: "导入模板包", description: "当前模板有未保存修改，确定继续导入吗？", details: ["未保存的编辑内容将丢失。"], confirmLabel: "继续导入" })) {
-      return;
-    }
-
-    importPackageMutation.mutate(packagePath);
-  }
-
-  function choosePackageUploadFile() {
-    if (canUploadPackage) {
-      packageUploadInputRef.current?.click();
-    }
-  }
-
-  async function handlePackageUploadFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = "";
-    if (!file || !canUploadPackage) {
-      return;
-    }
-
-    if (hasChanges && !await requestConfirmation({ title: "上传并导入模板包", description: "当前模板有未保存修改，确定继续吗？", details: ["未保存的编辑内容将丢失。"], confirmLabel: "继续上传并导入" })) {
-      return;
-    }
-
-    uploadPackageMutation.mutate(file);
   }
 
   function handleSave(event: FormEvent<HTMLFormElement>) {
@@ -910,31 +741,31 @@ export function ReportTemplateDesignerPage({
               onDelete={handleDeleteTemplate}
             />
             <ReportTemplatePackagePanel
-              desktopAvailable={desktopAvailable}
+              desktopAvailable={packageWorkspace.desktopAvailable}
               canManageTemplates={canManageTemplates}
               isBusy={isBusy}
-              importStrategy={packageImportStrategy}
-              exportPath={packageExportPath}
-              importPath={packageImportPath}
-              uploadInputRef={packageUploadInputRef}
+              importStrategy={packageWorkspace.importStrategy}
+              exportPath={packageWorkspace.exportPath}
+              importPath={packageWorkspace.importPath}
+              uploadInputRef={packageWorkspace.uploadInputRef}
               canExport={canExportPackage}
               canExportByPath={canExportPackageByPath}
               canDownload={canDownloadPackage}
               canImport={canImportPackage}
               canImportByPath={canImportPackageByPath}
               canUpload={canUploadPackage}
-              onImportStrategyChange={setPackageImportStrategy}
-              onExport={handleExportPackage}
-              onExportByPath={handleExportPackageByPath}
-              onDownload={handleDownloadPackage}
-              onImport={handleImportPackage}
-              onImportByPath={handleImportPackageByPath}
-              onUpload={choosePackageUploadFile}
-              onUploadFileChange={handlePackageUploadFile}
-              onExportPathChange={setPackageExportPath}
-              onImportPathChange={setPackageImportPath}
-              onChooseExportPath={choosePackageExportPath}
-              onChooseImportPath={choosePackageImportPath}
+              onImportStrategyChange={packageWorkspace.setImportStrategy}
+              onExport={() => packageWorkspace.exportPackage(canExportPackage)}
+              onExportByPath={() => packageWorkspace.exportByPath(canExportPackageByPath)}
+              onDownload={() => packageWorkspace.downloadPackage(canDownloadPackage)}
+              onImport={() => packageWorkspace.importPackage(canImportPackage, hasChanges)}
+              onImportByPath={() => packageWorkspace.importByPath(canImportPackageByPath, hasChanges)}
+              onUpload={() => packageWorkspace.chooseUpload(canUploadPackage)}
+              onUploadFileChange={(event) => packageWorkspace.uploadFile(event, canUploadPackage, hasChanges)}
+              onExportPathChange={packageWorkspace.setExportPath}
+              onImportPathChange={packageWorkspace.setImportPath}
+              onChooseExportPath={packageWorkspace.chooseExportPath}
+              onChooseImportPath={packageWorkspace.chooseImportPath}
             />
           </aside>
 

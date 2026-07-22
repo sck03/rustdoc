@@ -62,6 +62,21 @@ for (const file of walk(root)) {
     }
   }
 
+  const coordinatorContracts = {
+    "features/single-window/CustomsCooPage.tsx": ["useSingleWindowLockedFields", "useCustomsCooProducerProfiles", "useCustomsCooAuthoritySelection"],
+    "features/single-window/AgentConsignmentPage.tsx": ["useSingleWindowLockedFields"],
+    "features/single-window/SingleWindowReferenceCatalogPage.tsx": ["useReferenceCatalogExcelWorkspace"],
+    "features/invoices/InvoiceListPage.tsx": ["useInvoiceListSingleWindowOperations"],
+    "features/reports/ReportTemplateDesignerPage.tsx": ["useReportTemplatePackageWorkspace"],
+    "features/invoices/InvoiceItemsEditor.tsx": ["useInvoiceItemsEditorInteraction", "InvoiceItemsEditorDialogs", "InvoiceItemsEditorProps"],
+    "features/settings/SettingsPage.tsx": ["useSettingsMaintenanceActions"],
+  };
+  for (const requiredCoordinator of coordinatorContracts[sourceRelativePath] ?? []) {
+    if (!sourceText.includes(requiredCoordinator)) {
+      failures.push(`${sourceRelativePath}: 大型页面协调职责不得回流，缺少 ${requiredCoordinator}`);
+    }
+  }
+
   if (sourceRelativePath === "ui/FrontendErrorBoundary.tsx") {
     for (const requiredRecoveryText of ["重试当前界面", "重新加载程序界面", "incidentId", "reportFrontendError"]) {
       if (!sourceText.includes(requiredRecoveryText)) {

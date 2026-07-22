@@ -35,6 +35,7 @@ import { InvoiceCopyOptionsPanel } from "./InvoiceCopyOptionsPanel.tsx";
 import { InvoiceTransferImportPanel } from "./InvoiceTransferImportPanel.tsx";
 import { InvoiceTable } from "./InvoiceTable.tsx";
 import { SingleWindowActionsPanel, type SingleWindowActionDraft } from "./SingleWindowActionsPanel.tsx";
+import { useInvoiceListSingleWindowOperations } from "./useInvoiceListSingleWindowOperations.ts";
 import { readPathDialogError, requestExcelSavePath, requestPackageOpenPath, requestPackageSavePath, requestSingleWindowPackageOpenPath, requestSingleWindowPackageSavePath } from "./invoiceListDesktopPaths.ts";
 import {
   buildBookingSheetDefaultFileName,
@@ -81,14 +82,6 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
   const [transferMessage, setTransferMessage] = useState<string | null>(null);
   const [transferSuccessMessage, setTransferSuccessMessage] = useState<string | null>(null);
   const [lastExportedPackagePath, setLastExportedPackagePath] = useState<string | null>(null);
-  const [singleWindowDraft, setSingleWindowDraft] = useState<SingleWindowActionDraft | null>(null);
-  const [singleWindowMessage, setSingleWindowMessage] = useState<string | null>(null);
-  const [singleWindowMessageType, setSingleWindowMessageType] = useState<"success" | "error">("success");
-  const [singleWindowJobId, setSingleWindowJobId] = useState<string | null>(null);
-  const [singleWindowPackagePath, setSingleWindowPackagePath] = useState<string | null>(null);
-  const [singleWindowReview, setSingleWindowReview] = useState<SingleWindowExportReview | null>(null);
-  const [singleWindowReviewBusinessType, setSingleWindowReviewBusinessType] = useState<SingleWindowBusinessType | null>(null);
-  const [singleWindowReviewInvoiceId, setSingleWindowReviewInvoiceId] = useState<number | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const routeSuccessMessage = readRouteSuccessMessage(location.state);
@@ -114,6 +107,14 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
   });
 
   const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
+  const singleWindow = useInvoiceListSingleWindowOperations({
+    client,
+    queryClient,
+    defaultExportDirectory,
+    canView: singleWindowPermission.canView,
+    canOperate: singleWindowPermission.canOperate,
+    canExportBookingSheet: excelPermission.canOperate,
+  });
 
   useEffect(() => {
     if (invoicesQuery.data && invoicesQuery.data.pageNumber !== pageNumber) {
@@ -295,150 +296,6 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
     },
   });
 
-  const bookingSheetMutation = useMutation({
-    mutationFn: async ({ invoice, destinationPath }: { invoice: ApiInvoiceListItemDto; destinationPath: string }) => {
-      const job = isDesktopBridgeAvailable()
-        ? await client.startInvoiceBookingSheetSaveToPathJob({ body: { invoiceId: invoice.id, destinationPath } })
-        : await client.startInvoiceBookingSheetDownloadJob({ invoiceId: invoice.id });
-      if (!isDesktopBridgeAvailable()) {
-        await downloadJobResultWhenReady(client, job, buildBookingSheetDefaultFileName(invoice));
-      }
-      return job;
-    },
-    onSuccess: async (job) => {
-      setSingleWindowMessage(`已创建托单导出任务：${job.jobId}`);
-      setSingleWindowMessageType("success");
-      setSingleWindowJobId(job.jobId);
-      setSingleWindowPackagePath(null);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
-    },
-    onError: (error) => {
-      setSingleWindowMessage(readApiError(error));
-      setSingleWindowMessageType("error");
-      setSingleWindowJobId(null);
-      setSingleWindowPackagePath(null);
-    },
-  });
-
-  const singleWindowSubmitPackageMutation = useMutation({
-    mutationFn: async ({ invoice, businessType, packagePath }: SingleWindowSubmitPackageRequest) => {
-      if (isDesktopBridgeAvailable()) {
-        const response = businessType === "CustomsCoo"
-          ? await client.saveCustomsCooSubmitPackageToPath({ invoiceId: invoice.id, body: { packagePath } })
-          : await client.saveAgentConsignmentSubmitPackageToPath({ invoiceId: invoice.id, body: { packagePath } });
-        return { mode: "desktop" as const, response };
-      }
-
-      const blob = businessType === "CustomsCoo"
-        ? await client.downloadCustomsCooSubmitPackage({ invoiceId: invoice.id })
-        : await client.downloadAgentConsignmentSubmitPackage({ invoiceId: invoice.id });
-      downloadBlob(blob, buildSingleWindowPackageDefaultFileName(invoice, businessType));
-      return { mode: "browser" as const };
-    },
-    onSuccess: async (result) => {
-      setSingleWindowMessage(result.mode === "desktop" ? (result.response.message || "单一窗口提交包已导出。") : "单一窗口提交包已交给浏览器下载。");
-      setSingleWindowMessageType("success");
-      setSingleWindowJobId(null);
-      setSingleWindowPackagePath(result.mode === "desktop" ? (result.response.packagePath || null) : null);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() });
-    },
-    onError: (error) => {
-      setSingleWindowMessage(readApiError(error));
-      setSingleWindowMessageType("error");
-      setSingleWindowJobId(null);
-      setSingleWindowPackagePath(null);
-    },
-  });
-
-  const singleWindowReviewMutation = useMutation({
-    mutationFn: async ({ invoice, businessType }: SingleWindowReviewRequest) => {
-      const review = await client.getSingleWindowExportReview({
-        businessType,
-        invoiceId: invoice.id,
-      });
-
-      return { invoice, businessType, review };
-    },
-    onSuccess: ({ invoice, businessType, review }) => {
-      setSingleWindowDraft({ invoice });
-      setSingleWindowReview(review);
-      setSingleWindowReviewBusinessType(businessType);
-      setSingleWindowReviewInvoiceId(invoice.id);
-      setSingleWindowPackagePath(null);
-      setSingleWindowJobId(null);
-      setSingleWindowMessage(buildSingleWindowReviewMessage(review, businessType));
-      setSingleWindowMessageType(review.totalErrorCount > 0 ? "error" : "success");
-    },
-    onError: (error) => {
-      setSingleWindowMessage(readApiError(error));
-      setSingleWindowMessageType("error");
-      setSingleWindowJobId(null);
-      setSingleWindowReview(null);
-      setSingleWindowReviewBusinessType(null);
-      setSingleWindowReviewInvoiceId(null);
-    },
-  });
-
-  const singleWindowRepairReviewMutation = useMutation({
-    mutationFn: async ({ invoice, businessType, groupKeys }: SingleWindowReviewRepairRequest) => {
-      const response = await client.repairSingleWindowExportReviewGroups({
-        businessType,
-        invoiceId: invoice.id,
-        body: { groupKeys },
-      });
-
-      return { invoice, businessType, response };
-    },
-    onSuccess: ({ invoice, businessType, response }) => {
-      setSingleWindowDraft({ invoice });
-      setSingleWindowReview(response.review);
-      setSingleWindowReviewBusinessType(businessType);
-      setSingleWindowReviewInvoiceId(invoice.id);
-      setSingleWindowPackagePath(null);
-      setSingleWindowJobId(null);
-      setSingleWindowMessage(response.message || buildSingleWindowReviewMessage(response.review, businessType));
-      setSingleWindowMessageType(response.review.totalErrorCount > 0 ? "error" : "success");
-      void queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() });
-    },
-    onError: (error) => {
-      setSingleWindowMessage(readApiError(error));
-      setSingleWindowMessageType("error");
-      setSingleWindowJobId(null);
-    },
-  });
-
-  const singleWindowReceiptImportMutation = useMutation({
-    mutationFn: (packagePath: string) =>
-      client.importSingleWindowReceiptPackage({
-        body: {
-          packagePath,
-          keepWorkingDirectory: false,
-        },
-      }),
-    onSuccess: async (response: ApiSingleWindowImportedPackageResponse) => {
-      const receiptText =
-        response.persistedReceiptCount > 0
-          ? `新增回执 ${response.persistedReceiptCount} 条。`
-          : "没有新增回执。";
-      setSingleWindowMessage(`${response.message || "单一窗口回执包已导入。"} ${receiptText}`);
-      setSingleWindowMessageType("success");
-      setSingleWindowJobId(null);
-      setSingleWindowPackagePath(response.packagePath || null);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() }),
-      ]);
-    },
-    onError: (error) => {
-      setSingleWindowMessage(readApiError(error));
-      setSingleWindowMessageType("error");
-      setSingleWindowJobId(null);
-      setSingleWindowPackagePath(null);
-    },
-  });
-
   function openCopyPanel(invoice: ApiInvoiceListItemDto) {
     if (!invoicePermission.canOperate) return;
 
@@ -455,16 +312,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
   }
 
   function openSingleWindowPanel(invoice: ApiInvoiceListItemDto) {
-    if (!singleWindowPermission.canView) return;
-
-    setSingleWindowDraft({ invoice });
-    setSingleWindowMessage(null);
-    setSingleWindowMessageType("success");
-    setSingleWindowJobId(null);
-    setSingleWindowPackagePath(null);
-    setSingleWindowReview(null);
-    setSingleWindowReviewBusinessType(null);
-    setSingleWindowReviewInvoiceId(null);
+    singleWindow.open(invoice);
   }
 
   function patchCopyDraft(next: Partial<InvoiceCopyDraft>) {
@@ -632,164 +480,6 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
     }
   }
 
-  async function handleExportBookingSheet(invoice: ApiInvoiceListItemDto) {
-    if (!excelPermission.canOperate || bookingSheetMutation.isPending) {
-      return;
-    }
-
-    if (!isDesktopBridgeAvailable()) {
-      setSingleWindowDraft({ invoice });
-      setSingleWindowMessage(null);
-      setSingleWindowJobId(null);
-      setSingleWindowPackagePath(null);
-      bookingSheetMutation.mutate({ invoice, destinationPath: "" });
-      return;
-    }
-
-    const destinationPath = await requestExcelSavePath(buildBookingSheetDefaultFileName(invoice), defaultExportDirectory).catch((error) => {
-      setSingleWindowDraft({ invoice });
-      setSingleWindowMessage(readPathDialogError(error));
-      setSingleWindowMessageType("error");
-      setSingleWindowJobId(null);
-      setSingleWindowPackagePath(null);
-      return "";
-    });
-    if (!destinationPath) {
-      return;
-    }
-
-    setSingleWindowDraft({ invoice });
-    setSingleWindowMessage(null);
-    setSingleWindowJobId(null);
-    setSingleWindowPackagePath(null);
-    bookingSheetMutation.mutate({ invoice, destinationPath });
-  }
-
-  async function handleExportSingleWindowPackage(
-    invoice: ApiInvoiceListItemDto,
-    businessType: SingleWindowBusinessType,
-  ) {
-    if (!singleWindowPermission.canOperate || singleWindowSubmitPackageMutation.isPending || singleWindowReviewMutation.isPending) {
-      return;
-    }
-
-    if (!isCurrentSingleWindowReview(invoice, businessType)) {
-      let review: SingleWindowExportReview;
-      try {
-        review = (await singleWindowReviewMutation.mutateAsync({ invoice, businessType })).review;
-      } catch {
-        return;
-      }
-
-      if (review.hasIssues || review.totalErrorCount > 0 || review.totalWarningCount > 0) {
-        return;
-      }
-    }
-
-    if (!isDesktopBridgeAvailable()) {
-      setSingleWindowMessage(null);
-      setSingleWindowJobId(null);
-      setSingleWindowPackagePath(null);
-      singleWindowSubmitPackageMutation.mutate({ invoice, businessType, packagePath: "" });
-      return;
-    }
-
-    const packagePath = await requestSingleWindowPackageSavePath(invoice, businessType, defaultExportDirectory).catch((error) => {
-      setSingleWindowMessage(readPathDialogError(error));
-      setSingleWindowMessageType("error");
-      setSingleWindowJobId(null);
-      setSingleWindowPackagePath(null);
-      return "";
-    });
-    if (!packagePath) {
-      return;
-    }
-
-    setSingleWindowMessage(null);
-    setSingleWindowJobId(null);
-    setSingleWindowPackagePath(null);
-    singleWindowSubmitPackageMutation.mutate({ invoice, businessType, packagePath });
-  }
-
-  function isCurrentSingleWindowReview(invoice: ApiInvoiceListItemDto, businessType: SingleWindowBusinessType) {
-    return matchesSingleWindowReview(invoice.id, businessType, singleWindowReviewInvoiceId, singleWindowReviewBusinessType, singleWindowReview);
-  }
-
-  function handleBuildSingleWindowReview(invoice: ApiInvoiceListItemDto, businessType: SingleWindowBusinessType) {
-    if (!singleWindowPermission.canView || singleWindowReviewMutation.isPending) {
-      return;
-    }
-
-    setSingleWindowMessage(null);
-    setSingleWindowJobId(null);
-    setSingleWindowPackagePath(null);
-    singleWindowReviewMutation.mutate({ invoice, businessType });
-  }
-
-  function handleRepairSingleWindowReview() {
-    if (
-      !singleWindowPermission.canOperate ||
-      !singleWindowDraft ||
-      !singleWindowReview ||
-      !singleWindowReviewBusinessType ||
-      singleWindowRepairReviewMutation.isPending
-    ) {
-      return;
-    }
-
-    const groupKeys = getAutoRepairGroupKeys(singleWindowReview);
-    if (groupKeys.length === 0) {
-      setSingleWindowMessage("当前预检结果没有可自动修复的分组。");
-      setSingleWindowMessageType("error");
-      setSingleWindowJobId(null);
-      return;
-    }
-
-    setSingleWindowMessage(null);
-    setSingleWindowJobId(null);
-    singleWindowRepairReviewMutation.mutate({
-      invoice: singleWindowDraft.invoice,
-      businessType: singleWindowReviewBusinessType,
-      groupKeys,
-    });
-  }
-
-  async function handleImportSingleWindowReceiptPackage() {
-    if (!singleWindowPermission.canOperate || singleWindowReceiptImportMutation.isPending) {
-      return;
-    }
-
-    const packagePath = await requestSingleWindowPackageOpenPath().catch((error) => {
-      setSingleWindowMessage(readPathDialogError(error));
-      setSingleWindowMessageType("error");
-      setSingleWindowJobId(null);
-      setSingleWindowPackagePath(null);
-      return "";
-    });
-    if (!packagePath) {
-      return;
-    }
-
-    setSingleWindowMessage(null);
-    setSingleWindowJobId(null);
-    setSingleWindowPackagePath(null);
-    singleWindowReceiptImportMutation.mutate(packagePath);
-  }
-
-  async function handleOpenSingleWindowPackagePath() {
-    if (!singleWindowPackagePath) {
-      return;
-    }
-
-    try {
-      await openPath(singleWindowPackagePath);
-    } catch (error) {
-      setSingleWindowMessage(error instanceof Error ? error.message : "打开单一窗口包失败。");
-      setSingleWindowMessageType("error");
-      setSingleWindowJobId(null);
-    }
-  }
-
   const invoices = invoicesQuery.data ?? null;
   const message = invoicesQuery.isError ? readApiError(invoicesQuery.error) : copyMessage ?? transferMessage;
   const isBusy =
@@ -799,11 +489,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
     previewTransferPackageMutation.isPending ||
     importTransferPackageMutation.isPending ||
     excelImportPreviewMutation.isPending ||
-    bookingSheetMutation.isPending ||
-    singleWindowSubmitPackageMutation.isPending ||
-    singleWindowReviewMutation.isPending ||
-    singleWindowRepairReviewMutation.isPending ||
-    singleWindowReceiptImportMutation.isPending;
+    singleWindow.isBusy;
 
   return (
     <section className="work-surface" aria-label="发票列表">
@@ -908,39 +594,34 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
           onSubmit={submitTransferImport}
         />
       ) : null}
-      {singleWindowDraft ? (
+      {singleWindow.draft ? (
         <SingleWindowActionsPanel
-          draft={singleWindowDraft}
-          isBusy={bookingSheetMutation.isPending || singleWindowSubmitPackageMutation.isPending || singleWindowReceiptImportMutation.isPending}
-          message={singleWindowMessage}
-          messageType={singleWindowMessageType}
-          jobId={singleWindowJobId}
-          packagePath={singleWindowPackagePath}
-          review={singleWindowReview}
-          reviewBusinessType={singleWindowReviewBusinessType}
-          reviewInvoiceId={singleWindowReviewInvoiceId}
-          isReviewBusy={singleWindowReviewMutation.isPending || singleWindowRepairReviewMutation.isPending}
+          draft={singleWindow.draft}
+          isBusy={singleWindow.isActionBusy}
+          message={singleWindow.message}
+          messageType={singleWindow.messageType}
+          jobId={singleWindow.jobId}
+          packagePath={singleWindow.packagePath}
+          review={singleWindow.review}
+          reviewBusinessType={singleWindow.reviewBusinessType}
+          reviewInvoiceId={singleWindow.reviewInvoiceId}
+          isReviewBusy={singleWindow.isReviewBusy}
           canOperate={singleWindowPermission.canOperate}
           canExportBookingSheet={excelPermission.canOperate}
           onCancel={() => {
-            setSingleWindowDraft(null);
-            setSingleWindowMessage(null);
-            setSingleWindowPackagePath(null);
-            setSingleWindowReview(null);
-            setSingleWindowReviewBusinessType(null);
-            setSingleWindowReviewInvoiceId(null);
+            singleWindow.close();
           }}
           onEditCustomsCoo={(invoice) => navigate(`/single-window/coo/${invoice.id}`)}
           onEditAgentConsignment={(invoice) => navigate(`/single-window/acd/${invoice.id}`)}
-          onReviewCustomsCoo={(invoice) => handleBuildSingleWindowReview(invoice, "CustomsCoo")}
-          onReviewAgentConsignment={(invoice) => handleBuildSingleWindowReview(invoice, "AgentConsignment")}
-          onRepairReview={handleRepairSingleWindowReview}
-          onExportCustomsCoo={(invoice) => void handleExportSingleWindowPackage(invoice, "CustomsCoo")}
-          onExportAgentConsignment={(invoice) => void handleExportSingleWindowPackage(invoice, "AgentConsignment")}
-          onImportReceiptPackage={() => void handleImportSingleWindowReceiptPackage()}
+          onReviewCustomsCoo={(invoice) => singleWindow.buildReview(invoice, "CustomsCoo")}
+          onReviewAgentConsignment={(invoice) => singleWindow.buildReview(invoice, "AgentConsignment")}
+          onRepairReview={singleWindow.repairReview}
+          onExportCustomsCoo={(invoice) => void singleWindow.exportPackage(invoice, "CustomsCoo")}
+          onExportAgentConsignment={(invoice) => void singleWindow.exportPackage(invoice, "AgentConsignment")}
+          onImportReceiptPackage={() => void singleWindow.importReceipt()}
           onOpenOperationCenter={() => navigate("/single-window/operation-center")}
-          onOpenPackagePath={() => void handleOpenSingleWindowPackagePath()}
-          onExportBookingSheet={(invoice) => void handleExportBookingSheet(invoice)}
+          onOpenPackagePath={() => void singleWindow.openPackagePath()}
+          onExportBookingSheet={(invoice) => void singleWindow.exportBookingSheet(invoice)}
         />
       ) : null}
 
@@ -953,7 +634,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
         onOpen={(invoiceId) => navigate(`/invoices/${invoiceId}`)}
         onCopy={openCopyPanel}
         onExportPackage={(invoice) => void handleExportTransferPackage(invoice)}
-        onExportBookingSheet={(invoice) => void handleExportBookingSheet(invoice)}
+        onExportBookingSheet={(invoice) => void singleWindow.exportBookingSheet(invoice)}
         onSingleWindow={openSingleWindowPanel}
       />
 
@@ -970,18 +651,3 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
     </section>
   );
 }
-
-type SingleWindowSubmitPackageRequest = {
-  invoice: ApiInvoiceListItemDto;
-  businessType: SingleWindowBusinessType;
-  packagePath: string;
-};
-
-type SingleWindowReviewRequest = {
-  invoice: ApiInvoiceListItemDto;
-  businessType: SingleWindowBusinessType;
-};
-
-type SingleWindowReviewRepairRequest = SingleWindowReviewRequest & {
-  groupKeys: string[];
-};

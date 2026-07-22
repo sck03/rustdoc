@@ -2,11 +2,7 @@ import { FormEvent, ReactNode, useEffect, useId, useMemo, useState } from "react
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardList } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  ApiAgentConsignmentDocumentDto,
-  ApiSingleWindowLockedFieldDto,
-  ExportDocManagerApiClient,
-} from "../../api/index.ts";
+import type { ApiAgentConsignmentDocumentDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { FieldShell, SelectField, TextAreaField, TextField } from "../../ui/FormFields.tsx";
@@ -22,6 +18,7 @@ import { SingleWindowScopedClearControls } from "./SingleWindowScopedClearContro
 import { SingleWindowDocumentActionBar } from "./SingleWindowDocumentActionBar.tsx";
 import { SingleWindowSectionNav } from "./SingleWindowSectionNav.tsx";
 import { SingleWindowTabs } from "./SingleWindowNavigation.tsx";
+import { useSingleWindowLockedFields } from "./useSingleWindowLockedFields.ts";
 import {
   type AgentScopedClearRequest,
   buildAgentConsignmentDocumentSnapshot,
@@ -72,9 +69,6 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
   const [undoDocument, setUndoDocument] = useState<ApiAgentConsignmentDocumentDto | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [lockedFieldsOpen, setLockedFieldsOpen] = useState(false);
-  const [lockedFields, setLockedFields] = useState<ApiSingleWindowLockedFieldDto[]>([]);
-  const [selectedLockedFieldKeys, setSelectedLockedFieldKeys] = useState<Set<string>>(() => new Set());
   const [persistedDocumentSnapshot, setPersistedDocumentSnapshot] = useState<string | null>(null);
 
   const documentQuery = useQuery({
@@ -231,80 +225,32 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
     },
   });
 
-  const lockedFieldsMutation = useMutation({
-    mutationFn: async () => {
-      if (!document || !isInvoiceIdValid) {
-        return null;
-      }
-
-      let savedDocument: ApiAgentConsignmentDocumentDto | null = null;
-      if (documentQuery.data && !areEditorDocumentsEqual(document, documentQuery.data)) {
-        if (!await requestConfirmation({ title: "保存后查看锁定字段", description: "当前草稿有未保存修改，需要先保存后再读取锁定字段。", confirmLabel: "保存并继续" })) {
-          return null;
-        }
-
-        const saveResponse = await client.saveAgentConsignmentDocument({
-          invoiceId: parsedInvoiceId,
-          body: normalizeAgentConsignmentDocumentForSave(document, parsedInvoiceId),
-        });
-        savedDocument = saveResponse.document;
-      }
-
-      const lockedFieldsResponse = await client.getAgentConsignmentLockedFields({ invoiceId: parsedInvoiceId });
-      return { savedDocument, lockedFieldsResponse };
-    },
-    onSuccess: (result) => {
-      if (!result) {
-        return;
-      }
-
-      if (result.savedDocument) {
-        setDocument(result.savedDocument);
-        setPersistedDocumentSnapshot(buildAgentConsignmentDocumentSnapshot(result.savedDocument, parsedInvoiceId));
-        setUndoDocument(null);
-        queryClient.setQueryData(documentQueryKey, result.savedDocument);
-        void Promise.all([
-          queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() }),
-          queryClient.invalidateQueries({ queryKey: reviewQueryKey }),
-        ]);
-      }
-
-      setLockedFields(result.lockedFieldsResponse.fields);
-      setSelectedLockedFieldKeys(new Set());
-      setLockedFieldsOpen(true);
-      setMessage(null);
-      setSuccessMessage(null);
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const unlockFieldsMutation = useMutation({
-    mutationFn: (fieldKeys: string[]) =>
-      client.unlockAgentConsignmentFields({
+  const lockedFieldsWorkspace = useSingleWindowLockedFields({
+    document,
+    isDocumentValid: isInvoiceIdValid,
+    hasUnsavedChanges: Boolean(document && documentQuery.data && !areEditorDocumentsEqual(document, documentQuery.data)),
+    saveDocument: async () => {
+      const response = await client.saveAgentConsignmentDocument({
         invoiceId: parsedInvoiceId,
-        body: { fieldKeys },
-      }),
-    onSuccess: (response) => {
-      setDocument(response.document);
-      setPersistedDocumentSnapshot(buildAgentConsignmentDocumentSnapshot(response.document, parsedInvoiceId));
+        body: normalizeAgentConsignmentDocumentForSave(document!, parsedInvoiceId),
+      });
+      return response.document;
+    },
+    loadLockedFields: () => client.getAgentConsignmentLockedFields({ invoiceId: parsedInvoiceId }),
+    unlockFields: (fieldKeys) => client.unlockAgentConsignmentFields({ invoiceId: parsedInvoiceId, body: { fieldKeys } }),
+    applyPersistedDocument: (nextDocument) => {
+      setDocument(nextDocument);
+      setPersistedDocumentSnapshot(buildAgentConsignmentDocumentSnapshot(nextDocument, parsedInvoiceId));
       setUndoDocument(null);
-      setLockedFields(response.lockedFields);
-      setSelectedLockedFieldKeys(new Set());
-      queryClient.setQueryData(documentQueryKey, response.document);
-      setMessage(null);
-      setSuccessMessage(response.message || "字段已恢复为当前建议值。");
+      queryClient.setQueryData(documentQueryKey, nextDocument);
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() }),
         queryClient.invalidateQueries({ queryKey: reviewQueryKey }),
       ]);
     },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
+    clearMessages: () => { setMessage(null); setSuccessMessage(null); },
+    showError: (nextMessage) => { setMessage(nextMessage); setSuccessMessage(null); },
+    showSuccess: (nextMessage) => { setMessage(null); setSuccessMessage(nextMessage); },
   });
 
   const isBusy =
@@ -315,8 +261,7 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
     scopedClearMutation.isPending ||
     repairReviewMutation.isPending ||
     saveMutation.isPending ||
-    lockedFieldsMutation.isPending ||
-    unlockFieldsMutation.isPending;
+    lockedFieldsWorkspace.isPending;
   const loadMessage = !isInvoiceIdValid
     ? "发票 ID 无效。"
     : documentQuery.isError
@@ -452,44 +397,6 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
     });
   }
 
-  function handleOpenLockedFields() {
-    if (!document || !isInvoiceIdValid) {
-      return;
-    }
-
-    setMessage(null);
-    setSuccessMessage(null);
-    lockedFieldsMutation.mutate();
-  }
-
-  function toggleLockedField(key: string) {
-    setSelectedLockedFieldKeys((current) => {
-      const next = new Set(current);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-
-      return next;
-    });
-  }
-
-  function toggleAllLockedFields() {
-    setSelectedLockedFieldKeys((current) =>
-      current.size === lockedFields.length ? new Set() : new Set(lockedFields.map((field) => field.key)),
-    );
-  }
-
-  function handleUnlockSelectedFields() {
-    const fieldKeys = Array.from(selectedLockedFieldKeys);
-    if (fieldKeys.length === 0 || !isInvoiceIdValid) {
-      return;
-    }
-
-    unlockFieldsMutation.mutate(fieldKeys);
-  }
-
   function handleUndoToolAction() {
     if (!undoDocument) {
       return;
@@ -551,7 +458,7 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
         onRestoreDefaults={handleRestoreDefaults}
         onFillEmptyFields={handleFillEmptyFields}
         onClearManualOverrides={handleClearManualOverrides}
-        onOpenLockedFields={handleOpenLockedFields}
+        onOpenLockedFields={lockedFieldsWorkspace.open}
         onUndo={handleUndoToolAction}
         onBuildReview={() => void reviewQuery.refetch()}
       />
@@ -628,16 +535,16 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
         </form>
       ) : null}
 
-      {lockedFieldsOpen ? (
+      {lockedFieldsWorkspace.isOpen ? (
         <SingleWindowLockedFieldsDialog
           title="代理委托字段锁定"
-          fields={lockedFields}
-          selectedKeys={selectedLockedFieldKeys}
-          isBusy={unlockFieldsMutation.isPending}
-          onClose={() => setLockedFieldsOpen(false)}
-          onToggleField={toggleLockedField}
-          onToggleAll={toggleAllLockedFields}
-          onUnlockSelected={handleUnlockSelectedFields}
+          fields={lockedFieldsWorkspace.fields}
+          selectedKeys={lockedFieldsWorkspace.selectedFieldKeys}
+          isBusy={lockedFieldsWorkspace.isPending}
+          onClose={lockedFieldsWorkspace.close}
+          onToggleField={lockedFieldsWorkspace.toggleField}
+          onToggleAll={lockedFieldsWorkspace.toggleAll}
+          onUnlockSelected={lockedFieldsWorkspace.unlockSelected}
         />
       ) : null}
     </section>

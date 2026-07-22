@@ -34,6 +34,7 @@ import { readSettingsCategoryFromSearch, readSettingsPanelLabelFromSearch } from
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { useSettingsMaintenanceActions } from "./useSettingsMaintenanceActions.ts";
 
 const LazyMaintenanceSettingsPanels = lazy(() => import("./MaintenanceSettingsPanels.tsx"));
 const LazyRuntimeDatabaseSettingsPanel = lazy(() => import("./RuntimeDatabaseSettingsPanel.tsx"));
@@ -312,41 +313,9 @@ export function SettingsPage({
     },
   });
 
-  const cleanupSystemLogsMutation = useMutation({
-    mutationFn: () => client.cleanupSystemLogs(),
-    onSuccess: (response) => {
-      setMessage(null);
-      setSuccessMessage(response.message || "日志清理已完成。");
-      void healthQuery.refetch();
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const refreshExchangeCurrenciesMutation = useMutation({
-    mutationFn: () => client.listAvailableExchangeRateCurrencies(),
-    onSuccess: (response) => {
-      const currencies = normalizeCurrencyList(response.currencies ?? []);
-      if (currencies.length === 0) {
-        setMessage("未读取到可用货币列表。");
-        setSuccessMessage(null);
-        return;
-      }
-
-      patchSettings([
-        { path: exchangeRateAllSupportedCurrenciesPath, value: currencies },
-        { path: exchangeRateLastCurrencyListUpdateTimePath, value: response.fetchedAt },
-      ]);
-      setMessage(null);
-      setSuccessMessage(`已读取 ${currencies.length} 种可用货币，请保存设置后生效。`);
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
+  const maintenanceActions = useSettingsMaintenanceActions({ client, patchSettings, refetchHealth: healthQuery.refetch, setMessage, setSuccessMessage });
+  const cleanupSystemLogsMutation = maintenanceActions.cleanupMutation;
+  const refreshExchangeCurrenciesMutation = maintenanceActions.refreshCurrenciesMutation;
 
   const isBusy =
     settingsQuery.isFetching ||
