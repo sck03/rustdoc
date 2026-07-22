@@ -35,6 +35,22 @@ for (const file of walk(root)) {
       }
     }
   }
+
+  if (sourceRelativePath === "App.tsx") {
+    for (const requiredWorkspaceNoticeContract of ["setWorkspaceNotice", "notice={workspaceNotice}", "onDismissNotice"]) {
+      if (!sourceText.includes(requiredWorkspaceNoticeContract)) {
+        failures.push(`${sourceRelativePath}: 权限或授权跳转必须在已登录工作区显示可关闭通知：${requiredWorkspaceNoticeContract}`);
+      }
+    }
+  }
+
+  if (sourceRelativePath === "app/WorkspaceShell.tsx") {
+    for (const requiredWorkspaceNoticeView of ["workspace-global-notice", "InlineNotice", "关闭提示"]) {
+      if (!sourceText.includes(requiredWorkspaceNoticeView)) {
+        failures.push(`${sourceRelativePath}: 工作区通知缺少统一反馈、可见容器或关闭操作：${requiredWorkspaceNoticeView}`);
+      }
+    }
+  }
 }
 
 if (failures.length) {

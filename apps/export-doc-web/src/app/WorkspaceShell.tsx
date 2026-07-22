@@ -21,8 +21,16 @@ import {
   type WorkspaceNavGroupConfig,
 } from "./workspaceNavigation.ts";
 import { getProductEditionPresentation } from "./productEdition.ts";
-import { IconButton } from "../ui/Button.tsx";
+import { Button, IconButton } from "../ui/Button.tsx";
+import { InlineNotice } from "../ui/PageState.tsx";
 import { useOnlineStatus } from "../ui/useOnlineStatus.ts";
+
+export type WorkspaceNotice = {
+  id: "permission" | "license";
+  tone: "error" | "warning" | "info";
+  title: string;
+  message: string;
+};
 
 type WorkspaceShellProps = {
   pathname: string;
@@ -32,6 +40,8 @@ type WorkspaceShellProps = {
   onLogout: () => void;
   children: ReactNode;
   connectivityOverride?: "online" | "offline";
+  notice?: WorkspaceNotice | null;
+  onDismissNotice?: () => void;
 };
 
 export function WorkspaceShell({
@@ -42,6 +52,8 @@ export function WorkspaceShell({
   onLogout,
   children,
   connectivityOverride,
+  notice,
+  onDismissNotice,
 }: WorkspaceShellProps) {
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -199,6 +211,16 @@ export function WorkspaceShell({
             <strong>设备当前离线</strong>
             <span>已加载内容仍可查看；联网查询和服务器操作可能暂时不可用，恢复网络后请明确重试。</span>
           </div>
+        </div> : null}
+
+        {notice ? <div className="workspace-global-notice">
+          <InlineNotice
+            tone={notice.tone}
+            title={notice.title}
+            action={onDismissNotice ? <Button variant="text" onClick={onDismissNotice}>关闭提示</Button> : undefined}
+          >
+            {notice.message}
+          </InlineNotice>
         </div> : null}
 
         <div className="workspace-content">{children}</div>

@@ -19,7 +19,7 @@ import { readStoredJson, removeStoredValue, writeStoredJson } from "./ui/browser
 import { readApiError } from "./ui/formUtils.ts";
 import { PageState } from "./ui/PageState.tsx";
 import { useConfirmUnsavedChanges } from "./ui/unsavedChangesGuard.tsx";
-import { WorkspaceShell } from "./app/WorkspaceShell.tsx";
+import { WorkspaceShell, type WorkspaceNotice } from "./app/WorkspaceShell.tsx";
 import { hasModulePermission, hasRouteModulePermission, PermissionAccessProvider } from "./app/PermissionAccessContext.tsx";
 import { getRequiredModule, getRequiredRouteAccessLevel, getRequiredWorkspace, isAdminOnlyRoute, isDashboardRoute, isDesktopOnlyRoute, isFullEditionOnlyRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
 import {
@@ -110,6 +110,7 @@ function App() {
   const [session, setSession] = useState<SessionState | null>(() => readStoredSession());
   const [loginState, setLoginState] = useState<LoadState>("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const [workspaceNotice, setWorkspaceNotice] = useState<WorkspaceNotice | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -125,6 +126,7 @@ function App() {
   const expireSession = useCallback((reason: string) => {
     setSession(null);
     setMessage(reason);
+    setWorkspaceNotice(null);
     setLoginState("idle");
     clearStoredSession();
     queryClient.clear();
@@ -286,7 +288,12 @@ function App() {
       requiredAccessLevel,
     );
     if (!workspaceAllowed || !moduleAllowed) {
-      setMessage("当前产品版本或权限模板未启用该模块。");
+      setWorkspaceNotice({
+        id: "permission",
+        tone: "warning",
+        title: "当前页面不可用",
+        message: "当前产品版本或权限模板未启用该模块，系统已返回当前账号可以使用的工作区。",
+      });
       navigate(getDefaultWorkspaceRoute(session.user.capabilities), { replace: true });
     }
   }, [location.pathname, navigate, session]);
@@ -306,8 +313,15 @@ function App() {
 
         queryClient.setQueryData(queryKeys.licenseStatus(), status);
         if (status.isTrialExpired) {
-          setMessage(status.message || "试用期已过，请先注册授权。");
+          setWorkspaceNotice({
+            id: "license",
+            tone: "warning",
+            title: "授权状态需要处理",
+            message: status.message || "试用期已过，请先注册授权。",
+          });
           navigate("/system/license", { replace: true });
+        } else {
+          setWorkspaceNotice((current) => current?.id === "license" ? null : current);
         }
       })
       .catch((error) => {
@@ -316,7 +330,12 @@ function App() {
         }
 
         if (error instanceof ApiError && error.status === 402) {
-          setMessage(readApiError(error));
+          setWorkspaceNotice({
+            id: "license",
+            tone: "warning",
+            title: "授权状态需要处理",
+            message: readApiError(error),
+          });
           navigate("/system/license", { replace: true });
         }
       });
@@ -349,6 +368,7 @@ function App() {
         user: response.user,
       };
       setSession(nextSession);
+      setWorkspaceNotice(null);
       writeStoredSession(nextSession);
       queryClient.clear();
       setLoginState("ready");
@@ -370,6 +390,7 @@ function App() {
 
     setSession(null);
     setMessage(null);
+    setWorkspaceNotice(null);
     setLoginState("idle");
     clearStoredSession();
     queryClient.clear();
@@ -394,6 +415,17 @@ function App() {
     const hasEditionAccess = !isFullEditionOnlyRoute(location.pathname) || isFullEdition;
     if (hasAdminAccess && hasRuntimeAccess && hasEditionAccess) return;
 
+    const restriction = !hasAdminAccess
+      ? "当前账号没有系统管理权限。"
+      : !hasRuntimeAccess
+        ? "该功能仅在桌面运行模式中提供。"
+        : "当前产品版本未包含该功能。";
+    setWorkspaceNotice({
+      id: "permission",
+      tone: "warning",
+      title: "当前页面不可用",
+      message: `${restriction}系统已返回当前账号可以使用的工作区。`,
+    });
     navigate(getDefaultWorkspaceRoute(session.user.capabilities), { replace: true });
   }, [canManageSystem, isDesktopRuntime, isFullEdition, location.pathname, navigate, session]);
 
@@ -428,6 +460,8 @@ function App() {
         isDesktopRuntime={isDesktopRuntime}
         user={session.user}
         onLogout={handleLogout}
+        notice={workspaceNotice}
+        onDismissNotice={() => setWorkspaceNotice(null)}
       >
       <Suspense fallback={<RouteLoadingPanel />}>
           <Routes>

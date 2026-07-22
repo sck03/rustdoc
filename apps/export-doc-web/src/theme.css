@@ -1820,6 +1820,15 @@ button.dashboard-metric {
   box-shadow: 0 7px 18px rgba(92, 66, 12, 0.06);
 }
 
+.workspace-global-notice {
+  margin: 12px 18px 0;
+}
+
+.workspace-global-notice .inline-notice {
+  margin: 0;
+  box-shadow: 0 7px 18px rgba(30, 42, 48, 0.05);
+}
+
 .workspace-connectivity-notice > div {
   display: flex;
   flex-wrap: wrap;
@@ -1841,6 +1850,10 @@ button.dashboard-metric {
 }
 
 @media (max-width: 560px) {
+  .workspace-global-notice {
+    margin: 10px 12px 0;
+  }
+
   .workspace-connectivity-notice {
     align-items: flex-start;
     margin: 10px 12px 0;
