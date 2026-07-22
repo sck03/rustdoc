@@ -120,6 +120,28 @@ for (const file of walk(root)) {
     }
   }
 
+  if (sourceRelativePath === "ui/tableRowInteractions.ts") {
+    for (const tableRowInteractionContract of ["event.target === event.currentTarget", "must not also activate the row's default action"]) {
+      if (!sourceText.includes(tableRowInteractionContract)) {
+        failures.push(`${sourceRelativePath}: 表格行键盘事件缺少行内控件隔离契约：${tableRowInteractionContract}`);
+      }
+    }
+  }
+
+  if (sourceRelativePath === "features/invoices/InvoiceTable.tsx" || sourceRelativePath === "features/single-window/SingleWindowOperationCenterList.tsx") {
+    if (!sourceText.includes("isDirectTableRowKeyboardEvent")) {
+      failures.push(`${sourceRelativePath}: 含行内操作按钮的可点击行必须隔离按钮键盘事件`);
+    }
+  }
+
+  if (sourceRelativePath === "features/invoices/InvoiceLetterOfCreditPanel.tsx") {
+    for (const creditPanelContract of ["isExpanded", "aria-expanded={isExpanded}", "低频信息，按需展开"]) {
+      if (!sourceText.includes(creditPanelContract)) {
+        failures.push(`${sourceRelativePath}: 低频信用证面板缺少默认折叠或可解释展开契约：${creditPanelContract}`);
+      }
+    }
+  }
+
   if (sourceRelativePath === "ui/FrontendErrorBoundary.tsx") {
     for (const requiredRecoveryText of ["重试当前界面", "重新加载程序界面", "incidentId", "reportFrontendError"]) {
       if (!sourceText.includes(requiredRecoveryText)) {

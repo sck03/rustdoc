@@ -3,6 +3,7 @@ import { Copy, Download, FileCheck2, FileSpreadsheet } from "lucide-react";
 import type { ApiInvoiceListItemDto } from "../../api/index.ts";
 import { formatAmount, formatDate } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { isDirectTableRowKeyboardEvent } from "../../ui/tableRowInteractions.ts";
 import { getInvoiceStatusLabel } from "./invoiceModel.ts";
 
 export function InvoiceTable({ data, isBusy, canOperate, canExportBookingSheet, canUseSingleWindow, onOpen, onCopy, onExportPackage, onExportBookingSheet, onSingleWindow }: {
@@ -11,7 +12,10 @@ export function InvoiceTable({ data, isBusy, canOperate, canExportBookingSheet, 
   onCopy: (invoice: ApiInvoiceListItemDto) => void; onExportPackage: (invoice: ApiInvoiceListItemDto) => void;
   onExportBookingSheet: (invoice: ApiInvoiceListItemDto) => void; onSingleWindow: (invoice: ApiInvoiceListItemDto) => void;
 }) {
-  const openFromKeyboard = (event: KeyboardEvent<HTMLTableRowElement>, id: number) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(id); } };
+  const openFromKeyboard = (event: KeyboardEvent<HTMLTableRowElement>, id: number) => {
+    if (!isDirectTableRowKeyboardEvent(event)) return;
+    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(id); }
+  };
   const actions = [
     { title: "导出单据包", icon: Download, run: onExportPackage, visible: canOperate },
     { title: "导出货代订舱托单", icon: FileSpreadsheet, run: onExportBookingSheet, visible: canExportBookingSheet },

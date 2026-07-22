@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { FileText, ShieldCheck, Upload } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, ShieldCheck, Upload } from "lucide-react";
 import { ApiInvoiceDetailDto, ApiLetterOfCreditReviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import {
   isDesktopBridgeAvailable,
@@ -34,6 +34,7 @@ export function InvoiceLetterOfCreditPanel({
   const [importMessageType, setImportMessageType] = useState<"success" | "error" | null>(null);
   const [reviewMessage, setReviewMessage] = useState<string | null>(null);
   const [reviewResult, setReviewResult] = useState<ApiLetterOfCreditReviewResponse | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
   const desktopAvailable = isDesktopBridgeAvailable();
 
   const importMutation = useMutation({
@@ -83,6 +84,12 @@ export function InvoiceLetterOfCreditPanel({
   const hasReviewContext = Boolean(
     invoice.letterOfCreditContent?.trim() ||
       invoice.letterOfCreditNo?.trim() ||
+      invoice.specialTerms?.trim(),
+  );
+  const hasCreditData = Boolean(
+    invoice.letterOfCreditNo?.trim() ||
+      invoice.letterOfCreditSourcePath?.trim() ||
+      invoice.letterOfCreditContent?.trim() ||
       invoice.specialTerms?.trim(),
   );
 
@@ -174,70 +181,89 @@ export function InvoiceLetterOfCreditPanel({
   return (
     <section className="form-section letter-of-credit-section" aria-label="信用证">
       <div className="section-header">
-        <h2>信用证</h2>
+        <div className="letter-of-credit-heading">
+          <h2>信用证</h2>
+          <span className="section-description">{hasCreditData ? "已填写，点击展开查看" : "低频信息，按需展开"}</span>
+        </div>
         <div className="toolbar-actions">
           <button
-            className="command-button secondary"
+            className="secondary-button compact-command-button"
             type="button"
-            disabled={disabled || isImporting || !invoice.letterOfCreditSourcePath?.trim()}
-            onClick={importLetterOfCredit}
+            aria-expanded={isExpanded}
+            disabled={isImporting || isReviewing}
+            onClick={() => setIsExpanded((current) => !current)}
           >
-            <Upload size={17} aria-hidden="true" />
-            <span>导入信用证</span>
-          </button>
-          <button
-            className="command-button secondary"
-            type="button"
-            disabled={reviewDisabled || isImporting || isReviewing || !hasReviewContext}
-            onClick={reviewLetterOfCredit}
-          >
-            <ShieldCheck size={17} aria-hidden="true" />
-            <span>{isReviewing ? "审查中" : "AI 审查"}</span>
+            {isExpanded ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+            <span>{isExpanded ? "收起信用证" : "展开信用证"}</span>
           </button>
         </div>
       </div>
-      {importMessage ? (
-        <InlineNotice tone={importMessageType === "error" ? "error" : "success"}>{importMessage}</InlineNotice>
-      ) : null}
-      {reviewMessage ? <InlineNotice tone="warning" title="信用证审查提示">{reviewMessage}</InlineNotice> : null}
-      <div className="field-grid">
-        <TextField
-          label="信用证号"
-          value={invoice.letterOfCreditNo ?? ""}
-          disabled={disabled}
-          onChange={(value) => patchInvoice({ letterOfCreditNo: value })}
-        />
-      </div>
-      <PathField
-        label="来源文件"
-        value={invoice.letterOfCreditSourcePath ?? ""}
-        disabled={disabled || isImporting}
-        onChange={(value) => patchInvoice({ letterOfCreditSourcePath: value })}
-        actions={
-          <>
-            {desktopAvailable ? (
-              <DesktopIconButton title="选择信用证文件" disabled={disabled || isImporting} onClick={chooseLetterOfCreditFile}>
-                <FileText size={15} aria-hidden="true" />
-              </DesktopIconButton>
-            ) : null}
-            {renderOpenPathAction(invoice.letterOfCreditSourcePath, "打开信用证来源", showImportError)}
-          </>
-        }
-      />
-      <PathTextAreaField
-        label="信用证文本"
-        value={invoice.letterOfCreditContent ?? ""}
-        disabled={disabled || isImporting}
-        onChange={(value) => patchInvoice({ letterOfCreditContent: value })}
-      />
-      {reviewResult ? (
-        <div className="letter-of-credit-review-result">
-          <div className="letter-of-credit-review-meta">
-            <span>{reviewResult.contextSummary}</span>
-            {reviewResult.letterOfCreditContentTruncated ? <strong>信用证文本已截断</strong> : null}
+      {isExpanded ? (
+        <>
+          <div className="toolbar-actions letter-of-credit-actions">
+            <button
+              className="command-button secondary"
+              type="button"
+              disabled={disabled || isImporting || !invoice.letterOfCreditSourcePath?.trim()}
+              onClick={importLetterOfCredit}
+            >
+              <Upload size={17} aria-hidden="true" />
+              <span>导入信用证</span>
+            </button>
+            <button
+              className="command-button secondary"
+              type="button"
+              disabled={reviewDisabled || isImporting || isReviewing || !hasReviewContext}
+              onClick={reviewLetterOfCredit}
+            >
+              <ShieldCheck size={17} aria-hidden="true" />
+              <span>{isReviewing ? "审查中" : "AI 审查"}</span>
+            </button>
           </div>
-          <textarea value={reviewResult.reportText} readOnly />
-        </div>
+          {importMessage ? (
+            <InlineNotice tone={importMessageType === "error" ? "error" : "success"}>{importMessage}</InlineNotice>
+          ) : null}
+          {reviewMessage ? <InlineNotice tone="warning" title="信用证审查提示">{reviewMessage}</InlineNotice> : null}
+          <div className="field-grid">
+            <TextField
+              label="信用证号"
+              value={invoice.letterOfCreditNo ?? ""}
+              disabled={disabled}
+              onChange={(value) => patchInvoice({ letterOfCreditNo: value })}
+            />
+          </div>
+          <PathField
+            label="来源文件"
+            value={invoice.letterOfCreditSourcePath ?? ""}
+            disabled={disabled || isImporting}
+            onChange={(value) => patchInvoice({ letterOfCreditSourcePath: value })}
+            actions={
+              <>
+                {desktopAvailable ? (
+                  <DesktopIconButton title="选择信用证文件" disabled={disabled || isImporting} onClick={chooseLetterOfCreditFile}>
+                    <FileText size={15} aria-hidden="true" />
+                  </DesktopIconButton>
+                ) : null}
+                {renderOpenPathAction(invoice.letterOfCreditSourcePath, "打开信用证来源", showImportError)}
+              </>
+            }
+          />
+          <PathTextAreaField
+            label="信用证文本"
+            value={invoice.letterOfCreditContent ?? ""}
+            disabled={disabled || isImporting}
+            onChange={(value) => patchInvoice({ letterOfCreditContent: value })}
+          />
+          {reviewResult ? (
+            <div className="letter-of-credit-review-result">
+              <div className="letter-of-credit-review-meta">
+                <span>{reviewResult.contextSummary}</span>
+                {reviewResult.letterOfCreditContentTruncated ? <strong>信用证文本已截断</strong> : null}
+              </div>
+              <textarea value={reviewResult.reportText} readOnly />
+            </div>
+          ) : null}
+        </>
       ) : null}
     </section>
   );

@@ -202,6 +202,22 @@
   min-height: 190px;
 }
 
+.letter-of-credit-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.letter-of-credit-heading .section-description {
+  margin: 0;
+}
+
+.letter-of-credit-actions {
+  justify-content: flex-start;
+}
+
 .letter-of-credit-review-result {
   display: grid;
   gap: 10px;

@@ -21,6 +21,7 @@ import { formatPlainNumber,readApiError } from "../../ui/formUtils.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { isDirectTableRowKeyboardEvent } from "../../ui/tableRowInteractions.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 
 import { ClientDispatchResultDetail } from "./SingleWindowOperationCenterDetailPage.tsx";
@@ -82,6 +83,7 @@ export function OperationCenterTable({
   onOpen: (batchId: number) => void;
 }) {
   function handleRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, batchId: number) {
+    if (!isDirectTableRowKeyboardEvent(event)) return;
     if (event.key === "Enter") {
       event.preventDefault();
       onOpen(batchId);
