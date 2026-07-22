@@ -35,6 +35,7 @@ import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { useSettingsMaintenanceActions } from "./useSettingsMaintenanceActions.ts";
+import { useSettingsDraftSync } from "./useSettingsDraftSync.ts";
 
 const LazyMaintenanceSettingsPanels = lazy(() => import("./MaintenanceSettingsPanels.tsx"));
 const LazyRuntimeDatabaseSettingsPanel = lazy(() => import("./RuntimeDatabaseSettingsPanel.tsx"));
@@ -151,16 +152,16 @@ export function SettingsPage({
     staleTime: 10 * 60 * 1000,
   });
 
-  useEffect(() => {
-    if (settingsQuery.data) {
-      setSettings(settingsQuery.data.settings);
-      setMessage(null);
-      setUpdateSecrets(false);
-      setHasUnsavedChanges(false);
-      setValidationResult(null);
-      setSingleWindowAuthorityAutoState({ fetchPlace: "", aplAdd: "" });
-    }
-  }, [settingsQuery.data]);
+  useSettingsDraftSync({
+    response: settingsQuery.data,
+    hasUnsavedChanges,
+    setSettings,
+    setMessage,
+    setUpdateSecrets,
+    setHasUnsavedChanges,
+    setValidationResult,
+    setSingleWindowAuthorityAutoState,
+  });
 
   useEffect(() => {
     if (settingsQuery.isError) {

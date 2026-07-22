@@ -96,11 +96,19 @@ for (const file of walk(root)) {
     "features/invoices/InvoiceListPage.tsx": ["useInvoiceListSingleWindowOperations"],
     "features/reports/ReportTemplateDesignerPage.tsx": ["useReportTemplatePackageWorkspace"],
     "features/invoices/InvoiceItemsEditor.tsx": ["useInvoiceItemsEditorInteraction", "InvoiceItemsEditorDialogs", "InvoiceItemsEditorProps"],
-    "features/settings/SettingsPage.tsx": ["useSettingsMaintenanceActions"],
+    "features/settings/SettingsPage.tsx": ["useSettingsMaintenanceActions", "useSettingsDraftSync"],
   };
   for (const requiredCoordinator of coordinatorContracts[sourceRelativePath] ?? []) {
     if (!sourceText.includes(requiredCoordinator)) {
       failures.push(`${sourceRelativePath}: 大型页面协调职责不得回流，缺少 ${requiredCoordinator}`);
+    }
+  }
+
+  if (sourceRelativePath === "features/settings/useSettingsDraftSync.ts") {
+    for (const settingsDraftContract of ["hasUnsavedChanges", "if (!response || hasUnsavedChanges)", "setSettings(response.settings)"]) {
+      if (!sourceText.includes(settingsDraftContract)) {
+        failures.push(`${sourceRelativePath}: 设置草稿同步缺少未保存保护契约：${settingsDraftContract}`);
+      }
     }
   }
 
