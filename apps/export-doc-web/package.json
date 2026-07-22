@@ -22,6 +22,7 @@
     "test:email-template-model": "node ../../scripts/test_email_template_model.mjs",
     "test:business-status-model": "node ../../scripts/test_business_status_model.mjs",
     "test:concurrency-feedback": "node ../../scripts/test_frontend_concurrency_feedback.mjs",
+    "test:query-retry-policy": "node ../../scripts/test_query_retry_policy.mjs",
     "test:accessibility-contracts": "node ../../scripts/test_frontend_accessibility_contracts.mjs",
     "test:visual-baselines": "node ../../scripts/test_frontend_visual_baselines.mjs",
     "test:visual-baselines:update": "node ../../scripts/update_frontend_visual_baselines.mjs",
