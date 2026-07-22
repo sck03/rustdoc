@@ -1806,7 +1806,8 @@ button.dashboard-metric {
   min-height: 0;
 }
 
-.workspace-connectivity-notice {
+.workspace-connectivity-notice,
+.workspace-service-notice {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1820,6 +1821,14 @@ button.dashboard-metric {
   box-shadow: 0 7px 18px rgba(92, 66, 12, 0.06);
 }
 
+.workspace-service-notice {
+  color: #842f2a;
+  background: #fff4f3;
+  border-color: #e9b8b4;
+  border-left-color: #c84a43;
+  box-shadow: 0 7px 18px rgba(110, 35, 31, 0.07);
+}
+
 .workspace-global-notice {
   margin: 12px 18px 0;
 }
@@ -1829,7 +1838,8 @@ button.dashboard-metric {
   box-shadow: 0 7px 18px rgba(30, 42, 48, 0.05);
 }
 
-.workspace-connectivity-notice > div {
+.workspace-connectivity-notice > div,
+.workspace-service-notice > div {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 10px;
@@ -1840,13 +1850,24 @@ button.dashboard-metric {
   color: #5e3c00;
 }
 
-.workspace-connectivity-notice span {
+.workspace-service-notice strong {
+  color: #70241f;
+}
+
+.workspace-connectivity-notice span,
+.workspace-service-notice span {
   overflow-wrap: anywhere;
 }
 
-.service-status[data-state="offline"] .service-status-dot {
+.service-status[data-state="device-offline"] .service-status-dot,
+.service-status[data-state="checking"] .service-status-dot {
   background: #d99a14;
   box-shadow: 0 0 0 4px rgba(217, 154, 20, 0.12);
+}
+
+.service-status[data-state="unreachable"] .service-status-dot {
+  background: #c84a43;
+  box-shadow: 0 0 0 4px rgba(200, 74, 67, 0.12);
 }
 
 @media (max-width: 560px) {
@@ -1854,13 +1875,26 @@ button.dashboard-metric {
     margin: 10px 12px 0;
   }
 
-  .workspace-connectivity-notice {
+  .workspace-connectivity-notice,
+  .workspace-service-notice {
     align-items: flex-start;
     margin: 10px 12px 0;
   }
 
-  .workspace-connectivity-notice > div {
+  .workspace-service-notice {
     display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .workspace-connectivity-notice > div,
+  .workspace-service-notice > div {
+    display: grid;
+  }
+
+  .workspace-service-notice > button {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: center;
   }
 }
 

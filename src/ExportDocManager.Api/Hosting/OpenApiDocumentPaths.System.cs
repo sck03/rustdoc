@@ -5,6 +5,21 @@ namespace ExportDocManager.Api.Hosting
         private static Dictionary<string, object> CreateSystemPaths() =>
             new Dictionary<string, object>
             {
+                    ["/readyz"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Lightweight API readiness check",
+                            operationId = "getReadiness",
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "The API process is ready to accept requests."
+                                }
+                            }
+                        }
+                    },
                     ["/healthz"] = new
                     {
                         get = new

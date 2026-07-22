@@ -4,7 +4,7 @@ namespace ExportDocManager.Api.Hosting
 {
     public static class BrowserFrontendHostingExtensions
     {
-        private static readonly string[] ReservedPathPrefixes = ["/api", "/openapi", "/healthz"];
+        private static readonly string[] ReservedPathPrefixes = ["/api", "/openapi", "/healthz", "/readyz"];
 
         public static WebApplication UseExportDocManagerBrowserFrontend(
             this WebApplication app,

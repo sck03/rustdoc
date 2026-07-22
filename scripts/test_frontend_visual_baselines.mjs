@@ -19,7 +19,7 @@ const browserExecutable = path.join(repositoryRoot, "Browsers", "ChromeForTestin
 const axeSource = readFileSync(path.join(webRoot, "node_modules", "axe-core", "axe.min.js"), "utf8");
 const updateApprovedBaselines = process.env.UPDATE_FRONTEND_VISUAL_BASELINES === "1";
 const maximumPixelDifferenceRatio = Number(process.env.FRONTEND_VISUAL_MAX_DIFF_RATIO ?? "0.001");
-const pages = ["login", "login-expired", "dashboard", "invoice", "invoiceParties", "hs", "singleWindow", "report", "state-loading", "state-empty", "state-error", "state-fatal", "state-offline", "state-offline-local", "state-permission", "state-route-redirect", "state-conflict", "state-feedback", "dialog"];
+const pages = ["login", "login-expired", "dashboard", "invoice", "invoiceParties", "hs", "singleWindow", "report", "state-loading", "state-empty", "state-error", "state-fatal", "state-offline", "state-offline-local", "state-service-unavailable", "state-permission", "state-route-redirect", "state-conflict", "state-feedback", "dialog"];
 const viewports = [
   { name: "desktop-1366", width: 1366, height: 768 },
   { name: "desktop-1920", width: 1920, height: 1080 },
@@ -152,6 +152,9 @@ try {
         const routeRedirectNoticeMatches = ${JSON.stringify(pageName)} === "state-route-redirect"
           ? visible(".workspace-global-notice .inline-notice") && visible(".workspace-global-notice button")
           : true;
+        const serviceUnavailableNoticeMatches = ${JSON.stringify(pageName)} === "state-service-unavailable"
+          ? visible(".workspace-service-notice") && visible(".workspace-service-notice button")
+          : true;
         return {
           title: document.title,
           scrollWidth: root.scrollWidth,
@@ -167,6 +170,7 @@ try {
           compactNavigationWidth,
           connectivityNoticeMatches,
           routeRedirectNoticeMatches,
+          serviceUnavailableNoticeMatches,
           invoiceDetailColumnCount: ${JSON.stringify(pageName)} === "invoice" ? document.querySelectorAll(".item-editor-table thead th").length : null,
           workspaceNavigation: isShelllessPage ? true : visible(".workspace-nav"),
           expectedStickyControl: ${JSON.stringify(pageName)} === "invoice" ? visible(".invoice-editor-sticky-actions")
@@ -191,6 +195,7 @@ try {
         && (value.compactNavigationWidth === null || value.compactNavigationWidth <= 80)
         && value.connectivityNoticeMatches
         && value.routeRedirectNoticeMatches
+        && value.serviceUnavailableNoticeMatches
         && (value.invoiceDetailColumnCount === null || value.invoiceDetailColumnCount >= 20)
         && value.workspaceNavigation && value.expectedStickyControl && value.expectedDialog
         && pixelComparison.passed;

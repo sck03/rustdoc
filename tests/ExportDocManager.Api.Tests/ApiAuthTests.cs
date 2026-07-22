@@ -132,6 +132,7 @@ namespace ExportDocManager.Api.Tests
         public void AuthenticationMiddleware_ShouldRequireTokenForApiExceptLogin()
         {
             Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/healthz"));
+            Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/readyz"));
             Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/openapi/v1.json"));
             Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/api/auth/login"));
             Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/api/system/shutdown-maintenance"));
@@ -143,6 +144,7 @@ namespace ExportDocManager.Api.Tests
         public void DesktopAccessMiddleware_ShouldRequireDesktopTokenForApiWhenEnabled()
         {
             Assert.False(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/healthz"));
+            Assert.False(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/readyz"));
             Assert.False(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/openapi/v1.json"));
             Assert.True(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/api/auth/login"));
             Assert.True(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/api/invoices"));
@@ -153,6 +155,7 @@ namespace ExportDocManager.Api.Tests
         public void LicenseRequirementMiddleware_ShouldAllowOnlyBootstrapAndLicenseApis()
         {
             Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/healthz"));
+            Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/readyz"));
             Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/openapi/v1.json"));
             Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/api/auth/login"));
             Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/api/auth/me"));

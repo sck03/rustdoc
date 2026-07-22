@@ -19,6 +19,9 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/", () => Results.Redirect("/swagger"));
 
+            endpoints.MapGet("/readyz", () => Results.Ok(new { status = "ok" }))
+                .WithName("Readyz");
+
             endpoints.MapGet("/healthz", async (
                 HttpContext context,
                 IAppPathProvider paths,

@@ -16,6 +16,13 @@ namespace ExportDocManager.Api.Tests
                 licenseSignatureVerifier: ApiTestLicenseSignatureVerifier.Instance);
             using var anonymousClient = harness.CreateClient();
 
+            var readinessResponse = await anonymousClient.GetAsync("/readyz");
+            Assert.Equal(HttpStatusCode.OK, readinessResponse.StatusCode);
+            using (var readinessDocument = JsonDocument.Parse(await readinessResponse.Content.ReadAsStringAsync()))
+            {
+                Assert.Equal("ok", readinessDocument.RootElement.GetProperty("status").GetString());
+            }
+
             var healthResponse = await anonymousClient.GetAsync("/healthz");
             Assert.Equal(HttpStatusCode.OK, healthResponse.StatusCode);
             using (var healthDocument = JsonDocument.Parse(await healthResponse.Content.ReadAsStringAsync()))

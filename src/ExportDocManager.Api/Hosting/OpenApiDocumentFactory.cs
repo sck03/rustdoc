@@ -890,6 +890,7 @@ namespace ExportDocManager.Api.Hosting
                 <body>
                   <h1>ExportDocManager API</h1>
                   <p>Sidecar is running. OpenAPI JSON is available at <a href="/openapi/v1.json"><code>/openapi/v1.json</code></a>.</p>
+                  <p>Lightweight readiness is available at <a href="/readyz"><code>/readyz</code></a>.</p>
                   <p>Health check is available at <a href="/healthz"><code>/healthz</code></a>.</p>
                 </body>
                 </html>

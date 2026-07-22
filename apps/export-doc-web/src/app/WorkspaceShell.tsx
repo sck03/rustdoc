@@ -7,7 +7,9 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  RefreshCw,
   Server,
+  ServerOff,
   WifiOff,
   X,
 } from "lucide-react";
@@ -23,7 +25,9 @@ import {
 import { getProductEditionPresentation } from "./productEdition.ts";
 import { Button, IconButton } from "../ui/Button.tsx";
 import { InlineNotice } from "../ui/PageState.tsx";
+import { getServiceConnectionLabel, resolveServiceConnectionState, type ServiceAvailability } from "../ui/serviceAvailabilityModel.ts";
 import { useOnlineStatus } from "../ui/useOnlineStatus.ts";
+import { useServiceAvailability } from "../ui/useServiceAvailability.ts";
 
 export type WorkspaceNotice = {
   id: "permission" | "license";
@@ -40,6 +44,7 @@ type WorkspaceShellProps = {
   onLogout: () => void;
   children: ReactNode;
   connectivityOverride?: "online" | "offline";
+  serviceAvailabilityOverride?: ServiceAvailability;
   notice?: WorkspaceNotice | null;
   onDismissNotice?: () => void;
 };
@@ -52,12 +57,18 @@ export function WorkspaceShell({
   onLogout,
   children,
   connectivityOverride,
+  serviceAvailabilityOverride,
   notice,
   onDismissNotice,
 }: WorkspaceShellProps) {
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const isOnline = useOnlineStatus(connectivityOverride);
+  const { availability: serviceAvailability, retry: retryServiceAvailability } = useServiceAvailability({
+    apiBaseUrl,
+    enabled: isDesktopRuntime || isOnline,
+    override: serviceAvailabilityOverride,
+  });
   const visibleGroups = useMemo(
     () => filterWorkspaceNavGroups({ ...user.capabilities, isDesktopRuntime }),
     [isDesktopRuntime, user.capabilities],
@@ -111,7 +122,9 @@ export function WorkspaceShell({
   const displayName = user.fullName || user.username;
   const productText = renderProductText(user);
   const showConnectivityNotice = !isDesktopRuntime && !isOnline;
-  const serviceStatusOnline = isDesktopRuntime || isOnline;
+  const serviceConnectionState = resolveServiceConnectionState({ isDesktopRuntime, isOnline, availability: serviceAvailability });
+  const showServiceUnavailableNotice = serviceConnectionState === "unreachable";
+  const serviceStatusLabel = getServiceConnectionLabel(serviceConnectionState);
 
   return (
     <div className={isNavCollapsed ? "app-shell app-shell-nav-collapsed" : "app-shell"}>
@@ -185,10 +198,10 @@ export function WorkspaceShell({
             </div>
           </div>
           <div className="session-strip">
-            <span className="service-status" data-state={serviceStatusOnline ? "online" : "offline"} title={apiBaseUrl}>
+            <span className="service-status" data-state={serviceConnectionState} title={apiBaseUrl}>
               <span className="service-status-dot" aria-hidden="true" />
               <Server size={15} aria-hidden="true" />
-              <span className="api-base">{serviceStatusOnline ? "服务已连接" : "设备离线"}</span>
+              <span className="api-base">{serviceStatusLabel}</span>
             </span>
             <span className="session-user">
               <span className="session-avatar" aria-hidden="true">
@@ -211,6 +224,15 @@ export function WorkspaceShell({
             <strong>设备当前离线</strong>
             <span>已加载内容仍可查看；联网查询和服务器操作可能暂时不可用，恢复网络后请明确重试。</span>
           </div>
+        </div> : null}
+
+        {showServiceUnavailableNotice ? <div className="workspace-service-notice" role="alert" aria-live="assertive">
+          <ServerOff size={18} aria-hidden="true" />
+          <div>
+            <strong>业务服务暂不可达</strong>
+            <span>设备网络可用，但程序无法连接业务服务。已加载内容仍可查看；保存、查询和审核前请先恢复服务。</span>
+          </div>
+          <Button variant="secondary" icon={<RefreshCw size={16} aria-hidden="true" />} onClick={retryServiceAvailability}>立即重试</Button>
         </div> : null}
 
         {notice ? <div className="workspace-global-notice">
