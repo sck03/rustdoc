@@ -21,11 +21,26 @@ for (const file of walk(root)) {
   visit(source, source);
 
   if (sourceRelativePath === "features/invoices/InvoiceReportPreviewPanel.tsx") {
-    const advancedBody = sourceText.indexOf('className="report-export-advanced-body"');
-    const lazyGuard = sourceText.lastIndexOf("showExportAdvanced ?", advancedBody);
-    if (advancedBody >= 0 && lazyGuard < 0) {
-      failures.push(`${sourceRelativePath}: 高级导出内容必须按展开状态延迟挂载，避免隐藏模板和邮件表单占用渲染资源`);
+    const advancedPanel = sourceText.indexOf("<InvoiceReportAdvancedExportPanel");
+    const lazyGuard = sourceText.lastIndexOf("showExportAdvanced ?", advancedPanel);
+    if (advancedPanel < 0 || lazyGuard < 0) {
+      failures.push(`${sourceRelativePath}: 高级导出组件必须按展开状态延迟挂载，避免隐藏模板和邮件表单占用渲染资源`);
     }
+    for (const extractedCoordinator of ["useInvoiceFileExportOperations", "useInvoiceDocumentPackageWorkspace"]) {
+      if (!sourceText.includes(extractedCoordinator)) {
+        failures.push(`${sourceRelativePath}: 报表输出协调器必须保持职责拆分：${extractedCoordinator}`);
+      }
+    }
+    for (const leakedOperation of ["selectSavePdfPath", "selectSaveExcelPath", "startInvoiceDocumentPackageSaveToPathJob", "startInvoiceDocumentEmailJob"]) {
+      if (sourceText.includes(leakedOperation)) {
+        failures.push(`${sourceRelativePath}: 文件与单据包操作不应重新回流主协调器：${leakedOperation}`);
+      }
+    }
+  }
+
+  if (sourceRelativePath === "features/invoices/InvoiceReportAdvancedExportPanel.tsx"
+    && !sourceText.includes('className="report-export-advanced-body"')) {
+    failures.push(`${sourceRelativePath}: 高级导出工作区缺少稳定的布局容器`);
   }
 
   if (sourceRelativePath === "ui/FrontendErrorBoundary.tsx") {
