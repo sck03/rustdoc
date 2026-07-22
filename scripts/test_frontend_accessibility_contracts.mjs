@@ -4,17 +4,6 @@ import ts from "../apps/export-doc-web/node_modules/typescript/lib/typescript.js
 
 const root = path.resolve(import.meta.dirname, "../apps/export-doc-web/src");
 const failures = [];
-const unifiedFeedbackFiles = new Set([
-  "features/invoices/InvoiceEditorPage.tsx",
-  "features/invoices/InvoiceListPage.tsx",
-  "features/payments/PaymentEditorPage.tsx",
-  "features/payments/PaymentListPage.tsx",
-  "features/master-data/MasterDataEditorPage.tsx",
-  "features/master-data/MasterDataListPage.tsx",
-  "features/settings/SettingsPage.tsx",
-  "features/settings/UserManagementPanel.tsx",
-  "features/settings/PermissionTemplateManagementPanel.tsx",
-]);
 
 for (const file of walk(root)) {
   if (!file.endsWith(".tsx") && !file.endsWith(".ts")) continue;
@@ -24,8 +13,10 @@ for (const file of walk(root)) {
   if (/\bwindow\.confirm\s*\(|(^|[^.\w])confirm\s*\(/m.test(sourceText)) {
     failures.push(`${path.relative(path.resolve(import.meta.dirname, ".."), file)}: 不允许使用原生 confirm，请使用应用确认组件`);
   }
-  if (unifiedFeedbackFiles.has(sourceRelativePath) && /className=["'](?:alert|success-alert|error-alert)["']/.test(sourceText)) {
-    failures.push(`${sourceRelativePath}: 核心工作流必须使用 InlineNotice 提供统一反馈语义`);
+  if (/\b(?:success-alert|error-alert|info-alert)\b/.test(sourceText)
+    || /className\s*=\s*["']alert["']/.test(sourceText)
+    || /className\s*=\s*\{[^}]*["']alert["']/s.test(sourceText)) {
+    failures.push(`${sourceRelativePath}: 业务提示必须使用 InlineNotice 提供统一反馈语义`);
   }
   visit(source, source);
 }

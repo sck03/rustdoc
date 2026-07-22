@@ -1,6 +1,7 @@
 import { LockKeyholeOpen, X } from "lucide-react";
 import { ApiSingleWindowLockedFieldDto } from "../../api/index.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 export function SingleWindowLockedFieldsDialog({
   title,
@@ -47,7 +48,7 @@ export function SingleWindowLockedFieldsDialog({
         </div>
 
         {fields.length === 0 ? (
-          <div className="info-alert">当前没有人工锁定字段。</div>
+          <InlineNotice tone="info">当前没有人工锁定字段。</InlineNotice>
         ) : (
           <ResponsiveTableFrame className="single-window-lock-table-frame" label="锁定字段列表">
             <table className="single-window-lock-table">

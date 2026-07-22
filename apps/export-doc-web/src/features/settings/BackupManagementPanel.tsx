@@ -12,6 +12,7 @@ import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { NumberField, SelectField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 import { formatBytes, formatRuntimeDate } from "./settingsFormatters.ts";
 
 export default function BackupManagementPanel({
@@ -253,8 +254,8 @@ export default function BackupManagementPanel({
           </button>
         </div>
       </div>
-      {message ? <div className="alert">{message}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+      {message ? <InlineNotice tone="error" title="备份操作失败">{message}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       <div className="detail-grid runtime-detail-grid">
         <div className="detail-item detail-item-wide">
           <span>备份目录</span>

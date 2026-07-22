@@ -11,7 +11,7 @@ import { SelectField } from "../../ui/FormFields.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
-import { PermissionNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
 import { buildReportPdfDefaultFileName } from "../reports/reportFileNames.ts";
 import { printReportPreviewHtml } from "../reports/printReportPreview.ts";
@@ -326,21 +326,20 @@ export function PaymentReportPreviewPanel({
         </div>
       </div>
 
-      {templateMessage ? <div className="alert">{templateMessage}</div> : null}
+      {templateMessage ? <InlineNotice tone="warning" title="报表模板提示">{templateMessage}</InlineNotice> : null}
       {!reportOutputPermission.canOperate ? (
         <PermissionNotice>当前模板未授予付款报销单据预览和输出操作权限。</PermissionNotice>
       ) : null}
-      {errorMessage ? <div className="alert">{errorMessage}</div> : null}
+      {errorMessage ? <InlineNotice tone="error" title="付款报表生成失败">{errorMessage}</InlineNotice> : null}
       {statusMessage ? (
-        <div className="success-alert status-action-alert">
-          <span>{statusMessage}</span>
-          <ViewJobButton jobId={lastCreatedJobId} disabled={isBusy} />
-        </div>
+        <InlineNotice tone="success" action={<ViewJobButton jobId={lastCreatedJobId} disabled={isBusy} />}>
+          {statusMessage}
+        </InlineNotice>
       ) : null}
       {hasSavedPayment && hasUnsavedDraftChanges ? (
-        <div className="info-alert">当前付款/报销单有未保存修改。HTML 预览使用当前草稿；PDF 请先保存后再生成。</div>
+        <InlineNotice tone="info">当前付款/报销单有未保存修改。HTML 预览使用当前草稿；PDF 请先保存后再生成。</InlineNotice>
       ) : null}
-      {previewStoragePolicy ? <div className="info-alert">{previewStoragePolicy}</div> : null}
+      {previewStoragePolicy ? <InlineNotice tone="info">{previewStoragePolicy}</InlineNotice> : null}
 
       <div className="report-preview-controls">
         <SelectField

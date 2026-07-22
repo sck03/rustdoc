@@ -17,7 +17,7 @@ import { DesktopIconButton,readDesktopError,renderOpenPathAction } from "../../u
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
-import { PermissionNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { listPageSizeOptions,normalizeListPageSize } from "../../ui/listViewState.ts";
 
 import {
@@ -147,7 +147,7 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
         </div>
       </div>
 
-      {message ? <div className="alert">{message}</div> : null}
+      {message ? <InlineNotice tone="error" title="操作中心加载失败">{message}</InlineNotice> : null}
       {!permission.canOperate ? <PermissionNotice>当前权限模板仅允许查看批次和回执；提交包导入、派发、收件和目录维护已禁用。</PermissionNotice> : null}
 
       <SubmitPackageImportPanel client={client} queryClient={queryClient} canOperate={permission.canOperate} />
@@ -281,8 +281,8 @@ function SubmitPackageImportPanel({
         </button>
       </div>
 
-      {message ? <div className={importMutation.isError || !result ? "alert" : "success-alert"}>{message}</div> : null}
-      {desktopMessage ? <div className="alert">{desktopMessage}</div> : null}
+      {message ? <InlineNotice tone={importMutation.isError || !result ? "error" : "success"}>{message}</InlineNotice> : null}
+      {desktopMessage ? <InlineNotice tone="error" title="提交包导入失败">{desktopMessage}</InlineNotice> : null}
 
       <div className="field-grid">
         {isDesktop ? <PathField

@@ -6,7 +6,7 @@ import {
   SingleWindowExportReview,
 } from "../../api/index.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
-import { PageState } from "../../ui/PageState.tsx";
+import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 
 export function SingleWindowExportReviewPanel({
   review,
@@ -38,7 +38,7 @@ export function SingleWindowExportReviewPanel({
   }
 
   if (!review) {
-    return <div className="info-alert">暂无预检结果。</div>;
+    return <InlineNotice tone="info">暂无预检结果。</InlineNotice>;
   }
 
   const selectedGroup = review.groups.find((group) => group.groupKey === selectedGroupKey) ?? review.groups[0] ?? null;

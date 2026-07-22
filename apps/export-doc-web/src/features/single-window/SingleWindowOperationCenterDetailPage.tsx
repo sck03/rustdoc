@@ -16,7 +16,7 @@ selectDirectory
 import { DesktopIconButton,readDesktopError,renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
-import { PageState, PermissionNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 
 import {
 buildClientBoxPath,
@@ -62,7 +62,7 @@ export function SingleWindowOperationCenterDetailPage({ client }: { client: Expo
         </div>
       </div>
 
-      {message ? <div className="alert">{message}</div> : null}
+      {message ? <InlineNotice tone="error" title="批次详情加载失败">{message}</InlineNotice> : null}
       {!permission.canOperate ? <PermissionNotice>当前权限模板仅允许查看批次、包和回执记录；客户端派发及回执处理已禁用。</PermissionNotice> : null}
       {!detail && detailQuery.isFetching ? <PageState tone="loading" title="正在加载批次详情" description="请稍候，系统正在读取提交包和回执记录。" /> : null}
 
@@ -85,7 +85,7 @@ export function OperationCenterDetail({
 
   return (
     <div className="entity-form">
-      {desktopMessage ? <div className="alert">{desktopMessage}</div> : null}
+      {desktopMessage ? <InlineNotice tone="error" title="桌面文件操作失败">{desktopMessage}</InlineNotice> : null}
       <section className="form-section" aria-label="批次信息">
         <div className="section-header">
           <h2>批次信息</h2>
@@ -294,7 +294,7 @@ export function OperationCenterClientBridgePanel({
     return (
       <section className="form-section" aria-label="客户端目录操作说明">
         <div className="section-header"><h2>客户端目录操作</h2></div>
-        <div className="info-alert">OutBox/InBox 等本机客户端目录仅在 Tauri 桌面端管理；浏览器不会显示或接收服务器绝对路径。</div>
+        <InlineNotice tone="info">OutBox/InBox 等本机客户端目录仅在 Tauri 桌面端管理；浏览器不会显示或接收服务器绝对路径。</InlineNotice>
       </section>
     );
   }
@@ -329,10 +329,10 @@ export function OperationCenterClientBridgePanel({
           当前权限仅允许查看客户端目录和交换箱；保存与派发已禁用。
         </PermissionNotice>
       ) : null}
-      {profileQuery.isError ? <div className="alert">{readApiError(profileQuery.error)}</div> : null}
-      {profileMessage ? <div className={saveProfileMutation.isError ? "alert" : "success-alert"}>{profileMessage}</div> : null}
-      {dispatchMessage ? <div className={dispatchMutation.isError ? "alert" : "success-alert"}>{dispatchMessage}</div> : null}
-      {desktopMessage ? <div className="alert">{desktopMessage}</div> : null}
+      {profileQuery.isError ? <InlineNotice tone="error" title="客户端配置加载失败">{readApiError(profileQuery.error)}</InlineNotice> : null}
+      {profileMessage ? <InlineNotice tone={saveProfileMutation.isError ? "error" : "success"}>{profileMessage}</InlineNotice> : null}
+      {dispatchMessage ? <InlineNotice tone={dispatchMutation.isError ? "error" : "success"}>{dispatchMessage}</InlineNotice> : null}
+      {desktopMessage ? <InlineNotice tone="error" title="桌面目录操作失败">{desktopMessage}</InlineNotice> : null}
 
       <div className="field-grid">
         <PathField

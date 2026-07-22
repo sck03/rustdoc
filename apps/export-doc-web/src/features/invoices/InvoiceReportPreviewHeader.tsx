@@ -1,5 +1,6 @@
 import { Eye, Printer, RefreshCw } from "lucide-react";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 type Props={canPreview:boolean;canPrint:boolean;canRefreshTemplates:boolean;errorMessage:string|null;hasSavedInvoice:boolean;hasUnsavedDraftChanges:boolean;isBusy:boolean;jobId:string|null;previewStoragePolicy:string|null;statusMessage:string|null;templateMessage:string|null;onPreview():void;onPrint():void;onRefresh():void};
 export function InvoiceReportPreviewHeader(p:Props){const {canPreview,errorMessage,hasSavedInvoice,hasUnsavedDraftChanges,isBusy,jobId:lastCreatedJobId,previewStoragePolicy,statusMessage,templateMessage}=p;const canPrintPreview=p.canPrint;return (<>
       <div className="section-header">
@@ -36,17 +37,16 @@ export function InvoiceReportPreviewHeader(p:Props){const {canPreview,errorMessa
         </div>
       </div>
 
-      {templateMessage ? <div className="alert">{templateMessage}</div> : null}
-      {errorMessage ? <div className="alert">{errorMessage}</div> : null}
+      {templateMessage ? <InlineNotice tone="warning" title="报表模板提示">{templateMessage}</InlineNotice> : null}
+      {errorMessage ? <InlineNotice tone="error" title="发票报表生成失败">{errorMessage}</InlineNotice> : null}
       {statusMessage ? (
-        <div className="success-alert status-action-alert">
-          <span>{statusMessage}</span>
-          <ViewJobButton jobId={lastCreatedJobId} disabled={isBusy} />
-        </div>
+        <InlineNotice tone="success" action={<ViewJobButton jobId={lastCreatedJobId} disabled={isBusy} />}>
+          {statusMessage}
+        </InlineNotice>
       ) : null}
       {hasSavedInvoice && hasUnsavedDraftChanges ? (
-        <div className="info-alert">当前发票有未保存修改。HTML 预览使用当前草稿；PDF、托单、单据包和邮件请先保存后再生成。</div>
+        <InlineNotice tone="info">当前发票有未保存修改。HTML 预览使用当前草稿；PDF、托单、单据包和邮件请先保存后再生成。</InlineNotice>
       ) : null}
-      {previewStoragePolicy ? <div className="info-alert">{previewStoragePolicy}</div> : null}
+      {previewStoragePolicy ? <InlineNotice tone="info">{previewStoragePolicy}</InlineNotice> : null}
 
 </>);}

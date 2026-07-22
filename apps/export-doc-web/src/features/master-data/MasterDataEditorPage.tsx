@@ -486,7 +486,7 @@ export function MasterDataEditorPage({
       {message && !hasConcurrencyConflict ? <InlineNotice tone="error" title="操作未完成">{message}</InlineNotice> : null}
       {productUnitLookupMessage ? <InlineNotice tone="warning" title="单位资料未能完整加载">{productUnitLookupMessage}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
-      {productUnitMessage ? <div className="info-alert">{productUnitMessage}</div> : null}
+      {productUnitMessage ? <InlineNotice tone="info">{productUnitMessage}</InlineNotice> : null}
       {!canOperate ? (
         <PermissionNotice>当前主数据记录为只读；字段修改、候选项新增和保存已禁用。</PermissionNotice>
       ) : null}

@@ -129,7 +129,7 @@
 
 .inline-notice-content { display: grid; gap: 2px; min-width: 0; }
 .inline-notice-content strong { color: currentColor; font-size: 13px; font-weight: 800; }
-.inline-notice-content span { min-width: 0; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+.inline-notice-message { min-width: 0; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
 .inline-notice-action { align-self: center; }
 
 @media (max-width: 560px) {

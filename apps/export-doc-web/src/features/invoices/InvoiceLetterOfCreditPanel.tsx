@@ -10,6 +10,7 @@ import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../..
 import { TextField } from "../../ui/FormFields.tsx";
 import { PathField, PathTextAreaField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { InlineNotice } from "../../ui/PageState.tsx";
 import { normalizeInvoiceForSave } from "./invoiceModel.ts";
 
 export function InvoiceLetterOfCreditPanel({
@@ -196,9 +197,9 @@ export function InvoiceLetterOfCreditPanel({
         </div>
       </div>
       {importMessage ? (
-        <div className={importMessageType === "error" ? "alert" : "success-alert"}>{importMessage}</div>
+        <InlineNotice tone={importMessageType === "error" ? "error" : "success"}>{importMessage}</InlineNotice>
       ) : null}
-      {reviewMessage ? <div className="alert">{reviewMessage}</div> : null}
+      {reviewMessage ? <InlineNotice tone="warning" title="信用证审查提示">{reviewMessage}</InlineNotice> : null}
       <div className="field-grid">
         <TextField
           label="信用证号"

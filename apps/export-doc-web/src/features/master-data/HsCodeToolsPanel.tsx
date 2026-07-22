@@ -11,6 +11,7 @@ import {
 readApiError
 } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 
 import {
@@ -341,7 +342,7 @@ export function HsCodeToolsPanel({
         </div>
       </div>
 
-      {message ? <div className={messageType === "error" ? "alert" : "success-alert"}>{message}</div> : null}
+      {message ? <InlineNotice tone={messageType === "error" ? "error" : "success"}>{message}</InlineNotice> : null}
 
       {mode === "hub" ? <div className="hs-code-action-hub">
         <button className="hs-code-action-card" type="button" disabled={isBusy} onClick={openImportWorkspace}>

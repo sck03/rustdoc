@@ -15,7 +15,7 @@ import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../..
 import { SelectField } from "../../ui/FormFields.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
-import { PermissionNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { listPageSizeOptions, loadListViewState, normalizeListPageSize, saveListViewState } from "../../ui/listViewState.ts";
 import { PathField, PathTextAreaField } from "../../ui/PathField.tsx";
 import { formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
@@ -395,11 +395,11 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
         </div>
       </div>
 
-      {errorMessage ? <div className="alert">{errorMessage}</div> : null}
+      {errorMessage ? <InlineNotice tone="error" title="任务中心操作失败">{errorMessage}</InlineNotice> : null}
       {message ? (
-        <div className={cancelMutation.isError || retryMutation.isError || deleteMutation.isError || clearFinishedMutation.isError || pdfMergeMutation.isError || reportZipMutation.isError ? "alert" : "success-alert"}>
+        <InlineNotice tone={cancelMutation.isError || retryMutation.isError || deleteMutation.isError || clearFinishedMutation.isError || pdfMergeMutation.isError || reportZipMutation.isError ? "error" : "success"}>
           {message}
-        </div>
+        </InlineNotice>
       ) : null}
 
       <JobTable
@@ -498,7 +498,7 @@ function InvoiceReportZipJobPanel({
 
   return (
     <form className="job-tool-panel" aria-label="批量报表 ZIP 任务" onSubmit={handleSubmit}>
-      {templateErrorMessage ? <div className="alert">{templateErrorMessage}</div> : null}
+      {templateErrorMessage ? <InlineNotice tone="warning" title="报表模板未完整加载">{templateErrorMessage}</InlineNotice> : null}
 
       <div className="job-tool-grid job-report-zip-grid">
         <PathTextAreaField

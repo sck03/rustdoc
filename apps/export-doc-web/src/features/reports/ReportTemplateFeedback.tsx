@@ -1,3 +1,5 @@
+import { InlineNotice } from "../../ui/PageState.tsx";
+
 export function ReportTemplateFeedback({ message, type }: { message: string | null; type: "success" | "error" | null }) {
-  return message ? <div className={type === "error" ? "alert" : "success-alert"}>{message}</div> : null;
+  return message ? <InlineNotice tone={type === "error" ? "error" : "success"}>{message}</InlineNotice> : null;
 }

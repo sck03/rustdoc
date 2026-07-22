@@ -19,7 +19,7 @@ import { DesktopIconButton,readDesktopError,renderOpenPathAction } from "../../u
 import { PathField } from "../../ui/PathField.tsx";
 import { formatPlainNumber,readApiError } from "../../ui/formUtils.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
-import { PermissionNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 
@@ -449,9 +449,9 @@ export function OperationCenterListActionsPanel({
       </div>
 
       {!canOperate ? <PermissionNotice>当前权限仅允许查看批次详情；目录保存、派发和回执处理已禁用。</PermissionNotice> : null}
-      {profileQuery.isError ? <div className="alert">{readApiError(profileQuery.error)}</div> : null}
-      {message ? <div className={messageKind === "error" ? "alert" : "success-alert"}>{message}</div> : null}
-      {desktopMessage ? <div className="alert">{desktopMessage}</div> : null}
+      {profileQuery.isError ? <InlineNotice tone="error" title="客户端配置加载失败">{readApiError(profileQuery.error)}</InlineNotice> : null}
+      {message ? <InlineNotice tone={messageKind === "error" ? "error" : "success"}>{message}</InlineNotice> : null}
+      {desktopMessage ? <InlineNotice tone="error" title="客户端目录操作失败">{desktopMessage}</InlineNotice> : null}
 
       <div className="operation-center-list-action-grid">
         {isDesktop ? <PathField

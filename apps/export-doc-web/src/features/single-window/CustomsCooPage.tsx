@@ -22,7 +22,7 @@ import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
-import { PageState, PermissionNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { CustomsCooProducerProfileDialog } from "./CustomsCooProducerProfileDialog.tsx";
 import { CustomsCooIdentitySections } from "./CustomsCooIdentitySections.tsx";
 import { CustomsCooTradeSections } from "./CustomsCooTradeSections.tsx";
@@ -983,8 +983,8 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
         onBuildReview={() => void reviewQuery.refetch()}
       />
 
-      {loadMessage || message || catalogMessage ? <div className="alert">{loadMessage || message || catalogMessage}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+      {loadMessage || message || catalogMessage ? <InlineNotice tone="error" title="原产地证操作未完成">{loadMessage || message || catalogMessage}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {!permission.canOperate ? <PermissionNotice>当前权限模板仅允许查看单一窗口草稿和预检结果；修改、修复、保存与交接操作已禁用。</PermissionNotice> : null}
       {!document && isBusy ? <PageState tone="loading" title="正在加载原产地证草稿" description="正在读取表头、商品明细、附件和预检状态。" /> : null}
 
@@ -1051,7 +1051,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
                   : "未加载"}
               </span>
             </div>
-            {reviewMessage ? <div className="alert">{reviewMessage}</div> : null}
+            {reviewMessage ? <InlineNotice tone="warning" title="审查提示">{reviewMessage}</InlineNotice> : null}
             <SingleWindowExportReviewPanel
               review={reviewQuery.data ?? null}
               isBusy={reviewQuery.isFetching}

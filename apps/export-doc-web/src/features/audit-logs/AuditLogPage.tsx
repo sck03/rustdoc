@@ -11,6 +11,7 @@ import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { readStoredJsonObject, writeStoredJson } from "../../ui/browserStorage.ts";
 import { listPageSizeOptions, normalizeListPageSize } from "../../ui/listViewState.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { InlineNotice } from "../../ui/PageState.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 import { AuditLogMaintenancePanel } from "./AuditLogMaintenancePanel.tsx";
 import {
@@ -441,8 +442,8 @@ export function AuditLogPage({
         </div>
       </form>
 
-      {message ? <div className="alert">{message}</div> : null}
-      {actionMessage ? <div className={actionMessage.kind === "success" ? "success-alert" : "alert"}>{actionMessage.text}</div> : null}
+      {message ? <InlineNotice tone="error" title="审计日志操作失败">{message}</InlineNotice> : null}
+      {actionMessage ? <InlineNotice tone={actionMessage.kind === "success" ? "success" : "error"}>{actionMessage.text}</InlineNotice> : null}
 
       {canManageAuditLogs ? (
         <AuditLogMaintenancePanel

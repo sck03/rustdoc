@@ -14,7 +14,7 @@ import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
-import { PageState, PermissionNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { SingleWindowHandoffPanel } from "./SingleWindowHandoffPanel.tsx";
 import { SingleWindowLockedFieldsDialog } from "./SingleWindowLockedFieldsDialog.tsx";
 import { SingleWindowExportReviewPanel } from "./SingleWindowExportReviewPanel.tsx";
@@ -556,9 +556,9 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
         onBuildReview={() => void reviewQuery.refetch()}
       />
 
-      {loadMessage || message ? <div className="alert">{loadMessage || message}</div> : null}
-      {referenceMessage ? <div className="alert">报关代理委托候选项加载失败：{referenceMessage}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+      {loadMessage || message ? <InlineNotice tone="error" title="代理委托操作未完成">{loadMessage || message}</InlineNotice> : null}
+      {referenceMessage ? <InlineNotice tone="warning" title="候选资料未完整加载">报关代理委托候选项加载失败：{referenceMessage}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {!permission.canOperate ? <PermissionNotice>当前权限模板仅允许查看单一窗口草稿和预检结果；修改、修复、保存与交接操作已禁用。</PermissionNotice> : null}
       {!document && isBusy ? <PageState tone="loading" title="正在加载代理委托草稿" description="正在读取委托信息、商品明细和预检状态。" /> : null}
 
@@ -614,7 +614,7 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
                   : "未加载"}
               </span>
             </div>
-            {reviewMessage ? <div className="alert">{reviewMessage}</div> : null}
+            {reviewMessage ? <InlineNotice tone="warning" title="审查提示">{reviewMessage}</InlineNotice> : null}
             <SingleWindowExportReviewPanel
               review={reviewQuery.data ?? null}
               isBusy={reviewQuery.isFetching}

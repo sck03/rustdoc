@@ -7,7 +7,7 @@ import { isDesktopBridgeAvailable, readOcrImageFileAsDataUrl, selectOcrImageFile
 import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
-import { PermissionNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 
 type OcrImageSource =
   | {
@@ -359,7 +359,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
       </div>
 
       {!ocrPermission.canOperate ? <PermissionNotice>当前模板仅允许进入 OCR 模块，图片载入和识别操作已禁用。</PermissionNotice> : null}
-      {message ? <div className={messageType === "error" ? "alert" : "success-alert"}>{message}</div> : null}
+      {message ? <InlineNotice tone={messageType === "error" ? "error" : "success"}>{message}</InlineNotice> : null}
 
       <div className="smart-ocr-layout">
         <section className="form-section smart-ocr-preview-panel" aria-label="图片预览">

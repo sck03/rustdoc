@@ -11,6 +11,7 @@ import { readStoredJson, writeStoredJson } from "../../ui/browserStorage.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { formatAmount, formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
@@ -356,9 +357,9 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
         </div>
       </section> : null}
 
-      {message ? <div className="alert">{message}</div> : null}
-      {partiesQuery.isError ? <div className="alert">{readApiError(partiesQuery.error)}</div> : null}
-      {actionMessage ? <div className={actionMessage.kind === "success" ? "success-alert" : "alert"}>{actionMessage.text}</div> : null}
+      {message ? <InlineNotice tone="error" title="查询未完成">{message}</InlineNotice> : null}
+      {partiesQuery.isError ? <InlineNotice tone="warning" title="客户与出口商资料未加载">{readApiError(partiesQuery.error)}</InlineNotice> : null}
+      {actionMessage ? <InlineNotice tone={actionMessage.kind === "success" ? "success" : "error"}>{actionMessage.text}</InlineNotice> : null}
 
       <QueryResultTable data={rows} isBusy={isBusy} onOpen={(invoiceId) => navigate(`/invoices/${invoiceId}`)} />
 

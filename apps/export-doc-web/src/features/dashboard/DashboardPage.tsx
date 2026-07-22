@@ -14,6 +14,7 @@ import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 export function DashboardPage({ client }: { client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
@@ -94,7 +95,7 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
         </div>
       </div>
 
-      {errorMessage ? <div className="alert">{errorMessage}</div> : null}
+      {errorMessage ? <InlineNotice tone="error" title="仪表盘数据加载失败">{errorMessage}</InlineNotice> : null}
 
       <div className="dashboard-metric-grid">
         {metrics.map((metric) => {

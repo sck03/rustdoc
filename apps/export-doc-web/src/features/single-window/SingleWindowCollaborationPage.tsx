@@ -8,7 +8,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
-import { PermissionNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { listPageSizeOptions,normalizeListPageSize } from "../../ui/listViewState.ts";
 
 import {
@@ -147,7 +147,7 @@ export function SingleWindowCollaborationPage({ client }: { client: ExportDocMan
         </div>
       </div>
 
-      {message ? <div className="alert">{message}</div> : null}
+      {message ? <InlineNotice tone="error" title="协同看板加载失败">{message}</InlineNotice> : null}
       {!permission.canOperate ? (
         <PermissionNotice>
           当前权限仅允许查询协同工单和工位状态；协作处理与状态推进已禁用。

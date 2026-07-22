@@ -2245,14 +2245,6 @@ tbody tr:hover {
   gap: 6px;
 }
 
-.single-window-list-panel .success-alert,
-.single-window-list-panel .alert {
-  align-items: center;
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-}
-
 .single-window-list-action-buttons {
   flex-wrap: wrap;
   justify-content: flex-start;
@@ -5333,39 +5325,4 @@ label textarea {
 .path-field-actions .icon-button {
   width: 38px;
   height: 38px;
-}
-
-.alert {
-  padding: 10px 12px;
-  color: #8a1f13;
-  background: #fff0ed;
-  border: 1px solid #f1b4aa;
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-.success-alert {
-  padding: 10px 12px;
-  color: #22543d;
-  background: #edf8f1;
-  border: 1px solid #b7dec4;
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-.status-action-alert {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.info-alert {
-  padding: 10px 12px;
-  color: #315166;
-  background: #eef7fb;
-  border: 1px solid #b8dbe8;
-  border-radius: 8px;
-  font-size: 13px;
 }

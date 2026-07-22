@@ -4,7 +4,7 @@ import type { ApiHealthResponse, ExportDocManagerApiClient } from "../../api/ind
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { formatRuntimeDate } from "./settingsFormatters.ts";
 import { readApiError } from "../../ui/formUtils.ts";
-import { PageState } from "../../ui/PageState.tsx";
+import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import {
   buildRuntimePathGroups,
   runtimePathAccessModeLabel,
@@ -74,11 +74,11 @@ export function RuntimeDiagnosticsSection({
           </button>
         </div>
       </div>
-      {health?.storagePolicy ? <div className="info-alert">{health.storagePolicy}</div> : null}
-      {errorMessage ? <div className="alert">{errorMessage}</div> : null}
-      {templateStorageMutation.isError ? <div className="alert">{readApiError(templateStorageMutation.error)}</div> : null}
+      {health?.storagePolicy ? <InlineNotice tone="info">{health.storagePolicy}</InlineNotice> : null}
+      {errorMessage ? <InlineNotice tone="error" title="运行诊断加载失败">{errorMessage}</InlineNotice> : null}
+      {templateStorageMutation.isError ? <InlineNotice tone="error" title="模板存储检查失败">{readApiError(templateStorageMutation.error)}</InlineNotice> : null}
       {templateStorageMutation.data ? (
-        <div className={templateStorageMutation.data.writable ? "success-alert runtime-template-storage-result" : "alert runtime-template-storage-result"}>
+        <InlineNotice tone={templateStorageMutation.data.writable ? "success" : "error"} className="runtime-template-storage-result">
           <div>
             <strong>{templateStorageMutation.data.writable ? "模板目录可用" : "模板目录需要处理"}</strong>
             <span>{templateStorageMutation.data.message}</span>
@@ -89,7 +89,7 @@ export function RuntimeDiagnosticsSection({
               ? renderOpenPathAction(templateStorageMutation.data.templateRoot, "打开模板目录", onPathError)
               : null}
           </div>
-        </div>
+        </InlineNotice>
       ) : null}
 
       <div className="runtime-overview-grid" aria-label="运行状态摘要">
@@ -105,9 +105,9 @@ export function RuntimeDiagnosticsSection({
       </div>
 
       {summary.coreMissing === 0 && summary.featureMissing > 0 ? (
-        <div className="info-alert runtime-feature-dependency-note">
+        <InlineNotice tone="info" className="runtime-feature-dependency-note">
           有 {summary.featureMissing} 项按功能需要的资源未安装，只影响对应功能，不影响数据库和基本运行。
-        </div>
+        </InlineNotice>
       ) : null}
 
       {dependencies.length > 0 ? (

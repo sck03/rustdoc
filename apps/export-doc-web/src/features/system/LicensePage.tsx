@@ -7,6 +7,7 @@ import {
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
   const queryClient = useQueryClient();
@@ -117,7 +118,7 @@ export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
         </div>
       </div>
 
-      {message ? <div className={messageType === "error" ? "alert" : "success-alert"}>{message}</div> : null}
+      {message ? <InlineNotice tone={messageType === "error" ? "error" : "success"}>{message}</InlineNotice> : null}
 
       <section className="form-section" aria-label="授权状态">
         <div className="detail-grid license-detail-grid">

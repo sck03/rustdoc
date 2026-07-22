@@ -2,7 +2,7 @@ import { lazy, Suspense, useRef, useState, type FormEvent } from "react";
 import { FileDown, FolderOpen, PackageCheck, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import type { ApiContainerPackingAnalysisDto, ApiContainerPackingProjectSummaryDto, ApiContainerTypeDto } from "../../../api/index.ts";
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
-import { PageState, PermissionNotice } from "../../../ui/PageState.tsx";
+import { InlineNotice, PageState, PermissionNotice } from "../../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../../ui/ResponsiveTable.tsx";
 import type { ContainerPackingCargoRow, ContainerPackingFormState, ContainerPackingRenderModeValue, ContainerPackingRulesFormState, ContainerPackingZoneValue } from "./containerPackingModel.ts";
 import { containerPackingRenderModeOptions, containerPackingZoneOptions, formatPackingPercent } from "./containerPackingModel.ts";
@@ -178,11 +178,11 @@ export function ContainerPackingWorkspace(props: Props) {
       </div>
 
       {visibleMessage ? (
-        <div className={hasVisibleError ? "alert" : "success-alert"}>
+        <InlineNotice tone={hasVisibleError ? "error" : "success"}>
           {visibleMessage}
-        </div>
+        </InlineNotice>
       ) : null}
-      {pdfExportMessage ? <div className={pdfExportMessage.kind === "error" ? "alert" : "success-alert"}>{pdfExportMessage.text}</div> : null}
+      {pdfExportMessage ? <InlineNotice tone={pdfExportMessage.kind === "error" ? "error" : "success"}>{pdfExportMessage.text}</InlineNotice> : null}
       {!canOperate ? (
         <PermissionNotice>
           当前权限模板仅允许查看装箱方案；输入、分析、保存和柜型维护已禁用。

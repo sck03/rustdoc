@@ -7,6 +7,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
@@ -45,7 +46,7 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
         </div>
       </div>
 
-      {query.isError ? <div className="alert">{readApiError(query.error)}</div> : null}
+      {query.isError ? <InlineNotice tone="error" title="销售工作台加载失败">{readApiError(query.error)}</InlineNotice> : null}
       {isFirstRun ? <section className="sales-first-run" aria-label="销售工作区开始使用">
         <div className="sales-first-run-heading">
           <div><span>首次使用</span><h2>从一位客户开始</h2><p>只需完成下面三步，销售概览就会自动形成，不需要先配置复杂流程。</p></div>

@@ -100,7 +100,7 @@ export function InlineNotice({
     <Icon size={18} aria-hidden="true" />
     <div className="inline-notice-content">
       {title ? <strong>{title}</strong> : null}
-      <span>{children}</span>
+      <div className="inline-notice-message">{children}</div>
     </div>
     {action ? <div className="inline-notice-action">{action}</div> : null}
   </div>;

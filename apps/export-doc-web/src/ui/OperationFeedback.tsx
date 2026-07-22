@@ -1,4 +1,4 @@
-import { AlertCircle, AlertTriangle, CheckCircle2, Info } from "lucide-react";
+import { InlineNotice } from "./PageState.tsx";
 
 export type OperationFeedbackTone = "success" | "warning" | "error" | "info";
 
@@ -14,18 +14,5 @@ export const infoFeedback = (text: string): OperationFeedbackState => ({ text, t
 
 export function OperationFeedback({ feedback }: { feedback: OperationFeedbackState | null }) {
   if (!feedback) return null;
-  const Icon = feedback.tone === "success" ? CheckCircle2
-    : feedback.tone === "warning" ? AlertTriangle
-      : feedback.tone === "error" ? AlertCircle
-        : Info;
-
-  return <div
-    className="operation-feedback"
-    data-tone={feedback.tone}
-    role={feedback.tone === "error" ? "alert" : "status"}
-    aria-live={feedback.tone === "error" ? "assertive" : "polite"}
-  >
-    <Icon size={17} aria-hidden="true" />
-    <span>{feedback.text}</span>
-  </div>;
+  return <InlineNotice tone={feedback.tone}>{feedback.text}</InlineNotice>;
 }

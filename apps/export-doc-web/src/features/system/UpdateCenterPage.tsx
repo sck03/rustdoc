@@ -9,6 +9,7 @@ import {
 } from "../../desktop/desktopBridge.ts";
 import { TextAreaField, TextField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 export function UpdateCenterPage() {
   const [endpoint, setEndpoint] = useState("");
@@ -81,7 +82,7 @@ export function UpdateCenterPage() {
         </div>
       </div>
 
-      {message ? <div className={messageType === "error" ? "alert" : "success-alert"}>{message}</div> : null}
+      {message ? <InlineNotice tone={messageType === "error" ? "error" : "success"}>{message}</InlineNotice> : null}
 
       <section className="form-section update-config-section" aria-label="更新配置">
         <div className="section-header">

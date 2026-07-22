@@ -4,6 +4,7 @@ import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 export function AboutPage({ client }: { client: ExportDocManagerApiClient }) {
   const healthQuery = useQuery({
@@ -35,7 +36,7 @@ export function AboutPage({ client }: { client: ExportDocManagerApiClient }) {
         </div>
       </div>
 
-      {errorMessage ? <div className="alert">{errorMessage}</div> : null}
+      {errorMessage ? <InlineNotice tone="error" title="系统信息加载失败">{errorMessage}</InlineNotice> : null}
 
       <section className="form-section" aria-label="产品信息">
         <div className="section-header">

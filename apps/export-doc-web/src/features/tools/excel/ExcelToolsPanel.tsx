@@ -14,6 +14,7 @@ import { PathField } from "../../../ui/PathField.tsx";
 import { formatAmount, formatDate, readApiError } from "../../../ui/formUtils.ts";
 import { downloadJobResultWhenReady } from "../../../ui/downloadJobResult.ts";
 import { ViewJobButton } from "../../jobs/ViewJobButton.tsx";
+import { InlineNotice } from "../../../ui/PageState.tsx";
 import { readDefaultExportDirectory } from "../../settings/settingsPaths.ts";
 
 const invoicePageSize = 50;
@@ -345,10 +346,7 @@ export function ExcelToolsPanel({
       </div>
 
       {message ? (
-        <div className={`${messageType === "error" ? "alert" : "success-alert"} status-action-alert`}>
-          <span>{message}</span>
-          {messageType === "success" ? <ViewJobButton jobId={lastCreatedJobId} disabled={isBusy} /> : null}
-        </div>
+        <InlineNotice tone={messageType === "error" ? "error" : "success"} action={messageType === "success" ? <ViewJobButton jobId={lastCreatedJobId} disabled={isBusy} /> : undefined}>{message}</InlineNotice>
       ) : null}
 
       <fieldset className="permission-fieldset" disabled={!canOperate}>

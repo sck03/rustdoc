@@ -8,6 +8,7 @@ import {
 } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 export function ExchangeRatePage({ client }: { client: ExportDocManagerApiClient }) {
   const [ratesResult, setRatesResult] = useState<ApiExchangeRateListResponse | null>(null);
@@ -80,7 +81,7 @@ export function ExchangeRatePage({ client }: { client: ExportDocManagerApiClient
         </div>
       </div>
 
-      {message ? <div className={messageType === "error" ? "alert" : "success-alert"}>{message}</div> : null}
+      {message ? <InlineNotice tone={messageType === "error" ? "error" : "success"}>{message}</InlineNotice> : null}
 
       <section className="form-section" aria-label="汇率状态">
         <div className="detail-grid exchange-rate-detail-grid">

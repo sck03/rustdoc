@@ -3,7 +3,7 @@ import type { ApiInvoiceListItemDto, SingleWindowExportReview } from "../../api/
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { formatDate } from "../../ui/formUtils.ts";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
-import { PageState, PermissionNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import type { SingleWindowBusinessType } from "./invoiceListFileNames.ts";
 import { flattenSingleWindowReviewIssues, formatReviewSeverity, formatReviewSeverityKey, formatSingleWindowBusinessType, formatSingleWindowNavigationTarget, getAutoRepairGroupKeys } from "./invoiceListModels.ts";
@@ -78,9 +78,7 @@ export function SingleWindowActionsPanel({
       </div>
 
       {message ? (
-        <div className={`${messageType === "error" ? "alert" : "success-alert"} status-action-alert`}>
-          <span>{message}</span>
-          <div className="toolbar-actions">
+        <InlineNotice tone={messageType === "error" ? "error" : "success"} action={<div className="toolbar-actions">
             {messageType === "success" ? <ViewJobButton jobId={jobId} disabled={isBusy} /> : null}
             {packagePath && isDesktopBridgeAvailable() ? (
               <button className="text-button compact-text-button" type="button" onClick={onOpenPackagePath}>
@@ -88,8 +86,9 @@ export function SingleWindowActionsPanel({
                 <span>打开</span>
               </button>
             ) : null}
-          </div>
-        </div>
+          </div>}>
+          {message}
+        </InlineNotice>
       ) : null}
       {!canOperate ? (
         <PermissionNotice>
@@ -193,7 +192,7 @@ export function SingleWindowActionsPanel({
               <strong>{currentReview.groups.length}</strong>
             </div>
           </div>
-          {currentReview.sourceDiffSummary ? <div className="info-alert">{currentReview.sourceDiffSummary}</div> : null}
+          {currentReview.sourceDiffSummary ? <InlineNotice tone="info">{currentReview.sourceDiffSummary}</InlineNotice> : null}
           <ResponsiveTableFrame className="compact-table" label="单一窗口预检问题">
             <table className="single-window-list-review-table">
               <thead>

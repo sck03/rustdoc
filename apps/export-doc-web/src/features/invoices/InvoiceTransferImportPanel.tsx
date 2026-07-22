@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import { FileArchive, Upload, X } from "lucide-react";
 import type { InvoiceTransferConflictAction, InvoiceTransferImportDraft } from "./invoiceListModels.ts";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 export function InvoiceTransferImportPanel({ draft, isBusy, uploadMode = false, uploadFile, onUploadFileChange, onCancel, onChange, onPreview, onSubmit }: {
   draft: InvoiceTransferImportDraft; isBusy: boolean; onCancel: () => void;
@@ -15,7 +16,7 @@ export function InvoiceTransferImportPanel({ draft, isBusy, uploadMode = false, 
     <form className="settings-form" onSubmit={onSubmit}>
       <div className="field-grid">{uploadMode ? <label><span>单据包文件</span><input type="file" accept=".edpkg" disabled={isBusy} onChange={(event) => onUploadFileChange?.(event.target.files?.[0] ?? null)} /></label> : <label><span>单据包路径</span><input value={draft.packagePath} disabled={isBusy} onChange={(event) => onChange({ packagePath: event.target.value, previewResponse: null })} /></label>}</div>
       {!uploadMode ? <div className="toolbar-actions"><button className="command-button secondary" type="button" disabled={isBusy} onClick={() => onPreview(draft.packagePath)}><FileArchive size={17} aria-hidden="true" /><span>{isBusy ? "处理中" : "预览"}</span></button></div> : <div className="field-help">{uploadFile ? `已选择：${uploadFile.name}` : "选择文件后自动预览。"}</div>}
-      {draft.previewResponse ? <><div className={draft.previewResponse.checksumValid ? "success-alert" : "alert"}>{draft.previewResponse.checksumMessage || (draft.previewResponse.checksumValid ? "校验通过" : "校验失败")}</div>
+      {draft.previewResponse ? <><InlineNotice tone={draft.previewResponse.checksumValid ? "success" : "error"}>{draft.previewResponse.checksumMessage || (draft.previewResponse.checksumValid ? "校验通过" : "校验失败")}</InlineNotice>
         {!draft.previewResponse.checksumValid ? <div className="inline-options"><label><input type="checkbox" checked={draft.allowInvalidChecksum} disabled={isBusy} onChange={(event) => onChange({ allowInvalidChecksum: event.target.checked })} /><span>继续导入校验失败的包</span></label></div> : null}
         {preview ? <div className="field-grid">
           <label><span>发票号</span><input value={preview.invoiceNo || "-"} disabled /></label><label><span>类型</span><input value={preview.type || "-"} disabled /></label>

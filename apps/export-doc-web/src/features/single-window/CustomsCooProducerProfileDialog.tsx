@@ -12,6 +12,7 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 type ProducerProfileDraft = ApiCustomsCooProducerProfileInputDto & {
   id: number;
@@ -245,8 +246,8 @@ export function CustomsCooProducerProfileDialog({
           </div>
         </div>
 
-        {profilesQuery.isError || message ? <div className="alert">{profilesQuery.isError ? readApiError(profilesQuery.error) : message}</div> : null}
-        {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+        {profilesQuery.isError || message ? <InlineNotice tone="error" title="生产企业资料操作失败">{profilesQuery.isError ? readApiError(profilesQuery.error) : message}</InlineNotice> : null}
+        {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
 
         <div className="producer-profile-layout">
           <ResponsiveTableFrame className="producer-profile-table-frame" label="生产企业资料">

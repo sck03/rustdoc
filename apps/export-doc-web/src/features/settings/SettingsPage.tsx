@@ -833,11 +833,11 @@ function SettingsValidationPanel({
           <span>应用自动修复</span>
         </button>
       </div>
-      <div className={result.isValid ? "success-alert" : "alert"}>
+      <InlineNotice tone={result.isValid ? "success" : "error"}>
         {messages.length === 0
           ? "未发现需要处理的设置项。"
           : `错误 ${errorCount} 项，警告 ${warningCount} 项。`}
-      </div>
+      </InlineNotice>
       {messages.length > 0 ? (
         <ResponsiveTableFrame className="backup-table-frame" label="设置校验消息">
           <table className="backup-table" aria-label="设置校验消息">

@@ -6,6 +6,7 @@ import {
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { InlineNotice } from "../../ui/PageState.tsx";
 import { normalizeInvoiceForSave } from "./invoiceModel.ts";
 
 const emptyAnalysis: ApiInvoiceProfitAnalysisResponse = {
@@ -77,7 +78,7 @@ export function InvoiceProfitAnalysisPanel({
         </button>
       </div>
 
-      {message ? <div className="alert">{message}</div> : null}
+      {message ? <InlineNotice tone="error" title="利润分析失败">{message}</InlineNotice> : null}
 
       <div className="detail-grid profit-analysis-grid">
         {metrics.map(([label, value]) => (

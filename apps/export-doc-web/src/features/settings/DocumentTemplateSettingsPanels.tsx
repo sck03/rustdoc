@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { ArrowDown, ArrowUp, FolderOpen, Plus, Trash2 } from "lucide-react";
 import { isDesktopBridgeAvailable, selectReportTemplateFile } from "../../desktop/desktopBridge.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 type SettingsRecord = Record<string, unknown>;
 
@@ -122,7 +123,7 @@ export function BatchExportSettingsPanel({
           </button>
         </div>
       </div>
-      {templateErrorMessage ? <div className="alert">{templateErrorMessage}</div> : null}
+      {templateErrorMessage ? <InlineNotice tone="warning" title="模板资料未完整加载">{templateErrorMessage}</InlineNotice> : null}
       <fieldset className="settings-fieldset" disabled={!canManageSettings}>
         <div className="field-grid">
           <TextSetting settings={settings} path={["batchExport", "outputFileNamePattern"]} label="文件命名规则" onChange={onChange} />
@@ -356,7 +357,7 @@ export function PaymentTemplateSettingsPanel({
           </button>
         </div>
       </div>
-      {templateErrorMessage ? <div className="alert">{templateErrorMessage}</div> : null}
+      {templateErrorMessage ? <InlineNotice tone="warning" title="模板资料未完整加载">{templateErrorMessage}</InlineNotice> : null}
       <fieldset className="settings-fieldset" disabled={!canManageSettings}>
         <div className="batch-export-items-toolbar">
           <span>{items.length} 个付款/报销模板</span>

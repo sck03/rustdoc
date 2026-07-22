@@ -12,7 +12,7 @@ import { isDesktopBridgeAvailable, selectEmailAttachmentFiles } from "../../desk
 import { readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { PathTextAreaField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
-import { PermissionNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { readEmailDraftNavigationState } from "./emailDraftNavigation.ts";
 
@@ -163,7 +163,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
       </div>
 
       {!emailPermission.canOperate ? <PermissionNotice>当前模板仅允许查看邮件服务状态，邮件编辑和发送已禁用。</PermissionNotice> : null}
-      {message ? <div className={message.kind === "error" ? "alert" : "success-alert"}>{message.text}</div> : null}
+      {message ? <InlineNotice tone={message.kind === "error" ? "error" : "success"}>{message.text}</InlineNotice> : null}
       <section className="form-section" aria-label="邮件状态">
         <div className="detail-grid email-status-detail-grid">
           <DetailItem label="SMTP 服务器" value={status?.isConfigured ? status.smtpHost : "-"} wide />
@@ -261,9 +261,9 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
                 <span>浏览器端不接受服务器文件路径</span>
               </div>
             </div>
-            <div className="info-alert">
+            <InlineNotice tone="info">
               局域网和容器版的通用邮件页只发送正文。需要发送单据附件时，请从对应发票或报表输出页面发起，系统会按当前账号可访问的业务记录生成附件。
-            </div>
+            </InlineNotice>
           </section>
         )}
       </div>

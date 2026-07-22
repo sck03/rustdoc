@@ -3,6 +3,7 @@ import { CreditCard, RefreshCw, Save, Settings } from "lucide-react";
 import { ApiPayeeDto, ApiPaymentDto } from "../../api/index.ts";
 import { DateField, EditableComboField, NumberField, SelectField, TextAreaField, TextField } from "../../ui/FormFields.tsx";
 import { formatAmount } from "../../ui/formUtils.ts";
+import { InlineNotice } from "../../ui/PageState.tsx";
 import { CustomOptionMap, getCustomOptions } from "../custom-options/customOptionModel.ts";
 
 type PaymentPatch = Partial<ApiPaymentDto>;
@@ -116,7 +117,7 @@ export function PaymentBasicInfoPanel({
           </button>
         </div>
       </div>
-      {referenceDataMessage ? <div className="alert">{referenceDataMessage}</div> : null}
+      {referenceDataMessage ? <InlineNotice tone="warning" title="参考资料未完整加载">{referenceDataMessage}</InlineNotice> : null}
       <div className="field-grid">
         <TextField label="发票号" value={payment.invoiceNo} onChange={(value) => onChange({ invoiceNo: value })} />
         <DateField label="付款日期" value={payment.paymentDate} onChange={(value) => onChange({ paymentDate: value })} />

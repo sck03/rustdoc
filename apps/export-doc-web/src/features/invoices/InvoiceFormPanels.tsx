@@ -11,6 +11,7 @@ import {
 } from "../../api/index.ts";
 import { DateField, EditableComboField, NumberField, SelectField, TextAreaField, TextField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { InlineNotice } from "../../ui/PageState.tsx";
 import { CustomOptionMap, getCustomOptions } from "../custom-options/customOptionModel.ts";
 import { type InvoiceItemCellSelection, InvoiceItemsEditor } from "./InvoiceItemsEditor.tsx";
 import { type EditableInvoiceItemField } from "./invoiceItemTableModel.ts";
@@ -215,7 +216,7 @@ export function InvoicePartiesPanel({
           <RefreshCw size={17} aria-hidden="true" />
         </button>
       </div>
-      {message ? <div className="alert">{message}</div> : null}
+      {message ? <InlineNotice tone="warning" title="客户与出口商资料未完整加载">{message}</InlineNotice> : null}
       <div className="invoice-party-groups">
         <section className="invoice-party-group" aria-label="客户信息">
           <div className="invoice-party-group-heading"><strong>客户信息</strong><span>选择客户档案后可继续调整本张发票内容</span></div>

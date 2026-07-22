@@ -19,6 +19,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 import {
   buildColumnMapState,
   buildExcelImportRequest,
@@ -642,10 +643,10 @@ export function SingleWindowReferenceCatalogPage({
         onChange={handleExcelImportFile}
       />
 
-      {!canManageReferenceCatalog ? <div className="info-alert">当前账号可查看参考词典，保存和恢复需要管理员权限。</div> : null}
-      {message ? <div className="alert">{message}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
-      {validationErrors.length > 0 ? <div className="alert">{validationErrors.slice(0, 4).join("；")}</div> : null}
+      {!canManageReferenceCatalog ? <InlineNotice tone="info">当前账号可查看参考词典，保存和恢复需要管理员权限。</InlineNotice> : null}
+      {message ? <InlineNotice tone="error" title="参考词典操作失败">{message}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
+      {validationErrors.length > 0 ? <InlineNotice tone="warning" title="请检查待导入数据">{validationErrors.slice(0, 4).join("；")}</InlineNotice> : null}
 
       <div className="toolbar single-window-reference-toolbar">
         <div className="reference-catalog-tabs" aria-label="参考词典分类">

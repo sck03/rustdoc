@@ -20,7 +20,7 @@ import { DesktopIconButton,readDesktopError,renderOpenPathAction } from "../../u
 import { PathField,PathTextAreaField } from "../../ui/PathField.tsx";
 import { formatPlainNumber,readApiError } from "../../ui/formUtils.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
-import { PermissionNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 
 import {
@@ -365,8 +365,8 @@ export function ReceiptPackagePanel({
             </button>
           </div>
         </div>
-        {exportMessage ? <div className={exportMessageKind === "error" ? "alert" : "success-alert"}>{exportMessage}</div> : null}
-        {receiptCollectionResult ? <div className="info-alert">已收集 {formatPlainNumber(receiptCollectionResult.receiptFiles.length)} 个回执文件。</div> : null}
+        {exportMessage ? <InlineNotice tone={exportMessageKind === "error" ? "error" : "success"}>{exportMessage}</InlineNotice> : null}
+        {receiptCollectionResult ? <InlineNotice tone="info">已收集 {formatPlainNumber(receiptCollectionResult.receiptFiles.length)} 个回执文件。</InlineNotice> : null}
         <div className="job-tool-submit-row">
           <label className="inline-filter"><span>导入回执包</span><input type="file" accept=".swpkg" disabled={!canOperate || isImportBusy} onChange={(event) => { setReceiptUploadFile(event.target.files?.[0] ?? null); setImportMessage(null); }} /></label>
           <button className="command-button secondary" type="button" disabled={!canOperate || isImportBusy || !receiptUploadFile} onClick={importReceiptPackage}>
@@ -374,7 +374,7 @@ export function ReceiptPackagePanel({
             <span>上传并导入</span>
           </button>
         </div>
-        {importMessage ? <div className={importReceiptPackageMutation.isError || !importResult ? "alert" : "success-alert"}>{importMessage}</div> : null}
+        {importMessage ? <InlineNotice tone={importReceiptPackageMutation.isError || !importResult ? "error" : "success"}>{importMessage}</InlineNotice> : null}
       </section>
     );
   }
@@ -386,16 +386,16 @@ export function ReceiptPackagePanel({
       </div>
 
       {exportMessage ? (
-        <div className={exportMessageKind === "error" ? "alert" : "success-alert"}>
+        <InlineNotice tone={exportMessageKind === "error" ? "error" : "success"}>
           {exportMessage}
-        </div>
+        </InlineNotice>
       ) : null}
       {importMessage ? (
-        <div className={importReceiptPackageMutation.isError || !importResult ? "alert" : "success-alert"}>
+        <InlineNotice tone={importReceiptPackageMutation.isError || !importResult ? "error" : "success"}>
           {importMessage}
-        </div>
+        </InlineNotice>
       ) : null}
-      {desktopMessage ? <div className="alert">{desktopMessage}</div> : null}
+      {desktopMessage ? <InlineNotice tone="error" title="回执包操作失败">{desktopMessage}</InlineNotice> : null}
       {!canOperate ? (
         <PermissionNotice>
           当前权限仅允许查看回执处理记录；收集、打包、导入及目录修改已禁用。

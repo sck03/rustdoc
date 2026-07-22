@@ -14,6 +14,7 @@ import { parseStringArray } from "./settingsValueUtils.ts";
 import { RuntimeDiagnosticsSection } from "./RuntimeDiagnosticsSection.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 type MaintenanceSectionKey = "postgresql" | "ownership" | "diagnostics" | "support";
 
@@ -111,9 +112,9 @@ function DataOwnershipUnavailablePanel() {
           <p className="section-description">用于多人团队发生岗位交接时，把发票和付款报销改派给接手人员。</p>
         </div>
       </div>
-      <div className="info-alert">
+      <InlineNotice tone="info">
         当前版本按单机单用户方式使用，不需要进行数据归属改派。启用全功能团队版并由管理员维护账号后，此处会提供来源人员、接手人员和业务范围选择。
-      </div>
+      </InlineNotice>
     </section>
   );
 }
@@ -245,13 +246,13 @@ function PostgreSqlMaintenancePanel({
           </button>
         </div>
       </div>
-      {!status?.postgreSqlSelected ? <div className="info-alert">当前为 SQLite 单机模式，PostgreSQL 团队库维护保持停用。</div> : null}
-      {status?.postgreSqlSelected && !status.postgreSqlConfigured ? <div className="info-alert">PostgreSQL 团队库连接信息尚未完整配置。</div> : null}
+      {!status?.postgreSqlSelected ? <InlineNotice tone="info">当前为 SQLite 单机模式，PostgreSQL 团队库维护保持停用。</InlineNotice> : null}
+      {status?.postgreSqlSelected && !status.postgreSqlConfigured ? <InlineNotice tone="info">PostgreSQL 团队库连接信息尚未完整配置。</InlineNotice> : null}
       {status?.postgreSqlConfigured && !status.toolsReady ? (
-        <div className="info-alert">未发现完整 PostgreSQL 客户端工具。请把 pg_dump、pg_restore、psql 放入程序根 Tools/PostgreSQL/bin。</div>
+        <InlineNotice tone="info">未发现完整 PostgreSQL 客户端工具。请把 pg_dump、pg_restore、psql 放入程序根 Tools/PostgreSQL/bin。</InlineNotice>
       ) : null}
-      {message ? <div className="alert">{message}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+      {message ? <InlineNotice tone="error" title="数据库维护失败">{message}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       <div className="detail-grid runtime-detail-grid">
         <div className="detail-item">
           <span>团队库模式</span>
@@ -336,10 +337,7 @@ function PostgreSqlMaintenancePanel({
         </label>
       </details>
       {lastRestorePlanPath ? (
-        <div className="info-alert">
-          <span>{lastRestorePlanPath}</span>
-          {renderOpenPathAction(lastRestorePlanPath, "打开还原计划目录", onPathError)}
-        </div>
+        <InlineNotice tone="info" action={renderOpenPathAction(lastRestorePlanPath, "打开还原计划目录", onPathError)}>{lastRestorePlanPath}</InlineNotice>
       ) : null}
       <ResponsiveTableFrame className="backup-table-frame" label="PostgreSQL 团队库物理备份列表">
         <table className="backup-table" aria-label="PostgreSQL 团队库物理备份列表">
@@ -457,8 +455,8 @@ function SupportPackagePanel({
           </button>
         </div>
       </div>
-      {message ? <div className="alert">{message}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+      {message ? <InlineNotice tone="error" title="数据归属维护失败">{message}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       <div className="backup-action-grid">
         <label className="settings-check">
           <input
@@ -620,8 +618,8 @@ function SharedDatabaseOwnershipPanel({
           </button>
         </div>
       </div>
-      {message ? <div className="alert">{message}</div> : null}
-      {successMessage ? <div className="success-alert">{successMessage}</div> : null}
+      {message ? <InlineNotice tone="error" title="支持包操作失败">{message}</InlineNotice> : null}
+      {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       <div className="detail-grid runtime-detail-grid">
         <div className="detail-item">
           <span>发票总数</span>
