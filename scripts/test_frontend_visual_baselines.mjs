@@ -19,7 +19,7 @@ const browserExecutable = path.join(repositoryRoot, "Browsers", "ChromeForTestin
 const axeSource = readFileSync(path.join(webRoot, "node_modules", "axe-core", "axe.min.js"), "utf8");
 const updateApprovedBaselines = process.env.UPDATE_FRONTEND_VISUAL_BASELINES === "1";
 const maximumPixelDifferenceRatio = Number(process.env.FRONTEND_VISUAL_MAX_DIFF_RATIO ?? "0.001");
-const pages = ["login", "dashboard", "invoice", "invoiceParties", "hs", "singleWindow", "report", "state-loading", "state-empty", "state-error", "state-fatal", "state-permission", "state-conflict", "state-feedback", "dialog"];
+const pages = ["login", "login-expired", "dashboard", "invoice", "invoiceParties", "hs", "singleWindow", "report", "state-loading", "state-empty", "state-error", "state-fatal", "state-offline", "state-offline-local", "state-permission", "state-conflict", "state-feedback", "dialog"];
 const viewports = [
   { name: "desktop-1366", width: 1366, height: 768 },
   { name: "desktop-1920", width: 1920, height: 1080 },
@@ -117,17 +117,38 @@ try {
               return controlRect.left < groupRect.left - 1 || controlRect.right > groupRect.right + 1;
             }).length
           : 0;
-        const reportPanelsSameRow = ${JSON.stringify(pageName)} === "report" && ${viewport.width} > 1180
+        const reportLayout = ${JSON.stringify(pageName)} === "report"
           ? (() => {
               const selectors = [".template-selection-panel", ".template-user-panel", ".template-admin-panel", ".template-package-panel"];
-              const tops = selectors.map((selector) => document.querySelector(selector)?.getBoundingClientRect().top ?? -1000);
-              return tops.every((top) => Math.abs(top - tops[0]) <= 1);
+              const panels = selectors.map((selector) => document.querySelector(selector));
+              const rects = panels.map((panel) => panel?.getBoundingClientRect()).filter(Boolean);
+              const selectionRect = rects[0];
+              const managementRects = rects.slice(1);
+              const workspaceWidth = document.querySelector(".report-template-surface")?.getBoundingClientRect().width ?? 0;
+              const overlapCount = rects.flatMap((rect, index) => rects.slice(index + 1).map((other) => ({ rect, other })))
+                .filter(({ rect, other }) => Math.min(rect.right, other.right) - Math.max(rect.left, other.left) > 1
+                  && Math.min(rect.bottom, other.bottom) - Math.max(rect.top, other.top) > 1).length;
+              const selectionFieldWidths = [...document.querySelectorAll(".template-selection-panel > label")]
+                .map((field) => field.getBoundingClientRect().width);
+              const responsivePlacementMatches = workspaceWidth <= 1160
+                ? managementRects.every((rect) => selectionRect && rect.top >= selectionRect.bottom - 1)
+                : managementRects.every((rect) => selectionRect && Math.abs(rect.top - selectionRect.top) <= 1);
+              return {
+                overlapCount,
+                minimumSelectionFieldWidth: selectionFieldWidths.length > 0 ? Math.min(...selectionFieldWidths) : 0,
+                responsivePlacementMatches,
+              };
             })()
-          : true;
-        const isShelllessPage = ["login", "state-fatal"].includes(${JSON.stringify(pageName)});
+          : { overlapCount: 0, minimumSelectionFieldWidth: 999, responsivePlacementMatches: true };
+        const isShelllessPage = ["login", "login-expired", "state-fatal"].includes(${JSON.stringify(pageName)});
         const compactNavigationWidth = !isShelllessPage && ${viewport.width} >= 861 && ${viewport.width} <= 1180
           ? document.querySelector(".workspace-nav")?.getBoundingClientRect().width ?? 1000
           : null;
+        const connectivityNoticeMatches = ${JSON.stringify(pageName)} === "state-offline"
+          ? visible(".workspace-connectivity-notice")
+          : ${JSON.stringify(pageName)} === "state-offline-local"
+            ? !visible(".workspace-connectivity-notice")
+            : true;
         return {
           title: document.title,
           scrollWidth: root.scrollWidth,
@@ -137,8 +158,11 @@ try {
           unlabeledInputs,
           truncatedCriticalText,
           partyControlOverflow,
-          reportPanelsSameRow,
+          reportPanelOverlapCount: reportLayout.overlapCount,
+          reportMinimumSelectionFieldWidth: reportLayout.minimumSelectionFieldWidth,
+          reportResponsivePlacementMatches: reportLayout.responsivePlacementMatches,
           compactNavigationWidth,
+          connectivityNoticeMatches,
           invoiceDetailColumnCount: ${JSON.stringify(pageName)} === "invoice" ? document.querySelectorAll(".item-editor-table thead th").length : null,
           workspaceNavigation: isShelllessPage ? true : visible(".workspace-nav"),
           expectedStickyControl: ${JSON.stringify(pageName)} === "invoice" ? visible(".invoice-editor-sticky-actions")
@@ -157,8 +181,11 @@ try {
         && axeViolations.length === 0
         && value.truncatedCriticalText.length === 0
         && value.partyControlOverflow === 0
-        && value.reportPanelsSameRow
+        && value.reportPanelOverlapCount === 0
+        && value.reportMinimumSelectionFieldWidth >= 128
+        && value.reportResponsivePlacementMatches
         && (value.compactNavigationWidth === null || value.compactNavigationWidth <= 80)
+        && value.connectivityNoticeMatches
         && (value.invoiceDetailColumnCount === null || value.invoiceDetailColumnCount >= 20)
         && value.workspaceNavigation && value.expectedStickyControl && value.expectedDialog
         && pixelComparison.passed;

@@ -20,6 +20,7 @@ const modelPath = path.join(
 );
 const reportWorkspaceCss = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "reportWorkspace.css"), "utf8");
 const responsiveOverridesCss = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "responsiveOverrides.css"), "utf8");
+const themeCss = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "theme.css"), "utf8");
 const modelImportSpecifier = `./${path.relative(workspaceRoot, modelPath).replaceAll("\\", "/")}`;
 
 fs.mkdirSync(workspaceRoot, { recursive: true });
@@ -97,6 +98,16 @@ assertMatch(
   responsiveOverridesCss,
   /@media\s*\(min-width:\s*861px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.report-template-sidebar\s*\{\s*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)[\s\S]*?\.template-selection-panel\s*\{\s*grid-column:\s*span 3/,
   "中等宽度应让选择区独占首行，其余三个模板面板同排",
+);
+assertMatch(
+  themeCss,
+  /@container\s+report-workspace\s*\(max-width:\s*1160px\)[\s\S]*?\.template-selection-panel\s*\{[\s\S]*?grid-column:\s*1\s*\/\s*-1;[\s\S]*?grid-row:\s*auto;/,
+  "工作区实际变窄时选择区必须独占首行并清除宽屏行定位",
+);
+assertMatch(
+  themeCss,
+  /@container\s+report-workspace\s*\(max-width:\s*1160px\)[\s\S]*?\.template-user-panel,\s*\.template-admin-panel,\s*\.template-package-panel\s*\{[\s\S]*?grid-column:\s*auto;[\s\S]*?grid-row:\s*auto;/,
+  "工作区实际变窄时三个管理面板必须清除宽屏固定列，避免覆盖默认模板",
 );
 
 console.log("report-template-workspace-model tests passed");

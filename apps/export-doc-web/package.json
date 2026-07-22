@@ -23,6 +23,8 @@
     "test:business-status-model": "node ../../scripts/test_business_status_model.mjs",
     "test:concurrency-feedback": "node ../../scripts/test_frontend_concurrency_feedback.mjs",
     "test:query-retry-policy": "node ../../scripts/test_query_retry_policy.mjs",
+    "test:authentication-failure-events": "node ../../scripts/test_authentication_failure_events.mjs",
+    "test:session-expiry-model": "node ../../scripts/test_session_expiry_model.mjs",
     "test:accessibility-contracts": "node ../../scripts/test_frontend_accessibility_contracts.mjs",
     "test:visual-baselines": "node ../../scripts/test_frontend_visual_baselines.mjs",
     "test:visual-baselines:update": "node ../../scripts/update_frontend_visual_baselines.mjs",

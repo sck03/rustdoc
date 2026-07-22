@@ -915,7 +915,11 @@ tbody tr:hover {
 }
 
 .report-template-sidebar {
-  grid-template-columns: minmax(300px, 1.25fr) minmax(220px, 1fr) minmax(220px, 1fr);
+  grid-template-columns:
+    minmax(420px, 1.6fr)
+    minmax(220px, 1fr)
+    minmax(220px, 1fr)
+    minmax(120px, 0.55fr);
 }
 
 @container report-workspace (max-width: 1160px) {
@@ -925,6 +929,14 @@ tbody tr:hover {
 
   .template-selection-panel {
     grid-column: 1 / -1;
+    grid-row: auto;
+  }
+
+  .template-user-panel,
+  .template-admin-panel,
+  .template-package-panel {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .new-report-designer-grid {
@@ -1792,6 +1804,51 @@ button.dashboard-metric {
 .workspace-content {
   min-width: 0;
   min-height: 0;
+}
+
+.workspace-connectivity-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 18px 0;
+  padding: 10px 13px;
+  color: #6f4c0d;
+  background: #fff8e6;
+  border: 1px solid #e8cc86;
+  border-left: 4px solid #d79a18;
+  border-radius: 10px;
+  box-shadow: 0 7px 18px rgba(92, 66, 12, 0.06);
+}
+
+.workspace-connectivity-notice > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-width: 0;
+}
+
+.workspace-connectivity-notice strong {
+  color: #5e3c00;
+}
+
+.workspace-connectivity-notice span {
+  overflow-wrap: anywhere;
+}
+
+.service-status[data-state="offline"] .service-status-dot {
+  background: #d99a14;
+  box-shadow: 0 0 0 4px rgba(217, 154, 20, 0.12);
+}
+
+@media (max-width: 560px) {
+  .workspace-connectivity-notice {
+    align-items: flex-start;
+    margin: 10px 12px 0;
+  }
+
+  .workspace-connectivity-notice > div {
+    display: grid;
+  }
 }
 
 .workspace-title-cluster {

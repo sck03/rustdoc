@@ -1,4 +1,4 @@
-import { type ComponentType, type FormEvent, lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { type ComponentType, type FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -7,6 +7,8 @@ import {
   createExportDocManagerApiClient,
 } from "./api/index.ts";
 import { queryKeys } from "./api/queryKeys.ts";
+import { notifyAuthenticationFailure, subscribeToAuthenticationFailure } from "./api/authenticationFailureEvents.ts";
+import { calculateSessionExpiryDelay } from "./api/sessionExpiryModel.ts";
 import {
   getDesktopRuntimeContext,
   isDesktopBridgeAvailable,
@@ -120,6 +122,15 @@ function App() {
   const isFullEdition = session?.user.capabilities?.productEdition?.trim().toLowerCase() === "full";
   const canManageAuditLogs = canManageSystem && isFullEdition;
 
+  const expireSession = useCallback((reason: string) => {
+    setSession(null);
+    setMessage(reason);
+    setLoginState("idle");
+    clearStoredSession();
+    queryClient.clear();
+    navigate("/", { replace: true });
+  }, [navigate, queryClient]);
+
   const client = useMemo(
     () =>
       createExportDocManagerApiClient({
@@ -188,6 +199,41 @@ function App() {
   }, [session]);
 
   useEffect(() => {
+    if (!sessionAccessToken) {
+      return undefined;
+    }
+
+    return subscribeToAuthenticationFailure(() => {
+      expireSession("登录状态已失效，请重新登录后继续。为保护账号安全，系统没有重复提交刚才的操作。");
+    });
+  }, [expireSession, sessionAccessToken]);
+
+  useEffect(() => {
+    if (!session?.expiresAt) {
+      return undefined;
+    }
+
+    let timerId: number | undefined;
+    const scheduleExpiry = () => {
+      const delay = calculateSessionExpiryDelay(session.expiresAt);
+      if (delay === null) {
+        return;
+      }
+      if (delay === 0) {
+        expireSession("登录已到期，请重新登录后继续。为保护业务数据，系统已结束当前会话。");
+        return;
+      }
+      timerId = window.setTimeout(scheduleExpiry, delay);
+    };
+    scheduleExpiry();
+    return () => {
+      if (timerId !== undefined) {
+        window.clearTimeout(timerId);
+      }
+    };
+  }, [expireSession, session?.expiresAt]);
+
+  useEffect(() => {
     if (!session || desktopContextLoading) {
       return undefined;
     }
@@ -215,20 +261,13 @@ function App() {
           return;
         }
 
-        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-          setSession(null);
-          setMessage("登录状态已失效，请重新登录。");
-          setLoginState("idle");
-          clearStoredSession();
-          queryClient.clear();
-          navigate("/", { replace: true });
-        }
+        notifyAuthenticationFailure(error);
       });
 
     return () => {
       isStale = true;
     };
-  }, [client, desktopContextLoading, navigate, queryClient, sessionAccessToken, sessionApiBaseUrl]);
+  }, [client, desktopContextLoading, expireSession, sessionAccessToken, sessionApiBaseUrl]);
 
   useEffect(() => {
     if (!session) return;
@@ -533,7 +572,8 @@ function readStoredSession(): SessionState | null {
     if (!session) {
       return null;
     }
-    if (session.expiresAt && new Date(session.expiresAt).getTime() <= Date.now()) {
+    const expiryDelay = calculateSessionExpiryDelay(session.expiresAt);
+    if (expiryDelay === null || expiryDelay === 0) {
       clearStoredSession();
       return null;
     }

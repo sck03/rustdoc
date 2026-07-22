@@ -8,6 +8,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Server,
+  WifiOff,
   X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -21,6 +22,7 @@ import {
 } from "./workspaceNavigation.ts";
 import { getProductEditionPresentation } from "./productEdition.ts";
 import { IconButton } from "../ui/Button.tsx";
+import { useOnlineStatus } from "../ui/useOnlineStatus.ts";
 
 type WorkspaceShellProps = {
   pathname: string;
@@ -29,6 +31,7 @@ type WorkspaceShellProps = {
   user: ApiUserDto;
   onLogout: () => void;
   children: ReactNode;
+  connectivityOverride?: "online" | "offline";
 };
 
 export function WorkspaceShell({
@@ -38,9 +41,11 @@ export function WorkspaceShell({
   user,
   onLogout,
   children,
+  connectivityOverride,
 }: WorkspaceShellProps) {
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const isOnline = useOnlineStatus(connectivityOverride);
   const visibleGroups = useMemo(
     () => filterWorkspaceNavGroups({ ...user.capabilities, isDesktopRuntime }),
     [isDesktopRuntime, user.capabilities],
@@ -93,6 +98,8 @@ export function WorkspaceShell({
   const ContextIcon = context.icon;
   const displayName = user.fullName || user.username;
   const productText = renderProductText(user);
+  const showConnectivityNotice = !isDesktopRuntime && !isOnline;
+  const serviceStatusOnline = isDesktopRuntime || isOnline;
 
   return (
     <div className={isNavCollapsed ? "app-shell app-shell-nav-collapsed" : "app-shell"}>
@@ -166,10 +173,10 @@ export function WorkspaceShell({
             </div>
           </div>
           <div className="session-strip">
-            <span className="service-status" title={apiBaseUrl}>
+            <span className="service-status" data-state={serviceStatusOnline ? "online" : "offline"} title={apiBaseUrl}>
               <span className="service-status-dot" aria-hidden="true" />
               <Server size={15} aria-hidden="true" />
-              <span className="api-base">服务已连接</span>
+              <span className="api-base">{serviceStatusOnline ? "服务已连接" : "设备离线"}</span>
             </span>
             <span className="session-user">
               <span className="session-avatar" aria-hidden="true">
@@ -185,6 +192,14 @@ export function WorkspaceShell({
             </IconButton>
           </div>
         </header>
+
+        {showConnectivityNotice ? <div className="workspace-connectivity-notice" role="status" aria-live="polite">
+          <WifiOff size={18} aria-hidden="true" />
+          <div>
+            <strong>设备当前离线</strong>
+            <span>已加载内容仍可查看；联网查询和服务器操作可能暂时不可用，恢复网络后请明确重试。</span>
+          </div>
+        </div> : null}
 
         <div className="workspace-content">{children}</div>
       </main>

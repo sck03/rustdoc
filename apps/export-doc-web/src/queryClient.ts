@@ -1,7 +1,14 @@
-import { QueryClient } from "@tanstack/react-query";
+import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
+import { notifyAuthenticationFailure } from "./api/authenticationFailureEvents.ts";
 import { queryRetryDelay, shouldRetryQueryFailure } from "./api/queryRetryPolicy.ts";
 
 export const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: notifyAuthenticationFailure,
+  }),
+  mutationCache: new MutationCache({
+    onError: notifyAuthenticationFailure,
+  }),
   defaultOptions: {
     queries: {
       gcTime: 5 * 60 * 1000,
@@ -13,7 +20,7 @@ export const queryClient = new QueryClient({
       staleTime: 30 * 1000,
     },
     mutations: {
-      networkMode: "online",
+      networkMode: "always",
       retry: false,
     },
   },
