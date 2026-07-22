@@ -833,7 +833,7 @@ export function InvoiceReportPreviewPanel({
               </span>
               <small>手动路径、单据包、邮件附件</small>
             </summary>
-            <div className="report-export-advanced-body">
+            {showExportAdvanced ? <div className="report-export-advanced-body">
           {desktopAvailable ? <div className="report-pdf-controls">
             <PathField
               label="输出 PDF"
@@ -1037,7 +1037,7 @@ export function InvoiceReportPreviewPanel({
         />
 
           </div>
-            </div>
+            </div> : null}
           </details>
         </>
       ) : null}

@@ -19,6 +19,14 @@ for (const file of walk(root)) {
     failures.push(`${sourceRelativePath}: 业务提示必须使用 InlineNotice 提供统一反馈语义`);
   }
   visit(source, source);
+
+  if (sourceRelativePath === "features/invoices/InvoiceReportPreviewPanel.tsx") {
+    const advancedBody = sourceText.indexOf('className="report-export-advanced-body"');
+    const lazyGuard = sourceText.lastIndexOf("showExportAdvanced ?", advancedBody);
+    if (advancedBody >= 0 && lazyGuard < 0) {
+      failures.push(`${sourceRelativePath}: 高级导出内容必须按展开状态延迟挂载，避免隐藏模板和邮件表单占用渲染资源`);
+    }
+  }
 }
 
 if (failures.length) {
