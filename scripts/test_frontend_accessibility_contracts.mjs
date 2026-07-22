@@ -62,6 +62,17 @@ for (const file of walk(root)) {
     }
   }
 
+  if (sourceRelativePath === "features/jobs/JobCenterPage.tsx") {
+    for (const taskCenterContract of ["handleCancelJob", "handleDeleteJob", "handleClearFinishedJobs", "messageTone", "requestConfirmation"]) {
+      if (!sourceText.includes(taskCenterContract)) {
+        failures.push(`${sourceRelativePath}: 任务中心缺少危险操作确认或稳定反馈语义：${taskCenterContract}`);
+      }
+    }
+    if (/\<tr[\s\S]{0,240}tabIndex=\{0\}/.test(sourceText)) {
+      failures.push(`${sourceRelativePath}: 任务表格行没有直接动作，不应伪装成可键盘操作控件`);
+    }
+  }
+
   const coordinatorContracts = {
     "features/single-window/CustomsCooPage.tsx": ["useSingleWindowLockedFields", "useCustomsCooProducerProfiles", "useCustomsCooAuthoritySelection"],
     "features/single-window/AgentConsignmentPage.tsx": ["useSingleWindowLockedFields"],
