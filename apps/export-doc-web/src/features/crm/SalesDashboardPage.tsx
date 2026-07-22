@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import type { KeyboardEvent } from "react";
 import { AlarmClock, ArrowRight, CalendarRange, CircleDollarSign, ContactRound, RefreshCw, TrendingUp, UsersRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
@@ -80,7 +81,7 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
           <table className="dashboard-recent-table responsive-data-table">
             <thead><tr><th>客户</th><th data-table-priority="secondary">联系人</th><th>下次动作</th><th>提醒时间</th></tr></thead>
             <tbody>
-              {(dashboard?.upcomingFollowUps ?? []).map((item) => <tr className="clickable-row" key={item.id} onClick={() => navigate("/crm/follow-ups")}>
+              {(dashboard?.upcomingFollowUps ?? []).map((item) => <tr className="clickable-row" key={item.id} tabIndex={0} onClick={() => navigate("/crm/follow-ups")} onKeyDown={(event) => handleRowKeyDown(event, () => navigate("/crm/follow-ups"))}>
                 <td className="strong-cell">{item.customerName}</td>
                 <td data-table-priority="secondary">{item.contactName || "-"}</td>
                 <td>{item.nextAction || item.summary}</td>
@@ -96,7 +97,7 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
         <section className="form-section" aria-label="商机阶段漏斗">
           <div className="section-header"><h2>商机阶段漏斗</h2></div>
           <ResponsiveTableFrame label="商机阶段漏斗" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>阶段</th><th>数量</th></tr></thead><tbody>
-            {(dashboard?.opportunityStages ?? []).map((item) => <tr className="clickable-row" key={item.stage} onClick={() => navigate("/crm/opportunities")}><td><BusinessStatusBadge value={item.stage} /></td><td>{item.count}</td></tr>)}
+            {(dashboard?.opportunityStages ?? []).map((item) => <tr className="clickable-row" key={item.stage} tabIndex={0} onClick={() => navigate("/crm/opportunities")} onKeyDown={(event) => handleRowKeyDown(event, () => navigate("/crm/opportunities"))}><td><BusinessStatusBadge value={item.stage} /></td><td>{item.count}</td></tr>)}
             {!dashboard?.opportunityStages.length ? <tr><td className="empty-cell" colSpan={2}>暂无商机阶段数据。</td></tr> : null}
           </tbody></table></ResponsiveTableFrame>
         </section>
@@ -112,7 +113,7 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
       <section className="form-section" aria-label="近期预计成交">
         <div className="section-header"><h2>未来 30 天预计成交</h2></div>
         <ResponsiveTableFrame label="未来 30 天预计成交" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th data-table-priority="secondary">阶段</th><th>预计金额</th><th data-table-priority="secondary">概率</th><th>预计日期</th></tr></thead><tbody>
-          {(dashboard?.upcomingOpportunityClosings ?? []).map((item) => <tr className="clickable-row" key={item.id} onClick={() => navigate("/crm/opportunities")}><td><TablePrimaryText value={item.title} /></td><td><TablePrimaryText value={item.customerName} /></td><td data-table-priority="secondary"><BusinessStatusBadge value={item.stage} /></td><td>{item.currency} {formatAmount(item.estimatedAmount)}</td><td data-table-priority="secondary">{item.probabilityPercent}%</td><td>{formatDate(item.expectedCloseAt)}</td></tr>)}
+          {(dashboard?.upcomingOpportunityClosings ?? []).map((item) => <tr className="clickable-row" key={item.id} tabIndex={0} onClick={() => navigate("/crm/opportunities")} onKeyDown={(event) => handleRowKeyDown(event, () => navigate("/crm/opportunities"))}><td><TablePrimaryText value={item.title} /></td><td><TablePrimaryText value={item.customerName} /></td><td data-table-priority="secondary"><BusinessStatusBadge value={item.stage} /></td><td>{item.currency} {formatAmount(item.estimatedAmount)}</td><td data-table-priority="secondary">{item.probabilityPercent}%</td><td>{formatDate(item.expectedCloseAt)}</td></tr>)}
           {!dashboard?.upcomingOpportunityClosings.length ? <tr><td className="empty-cell" colSpan={6}>未来 30 天暂无预计成交商机。</td></tr> : null}
         </tbody></table></ResponsiveTableFrame>
       </section>
@@ -126,4 +127,10 @@ function formatDate(value?: string) { return value ? new Date(value).toLocaleDat
 function formatDateTime(value?: string) {
   if (!value) return "未设置";
   return new Date(value).toLocaleString("zh-CN", { hour12: false });
+}
+
+function handleRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, action: () => void) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  action();
 }

@@ -169,6 +169,9 @@ function checkElement(opening, children, source) {
   }
 
   const className = attributes.get("className") ?? "";
+  if (className.includes("clickable-row") && (!attributes.has("tabIndex") || !attributes.has("onKeyDown"))) {
+    fail(opening, source, "可点击表格行必须提供键盘焦点和 Enter/空格操作，避免只能用鼠标打开");
+  }
   if (tag === "button" && !attributes.has("type")) {
     fail(opening, source, "原生按钮必须显式声明 type，防止表单内误提交");
   }
