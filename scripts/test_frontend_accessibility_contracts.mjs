@@ -63,7 +63,7 @@ for (const file of walk(root)) {
   }
 
   if (sourceRelativePath === "features/jobs/JobCenterPage.tsx") {
-    for (const taskCenterContract of ["handleCancelJob", "handleDeleteJob", "handleClearFinishedJobs", "messageTone", "requestConfirmation"]) {
+    for (const taskCenterContract of ["messageTone", "useJobCenterOperations"]) {
       if (!sourceText.includes(taskCenterContract)) {
         failures.push(`${sourceRelativePath}: 任务中心缺少危险操作确认或稳定反馈语义：${taskCenterContract}`);
       }
@@ -71,6 +71,22 @@ for (const file of walk(root)) {
     if (/\<tr[\s\S]{0,240}tabIndex=\{0\}/.test(sourceText)) {
       failures.push(`${sourceRelativePath}: 任务表格行没有直接动作，不应伪装成可键盘操作控件`);
     }
+    if (!sourceText.includes("useJobCenterOperations")) {
+      failures.push(`${sourceRelativePath}: 任务查询、导出、删除和反馈协调必须保持在独立工作区 Hook`);
+    }
+  }
+
+  if (sourceRelativePath === "features/jobs/useJobCenterOperations.ts") {
+    for (const taskCenterWorkspaceContract of ["requestConfirmation", "handleCancelJob", "handleDeleteJob", "handleClearFinishedJobs", "messageTone"]) {
+      if (!sourceText.includes(taskCenterWorkspaceContract)) {
+        failures.push(`${sourceRelativePath}: 任务中心工作区缺少危险操作确认或稳定反馈语义：${taskCenterWorkspaceContract}`);
+      }
+    }
+  }
+
+  if (sourceRelativePath === "features/tools/container-packing/ContainerPackingWorkspace.tsx"
+    && !sourceText.includes("useContainerPackingPdfExport")) {
+    failures.push(`${sourceRelativePath}: PDF 导出状态与异步路径选择不得重新回流装柜展示组件`);
   }
 
   const coordinatorContracts = {

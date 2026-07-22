@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, Download, FileArchive, FileStack, Play, RefreshCw, Save, Search, Trash2 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { type ApiReportTemplateDto, type BackgroundJobSnapshot, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -19,11 +19,9 @@ import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { listPageSizeOptions, loadListViewState, normalizeListPageSize, saveListViewState } from "../../ui/listViewState.ts";
 import { PathField, PathTextAreaField } from "../../ui/PathField.tsx";
 import { formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
-import { downloadBlob } from "../../ui/downloadBlob.ts";
-import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 import { normalizeJobId } from "./jobNavigation.ts";
+import { useJobCenterOperations } from "./useJobCenterOperations.ts";
 
 const invoiceReportType = "ExportDocument";
 const jobListViewStateStorageKey = "export-doc-manager.job-list-view-state.v1";
@@ -38,7 +36,6 @@ const jobStatusOptions = [
 ];
 
 export function JobCenterPage({ client }: { client: ExportDocManagerApiClient }) {
-  const requestConfirmation = useConfirmation();
   const jobPermission = useModulePermission("document.jobs");
   const reportPermission = useModulePermission("document.reports");
   const invoiceReportPermission = useModulePermission("document.invoice-reports");
@@ -51,38 +48,9 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   const [status, setStatus] = useState("");
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(initialListViewState.pageSize);
-  const [message, setMessage] = useState<string | null>(null);
-  const [messageTone, setMessageTone] = useState<"success" | "error">("success");
-  const [pdfSources, setPdfSources] = useState("");
-  const [pdfDestination, setPdfDestination] = useState("");
-  const [pdfUploadFiles, setPdfUploadFiles] = useState<File[]>([]);
-  const [reportInvoiceIds, setReportInvoiceIds] = useState("");
-  const [reportZipDestination, setReportZipDestination] = useState("");
-  const [reportTemplatePath, setReportTemplatePath] = useState("");
-  const [reportWithSeal, setReportWithSeal] = useState(true);
   const desktopAvailable = isDesktopBridgeAvailable();
   const canCreateInvoiceReportZip =
     jobPermission.canOperate && reportPermission.canView && invoiceReportPermission.canOperate;
-
-  function clearFeedback() {
-    setMessage(null);
-    setMessageTone("success");
-  }
-
-  function showSuccess(nextMessage: string) {
-    setMessage(nextMessage);
-    setMessageTone("success");
-  }
-
-  function showError(nextMessage: string) {
-    setMessage(nextMessage);
-    setMessageTone("error");
-  }
-
-  function handleChildMessage(nextMessage: string | null) {
-    if (nextMessage) showError(nextMessage);
-    else clearFeedback();
-  }
 
   const jobsQuery = useQuery({
     queryKey: queryKeys.jobs(pageNumber, pageSize, committedKeyword.trim(), status),
@@ -109,6 +77,21 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
     enabled: jobPermission.canOperate,
     staleTime: 5 * 60 * 1000,
   });
+
+  const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
+  const operations = useJobCenterOperations({
+    client,
+    queryClient,
+    canOperate: jobPermission.canOperate,
+    canManage: jobPermission.canManage,
+    canCreateInvoiceReportZip,
+    desktopAvailable,
+    defaultExportDirectory,
+    jobsCount: jobsQuery.data?.items?.length ?? 0,
+    focusJob,
+    clearFocusedJob,
+  });
+  const { pdfSources, pdfDestination, pdfUploadFiles, reportInvoiceIds, reportZipDestination, reportTemplatePath, reportWithSeal, reportInvoiceIdList, canStartPdfMerge, canStartReportZip } = operations;
 
   useEffect(() => {
     if (jobsQuery.data && jobsQuery.data.pageNumber !== pageNumber) {
@@ -144,143 +127,34 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
     }
 
     const preferredTemplate = findPreferredInvoiceTemplate(reportTemplatesQuery.data);
-    setReportTemplatePath(preferredTemplate.templatePath);
-    setReportWithSeal(preferredTemplate.withSealDefault);
+    operations.setReportTemplatePath(preferredTemplate.templatePath);
+    operations.setReportWithSeal(preferredTemplate.withSealDefault);
   }, [reportTemplatePath, reportTemplatesQuery.data]);
-
-  const cancelMutation = useMutation({
-    mutationFn: (jobId: string) => client.cancelJob({ jobId }),
-    onSuccess: async (response) => {
-      showSuccess(response.message || "已请求取消任务。");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
-    },
-    onError: (error) => {
-      showError(readApiError(error));
-    },
-  });
-
-  const retryMutation = useMutation({
-    mutationFn: (jobId: string) => client.retryJob({ jobId }),
-    onSuccess: async (job) => {
-      focusJob(job.jobId, `已重新创建任务：${job.jobId}`);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
-    },
-    onError: (error) => {
-      showError(readApiError(error));
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (jobId: string) => client.deleteJob({ jobId }),
-    onSuccess: async (response) => {
-      showSuccess(response.message || "已删除任务记录。");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
-    },
-    onError: (error) => {
-      showError(readApiError(error));
-    },
-  });
-
-  const clearFinishedMutation = useMutation({
-    mutationFn: () => client.clearFinishedJobs(),
-    onSuccess: async (response) => {
-      showSuccess(response.message || "已清理已结束任务记录。");
-      clearFocusedJob();
-      await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
-    },
-    onError: (error) => {
-      showError(readApiError(error));
-    },
-  });
-
-  const pdfMergeMutation = useMutation({
-    mutationFn: async () => {
-      if (!desktopAvailable) {
-        const form = new FormData();
-        pdfUploadFiles.forEach((file) => form.append("files", file, file.name));
-        const job = await client.uploadAndStartPdfMergeDownloadJob({ body: form });
-        await downloadJobResultWhenReady(client, job, "merged.pdf");
-        return job;
-      }
-
-      return client.startPdfMergeSaveToPathJob({
-        body: {
-          sourceFiles: readPathLines(pdfSources),
-          destinationPath: pdfDestination.trim(),
-        },
-      });
-    },
-    onSuccess: async (job) => {
-      focusJob(job.jobId, `已创建 PDF 合并任务：${job.jobId}`);
-      setPdfDestination("");
-      setPdfUploadFiles([]);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
-    },
-    onError: (error) => {
-      showError(readApiError(error));
-    },
-  });
-
-  const reportZipMutation = useMutation({
-    mutationFn: async () => {
-      const body = {
-        invoiceIds: readPositiveIntegerTokens(reportInvoiceIds),
-        reportType: invoiceReportType,
-        templatePath: reportTemplatePath.trim(),
-        withSeal: reportWithSeal,
-        destinationPath: desktopAvailable ? reportZipDestination.trim() : "",
-      };
-      const job = desktopAvailable
-        ? await client.startInvoiceReportPdfZipSaveToPathJob({ body })
-        : await client.startInvoiceReportPdfZipDownloadJob({ body });
-      if (!desktopAvailable) {
-        await downloadJobResultWhenReady(client, job, "invoice-reports.zip");
-      }
-      return job;
-    },
-    onSuccess: async (job) => {
-      focusJob(job.jobId, `已创建批量报表 ZIP 任务：${job.jobId}`);
-      setReportZipDestination("");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
-    },
-    onError: (error) => {
-      showError(readApiError(error));
-    },
-  });
-
-  const downloadMutation = useMutation({
-    mutationFn: async (job: BackgroundJobSnapshot) => {
-      const blob = await client.downloadJobResult({ jobId: job.jobId });
-      const fileName = fileNameFromPath(job.outputPath) || `${job.kind || "download"}.bin`;
-      downloadBlob(blob, fileName);
-    },
-    onError: (error) => showError(readApiError(error)),
-  });
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     clearFocusedJob();
     setCommittedKeyword(keyword.trim());
     setPageNumber(1);
-    clearFeedback();
+    operations.clearFeedback();
   }
 
   function changeStatus(value: string) {
     clearFocusedJob();
     setStatus(value);
     setPageNumber(1);
-    clearFeedback();
+    operations.clearFeedback();
   }
 
   function handlePageSizeChange(nextPageSize: number) {
     setPageSize(normalizeListPageSize(nextPageSize));
     setPageNumber(1);
-    clearFeedback();
+    operations.clearFeedback();
   }
 
   function focusJob(jobId: string, nextMessage: string) {
     const normalizedJobId = normalizeJobId(jobId);
-    showSuccess(nextMessage);
+    operations.showSuccess(nextMessage);
     if (!normalizedJobId) {
       return;
     }
@@ -298,73 +172,13 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
     }
   }
 
-  async function handleCancelJob(job: BackgroundJobSnapshot) {
-    if (!jobPermission.canOperate || isBusy || !job.canCancel) return;
-    const confirmed = await requestConfirmation({
-      title: "取消后台任务",
-      description: `确定取消“${job.title || job.jobId}”吗？`,
-      details: ["正在执行的处理会尽快停止；是否已生成部分输出取决于任务当前阶段。"],
-      confirmLabel: "确认取消",
-      tone: "danger",
-    });
-    if (!confirmed) return;
-    clearFeedback();
-    cancelMutation.mutate(job.jobId);
-  }
-
-  async function handleDeleteJob(job: BackgroundJobSnapshot) {
-    if (!jobPermission.canManage || isBusy || !isTerminalJob(job.status)) return;
-    const confirmed = await requestConfirmation({
-      title: "删除任务记录",
-      description: `确定删除“${job.title || job.jobId}”的任务记录吗？`,
-      details: ["该操作不会删除用户自行选择位置保存的文件。", "程序托管的浏览器临时下载结果会随记录一并清理。"],
-      confirmLabel: "确认删除",
-      tone: "danger",
-    });
-    if (!confirmed) return;
-    clearFeedback();
-    deleteMutation.mutate(job.jobId);
-  }
-
-  async function handleClearFinishedJobs() {
-    if (!jobPermission.canManage || isBusy || jobs.length === 0) return;
-    const confirmed = await requestConfirmation({
-      title: "清理已结束任务",
-      description: "确定清理当前账号可管理的所有已完成、失败和已取消任务记录吗？",
-      details: ["这会清理全部分页中的已结束记录，不只当前页。", "程序托管的浏览器临时下载结果会一并清理。"],
-      confirmLabel: "确认清理",
-      tone: "danger",
-    });
-    if (!confirmed) return;
-    clearFeedback();
-    clearFinishedMutation.mutate();
-  }
-
   const page = jobsQuery.data ?? null;
   const jobs = page?.items ?? [];
   const totalPages = Math.max(page?.totalPages ?? 1, 1);
   const errorMessage = jobsQuery.isError ? readApiError(jobsQuery.error) : null;
-  const isBusy =
-    jobsQuery.isFetching ||
-    cancelMutation.isPending ||
-    retryMutation.isPending ||
-    deleteMutation.isPending ||
-    clearFinishedMutation.isPending ||
-    pdfMergeMutation.isPending ||
-    reportZipMutation.isPending;
-  const pdfSourceFiles = readPathLines(pdfSources);
-  const canStartPdfMerge = desktopAvailable
-    ? pdfSourceFiles.length > 0 && Boolean(pdfDestination.trim()) && !isBusy
-    : pdfUploadFiles.length >= 2 && !isBusy;
-  const reportInvoiceIdList = readPositiveIntegerTokens(reportInvoiceIds);
   const reportTemplates = reportTemplatesQuery.data ?? [];
   const reportTemplateErrorMessage = reportTemplatesQuery.isError ? readApiError(reportTemplatesQuery.error) : null;
-  const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
-  const canStartReportZip =
-    reportInvoiceIdList.length > 0 &&
-    (!desktopAvailable || Boolean(reportZipDestination.trim())) &&
-    !isBusy &&
-    !reportTemplatesQuery.isFetching;
+  const isBusy = jobsQuery.isFetching || operations.isBusy || reportTemplatesQuery.isFetching;
 
   return (
     <section className="work-surface job-center-surface" aria-label="任务中心">
@@ -387,13 +201,13 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
             templateErrorMessage={reportTemplateErrorMessage}
             isTemplateLoading={reportTemplatesQuery.isFetching}
             disabled={isBusy}
-            canSubmit={canStartReportZip}
-            onInvoiceIdsChange={setReportInvoiceIds}
-            onDestinationPathChange={setReportZipDestination}
-            onTemplatePathChange={setReportTemplatePath}
-            onWithSealChange={setReportWithSeal}
-            onSubmit={() => reportZipMutation.mutate()}
-            onMessage={handleChildMessage}
+            canSubmit={canStartReportZip && !reportTemplatesQuery.isFetching}
+            onInvoiceIdsChange={operations.setReportInvoiceIds}
+            onDestinationPathChange={operations.setReportZipDestination}
+            onTemplatePathChange={operations.setReportTemplatePath}
+            onWithSealChange={operations.setReportWithSeal}
+            onSubmit={() => operations.reportZipMutation.mutate()}
+            onMessage={operations.handleChildMessage}
             defaultExportDirectory={defaultExportDirectory}
           />
         </details> : (
@@ -402,20 +216,20 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
         <details>
           <summary>
             <span>PDF 合并</span>
-            <small>{pdfSourceFiles.length} 个源文件</small>
+            <small>{readPathLines(pdfSources).length} 个源文件</small>
           </summary>
           {desktopAvailable ? <PdfMergeJobPanel
             sourcePaths={pdfSources}
             destinationPath={pdfDestination}
             disabled={isBusy}
             canSubmit={canStartPdfMerge}
-            onSourcePathsChange={setPdfSources}
-            onDestinationPathChange={setPdfDestination}
-            onSubmit={() => pdfMergeMutation.mutate()}
-            onMessage={handleChildMessage}
+            onSourcePathsChange={operations.setPdfSources}
+            onDestinationPathChange={operations.setPdfDestination}
+            onSubmit={() => operations.pdfMergeMutation.mutate()}
+            onMessage={operations.handleChildMessage}
             defaultExportDirectory={defaultExportDirectory}
-          /> : <form className="job-tool-panel" onSubmit={(event) => { event.preventDefault(); clearFeedback(); pdfMergeMutation.mutate(); }}>
-            <label className="inline-filter"><span>源 PDF</span><input type="file" accept="application/pdf,.pdf" multiple disabled={isBusy} onChange={(event) => setPdfUploadFiles(Array.from(event.target.files ?? []))} /></label>
+          /> : <form className="job-tool-panel" onSubmit={(event) => { event.preventDefault(); operations.clearFeedback(); operations.pdfMergeMutation.mutate(); }}>
+            <label className="inline-filter"><span>源 PDF</span><input type="file" accept="application/pdf,.pdf" multiple disabled={isBusy} onChange={(event) => operations.setPdfUploadFiles(Array.from(event.target.files ?? []))} /></label>
             <div className="job-tool-submit-row"><span>{pdfUploadFiles.length} 个源文件</span><button className="solid action-button" type="submit" disabled={!canStartPdfMerge}><Play size={16} aria-hidden="true" /><span>合并并下载</span></button></div>
             <div className="field-help">文件仅暂存在运行数据根，任务结束后自动清理。</div>
           </form>}
@@ -441,7 +255,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
             type="button"
             title="清理已完成、失败、已取消的任务记录"
             disabled={!jobPermission.canManage || isBusy || jobs.length === 0}
-            onClick={() => void handleClearFinishedJobs()}
+            onClick={() => void operations.handleClearFinishedJobs()}
           >
             <Trash2 size={17} aria-hidden="true" />
             <span>清理已结束</span>
@@ -459,9 +273,9 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
       </div>
 
       {errorMessage ? <InlineNotice tone="error" title="任务中心操作失败">{errorMessage}</InlineNotice> : null}
-      {message ? (
-        <InlineNotice tone={messageTone}>
-          {message}
+      {operations.message ? (
+        <InlineNotice tone={operations.messageTone}>
+          {operations.message}
         </InlineNotice>
       ) : null}
 
@@ -471,11 +285,11 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
         isBusy={isBusy}
         canOperate={jobPermission.canOperate}
         canManage={jobPermission.canManage}
-        onMessage={handleChildMessage}
-        onCancel={(job) => void handleCancelJob(job)}
-        onRetry={(jobId) => retryMutation.mutate(jobId)}
-        onDelete={(job) => void handleDeleteJob(job)}
-        onDownload={(job) => downloadMutation.mutate(job)}
+        onMessage={operations.handleChildMessage}
+        onCancel={(job) => void operations.handleCancelJob(job)}
+        onRetry={(jobId) => operations.retryMutation.mutate(jobId)}
+        onDelete={(job) => void operations.handleDeleteJob(job)}
+        onDownload={(job) => operations.downloadMutation.mutate(job)}
         desktopAvailable={desktopAvailable}
       />
 

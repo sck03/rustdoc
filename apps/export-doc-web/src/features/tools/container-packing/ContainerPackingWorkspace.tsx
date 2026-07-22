@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, type FormEvent } from "react";
 import { FileDown, FolderOpen, PackageCheck, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import type { ApiContainerPackingAnalysisDto, ApiContainerPackingProjectSummaryDto, ApiContainerTypeDto } from "../../../api/index.ts";
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
@@ -7,6 +7,7 @@ import { ResponsiveTableFrame } from "../../../ui/ResponsiveTable.tsx";
 import type { ContainerPackingCargoRow, ContainerPackingFormState, ContainerPackingRenderModeValue, ContainerPackingRulesFormState, ContainerPackingZoneValue } from "./containerPackingModel.ts";
 import { containerPackingRenderModeOptions, containerPackingZoneOptions, formatPackingPercent } from "./containerPackingModel.ts";
 import { ContainerPackingVisualization, type ContainerPackingVisualizationDimensions } from "./ContainerPackingVisualization.tsx";
+import { useContainerPackingPdfExport } from "./useContainerPackingPdfExport.ts";
 const ContainerPackingScene3d = lazy(() => import("./ContainerPackingScene3d.tsx"));
 
 type Props = {
@@ -27,44 +28,7 @@ type Props = {
 export function ContainerPackingWorkspace(props: Props) {
  const { analysis, autoRefreshEnabled, autoRefreshState, canAnalyze, canDeleteContainerType, canLoadProject, canManage, canOperate, canSaveContainerType, canSaveProject, cargoRows, container, containerTypes, currentProjectId, hasVisibleError, isAnalyzing, isDeletingContainerType, isDeletingProject, isLoadingProject, isRefreshingProjects, isSavingContainerType, isSavingProject, packingStatusText, projectName, renderMode, rules, savedProjects, selectedProjectId, validCargoCount, visibleMessage, visualizationDimensions } = props;
  const { onAddCargo:addCargoRow,onAnalyze:runContainerPackingAnalysis,onApplyContainerType:applyContainerType,onAutoRefreshChange:setAutoRefreshEnabled,onClearCargo:clearCargoRows,onContainerFieldChange:updateContainerField,onDeleteContainerType:handleDeleteContainerType,onDeleteProject:handleDeleteProject,onLoadProject:handleLoadProject,onProjectNameChange:updateProjectName,onRefreshProjects,onRemoveCargo:removeCargoRow,onRenderModeChange:setRenderMode,onRulesFieldChange:updateRulesField,onSaveContainerType:handleSaveContainerType,onSaveProject:handleSaveProject,onSelectedProjectChange:setSelectedProjectId,onSubmit:handleSubmit,onUpdateCargo:updateCargoRow }=props;
- const pdfRootRef = useRef<HTMLDivElement | null>(null);
- const [pdfExportState, setPdfExportState] = useState<"idle" | "exporting">("idle");
- const [pdfExportMessage, setPdfExportMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
-
- async function handleExportPdf() {
-   if (!analysis || !pdfRootRef.current || pdfExportState === "exporting") return;
-   setPdfExportState("exporting");
-   setPdfExportMessage(null);
-   try {
-     const { exportContainerPackingPdf } = await import("./containerPackingPdfExport.ts");
-     const result = await exportContainerPackingPdf({ root: pdfRootRef.current, projectName, containerType: container.containerType });
-     if (result.status === "cancelled") return;
-     const sizeText = formatPdfSize(result.sizeBytes ?? 0);
-     if (result.status === "save-failed") {
-       setPdfExportMessage({
-         kind: "error",
-         text: `PDF 已生成，但没有保存成功：${result.error}。请重新点击“导出 PDF”并选择保存位置。`,
-       });
-       return;
-     }
-     setPdfExportMessage({
-       kind: "success",
-       text: result.mode === "desktop"
-         ? `PDF 已保存到 ${result.path}（${result.pageCount} 页，${sizeText}）`
-         : `PDF 已下载（${result.pageCount} 页，${sizeText}）。`,
-     });
-   } catch (error) {
-     const errorText = error instanceof Error ? error.message : typeof error === "string" ? error : "未知错误";
-     setPdfExportMessage({ kind: "error", text: `PDF 生成失败：${errorText}` });
-   } finally {
-     setPdfExportState("idle");
-   }
- }
-
- function formatPdfSize(sizeBytes: number) {
-   if (sizeBytes < 1024 * 1024) return `${Math.max(1, Math.round(sizeBytes / 1024))} KB`;
-   return `${(sizeBytes / 1024 / 1024).toFixed(1)} MB`;
- }
+ const pdfExport = useContainerPackingPdfExport(projectName, container.containerType);
   return (
     <form
       className="job-tool-panel"
@@ -152,7 +116,7 @@ export function ContainerPackingWorkspace(props: Props) {
             className="command-button secondary"
             type="button"
             disabled={!analysis}
-            onClick={() => pdfRootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            onClick={() => pdfExport.pdfRootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
           >
             <PackageCheck size={16} aria-hidden="true" />
             <span>查看效果图</span>
@@ -160,11 +124,11 @@ export function ContainerPackingWorkspace(props: Props) {
           <button
             className="command-button secondary"
             type="button"
-            disabled={!analysis || pdfExportState === "exporting"}
-            onClick={() => void handleExportPdf()}
+            disabled={!analysis || pdfExport.state === "exporting"}
+            onClick={() => void pdfExport.exportPdf()}
           >
             <FileDown size={16} aria-hidden="true" />
-            <span>{pdfExportState === "exporting" ? "正在生成" : "导出 PDF"}</span>
+            <span>{pdfExport.state === "exporting" ? "正在生成" : "导出 PDF"}</span>
           </button>
           <button
             className="solid action-button"
@@ -182,7 +146,7 @@ export function ContainerPackingWorkspace(props: Props) {
           {visibleMessage}
         </InlineNotice>
       ) : null}
-      {pdfExportMessage ? <InlineNotice tone={pdfExportMessage.kind === "error" ? "error" : "success"}>{pdfExportMessage.text}</InlineNotice> : null}
+      {pdfExport.message ? <InlineNotice tone={pdfExport.message.kind === "error" ? "error" : "success"}>{pdfExport.message.text}</InlineNotice> : null}
       {!canOperate ? (
         <PermissionNotice>
           当前权限模板仅允许查看装箱方案；输入、分析、保存和柜型维护已禁用。
@@ -693,7 +657,7 @@ export function ContainerPackingWorkspace(props: Props) {
       </section> : null}
 
       {analysis ? (
-        <div className="container-packing-result" ref={pdfRootRef} data-container-packing-pdf>
+        <div className="container-packing-result" ref={pdfExport.pdfRootRef} data-container-packing-pdf>
           <div className="container-packing-pdf-cargo" aria-hidden="true">
             <h2>货物清单</h2>
             <table>
