@@ -238,23 +238,12 @@ function Copy-BrowserRuntimeResources {
         throw "Required browser runtime directory was not found: $Source"
     }
 
+    # Browser assets are versioned as one unit. Reusing individual files can
+    # retain an old platform or an obsolete Chromium directory after upgrades.
+    Remove-GeneratedEntry -Path $Destination -Root $OutputRoot -Purpose "stale packaged browser runtime"
     New-Item -ItemType Directory -Path $Destination -Force | Out-Null
 
-    Remove-GeneratedEntry -Path (Join-Path $Destination "Browsers") -Root $OutputRoot -Purpose "stale nested browser directory"
-
     $platform = Get-ChromeForTestingPlatform
-    foreach ($relativePath in @(
-        "ChromeForTesting\$platform\chrome-win64",
-        "ChromeForTesting\$platform\chrome-win32",
-        "ChromeForTesting\$platform\Chrome",
-        "ChromeForTesting\$platform\chrome",
-        "ChromeForTesting\$platform\chrome-mac-x64",
-        "ChromeForTesting\$platform\chrome-mac-arm64",
-        "ChromeForTesting\$platform\chrome-linux64"
-    )) {
-        Remove-GeneratedEntry -Path (Join-Path $Destination $relativePath) -Root $OutputRoot -Purpose "unused packaged browser runtime"
-    }
-
     $readmePath = Join-Path $Source "README.md"
     if (Test-Path -LiteralPath $readmePath -PathType Leaf) {
         Copy-RequiredFile -Source $readmePath -Destination (Join-Path $Destination "README.md")
@@ -386,8 +375,8 @@ foreach ($entryName in @("sidecar", "Templates", "Resources", "OcrModels", "Brow
     }
 
     $entrySource = Join-Path $resourcesRoot $entryName
-    if (Test-Path -LiteralPath $entrySource -PathType Container) {
-        Remove-GeneratedEntry -Path (Join-Path $entryDestination $entryName) -Root $resolvedOutputDir -Purpose "stale nested $entryName directory"
+    if (Test-Path -LiteralPath $entryDestination) {
+        Remove-GeneratedEntry -Path $entryDestination -Root $resolvedOutputDir -Purpose "stale packaged $entryName entry"
     }
 
     Copy-RequiredEntry -Source $entrySource -Destination $entryDestination
@@ -399,6 +388,7 @@ Remove-GeneratedEntry -Path (Join-Path $toolsDir "ExportDocLicenseKeyGen.exe") -
 Remove-GeneratedEntry -Path (Join-Path $toolsDir "WebView2Loader.dll") -Root $resolvedOutputDir -Purpose "stale packaged license key generator WebView2 loader"
 
 if ($IncludeLicenseKeygen) {
+    Remove-GeneratedEntry -Path $resolvedLicenseOutputDir -Root $artifactsRoot -Purpose "stale internal license key generator output"
     New-Item -ItemType Directory -Path $resolvedLicenseOutputDir -Force | Out-Null
     Copy-RequiredFile -Source $licenseExe -Destination (Join-Path $resolvedLicenseOutputDir "ExportDocLicenseKeyGen.exe")
 }

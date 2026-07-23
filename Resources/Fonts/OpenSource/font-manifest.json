@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "policy": "Only the font binaries listed in this manifest may be bundled with ExportDocManager. Proprietary operating-system fonts are fallback references only and must never be copied into a package.",
+  "sourceRepository": "https://github.com/notofonts/noto-cjk",
+  "sourceCommit": "f8d157532fbfaeda587e826d4cd5b21a49186f7c",
+  "license": "SIL Open Font License 1.1",
+  "licenseFile": "OFL-Noto-CJK.txt",
+  "licenseSha256": "6A73F9541C2DE74158C0E7CF6B0A58EF774F5A780BF191F2D7EC9CC53EFE2BF2",
+  "fonts": [
+    {
+      "family": "Noto Sans CJK SC",
+      "fileName": "NotoSansCJKsc-Regular.otf",
+      "weight": 400,
+      "style": "normal",
+      "sha256": "2C76254F6FC379FDDFCE0A7E84FB5385BB135D3E399294F6EEB6680D0365B74B",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
+    },
+    {
+      "family": "Noto Sans CJK SC",
+      "fileName": "NotoSansCJKsc-Bold.otf",
+      "weight": 700,
+      "style": "normal",
+      "sha256": "B5F0D1A190A7F9B43C310A8850630AF12553DF32C4C050543F9059732D9B4C0A",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Bold.otf"
+    },
+    {
+      "family": "Noto Serif CJK SC",
+      "fileName": "NotoSerifCJKsc-Regular.otf",
+      "weight": 400,
+      "style": "normal",
+      "sha256": "2A2EAE2628DF83556C54018C41E20FA532C1B862C5256AE8B3F23FEB918D12CA",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Serif/OTF/SimplifiedChinese/NotoSerifCJKsc-Regular.otf"
+    }
+  ],
+  "forbiddenBundledFontExamples": [
+    "Microsoft YaHei",
+    "Segoe UI",
+    "SimSun",
+    "SimHei",
+    "Arial",
+    "Times New Roman",
+    "SF Pro",
+    "PingFang SC",
+    "Consolas"
+  ]
+}

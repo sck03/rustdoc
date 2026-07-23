@@ -154,6 +154,10 @@
 .template-admin-panel { grid-column: 3; grid-row: 1; }
 .template-package-panel { grid-column: 4; grid-row: 1; }
 
+.report-template-mobile-selection {
+  display: none;
+}
+
 .template-management-panel {
   display: grid;
   align-content: start;
@@ -191,7 +195,7 @@
   min-width: 0;
   overflow: hidden;
   color: #687582;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -309,7 +313,7 @@
 
 .template-version-row small {
   color: #74818c;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
 }
 
 .compact-button {
@@ -332,7 +336,7 @@
   padding: 2px 7px;
   border: 1px solid transparent;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 750;
   line-height: 1;
 }
@@ -424,7 +428,7 @@
   background: #fbfcfd;
   border: 0;
   outline: 0;
-  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-family: var(--edm-font-mono);
   font-size: 13px;
   line-height: 1.55;
   tab-size: 2;
@@ -626,7 +630,7 @@
 .new-report-designer-panel-title small {
   margin-left: auto;
   color: #687582;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
@@ -668,7 +672,7 @@
   min-width: 0;
   overflow: hidden;
   color: #687582;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -692,7 +696,7 @@
 .new-report-component-group-title {
   grid-column: 1 / -1;
   color: #687582;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 800;
 }
 
@@ -767,7 +771,7 @@
 
 .new-report-model-overview span {
   color: #687582;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 800;
 }
 
@@ -830,7 +834,7 @@
 .new-report-model-block small,
 .new-report-model-empty {
   color: #687582;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
@@ -888,7 +892,7 @@
   padding-left: 12px;
   color: #687582;
   border-left: 1px dashed #c9d6df;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
@@ -985,8 +989,8 @@
 
 .new-report-field-list button small {
   color: #4c6870;
-  font-family: "Cascadia Mono", "Consolas", monospace;
-  font-size: 10px;
+  font-family: var(--edm-font-mono);
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
@@ -1044,7 +1048,7 @@
   gap: 8px;
   min-width: 0;
   color: #687582;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 800;
 }
 
@@ -1094,7 +1098,7 @@
   gap: 6px;
   min-width: 0;
   color: #687582;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 800;
 }
 
@@ -1107,7 +1111,7 @@
   background: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 800;
 }
 
@@ -1117,7 +1121,7 @@
   padding-top: 5px;
   color: #64748b;
   border-top: 1px dashed #cbd5e1;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   line-height: 1.45;
   white-space: pre-wrap;
 }
@@ -1135,7 +1139,7 @@
   max-width: 100%;
   overflow-wrap: anywhere;
   color: #0f5f8a;
-  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-family: var(--edm-font-mono);
   white-space: normal;
 }
 
@@ -1155,7 +1159,7 @@
   background: #fff7d6;
   border: 1px solid #f0d37b;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 800;
 }
 
@@ -1239,7 +1243,7 @@
   display: block;
   margin-top: 4px;
   color: #687582;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
@@ -1304,7 +1308,7 @@
   background: #d9eee9;
   border: 1px solid #98d0c5;
   border-radius: 5px;
-  font-size: 10px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 800;
 }
 
@@ -1421,7 +1425,7 @@
 
 .new-report-section-print-title small {
   color: #687582;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
@@ -1618,7 +1622,7 @@
   color: #28343f;
   background: #f8fafb;
   border-right: 1px solid #dbe3ea;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   line-height: 1.2;
   overflow: hidden;
   white-space: nowrap;
@@ -1640,7 +1644,7 @@
 }
 
 .new-report-column-width-segment strong {
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
 }
 
 .new-report-column-width-handle {

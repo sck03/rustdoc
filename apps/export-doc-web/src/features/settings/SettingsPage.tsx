@@ -59,7 +59,6 @@ type SingleWindowAuthorityAutoState = {
 };
 
 const systemDefaultPatches: SettingPatch[] = [
-  { path: ["system", "appName"], value: "出口单证管理系统" },
   { path: ["system", "defaultTemplateExporterNameCn"], value: "" },
   { path: ["system", "backupRetentionDays"], value: 0 },
   { path: ["system", "itemEntryBlankRowCount"], value: 20 },
@@ -94,11 +93,13 @@ export function SettingsPage({
   canManageSettings,
   canManageUsers,
   canUseDocumentWorkspace,
+  productName,
 }: {
   client: ExportDocManagerApiClient;
   canManageSettings: boolean;
   canManageUsers: boolean;
   canUseDocumentWorkspace: boolean;
+  productName: string;
 }) {
   const requestConfirmation = useConfirmation();
   const location = useLocation();
@@ -514,7 +515,10 @@ export function SettingsPage({
       return;
     }
 
-    patchSettings(systemDefaultPatches);
+    patchSettings([
+      { path: ["system", "appName"], value: productName },
+      ...systemDefaultPatches,
+    ]);
     setSingleWindowAuthorityAutoState({ fetchPlace: "", aplAdd: "" });
     setMessage(null);
     setSuccessMessage("已恢复系统设置默认值，请检查后保存。受保护的密码/密钥字段仍按“更新敏感字段”开关处理。");

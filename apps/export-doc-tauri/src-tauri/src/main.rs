@@ -31,7 +31,7 @@ fn main() {
             });
         rfd::MessageDialog::new()
             .set_level(rfd::MessageLevel::Error)
-            .set_title("出口单证管理系统启动失败")
+            .set_title("程序启动失败")
             .set_description(format!("程序启动失败：{error}\n\n{diagnostic_hint}"))
             .set_buttons(rfd::MessageButtons::Ok)
             .show();

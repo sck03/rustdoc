@@ -35,8 +35,8 @@ fn release_startup_path() -> &'static str {
 
 fn product_window_title() -> &'static str {
     match option_env!("EXPORTDOCMANAGER_PRODUCT_EDITION") {
-        Some("Document") => "出口单证管理系统（单证员版）",
-        Some("Sales") => "外贸业务管理系统（业务员版）",
+        Some("Document") => "外贸业务综合管理系统（单证员版）",
+        Some("Sales") => "外贸业务综合管理系统（业务员版）",
         _ => "外贸业务综合管理系统（全功能版）",
     }
 }

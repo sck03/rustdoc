@@ -276,6 +276,15 @@ if ($SkipExcelAnalyzerBuild) {
 }
 Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments $prepareArgs
 
+$payloadVerifier = Join-Path $scriptRoot "verify-package-payload.ps1"
+Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments @(
+    "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
+    "-File", $payloadVerifier,
+    "-PackageRoot", $resolvedOutputDir,
+    "-Profile", "Desktop",
+    "-RuntimeIdentifier", "win-x64"
+)
+
 Write-Host "Complete Windows desktop run directory is ready:"
 Write-Host "  $resolvedOutputDir"
 if ($IncludeLicenseKeygen) {

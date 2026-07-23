@@ -72,10 +72,11 @@ try {
       const url = `http://127.0.0.1:${port}/visual-baseline.html?page=${pageName}`;
       await page.send("Page.navigate", { url });
       await waitForReady(page);
+      await evaluate(page, "document.fonts?.ready ?? Promise.resolve()", false);
       await evaluate(page, `(() => {
         const style = document.createElement("style");
         style.dataset.visualRegressionStability = "true";
-        style.textContent = "*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important;scroll-behavior:auto!important}";
+        style.textContent = "html{overflow-y:scroll!important;scrollbar-gutter:stable!important}*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important;scroll-behavior:auto!important}";
         document.head.appendChild(style);
         document.activeElement?.blur?.();
       })()`, false);
@@ -180,7 +181,7 @@ try {
       })()`, true);
       const value = audit.value;
       const screenshotPath = path.join(outputRoot, `${pageName}-${viewport.name}.png`);
-      await captureScreenshot(page, screenshotPath);
+      await captureScreenshot(page, screenshotPath, { captureBeyondViewport: false });
       const approvedPath = path.join(approvedRoot, path.basename(screenshotPath));
       if (updateApprovedBaselines) copyFileSync(screenshotPath, approvedPath);
       const pixelComparison = compareScreenshot({ screenshotPath, approvedPath, diffRoot, maximumPixelDifferenceRatio });

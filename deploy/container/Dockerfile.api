@@ -1,3 +1,10 @@
+FROM node:20-bookworm-slim AS report-fonts
+WORKDIR /src
+COPY scripts/provision-report-fonts.mjs scripts/verify-font-license-policy.mjs scripts/
+COPY Resources/Fonts/OpenSource/font-manifest.json Resources/Fonts/OpenSource/OFL-Noto-CJK.txt Resources/Fonts/OpenSource/README.md Resources/Fonts/OpenSource/
+RUN node scripts/provision-report-fonts.mjs \
+    && node scripts/verify-font-license-policy.mjs --require-files
+
 FROM mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim AS build
 WORKDIR /src
 
@@ -12,6 +19,7 @@ COPY src/ src/
 COPY Shared/ Shared/
 COPY Templates/ Templates/
 COPY Resources/ Resources/
+COPY --from=report-fonts /src/Resources/Fonts/OpenSource/ Resources/Fonts/OpenSource/
 COPY OcrModels/ OcrModels/
 RUN dotnet publish src/ExportDocManager.Api/ExportDocManager.Api.csproj \
     --configuration Release \

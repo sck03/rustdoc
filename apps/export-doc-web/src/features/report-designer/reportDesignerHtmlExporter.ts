@@ -1,4 +1,5 @@
 import type { ReportBlock, ReportBorderStyle, ReportDesignerSchema, ReportSection, ReportTextStyle } from "./reportDesignerSchema.ts";
+import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
 import {
   isReportDesignerCssColor,
   isReportDesignerFieldPath,
@@ -753,7 +754,7 @@ function escapeHtmlAttribute(value: string) {
 }
 
 function renderFontFamily(value: string) {
-  return isSafeReportDesignerCssFontFamily(value) ? value : "Arial, sans-serif";
+  return isSafeReportDesignerCssFontFamily(value) ? value : portableReportSansFontFamily;
 }
 
 function renderCssColor(value: string) {

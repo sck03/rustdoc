@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+> 报表打印像素回归默认只读基准。模板版式有意调整后，先运行 `node scripts/test_report_template_print_pixel_regression.mjs --update` 生成受控基准，再立即运行不带 `--update` 的普通检查。更新只写测试夹具和 `.codex-runtime`，不会写系统临时目录。
+
 ## GitHub 公开发布
 
 - `github/verify-public-source.ps1`：上传前检查注册机、私钥、内部 `KEY/` 产物和 GitHub 大文件边界。
@@ -15,6 +17,8 @@
 | `run-tests.cmd` | 先核查全部脚本，再运行完整 .NET 测试 |
 
 公开/客户构建默认不生成内部注册机。只有本机保留私有 `apps/license-keygen-tauri/` 源码并显式向 PowerShell 构建脚本传入 `-IncludeLicenseKeygen` 时，才会把内部工具整理到客户目录之外的 `KEY/`。
+
+构建输出按“一次生成、完整替换”处理：单版和三版便携包会在复制前清理旧稳定资源及整个浏览器目标目录；未传 `-IncludeLicenseKeygen` 的三版构建会删除旧 `KEY/`；安装器只清理本次请求版本的旧安装包与版本 manifest，未请求版本继续保留。单版便携和每一版安装器在进入交付目录前都会自动执行 `verify-package-payload.ps1`，禁止夹带未知字体、Playwright 开发 UI、重复 ONNX Runtime 或内部注册机。
 
 公开仓库不提交 Chromium 二进制。`run-tests.ps1` 找不到程序根 Chromium 或 `EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE` 时，会明确跳过两个真实 PDF 浏览器测试；正式发布验收使用 `-RequireBrowserPdfTests`，缺少渲染器即失败。测试默认执行 restore，只有确认依赖已还原时才使用 `-NoRestore`。
 

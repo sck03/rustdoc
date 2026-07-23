@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,6 +28,8 @@ const productEdition = normalizeProductEdition(process.env.EXPORTDOCMANAGER_PROD
 const allowMissingBrowser = (process.env.EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER || "").toLowerCase() === "true";
 
 run("node", [path.join(repoRoot, "scripts", "sync-version.mjs")], process.env);
+run("node", [path.join(repoRoot, "scripts", "provision-report-fonts.mjs")], process.env);
+run("node", [path.join(repoRoot, "scripts", "verify-font-license-policy.mjs"), "--require-files"], process.env);
 
 assertInsideRepo(bundleRoot, "Tauri bundle output");
 
@@ -45,7 +47,7 @@ const env = {
   NUGET_HTTP_CACHE_PATH: resolveLocalBuildPath("NUGET_HTTP_CACHE_PATH", "nuget-http-cache"),
   TEMP: resolveLocalBuildPath("TEMP", "temp"),
   TMP: resolveLocalBuildPath("TMP", "temp"),
-  CARGO_TARGET_DIR: process.env.CARGO_TARGET_DIR || path.join(bundleRoot, "cargo-ocr-target"),
+  CARGO_TARGET_DIR: resolveLocalBuildPath("CARGO_TARGET_DIR", "cargo-target-tauri"),
 };
 await mkdir(env.DOTNET_CLI_HOME, { recursive: true });
 await mkdir(env.NUGET_PACKAGES, { recursive: true });
@@ -169,17 +171,33 @@ async function ensureMacOsX64OnnxRuntime(buildEnv) {
   const version = "1.27.1";
   const archiveRoot = path.join(localRuntimeRoot, "onnxruntime", `osx-x64-${version}`);
   const archive = path.join(archiveRoot, `onnxruntime-osx-x86_64-${version}.tgz`);
+  const archiveDownload = `${archive}.download`;
   const extracted = path.join(archiveRoot, `onnxruntime-osx-x86_64-${version}`);
   await mkdir(archiveRoot, { recursive: true });
   if (!(await tryStat(archive))) {
-    run("curl", ["-fL", "--retry", "3", "-o", archive, `https://github.com/microsoft/onnxruntime/releases/download/v${version}/onnxruntime-osx-x86_64-${version}.tgz`], buildEnv);
-  }
-  if (!(await tryStat(extracted))) {
-    run("tar", ["-xzf", archive, "-C", archiveRoot], buildEnv);
+    await rm(archiveDownload, { force: true });
+    try {
+      run("curl", ["-fL", "--retry", "3", "-o", archiveDownload, `https://github.com/microsoft/onnxruntime/releases/download/v${version}/onnxruntime-osx-x86_64-${version}.tgz`], buildEnv);
+      await rename(archiveDownload, archive);
+    } finally {
+      await rm(archiveDownload, { force: true });
+    }
   }
   const libRoot = path.join(extracted, "lib");
   const source = path.join(libRoot, "libonnxruntime.dylib");
-  if (!(await tryStat(source))) throw new Error(`ONNX Runtime macOS x64 native library was not found after extracting ${archive}.`);
+  if (!(await tryStat(source))) {
+    await rm(extracted, { recursive: true, force: true });
+    try {
+      run("tar", ["-xzf", archive, "-C", archiveRoot], buildEnv);
+      if (!(await tryStat(source))) {
+        throw new Error(`ONNX Runtime macOS x64 native library was not found after extracting ${archive}.`);
+      }
+    } catch (error) {
+      await rm(extracted, { recursive: true, force: true });
+      await rm(archive, { force: true });
+      throw error;
+    }
+  }
   await cp(source, nativeLibrary, { force: true, dereference: true });
 }
 

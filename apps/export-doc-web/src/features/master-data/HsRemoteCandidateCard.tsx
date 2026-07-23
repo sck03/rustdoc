@@ -9,6 +9,7 @@ export function HsRemoteCandidateCard({
   candidate,
   status,
   canOperate,
+  allowSelection,
   selected,
   draft,
   isBusy,
@@ -24,6 +25,7 @@ export function HsRemoteCandidateCard({
   candidate: HsCodeRemoteCandidate;
   status: string;
   canOperate: boolean;
+  allowSelection: boolean;
   selected: boolean;
   draft: string;
   isBusy: boolean;
@@ -36,7 +38,7 @@ export function HsRemoteCandidateCard({
   formatVerifiedAt: (value?: string) => string;
 }) {
   return <article className="remote-candidate-card">
-    {canOperate ? <input type="checkbox" aria-label={`选择 ${candidate.productName}`} checked={selected} onChange={onToggle} /> : null}
+    {canOperate && allowSelection ? <input type="checkbox" aria-label={`选择 ${candidate.productName}`} checked={selected} onChange={onToggle} /> : null}
     <div className="remote-candidate-evidence">
       <div className="remote-candidate-title"><strong>{candidate.productName}</strong><span className="status-pill">{statusLabel(candidate.resolutionStatus)}</span></div>
       <div className="remote-code-comparison">

@@ -14,6 +14,7 @@ App_Data
 **/target
 apps/license-keygen-tauri
 Browsers/ChromeForTesting
+Resources/Fonts/OpenSource/*.otf
 deploy/container/.env
 deploy/container/runtime
 deploy/container/config

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   Eraser,
@@ -10,6 +10,7 @@ import {
   Undo2,
   WandSparkles,
 } from "lucide-react";
+import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
 
 export function SingleWindowDocumentActionBar({
   title,
@@ -49,7 +50,13 @@ export function SingleWindowDocumentActionBar({
   onBuildReview: () => void;
 }) {
   const [viewMode, setViewMode] = useState<"standard" | "advanced">("standard");
+  const workspaceDeviceMode = useWorkspaceDeviceMode();
+  const canUseAdvancedTools = getWorkspaceDeviceCapabilities(workspaceDeviceMode).canUseAdvancedTools;
   const isActionDisabled = isBusy || !isDocumentReady || !isInvoiceIdValid;
+
+  useEffect(() => {
+    if (!canUseAdvancedTools) setViewMode("standard");
+  }, [canUseAdvancedTools]);
 
   return (
     <div className="editor-toolbar single-window-document-toolbar">
@@ -78,6 +85,8 @@ export function SingleWindowDocumentActionBar({
             className={viewMode === "advanced" ? "active" : ""}
             type="button"
             aria-pressed={viewMode === "advanced"}
+            disabled={!canUseAdvancedTools}
+            title={canUseAdvancedTools ? "显示高级报关属性和技术操作" : "高级报关属性请使用桌面端"}
             onClick={() => setViewMode("advanced")}
           >
             高级模式

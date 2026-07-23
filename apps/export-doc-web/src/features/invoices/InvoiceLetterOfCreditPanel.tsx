@@ -179,7 +179,7 @@ export function InvoiceLetterOfCreditPanel({
   }
 
   return (
-    <section className="form-section letter-of-credit-section" aria-label="信用证">
+    <section className="form-section letter-of-credit-section information-tier-advanced" aria-label="信用证">
       <div className="section-header">
         <div className="letter-of-credit-heading">
           <h2>信用证</h2>

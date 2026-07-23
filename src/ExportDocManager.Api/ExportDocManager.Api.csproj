@@ -40,6 +40,10 @@
       <Link>Resources\SingleWindow\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
+    <Content Include="..\..\Resources\Fonts\**\*" Condition="'$(ExportDocIncludeBusinessResources)' == 'true'">
+      <Link>Resources\Fonts\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <Target Name="RemoveUnusedOnnxRuntimeProviderPayload" AfterTargets="Build;Publish">
@@ -55,6 +59,15 @@
       <_ReleaseNativeDebugSymbols Include="$(PublishDir)**\*.pdb" />
     </ItemGroup>
     <Delete Files="@(_ReleaseNativeDebugSymbols)" />
+  </Target>
+
+  <Target Name="RemovePlaywrightDeveloperUiPayload" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">
+    <ItemGroup>
+      <_PlaywrightDeveloperUiPayload Include="$(PublishDir).playwright/package/lib/vite/dashboard" />
+      <_PlaywrightDeveloperUiPayload Include="$(PublishDir).playwright/package/lib/vite/recorder" />
+      <_PlaywrightDeveloperUiPayload Include="$(PublishDir).playwright/package/lib/vite/traceViewer" />
+    </ItemGroup>
+    <RemoveDir Directories="@(_PlaywrightDeveloperUiPayload)" />
   </Target>
 
 </Project>

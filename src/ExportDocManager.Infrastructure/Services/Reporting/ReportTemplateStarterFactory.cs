@@ -92,7 +92,7 @@ namespace ExportDocManager.Services.Reporting
     <meta charset="UTF-8">
     <style>
         @page { size: A4 portrait; margin: 15mm; }
-        body { font-family: Arial, "Microsoft YaHei", sans-serif; font-size: 12px; margin: 0; }
+        body { font-family: {{{ ReportFontPolicy.SansCssFamilyList }}}; font-size: 12px; margin: 0; }
         .report-container { width: 100%; max-width: 980px; margin: 0 auto; }
         .company { text-align: center; font-weight: bold; font-size: 24px; margin-top: 6px; }
         .company-subtitle { text-align: center; font-size: 13px; margin: 2px 0 12px; }
@@ -110,7 +110,7 @@ namespace ExportDocManager.Services.Reporting
         .amount-cell { text-align: right; white-space: nowrap; }
     </style>
 </head>
-<body>
+<body data-edm-report-font="sans">
     <div class="report-container">
         <div class="company">{{ Exporter.ExporterNameEN | string.upcase }}</div>
         <div class="company-subtitle">{{ Exporter.AddressEN }}</div>
@@ -188,7 +188,7 @@ namespace ExportDocManager.Services.Reporting
     <meta charset="UTF-8">
     <style>
         @page { size: A4 portrait; margin: 15mm; }
-        body { font-family: Arial, "Microsoft YaHei", sans-serif; font-size: 12px; margin: 0; }
+        body { font-family: {{{ ReportFontPolicy.SansCssFamilyList }}}; font-size: 12px; margin: 0; }
         .report-container { width: 100%; max-width: 1080px; margin: 0 auto; }
         .company { text-align: center; font-weight: bold; font-size: 24px; margin-top: 6px; }
         .company-subtitle { text-align: center; font-size: 13px; margin: 2px 0 12px; }
@@ -203,7 +203,7 @@ namespace ExportDocManager.Services.Reporting
         .number-cell { text-align: right; white-space: nowrap; }
     </style>
 </head>
-<body>
+<body data-edm-report-font="sans">
     <div class="report-container">
         <div class="company">{{ Exporter.ExporterNameEN | string.upcase }}</div>
         <div class="company-subtitle">{{ Exporter.AddressEN }}</div>
@@ -296,7 +296,7 @@ namespace ExportDocManager.Services.Reporting
     <meta charset="UTF-8">
     <style>
         @page { size: A4 portrait; margin: 15mm; }
-        body { font-family: "Microsoft YaHei", SimSun, sans-serif; font-size: 14px; margin: 0; }
+        body { font-family: {{{ ReportFontPolicy.SerifCssFamilyList }}}; font-size: 14px; margin: 0; }
         .report-container { width: 100%; max-width: 980px; margin: 0 auto; }
         .company { text-align: center; font-size: 28px; font-weight: bold; margin: 8px 0 6px; }
         .document-title { text-align: center; font-size: 26px; letter-spacing: 2px; margin: 0 0 18px; }
@@ -308,7 +308,7 @@ namespace ExportDocManager.Services.Reporting
         .signature-row td { border: none; padding-top: 18px; }
     </style>
 </head>
-<body>
+<body data-edm-report-font="serif">
     <div class="report-container">
         <div class="company">{{ Exporter.ExporterNameCN }}</div>
         <div class="document-title">{{{ encodedHeading }}}</div>
@@ -367,7 +367,7 @@ namespace ExportDocManager.Services.Reporting
     <meta charset="UTF-8">
     <style>
         @page { size: A4 portrait; margin: 15mm; }
-        body { font-family: "Microsoft YaHei", SimSun, sans-serif; font-size: 14px; margin: 0; }
+        body { font-family: {{{ ReportFontPolicy.SerifCssFamilyList }}}; font-size: 14px; margin: 0; }
         .report-container { width: 100%; max-width: 1040px; margin: 0 auto; }
         .company { text-align: center; font-size: 28px; font-weight: bold; margin: 8px 0 6px; }
         .document-title { text-align: center; font-size: 24px; letter-spacing: 6px; margin: 0 0 16px; }
@@ -379,7 +379,7 @@ namespace ExportDocManager.Services.Reporting
         .signature-row td { border: none; padding-top: 20px; text-align: center; }
     </style>
 </head>
-<body>
+<body data-edm-report-font="serif">
     <div class="report-container">
         <div class="company">{{ Exporter.ExporterNameCN }}</div>
         <div class="document-title">{{{ encodedHeading }}}</div>

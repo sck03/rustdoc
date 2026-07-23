@@ -1,7 +1,8 @@
-import { FormEvent, useCallback, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { ApiReportTemplatePreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import {
   isDesktopBridgeAvailable,
@@ -10,6 +11,7 @@ import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 import { hasReportDesignerSchema } from "../report-designer/reportDesignerTemplateParser.ts";
 import {
@@ -62,6 +64,9 @@ export function ReportTemplateDesignerPage({
   canManageTemplates: boolean;
   canDesignTemplates: boolean;
 }) {
+  const workspaceDeviceMode = useWorkspaceDeviceMode();
+  const workspaceDeviceCapabilities = getWorkspaceDeviceCapabilities(workspaceDeviceMode);
+  const isLimitedReportView = !workspaceDeviceCapabilities.canUseDenseWorkbench;
   const requestConfirmation = useConfirmation();
   const invoiceOutputPermission = useModulePermission("document.invoice-reports");
   const paymentOutputPermission = useModulePermission("document.payment-reports");
@@ -87,7 +92,9 @@ export function ReportTemplateDesignerPage({
   const [content, setContent] = useState("");
   const [contentTemplatePath, setContentTemplatePath] = useState("");
   const [loadedContent, setLoadedContent] = useState("");
-  const [workspaceMode, setWorkspaceMode] = useState<TemplateWorkspaceMode>("design");
+  const [workspaceMode, setWorkspaceMode] = useState<TemplateWorkspaceMode>(() =>
+    isLimitedReportView ? "preview" : "design",
+  );
   const [designerMode, setDesignerMode] = useState<DesignerMode>("new");
   const [designerDraftContent, setDesignerDraftContent] = useState("");
   const [templatePreviewMode, setTemplatePreviewMode] = useState<TemplatePreviewMode>("sample");
@@ -223,6 +230,12 @@ export function ReportTemplateDesignerPage({
     setMessage(null);
     setMessageType(null);
   }, []);
+
+  useEffect(() => {
+    if (isLimitedReportView) {
+      setWorkspaceMode("preview");
+    }
+  }, [isLimitedReportView]);
   const hasAppliedTemplateChanges = content !== loadedContent;
   const hasUnappliedDesignerChanges =
     designerMode === "new" && Boolean(designerDraftContent.trim()) && designerDraftContent !== content;
@@ -558,6 +571,9 @@ export function ReportTemplateDesignerPage({
   }
 
   function handleDesignerModeChange(mode: DesignerMode) {
+    if (isLimitedReportView) {
+      return;
+    }
     if (mode === designerMode) {
       return;
     }
@@ -692,11 +708,35 @@ export function ReportTemplateDesignerPage({
           isBusy={isBusy}
           canPreview={canRenderTemplatePreview}
           canSave={canSave}
+          designDisabled={isLimitedReportView}
           onDesignerModeChange={handleDesignerModeChange}
           onWorkspaceModeChange={setWorkspaceMode}
           onRefresh={() => void handleRefreshTemplates()}
           onPreview={handleRenderTemplatePreview}
         />
+
+        <WorkspaceDeviceNotice
+          mode={workspaceDeviceMode}
+          phone="可选择模板、查看预览和进行轻量确认；结构化拖拽、源码编辑、模板保存和模板包导入导出请使用桌面端。"
+          tablet="可选择模板、查看预览和进行现场确认；完整报表设计、源码编辑、模板保存和模板包导入导出请使用桌面端。"
+        />
+
+        {isLimitedReportView ? (
+          <div className="report-template-mobile-selection">
+            <ReportTemplateSelectionPanel
+              reportType={reportType}
+              reportTypeOptions={availableReportTypeOptions}
+              templates={templates}
+              userTemplates={userTemplates}
+              selectedTemplatePath={selectedTemplatePath}
+              selectedUserTemplateId={selectedUserTemplateId}
+              isBusy={isBusy}
+              onReportTypeChange={handleReportTypeChange}
+              onTemplateChange={handleTemplateChange}
+              onUserTemplateChange={handleUserTemplateChange}
+            />
+          </div>
+        ) : null}
 
         <ReportTemplateFeedback message={effectiveMessage} type={effectiveMessageType} />
 

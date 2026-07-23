@@ -35,6 +35,7 @@ const baselineDefaults = {
   maxContentBoundsDelta: 24,
   maxFullPageSizeDelta: 24,
 };
+const updateBaseline = process.argv.includes("--update");
 
 const templateCases = createReportRegressionTemplateCases("printPixel");
 
@@ -365,7 +366,12 @@ async function run() {
   const actualBaseline = buildPrintPixelBaseline(results);
   const actualBaselinePath = path.join(workspaceRoot, "print-pixel-baseline.actual.json");
   fs.writeFileSync(actualBaselinePath, `${JSON.stringify(actualBaseline, null, 2)}\n`, "utf8");
-  assertPrintPixelBaselines(results, loadPrintPixelBaselines());
+  if (updateBaseline) {
+    fs.copyFileSync(actualBaselinePath, baselinePath);
+    process.stdout.write(`updated print pixel baseline: ${baselinePath}\n`);
+  } else {
+    assertPrintPixelBaselines(results, loadPrintPixelBaselines());
+  }
 
   const summaryPath = path.join(workspaceRoot, "print-pixel-regression-summary.json");
   fs.writeFileSync(summaryPath, `${JSON.stringify({ browserExecutable: chromePath, results }, null, 2)}\n`, "utf8");

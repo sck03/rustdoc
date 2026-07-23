@@ -845,7 +845,7 @@ tbody tr:hover {
   box-shadow: inset 0 1px 2px rgb(15 23 42 / 4%);
 }
 .hs-knowledge-surface input::placeholder,
-.hs-knowledge-surface textarea::placeholder { color: #7b8b93; opacity: 1; }
+.hs-knowledge-surface textarea::placeholder { color: #657976; opacity: 1; }
 .hs-knowledge-readonly .knowledge-score button,
 .hs-knowledge-readonly .remote-candidate-review article > div:last-child button,
 .hs-knowledge-readonly .knowledge-table article > div:last-child button,
@@ -867,7 +867,7 @@ tbody tr:hover {
 .hs-code-column-mapping span { padding: 5px 8px; background: #eef6f5; border-radius: 6px; font-size: 12px; }
 .hs-code-preview-table-frame { max-height: 360px; }
 .hs-code-preview-table-frame table { min-width: 820px; }
-.hs-code-change-badge { display: inline-flex; padding: 3px 7px; border-radius: 999px; background: #e8eef2; font-size: 11px; font-weight: 700; }
+.hs-code-change-badge { display: inline-flex; padding: 3px 7px; border-radius: 999px; background: #e8eef2; font-size: var(--edm-font-size-xs); font-weight: 700; }
 .change-add { color: #047857; background: #d1fae5; }
 .change-update { color: #1d4ed8; background: #dbeafe; }
 .change-suspectedobsolete,.change-conflict,.change-invalid { color: #b45309; background: #fef3c7; }
@@ -1716,7 +1716,7 @@ tbody tr:hover {
   overflow: auto;
   color: #242a31;
   background: #fbfcfd;
-  font-family: "Cascadia Mono", Consolas, monospace;
+  font-family: var(--edm-font-mono);
   font-size: 12px;
   line-height: 1.55;
   white-space: pre-wrap;
@@ -1951,7 +1951,7 @@ tbody tr:hover {
   background: #fbfcfd;
   border: 1px solid #dde3e8;
   border-radius: 8px;
-  font-family: "Cascadia Mono", Consolas, monospace;
+  font-family: var(--edm-font-mono);
   font-size: 13px;
   line-height: 1.55;
 }
@@ -2077,13 +2077,13 @@ tbody tr:hover {
 
 .update-endpoint-field input {
   height: 42px;
-  font-family: "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  font-family: var(--edm-font-mono);
   font-size: 13px;
 }
 
 .update-public-key-field textarea {
   min-height: 112px;
-  font-family: "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  font-family: var(--edm-font-mono);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -2460,7 +2460,7 @@ tbody tr:hover {
 .runtime-dependency-path {
   overflow: hidden;
   color: #35434b;
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: var(--edm-font-mono);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2601,7 +2601,7 @@ tbody tr:hover {
 
 .runtime-path-name span {
   color: #77818a;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   line-height: 1.45;
 }
 
@@ -2609,7 +2609,7 @@ tbody tr:hover {
   min-width: 0;
   overflow: hidden;
   color: #394852;
-  font-family: Consolas, "Cascadia Mono", monospace;
+  font-family: var(--edm-font-mono);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2631,7 +2631,7 @@ tbody tr:hover {
   min-height: 24px;
   padding: 0 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -4298,7 +4298,7 @@ tbody tr:hover {
   background: #e8f6f3;
   border: 1px solid #c8e4dd;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 800;
   white-space: nowrap;
 }
@@ -5044,7 +5044,7 @@ tbody tr:hover {
   overflow: auto;
   white-space: pre-wrap;
   color: #202124;
-  font: 12px/1.5 Consolas, "Courier New", monospace;
+  font: 12px/1.5 var(--edm-font-mono);
 }
 
 .single-window-review-subheader {
@@ -5215,7 +5215,7 @@ label {
   background: #fff0ed;
   border: 1px solid #f1b4aa;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 800;
   line-height: 1.2;
 }

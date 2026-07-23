@@ -26,7 +26,7 @@
 .page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .page-heading h1 { margin: 4px 0; }
 .page-heading p { margin: 0; color: var(--text-secondary); }
-.eyebrow { color: var(--accent-color); font-size: 11px; letter-spacing: .15em; }
+.eyebrow { color: var(--accent-color); font-size: var(--edm-font-size-xs); letter-spacing: .15em; }
 
 .hs-knowledge-nav {
   justify-content: flex-start;
@@ -55,6 +55,29 @@
 
 .hs-knowledge-nav a:hover { color: #0f766e; background: #fff; border-color: #88aaa8; }
 .hs-knowledge-nav a.active { color: #0f766e; background: #fff; border-color: #72a9a4; box-shadow: 0 4px 14px rgba(15, 118, 110, .12); }
+.hs-knowledge-maintenance-nav {
+  display: grid;
+  min-width: 170px;
+  padding: 2px 6px;
+  border: 1px solid #cad8dc;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .48);
+}
+.hs-knowledge-maintenance-nav > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  color: #46565f;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 700;
+}
+.hs-knowledge-maintenance-nav > summary::-webkit-details-marker { display: none; }
+.hs-knowledge-maintenance-nav > summary::after { margin-left: auto; content: "＋"; }
+.hs-knowledge-maintenance-nav[open] > summary::after { content: "－"; }
+.hs-knowledge-maintenance-nav > div { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 6px; }
+.hs-knowledge-maintenance-nav > div a { padding: 7px 10px; font-size: var(--edm-font-size-sm); }
 .knowledge-task-card { padding: 24px; background: var(--surface); border: 1px solid var(--border-color); border-radius: 18px; box-shadow: 0 8px 30px rgba(0, 0, 0, .04); }
 .knowledge-tool-card { display: grid; gap: 12px; padding: 18px 20px 20px; }
 .knowledge-task-lead { max-width: 680px; margin: 0; color: #5c6972; line-height: 1.6; }
@@ -126,7 +149,7 @@
 }
 
 .knowledge-workflow strong { color: #354742; font-size: 13px; }
-.knowledge-workflow small { color: #566762; font-size: 10px; line-height: 1.35; }
+.knowledge-workflow small { color: #566762; font-size: var(--edm-font-size-xs); line-height: 1.35; }
 .knowledge-workflow > div.active { background: #ffffff; border-color: #83b9af; box-shadow: 0 4px 13px rgba(15, 118, 110, .09); }
 .knowledge-workflow > div.active > span { background: #0f766e; }
 

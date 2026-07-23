@@ -360,7 +360,7 @@ fn prompt_for_runtime_data_root(
 ) -> Result<PathBuf, Box<dyn Error>> {
     rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Warning)
-        .set_title("选择出口单证管理系统数据目录")
+        .set_title("选择程序数据目录")
         .set_description(format!(
             "{reason}\n\n数据库、缓存、单一窗口业务数据和运行期可写数据会放到该目录。不会静默改写到 AppData 或 ProgramData。"
         ))
@@ -368,7 +368,7 @@ fn prompt_for_runtime_data_root(
         .show();
 
     let selected = rfd::FileDialog::new()
-        .set_title("选择出口单证管理系统数据目录")
+        .set_title("选择程序数据目录")
         .pick_folder()
         .ok_or_else(|| {
             format!(

@@ -12,6 +12,7 @@ import {
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
 import {
   isDesktopBridgeAvailable,
   openPath,
@@ -24,6 +25,7 @@ import {
 } from "../../desktop/desktopBridge.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
+import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { formatAmount, formatDate, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
 import { listPageSizeOptions, loadListViewState, normalizeListPageSize, saveListViewState } from "../../ui/listViewState.ts";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
@@ -70,6 +72,8 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
   const invoicePermission = useModulePermission("document.invoices");
   const excelPermission = useModulePermission("document.excel");
   const singleWindowPermission = useModulePermission("document.single-window");
+  const workspaceDeviceMode = useWorkspaceDeviceMode();
+  const workspaceDeviceCapabilities = getWorkspaceDeviceCapabilities(workspaceDeviceMode);
   const [initialListViewState] = useState(() => loadListViewState(invoiceListViewStateStorageKey));
   const [keyword, setKeyword] = useState(initialListViewState.keyword);
   const [committedKeyword, setCommittedKeyword] = useState(initialListViewState.keyword);
@@ -496,6 +500,11 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
       {!invoicePermission.canOperate ? (
         <PermissionNotice>当前权限模板仅允许查看发票；新建、复制、导入和单据包维护已禁用。</PermissionNotice>
       ) : null}
+      <WorkspaceDeviceNotice
+        mode={workspaceDeviceMode}
+        phone="可查看、搜索和打开已有发票进行简单回填；新建完整发票、Excel/单据包导入和批量输出请使用桌面端。"
+        tablet="可查看、搜索、新建基础草稿和进行轻量编辑；Excel/单据包导入和批量输出请使用桌面端。"
+      />
       <div className="toolbar">
         <form className="search-form" onSubmit={handleSearch}>
           <Search size={17} aria-hidden="true" />
@@ -516,7 +525,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
           >
             <X size={18} aria-hidden="true" />
           </button>
-          {invoicePermission.canOperate && excelPermission.canOperate ? <button
+          {workspaceDeviceCapabilities.canImportExport && invoicePermission.canOperate && excelPermission.canOperate ? <button
             className="command-button secondary"
             type="button"
             disabled={isBusy}
@@ -525,7 +534,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
             <FileSpreadsheet size={17} aria-hidden="true" />
             <span>导入 Excel</span>
           </button> : null}
-          {invoicePermission.canOperate ? <button
+          {workspaceDeviceCapabilities.canImportExport && invoicePermission.canOperate ? <button
             className="command-button secondary"
             type="button"
             disabled={isBusy}
@@ -543,7 +552,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
           >
             <RefreshCw size={18} aria-hidden="true" />
           </button>
-          {invoicePermission.canOperate ? <button className="command-button" type="button" onClick={() => navigate("/invoices/new")}>
+          {invoicePermission.canOperate && workspaceDeviceMode !== "phone" ? <button className="command-button" type="button" onClick={() => navigate("/invoices/new")}>
             <Plus size={17} aria-hidden="true" />
             <span>新建</span>
           </button> : null}
@@ -629,8 +638,9 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
         data={invoices?.items ?? []}
         isBusy={isBusy}
         hasError={Boolean(invoicesQuery.isError)}
-        canOperate={invoicePermission.canOperate}
-        canExportBookingSheet={excelPermission.canOperate}
+        canOperate={invoicePermission.canOperate && workspaceDeviceMode !== "phone"}
+        canExportPackage={invoicePermission.canOperate && workspaceDeviceCapabilities.canImportExport}
+        canExportBookingSheet={excelPermission.canOperate && workspaceDeviceCapabilities.canImportExport}
         canUseSingleWindow={singleWindowPermission.canView}
         onOpen={(invoiceId) => navigate(`/invoices/${invoiceId}`)}
         onCopy={openCopyPanel}

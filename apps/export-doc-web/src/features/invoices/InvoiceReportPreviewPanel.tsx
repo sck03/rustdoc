@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import type { ApiInvoiceDetailDto, ApiReportHtmlPreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission, usePermissionCapabilities } from "../../app/PermissionAccessContext.tsx";
+import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { PermissionNotice } from "../../ui/PageState.tsx";
@@ -50,9 +51,13 @@ export function InvoiceReportPreviewPanel({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [showExportAdvanced, setShowExportAdvanced] = useState(false);
+  const workspaceDeviceMode = useWorkspaceDeviceMode();
+  const workspaceDeviceCapabilities = getWorkspaceDeviceCapabilities(workspaceDeviceMode);
   const desktopAvailable = isDesktopBridgeAvailable();
   const hasSavedInvoice = invoiceId > 0;
-  const canUseSavedInvoiceOutput = hasSavedInvoice && !hasUnsavedDraftChanges;
+  const canUseSavedInvoiceOutput = hasSavedInvoice
+    && !hasUnsavedDraftChanges
+    && workspaceDeviceCapabilities.canImportExport;
   const hasPreviewSource = hasSavedInvoice || Boolean(invoiceDraft);
   const invoiceDraftPreviewKey = invoiceDraft ? JSON.stringify(invoiceDraft) : "";
 
@@ -161,7 +166,9 @@ export function InvoiceReportPreviewPanel({
   const selectedTemplateCount = documentPackage.selectedTemplates.length;
   const hasValidPackageSelection = selectedTemplateCount > 0 && selectedTemplateCount <= 20;
   const canPreviewPackage = reportOutputPermission.canOperate && canUseSavedInvoiceOutput && hasValidPackageSelection && !isBusy;
-  const canPrintPreview = (Boolean(preview?.html) || Boolean(documentPackage.preview?.items.some((item) => item.html))) && !isBusy;
+  const canPrintPreview = workspaceDeviceCapabilities.canImportExport
+    && (Boolean(preview?.html) || Boolean(documentPackage.preview?.items.some((item) => item.html)))
+    && !isBusy;
   const canGeneratePdf = reportOutputPermission.canOperate
     && canUseSavedInvoiceOutput
     && canPreview
@@ -187,7 +194,10 @@ export function InvoiceReportPreviewPanel({
   const canSavePackageConfig = canEditPackageConfig
     && documentPackage.configDirty
     && documentPackage.configDraft.items.length > 0;
-  const canOpenTemplateDesigner = reportDesignPermission.canView && Boolean(selectedTemplatePath) && !isBusy;
+  const canOpenTemplateDesigner = workspaceDeviceCapabilities.canUseDenseWorkbench
+    && reportDesignPermission.canView
+    && Boolean(selectedTemplatePath)
+    && !isBusy;
   const templateMessage = templatesQuery.isError ? readApiError(templatesQuery.error) : null;
   const previewStoragePolicy = preview?.storagePolicy || documentPackage.preview?.storagePolicy || "";
 
@@ -236,7 +246,7 @@ export function InvoiceReportPreviewPanel({
         canPrint={canPrintPreview}
         canRefreshTemplates={reportOutputPermission.canView}
         errorMessage={errorMessage}
-        hasSavedInvoice={hasSavedInvoice}
+        hasSavedInvoice={hasSavedInvoice && workspaceDeviceCapabilities.canImportExport}
         hasUnsavedDraftChanges={hasUnsavedDraftChanges}
         isBusy={isBusy}
         jobId={lastCreatedJobId}
@@ -258,8 +268,8 @@ export function InvoiceReportPreviewPanel({
         desktopAvailable={desktopAvailable}
         hasSavedInvoice={hasSavedInvoice}
         isBusy={isBusy}
-        showTemplateDesigner={reportDesignPermission.canView}
-        showTemplateSettings={canManageSettings}
+        showTemplateDesigner={workspaceDeviceCapabilities.canUseDenseWorkbench && reportDesignPermission.canView}
+        showTemplateSettings={workspaceDeviceCapabilities.canUseAdvancedTools && canManageSettings}
         selectedTemplatePath={selectedTemplatePath}
         templates={templates}
         withSeal={withSeal}
@@ -276,7 +286,7 @@ export function InvoiceReportPreviewPanel({
         }}
       />
 
-      {hasSavedInvoice && reportOutputPermission.canOperate ? (
+      {hasSavedInvoice && reportOutputPermission.canOperate && workspaceDeviceCapabilities.canImportExport ? (
         <details
           className="report-export-advanced"
           open={showExportAdvanced}

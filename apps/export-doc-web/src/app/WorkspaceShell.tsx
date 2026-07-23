@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Server,
   ServerOff,
+  SlidersHorizontal,
   WifiOff,
   X,
 } from "lucide-react";
@@ -28,6 +29,13 @@ import { InlineNotice } from "../ui/PageState.tsx";
 import { getServiceConnectionLabel, resolveServiceConnectionState, type ServiceAvailability } from "../ui/serviceAvailabilityModel.ts";
 import { useOnlineStatus } from "../ui/useOnlineStatus.ts";
 import { useServiceAvailability } from "../ui/useServiceAvailability.ts";
+import {
+  applyInterfaceDensity,
+  persistInterfaceDensity,
+  readInterfaceDensity,
+  toggleInterfaceDensity,
+} from "./interfaceDensity.ts";
+import { useWorkspaceDeviceMode } from "./workspaceDevice.ts";
 
 export type WorkspaceNotice = {
   id: "permission" | "license";
@@ -63,6 +71,8 @@ export function WorkspaceShell({
 }: WorkspaceShellProps) {
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [interfaceDensity, setInterfaceDensity] = useState(readInterfaceDensity);
+  const workspaceDeviceMode = useWorkspaceDeviceMode();
   const isOnline = useOnlineStatus(connectivityOverride);
   const { availability: serviceAvailability, retry: retryServiceAvailability } = useServiceAvailability({
     apiBaseUrl,
@@ -97,6 +107,10 @@ export function WorkspaceShell({
   }, [pathname]);
 
   useEffect(() => {
+    applyInterfaceDensity(interfaceDensity);
+  }, [interfaceDensity]);
+
+  useEffect(() => {
     const compactWorkspace = window.matchMedia("(min-width: 861px) and (max-width: 1180px)");
     const applyWorkspaceWidth = (matches: boolean) => setIsNavCollapsed(matches);
     applyWorkspaceWidth(compactWorkspace.matches);
@@ -117,6 +131,12 @@ export function WorkspaceShell({
     });
   }
 
+  function handleToggleInterfaceDensity() {
+    const nextDensity = toggleInterfaceDensity(interfaceDensity);
+    setInterfaceDensity(nextDensity);
+    persistInterfaceDensity(nextDensity);
+  }
+
   const context = getWorkspaceContext(pathname);
   const ContextIcon = context.icon;
   const displayName = user.fullName || user.username;
@@ -127,7 +147,10 @@ export function WorkspaceShell({
   const serviceStatusLabel = getServiceConnectionLabel(serviceConnectionState);
 
   return (
-    <div className={isNavCollapsed ? "app-shell app-shell-nav-collapsed" : "app-shell"}>
+    <div
+      className={isNavCollapsed ? "app-shell app-shell-nav-collapsed" : "app-shell"}
+      data-workspace-device={workspaceDeviceMode}
+    >
       <aside className={isMobileNavOpen ? "workspace-nav workspace-nav-mobile-open" : "workspace-nav"}>
         <div className="brand-mark">
           <span className="brand-icon">
@@ -198,6 +221,16 @@ export function WorkspaceShell({
             </div>
           </div>
           <div className="session-strip">
+            <button
+              className="density-toggle-button"
+              type="button"
+              aria-label={`当前为${interfaceDensity === "compact" ? "紧凑" : "舒适"}密度，切换为${interfaceDensity === "compact" ? "舒适" : "紧凑"}密度`}
+              title={`切换为${interfaceDensity === "compact" ? "舒适" : "紧凑"}密度`}
+              onClick={handleToggleInterfaceDensity}
+            >
+              <SlidersHorizontal size={16} aria-hidden="true" />
+              <span>{interfaceDensity === "compact" ? "紧凑" : "舒适"}</span>
+            </button>
             <span className="service-status" data-state={serviceConnectionState} title={apiBaseUrl}>
               <span className="service-status-dot" aria-hidden="true" />
               <Server size={15} aria-hidden="true" />

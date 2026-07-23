@@ -133,7 +133,7 @@ namespace ExportDocManager.Models
     {
         [DisplayName("软件名称")]
         [Description("显示在主界面标题栏的软件名称")]
-        public string AppName { get; set; } = "出口单证管理系统";
+        public string AppName { get; set; } = "外贸业务综合管理系统";
 
         [DisplayName("默认出口商中文名")]
         [Description("Excel 未提供出口商中文名时用于导入草稿和导出模板；请先填写真实出口商中文公司名，避免把英文发票抬头当作中文名")]

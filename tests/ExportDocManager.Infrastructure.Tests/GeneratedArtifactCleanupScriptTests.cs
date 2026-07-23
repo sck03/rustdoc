@@ -100,6 +100,38 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public void PackagingScripts_ShouldReplaceStaleVersionedOutputsWithinWorkspaceBoundaries()
+        {
+            string prepareScript = File.ReadAllText(ResolveWorkspacePath("scripts", "prepare-windows-desktop-run.ps1"));
+            string editionsScript = File.ReadAllText(ResolveWorkspacePath("scripts", "build-windows-editions.ps1"));
+            string installerScript = File.ReadAllText(ResolveWorkspacePath("scripts", "build-windows-installers.ps1"));
+            string desktopScript = File.ReadAllText(ResolveWorkspacePath("scripts", "build-windows-desktop-run.ps1"));
+            string browserPdfScript = File.ReadAllText(ResolveWorkspacePath("scripts", "verify-bundled-browser-pdf.ps1"));
+
+            Assert.Contains("Remove-GeneratedEntry -Path $Destination -Root $OutputRoot -Purpose \"stale packaged browser runtime\"", prepareScript, StringComparison.Ordinal);
+            Assert.DoesNotContain("Join-Path $Destination \"Browsers\"", prepareScript, StringComparison.Ordinal);
+            Assert.Contains("Remove-GeneratedEntry -Path $resolvedLicenseOutputDir -Root $artifactsRoot", prepareScript, StringComparison.Ordinal);
+
+            Assert.Contains("if (-not $IncludeLicenseKeygen)", editionsScript, StringComparison.Ordinal);
+            Assert.Contains("Join-Path $outputRoot \"KEY\"", editionsScript, StringComparison.Ordinal);
+            Assert.Contains("Remove-Item -LiteralPath $staleLicenseOutputFullPath -Recurse -Force", editionsScript, StringComparison.Ordinal);
+
+            Assert.Contains("Get-ChildItem -LiteralPath $outputRoot -File -Filter \"ExportDocManager-$edition-*-win-x64-setup.exe\"", installerScript, StringComparison.Ordinal);
+            Assert.Contains("Join-Path $outputRoot \"product-edition-$edition.json\"", installerScript, StringComparison.Ordinal);
+            Assert.Contains("Assert-Inside -Path $staleInstaller.FullName -Root $outputRoot", installerScript, StringComparison.Ordinal);
+            Assert.Contains("Join-Path $scriptRoot \"verify-package-payload.ps1\"", installerScript, StringComparison.Ordinal);
+            Assert.Contains("Join-Path $artifactsRoot \"tauri-bundle\\resources\"", installerScript, StringComparison.Ordinal);
+
+            Assert.Contains("$payloadVerifier = Join-Path $scriptRoot \"verify-package-payload.ps1\"", desktopScript, StringComparison.Ordinal);
+            Assert.Contains("\"-Profile\", \"Desktop\"", desktopScript, StringComparison.Ordinal);
+            Assert.Contains("\"-RuntimeIdentifier\", \"win-x64\"", desktopScript, StringComparison.Ordinal);
+
+            Assert.Contains(".codex-runtime/browser-pdf-check", browserPdfScript, StringComparison.Ordinal);
+            Assert.Contains("Assert-RepositoryChildPath", browserPdfScript, StringComparison.Ordinal);
+            Assert.DoesNotContain("Path]::GetTempPath", browserPdfScript, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void ScriptSuite_ShouldValidateAllScriptFormatsAndNativeExitCodes()
         {
             string verifier = File.ReadAllText(ResolveWorkspacePath("scripts", "verify-script-suite.ps1"));

@@ -56,7 +56,7 @@ export function InvoiceBasicInfoPanel({
   onCommitCustomOption?: (optionType: string, value: string) => void;
 }) {
   return (
-    <section className="form-section" aria-label="基础信息">
+    <section className="form-section information-tier-required" aria-label="基础信息">
       <div className="section-header">
         <h2>基础信息</h2>
         <div className="toolbar-actions">
@@ -209,7 +209,7 @@ export function InvoicePartiesPanel({
   }
 
   return (
-    <section className="form-section" aria-label="客户与出口商">
+    <section className="form-section information-tier-required" aria-label="客户与出口商">
       <div className="section-header">
         <h2>客户与出口商</h2>
         <button className="icon-button" type="button" title="刷新客户和出口商" aria-label="刷新客户和出口商" disabled={isBusy} onClick={onRefresh}>
@@ -399,7 +399,7 @@ export function InvoiceShippingTermsPanel({
   );
 
   return (
-    <section className="form-section" aria-label="运输与条款">
+    <section className="form-section information-tier-required" aria-label="运输与条款">
       <div className="section-header">
         <h2>运输与条款</h2>
       </div>
@@ -688,7 +688,7 @@ export function InvoiceMarksAndItemsPanel({
 
   return (
     <section
-      className={isFocusedWorkbench ? "form-section invoice-items-workbench invoice-items-focus-panel" : "form-section invoice-items-workbench"}
+      className={isFocusedWorkbench ? "form-section invoice-items-workbench invoice-items-focus-panel information-tier-required" : "form-section invoice-items-workbench information-tier-required"}
       aria-label="商品明细"
     >
       <div className="section-header">

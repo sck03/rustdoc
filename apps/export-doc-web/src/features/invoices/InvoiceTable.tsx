@@ -6,10 +6,10 @@ import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { isDirectTableRowKeyboardEvent } from "../../ui/tableRowInteractions.ts";
 import { getInvoiceStatusLabel } from "./invoiceModel.ts";
 
-export function InvoiceTable({ data, isBusy, hasError = false, canOperate, canExportBookingSheet, canUseSingleWindow, onOpen, onCopy, onExportPackage, onExportBookingSheet, onSingleWindow }: {
+export function InvoiceTable({ data, isBusy, hasError = false, canOperate, canExportPackage, canExportBookingSheet, canUseSingleWindow, onOpen, onCopy, onExportPackage, onExportBookingSheet, onSingleWindow }: {
   data: ApiInvoiceListItemDto[]; isBusy: boolean; onOpen: (invoiceId: number) => void;
   hasError?: boolean;
-  canOperate: boolean; canExportBookingSheet: boolean; canUseSingleWindow: boolean;
+  canOperate: boolean; canExportPackage: boolean; canExportBookingSheet: boolean; canUseSingleWindow: boolean;
   onCopy: (invoice: ApiInvoiceListItemDto) => void; onExportPackage: (invoice: ApiInvoiceListItemDto) => void;
   onExportBookingSheet: (invoice: ApiInvoiceListItemDto) => void; onSingleWindow: (invoice: ApiInvoiceListItemDto) => void;
 }) {
@@ -18,7 +18,7 @@ export function InvoiceTable({ data, isBusy, hasError = false, canOperate, canEx
     if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(id); }
   };
   const actions = [
-    { title: "导出单据包", icon: Download, run: onExportPackage, visible: canOperate },
+    { title: "导出单据包", icon: Download, run: onExportPackage, visible: canExportPackage },
     { title: "导出货代订舱托单", icon: FileSpreadsheet, run: onExportBookingSheet, visible: canExportBookingSheet },
     { title: "单一窗口办理", icon: FileCheck2, run: onSingleWindow, visible: canUseSingleWindow },
     { title: "复制发票", icon: Copy, run: onCopy, visible: canOperate },

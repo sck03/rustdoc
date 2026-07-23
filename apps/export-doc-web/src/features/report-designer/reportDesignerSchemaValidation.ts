@@ -28,6 +28,7 @@ import type {
   ReportTextStyle,
 } from "./reportDesignerSchema.ts";
 import { getReportDesignerBlockPlacementIssue } from "./reportDesignerModel.ts";
+import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
 
 export const CURRENT_REPORT_DESIGNER_SCHEMA_VERSION = 2;
 
@@ -1315,8 +1316,8 @@ function readFontFamily(value: unknown, path: string, issues: ReportDesignerSche
     return value.trim();
   }
 
-  issues.push(createIssue("warning", path, "默认字体无效，已回退为 Arial。"));
-  return "Arial, sans-serif";
+  issues.push(createIssue("warning", path, "默认字体无效，已回退为跨平台开源字体栈。"));
+  return portableReportSansFontFamily;
 }
 
 function readCssColor(value: unknown, path: string, issues: ReportDesignerSchemaIssue[]) {

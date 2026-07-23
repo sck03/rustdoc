@@ -9,6 +9,7 @@ export function ReportTemplateWorkspaceHeader({
   isBusy,
   canPreview,
   canSave,
+  designDisabled,
   onDesignerModeChange,
   onWorkspaceModeChange,
   onRefresh,
@@ -20,6 +21,7 @@ export function ReportTemplateWorkspaceHeader({
   isBusy: boolean;
   canPreview: boolean;
   canSave: boolean;
+  designDisabled?: boolean;
   onDesignerModeChange: (mode: DesignerMode) => void;
   onWorkspaceModeChange: (mode: TemplateWorkspaceMode) => void;
   onRefresh: () => void;
@@ -39,6 +41,8 @@ export function ReportTemplateWorkspaceHeader({
               type="button"
               role="tab"
               aria-selected={designerMode === "new"}
+              disabled={designDisabled}
+              title={designDisabled ? "当前设备仅提供模板选择与预览，完整设计请使用桌面端" : undefined}
               onClick={() => onDesignerModeChange("new")}
             >
               <LayoutTemplate size={16} aria-hidden="true" />
@@ -49,6 +53,8 @@ export function ReportTemplateWorkspaceHeader({
               type="button"
               role="tab"
               aria-selected={designerMode === "source"}
+              disabled={designDisabled}
+              title={designDisabled ? "源码编辑请使用桌面端" : undefined}
               onClick={() => onDesignerModeChange("source")}
             >
               <Code2 size={16} aria-hidden="true" />
@@ -59,7 +65,7 @@ export function ReportTemplateWorkspaceHeader({
             <RefreshCw size={18} aria-hidden="true" />
           </IconButton>
           <Button variant="secondary" icon={<Eye size={17} aria-hidden="true" />} disabled={!canPreview} onClick={onPreview}>预览</Button>
-          <Button variant="primary" type="submit" icon={<Save size={17} aria-hidden="true" />} disabled={!canSave}>保存</Button>
+          <Button variant="primary" type="submit" icon={<Save size={17} aria-hidden="true" />} disabled={designDisabled || !canSave}>保存</Button>
         </div>
       </div>
 
@@ -69,6 +75,8 @@ export function ReportTemplateWorkspaceHeader({
           type="button"
           role="tab"
           aria-selected={workspaceMode === "design"}
+          disabled={designDisabled}
+          title={designDisabled ? "结构化设计请使用桌面端" : undefined}
           onClick={() => onWorkspaceModeChange("design")}
         >
           <LayoutTemplate size={16} aria-hidden="true" />

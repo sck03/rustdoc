@@ -30,11 +30,7 @@ export function InvoiceItemsTable(props:Props){
           <thead>
             <tr>
               <th>操作</th>
-              {visibleColumns.map((column) => (
-                <th key={column.field} className={column.headerClassName}>
-                  {column.header}
-                </th>
-              ))}
+              {visibleColumns.map((column) => <th key={column.field}>{column.header}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -169,4 +165,3 @@ export function InvoiceItemsTable(props:Props){
 
  </>;
 }
-

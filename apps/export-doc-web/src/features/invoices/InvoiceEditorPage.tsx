@@ -4,12 +4,14 @@ import { ArrowLeft, Edit3, Minimize2, PackageSearch, Save, Trash2 } from "lucide
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { isConcurrencyConflict, normalizeText, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ConcurrencyConflictNotice, InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
+import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import {
   hasCustomOptionValue,
   invoiceCustomOptionTypes,
@@ -62,6 +64,8 @@ export function InvoiceEditorPage({
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const workspaceDeviceMode = useWorkspaceDeviceMode();
+  const workspaceDeviceCapabilities = getWorkspaceDeviceCapabilities(workspaceDeviceMode);
   const [initialNewRouteState] = useState(() => ({
     invoiceDraft: readRouteInvoiceDraft(location.state),
     successMessage: readRouteSuccessMessage(location.state),
@@ -87,7 +91,8 @@ export function InvoiceEditorPage({
 
   const parsedInvoiceId = Number(invoiceId);
   const isNew = mode === "new";
-  const isInvoiceItemsWorkbenchMode = searchParams.get("workbench") === "items";
+  const isInvoiceItemsWorkbenchMode = searchParams.get("workbench") === "items"
+    && workspaceDeviceCapabilities.canUseDenseWorkbench;
   const isInvoiceIdValid = Number.isInteger(parsedInvoiceId) && parsedInvoiceId > 0;
   const queryClient = useQueryClient();
   const routeInvoiceImportKey =
@@ -103,7 +108,7 @@ export function InvoiceEditorPage({
     invoice,
     setInvoice,
     setSuccessMessage,
-    isEditable: isInvoiceEditable,
+    isEditable: isInvoiceEditable && workspaceDeviceCapabilities.canUseDenseWorkbench,
     canSaveToProductLibrary: masterDataPermission.canOperate,
   });
 
@@ -585,11 +590,11 @@ export function InvoiceEditorPage({
       client={client}
       invoice={invoice}
       canSaveToProductLibrary={masterDataPermission.canOperate}
-      canUseHsKnowledge={invoicePermission.canOperate}
+      canUseHsKnowledge={invoicePermission.canOperate && workspaceDeviceCapabilities.canUseDenseWorkbench}
       canRedoItemEdit={itemsWorkspace.canRedoItemEdit}
       canUndoItemEdit={itemsWorkspace.canUndoItemEdit}
       invoiceItemBlankRowCount={invoiceItemBlankRowCount}
-      isEditable={isInvoiceEditable}
+      isEditable={isInvoiceEditable && workspaceDeviceCapabilities.canUseDenseWorkbench}
       isFocusedWorkbench={isInvoiceItemsWorkbenchMode}
       isProductLibraryBusy={isProductLibraryBusy}
       onChange={patchInvoice}
@@ -601,7 +606,7 @@ export function InvoiceEditorPage({
       onFillDownItemCells={itemsWorkspace.fillDownItemCells}
       onFillDownItemField={itemsWorkspace.fillDownItemField}
       onMoveItem={itemsWorkspace.moveItem}
-      onOpenFocusedWorkbench={openInvoiceItemsWorkbench}
+      onOpenFocusedWorkbench={workspaceDeviceCapabilities.canUseDenseWorkbench ? openInvoiceItemsWorkbench : undefined}
       onPasteItemTable={itemsWorkspace.pasteItemTable}
       onRedoItemEdit={itemsWorkspace.redoItemEdit}
       onRefreshProductLibrary={itemsWorkspace.refreshProductLibrary}
@@ -665,6 +670,11 @@ export function InvoiceEditorPage({
           当前权限模板仅允许查看发票；表头、商品明细、状态、信用证导入和保存操作已禁用。
         </PermissionNotice>
       ) : null}
+      <WorkspaceDeviceNotice
+        mode={workspaceDeviceMode}
+        phone="手机端用于查看、搜索、审批和简单回填；商品明细工作台、批量录入、信用证处理和导入导出请使用桌面端。"
+        tablet="平板端用于轻量编辑和现场确认；商品明细工作台、批量录入、信用证处理和导入导出请使用桌面端。"
+      />
 
       {!invoice && isBusy ? <PageState tone="loading" title="正在加载发票" description="请稍候，系统正在读取发票和商品明细。" /> : null}
 
@@ -745,22 +755,17 @@ export function InvoiceEditorPage({
                   onCommitCustomOption={commitInvoiceCustomOption}
                 />
 
-                {isNew ? (
-                  <details className="invoice-new-optional-section">
-                    <summary>报关与扩展字段</summary>
-                    <InvoiceExtendedFieldsPanel
-                      invoice={invoice}
-                      isEditable={isInvoiceEditable}
-                      onChange={patchInvoice}
-                    />
-                  </details>
-                ) : (
+                <details className="invoice-new-optional-section information-tier-advanced">
+                  <summary>
+                    <span>报关与扩展字段（低频）</span>
+                    <small>报关行、备用字段和高级 JSON，按需展开</small>
+                  </summary>
                   <InvoiceExtendedFieldsPanel
                     invoice={invoice}
-                    isEditable={isInvoiceEditable}
+                    isEditable={isInvoiceEditable && workspaceDeviceCapabilities.canUseAdvancedTools}
                     onChange={patchInvoice}
                   />
-                )}
+                </details>
               </div>
 
               <div id="invoice-items-section" className="invoice-editor-section-anchor">
@@ -778,7 +783,7 @@ export function InvoiceEditorPage({
                 <InvoiceLetterOfCreditPanel
                   client={client}
                   invoice={invoice}
-                  disabled={!isInvoiceEditable || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
+                  disabled={!isInvoiceEditable || !workspaceDeviceCapabilities.canUseAdvancedTools || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
                   reviewDisabled={!invoicePermission.canOperate || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
                   onChange={patchInvoice}
                   onClearPageMessages={clearInvoicePageMessages}

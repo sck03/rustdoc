@@ -41,8 +41,8 @@ export function LoginPage({
             </span>
             <span>{product.englishName}</span>
           </div>
-          <h1>{product.productName}</h1>
-          <p>{product.loginTagline} · {product.editionName}</p>
+          <h1>{product.displayName}</h1>
+          <p>{product.loginTagline}</p>
         </section>
 
         <form className="login-card" onSubmit={onSubmit} onKeyDownCapture={handleEnterAsTabFormKeyDown}>

@@ -23,6 +23,11 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $artifactsRoot "windows-desktop-run"
 }
 $outputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
+$artifactsRootFullPath = [System.IO.Path]::GetFullPath($artifactsRoot)
+$artifactsPrefix = $artifactsRootFullPath.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+if (-not $outputRoot.StartsWith($artifactsPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Windows edition output must stay inside $artifactsRootFullPath. Resolved path: $outputRoot"
+}
 $builder = Join-Path $scriptRoot "build-windows-desktop-run.ps1"
 $first = $true
 $powerShellExecutable = Resolve-ExportDocPowerShellExecutable
@@ -59,6 +64,18 @@ if ($PreflightOnly) {
     }
     Wait-ExportDocInteractiveExit -Enabled $interactiveLaunch
     return
+}
+
+if (-not $IncludeLicenseKeygen) {
+    $staleLicenseOutput = Join-Path $outputRoot "KEY"
+    if (Test-Path -LiteralPath $staleLicenseOutput) {
+        $staleLicenseOutputFullPath = [System.IO.Path]::GetFullPath($staleLicenseOutput)
+        $outputPrefix = $outputRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+        if (-not $staleLicenseOutputFullPath.StartsWith($outputPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Stale license key generator cleanup escaped the edition output root: $staleLicenseOutputFullPath"
+        }
+        Remove-Item -LiteralPath $staleLicenseOutputFullPath -Recurse -Force
+    }
 }
 
 foreach ($edition in @("Document", "Sales", "Full")) {

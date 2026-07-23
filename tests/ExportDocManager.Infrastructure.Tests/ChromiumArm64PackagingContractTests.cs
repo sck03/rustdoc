@@ -22,6 +22,14 @@ public sealed class ChromiumArm64PackagingContractTests
         Assert.Contains("ExportDocManager.Api/ExportDocManager.Api.csproj", provision);
         Assert.Contains("Microsoft.Playwright.dll", provision);
         Assert.Contains("install --with-deps chromium", provision);
+        Assert.Contains("Get-ValidatedStagedBrowser", provision);
+        Assert.Contains("chromium-arm64.manifest.json", provision);
+        Assert.Contains("Assert-ChildPath", provision);
+        Assert.Contains("Remove-RepositoryEntry -Path $buildRoot", provision);
+        Assert.Contains("Remove-RepositoryEntry -Path $cacheRoot", provision);
+        Assert.Contains("Expected exactly one Playwright Chromium ARM64 executable", provision);
+        Assert.Contains("Sort-Object FullName", provision);
+        Assert.DoesNotContain("Select-Object -First 1", provision);
         Assert.Contains("ChromiumArm64", bundle);
         Assert.Contains("verify-bundled-browser-pdf.ps1", reusableDesktop);
         Assert.Contains("verify-bundled-browser-pdf.ps1", reusableServer);

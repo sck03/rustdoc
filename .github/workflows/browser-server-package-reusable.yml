@@ -71,6 +71,14 @@ jobs:
       - name: Install Web dependencies
         run: npm ci --prefix apps/export-doc-web
 
+      - name: Provision and verify open-source report fonts
+        shell: pwsh
+        run: |
+          node scripts/provision-report-fonts.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/verify-font-license-policy.mjs --require-files
+          exit $LASTEXITCODE
+
       - name: Validate and apply requested version
         id: version
         shell: pwsh

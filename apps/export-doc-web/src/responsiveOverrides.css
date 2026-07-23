@@ -296,7 +296,7 @@
   }
 
   .maintenance-section-nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
   .exchange-currency-manager {
@@ -716,9 +716,66 @@
   }
 }
 
+@media (max-width: 680px) {
+  :where(.app-shell, .login-screen) :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    font-size: 16px !important;
+  }
+
+  .login-input-shell {
+    min-height: var(--edm-touch-target);
+    height: var(--edm-touch-target);
+  }
+
+  .app-shell :where(
+    .command-button,
+    .primary-button,
+    .secondary-button,
+    .icon-button,
+    .compact-icon-button,
+    .nav-group-button,
+    .nav-item,
+    .nav-rail-item,
+    .settings-category-item,
+    .master-data-tab,
+    .report-template-workspace-tabs button,
+    .segmented-control button,
+    .density-toggle-button
+  ) {
+    min-height: var(--edm-touch-target) !important;
+  }
+
+  .login-submit-button,
+  .login-connection-settings summary {
+    min-height: var(--edm-touch-target);
+  }
+
+  .report-template-mobile-selection {
+    display: block;
+    min-width: 0;
+    padding: 12px;
+    background: #ffffff;
+    border: 1px solid var(--edm-line);
+    border-radius: var(--edm-radius-md);
+    box-shadow: var(--edm-shadow-sm);
+  }
+
+  .report-template-mobile-selection .template-selection-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .report-template-sticky-header .segmented-control,
+  .report-template-sticky-header button[type="submit"] {
+    display: none;
+  }
+}
+
 @media (min-width: 861px) and (max-width: 1180px) {
   .maintenance-section-nav {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .maintenance-technical-nav {
+    grid-column: 1 / -1;
   }
 
   .single-window-tool-group,
@@ -752,6 +809,16 @@
 
   .report-template-sidebar {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .report-template-mobile-selection {
+    display: block;
+    min-width: 0;
+    padding: 12px;
+    background: #ffffff;
+    border: 1px solid var(--edm-line);
+    border-radius: var(--edm-radius-md);
+    box-shadow: var(--edm-shadow-sm);
   }
 
   .template-selection-panel {

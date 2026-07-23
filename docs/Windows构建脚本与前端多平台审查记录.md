@@ -1,9 +1,15 @@
 # Windows 构建脚本与前端多平台审查记录
 
-> 审查日期：2026-07-17  
+> 审查日期：2026-07-23
 > 范围：`scripts/` Windows 构建入口、构建缓存与临时目录、Tauri bundle 依赖发现、Web 动态视口和现有前端依赖。
 
 ## 1. 本轮结论
+
+### 2026-07-23 最终前端与模板验证补记
+
+- 前端生产构建 `2145 modules`，视觉基准 `80/80`，缩放/密度契约 `84/84`，无障碍、导航、字体许可和脚本全目录门禁均通过。
+- .NET Release 全方案 `570/570`、Rust `cargo fmt --check`、报表视觉 `9/9`、PDF 结构 `11/11`、打印像素 `11/11` 和报表基础设施定向测试 `11/11` 通过。
+- 报表 PDF viewer 像素测试需要完整 Chrome for Testing；当前工作区只携带 Headless Shell，故该项保持“未执行”，不把 Headless Shell 结果冒充完整 Chrome 验收。macOS/Linux、高 DPI 和真实移动浏览器继续由对应 runner/实机完成。
 
 - `build-windows-desktop-run.ps1`、`build-windows-editions.ps1`、`build-windows-installers.ps1` 默认在成功或失败后等待回车，不再依赖 Explorer 父进程识别。自动化使用 `-NoPause`，或设置 `EXPORTDOCMANAGER_NO_PAUSE=1`/`CI=true` 后自动退出。
 - 四个普通用户 `.cmd` 入口都缩减为 4 行，只声明对应 PowerShell 文件并转交 `scripts/lib/run-powershell-entry.cmd`。共享 CMD 统一发现 PowerShell、设置子脚本无暂停环境、透传用户参数、保留真实退出码并在普通双击场景执行 `pause`；即使 PowerShell 在脚本初始化早期失败，窗口也会保留。
@@ -77,7 +83,7 @@ pwsh -NoProfile -File ./scripts/verify-script-suite.ps1
 ## 4. 前端多平台与商业化审查
 
 - 当前生产依赖仍为 React、React Router、TanStack Query、Lucide、Three.js、html2canvas 和 jsPDF，均为免费开源库；本轮未新增依赖、云字体、在线 UI 服务或仅用于装饰的组件库。
-- 字体继续使用 Windows、macOS、Linux 平台原生字体回退，不下载远程字体。
+- 正式 PDF/打印使用构建期固定下载并校验 SHA-256 的 Noto CJK 开源字体，字体文件随程序位于 `Resources/Fonts/OpenSource`；系统字体只作为 UI/CSS 回退，不把微软雅黑、Segoe UI、宋体、Arial 或 SF Pro 复制进安装包。
 - 主要宽表使用内部滚动容器保留专业录入密度；普通业务表单在既有 `1180 / 860 / 560px` 断点下换列，销售工作区、设置页和维护页不要求桌面固定分辨率。
 - 本轮对 `app-shell`、侧栏、单一窗口锁定弹窗、生产企业档案、发票商品专注模式、报表预览、唛头编辑和商品库弹窗补充动态视口高度，降低移动浏览器和小型 WebView 中底部按钮被浏览器 UI 遮挡的风险。
 - 现有 Web 生产构建已按路由和大型能力拆分 chunk；Three.js、jsPDF 和 html2canvas 没有进入所有页面的主业务 chunk。
@@ -105,3 +111,12 @@ pwsh -NoProfile -File ./scripts/verify-script-suite.ps1
 | Windows 三版本便携构建编排 | 100% | 已完成带预置 `App_Data/logs` 的三版本完整覆盖构建；仍待用户机器运行与高 DPI 人工验收 |
 | Windows NSIS 安装器编排 | 95% | 当前没有现成 installer manifest，本轮完成预检与参数修复，仍待重新生成三安装包并执行签名/安装/卸载验收 |
 | 前端代码级多平台适配 | 98% | 仍待 Windows ARM64、Linux、macOS、移动浏览器和高 DPI 实机验收 |
+
+## 7. 2026-07-23 scripts 全目录复审增量
+
+- 复审范围从三个 Windows edition 目录扩展到所有发布、供给和验证脚本。单版便携构建现在也自动运行 package payload verifier；稳定资源与浏览器目标在复制前整体删除，不再依赖逐文件覆盖。
+- 三版未请求注册机时清理旧 `KEY`；安装器按请求 edition 清理旧版本 setup/manifest，并在每版 NSIS 复制到交付目录前执行 Desktop 载荷审计；客户载荷明确拒绝注册机、Playwright 开发 UI、未知字体、重复 ONNX 和错误浏览器平台。
+- 浏览器 PDF 验证工作目录从系统 TEMP 迁入 `.codex-runtime/browser-pdf-check/<guid>` 并自动回收。本机真实 PDF 输出通过，检查结束后无工作区 `chrome-headless-shell` 进程。
+- Linux ARM64 Chromium 只有在 manifest、架构、Playwright 版本、相对可执行路径和实际启动全部有效时才复用；否则清理 destination/build/cache 后重新供给，并要求本次 cache 中只有一个目标 Chromium。macOS x64 ONNX Runtime 下载使用 `.download` 原子替换，解压失败会清理损坏压缩包和半成品目录。
+- 本机个人注册机构建入口受既有私有文件忽略规则保护，不是公开仓库组成部分；独立首次/增量构建均已通过，输出位于 `artifacts/license-keygen/KEY`。公开脚本门禁在当前工作区检查 `24` 个 PS1、`6` 个 CMD、`64` 个 MJS，其中多出的 1 个 PS1/1 个 CMD 即本机忽略的私有入口；GitHub 提交候选仍不包含它们。
+- 最终本机验证：脚本语法/入口/系统路径总门禁通过；相关契约 `16/16`；全解决方案 `569/569`；真实浏览器 PDF 通过。三版便携在预置旧 Linux 浏览器、错误嵌套 Browsers、Playwright dashboard 字体、废弃模板和旧 `KEY` 后完成真实覆盖，最终每版 `778` 文件、3 个批准字体、唯一 `win64` 浏览器，全部探针和 `KEY` 清零。三版 NSIS 在预置 `0.0.0` 伪旧 setup/manifest 后完成真实构建，最终只保留三份 `0.1.1` 安装器，大小约 `310 MB/份`，应用标识与 SHA-256 均独立。验证结束后无工作区 `chrome-headless-shell` 进程。macOS/Linux 对应 runner 仍待执行。

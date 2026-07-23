@@ -9,7 +9,7 @@
   --edm-ink-950: #102322;
   --edm-ink-800: #263c3a;
   --edm-ink-600: #526866;
-  --edm-ink-500: #70827f;
+  --edm-ink-500: #607572;
   --edm-line: #d9e3e0;
   --edm-line-strong: #c5d3cf;
   --edm-canvas: #f3f7f5;
@@ -25,6 +25,26 @@
   --edm-radius-sm: 8px;
   --edm-radius-md: 12px;
   --edm-radius-lg: 16px;
+  --edm-font-size-xs: 12px;
+  --edm-font-size-sm: 13px;
+  --edm-font-size-md: 14px;
+  --edm-font-size-lg: 16px;
+  --edm-font-size-xl: 18px;
+  --edm-font-size-2xl: 23px;
+  --edm-line-height-tight: 1.25;
+  --edm-line-height-normal: 1.5;
+  --edm-line-height-relaxed: 1.65;
+  --edm-font-weight-regular: 400;
+  --edm-font-weight-medium: 600;
+  --edm-font-weight-semibold: 700;
+  --edm-font-weight-bold: 800;
+  --edm-control-height: 40px;
+  --edm-control-height-small: 36px;
+  --edm-touch-target: 44px;
+  --edm-page-padding-x: 26px;
+  --edm-page-padding-y: 20px;
+  --edm-section-padding: 17px;
+  --edm-layout-gap: 14px;
   color-scheme: light;
   color: var(--edm-ink-950);
   background: var(--edm-canvas);
@@ -35,12 +55,26 @@
 
 body {
   color: var(--edm-ink-950);
-  line-height: 1.45;
+  font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-normal);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background:
     radial-gradient(circle at 92% 4%, rgba(17, 155, 136, 0.08), transparent 26rem),
     var(--edm-canvas);
+}
+
+html[data-interface-density="compact"] {
+  --edm-control-height: 34px;
+  --edm-control-height-small: 30px;
+  --edm-page-padding-x: 18px;
+  --edm-page-padding-y: 14px;
+  --edm-section-padding: 12px;
+  --edm-layout-gap: 10px;
+}
+
+html[data-interface-density="compact"] body {
+  font-size: var(--edm-font-size-sm);
 }
 
 .supplier-assessment-analysis {
@@ -231,7 +265,7 @@ body {
 }
 
 :where(input, textarea)::placeholder {
-  color: #879794;
+  color: #657976;
   opacity: 1;
 }
 
@@ -310,7 +344,7 @@ body {
 
 .brand-copy small {
   color: rgba(224, 242, 237, 0.66);
-  font-size: 10px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 600;
   letter-spacing: 0.08em;
 }
@@ -483,7 +517,7 @@ body {
   margin: 1px 0 0;
   overflow: hidden;
   color: #536560;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -492,7 +526,7 @@ body {
 .eyebrow {
   margin-bottom: 2px;
   color: var(--edm-primary-700);
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 800;
   letter-spacing: 0.12em;
 }
@@ -509,6 +543,29 @@ h1 {
 
 .session-strip {
   gap: 10px;
+}
+
+.density-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 11px;
+  color: var(--edm-ink-600);
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid var(--edm-line);
+  border-radius: 999px;
+  box-shadow: var(--edm-shadow-sm);
+  font-size: var(--edm-font-size-xs);
+  font-weight: var(--edm-font-weight-semibold);
+  white-space: nowrap;
+}
+
+.density-toggle-button:hover:not(:disabled) {
+  color: var(--edm-primary-700);
+  background: var(--edm-primary-50);
+  border-color: #8fc7bc;
 }
 
 .service-status,
@@ -577,15 +634,15 @@ h1 {
 
 .session-user-copy small {
   color: var(--edm-ink-600);
-  font-size: 10px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 600;
 }
 
 .work-surface,
 .editor-surface,
 .dashboard-page {
-  gap: 14px;
-  padding: 20px 26px 26px;
+  gap: var(--edm-layout-gap);
+  padding: var(--edm-page-padding-y) var(--edm-page-padding-x) calc(var(--edm-page-padding-y) + 6px);
 }
 
 .form-section,
@@ -602,7 +659,7 @@ h1 {
 }
 
 .form-section {
-  padding: 17px;
+  padding: var(--edm-section-padding);
 }
 
 .section-header {
@@ -632,7 +689,7 @@ h1 {
 }
 
 .command-button {
-  min-height: 39px;
+  min-height: var(--edm-control-height);
   background: linear-gradient(135deg, var(--edm-primary-600), var(--edm-primary-700));
   border-color: var(--edm-primary-700);
   box-shadow: 0 5px 13px rgba(15, 127, 114, 0.17);
@@ -693,6 +750,11 @@ h1 {
   caret-color: var(--edm-primary-600);
 }
 
+.icon-button {
+  width: var(--edm-control-height);
+  height: var(--edm-control-height);
+}
+
 .app-shell input:not([type="checkbox"]):not([type="radio"]):focus,
 .app-shell select:focus,
 .app-shell textarea:focus,
@@ -738,6 +800,11 @@ th {
   background: #edf4f2;
   border-bottom-color: #d8e5e1;
   letter-spacing: 0.025em;
+}
+
+/* Table headings are labels, not numeric values. Keep every work-table header left aligned. */
+th.amount-cell {
+  text-align: left;
 }
 
 td {
@@ -1325,9 +1392,9 @@ tbody tr:hover {
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 15px 18px;
+  gap: var(--edm-layout-gap) calc(var(--edm-layout-gap) + 4px);
   align-content: start;
-  padding: 18px;
+  padding: var(--edm-section-padding);
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid var(--edm-line);
   border-radius: var(--edm-radius-md);
@@ -1379,7 +1446,7 @@ tbody tr:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
+  min-height: var(--edm-control-height);
   padding: 0 13px;
   border: 1px solid transparent;
   border-radius: 9px;
@@ -1598,7 +1665,7 @@ tbody tr:hover {
 
 .field-hint {
   color: var(--edm-ink-500);
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -1615,7 +1682,7 @@ tbody tr:hover {
 
 .sales-first-run-heading span {
   color: var(--edm-primary-700);
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 800;
   letter-spacing: 0.08em;
 }
@@ -1684,13 +1751,13 @@ tbody tr:hover {
   color: #ffffff;
   background: var(--edm-primary-600);
   border-radius: 50%;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
 }
 
 .sales-first-run-steps small {
   grid-column: 1;
   color: var(--edm-ink-500);
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
 }
 
 .sales-first-run-steps svg {
@@ -1804,6 +1871,47 @@ button.dashboard-metric {
 .workspace-content {
   min-width: 0;
   min-height: 0;
+}
+
+.about-font-license-grid {
+  margin-top: 4px;
+}
+
+.about-license-note {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  color: var(--edm-ink-600);
+  background: var(--edm-surface-muted);
+  border-left: 3px solid var(--edm-primary-500);
+  border-radius: var(--edm-radius-sm);
+  font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-relaxed);
+}
+
+html[data-interface-density="compact"] .workspace-header {
+  min-height: 68px;
+  padding: 10px var(--edm-page-padding-x);
+}
+
+html[data-interface-density="compact"] :where(
+  .command-button,
+  .primary-button,
+  .secondary-button,
+  .icon-button,
+  .density-toggle-button,
+  .service-status,
+  .session-user
+) {
+  min-height: var(--edm-control-height);
+}
+
+html[data-interface-density="compact"] :where(.form-section, .form-grid) {
+  padding: var(--edm-section-padding);
+}
+
+html[data-interface-density="compact"] :where(th, td) {
+  padding-top: 7px;
+  padding-bottom: 7px;
 }
 
 .workspace-connectivity-notice,
@@ -1930,7 +2038,7 @@ button.dashboard-metric {
   background: rgba(255, 255, 255, 0.045);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 999px;
-  font-size: 10px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
   letter-spacing: 0.025em;
 }
@@ -1977,7 +2085,7 @@ button.dashboard-metric {
   background: var(--edm-surface-muted);
   border: 1px solid var(--edm-line);
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 750;
 }
 
@@ -2292,13 +2400,39 @@ dialog::backdrop {
   .primary-button,
   .secondary-button,
   .task-view-tab {
-    min-height: 42px;
+    min-height: var(--edm-touch-target);
   }
 
   .icon-button,
   .compact-icon-button {
-    min-width: 40px;
-    min-height: 40px;
+    min-width: var(--edm-touch-target);
+    min-height: var(--edm-touch-target);
+  }
+
+  .app-shell :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    font-size: 16px;
+  }
+
+  .app-shell :where(
+    .nav-group-button,
+    .nav-item,
+    .nav-rail-item,
+    .settings-category-item,
+    .master-data-tab,
+    .report-template-workspace-tabs button,
+    .segmented-control button,
+    .density-toggle-button
+  ) {
+    min-height: var(--edm-touch-target);
+  }
+
+  .density-toggle-button {
+    min-width: var(--edm-touch-target);
+    padding: 0;
+  }
+
+  .density-toggle-button span {
+    display: none;
   }
 
   .table-frame,

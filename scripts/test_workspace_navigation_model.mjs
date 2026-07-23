@@ -20,7 +20,10 @@ const productEditionPath = path
 const permissionAccessPath = path
   .join(repoRoot, "apps", "export-doc-web", "src", "app", "PermissionAccessContext.tsx")
   .replaceAll("\\", "/");
-fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as product from ${JSON.stringify(productEditionPath)}; import * as permission from ${JSON.stringify(permissionAccessPath)}; globalThis.__model = model; globalThis.__product = product; globalThis.__permission = permission;`, "utf8");
+const workspaceDevicePath = path
+  .join(repoRoot, "apps", "export-doc-web", "src", "app", "workspaceDevice.ts")
+  .replaceAll("\\", "/");
+fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as product from ${JSON.stringify(productEditionPath)}; import * as permission from ${JSON.stringify(permissionAccessPath)}; import * as device from ${JSON.stringify(workspaceDevicePath)}; globalThis.__model = model; globalThis.__product = product; globalThis.__permission = permission; globalThis.__device = device;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -28,6 +31,7 @@ await import(pathToFileURL(bundle).href);
 const model = globalThis.__model;
 const product = globalThis.__product;
 const permission = globalThis.__permission;
+const device = globalThis.__device;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 assert(model.getWorkspaceContext("/invoices/12").title === "发票编辑", "invoice editor context");
 assert(model.getWorkspaceContext("/payments/new").title === "新建付款报销", "payment create context");
@@ -107,6 +111,13 @@ assert(model.getRequiredRouteAccessLevel("/single-window/acd/8") === "operate", 
 assert(model.getRequiredRouteAccessLevel("/invoices/8") === "view", "invoice detail route permits view");
 assert(product.getDefaultWorkspaceRoute({ enabledModules: financeModules }) === "/payments", "finance default route");
 assert(product.getDefaultWorkspaceRoute({ enabledModules: [] }) === "/access-denied", "empty permission template uses access denied route");
+assert(product.getProductEditionPresentation("Document").displayName === "外贸业务综合管理系统（单证员版）", "document edition brand name");
+assert(product.getProductEditionPresentation("Sales").displayName === "外贸业务综合管理系统（业务员版）", "sales edition brand name");
+assert(product.getProductEditionPresentation("Full").displayName === "外贸业务综合管理系统（全功能版）", "full edition brand name");
+assert(new Set(["Document", "Sales", "Full"].map((edition) => product.getProductEditionPresentation(edition).productName)).size === 1, "all editions share the same product brand");
+assert(device.getWorkspaceDeviceCapabilities("phone").canUseDenseWorkbench === false, "phone blocks dense workbench");
+assert(device.getWorkspaceDeviceCapabilities("tablet").canImportExport === false, "tablet blocks full import and export");
+assert(device.getWorkspaceDeviceCapabilities("desktop").canUseBatchOperations === true, "desktop enables batch operations");
 assert(permission.hasModulePermission([{ moduleKey: "document.payments", accessLevel: "view" }], "document.payments", "view"), "view grant permits view");
 assert(!permission.hasModulePermission([{ moduleKey: "document.payments", accessLevel: "view" }], "document.payments", "operate"), "view grant blocks operate");
 assert(permission.hasModulePermission([{ moduleKey: "document.reports", accessLevel: "manage" }], "document.reports", "manage"), "manage grant permits report design");

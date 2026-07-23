@@ -1,7 +1,7 @@
 /* Invoice details, payments, settings and remaining business feature styles. */
 .invoice-custom-fields-json textarea {
   min-height: 132px;
-  font-family: "Consolas", "SFMono-Regular", "Microsoft YaHei UI", monospace;
+  font-family: var(--edm-font-mono);
   line-height: 1.5;
 }
 
@@ -140,7 +140,7 @@
   min-width: 0;
   overflow: hidden;
   color: #58616a;
-  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-family: var(--edm-font-mono);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -267,7 +267,7 @@
 
 .settings-path-input {
   min-width: 0;
-  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-family: var(--edm-font-mono);
   font-size: 12px;
 }
 
@@ -1026,10 +1026,40 @@
 
 .maintenance-section-nav {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(250px, 1.2fr);
   gap: 10px;
   min-width: 0;
 }
+
+.maintenance-technical-nav {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #d9e2e7;
+  border-radius: 10px;
+  background: #f8fbfb;
+}
+
+.maintenance-technical-nav > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 5px 6px;
+  color: #42515f;
+  cursor: pointer;
+  list-style: none;
+}
+
+.maintenance-technical-nav > summary::-webkit-details-marker { display: none; }
+.maintenance-technical-nav > summary::after { margin-left: auto; content: "＋"; color: #607572; }
+.maintenance-technical-nav[open] > summary::after { content: "－"; }
+.maintenance-technical-nav > summary > span { display: grid; gap: 2px; min-width: 0; }
+.maintenance-technical-nav > summary strong,
+.maintenance-technical-nav > summary small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.maintenance-technical-nav > summary strong { font-size: 13px; }
+.maintenance-technical-nav > summary small { color: #607572; font-size: var(--edm-font-size-xs); }
+.maintenance-technical-nav-items { display: grid; gap: 8px; padding-top: 8px; }
+.maintenance-technical-nav-items .maintenance-section-tab { min-height: 54px; }
 
 .maintenance-section-tab {
   display: flex;
@@ -1073,8 +1103,8 @@
 }
 
 .maintenance-section-tab small {
-  color: #71808a;
-  font-size: 11px;
+  color: #607572;
+  font-size: var(--edm-font-size-xs);
   font-weight: 600;
 }
 
@@ -1110,7 +1140,7 @@
 }
 
 .maintenance-advanced-details small {
-  color: #71808a;
+  color: #607572;
   font-size: 12px;
   font-weight: 500;
 }
@@ -1291,7 +1321,7 @@
 }
 
 .batch-export-path-input {
-  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-family: var(--edm-font-mono);
   font-size: 12px;
 }
 
@@ -1453,8 +1483,8 @@
 }
 
 .identity-management-tab small {
-  color: #7a878d;
-  font-size: 11px;
+  color: #607572;
+  font-size: var(--edm-font-size-xs);
 }
 
 .user-management-layout {
@@ -1482,8 +1512,8 @@
 }
 
 .field-help {
-  color: #7a878d;
-  font-size: 11px;
+  color: #607572;
+  font-size: var(--edm-font-size-xs);
   font-weight: 400;
   line-height: 1.45;
 }
@@ -1634,7 +1664,7 @@
 
 .permission-template-count small {
   color: #78868c;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   font-weight: 400;
 }
 
@@ -1662,7 +1692,7 @@
 
 .permission-level-guide span {
   color: #71807f;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   line-height: 1.45;
 }
 
@@ -1715,7 +1745,7 @@
 .permission-module-row small {
   overflow: hidden;
   color: #7b8790;
-  font-size: 11px;
+  font-size: var(--edm-font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1758,7 +1788,7 @@
 }
 
 .permission-advanced-details small {
-  color: #7a878d;
+  color: #607572;
 }
 
 .permission-fieldset {

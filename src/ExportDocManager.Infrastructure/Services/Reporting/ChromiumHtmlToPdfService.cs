@@ -96,7 +96,7 @@ namespace ExportDocManager.Services.Reporting
 
         public string ResolveRendererExecutablePath() => _executableResolver.Resolve();
 
-        private static string PrepareHtml(string html, HtmlToPdfRenderOptions options)
+        private string PrepareHtml(string html, HtmlToPdfRenderOptions options)
         {
             string content = html ?? string.Empty;
             if (string.IsNullOrWhiteSpace(content))
@@ -137,7 +137,40 @@ namespace ExportDocManager.Services.Reporting
                 }
             }
 
+            content = InsertHeadContent(content, ReportFontPolicy.BuildHtmlStyle(_pathProvider));
+
             return content;
+        }
+
+        private static string InsertHeadContent(string content, string headContent)
+        {
+            int headCloseIndex = content.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+            if (headCloseIndex >= 0)
+            {
+                return content.Insert(headCloseIndex, headContent);
+            }
+
+            int headIndex = content.IndexOf("<head", StringComparison.OrdinalIgnoreCase);
+            if (headIndex >= 0)
+            {
+                int headEnd = content.IndexOf('>', headIndex);
+                if (headEnd >= 0)
+                {
+                    return content.Insert(headEnd + 1, headContent);
+                }
+            }
+
+            int htmlIndex = content.IndexOf("<html", StringComparison.OrdinalIgnoreCase);
+            if (htmlIndex >= 0)
+            {
+                int htmlEnd = content.IndexOf('>', htmlIndex);
+                if (htmlEnd >= 0)
+                {
+                    return content.Insert(htmlEnd + 1, $"<head>{headContent}</head>");
+                }
+            }
+
+            return $"<!doctype html><html><head>{headContent}</head><body>{content}</body></html>";
         }
 
         private async Task RunChromiumAsync(

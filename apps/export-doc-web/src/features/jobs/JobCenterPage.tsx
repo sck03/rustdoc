@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { type ApiReportTemplateDto, type BackgroundJobSnapshot, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
 import {
   isDesktopBridgeAvailable,
   selectPdfFiles,
@@ -16,6 +17,7 @@ import { SelectField } from "../../ui/FormFields.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
+import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { listPageSizeOptions, loadListViewState, normalizeListPageSize, saveListViewState } from "../../ui/listViewState.ts";
 import { PathField, PathTextAreaField } from "../../ui/PathField.tsx";
 import { formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
@@ -39,6 +41,8 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   const jobPermission = useModulePermission("document.jobs");
   const reportPermission = useModulePermission("document.reports");
   const invoiceReportPermission = useModulePermission("document.invoice-reports");
+  const workspaceDeviceMode = useWorkspaceDeviceMode();
+  const workspaceDeviceCapabilities = getWorkspaceDeviceCapabilities(workspaceDeviceMode);
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = normalizeJobId(searchParams.get("jobId"));
@@ -50,7 +54,10 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   const [pageSize, setPageSize] = useState(initialListViewState.pageSize);
   const desktopAvailable = isDesktopBridgeAvailable();
   const canCreateInvoiceReportZip =
-    jobPermission.canOperate && reportPermission.canView && invoiceReportPermission.canOperate;
+    workspaceDeviceCapabilities.canImportExport
+    && jobPermission.canOperate
+    && reportPermission.canView
+    && invoiceReportPermission.canOperate;
 
   const jobsQuery = useQuery({
     queryKey: queryKeys.jobs(pageNumber, pageSize, committedKeyword.trim(), status),
@@ -74,7 +81,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
     queryFn: () => client.getSettings(),
-    enabled: jobPermission.canOperate,
+    enabled: jobPermission.canOperate && workspaceDeviceCapabilities.canImportExport,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -185,7 +192,12 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
       {!jobPermission.canOperate ? (
         <PermissionNotice>当前权限模板仅允许查看任务；新建、取消和重试已禁用，删除与批量清理需要管理权限。</PermissionNotice>
       ) : null}
-      {jobPermission.canOperate ? <section className="job-create-panel" aria-label="新建任务">
+      <WorkspaceDeviceNotice
+        mode={workspaceDeviceMode}
+        phone="可查看任务进度、处理失败任务和接收提醒；批量报表、PDF 合并、清理及文件导入导出请使用桌面端。"
+        tablet="可查看任务进度并处理单个失败任务；批量报表、PDF 合并、清理及文件导入导出请使用桌面端。"
+      />
+      {jobPermission.canOperate && workspaceDeviceCapabilities.canImportExport ? <section className="job-create-panel" aria-label="新建任务">
         {canCreateInvoiceReportZip ? <details>
           <summary>
             <span>批量报表 ZIP</span>
@@ -250,7 +262,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
           <FilterSelect label="状态" value={status} options={jobStatusOptions} onChange={changeStatus} />
         </div>
         <div className="toolbar-actions">
-          <button
+          {workspaceDeviceCapabilities.canUseBatchOperations ? <button
             className="command-button secondary"
             type="button"
             title="清理已完成、失败、已取消的任务记录"
@@ -259,7 +271,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
           >
             <Trash2 size={17} aria-hidden="true" />
             <span>清理已结束</span>
-          </button>
+          </button> : null}
           <button
             className="icon-button"
             type="button"
@@ -286,6 +298,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
         hasError={Boolean(errorMessage)}
         canOperate={jobPermission.canOperate}
         canManage={jobPermission.canManage}
+        canDownload={workspaceDeviceCapabilities.canImportExport}
         onMessage={operations.handleChildMessage}
         onCancel={(job) => void operations.handleCancelJob(job)}
         onRetry={(jobId) => operations.retryMutation.mutate(jobId)}
@@ -550,6 +563,7 @@ function JobTable({
   hasError,
   canOperate,
   canManage,
+  canDownload,
   onMessage,
   onCancel,
   onRetry,
@@ -563,6 +577,7 @@ function JobTable({
   hasError: boolean;
   canOperate: boolean;
   canManage: boolean;
+  canDownload: boolean;
   onMessage: (message: string | null) => void;
   onCancel: (job: BackgroundJobSnapshot) => void;
   onRetry: (jobId: string) => void;
@@ -578,7 +593,7 @@ function JobTable({
             <th>任务</th>
             <th>类型</th>
             <th>状态</th>
-            <th className="amount-cell">进度</th>
+            <th>进度</th>
             <th>消息</th>
             <th>输出</th>
             <th>创建</th>
@@ -620,7 +635,7 @@ function JobTable({
                   <div className="table-path-cell job-output-path-cell">
                     <span>{desktopAvailable ? (job.outputPath || "-") : (job.outputPath ? fileNameFromPath(job.outputPath) : "-")}</span>
                     {desktopAvailable && job.outputPath?.trim() ? renderOpenPathAction(job.outputPath, "打开任务输出", onMessage) : null}
-                    {!desktopAvailable && job.status.toLowerCase() === "succeeded" && job.outputPath ? (
+                    {canDownload && !desktopAvailable && job.status.toLowerCase() === "succeeded" && job.outputPath ? (
                       <button className="icon-button compact-icon-button" type="button" title="下载任务结果" aria-label="下载任务结果" onClick={() => onDownload(job)}>
                         <Download size={16} aria-hidden="true" />
                       </button>

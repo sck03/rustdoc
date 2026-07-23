@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <style>
     body {
-        font-family: 'SimSun', '宋体', serif;
+        font-family: var(--edm-report-font-serif, "Noto Serif CJK SC", "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
         font-size: 12px;
         margin: 0;
         padding: 15px;
@@ -14,14 +14,14 @@
         padding-right: 45px;
     }
     .company-title {
-        font-family: 'SimHei', '黑体', sans-serif;
+        font-family: var(--edm-report-font-sans, "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei UI", sans-serif);
         font-size: 26px;
         font-weight: bold;
         text-align: center;
         margin-bottom: 5px;
     }
     .sub-title {
-        font-family: 'SimHei', '黑体', sans-serif;
+        font-family: var(--edm-report-font-sans, "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei UI", sans-serif);
         font-size: 18px;
         text-align: center;
         margin-bottom: 15px;
@@ -123,7 +123,7 @@
     }
 </style>
 </head>
-<body>
+<body data-edm-report-font="serif">
 
 <div class="wrapper">
     <div class="company-title">{{ Payment.PayerName }}</div>
@@ -209,4 +209,3 @@
 
 </body>
 </html>
-

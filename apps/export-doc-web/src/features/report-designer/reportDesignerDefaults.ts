@@ -6,6 +6,10 @@ import type {
   ReportTextStyle,
 } from "./reportDesignerSchema.ts";
 import { createGridBlock } from "./reportDesignerMutations.ts";
+import {
+  portableReportSansFontFamily,
+  portableReportSerifFontFamily,
+} from "../../app/typographyPolicy.ts";
 
 const baseTextStyle: ReportTextStyle = {
   fontSizePt: 10,
@@ -51,7 +55,7 @@ function createExportInvoiceSchema(): ReportDesignerSchema {
       marginRightMm: 8,
       marginBottomMm: 8,
       marginLeftMm: 8,
-      fontFamily: "Microsoft YaHei, SimSun, Arial, sans-serif",
+      fontFamily: portableReportSansFontFamily,
       fontSizePt: 9,
     },
     sections: [
@@ -201,7 +205,7 @@ function createPaymentVoucherSchema(): ReportDesignerSchema {
       marginRightMm: 14,
       marginBottomMm: 16,
       marginLeftMm: 14,
-      fontFamily: "Arial, sans-serif",
+      fontFamily: portableReportSerifFontFamily,
       fontSizePt: 10,
     },
     sections: [

@@ -78,7 +78,7 @@
 
   .responsive-table-frame[data-mobile-layout="cards"] tbody td::before {
     color: var(--edm-ink-500);
-    font-size: 11px;
+    font-size: var(--edm-font-size-xs);
     font-weight: 750;
     content: attr(data-label);
   }
@@ -106,7 +106,7 @@
 .concurrency-conflict-notice small { color: #806b3c; }
 
 @media (max-width: 680px) {
-  .concurrency-conflict-notice { grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+  .concurrency-conflict-notice { grid-template-columns: auto minmax(0, 1fr); gap: 8px; padding: 10px 12px; align-items: start; }
   .concurrency-conflict-notice .command-button { grid-column: 1 / -1; width: 100%; justify-content: center; }
 }
 .inline-notice {
@@ -131,6 +131,19 @@
 .inline-notice-content strong { color: currentColor; font-size: 13px; font-weight: 800; }
 .inline-notice-message { min-width: 0; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
 .inline-notice-action { align-self: center; }
+
+.workspace-device-notice {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.workspace-device-notice .inline-notice-message,
+.workspace-device-notice .inline-notice-content {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
 @media (max-width: 560px) {
   .inline-notice { grid-template-columns: auto minmax(0, 1fr); }

@@ -119,11 +119,25 @@ if (Test-Path -LiteralPath $manifestPath -PathType Leaf) {
 
 foreach ($edition in $Editions) {
     $metadata = switch ($edition) {
-        "Document" { @{ displayName = "出口单证管理系统（单证员版）"; identifier = "com.exportdocmanager.desktop.document" } }
-        "Sales" { @{ displayName = "出口单证管理系统（业务员版）"; identifier = "com.exportdocmanager.desktop.sales" } }
-        default { @{ displayName = "出口单证管理系统（全功能版）"; identifier = "com.exportdocmanager.desktop.full" } }
+        "Document" { @{ displayName = "外贸业务综合管理系统（单证员版）"; identifier = "com.exportdocmanager.desktop.document" } }
+        "Sales" { @{ displayName = "外贸业务综合管理系统（业务员版）"; identifier = "com.exportdocmanager.desktop.sales" } }
+        default { @{ displayName = "外贸业务综合管理系统（全功能版）"; identifier = "com.exportdocmanager.desktop.full" } }
     }
     $configPath = Join-Path $configRoot ("tauri.{0}.conf.json" -f $edition.ToLowerInvariant())
+
+    # A requested edition replaces all of its previous versioned installers.
+    # Editions that were not requested remain available and stay in the merged
+    # manifest above.
+    foreach ($staleInstaller in @(Get-ChildItem -LiteralPath $outputRoot -File -Filter "ExportDocManager-$edition-*-win-x64-setup.exe" -ErrorAction SilentlyContinue)) {
+        $verifiedInstallerPath = Assert-Inside -Path $staleInstaller.FullName -Root $outputRoot -Purpose "stale $edition installer"
+        Remove-Item -LiteralPath $verifiedInstallerPath -Force
+    }
+    $staleEditionManifestPath = Join-Path $outputRoot "product-edition-$edition.json"
+    if (Test-Path -LiteralPath $staleEditionManifestPath) {
+        $verifiedEditionManifestPath = Assert-Inside -Path $staleEditionManifestPath -Root $outputRoot -Purpose "stale $edition manifest"
+        Remove-Item -LiteralPath $verifiedEditionManifestPath -Force
+    }
+
     [ordered]@{
         productName = $metadata.displayName
         identifier = $metadata.identifier
@@ -157,6 +171,14 @@ foreach ($edition in $Editions) {
 
     $startedAt = Get-Date
     Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments $arguments
+
+    Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments @(
+        "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $scriptRoot "verify-package-payload.ps1"),
+        "-PackageRoot", (Join-Path $artifactsRoot "tauri-bundle\resources"),
+        "-Profile", "Desktop",
+        "-RuntimeIdentifier", "win-x64"
+    )
 
     $installers = @(Get-ChildItem -LiteralPath $bundleRoot -Filter "*-setup.exe" -File)
     if ($installers.Count -ne 1) {

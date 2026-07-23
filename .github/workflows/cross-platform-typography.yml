@@ -1,0 +1,172 @@
+name: Cross-platform typography and report validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "Resources/Fonts/**"
+      - "Templates/**"
+      - "apps/export-doc-web/src/**"
+      - "scripts/provision-report-fonts.mjs"
+      - "scripts/verify-font-license-policy.mjs"
+      - "scripts/compare-report-pdf-metrics.mjs"
+      - "scripts/extract-report-pdf-layout.py"
+      - "scripts/report-layout-requirements.txt"
+      - "src/ExportDocManager.Infrastructure/Services/Reporting/**"
+      - "tests/ExportDocManager.Infrastructure.Tests/ReportHtmlServiceInfrastructureTests.cs"
+      - ".github/workflows/cross-platform-typography.yml"
+  pull_request:
+    paths:
+      - "Resources/Fonts/**"
+      - "Templates/**"
+      - "apps/export-doc-web/src/**"
+      - "scripts/provision-report-fonts.mjs"
+      - "scripts/verify-font-license-policy.mjs"
+      - "scripts/compare-report-pdf-metrics.mjs"
+      - "scripts/extract-report-pdf-layout.py"
+      - "scripts/report-layout-requirements.txt"
+      - "src/ExportDocManager.Infrastructure/Services/Reporting/**"
+      - "tests/ExportDocManager.Infrastructure.Tests/ReportHtmlServiceInfrastructureTests.cs"
+      - ".github/workflows/cross-platform-typography.yml"
+
+concurrency:
+  group: cross-platform-typography-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  render-reports:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows 125% / 150% font contract
+            os: windows-latest
+            slug: windows-x64
+            scale_profiles: windows-125,windows-150,windows-4k,mobile-safari-contract
+          - name: macOS Retina font contract
+            os: macos-latest
+            slug: macos-native
+            scale_profiles: macos-retina,mobile-safari-contract
+          - name: Linux font contract
+            os: ubuntu-latest
+            slug: linux-x64
+            scale_profiles: linux-100,mobile-safari-contract
+
+    runs-on: ${{ matrix.os }}
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}/.codex-runtime/nuget-packages
+      EXPORTDOCMANAGER_RETAIN_REPORT_TEST_ARTIFACTS: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Linux Chromium runtime libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2t64 libatk-bridge2.0-0 libatk1.0-0 libcups2 libdrm2 libgbm1 libgtk-3-0 libnss3 libx11-xcb1 libxcomposite1 libxdamage1 libxfixes3 libxrandr2
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+
+      - name: Set up Python for PDF layout evidence
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install PDF layout test dependency
+        run: python -m pip install --disable-pip-version-check -r scripts/report-layout-requirements.txt
+
+      - name: Provision pinned report fonts
+        shell: pwsh
+        run: |
+          node scripts/provision-report-fonts.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/verify-font-license-policy.mjs --require-files
+          exit $LASTEXITCODE
+
+      - name: Provision Chrome Headless Shell
+        shell: pwsh
+        run: ./scripts/provision-chrome-for-testing.ps1 -Product ChromeHeadlessShell
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix apps/export-doc-web
+
+      - name: Validate density, scaling and native font rendering
+        env:
+          EXPORTDOCMANAGER_SCALE_PROFILE_FILTER: ${{ matrix.scale_profiles }}
+        run: npm --prefix apps/export-doc-web run test:scale-contracts
+
+      - name: Upload frontend scale evidence
+        uses: actions/upload-artifact@v5
+        with:
+          name: frontend-scale-${{ matrix.slug }}
+          path: artifacts/frontend-scale-contracts
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Restore report test project
+        run: dotnet restore tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj --configfile NuGet.Config
+
+      - name: Render long multilingual built-in reports to PDF
+        run: >-
+          dotnet test tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj
+          -c Release
+          -m:1
+          -p:BuildInParallel=false
+          --no-restore
+          --filter "FullyQualifiedName~RenderBuiltInProgramTemplatesToPdf|FullyQualifiedName~RenderBuiltInProgramTemplatesWithMultiItemBusinessDataToPdf"
+
+      - name: Verify PDF wrapping and reject overlapping text
+        run: python scripts/extract-report-pdf-layout.py .codex-runtime/ExportDocManager.Infrastructure.Tests
+
+      - name: Upload rendered PDFs and metrics
+        uses: actions/upload-artifact@v5
+        with:
+          name: cross-platform-report-${{ matrix.slug }}
+          path: |
+            .codex-runtime/ExportDocManager.Infrastructure.Tests/**/RenderedPdfs/*.pdf
+            .codex-runtime/ExportDocManager.Infrastructure.Tests/**/RenderedPdfs/*.metrics.json
+            .codex-runtime/ExportDocManager.Infrastructure.Tests/**/RenderedPdfs/*.layout.json
+          if-no-files-found: error
+          retention-days: 14
+
+  compare-platforms:
+    name: Compare pagination and wrapping metrics
+    needs: render-reports
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download platform report artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: cross-platform-report-*
+          path: artifacts/cross-platform-report-metrics
+
+      - name: Compare report metrics
+        env:
+          EXPORTDOCMANAGER_EXPECTED_REPORT_PLATFORMS: 3
+        run: node scripts/compare-report-pdf-metrics.mjs artifacts/cross-platform-report-metrics
+
+      - name: Upload comparison summary
+        uses: actions/upload-artifact@v5
+        with:
+          name: cross-platform-report-comparison
+          path: artifacts/cross-platform-report-metrics/cross-platform-report-summary.json
+          if-no-files-found: error
+          retention-days: 30

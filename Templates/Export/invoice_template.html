@@ -7,7 +7,7 @@
 			size: A4 portrait; /* 纵向 */
 			margin: 1cm;
 		}
-        body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }
+        body { font-family: var(--edm-report-font-sans, "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", Arial, sans-serif); font-size: 12px; margin: 20px; }
         .print-page { position: relative; min-height: 250mm; padding-bottom: 45px; box-sizing: border-box; }
         .page-break { page-break-before: always; }
         .header {
@@ -157,7 +157,7 @@
        
     </style>
 </head>
-<body>
+<body data-edm-report-font="sans">
     {{ $items_per_page = 12 }}
     {{ $total_pages = (items.size / $items_per_page) | math.ceil }}
     
@@ -263,8 +263,8 @@
                             {{ end }}
                         </span>
                         <span class="item-details">
-                            <span>{{ $item.Cartons | math.format 'G29' }}{{ $item.CtnUnitEN }}</span>
-                            <span>{{ $item.Quantity | math.format 'G29' }}{{ $item.UnitEN }}</span>
+                            {{ if $item.Cartons > 0 }}<span>{{ $item.Cartons | math.format 'G29' }}{{ $item.CtnUnitEN }}</span>{{ end }}
+                            {{ if $item.Quantity > 0 }}<span>{{ $item.Quantity | math.format 'G29' }}{{ $item.UnitEN }}</span>{{ end }}
                             <span>@{{ Invoice.Currency }}{{ $item.UnitPrice | math.format 'G29' }}</span>
                         </span>
                     </span>
@@ -278,11 +278,11 @@
                 <td colspan="2">
                     TOTAL: 
                     {{ for $kvp in total_by_ctn_unit }}
-                        {{ if !for.first }};{{ end }}{{ $kvp.value | math.format 'G29' }}{{ $kvp.key }}
+                        {{ if !for.first }};{{ end }}{{ $kvp.Value | math.format 'G29' }}{{ $kvp.Key }}
                     {{ end }}
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                     {{ for $kvp in total_by_qty_unit }}
-                        {{ if !for.first }};{{ end }}{{ $kvp.value | math.format 'G29' }}{{ $kvp.key }}
+                        {{ if !for.first }};{{ end }}{{ $kvp.Value | math.format 'G29' }}{{ $kvp.Key }}
                     {{ end }}
                 </td>
                 <td>{{ Invoice.Currency }}{{ Invoice.TotalAmount | math.format 'F2' }}</td>

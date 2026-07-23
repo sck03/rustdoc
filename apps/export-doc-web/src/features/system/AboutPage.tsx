@@ -5,8 +5,15 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import type { ProductEditionPresentation } from "../../app/productEdition.ts";
 
-export function AboutPage({ client }: { client: ExportDocManagerApiClient }) {
+export function AboutPage({
+  client,
+  product,
+}: {
+  client: ExportDocManagerApiClient;
+  product: ProductEditionPresentation;
+}) {
   const healthQuery = useQuery({
     queryKey: queryKeys.health(),
     queryFn: () => client.getHealth(),
@@ -26,8 +33,8 @@ export function AboutPage({ client }: { client: ExportDocManagerApiClient }) {
     <section className="work-surface about-surface" aria-label="关于">
       <div className="toolbar about-toolbar">
         <div className="toolbar-summary">
-          <strong>出口单证管理系统</strong>
-          <span>{isDesktopRuntime ? "本地优先桌面工作区" : "局域网与容器协同工作区"}</span>
+          <strong>{product.displayName}</strong>
+          <span>{product.loginTagline} · {isDesktopRuntime ? "本地优先桌面工作区" : "局域网与容器协同工作区"}</span>
         </div>
         <div className="toolbar-actions">
           <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={refresh}>
@@ -47,7 +54,8 @@ export function AboutPage({ client }: { client: ExportDocManagerApiClient }) {
           <Info size={18} aria-hidden="true" />
         </div>
         <div className="detail-grid about-detail-grid">
-          <DetailItem label="产品" value="出口单证管理系统" />
+          <DetailItem label="产品" value={product.displayName} />
+          <DetailItem label="版本形态" value={product.editionName} />
           <DetailItem label="版本" value={productVersionText} />
           <DetailItem label="API 版本" value={formatVersion(health?.informationalVersion || health?.productVersion)} />
           <DetailItem label="形态" value={isDesktopRuntime ? "绿色便携桌面版" : "局域网 / 容器 Web 版"} />
@@ -70,6 +78,24 @@ export function AboutPage({ client }: { client: ExportDocManagerApiClient }) {
           <DetailItem label="数据库模式" value={health?.databaseProvider || "-"} />
           <DetailItem label="浏览器环境" value={readBrowserRuntimeText()} />
         </div>
+      </section>
+
+      <section className="form-section" aria-label="字体与第三方许可">
+        <div className="section-header">
+          <div>
+            <h2>字体与第三方许可</h2>
+            <span>正式报表采用可随软件分发的开源字体</span>
+          </div>
+        </div>
+        <div className="detail-grid about-font-license-grid">
+          <DetailItem label="PDF / 打印无衬线字体" value="Noto Sans CJK SC" />
+          <DetailItem label="中文正式单据衬线字体" value="Noto Serif CJK SC" />
+          <DetailItem label="字体许可证" value="SIL Open Font License 1.1" />
+          <DetailItem label="许可证文件" value="Resources/Fonts/OpenSource/OFL-Noto-CJK.txt" wide />
+        </div>
+        <p className="about-license-note">
+          微软雅黑、Segoe UI、宋体、Arial、SF Pro、PingFang 等仅可作为操作系统已有字体的回退名称；程序安装包不会复制或分发这些专有字体文件。
+        </p>
       </section>
     </section>
   );

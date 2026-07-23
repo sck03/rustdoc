@@ -109,10 +109,10 @@ export async function evaluate(page, expression, returnByValue, contextId = unde
   return result.result ?? {};
 }
 
-export async function captureScreenshot(page, screenshotPath) {
+export async function captureScreenshot(page, screenshotPath, { captureBeyondViewport = true } = {}) {
   const result = await page.send("Page.captureScreenshot", {
     format: "png",
-    captureBeyondViewport: true,
+    captureBeyondViewport,
   });
 
   if (!result.data) {

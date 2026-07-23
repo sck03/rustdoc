@@ -10,7 +10,7 @@
             size: A4 landscape; /* 横向 */
             margin: 1cm;
         }
-        body { margin: 0; font-family: "Times New Roman", serif; color: black; }
+        body { margin: 0; font-family: var(--edm-report-font-serif, "Noto Serif CJK SC", "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, "Times New Roman", serif); color: black; }
         .customs-page { position: relative; }
         table {
             border-collapse: separate; /* 使用 separate，避免边框合并 */
@@ -38,7 +38,7 @@
         .middle { vertical-align: middle; }
         .normal-wrap { white-space: normal; }
         .header { font-size: 13pt; }
-        .subheader { font-size: 9pt; font-family: 宋体; }
+        .subheader { font-size: 9pt; font-family: var(--edm-report-font-serif, "Noto Serif CJK SC", "Songti SC", SimSun, serif); }
         .small { font-size: 8pt; }
         .no-inner-vertical { border-left: none; border-right: none; }
         .outer-bordered td { 
@@ -73,10 +73,31 @@
         }
         .商品-row td {
             text-align: center;
-
+            line-height: 1.18;
             border-bottom: 0.5pt solid black;			
             border-left: none; /* 移除商品项的内部竖边框 */
             border-right: none; /* 移除商品项的内部竖边框 */
+        }
+        .customs-item-description {
+            text-align: left !important;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .customs-item-attributes {
+            display: inline;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .customs-item-number {
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+        .customs-item-country {
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
         /* 为商品项部分的最左边和最右边添加竖边框 */
         .商品-row td:first-child {
@@ -87,7 +108,7 @@
         }
         .商品-row-first td { border-bottom: none; } /* 第一行无底部边框 */
         .商品-row-second td { border-top: none; } /* 第二行无顶部边框 */
-        .page-number { position: absolute; top: 0; right: 10pt; font-size: 9pt; font-family: 宋体; font-weight: 700; }
+        .page-number { position: absolute; top: 0; right: 10pt; font-size: 9pt; font-family: var(--edm-report-font-serif, "Noto Serif CJK SC", "Songti SC", SimSun, serif); font-weight: 700; }
         col { width: auto; }
         tr { height: auto; }
         @media print {
@@ -173,7 +194,7 @@
         }
     </style>
 </head>
-<body link="blue" vlink="purple">
+<body data-edm-report-font="serif" link="blue" vlink="purple">
     <div class="content-wrapper">
         {{ $customs_total_pages = 1 }}
         {{ if items.size > 6 }}
@@ -290,20 +311,20 @@
             <tr style="height: 12pt" class="商品-row 商品-row-first">
                 <td>{{ for.index + 1 }}</td>
                 <td colspan="2">{{ item.HSCode }}</td>
-                <td colspan="4">{{ item.StyleName }}</td>
-                <td>{{ item.Quantity }}{{ item.UnitCN }}</td>
-                <td colspan="2">{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'F2' }} </td>
+                <td colspan="4" class="customs-item-description">{{ if item.StyleNameCN && item.StyleNameCN != "" }}{{ item.StyleNameCN }}{{ else }}{{ item.StyleName }}{{ end }}</td>
+                <td class="customs-item-number">{{ item.Quantity }}{{ item.UnitCN }}</td>
+                <td colspan="2" class="customs-item-number">{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'F2' }} </td>
                 <td>中国</td>
-                <td colspan="2">{{ Invoice.DestinationCountry }}</td>
-                <td>{{ item.Origin }}</td>
+                <td colspan="2" class="customs-item-country">{{ Invoice.DestinationCountry }}</td>
+                <td class="customs-item-country">{{ item.Origin }}</td>
                 <td></td>
             </tr>
             <tr style="height: 12pt" class="商品-row 商品-row-second">
                 <td></td>
                 <td colspan="2"></td>
-                <td colspan="4" class="normal-wrap">{{ item.FabricComposition }}&nbsp;品牌:{{ item.Brand ? ' ' + item.Brand : '' }}</td>
-                <td>{{ item.NWTotal | math.format 'F2' }}千克</td>
-                <td colspan="2">{{ Invoice.Currency }}{{ item.TotalPrice | math.format 'F2' }}</td>
+                <td colspan="4" class="customs-item-description"><span class="customs-item-attributes">{{ item.FabricComposition }}{{ if item.Brand && item.Brand != "" }} 品牌: {{ item.Brand }}{{ end }}</span></td>
+                <td class="customs-item-number">{{ item.NWTotal | math.format 'F2' }}千克</td>
+                <td colspan="2" class="customs-item-number">{{ Invoice.Currency }}{{ item.TotalPrice | math.format 'F2' }}</td>
                 <td></td>
                 <td colspan="2"></td>
                 <td></td>
@@ -383,20 +404,20 @@
             <tr style="height: 12pt" class="商品-row 商品-row-first">
                 <td>{{ for.index + 1 }}</td>
                 <td colspan="2">{{ item.HSCode }}</td>
-                <td colspan="4">{{ item.StyleName }}</td>
-                <td>{{ item.Quantity }}{{ item.UnitCN }}</td>
-                <td colspan="2">{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'F2' }} </td>
+                <td colspan="4" class="customs-item-description">{{ if item.StyleNameCN && item.StyleNameCN != "" }}{{ item.StyleNameCN }}{{ else }}{{ item.StyleName }}{{ end }}</td>
+                <td class="customs-item-number">{{ item.Quantity }}{{ item.UnitCN }}</td>
+                <td colspan="2" class="customs-item-number">{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'F2' }} </td>
                 <td>中国</td>
-                <td colspan="2">{{ Invoice.DestinationCountry }}</td>
-                <td>{{ item.Origin }}</td>
+                <td colspan="2" class="customs-item-country">{{ Invoice.DestinationCountry }}</td>
+                <td class="customs-item-country">{{ item.Origin }}</td>
                 <td></td>
             </tr>
             <tr style="height: 12pt" class="商品-row 商品-row-second">
                 <td></td>
                 <td colspan="2"></td>
-                <td colspan="4" class="normal-wrap">{{ item.FabricComposition }}&nbsp;品牌:{{ item.Brand ? ' ' + item.Brand : '' }}</td>
-                <td>{{ item.NWTotal | math.format 'F2' }}千克</td>
-                <td colspan="2">{{ Invoice.Currency }}{{ item.TotalPrice | math.format 'F2' }}</td>
+                <td colspan="4" class="customs-item-description"><span class="customs-item-attributes">{{ item.FabricComposition }}{{ if item.Brand && item.Brand != "" }} 品牌: {{ item.Brand }}{{ end }}</span></td>
+                <td class="customs-item-number">{{ item.NWTotal | math.format 'F2' }}千克</td>
+                <td colspan="2" class="customs-item-number">{{ Invoice.Currency }}{{ item.TotalPrice | math.format 'F2' }}</td>
                 <td></td>
                 <td colspan="2"></td>
                 <td></td>
@@ -440,20 +461,20 @@
             <tr style="height: 12pt" class="商品-row 商品-row-first">
                 <td>{{ for.index + 1 }}</td>
                 <td colspan="2">{{ item.HSCode }}</td>
-                <td colspan="4">{{ item.StyleName }}</td>
-                <td>{{ item.Quantity }}{{ item.UnitCN }}</td>
-                <td colspan="2">{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'F2' }} </td>
+                <td colspan="4" class="customs-item-description">{{ if item.StyleNameCN && item.StyleNameCN != "" }}{{ item.StyleNameCN }}{{ else }}{{ item.StyleName }}{{ end }}</td>
+                <td class="customs-item-number">{{ item.Quantity }}{{ item.UnitCN }}</td>
+                <td colspan="2" class="customs-item-number">{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'F2' }} </td>
                 <td>中国</td>
-                <td colspan="2">{{ Invoice.DestinationCountry }}</td>
-                <td>{{ item.Origin }}</td>
+                <td colspan="2" class="customs-item-country">{{ Invoice.DestinationCountry }}</td>
+                <td class="customs-item-country">{{ item.Origin }}</td>
                 <td></td>
             </tr>
             <tr style="height: 12pt" class="商品-row 商品-row-second">
                 <td></td>
                 <td colspan="2"></td>
-                <td colspan="4" class="normal-wrap">{{ item.FabricComposition }}&nbsp;品牌:{{ item.Brand ? ' ' + item.Brand : '' }}</td>
-                <td>{{ item.NWTotal | math.format 'F2' }}千克</td>
-                <td colspan="2">{{ Invoice.Currency }}{{ item.TotalPrice | math.format 'F2' }}</td>
+                <td colspan="4" class="customs-item-description"><span class="customs-item-attributes">{{ item.FabricComposition }}{{ if item.Brand && item.Brand != "" }} 品牌: {{ item.Brand }}{{ end }}</span></td>
+                <td class="customs-item-number">{{ item.NWTotal | math.format 'F2' }}千克</td>
+                <td colspan="2" class="customs-item-number">{{ Invoice.Currency }}{{ item.TotalPrice | math.format 'F2' }}</td>
                 <td></td>
                 <td colspan="2"></td>
                 <td></td>

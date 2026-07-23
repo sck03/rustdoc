@@ -122,6 +122,13 @@ function App() {
   const canManageSystem = session?.user.capabilities?.canManageSettings === true;
   const isFullEdition = session?.user.capabilities?.productEdition?.trim().toLowerCase() === "full";
   const canManageAuditLogs = canManageSystem && isFullEdition;
+  const activeProduct = getProductEditionPresentation(
+    session?.user.capabilities?.productEdition ?? desktopProductEdition,
+  );
+
+  useEffect(() => {
+    document.title = activeProduct.displayName;
+  }, [activeProduct.displayName]);
 
   const expireSession = useCallback((reason: string) => {
     setSession(null);
@@ -551,7 +558,7 @@ function App() {
               <Route path="/tools/email" element={<EmailPage client={client} />} />
               <Route path="/system/update" element={<UpdateCenterPage />} />
               <Route path="/system/license" element={<LicensePage client={client} />} />
-              <Route path="/system/about" element={<AboutPage client={client} />} />
+              <Route path="/system/about" element={<AboutPage client={client} product={activeProduct} />} />
               <Route path="/access-denied" element={<NoModuleAccessPage />} />
               <Route
                 path="/audit-logs"
@@ -579,6 +586,7 @@ function App() {
                     canManageSettings={session.user.capabilities?.canManageSettings === true}
                     canManageUsers={session.user.capabilities?.canManageUsers === true}
                     canUseDocumentWorkspace={session.user.capabilities?.canUseDocumentWorkspace === true}
+                    productName={activeProduct.productName}
                   />
                 }
               />

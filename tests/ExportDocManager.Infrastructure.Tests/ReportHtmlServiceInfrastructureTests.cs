@@ -5,7 +5,9 @@ using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace ExportDocManager.Infrastructure.Tests
@@ -175,6 +177,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.DoesNotContain("Payee Should Not Leak", packingListResult.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("PO:", packingListResult.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("Style:", packingListResult.Html, StringComparison.Ordinal);
+                Assert.DoesNotContain("Order No.:", packingListResult.Html, StringComparison.Ordinal);
                 Assert.Contains("PO-I1", packingListResult.Html, StringComparison.Ordinal);
                 Assert.Matches(@">\s*I1\s*<", packingListResult.Html);
 
@@ -244,6 +247,17 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.DoesNotContain("PO:", template, StringComparison.Ordinal);
                 Assert.DoesNotContain("Style:", template, StringComparison.Ordinal);
             }
+
+            string repositoryRoot = FindRepositoryRoot();
+            string customs = File.ReadAllText(Path.Combine(repositoryRoot, "Templates", "Export", "customs_declaration_template.html"));
+            string builtInPackingList = File.ReadAllText(Path.Combine(repositoryRoot, "Templates", "Export", "packing_list_template.html"));
+            Assert.Contains("item.StyleNameCN", customs, StringComparison.Ordinal);
+            Assert.Contains("customs-item-attributes", customs, StringComparison.Ordinal);
+
+            Assert.Contains("border: 1px solid #111", builtInPackingList, StringComparison.Ordinal);
+            Assert.Contains("border-right: 1px solid #111", builtInPackingList, StringComparison.Ordinal);
+            Assert.Contains("background: #f2f2f2", builtInPackingList, StringComparison.Ordinal);
+            Assert.Contains("text-align: center", builtInPackingList, StringComparison.Ordinal);
         }
 
         [Fact]
@@ -256,6 +270,7 @@ namespace ExportDocManager.Infrastructure.Tests
             try
             {
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
+                Assert.True(ReportFontPolicy.Inspect(pathProvider).Complete, "Pinned Noto CJK report fonts must be provisioned before formal PDF validation.");
                 string rendererPath = new ChromiumHtmlToPdfService(pathProvider).ResolveRendererExecutablePath();
                 Assert.StartsWith(Path.Combine(appRoot, "Browsers"), rendererPath, StringComparison.OrdinalIgnoreCase);
 
@@ -314,7 +329,10 @@ namespace ExportDocManager.Infrastructure.Tests
             }
             finally
             {
-                DeleteDirectoryIfExists(dataRoot);
+                if (!ShouldRetainReportTestArtifacts())
+                {
+                    DeleteDirectoryIfExists(dataRoot);
+                }
             }
         }
 
@@ -328,6 +346,7 @@ namespace ExportDocManager.Infrastructure.Tests
             try
             {
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
+                Assert.True(ReportFontPolicy.Inspect(pathProvider).Complete, "Pinned Noto CJK report fonts must be provisioned before cross-platform pagination validation.");
                 await using var factory = new TestDbContextFactory();
                 var seed = await SeedSameInvoiceNumberActualCustomsAndPaymentAsync(factory);
                 var htmlService = new ReportHtmlService(factory, new StubSettingsService(), pathProvider);
@@ -335,6 +354,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 string invoiceTemplatePath = Path.Combine(appRoot, "Templates", "Export", "invoice_template.html");
                 string packingListTemplatePath = Path.Combine(appRoot, "Templates", "Export", "packing_list_template.html");
+                string contractTemplatePath = Path.Combine(appRoot, "Templates", "Export", "contract_template.html");
                 string customsTemplatePath = Path.Combine(appRoot, "Templates", "Export", "customs_declaration_template.html");
                 string paymentVoucherTemplatePath = Path.Combine(appRoot, "Templates", "Internal", "payment_voucher_template.html");
 
@@ -348,6 +368,22 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.DoesNotContain("MULTI-CUSTOMS-ITEM", actualInvoiceHtml.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("Customs Multi Customer", actualInvoiceHtml.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("PAYMENT-SAME-NO-SHOULD-NOT-LEAK", actualInvoiceHtml.Html, StringComparison.Ordinal);
+                Assert.DoesNotContain(">0CTN<", actualInvoiceHtml.Html, StringComparison.Ordinal);
+
+                var packingListHtml = await htmlService.RenderInvoiceReportAsync(
+                    seed.ActualInvoiceId,
+                    ReportDocumentType.ExportDocument,
+                    packingListTemplatePath,
+                    withSeal: false);
+                Assert.Equal(3, Regex.Matches(packingListHtml.Html, "class=\"print-page\"").Count);
+                Assert.Contains("24CTN", packingListHtml.Html, StringComparison.Ordinal);
+                Assert.Contains("375PCS", packingListHtml.Html, StringComparison.Ordinal);
+                Assert.True(
+                    Regex.IsMatch(
+                        packingListHtml.Html,
+                        "MULTI-ACTUAL-ITEM-002.*?<td class=\"numeric-cell package\">\\s*</td>",
+                        RegexOptions.Singleline),
+                    "Mixed-carton continuation items should keep the package cell empty instead of rendering 0CTN.");
 
                 var customsHtml = await htmlService.RenderInvoiceReportAsync(
                     seed.CustomsInvoiceId,
@@ -355,7 +391,10 @@ namespace ExportDocManager.Infrastructure.Tests
                     customsTemplatePath,
                     withSeal: false);
                 Assert.Contains("MULTI-CUSTOMS-ITEM-018", customsHtml.Html, StringComparison.Ordinal);
+                Assert.Contains("中文品名 001 / 棉制针织男式T恤衫", customsHtml.Html, StringComparison.Ordinal);
                 Assert.Contains("Customs Multi Customer", customsHtml.Html, StringComparison.Ordinal);
+                Assert.Contains("class=\"customs-item-description\"", customsHtml.Html, StringComparison.Ordinal);
+                Assert.Contains("class=\"customs-item-number\"", customsHtml.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("MULTI-ACTUAL-ITEM", customsHtml.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("Actual Multi Customer", customsHtml.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("PAYMENT-SAME-NO-SHOULD-NOT-LEAK", customsHtml.Html, StringComparison.Ordinal);
@@ -400,6 +439,21 @@ namespace ExportDocManager.Infrastructure.Tests
                     appRoot,
                     dataRoot);
 
+                var contractResult = await pdfService.RenderInvoicePdfAsync(new ReportPdfRenderRequest
+                {
+                    SourceId = seed.ActualInvoiceId,
+                    ReportType = ReportDocumentType.ExportDocument,
+                    TemplatePath = contractTemplatePath,
+                    WithSeal = false,
+                    DestinationPath = Path.Combine(dataRoot, "RenderedPdfs", "multi-item-actual-contract.pdf"),
+                    DocumentTitle = "BuiltIn-MultiItem-Actual-Contract"
+                });
+                AssertBuiltInPdfResult(
+                    contractResult,
+                    new BuiltInPdfCase("multi-item-actual-contract", ReportDocumentType.ExportDocument, contractTemplatePath, 2, "portrait", 30000, "portrait"),
+                    appRoot,
+                    dataRoot);
+
                 var customsResult = await pdfService.RenderInvoicePdfAsync(new ReportPdfRenderRequest
                 {
                     SourceId = seed.CustomsInvoiceId,
@@ -432,7 +486,10 @@ namespace ExportDocManager.Infrastructure.Tests
             }
             finally
             {
-                DeleteDirectoryIfExists(dataRoot);
+                if (!ShouldRetainReportTestArtifacts())
+                {
+                    DeleteDirectoryIfExists(dataRoot);
+                }
             }
         }
 
@@ -723,14 +780,22 @@ namespace ExportDocManager.Infrastructure.Tests
         private static async Task<SameInvoiceNumberSeed> SeedSameInvoiceNumberActualCustomsAndPaymentAsync(IDbContextFactory<AppDbContext> factory)
         {
             await using var context = await factory.CreateDbContextAsync();
-            var actualCustomer = new Customer { CustomerNameEN = "Actual Multi Customer", AddressEN = "1 Actual Road" };
-            var customsCustomer = new Customer { CustomerNameEN = "Customs Multi Customer", AddressEN = "2 Customs Road" };
+            var actualCustomer = new Customer
+            {
+                CustomerNameEN = "Actual Multi Customer — 上海分公司 / Société Générale International Trading (测试)",
+                AddressEN = "ROOM 2801, INTERNATIONAL COMMERCE CENTER, 888 CENTURY AVENUE, PUDONG NEW AREA, SHANGHAI, CHINA № 200120"
+            };
+            var customsCustomer = new Customer
+            {
+                CustomerNameEN = "Customs Multi Customer — HONG KONG / 香港进口部 ™",
+                AddressEN = "ROOM 1808, COMMERCIAL BUILDING, 128 QUEEN'S ROAD CENTRAL, HONG KONG SAR, CHINA (ATTN: IMPORT DEPT.)"
+            };
             var exporter = new Exporter
             {
-                ExporterNameEN = "Bridge Export Multi",
-                ExporterNameCN = "桥出口多页",
-                AddressEN = "88 Runtime Harbor",
-                AddressCN = "运行港 88 号",
+                ExporterNameEN = "BRIDGE IMPORT & EXPORT CO., LTD. / LONG-NAME CROSS-PLATFORM REPORT VALIDATION",
+                ExporterNameCN = "布利杰进出口有限公司（跨平台长名称分页与换行验证）",
+                AddressEN = "BUILDING 6, NO. 1888 INTERNATIONAL LOGISTICS AVENUE, NINGBO, ZHEJIANG, CHINA — EXPORT DOCUMENT DEPARTMENT",
+                AddressCN = "中国浙江省宁波市国际物流大道1888号6号楼（出口单证部）",
                 CreditCode = "91310000MULTIPAGE",
                 CustomsCode = "3100999999"
             };
@@ -809,7 +874,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 CustomerId = customerId,
                 ExporterId = exporter.Id,
                 Currency = "USD",
-                ShippingMarks = $"{type}\nMULTI PAGE MARKS",
+                ShippingMarks = $"{type}\nMULTI PAGE MARKS / 唛头测试 ™ № & （） ≤",
                 ShippingMarksType = "Text",
                 PaymentTerms = "T/T",
                 PortOfLoading = "NINGBO",
@@ -837,8 +902,9 @@ namespace ExportDocManager.Infrastructure.Tests
                 {
                     PoNumber = $"PO-{index:000}",
                     StyleNo = $"{markerPrefix}-{index:000}",
-                    StyleName = $"{markerPrefix}-{index:000}",
-                    FabricComposition = $"Polyester marker {markerPrefix}-{index:000}",
+                    StyleName = $"{markerPrefix}-{index:000} / 棉制针织男式T恤衫 / MEN'S KNITTED T-SHIRT – 100% COTTON ™ № {index:00}",
+                    StyleNameCN = $"中文品名 {index:000} / 棉制针织男式T恤衫",
+                    FabricComposition = $"100% COTTON / 棉；跨平台换行与特殊符号验证（{markerPrefix}-{index:000}）",
                     Brand = $"Brand{index:00}",
                     HSCode = "6205200090",
                     Origin = "CHINA",
@@ -847,7 +913,7 @@ namespace ExportDocManager.Infrastructure.Tests
                     CtnUnitEN = "CTN",
                     CtnUnitCN = "箱",
                     Quantity = index + 2,
-                    Cartons = 1,
+                    Cartons = index == 2 ? 0 : 1,
                     UnitPrice = 3.25m + index,
                     GWTotal = 2.5m + index,
                     NWTotal = 2.0m + index,
@@ -917,6 +983,28 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal(testCase.ExpectedPages, metrics.PageCount);
             Assert.Equal(testCase.ExpectedOrientation, metrics.FirstPageOrientation);
             Assert.True(metrics.StreamCount >= testCase.ExpectedPages, $"{testCase.Slug}: expected PDF streams.");
+
+            if (ShouldRetainReportTestArtifacts())
+            {
+                string metricsPath = Path.ChangeExtension(result.DestinationPath, ".metrics.json");
+                File.WriteAllText(
+                    metricsPath,
+                    JsonSerializer.Serialize(
+                        new
+                        {
+                            testCase.Slug,
+                            OperatingSystem = RuntimeInformation.OSDescription,
+                            Architecture = RuntimeInformation.ProcessArchitecture.ToString(),
+                            result.RendererPath,
+                            metrics.Bytes,
+                            metrics.PageCount,
+                            metrics.FirstPageOrientation,
+                            metrics.StreamCount,
+                            metrics.FirstPageWidth,
+                            metrics.FirstPageHeight
+                        },
+                        new JsonSerializerOptions { WriteIndented = true }));
+            }
         }
 
         private static void AssertTemplatePageOrientation(BuiltInPdfCase testCase)
@@ -956,8 +1044,16 @@ namespace ExportDocManager.Infrastructure.Tests
                 Bytes: bytes.Length,
                 PageCount: Regex.Matches(content, @"/Type\s*/Page\b").Count,
                 FirstPageOrientation: width > height ? "landscape" : "portrait",
-                StreamCount: Regex.Matches(content, @"stream(\r\n|\n|\r)").Count);
+                StreamCount: Regex.Matches(content, @"stream(\r\n|\n|\r)").Count,
+                FirstPageWidth: width,
+                FirstPageHeight: height);
         }
+
+        private static bool ShouldRetainReportTestArtifacts() =>
+            string.Equals(
+                Environment.GetEnvironmentVariable("EXPORTDOCMANAGER_RETAIN_REPORT_TEST_ARTIFACTS"),
+                "1",
+                StringComparison.Ordinal);
 
         private sealed record BuiltInPdfCase(
             string Slug,
@@ -977,7 +1073,9 @@ namespace ExportDocManager.Infrastructure.Tests
             int Bytes,
             int PageCount,
             string FirstPageOrientation,
-            int StreamCount);
+            int StreamCount,
+            double FirstPageWidth,
+            double FirstPageHeight);
 
         private static string FindRepositoryRoot()
         {

@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
-import { Calculator } from "lucide-react";
+import { Calculator, ChevronDown, ChevronUp } from "lucide-react";
+import { useState } from "react";
 import {
   ApiInvoiceDetailDto,
   ApiInvoiceProfitAnalysisResponse,
@@ -39,6 +40,7 @@ export function InvoiceProfitAnalysisPanel({
   invoiceId: number;
   disabled: boolean;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const profitMutation = useMutation({
     mutationFn: () =>
       client.analyzeInvoiceProfit({
@@ -63,31 +65,52 @@ export function InvoiceProfitAnalysisPanel({
   ] as const;
 
   return (
-    <section className="form-section profit-analysis-section" aria-label="利润分析">
+    <section className="form-section profit-analysis-section information-tier-reference" aria-label="利润分析">
       <div className="section-header">
-        <h3>利润分析</h3>
-        <button
-          className="command-button secondary"
-          type="button"
-          onClick={() => profitMutation.mutate()}
-          disabled={disabled || isBusy}
-          title="计算利润分析"
-        >
-          <Calculator size={16} aria-hidden="true" />
-          <span>{isBusy ? "计算中" : "计算"}</span>
-        </button>
+        <div>
+          <h3>利润分析</h3>
+          <span className="section-description">参考信息，按需展开计算</span>
+        </div>
+        <div className="toolbar-actions">
+          {isExpanded ? (
+            <button
+              className="command-button secondary"
+              type="button"
+              onClick={() => profitMutation.mutate()}
+              disabled={disabled || isBusy}
+              title="计算利润分析"
+            >
+              <Calculator size={16} aria-hidden="true" />
+              <span>{isBusy ? "计算中" : "计算"}</span>
+            </button>
+          ) : null}
+          <button
+            className="secondary-button compact-command-button"
+            type="button"
+            aria-expanded={isExpanded}
+            disabled={isBusy}
+            onClick={() => setIsExpanded((current) => !current)}
+          >
+            {isExpanded ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+            <span>{isExpanded ? "收起利润分析" : "展开利润分析"}</span>
+          </button>
+        </div>
       </div>
 
-      {message ? <InlineNotice tone="error" title="利润分析失败">{message}</InlineNotice> : null}
+      {isExpanded ? (
+        <>
+          {message ? <InlineNotice tone="error" title="利润分析失败">{message}</InlineNotice> : null}
 
-      <div className="detail-grid profit-analysis-grid">
-        {metrics.map(([label, value]) => (
-          <div className="detail-item" key={label}>
-            <span>{label}</span>
-            <strong>{value}</strong>
+          <div className="detail-grid profit-analysis-grid">
+            {metrics.map(([label, value]) => (
+              <div className="detail-item" key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      ) : null}
     </section>
   );
 }

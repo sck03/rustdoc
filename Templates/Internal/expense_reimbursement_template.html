@@ -15,7 +15,7 @@
         max-width: 100%;
     }
     body {
-        font-family: 'SimSun', '宋体', serif;
+        font-family: var(--edm-report-font-serif, "Noto Serif CJK SC", "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
         font-size: 14px;
         margin: 20px;
         overflow-wrap: anywhere;
@@ -24,12 +24,12 @@
         text-align: center;
     }
     .company-title {
-        font-family: 'SimHei', '黑体', sans-serif;
+        font-family: var(--edm-report-font-sans, "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei UI", sans-serif);
         font-size: 26px;
         font-weight: bold;
     }
     .sub-title {
-        font-family: 'SimHei', '黑体', sans-serif;
+        font-family: var(--edm-report-font-sans, "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei UI", sans-serif);
         font-size: 20px;
         margin: 10px 0;
     }
@@ -103,7 +103,7 @@
     }
 </style>
 </head>
-<body>
+<body data-edm-report-font="serif">
 
 <div class="center-text company-title">{{ Payment.PayerName }}</div>
 <div class="center-text sub-title">费用报销明细单</div>

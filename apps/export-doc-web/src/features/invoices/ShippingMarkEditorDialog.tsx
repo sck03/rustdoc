@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { Circle, Diamond, Eraser, Minus, MousePointer2, Save, Square, Trash2, Triangle, Type, X } from "lucide-react";
+import { buildPortableCanvasFont } from "../../app/typographyPolicy.ts";
 
 type ShippingMarkTool = "select" | "text" | "line" | "rectangle" | "diamond" | "triangle" | "circle";
 type DrawableShippingMarkTool = Exclude<ShippingMarkTool, "select">;
@@ -35,7 +36,7 @@ type ActivePointer =
 
 const canvasWidth = 720;
 const canvasHeight = 420;
-const textFont = "600 24px Arial, Microsoft YaHei UI, sans-serif";
+const textFont = buildPortableCanvasFont(600, 24);
 const defaultTextDraft = "N/M";
 
 const toolButtons: Array<{

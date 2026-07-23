@@ -40,6 +40,7 @@ export default function MaintenanceSettingsPanels({
   onPathError: (message: string) => void;
 }) {
   const [activeSection, setActiveSection] = useState<MaintenanceSectionKey>("postgresql");
+  const [technicalSectionsExpanded, setTechnicalSectionsExpanded] = useState(false);
   const sections = [
     { key: "postgresql" as const, label: "团队库", description: "备份与还原准备", icon: Database },
     { key: "ownership" as const, label: "数据归属", description: "人员变更时改派业务数据", icon: Users },
@@ -50,8 +51,8 @@ export default function MaintenanceSettingsPanels({
   useEffect(() => {
     const normalizedLabel = initialPanelLabel.trim();
     if (!normalizedLabel) return;
-    if (normalizedLabel.includes("运行诊断")) setActiveSection("diagnostics");
-    else if (normalizedLabel.includes("支持") || normalizedLabel.includes("问题诊断")) setActiveSection("support");
+    if (normalizedLabel.includes("运行诊断")) { setTechnicalSectionsExpanded(true); setActiveSection("diagnostics"); }
+    else if (normalizedLabel.includes("支持") || normalizedLabel.includes("问题诊断")) { setTechnicalSectionsExpanded(true); setActiveSection("support"); }
     else if (normalizedLabel.includes("归属") || normalizedLabel.includes("权限改派")) setActiveSection("ownership");
     else if (normalizedLabel.includes("PostgreSQL") || normalizedLabel.includes("团队库")) setActiveSection("postgresql");
   }, [canManageUsers, initialPanelLabel]);
@@ -59,7 +60,7 @@ export default function MaintenanceSettingsPanels({
   return (
     <div className="maintenance-workspace">
       <nav className="maintenance-section-nav" aria-label="维护工具分类">
-        {sections.map((section) => {
+        {sections.slice(0, 2).map((section) => {
           const Icon = section.icon;
           return (
             <button
@@ -74,6 +75,36 @@ export default function MaintenanceSettingsPanels({
             </button>
           );
         })}
+        <details
+          className="maintenance-technical-nav"
+          open={technicalSectionsExpanded}
+          onToggle={(event) => {
+            const expanded = event.currentTarget.open;
+            setTechnicalSectionsExpanded(expanded);
+            if (!expanded && (activeSection === "diagnostics" || activeSection === "support")) {
+              setActiveSection("postgresql");
+            }
+          }}
+        >
+          <summary><Activity size={18} aria-hidden="true" /><span><strong>高级支持与诊断</strong><small>低频技术信息，按需展开</small></span></summary>
+          <div className="maintenance-technical-nav-items">
+            {sections.slice(2).map((section) => {
+              const Icon = section.icon;
+              return (
+                <button
+                  key={section.key}
+                  className={activeSection === section.key ? "maintenance-section-tab maintenance-section-tab-active" : "maintenance-section-tab"}
+                  type="button"
+                  aria-current={activeSection === section.key ? "page" : undefined}
+                  onClick={() => { setTechnicalSectionsExpanded(true); setActiveSection(section.key); }}
+                >
+                  <Icon size={18} aria-hidden="true" />
+                  <span><strong>{section.label}</strong><small>{section.description}</small></span>
+                </button>
+              );
+            })}
+          </div>
+        </details>
       </nav>
       <div className="maintenance-section-content">
         {activeSection === "postgresql" ? (

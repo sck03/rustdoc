@@ -152,6 +152,8 @@
 }
 
 .invoice-new-optional-section summary {
+  display: grid;
+  gap: 3px;
   min-height: 42px;
   padding: 11px 16px;
   color: #39424c;
@@ -194,12 +196,44 @@
   border-radius: 8px;
 }
 
+.information-tier-required {
+  border-top: 3px solid #0f766e;
+}
+
+.information-tier-reference {
+  background: #fbfdfc;
+  border-color: #dce8e5;
+}
+
+.information-tier-advanced {
+  border-color: #d7e0e4;
+  background: #fcfdfd;
+}
+
+.information-tier-advanced > .section-header h2,
+.information-tier-advanced > .section-header h3,
+.information-tier-reference > .section-header h2,
+.information-tier-reference > .section-header h3 {
+  color: #43534f;
+}
+
 .report-preview-section {
   min-height: 520px;
 }
 
 .letter-of-credit-section .path-textarea-field textarea {
   min-height: 190px;
+}
+
+.invoice-new-optional-section summary small {
+  color: #607572;
+  font-size: var(--edm-font-size-xs);
+  font-weight: var(--edm-font-weight-medium);
+  line-height: var(--edm-line-height-normal);
+}
+
+.invoice-new-optional-section .invoice-extended-fields-section > .section-header {
+  display: none;
 }
 
 .letter-of-credit-heading {
@@ -249,7 +283,7 @@
 .letter-of-credit-review-result textarea {
   min-height: 210px;
   resize: vertical;
-  font-family: "Consolas", "SFMono-Regular", "Microsoft YaHei UI", monospace;
+  font-family: var(--edm-font-mono);
   line-height: 1.55;
 }
 
