@@ -1,9 +1,9 @@
-import { spawn } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
+import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
 import { captureScreenshot, createPageSession, evaluate, getFreePort, startChrome } from "./lib/web-runtime-browser-session.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -39,7 +39,7 @@ const viteCommand = process.platform === "win32" ? (process.env.ComSpec || "cmd.
 const viteArguments = process.platform === "win32"
   ? ["/d", "/s", "/c", `npm run dev -- --port ${port} --strictPort`]
   : ["run", "dev", "--", "--port", String(port), "--strictPort"];
-const vite = spawn(viteCommand, viteArguments, {
+const vite = spawnProcessTree(viteCommand, viteArguments, {
   cwd: webRoot,
   stdio: ["ignore", "pipe", "pipe"],
   windowsHide: true,
@@ -320,20 +320,4 @@ async function waitForReady(page) {
     await delay(100);
   }
   throw new Error("Visual baseline page did not become ready.");
-}
-
-async function stopProcessTree(child) {
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  if (process.platform === "win32") {
-    await new Promise((resolve) => {
-      const killer = spawn("taskkill.exe", ["/pid", String(child.pid), "/T", "/F"], {
-        stdio: "ignore",
-        windowsHide: true,
-      });
-      killer.once("exit", resolve);
-      killer.once("error", resolve);
-    });
-    return;
-  }
-  child.kill("SIGTERM");
 }

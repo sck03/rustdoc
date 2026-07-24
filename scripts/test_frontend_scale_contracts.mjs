@@ -1,8 +1,8 @@
-import { spawn } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
+import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
 import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
 import { captureScreenshot, createPageSession, evaluate, getFreePort, startChrome } from "./lib/web-runtime-browser-session.mjs";
 
@@ -44,7 +44,7 @@ const viteCommand = process.platform === "win32" ? (process.env.ComSpec || "cmd.
 const viteArguments = process.platform === "win32"
   ? ["/d", "/s", "/c", `npm run dev -- --port ${port} --strictPort`]
   : ["run", "dev", "--", "--port", String(port), "--strictPort"];
-const vite = spawn(viteCommand, viteArguments, { cwd: webRoot, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+const vite = spawnProcessTree(viteCommand, viteArguments, { cwd: webRoot, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
 let viteOutput = "";
 vite.stdout.on("data", (chunk) => { viteOutput += chunk.toString(); });
 vite.stderr.on("data", (chunk) => { viteOutput += chunk.toString(); });
@@ -191,17 +191,4 @@ async function waitForReady(page) {
     await delay(100);
   }
   throw new Error("Visual scale page did not become ready.");
-}
-
-async function stopProcessTree(child) {
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  if (process.platform === "win32") {
-    await new Promise((resolve) => {
-      const killer = spawn("taskkill.exe", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
-      killer.once("exit", resolve);
-      killer.once("error", resolve);
-    });
-    return;
-  }
-  child.kill("SIGTERM");
 }
