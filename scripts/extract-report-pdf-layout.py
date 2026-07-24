@@ -73,13 +73,15 @@ def group_words_into_lines(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
         text = normalize_text(" ".join(str(item.get("text") or "") for item in line_words))
         if not text:
             continue
+        wrap_shape = wrapping_shape(text)
         result.append(
             {
                 "top": round(float(line["anchorTop"]), 2),
                 "left": round(min(float(item["x0"]) for item in line_words), 2),
                 "right": round(max(float(item["x1"]) for item in line_words), 2),
                 "textHash": sha256_text(text),
-                "wrapHash": sha256_text(wrapping_shape(text)),
+                "wrapHash": sha256_text(wrap_shape),
+                "wrapLength": len(wrap_shape.replace(" ", "")),
                 "textLength": len(text),
             }
         )
@@ -117,7 +119,7 @@ def find_text_overlaps(words: list[dict[str, Any]], page_number: int) -> list[di
 
 def extract_pdf_layout(pdf_path: Path) -> dict[str, Any]:
     pages: list[dict[str, Any]] = []
-    all_wrap_hashes: list[str] = []
+    all_wrap_lengths: list[str] = []
     overlaps: list[dict[str, Any]] = []
 
     with pdfplumber.open(pdf_path) as pdf:
@@ -136,7 +138,8 @@ def extract_pdf_layout(pdf_path: Path) -> dict[str, Any]:
             overlaps.extend(page_overlaps)
             line_hashes = [line["textHash"] for line in lines]
             line_wrap_hashes = [line["wrapHash"] for line in lines]
-            all_wrap_hashes.extend(line_wrap_hashes)
+            line_wrap_lengths = [line["wrapLength"] for line in lines]
+            all_wrap_lengths.extend(str(length) for length in line_wrap_lengths)
             pages.append(
                 {
                     "pageNumber": page_number,
@@ -146,6 +149,7 @@ def extract_pdf_layout(pdf_path: Path) -> dict[str, Any]:
                     "lineCount": len(lines),
                     "lineHashes": line_hashes,
                     "lineWrapHashes": line_wrap_hashes,
+                    "lineWrapLengths": line_wrap_lengths,
                     "lineTops": [line["top"] for line in lines],
                     "lineLefts": [line["left"] for line in lines],
                     "lineRights": [line["right"] for line in lines],
@@ -160,7 +164,7 @@ def extract_pdf_layout(pdf_path: Path) -> dict[str, Any]:
         )
 
     return {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "slug": pdf_path.stem,
         "sourceFile": pdf_path.name,
         "operatingSystem": platform.platform(),
@@ -169,7 +173,7 @@ def extract_pdf_layout(pdf_path: Path) -> dict[str, Any]:
         "pdfplumberVersion": pdfplumber.__version__,
         "pageCount": len(pages),
         "lineCount": sum(page["lineCount"] for page in pages),
-        "layoutHash": sha256_text("\n".join(all_wrap_hashes)),
+        "layoutHash": sha256_text("\n".join(all_wrap_lengths)),
         "overlapCount": 0,
         "pages": pages,
     }
