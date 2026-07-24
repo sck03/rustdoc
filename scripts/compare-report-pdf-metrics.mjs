@@ -71,6 +71,10 @@ for (const [slug, entries] of [...groups.entries()].sort(([left], [right]) => le
   if (layoutPageCounts.length !== 1) failures.push(`${slug}: extracted layout page counts differ (${layoutPageCounts.join(", ")})`);
   if (layoutLineCounts.length !== 1) failures.push(`${slug}: extracted line counts differ (${layoutLineCounts.join(", ")})`);
   if (layoutHashes.length !== 1 || !layoutHashes[0]) failures.push(`${slug}: line wrapping signatures differ across platforms`);
+  if (layoutHashes.length !== 1 || !layoutHashes[0]) {
+    const mismatch = describeFirstLayoutMismatch(layoutEntries);
+    if (mismatch) failures.push(`${slug}: ${mismatch}`);
+  }
   if (overlapCounts.some((count) => count !== 0)) failures.push(`${slug}: at least one platform contains overlapping PDF text`);
   if (maximumLineTopSpread > 2.5) failures.push(`${slug}: equivalent text lines move vertically by more than 2.5pt across platforms`);
   if (layoutEntries.length > 0 && pageCounts.length === 1 && layoutPageCounts.some((count) => count !== pageCounts[0])) {
@@ -176,6 +180,30 @@ function calculateMaximumLineTopSpread(entries) {
     }
   }
   return maximum;
+}
+
+function describeFirstLayoutMismatch(entries) {
+  if (entries.length <= 1) return "layout mismatch cannot be localized without multiple platform results";
+  const maximumPages = Math.max(...entries.map((entry) => entry.pages?.length ?? 0));
+  for (let pageIndex = 0; pageIndex < maximumPages; pageIndex += 1) {
+    const maximumLines = Math.max(...entries.map((entry) => entry.pages?.[pageIndex]?.lineHashes?.length ?? 0));
+    for (let lineIndex = 0; lineIndex < maximumLines; lineIndex += 1) {
+      const hashes = entries.map((entry) => entry.pages?.[pageIndex]?.lineHashes?.[lineIndex] ?? "<missing>");
+      if (unique(hashes).length === 1) continue;
+
+      const platforms = entries.map((entry) => {
+        const page = entry.pages?.[pageIndex];
+        const operatingSystem = String(entry.operatingSystem || "unknown").split("-")[0];
+        const hash = String(page?.lineHashes?.[lineIndex] ?? "missing").slice(0, 12);
+        const top = page?.lineTops?.[lineIndex] ?? "missing";
+        const left = page?.lineLefts?.[lineIndex] ?? "missing";
+        const right = page?.lineRights?.[lineIndex] ?? "missing";
+        return `${operatingSystem}[hash=${hash},top=${top},left=${left},right=${right}]`;
+      });
+      return `first differing line is page ${pageIndex + 1}, line ${lineIndex + 1}: ${platforms.join("; ")}`;
+    }
+  }
+  return "layout hashes differ although all extracted line hashes match";
 }
 
 function escapeWorkflowCommand(value) {
