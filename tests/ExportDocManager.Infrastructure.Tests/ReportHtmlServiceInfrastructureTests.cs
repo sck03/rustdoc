@@ -549,6 +549,32 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public void ChromiumHtmlToPdfService_BuildArguments_ShouldOnlyDisableSandboxWhenExplicitlyRequested()
+        {
+            string htmlPath = Path.Combine(Path.GetTempPath(), "report-source.html");
+            string pdfPath = Path.Combine(Path.GetTempPath(), "report-output.pdf");
+            string userDataPath = Path.Combine(Path.GetTempPath(), "report-user-data");
+            string diskCachePath = Path.Combine(Path.GetTempPath(), "report-disk-cache");
+
+            var sandboxed = ChromiumHtmlToPdfService.BuildChromiumArguments(
+                htmlPath,
+                pdfPath,
+                userDataPath,
+                diskCachePath,
+                disableSandbox: false);
+            var explicitlyUnsandboxed = ChromiumHtmlToPdfService.BuildChromiumArguments(
+                htmlPath,
+                pdfPath,
+                userDataPath,
+                diskCachePath,
+                disableSandbox: true);
+
+            Assert.DoesNotContain("--no-sandbox", sandboxed);
+            Assert.Contains("--no-sandbox", explicitlyUnsandboxed);
+            Assert.Equal(sandboxed.Count + 1, explicitlyUnsandboxed.Count);
+        }
+
+        [Fact]
         public void ChromiumHtmlToPdfService_WhenHeadlessShellAndChromeExist_ShouldPreferHeadlessShell()
         {
             string appRoot = CreateTempDirectory("report-pdf-app");

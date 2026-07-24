@@ -11,6 +11,7 @@ namespace ExportDocManager.Services.Reporting
     {
         public const string ChromiumExecutableEnvironmentVariable = BrowserExecutableResolver.ChromiumExecutableEnvironmentVariable;
         public const string ChromiumTimeoutEnvironmentVariable = "EXPORTDOCMANAGER_CHROMIUM_TIMEOUT_SECONDS";
+        public const string ChromiumNoSandboxEnvironmentVariable = "EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX";
 
         private static readonly TimeSpan DefaultRenderTimeout = TimeSpan.FromSeconds(60);
         private static readonly TimeSpan ProcessDrainTimeout = TimeSpan.FromSeconds(5);
@@ -196,24 +197,15 @@ namespace ExportDocManager.Services.Reporting
                 EnableRaisingEvents = true
             };
 
-            process.StartInfo.ArgumentList.Add("--headless=new");
-            process.StartInfo.ArgumentList.Add("--disable-gpu");
-            process.StartInfo.ArgumentList.Add("--disable-extensions");
-            process.StartInfo.ArgumentList.Add("--disable-background-networking");
-            process.StartInfo.ArgumentList.Add("--disable-dev-shm-usage");
-            process.StartInfo.ArgumentList.Add("--disable-sync");
-            process.StartInfo.ArgumentList.Add("--disable-features=Translate,MediaRouter,OptimizationHints,PaintHolding");
-            process.StartInfo.ArgumentList.Add("--no-first-run");
-            process.StartInfo.ArgumentList.Add("--no-default-browser-check");
-            process.StartInfo.ArgumentList.Add("--allow-file-access-from-files");
-            process.StartInfo.ArgumentList.Add("--run-all-compositor-stages-before-draw");
-            process.StartInfo.ArgumentList.Add("--virtual-time-budget=1000");
-            process.StartInfo.ArgumentList.Add($"--user-data-dir={userDataPath}");
-            process.StartInfo.ArgumentList.Add($"--disk-cache-dir={diskCachePath}");
-            process.StartInfo.ArgumentList.Add($"--print-to-pdf={pdfPath}");
-            process.StartInfo.ArgumentList.Add("--print-to-pdf-no-header");
-            process.StartInfo.ArgumentList.Add("--no-pdf-header-footer");
-            process.StartInfo.ArgumentList.Add(ToFileUri(htmlPath));
+            foreach (string argument in BuildChromiumArguments(
+                         htmlPath,
+                         pdfPath,
+                         userDataPath,
+                         diskCachePath,
+                         ResolveNoSandboxSetting()))
+            {
+                process.StartInfo.ArgumentList.Add(argument);
+            }
 
             if (!process.Start())
             {
@@ -279,6 +271,69 @@ namespace ExportDocManager.Services.Reporting
             }
 
             return TimeSpan.FromSeconds(seconds);
+        }
+
+        private static bool ResolveNoSandboxSetting()
+        {
+            string configured = Environment.GetEnvironmentVariable(ChromiumNoSandboxEnvironmentVariable);
+            if (string.IsNullOrWhiteSpace(configured))
+            {
+                return false;
+            }
+
+            string normalized = configured.Trim();
+            if (normalized == "1")
+            {
+                return true;
+            }
+
+            if (normalized == "0")
+            {
+                return false;
+            }
+
+            if (bool.TryParse(normalized, out bool enabled))
+            {
+                return enabled;
+            }
+
+            throw new InvalidOperationException($"{ChromiumNoSandboxEnvironmentVariable} 只能配置为 0、1、false 或 true。");
+        }
+
+        internal static IReadOnlyList<string> BuildChromiumArguments(
+            string htmlPath,
+            string pdfPath,
+            string userDataPath,
+            string diskCachePath,
+            bool disableSandbox)
+        {
+            var arguments = new List<string>
+            {
+                "--headless=new",
+                "--disable-gpu",
+                "--disable-extensions",
+                "--disable-background-networking",
+                "--disable-dev-shm-usage",
+                "--disable-sync",
+                "--disable-features=Translate,MediaRouter,OptimizationHints,PaintHolding",
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--allow-file-access-from-files",
+                "--run-all-compositor-stages-before-draw",
+                "--virtual-time-budget=1000",
+                $"--user-data-dir={userDataPath}",
+                $"--disk-cache-dir={diskCachePath}",
+                $"--print-to-pdf={pdfPath}",
+                "--print-to-pdf-no-header",
+                "--no-pdf-header-footer",
+                ToFileUri(htmlPath)
+            };
+            if (disableSandbox)
+            {
+                arguments.Insert(1, "--no-sandbox");
+            }
+
+            return arguments;
         }
 
         internal static string ToFileUri(string localPath)
