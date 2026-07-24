@@ -53,7 +53,10 @@ namespace ExportDocManager.Services.MasterData
         IReadOnlyList<HsCodeHistoryLearningCandidate> Items,
         int TotalCount,
         int PageNumber,
-        int PageSize);
+        int PageSize,
+        bool IsTruncated = false,
+        int ScannedSourceCount = 0,
+        string Notice = "");
 
     public sealed record HsCodeRemoteCandidateReviewInput(int Id, string CurrentCode, bool Confirmed);
 

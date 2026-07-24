@@ -2868,9 +2868,12 @@ export interface BackgroundJobSnapshot {
 }
 
 export interface HsCodeHistoryCandidatePage {
+  isTruncated: boolean;
   items: HsCodeHistoryLearningCandidate[];
+  notice: string;
   pageNumber: number;
   pageSize: number;
+  scannedSourceCount: number;
   totalCount: number;
 }
 

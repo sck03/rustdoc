@@ -66,6 +66,32 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task HsCodeQueryPageAsync_ShouldClampInternalPageSize()
+        {
+            using var factory = new TestDbContextFactory();
+            await using (var context = await factory.CreateDbContextAsync())
+            {
+                context.HsCodes.AddRange(Enumerable.Range(1, 205).Select(index => new HsCode
+                {
+                    Code = $"{index:0000000000}",
+                    Name = $"测试编码 {index}"
+                }));
+                await context.SaveChangesAsync();
+            }
+
+            IHsCodeReadRepository repository = new LocalMasterDataReadRepository(factory);
+            var result = await repository.QueryPageAsync(new HsCodeReadQuery
+            {
+                PageNumber = 1,
+                PageSize = int.MaxValue
+            });
+
+            Assert.Equal(200, result.PageSize);
+            Assert.Equal(200, result.Items.Count);
+            Assert.Equal(205, result.TotalCount);
+        }
+
+        [Fact]
         public async Task ProductQueryPageAsync_ShouldPageAndFilterInDatabaseOrder()
         {
             using var factory = new TestDbContextFactory();

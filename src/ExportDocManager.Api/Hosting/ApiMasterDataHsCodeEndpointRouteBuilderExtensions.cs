@@ -714,7 +714,8 @@ namespace ExportDocManager.Api.Hosting
                 string query, int? maxResults, CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
-                return Results.Ok(await service.SearchAsync(query, maxResults ?? 20, cancellationToken));
+                try { return Results.Ok(await service.SearchAsync(query, maxResults ?? 20, cancellationToken)); }
+                catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
             }).WithName("SearchHsCodeKnowledge");
 
             endpoints.MapGet("/api/invoices/hs-knowledge/search", async (
@@ -722,7 +723,8 @@ namespace ExportDocManager.Api.Hosting
                 string query, int? maxResults, CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
-                return Results.Ok(await service.SearchAsync(query, maxResults ?? 20, cancellationToken));
+                try { return Results.Ok(await service.SearchAsync(query, maxResults ?? 20, cancellationToken)); }
+                catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
             }).WithName("SearchInvoiceHsCodeKnowledge");
 
             endpoints.MapGet("/api/master-data/hs-knowledge/examples", async (
@@ -793,7 +795,18 @@ namespace ExportDocManager.Api.Hosting
                 string keyword, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
-                return Results.Ok(await service.DiscoverHistoryCandidatesAsync(keyword, pageNumber ?? 1, pageSize ?? 30, cancellationToken));
+                try
+                {
+                    return Results.Ok(await service.DiscoverHistoryCandidatesAsync(
+                        keyword,
+                        pageNumber ?? 1,
+                        pageSize ?? 30,
+                        cancellationToken));
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                }
             }).WithName("DiscoverHsCodeHistoryCandidates");
 
             endpoints.MapGet("/api/master-data/hs-knowledge/remote-candidates", async (

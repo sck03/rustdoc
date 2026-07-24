@@ -867,7 +867,7 @@ export function InvoiceItemsEditor({
         products={productLibraryProducts} productLibraryPageNumber={productLibraryPageNumber} productLibraryPageSize={productLibraryPageSize} productLibraryTotalCount={productLibraryTotalCount} productLibraryTotalPages={productLibraryTotalPages} readOnly={readOnly} unitCandidateDialog={unitCandidateDialog} onApplyProduct={applyPickedProduct}
         onApplyUnitCandidate={applyUnitCandidate} onCloseProductPicker={() => setIsProductPickerOpen(false)} onCloseUnitCandidates={() => setUnitCandidateDialog(null)}
         onRefresh={onRefreshProductLibrary} onSearch={(keyword) => { setProductKeyword(keyword); onSearchProductLibrary(keyword); }} onProductLibraryPageChange={onProductLibraryPageChange} onProductLibraryPageSizeChange={onProductLibraryPageSizeChange}
-        onCloseHsKnowledge={() => setIsHsKnowledgeOpen(false)} onApplyHs={(patch, result) => { if (focusedRowIndex == null || readOnly) return; markInvoiceItemMutationFrom(focusedRowIndex); onChangeItem(focusedRowIndex, patch); setEditorMessage(`已回填 HS 编码 ${result.currentCode}；本次确认已进入本地学习记录。`); }} />
+        onCloseHsKnowledge={() => setIsHsKnowledgeOpen(false)} onApplyHs={(patch, result, feedbackRecorded) => { if (focusedRowIndex == null || readOnly) return; markInvoiceItemMutationFrom(focusedRowIndex); onChangeItem(focusedRowIndex, patch); setEditorMessage(feedbackRecorded ? `已回填 HS 编码 ${result.currentCode}；本次确认已进入本地学习记录。` : `已回填 HS 编码 ${result.currentCode}；学习记录暂未写入，不影响本次发票。`); }} />
       <InvoiceItemsTable
         activeFocusedCell={activeFocusedCell} activeFocusedCellOptions={activeFocusedCellOptions} currency={currency}
         displayItems={displayItems} invoiceItemTableMinWidth={invoiceItemTableMinWidth} itemsCount={items.length}

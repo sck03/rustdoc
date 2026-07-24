@@ -1288,14 +1288,17 @@ namespace ExportDocManager.Api.Hosting
                         ["HsCodeHistoryCandidatePage"] = new
                         {
                             type = "object",
-                            required = new[] { "items", "totalCount", "pageNumber", "pageSize" },
-                            properties = new Dictionary<string, object>
-                            {
-                                ["items"] = new { type = "array", items = new Dictionary<string, string> { ["$ref"] = "#/components/schemas/HsCodeHistoryLearningCandidate" } },
-                                ["totalCount"] = new { type = "integer", format = "int32" },
-                                ["pageNumber"] = new { type = "integer", format = "int32" },
-                                ["pageSize"] = new { type = "integer", format = "int32" }
-                            }
+                             required = new[] { "items", "totalCount", "pageNumber", "pageSize", "isTruncated", "scannedSourceCount", "notice" },
+                             properties = new Dictionary<string, object>
+                             {
+                                 ["items"] = new { type = "array", items = new Dictionary<string, string> { ["$ref"] = "#/components/schemas/HsCodeHistoryLearningCandidate" } },
+                                 ["totalCount"] = new { type = "integer", format = "int32" },
+                                 ["pageNumber"] = new { type = "integer", format = "int32" },
+                                 ["pageSize"] = new { type = "integer", format = "int32" },
+                                 ["isTruncated"] = new { type = "boolean", description = "Whether the bounded source window contained more records." },
+                                 ["scannedSourceCount"] = new { type = "integer", format = "int32", description = "Number of source rows analyzed for this response." },
+                                 ["notice"] = StringProperty("Human-readable explanation when the source window is bounded.")
+                             }
                         },
                         ["HsCodeRemoteCandidate"] = new
                         {

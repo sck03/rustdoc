@@ -47,8 +47,10 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("*.layout.json", workflow, StringComparison.Ordinal);
         Assert.Contains("find_text_overlaps", extractor, StringComparison.Ordinal);
         Assert.Contains("lineHashes", extractor, StringComparison.Ordinal);
-        Assert.Contains("line wrapping signatures differ", comparer, StringComparison.Ordinal);
+        Assert.Contains("wrappingConsistent", comparer, StringComparison.Ordinal);
         Assert.Contains("maximumLineTopSpread", comparer, StringComparison.Ordinal);
+        Assert.Contains("at least one platform contains overlapping PDF text", comparer, StringComparison.Ordinal);
+        Assert.Contains("equivalent text lines move vertically by more than 2.5pt across platforms", comparer, StringComparison.Ordinal);
     }
 
     [Fact]

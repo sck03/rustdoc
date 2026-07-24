@@ -62,7 +62,7 @@ function KnowledgeSearch({ client, canOperate }: { client: ExportDocManagerApiCl
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
   const [feedback, setFeedback] = useState<KnowledgeFeedback | null>(null);
-  const search = useQuery({ queryKey: ["hs-knowledge", "search", query], queryFn: () => client.searchHsCodeKnowledge({ query }), enabled: !!query });
+  const search = useQuery({ queryKey: ["hs-knowledge", "search", query], queryFn: ({ signal }) => client.searchHsCodeKnowledge({ query }, { signal }), enabled: !!query });
   const feedbackMutation = useMutation({
     mutationFn: (value: { code: string; accepted: boolean; name: string; specification: string }) => client.recordHsCodeKnowledgeFeedback({ body: { queryText: query, productName: value.name, specification: value.specification, candidateCode: value.code, accepted: value.accepted } }),
     onSuccess: (_, value) => { setFeedback({ tone: "success", message: value.accepted ? "已确认适用，本次选择已加入本地学习记录。" : "已记录为不适用。" }); void search.refetch(); },
@@ -71,7 +71,7 @@ function KnowledgeSearch({ client, canOperate }: { client: ExportDocManagerApiCl
   function submit(event: FormEvent) { event.preventDefault(); if (draft.trim()) { setFeedback(null); setQuery(draft.trim()); } }
   return <div className="knowledge-task-card knowledge-search-card">
     <div className="knowledge-intro"><Sparkles size={24}/><div><h2>像普通商品名称一样查询</h2><p>输入品名、材质、用途或规格，系统会优先展示已审核实例和当前年度税则。</p></div></div>
-    <form className="knowledge-search-form" onSubmit={submit}><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="例如：棉制针织男式圆领短袖T恤衫"/><button className="command-button" type="submit">查询本地知识库</button></form>
+    <form className="knowledge-search-form" onSubmit={submit}><input value={draft} maxLength={500} onChange={event => setDraft(event.target.value)} placeholder="例如：棉制针织男式圆领短袖T恤衫"/><button className="command-button" type="submit">查询本地知识库</button></form>
     {feedback ? <InlineNotice tone={feedback.tone}>{feedback.message}</InlineNotice> : null}
     {search.isError ? <InlineNotice tone="error" title="智能查询失败">{readApiError(search.error)}</InlineNotice> : null}
     {search.isFetching && query ? <PageState tone="loading" title="正在检索本地申报实例" description="系统正在匹配当前有效税则和已审核经验。" /> : null}
@@ -99,7 +99,7 @@ function ExampleLibrary({ client, canOperate, canManage, canBatchManage }: { cli
   const requestConfirmation = useConfirmation();
   const [keyword, setKeyword] = useState(""); const debouncedKeyword = useDebouncedValue(keyword); const [pageNumber, setPageNumber] = useState(1); const [pageSize, setPageSize] = useState(30);
   const [editing, setEditing] = useState<HsCodeKnowledgeExampleInput | null>(null); const [selected, setSelected] = useState<Set<number>>(new Set()); const [feedback, setFeedback] = useState<KnowledgeFeedback | null>(null);
-  const data = useQuery({ queryKey: ["hs-knowledge", "examples", debouncedKeyword, pageNumber, pageSize], queryFn: () => client.listHsCodeKnowledgeExamples({ keyword: debouncedKeyword, pageNumber, pageSize }), placeholderData: keepPreviousData });
+  const data = useQuery({ queryKey: ["hs-knowledge", "examples", debouncedKeyword, pageNumber, pageSize], queryFn: ({ signal }) => client.listHsCodeKnowledgeExamples({ keyword: debouncedKeyword, pageNumber, pageSize }, { signal }), placeholderData: keepPreviousData });
   const invalidate = async () => { setSelected(new Set()); await queryClient.invalidateQueries({ queryKey: ["hs-knowledge", "examples"] }); };
   const save = useMutation({ mutationFn: (value: HsCodeKnowledgeExampleInput) => client.saveHsCodeKnowledgeExample({ body: value }), onSuccess: async () => { setEditing(null); setFeedback({tone:"success",message:"申报实例已保存。"}); await invalidate(); }, onError: error => setFeedback({tone:"error",message:readApiError(error)}) });
   const remove = useMutation({ mutationFn: (id: number) => client.deleteHsCodeKnowledgeExample({ id }), onSuccess: async () => { setFeedback({tone:"success",message:"申报实例已删除。"}); await invalidate(); }, onError: error => setFeedback({tone:"error",message:readApiError(error)}) });
@@ -131,7 +131,7 @@ function ExampleLibrary({ client, canOperate, canManage, canBatchManage }: { cli
   return <div className="knowledge-task-card"><div className="section-heading"><div><h2>申报实例库</h2><p>只保存已经人工确认、可以参与智能查询的公司经验。</p></div>{canOperate ? <button className="command-button" type="button" onClick={() => setEditing(blank)}>新增实例</button> : null}</div>
     <div className="knowledge-list-toolbar"><input className="knowledge-filter" aria-label="搜索申报实例" value={keyword} onChange={event => setKeyword(event.target.value)} placeholder="搜索名称、规格或HS编码"/>{canBatchManage && selected.size ? <button className="secondary-button danger-button" type="button" onClick={() => void confirmBatchDelete()}>批量删除（{selected.size}）</button> : null}</div>
     {feedback ? <InlineNotice tone={feedback.tone}>{feedback.message}</InlineNotice> : null}
-    {editing ? <form className="knowledge-editor" onSubmit={event => { event.preventDefault(); save.mutate(editing); }}><label>商品名称<input required value={editing.productName} onChange={event => setEditing({...editing, productName:event.target.value})}/></label><label>历史/原始编码<input required value={editing.rawReportedHsCode} onChange={event => setEditing({...editing, rawReportedHsCode:event.target.value})}/></label><label>当前有效编码<input value={editing.resolvedCurrentHsCode} onChange={event => setEditing({...editing, resolvedCurrentHsCode:event.target.value})}/></label><label>来源年份<input type="number" value={editing.sourceYear ?? ""} onChange={event => setEditing({...editing, sourceYear:event.target.value ? Number(event.target.value) : undefined})}/></label><label className="wide">规格与申报要素<textarea value={editing.specification} onChange={event => setEditing({...editing, specification:event.target.value})}/></label><div className="wide form-actions"><button className="command-button" type="submit" disabled={save.isPending}>保存实例</button><button className="secondary-button" type="button" onClick={() => setEditing(null)}>取消</button></div></form> : null}
+    {editing ? <form className="knowledge-editor" onSubmit={event => { event.preventDefault(); save.mutate(editing); }}><label>商品名称<input required maxLength={300} value={editing.productName} onChange={event => setEditing({...editing, productName:event.target.value})}/></label><label>历史/原始编码<input required maxLength={20} value={editing.rawReportedHsCode} onChange={event => setEditing({...editing, rawReportedHsCode:event.target.value})}/></label><label>当前有效编码<input maxLength={20} value={editing.resolvedCurrentHsCode} onChange={event => setEditing({...editing, resolvedCurrentHsCode:event.target.value})}/></label><label>来源年份<input type="number" value={editing.sourceYear ?? ""} onChange={event => setEditing({...editing, sourceYear:event.target.value ? Number(event.target.value) : undefined})}/></label><label className="wide">规格与申报要素<textarea maxLength={1500} value={editing.specification} onChange={event => setEditing({...editing, specification:event.target.value})}/></label><div className="wide form-actions"><button className="command-button" type="submit" disabled={save.isPending}>保存实例</button><button className="secondary-button" type="button" onClick={() => setEditing(null)}>取消</button></div></form> : null}
     {data.isLoading ? <PageState tone="loading" title="正在读取申报实例" description="数据量较多时系统会按页加载，不会一次载入全部记录。" /> : null}{data.isError ? <PageState tone="error" title="申报实例读取失败" description={readApiError(data.error)} /> : null}
     <div className="knowledge-table">{data.data?.items.map(item => <article key={item.id}>{canBatchManage ? <input type="checkbox" aria-label={`选择 ${item.productName}`} checked={selected.has(item.id)} onChange={() => toggle(item.id)}/> : null}<div><strong>{item.productName}</strong><span>{item.rawReportedHsCode}{item.resolvedCurrentHsCode && item.resolvedCurrentHsCode !== item.rawReportedHsCode ? ` → ${item.resolvedCurrentHsCode}` : ""}</span><p>{item.specification || "暂无规格说明"}</p><small>{item.source}{item.sourceYear ? ` · ${item.sourceYear}年` : ""}</small></div><div><span className="status-pill">{knowledgeStatusLabel(item.resolutionStatus)}</span>{canOperate ? <button className="secondary-button" type="button" onClick={() => setEditing({...blank, ...item, resolvedCurrentHsCode:item.resolvedCurrentHsCode ?? "", specification:item.specification ?? ""})}>编辑</button> : null}{canManage ? <button className="text-button danger" type="button" onClick={() => void confirmDelete(item.id, item.productName)}>删除</button> : null}</div></article>)}</div>
     {data.data?.totalCount === 0 ? <PageState title="暂无正式申报实例" description="可从历史资料学习，或在联网候选审核后加入经过确认的公司经验。" /> : null}
@@ -143,7 +143,7 @@ function RemoteCandidateReview({ client, canOperate, canBatchOperate }: { client
   const queryClient = useQueryClient();
   const [status, setStatus] = useState("Pending"); const [keyword, setKeyword] = useState(""); const debouncedKeyword = useDebouncedValue(keyword); const [pageNumber, setPageNumber] = useState(1); const [pageSize, setPageSize] = useState(30);
   const [selected, setSelected] = useState<Set<number>>(new Set()); const [drafts, setDrafts] = useState<Record<number,string>>({}); const [feedback, setFeedback] = useState<KnowledgeFeedback | null>(null);
-  const candidates = useQuery({ queryKey: ["hs-remote-candidates", status, debouncedKeyword, pageNumber, pageSize], queryFn: () => client.listHsCodeRemoteCandidates({ status, keyword: debouncedKeyword, pageNumber, pageSize }), placeholderData: keepPreviousData });
+  const candidates = useQuery({ queryKey: ["hs-remote-candidates", status, debouncedKeyword, pageNumber, pageSize], queryFn: ({ signal }) => client.listHsCodeRemoteCandidates({ status, keyword: debouncedKeyword, pageNumber, pageSize }, { signal }), placeholderData: keepPreviousData });
   useEffect(() => { setPageNumber(1); setSelected(new Set()); }, [status, debouncedKeyword, pageSize]);
   useEffect(() => { setDrafts(current => { const next = {...current}; for (const item of candidates.data?.items ?? []) if (!(item.id in next)) next[item.id] = item.suggestedCurrentHsCode ?? ""; return next; }); }, [candidates.data]);
   const refresh = async (value: string) => { setFeedback({tone:"success",message:value}); setSelected(new Set()); await queryClient.invalidateQueries({ queryKey: ["hs-remote-candidates"] }); await queryClient.invalidateQueries({ queryKey: ["hs-knowledge", "examples"] }); };
@@ -171,7 +171,7 @@ function HistoryLearning({ client, canOperate }: { client: ExportDocManagerApiCl
   const debouncedKeyword = useDebouncedValue(keyword);
   const [pageNumber, setPageNumber] = useState(1); const [pageSize, setPageSize] = useState(30);
   const [feedback, setFeedback] = useState<KnowledgeFeedback | null>(null);
-  const candidates = useQuery({ queryKey: ["hs-history-candidates", debouncedKeyword, pageNumber, pageSize], queryFn: () => client.discoverHsCodeHistoryCandidates({ keyword: debouncedKeyword, pageNumber, pageSize }), placeholderData: keepPreviousData });
+  const candidates = useQuery({ queryKey: ["hs-history-candidates", debouncedKeyword, pageNumber, pageSize], queryFn: ({ signal }) => client.discoverHsCodeHistoryCandidates({ keyword: debouncedKeyword, pageNumber, pageSize }, { signal }), placeholderData: keepPreviousData });
   useEffect(() => setPageNumber(1), [debouncedKeyword, pageSize]);
   const confirm = useMutation({
     mutationFn: (item: NonNullable<typeof candidates.data>["items"][number]) => client.saveHsCodeKnowledgeExample({ body: { id: 0, rawReportedHsCode: item.rawCode, resolvedCurrentHsCode: item.currentCode, productName: item.productName, specification: item.specification, source: `HistoryConfirmed:${item.source}`, sourceYear: new Date().getFullYear(), resolutionStatus: "ManuallyVerified", isManuallyVerified: true } }),
@@ -180,9 +180,10 @@ function HistoryLearning({ client, canOperate }: { client: ExportDocManagerApiCl
   });
   return <div className="knowledge-task-card">
     <div className="section-heading"><div><h2>从历史资料提取待确认经验</h2><p>扫描商品资料、历史发票和报关资料；确认后才进入正式实例库。</p></div></div>
-    <input className="knowledge-filter" aria-label="筛选历史资料候选" value={keyword} onChange={event => setKeyword(event.target.value)} placeholder="筛选商品名称、材质、品牌或HS编码" />
-    {feedback ? <InlineNotice tone={feedback.tone}>{feedback.message}</InlineNotice> : null}
-    {candidates.isLoading ? <PageState tone="loading" title="正在分析历史资料" description="系统正在扫描商品、历史发票和已保存申报经验。" /> : null}
+    <input className="knowledge-filter" aria-label="筛选历史资料候选" value={keyword} maxLength={200} onChange={event => setKeyword(event.target.value)} placeholder="筛选商品名称、材质、品牌或HS编码" />
+     {feedback ? <InlineNotice tone={feedback.tone}>{feedback.message}</InlineNotice> : null}
+     {candidates.data?.notice ? <InlineNotice tone="warning" title="历史资料分批分析">{candidates.data.notice}</InlineNotice> : null}
+     {candidates.isLoading ? <PageState tone="loading" title="正在分析历史资料" description="系统正在扫描商品、历史发票和已保存申报经验。" /> : null}
     {candidates.isError ? <PageState tone="error" title="历史资料分析失败" description={readApiError(candidates.error)} /> : null}
     <div className="knowledge-table history-candidate-list">{candidates.data?.items.map(item => <article className="history-candidate-card" key={item.fingerprint}>
       <div className="history-candidate-main">

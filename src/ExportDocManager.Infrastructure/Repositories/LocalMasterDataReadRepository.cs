@@ -188,7 +188,7 @@ namespace ExportDocManager.Services.Infrastructure
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var normalizedQuery = query ?? new HsCodeReadQuery();
             var normalizedPageNumber = Math.Max(1, normalizedQuery.PageNumber);
-            var normalizedPageSize = Math.Max(1, normalizedQuery.PageSize);
+            var normalizedPageSize = Math.Clamp(normalizedQuery.PageSize <= 0 ? 50 : normalizedQuery.PageSize, 1, 200);
             var hsCodeQuery = BuildHsCodeQuery(context, normalizedQuery);
 
             var totalCount = await hsCodeQuery.CountAsync(cancellationToken);

@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.MasterData;
+using ExportDocManager.Services.Security;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
@@ -463,6 +464,150 @@ public sealed class HsCodeKnowledgeServiceTests
         Assert.True(female == null || female.Score < best.Score);
     }
 
+    [Fact]
+    public async Task HistoryDiscovery_ShouldBoundUnfilteredSourceWindow()
+    {
+        using var factory = new SqliteFactory();
+        await using (var context = factory.CreateDbContext())
+        {
+            context.HsCodes.Add(ActiveCode("6109100090", "棉制针织T恤衫"));
+            context.Products.AddRange(Enumerable.Range(1, 2501).Select(index => new Product
+            {
+                ProductCode = $"SKU-{index:0000}",
+                NameCN = $"历史商品 {index:0000}",
+                HSCode = "6109100090",
+                Material = "100%棉",
+                UpdatedAt = new DateTime(2026, 1, 1).AddMinutes(index)
+            }));
+            await context.SaveChangesAsync();
+        }
+
+        var page = await new HsCodeKnowledgeService(factory)
+            .DiscoverHistoryCandidatesAsync(string.Empty, 1, 30);
+
+        Assert.True(page.IsTruncated);
+        Assert.Equal(2500, page.ScannedSourceCount);
+        Assert.Equal(2500, page.TotalCount);
+        Assert.Equal(30, page.Items.Count);
+        Assert.Contains("更具体", page.Notice, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SharedMode_ShouldScopeHistorySourcesButKeepApprovedKnowledgeShared()
+    {
+        using var factory = new SqliteFactory();
+        await using (var context = factory.CreateDbContext())
+        {
+            context.HsCodes.AddRange(
+                ActiveCode("6109100090", "棉制针织T恤衫"),
+                ActiveCode("6110300090", "化纤制针织套头衫"));
+            context.Invoices.AddRange(
+                new Invoice
+                {
+                    InvoiceNo = "OWN-HISTORY",
+                    Type = "实际数据",
+                    OwnerUserId = 7,
+                    Items = [new Item { StyleNameCN = "本账号商品", HSCode = "6109100090" }]
+                },
+                new Invoice
+                {
+                    InvoiceNo = "OTHER-HISTORY",
+                    Type = "实际数据",
+                    OwnerUserId = 8,
+                    Items = [new Item { StyleNameCN = "其他账号商品", HSCode = "6110300090" }]
+                });
+            context.HsCodeDeclarationExamples.Add(new HsCodeDeclarationExample
+            {
+                Fingerprint = new string('A', 64),
+                RawReportedHsCode = "6110300090",
+                ResolvedCurrentHsCode = "6110300090",
+                ProductName = "公司共享套头衫知识",
+                SearchText = "公司共享套头衫知识",
+                Source = "ManuallyVerified",
+                ResolutionStatus = "ManuallyVerified",
+                IsManuallyVerified = true
+            });
+            await context.SaveChangesAsync();
+        }
+
+        var settings = new DatabaseConnectionSettings
+        {
+            Provider = DatabaseConnectionSettings.PostgreSqlProvider,
+            PostgreSqlHost = "127.0.0.1",
+            PostgreSqlDatabase = "exportdoc_test",
+            PostgreSqlUsername = "test_user"
+        };
+        var scope = new BusinessDataAccessScope(
+            settings,
+            new FixedCurrentUserContext(new User { Id = 7, Username = "operator", Role = "User" }));
+        var service = new HsCodeKnowledgeService(factory, scope);
+
+        var history = await service.DiscoverHistoryCandidatesAsync(string.Empty, 1, 30);
+        var candidate = Assert.Single(history.Items);
+        Assert.Equal("本账号商品", candidate.ProductName);
+        Assert.DoesNotContain(history.Items, item => item.ProductName == "其他账号商品");
+
+        var shared = Assert.Single((await service.SearchAsync("公司共享套头衫知识")).Items);
+        Assert.Equal("6110300090", shared.CurrentCode);
+        Assert.True(shared.CanUse);
+    }
+
+    [Fact]
+    public async Task ParameterizedKnowledgeQueries_ShouldTreatSqlPayloadAsText()
+    {
+        using var factory = new SqliteFactory();
+        await using (var context = factory.CreateDbContext())
+        {
+            context.HsCodes.Add(ActiveCode("6109100090", "棉制针织T恤衫"));
+            context.Products.Add(new Product { ProductCode = "SAFE", NameCN = "安全商品", HSCode = "6109100090" });
+            await context.SaveChangesAsync();
+        }
+        var service = new HsCodeKnowledgeService(factory);
+        const string payload = "%' OR 1=1; DROP TABLE HsCodes; --";
+
+        Assert.Empty((await service.DiscoverHistoryCandidatesAsync(payload, 1, 30)).Items);
+        await service.RecordFeedbackAsync(new HsCodeKnowledgeFeedbackInput(
+            payload,
+            payload,
+            payload,
+            "6109100090",
+            false));
+
+        await using var verification = factory.CreateDbContext();
+        Assert.Equal(1, await verification.HsCodes.CountAsync());
+        Assert.Equal(payload, Assert.Single(await verification.HsCodeSearchFeedback.ToListAsync()).QueryText);
+    }
+
+    [Fact]
+    public async Task KnowledgeInputs_ShouldRejectOversizedTextBeforeDatabaseWrite()
+    {
+        using var factory = new SqliteFactory();
+        var service = new HsCodeKnowledgeService(factory);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.SearchAsync(new string('Q', 501)));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.DiscoverHistoryCandidatesAsync(new string('H', 201), 1, 30));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.SaveExampleAsync(new HsCodeExampleInput(
+            0,
+            "6109100090",
+            string.Empty,
+            new string('N', 301),
+            string.Empty,
+            "Manual",
+            2026,
+            "Unresolved",
+            false)));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.RecordFeedbackAsync(new HsCodeKnowledgeFeedbackInput(
+            "query",
+            "product",
+            new string('S', 1501),
+            "6109100090",
+            false)));
+
+        await using var verification = factory.CreateDbContext();
+        Assert.Empty(await verification.HsCodeDeclarationExamples.ToListAsync());
+        Assert.Empty(await verification.HsCodeSearchFeedback.ToListAsync());
+    }
+
     private sealed class SqliteFactory : IDbContextFactory<AppDbContext>, IDisposable
     {
         private readonly SqliteConnection _connection = new("Data Source=:memory:");
@@ -471,6 +616,12 @@ public sealed class HsCodeKnowledgeServiceTests
         public AppDbContext CreateDbContext() => new(_options);
         public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) => Task.FromResult(CreateDbContext());
         public void Dispose() { _connection.Dispose(); }
+    }
+
+    private sealed class FixedCurrentUserContext : ICurrentUserContext
+    {
+        public FixedCurrentUserContext(User currentUser) => CurrentUser = currentUser;
+        public User CurrentUser { get; }
     }
 
     private static HsCode ActiveCode(string code, string name) => new()

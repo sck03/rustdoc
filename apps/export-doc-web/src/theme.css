@@ -45,6 +45,14 @@
   --edm-page-padding-y: 20px;
   --edm-section-padding: 17px;
   --edm-layout-gap: 14px;
+  /* Stable semantic aliases for workspace CSS and third-party-style feature modules. */
+  --surface: var(--edm-surface);
+  --surface-muted: var(--edm-surface-muted);
+  --input-background: #ffffff;
+  --border-color: var(--edm-line);
+  --text-primary: var(--edm-ink-950);
+  --text-secondary: var(--edm-ink-600);
+  --accent-color: var(--edm-primary-600);
   color-scheme: light;
   color: var(--edm-ink-950);
   background: var(--edm-canvas);

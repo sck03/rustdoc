@@ -60,4 +60,14 @@ const imported = model.readRouteInvoiceDraft({ invoiceDraft: { ...draft, custome
 assert(imported?.customerNameEN === "MIXED CASE BUYER", "routed Excel draft uppercased automatically");
 assert(hsModel.buildInvoiceHsQuery({ hsCode: "6110", styleNameCN: "化纤制套头衫" }) === "6110", "HS code prefix takes priority");
 assert(hsModel.buildInvoiceHsQuery({ hsCode: "61", styleNameCN: "化纤制套头衫", styleName: "PULLOVER" }) === "化纤制套头衫 PULLOVER", "short HS code falls back to product names");
+const feedbackContext = hsModel.buildInvoiceHsFeedbackContext({
+  styleNo: "YLAW1320-2",
+  styleNameCN: "化纤制针织女式非起绒套头衫",
+  styleName: "LADIES PULLOVER",
+  fabricComposition: "51%涤44%棉5%氨纶",
+  brand: "PETROL INDUSTRIES",
+}, "候选标准名称", "候选规格");
+assert(feedbackContext.productName === "化纤制针织女式非起绒套头衫", "HS feedback learns the current invoice product name");
+assert(feedbackContext.specification.includes("LADIES PULLOVER") && feedbackContext.specification.includes("51%涤44%棉5%氨纶") && feedbackContext.specification.includes("PETROL INDUSTRIES"), "HS feedback keeps reusable product attributes");
+assert(!feedbackContext.specification.includes("YLAW1320-2"), "HS feedback does not split identical products by style number");
 process.stdout.write("invoice-text-normalization model tests passed\n");

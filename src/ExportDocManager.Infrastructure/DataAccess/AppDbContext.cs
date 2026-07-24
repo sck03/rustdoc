@@ -90,6 +90,8 @@ namespace ExportDocManager.DataAccess
 
             modelBuilder.Entity<Item>().HasIndex(i => i.InvoiceId);
             modelBuilder.Entity<Item>().HasIndex(i => i.StyleNo); // Frequently searched
+            modelBuilder.Entity<Item>().HasIndex(i => i.HSCode);
+            modelBuilder.Entity<Item>().HasIndex(i => new { i.InvoiceId, i.Id });
             modelBuilder.Entity<Item>().HasIndex(i => new { i.InvoiceId, i.StyleNo });
             modelBuilder.Entity<Item>().HasIndex(i => new { i.InvoiceId, i.StyleName });
             modelBuilder.Entity<Item>().HasIndex(i => new { i.InvoiceId, i.HSCode });
@@ -194,6 +196,8 @@ namespace ExportDocManager.DataAccess
             
             modelBuilder.Entity<Product>().HasIndex(p => p.ProductCode);
             modelBuilder.Entity<Product>().HasIndex(p => p.NameEN);
+            modelBuilder.Entity<Product>().HasIndex(p => p.HSCode);
+            modelBuilder.Entity<Product>().HasIndex(p => new { p.UpdatedAt, p.Id });
             modelBuilder.Entity<Product>().HasIndex(p => new { p.ProductCode, p.NameEN, p.UpdatedAt, p.Id });
 
             modelBuilder.Entity<HsCode>().HasIndex(h => h.Code);
@@ -327,6 +331,8 @@ namespace ExportDocManager.DataAccess
 
             modelBuilder.Entity<CustomsCooItem>()
                 .HasIndex(item => new { item.DocumentId, item.GNo });
+            modelBuilder.Entity<CustomsCooItem>()
+                .HasIndex(item => item.HSCode);
             modelBuilder.Entity<CustomsCooNonpartyCorp>()
                 .HasIndex(item => new { item.DocumentId, item.SortNo });
             modelBuilder.Entity<CustomsCooAttachment>()

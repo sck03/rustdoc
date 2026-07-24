@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,6 +17,13 @@ namespace ExportDocManager.Services.MasterData
         private const int SearchExampleCandidateLimit = 2000;
         private const int SearchMasterCandidateLimit = 1000;
         private const int DatabaseInClauseBatchSize = 400;
+        // History discovery is an interactive review screen, not an export job. Keep each
+        // request bounded so a growing invoice archive cannot turn one page load into a
+        // full-database materialization. Users can narrow the window with a keyword.
+        private const int HistoryRecentSourceLimit = 2500;
+        private const int HistoryKeywordSourceLimit = 5000;
+        private const int MaximumHistoryKeywordLength = 200;
+        private const int MaximumKnowledgeQueryLength = 500;
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = false };
         private static readonly IReadOnlyDictionary<string, string> Synonyms = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -31,9 +39,15 @@ namespace ExportDocManager.Services.MasterData
         };
 
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
+        private readonly BusinessDataAccessScope _businessDataAccessScope;
 
-        public HsCodeKnowledgeService(IDbContextFactory<AppDbContext> dbContextFactory) =>
+        public HsCodeKnowledgeService(
+            IDbContextFactory<AppDbContext> dbContextFactory,
+            BusinessDataAccessScope businessDataAccessScope = null)
+        {
             _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
+            _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
+        }
 
         public async Task<HsCodeKnowledgeSearchResponse> SearchAsync(
             string query,
@@ -41,6 +55,8 @@ namespace ExportDocManager.Services.MasterData
             CancellationToken cancellationToken = default)
         {
             string rawQuery = (query ?? string.Empty).Trim();
+            if (rawQuery.Length > MaximumKnowledgeQueryLength)
+                throw new ArgumentException($"查询条件不能超过 {MaximumKnowledgeQueryLength} 个字符。", nameof(query));
             if (string.IsNullOrWhiteSpace(rawQuery))
                 return new HsCodeKnowledgeSearchResponse(string.Empty, [], 0, "请输入商品名称、材质、用途、规格或至少4位HS编码。");
             string normalizedQuery = NormalizeSearchText(rawQuery);
@@ -258,10 +274,14 @@ namespace ExportDocManager.Services.MasterData
             ArgumentNullException.ThrowIfNull(input);
             string rawCode = HsCodeTextHelper.NormalizeCode(input.RawReportedHsCode);
             string currentCode = HsCodeTextHelper.NormalizeCode(input.ResolvedCurrentHsCode);
-            string name = (input.ProductName ?? string.Empty).Trim();
+            string name = ValidateTextLength(input.ProductName, 300, "商品名称");
+            string specification = ValidateTextLength(input.Specification, 1500, "规格与申报要素");
+            string source = ValidateTextLength(input.Source, 100, "实例来源");
             if (string.IsNullOrWhiteSpace(rawCode) || string.IsNullOrWhiteSpace(name))
                 throw new InvalidOperationException("申报实例必须填写历史/原始HS编码和商品名称。");
-            string fingerprint = BuildFingerprint(rawCode, name, input.Specification);
+            if (rawCode.Length > 20 || currentCode.Length > 20)
+                throw new ArgumentException("HS 编码不能超过 20 个字符。");
+            string fingerprint = BuildFingerprint(rawCode, name, specification);
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             if (!string.IsNullOrWhiteSpace(currentCode) &&
                 !await HasTrustedActiveCodeAsync(context, currentCode, cancellationToken))
@@ -279,9 +299,9 @@ namespace ExportDocManager.Services.MasterData
             entity.RawReportedHsCode = rawCode;
             entity.ResolvedCurrentHsCode = string.IsNullOrWhiteSpace(currentCode) ? null : currentCode;
             entity.ProductName = name;
-            entity.Specification = (input.Specification ?? string.Empty).Trim();
-            entity.SearchText = NormalizeSearchText($"{name} {input.Specification}");
-            entity.Source = string.IsNullOrWhiteSpace(input.Source) ? "Manual" : input.Source.Trim();
+            entity.Specification = specification;
+            entity.SearchText = NormalizeSearchText($"{name} {specification}");
+            entity.Source = string.IsNullOrWhiteSpace(source) ? "Manual" : source;
             entity.SourceYear = input.SourceYear;
             entity.ResolutionStatus = NormalizeResolutionStatus(input.ResolutionStatus, currentCode, rawCode);
             entity.IsManuallyVerified = input.IsManuallyVerified;
@@ -317,9 +337,13 @@ namespace ExportDocManager.Services.MasterData
         public async Task RecordFeedbackAsync(HsCodeKnowledgeFeedbackInput input, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(input);
+            string queryText = ValidateTextLength(input.QueryText, MaximumKnowledgeQueryLength, "查询条件");
+            string productName = ValidateTextLength(input.ProductName, 300, "商品名称");
+            string specification = ValidateTextLength(input.Specification, 1500, "规格与申报要素");
             string code = HsCodeTextHelper.NormalizeCode(input.CandidateCode);
             if (string.IsNullOrWhiteSpace(code)) throw new InvalidOperationException("确认结果必须包含HS编码。");
-            string fingerprint = BuildFingerprint(NormalizeSearchText(input.QueryText), code, input.ProductName, input.Specification);
+            if (code.Length > 20) throw new ArgumentException("HS 编码不能超过 20 个字符。", nameof(input));
+            string fingerprint = BuildFingerprint(NormalizeSearchText(queryText), code, productName, specification);
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             if (input.Accepted &&
                 !await HasTrustedActiveCodeAsync(context, code, cancellationToken))
@@ -331,9 +355,9 @@ namespace ExportDocManager.Services.MasterData
                 entity = new HsCodeSearchFeedback { Fingerprint = fingerprint };
                 await context.HsCodeSearchFeedback.AddAsync(entity, cancellationToken);
             }
-            entity.QueryText = (input.QueryText ?? string.Empty).Trim();
-            entity.ProductName = (input.ProductName ?? string.Empty).Trim();
-            entity.Specification = (input.Specification ?? string.Empty).Trim();
+            entity.QueryText = queryText;
+            entity.ProductName = productName;
+            entity.Specification = specification;
             entity.CandidateCode = code;
             if (input.Accepted) { entity.AcceptedCount++; entity.LastConfirmedAt = now; }
             else entity.RejectedCount++;
@@ -341,8 +365,8 @@ namespace ExportDocManager.Services.MasterData
             if (input.Accepted)
             {
                 var exampleInput = new HsCodeExampleInput(0, code, code,
-                    string.IsNullOrWhiteSpace(input.ProductName) ? input.QueryText : input.ProductName,
-                    input.Specification, "UserConfirmed", DateTime.Now.Year, "ManuallyVerified", true);
+                    string.IsNullOrWhiteSpace(productName) ? queryText : productName,
+                    specification, "UserConfirmed", DateTime.Now.Year, "ManuallyVerified", true);
                 await UpsertExampleInContextAsync(context, exampleInput, now, cancellationToken, incrementUseCount: false);
             }
             await context.SaveChangesAsync(cancellationToken);
@@ -353,29 +377,43 @@ namespace ExportDocManager.Services.MasterData
         {
             pageNumber = Math.Max(pageNumber, 1);
             pageSize = Math.Clamp(pageSize, 1, 100);
-            string filter = NormalizeSearchText(keyword);
+            string rawFilter = (keyword ?? string.Empty).Trim();
+            if (rawFilter.Length > MaximumHistoryKeywordLength)
+                throw new ArgumentException($"历史资料筛选条件不能超过 {MaximumHistoryKeywordLength} 个字符。", nameof(keyword));
+            string filter = NormalizeSearchText(rawFilter);
+            int sourceLimit = string.IsNullOrWhiteSpace(rawFilter)
+                ? HistoryRecentSourceLimit
+                : HistoryKeywordSourceLimit;
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            var codes = await context.HsCodes.AsNoTracking().ToListAsync(cancellationToken);
-            var codeMap = codes.Where(item => !string.IsNullOrWhiteSpace(item.NormalizedCode))
-                .GroupBy(item => item.NormalizedCode, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-            var relations = await context.HsCodeReplacementRelations.AsNoTracking().ToListAsync(cancellationToken);
-            var known = (await context.HsCodeDeclarationExamples.AsNoTracking().Select(item => item.Fingerprint).ToListAsync(cancellationToken))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // Read only the columns needed by the learning screen. The previous implementation
+            // loaded complete entities from all three history sources before filtering in memory.
+            // Each source is now filtered and bounded in SQL; the extra row is used only to tell
+            // the UI that a narrower keyword is needed for a complete review window.
             var rows = new List<HistorySourceRow>();
 
-            rows.AddRange((await context.Products.AsNoTracking().Where(item => item.HSCode != null && item.HSCode != "").Take(5000).ToListAsync(cancellationToken))
-                .Select(item => new HistorySourceRow(item.HSCode, Prefer(item.NameCN, item.NameEN), $"{item.Material} {item.Brand} {item.Elements} {item.Description}", "商品主数据", string.Empty)));
-            rows.AddRange((await context.Items.AsNoTracking().Where(item => item.HSCode != null && item.HSCode != "").Take(10000).ToListAsync(cancellationToken))
-                .Select(item => new HistorySourceRow(item.HSCode, NormalizeHistoryProductName(Prefer(item.StyleNameCN, item.StyleName)),
-                    JoinHistorySpecification(item.FabricComposition, item.Brand), "历史商业发票", item.StyleNo)));
-            rows.AddRange((await context.CustomsCooItems.AsNoTracking().Where(item => item.HSCode != "").Take(5000).ToListAsync(cancellationToken))
-                .Select(item => new HistorySourceRow(item.HSCode, Prefer(item.GoodsName, item.GoodsNameE), item.GoodsDesc, "历史报关资料", item.SourceStyleNo)));
+            var productRows = await ReadProductHistoryRowsAsync(context, rawFilter, sourceLimit, cancellationToken);
+            var itemRows = await ReadInvoiceHistoryRowsAsync(context, rawFilter, sourceLimit, cancellationToken);
+            var customsRows = await ReadCustomsHistoryRowsAsync(context, rawFilter, sourceLimit, cancellationToken);
+            rows.AddRange(productRows.Rows.Select(ToHistorySourceRow));
+            rows.AddRange(itemRows.Rows.Select(ToHistorySourceRow));
+            rows.AddRange(customsRows.Rows.Select(ToHistorySourceRow));
 
-            var candidates = rows.Where(item => !string.IsNullOrWhiteSpace(item.Code) && !string.IsNullOrWhiteSpace(item.Name))
-                .Select(item => item with { Code = HsCodeTextHelper.NormalizeCode(item.Code), Name = item.Name.Trim(), Specification = (item.Specification ?? string.Empty).Trim() })
-                .Where(item => string.IsNullOrWhiteSpace(filter) || NormalizeSearchText($"{item.Name} {item.Specification} {item.Code}").Contains(filter, StringComparison.OrdinalIgnoreCase))
-                .GroupBy(item => new { item.Code, Name = NormalizeSearchText(item.Name), Specification = NormalizeSearchText(item.Specification) })
+            var groupedRows = rows.Where(item => !string.IsNullOrWhiteSpace(item.Code) && !string.IsNullOrWhiteSpace(item.Name))
+                .Select(item => item with
+                {
+                    Code = HsCodeTextHelper.NormalizeCode(item.Code),
+                    Name = NormalizeHistoryProductName(item.Name.Trim()),
+                    Specification = (item.Specification ?? string.Empty).Trim()
+                })
+                .Where(item => string.IsNullOrWhiteSpace(filter) ||
+                    NormalizeSearchText($"{item.Name} {item.Specification} {item.Code}").Contains(filter, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(item => new
+                {
+                    item.Code,
+                    Name = NormalizeSearchText(item.Name),
+                    Specification = NormalizeSearchText(item.Specification)
+                })
                 .Select(group =>
                 {
                     var first = group.First();
@@ -385,19 +423,227 @@ namespace ExportDocManager.Services.MasterData
                         .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
                         .ToList();
                     string fingerprint = BuildFingerprint(first.Code, first.Name, first.Specification);
-                    var resolution = ResolveCurrentCode(new HsCodeDeclarationExample { RawReportedHsCode = first.Code }, codeMap, relations);
-                    return new HsCodeHistoryLearningCandidate(fingerprint, first.Code, resolution.CurrentCode ?? string.Empty,
-                        first.Name, first.Specification, string.Join("、", group.Select(item => item.Source).Distinct()), group.Count(),
-                        variants.Count, variants.Take(5).ToList(), resolution.Status, resolution.Replacements,
-                        !known.Contains(fingerprint) && resolution.CanUse);
+                    return new HistoryCandidateGroup(
+                        fingerprint,
+                        first.Code,
+                        first.Name,
+                        first.Specification,
+                        string.Join("、", group.Select(item => item.Source).Distinct()),
+                        group.Count(),
+                        variants.Count,
+                        variants.Take(5).ToList());
                 })
+                .ToList();
+
+            // Resolve only codes actually present in the bounded candidate set. This keeps the
+            // formal tax table and replacement graph out of the history page's hot path.
+            var rawCodes = groupedRows.Select(item => item.RawCode)
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var relations = await LoadReplacementRelationsAsync(context, rawCodes, cancellationToken);
+            var lookupCodes = rawCodes
+                .Concat(relations.Select(item => item.NewCode))
+                .Select(HsCodeTextHelper.NormalizeCode)
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var codes = await LoadHsCodesByNormalizedCodesAsync(context, lookupCodes, cancellationToken);
+            var codeMap = codes.Where(item => !string.IsNullOrWhiteSpace(item.NormalizedCode))
+                .GroupBy(item => item.NormalizedCode, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var known = await LoadKnownFingerprintsAsync(
+                context,
+                groupedRows.Select(item => item.Fingerprint),
+                cancellationToken);
+
+            var candidates = groupedRows
                 .Where(item => !known.Contains(item.Fingerprint))
+                .Select(item =>
+                {
+                    var resolution = ResolveCurrentCode(
+                        new HsCodeDeclarationExample { RawReportedHsCode = item.RawCode },
+                        codeMap,
+                        relations);
+                    return new HsCodeHistoryLearningCandidate(
+                        item.Fingerprint,
+                        item.RawCode,
+                        resolution.CurrentCode ?? string.Empty,
+                        item.ProductName,
+                        item.Specification,
+                        item.Source,
+                        item.SourceCount,
+                        item.VariantCount,
+                        item.VariantSamples,
+                        resolution.Status,
+                        resolution.Replacements,
+                        resolution.CanUse);
+                })
                 .OrderByDescending(item => item.CanConfirm).ThenByDescending(item => item.SourceCount).ThenBy(item => item.ProductName)
                 .ToList();
             int totalCount = candidates.Count;
             var items = candidates.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();
-            return new HsCodeHistoryCandidatePage(items, totalCount, pageNumber, pageSize);
+            bool isTruncated = productRows.HasMore || itemRows.HasMore || customsRows.HasMore;
+            string notice = isTruncated
+                ? $"历史资料量较大，本次按每类最多 {sourceLimit:N0} 条近期记录分析；请输入更具体的品名、款号或 HS 编码以缩小范围。"
+                : string.Empty;
+            return new HsCodeHistoryCandidatePage(items, totalCount, pageNumber, pageSize, isTruncated, rows.Count, notice);
         }
+
+        private static async Task<HistorySourceReadResult> ReadProductHistoryRowsAsync(
+            AppDbContext context,
+            string keyword,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            var query = context.Products.AsNoTracking()
+                .Where(item => item.HSCode != null && item.HSCode != "");
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                string codePrefix = HsCodeTextHelper.NormalizeCodeSearchKeyword(keyword);
+                query = !string.IsNullOrWhiteSpace(codePrefix) && codePrefix.All(char.IsDigit)
+                    ? query.Where(item => item.HSCode.StartsWith(codePrefix))
+                    : query.Where(item =>
+                        (item.HSCode != null && item.HSCode.Contains(keyword)) ||
+                        (item.ProductCode != null && item.ProductCode.Contains(keyword)) ||
+                        (item.NameCN != null && item.NameCN.Contains(keyword)) ||
+                        (item.NameEN != null && item.NameEN.Contains(keyword)) ||
+                        (item.Material != null && item.Material.Contains(keyword)) ||
+                        (item.Brand != null && item.Brand.Contains(keyword)));
+            }
+
+            var rows = await query
+                .OrderByDescending(item => item.UpdatedAt)
+                .ThenByDescending(item => item.Id)
+                .Take(limit + 1)
+                .Select(item => new HistorySourceProjection(
+                    item.HSCode,
+                    item.NameCN,
+                    item.NameEN,
+                    item.Material,
+                    item.Brand,
+                    item.Elements,
+                    item.Description,
+                    "商品主数据",
+                    string.Empty))
+                .ToListAsync(cancellationToken);
+            return TrimHistoryRows(rows, limit);
+        }
+
+        private async Task<HistorySourceReadResult> ReadInvoiceHistoryRowsAsync(
+            AppDbContext context,
+            string keyword,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            IQueryable<Item> query = context.Items.AsNoTracking()
+                .Where(item => item.HSCode != null && item.HSCode != "");
+            if (_businessDataAccessScope.ShouldFilterBusinessData())
+            {
+                var scopedInvoices = _businessDataAccessScope.ApplyInvoiceScope(context.Invoices.AsNoTracking());
+                query = query.Where(item => scopedInvoices.Any(invoice => invoice.Id == item.InvoiceId));
+            }
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                string codePrefix = HsCodeTextHelper.NormalizeCodeSearchKeyword(keyword);
+                query = !string.IsNullOrWhiteSpace(codePrefix) && codePrefix.All(char.IsDigit)
+                    ? query.Where(item => item.HSCode.StartsWith(codePrefix))
+                    : query.Where(item =>
+                        (item.HSCode != null && item.HSCode.Contains(keyword)) ||
+                        (item.StyleNo != null && item.StyleNo.Contains(keyword)) ||
+                        (item.StyleNameCN != null && item.StyleNameCN.Contains(keyword)) ||
+                        (item.StyleName != null && item.StyleName.Contains(keyword)) ||
+                        (item.FabricComposition != null && item.FabricComposition.Contains(keyword)) ||
+                        (item.Brand != null && item.Brand.Contains(keyword)));
+            }
+
+            var rows = await query
+                .OrderByDescending(item => item.InvoiceId)
+                .ThenByDescending(item => item.Id)
+                .Take(limit + 1)
+                .Select(item => new HistorySourceProjection(
+                    item.HSCode,
+                    item.StyleNameCN,
+                    item.StyleName,
+                    item.FabricComposition,
+                    item.Brand,
+                    string.Empty,
+                    string.Empty,
+                    "历史商业发票",
+                    item.StyleNo))
+                .ToListAsync(cancellationToken);
+            return TrimHistoryRows(rows, limit);
+        }
+
+        private async Task<HistorySourceReadResult> ReadCustomsHistoryRowsAsync(
+            AppDbContext context,
+            string keyword,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            IQueryable<CustomsCooItem> query = context.CustomsCooItems.AsNoTracking()
+                .Where(item => item.HSCode != null && item.HSCode != "");
+            if (_businessDataAccessScope.ShouldFilterBusinessData())
+            {
+                var scopedInvoices = _businessDataAccessScope.ApplyInvoiceScope(context.Invoices.AsNoTracking());
+                query = from item in query
+                        join document in context.CustomsCooDocuments.AsNoTracking()
+                            on item.DocumentId equals document.Id
+                        join invoice in scopedInvoices
+                            on document.SourceInvoiceId equals invoice.Id
+                        select item;
+            }
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                string codePrefix = HsCodeTextHelper.NormalizeCodeSearchKeyword(keyword);
+                query = !string.IsNullOrWhiteSpace(codePrefix) && codePrefix.All(char.IsDigit)
+                    ? query.Where(item => item.HSCode.StartsWith(codePrefix))
+                    : query.Where(item =>
+                        item.HSCode.Contains(keyword) ||
+                        item.SourceStyleNo.Contains(keyword) ||
+                        item.GoodsName.Contains(keyword) ||
+                        item.GoodsNameE.Contains(keyword) ||
+                        item.GoodsDesc.Contains(keyword));
+            }
+
+            var rows = await query
+                .OrderByDescending(item => item.Id)
+                .Take(limit + 1)
+                .Select(item => new HistorySourceProjection(
+                    item.HSCode,
+                    item.GoodsName,
+                    item.GoodsNameE,
+                    item.GoodsDesc,
+                    string.Empty,
+                    string.Empty,
+                    string.Empty,
+                    "历史报关资料",
+                    item.SourceStyleNo))
+                .ToListAsync(cancellationToken);
+            return TrimHistoryRows(rows, limit);
+        }
+
+        private static HistorySourceReadResult TrimHistoryRows(
+            List<HistorySourceProjection> rows,
+            int limit)
+        {
+            bool hasMore = rows.Count > limit;
+            if (hasMore)
+                rows.RemoveRange(limit, rows.Count - limit);
+            return new HistorySourceReadResult(rows, hasMore);
+        }
+
+        private static HistorySourceRow ToHistorySourceRow(HistorySourceProjection row) =>
+            new(
+                row.Code,
+                Prefer(row.NamePrimary, row.NameFallback),
+                JoinHistorySpecification(
+                    row.SpecificationOne,
+                    row.SpecificationTwo,
+                    row.SpecificationThree,
+                    row.SpecificationFour),
+                row.Source,
+                row.Variant);
 
         public async Task<int> CaptureRemoteExamplesAsync(
             string query, IEnumerable<HsCode> remoteRows, CancellationToken cancellationToken = default)
@@ -467,9 +713,28 @@ namespace ExportDocManager.Services.MasterData
                 .ToList();
             if (examples.Count == 0) return 0;
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            var codes = await context.HsCodes.AsNoTracking().ToListAsync(cancellationToken);
+            var rawCodes = examples
+                .Select(record => HsCodeTextHelper.NormalizeCode(record.Item.Code))
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var relations = await LoadReplacementRelationsAsync(context, rawCodes, cancellationToken);
+            var lookupCodes = rawCodes
+                .Concat(relations.Select(item => item.NewCode))
+                .Select(HsCodeTextHelper.NormalizeCode)
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var codes = await LoadHsCodesByNormalizedCodesAsync(context, lookupCodes, cancellationToken);
+            var recommendedPrefixes = (replacementEvidence ?? [])
+                .SelectMany(item => item.RecommendedKeywords ?? [])
+                .Select(HsCodeTextHelper.NormalizeCode)
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            codes.AddRange((await LoadTrustedHsCodesByPrefixesAsync(context, recommendedPrefixes, cancellationToken))
+                .Where(candidate => codes.All(code => code.Id != candidate.Id)));
             var codeMap = codes.Where(item => !string.IsNullOrWhiteSpace(item.NormalizedCode)).GroupBy(item => item.NormalizedCode, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-            var relations = await context.HsCodeReplacementRelations.AsNoTracking().ToListAsync(cancellationToken);
             var fingerprints = examples
                 .Select(record => BuildFingerprint(
                     HsCodeTextHelper.NormalizeCode(record.Item.Code),
@@ -842,6 +1107,54 @@ namespace ExportDocManager.Services.MasterData
             return result;
         }
 
+        private static async Task<List<HsCode>> LoadTrustedHsCodesByPrefixesAsync(
+            AppDbContext context,
+            IEnumerable<string> prefixes,
+            CancellationToken cancellationToken)
+        {
+            var result = new List<HsCode>();
+            foreach (string prefix in (prefixes ?? Enumerable.Empty<string>())
+                         .Where(value => !string.IsNullOrWhiteSpace(value))
+                         .Distinct(StringComparer.OrdinalIgnoreCase)
+                         .Take(50))
+            {
+                var matches = await context.HsCodes.AsNoTracking()
+                    .Where(item => item.Status == HsCodeValidityPolicy.ActiveStatus &&
+                        item.SourceName != null && item.SourceName != "" &&
+                        item.EffectiveYear != null && item.LastVerifiedAt != null &&
+                        item.NormalizedCode.StartsWith(prefix))
+                    .OrderByDescending(item => item.EffectiveYear)
+                    .ThenByDescending(item => item.LastVerifiedAt)
+                    .ThenBy(item => item.NormalizedCode)
+                    .Take(200)
+                    .ToListAsync(cancellationToken);
+                result.AddRange(matches.Where(candidate => result.All(item => item.Id != candidate.Id)));
+            }
+            return result;
+        }
+
+        private static async Task<HashSet<string>> LoadKnownFingerprintsAsync(
+            AppDbContext context,
+            IEnumerable<string> fingerprints,
+            CancellationToken cancellationToken)
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var valuesToFind = (fingerprints ?? Enumerable.Empty<string>())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            foreach (var batch in valuesToFind.Chunk(DatabaseInClauseBatchSize))
+            {
+                string[] values = batch.ToArray();
+                var found = await context.HsCodeDeclarationExamples.AsNoTracking()
+                    .Where(item => values.Contains(item.Fingerprint))
+                    .Select(item => item.Fingerprint)
+                    .ToListAsync(cancellationToken);
+                result.UnionWith(found);
+            }
+            return result;
+        }
+
         private static async Task<List<HsCodeReplacementRelation>> LoadReplacementRelationsAsync(
             AppDbContext context,
             IReadOnlyCollection<string> oldCodes,
@@ -1164,6 +1477,14 @@ namespace ExportDocManager.Services.MasterData
 
         private static string Prefer(string primary, string fallback) => string.IsNullOrWhiteSpace(primary) ? fallback : primary.Trim();
 
+        private static string ValidateTextLength(string value, int maximumLength, string fieldName)
+        {
+            string normalized = (value ?? string.Empty).Trim();
+            if (normalized.Length > maximumLength)
+                throw new ArgumentException($"{fieldName}不能超过 {maximumLength} 个字符。", fieldName);
+            return normalized;
+        }
+
         private static string NormalizeHistoryProductName(string value)
         {
             string name = (value ?? string.Empty).Normalize(NormalizationForm.FormKC).Trim();
@@ -1199,6 +1520,26 @@ namespace ExportDocManager.Services.MasterData
             IReadOnlyList<string> ConflictWarnings);
         private sealed record AttributeAssessment(int Penalty, IReadOnlyList<string> MatchReasons, IReadOnlyList<string> ConflictWarnings);
         private sealed record HistorySourceRow(string Code, string Name, string Specification, string Source, string Variant);
+        private sealed record HistorySourceProjection(
+            string Code,
+            string NamePrimary,
+            string NameFallback,
+            string SpecificationOne,
+            string SpecificationTwo,
+            string SpecificationThree,
+            string SpecificationFour,
+            string Source,
+            string Variant);
+        private sealed record HistorySourceReadResult(IReadOnlyList<HistorySourceProjection> Rows, bool HasMore);
+        private sealed record HistoryCandidateGroup(
+            string Fingerprint,
+            string RawCode,
+            string ProductName,
+            string Specification,
+            string Source,
+            int SourceCount,
+            int VariantCount,
+            IReadOnlyList<string> VariantSamples);
     }
 
 }

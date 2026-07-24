@@ -71,9 +71,23 @@ for (const file of walk(root)) {
   }
 
   if (sourceRelativePath === "features/master-data/HsCodeKnowledgePage.tsx") {
-    for (const hsKnowledgeContract of ["useDebouncedValue", "placeholderData: keepPreviousData", "ListPaginationControls", "confirmSelected"]) {
+    for (const hsKnowledgeContract of ["useDebouncedValue", "placeholderData: keepPreviousData", "ListPaginationControls", "confirmSelected", "queryFn: ({ signal })"]) {
       if (!sourceText.includes(hsKnowledgeContract)) {
         failures.push(`${sourceRelativePath}: HS 实例、候选和历史列表缺少防抖/分页/准确反馈闭环：${hsKnowledgeContract}`);
+      }
+    }
+    if (!sourceText.includes("candidates.data?.notice")) {
+      failures.push(`${sourceRelativePath}: 历史资料候选必须向用户说明有界扫描窗口，避免把分批结果误认为完整数据集`);
+    }
+  }
+
+  if (sourceRelativePath === "features/invoices/InvoiceHsKnowledgePanel.tsx") {
+    if (/<form\b/.test(sourceText)) {
+      failures.push(`${sourceRelativePath}: HS 查询面板不得嵌套发票外层 form，查询按钮会被浏览器误判为保存提交`);
+    }
+    for (const hsSearchContract of ['role="search"', 'type="button"', "onKeyDown", "maxLength={500}"]) {
+      if (!sourceText.includes(hsSearchContract)) {
+        failures.push(`${sourceRelativePath}: HS 查询面板缺少独立按钮、快捷键或输入边界：${hsSearchContract}`);
       }
     }
   }
@@ -247,6 +261,10 @@ for (const saveActionContract of [
 }
 if (themeCss.includes(".invoice-editor-sticky-actions span {")) {
   failures.push("theme.css: 发票保存区状态文字选择器不得覆盖按钮组件内部文字");
+}
+const hsKnowledgeCss = fs.readFileSync(path.join(root, "features", "master-data", "hsKnowledge.css"), "utf8");
+if (!hsKnowledgeCss.includes("background: var(--input-background, #fff)")) {
+  failures.push("hsKnowledge.css: 智能 HS 查询输入框必须有稳定的非透明背景回退");
 }
 for (const reducedMotionContract of [
   "@media (prefers-reduced-motion: reduce)",

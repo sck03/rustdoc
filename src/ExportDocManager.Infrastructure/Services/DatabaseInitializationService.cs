@@ -364,12 +364,22 @@ namespace ExportDocManager.Services.Infrastructure
                     ON "Invoices" ("CompanyScope", "DepartmentId", "InvoiceDate", "Id");
                 CREATE INDEX IF NOT EXISTS "IX_Items_InvoiceId_StyleNo"
                     ON "Items" ("InvoiceId", "StyleNo");
+                CREATE INDEX IF NOT EXISTS "IX_Items_HSCode"
+                    ON "Items" ("HSCode");
+                CREATE INDEX IF NOT EXISTS "IX_Items_InvoiceId_Id"
+                    ON "Items" ("InvoiceId", "Id");
                 CREATE INDEX IF NOT EXISTS "IX_Items_InvoiceId_StyleName"
                     ON "Items" ("InvoiceId", "StyleName");
                 CREATE INDEX IF NOT EXISTS "IX_Items_InvoiceId_HSCode"
                     ON "Items" ("InvoiceId", "HSCode");
                 CREATE INDEX IF NOT EXISTS "IX_Products_ProductCode_NameEN_UpdatedAt_Id"
                     ON "Products" ("ProductCode", "NameEN", "UpdatedAt", "Id");
+                CREATE INDEX IF NOT EXISTS "IX_Products_HSCode"
+                    ON "Products" ("HSCode");
+                CREATE INDEX IF NOT EXISTS "IX_Products_UpdatedAt_Id"
+                    ON "Products" ("UpdatedAt", "Id");
+                CREATE INDEX IF NOT EXISTS "IX_CustomsCooItems_HSCode"
+                    ON "CustomsCooItems" ("HSCode");
                 CREATE INDEX IF NOT EXISTS "IX_HsCodeDeclarationExamples_IsManuallyVerified_UpdatedAt"
                     ON "HsCodeDeclarationExamples" ("IsManuallyVerified", "UpdatedAt");
                 """).ConfigureAwait(false);
