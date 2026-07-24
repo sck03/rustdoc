@@ -16,6 +16,7 @@ namespace ExportDocManager.Services.Infrastructure
         IUnitReadRepository,
         IHsCodeReadRepository
     {
+        private const int DatabaseIdBatchSize = 400;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
 
         public LocalMasterDataReadRepository(IDbContextFactory<AppDbContext> contextFactory)
@@ -218,6 +219,47 @@ namespace ExportDocManager.Services.Infrastructure
             return await context.HsCodes
                 .AsNoTracking()
                 .FirstOrDefaultAsync(hsCode => hsCode.NormalizedCode == normalizedCodeKey, cancellationToken);
+        }
+
+        public async Task<HsCode> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+        {
+            if (id <= 0)
+            {
+                return null;
+            }
+
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.HsCodes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        }
+
+        public async Task<IReadOnlyList<int>> FindExistingIdsAsync(
+            IReadOnlyCollection<int> ids,
+            CancellationToken cancellationToken = default)
+        {
+            var validIds = (ids ?? Array.Empty<int>())
+                .Where(id => id > 0)
+                .Distinct()
+                .ToArray();
+            if (validIds.Length == 0)
+            {
+                return Array.Empty<int>();
+            }
+
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var result = new List<int>(validIds.Length);
+            foreach (var batch in validIds.Chunk(DatabaseIdBatchSize))
+            {
+                int[] batchIds = batch.ToArray();
+                result.AddRange(await context.HsCodes
+                    .AsNoTracking()
+                    .Where(item => batchIds.Contains(item.Id))
+                    .Select(item => item.Id)
+                    .ToListAsync(cancellationToken));
+            }
+
+            return result;
         }
 
         private static IQueryable<HsCode> BuildHsCodeQuery(AppDbContext context, HsCodeReadQuery query)

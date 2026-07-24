@@ -21,9 +21,15 @@ ApiStartupValidator.Validate(pathProvider, databaseSettings, runtimeOptions);
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls(runtimeOptions.ListenUrls);
+builder.WebHost.ConfigureKestrel(options =>
+    options.Limits.MaxRequestBodySize = ApiUploadLimits.MaximumRequestBodyBytes);
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+    options.MultipartBodyLengthLimit = ApiUploadLimits.MaximumRequestBodyBytes);
 builder.Services.AddExportDocManagerApiServices(pathProvider, databaseSettings, runtimeOptions);
 
 var app = builder.Build();
+app.UseExportDocManagerForwardedHeaders(runtimeOptions);
+app.UseExportDocManagerApiSafety();
 app.UseCors(ApiCorsPolicy.LocalFrontendPolicyName);
 app.UseExportDocManagerDesktopAccess();
 app.UseExportDocManagerApiAuthentication();

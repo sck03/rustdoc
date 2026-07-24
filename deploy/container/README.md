@@ -1,13 +1,15 @@
 # Full 局域网 / 容器版
 
-该部署只发布 `Full` 产品，并通过 PostgreSQL 中的账号岗位、权限模板和数据归属控制实际能力。Web 与 API 使用同一域名反向代理，API 不直接映射到宿主机端口。
+该部署只发布 `Full` 产品，并通过 PostgreSQL 中的账号岗位、权限模板和数据归属控制实际能力。Web 与 API 使用同一域名反向代理，API 不直接映射到宿主机端口。Compose 为 Nginx 分配固定容器地址，API 只信任该明确地址提供的 `X-Forwarded-For` / `X-Forwarded-Proto`，因此多用户登录限流按真实客户端地址区分，同时不会无条件信任外部可伪造的转发头。
 
 ## 初始化
 
 在本目录执行：
 
 ```powershell
-pwsh -File .\initialize-container-runtime.ps1 -PostgreSqlPassword "请替换为长随机数据库密码"
+pwsh -File .\initialize-container-runtime.ps1 `
+  -PostgreSqlPassword "请替换为长随机数据库密码" `
+  -BootstrapToken "请替换为另一段至少24位的随机首次部署令牌"
 docker compose up -d --build
 ```
 
@@ -17,7 +19,13 @@ docker compose up -d --build
 docker compose -f .\docker-compose.ghcr.yml --env-file .\.env up -d
 ```
 
-随后由部署管理员访问 `http://服务器地址:8080`，首次使用用户名 `admin` 登录；这次输入的密码会成为首个应用管理员密码，至少需要 8 个字符。空数据库首次初始化只接受 `admin` 用户名，其他用户名不能先行创建或认领管理员。数据库连接密码来自运行目录 `runtime/config/appsettings.json`，与应用管理员密码相互独立。
+随后由部署管理员访问 `http://服务器地址:8080`，展开登录页“服务器连接设置”，在“首次部署令牌”中填写初始化命令使用的 `BootstrapToken`，再以用户名 `admin` 登录；这次输入的密码会成为首个应用管理员密码，至少需要 8 个字符。令牌只随本次登录请求发送，登录成功后从页面内存清除，不写入浏览器存储。空数据库首次初始化只接受 `admin` 用户名，其他用户名不能先行创建或认领管理员。数据库连接密码来自运行目录 `runtime/config/appsettings.json`，与应用管理员密码及首次部署令牌相互独立。
+
+API 启动时仍要求 `.env` 中保留至少 24 位的 `EXPORTDOCMANAGER_BOOTSTRAP_TOKEN`；数据库已有用户后，普通登录无需再次填写该令牌，可以按企业密钥轮换制度更换 `.env` 中的值并重启 API。不要把令牌复用为数据库密码或管理员密码。
+
+默认容器网段为 `172.30.238.0/24`，Nginx 地址为 `172.30.238.10`。如果该网段与现有 Docker、VPN 或局域网路由冲突，应在 `.env` 同时修改 `EXPORTDOCMANAGER_CONTAINER_SUBNET` 和 `EXPORTDOCMANAGER_REVERSE_PROXY_IP`，并确保代理地址属于所选网段。公网 HTTPS/CDN 代理位于内置 Nginx 前方时，还应把它实际连接 Nginx 的明确来源 IP 写入 `EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES`；多个地址用分号分隔。API 会按已配置代理数量限制转发链，并逐跳核对可信地址，不接受任意长度的客户端伪造链。不要填写整个不受控网段。非 Compose 反向代理部署可通过 `EXPORTDOCMANAGER_TRUSTED_PROXIES` 配置一个或多个明确代理 IP（逗号或分号分隔，不接受主机名和 CIDR）。
+
+敏感配置默认由运行目录 `runtime/api-data/Security/local-master-key.bin` 中自动生成的本地主密钥保护，不写系统盘固定目录。也可以在 `.env` 设置 `EXPORTDOCMANAGER_MASTER_KEY`（32 字节 Base64 或 64 位十六进制）；一旦使用环境主密钥，必须长期安全备份并在迁移时一并提供，随意更换会导致既有密文无法解密。
 
 系统默认关闭公开自注册。管理员登录后通过侧栏“系统维护 → 账号与权限”创建、停用、重置或删除账号；已有发票、付款等业务数据归属的账号只能停用，不能直接删除。
 

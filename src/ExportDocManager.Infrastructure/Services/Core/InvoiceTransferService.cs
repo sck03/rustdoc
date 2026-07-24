@@ -19,6 +19,9 @@ namespace ExportDocManager.Services.Core
 {
     public class InvoiceTransferService : IInvoiceTransferService
     {
+        private const long MaximumPackageJsonBytes = 32L * 1024L * 1024L;
+        private const long MaximumPackageMetadataBytes = 256L * 1024L;
+        private const int MaximumPackageEntries = 16;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly IInvoicePartyResolver _invoicePartyResolver;
         private readonly BusinessDataAccessScope _businessDataAccessScope;
@@ -88,6 +91,10 @@ namespace ExportDocManager.Services.Core
             }
 
             using var archive = ZipFile.OpenRead(filePath);
+            if (archive.Entries.Count > MaximumPackageEntries)
+            {
+                throw new InvalidDataException("单据包包含过多文件。");
+            }
             var dataEntry = archive.GetEntry("data.json");
             var metaEntry = archive.GetEntry("meta.json");
             if (dataEntry == null || metaEntry == null)
@@ -97,16 +104,20 @@ namespace ExportDocManager.Services.Core
 
             string dataJson;
             using (var stream = dataEntry.Open())
-            using (var reader = new StreamReader(stream, Encoding.UTF8))
             {
-                dataJson = await reader.ReadToEndAsync(cancellationToken);
+                dataJson = await BoundedStreamHelper.ReadUtf8TextAsync(
+                    stream,
+                    MaximumPackageJsonBytes,
+                    cancellationToken);
             }
 
             string metaJson;
             using (var stream = metaEntry.Open())
-            using (var reader = new StreamReader(stream, Encoding.UTF8))
             {
-                metaJson = await reader.ReadToEndAsync(cancellationToken);
+                metaJson = await BoundedStreamHelper.ReadUtf8TextAsync(
+                    stream,
+                    MaximumPackageMetadataBytes,
+                    cancellationToken);
             }
 
             var package = JsonSerializer.Deserialize<InvoiceTransferPackage>(dataJson)

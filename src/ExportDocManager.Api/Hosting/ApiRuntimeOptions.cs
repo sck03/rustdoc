@@ -1,5 +1,6 @@
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using System.Net;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -10,6 +11,9 @@ namespace ExportDocManager.Api.Hosting
         public const string ProductEditionEnvironmentVariable = "EXPORTDOCMANAGER_PRODUCT_EDITION";
         public const string NetworkModeEnvironmentVariable = "EXPORTDOCMANAGER_NETWORK_MODE";
         public const string AllowedOriginsEnvironmentVariable = "EXPORTDOCMANAGER_ALLOWED_ORIGINS";
+        public const string TrustedProxiesEnvironmentVariable = "EXPORTDOCMANAGER_TRUSTED_PROXIES";
+        public const string BootstrapTokenEnvironmentVariable = "EXPORTDOCMANAGER_BOOTSTRAP_TOKEN";
+        public const string BootstrapTokenHeaderName = "X-ExportDocManager-Bootstrap-Token";
 
         public string AppRoot { get; init; } = AppContext.BaseDirectory;
 
@@ -24,6 +28,14 @@ namespace ExportDocManager.Api.Hosting
         public bool NetworkMode { get; init; }
 
         public IReadOnlyList<string> AllowedOrigins { get; init; } = [];
+
+        /// <summary>
+        /// Explicit reverse-proxy addresses that are allowed to supply X-Forwarded-* headers.
+        /// The framework's loopback defaults remain in place when this list is empty.
+        /// </summary>
+        public IReadOnlyList<IPAddress> TrustedProxies { get; init; } = [];
+
+        public string BootstrapToken { get; init; } = string.Empty;
 
         public static ApiRuntimeOptions Parse(string[] args)
         {
@@ -48,6 +60,11 @@ namespace ExportDocManager.Api.Hosting
             string allowedOriginsValue = ReadOption(args, "--allowed-origins") ??
                 Environment.GetEnvironmentVariable(AllowedOriginsEnvironmentVariable) ??
                 string.Empty;
+            string trustedProxiesValue = ReadOption(args, "--trusted-proxies") ??
+                Environment.GetEnvironmentVariable(TrustedProxiesEnvironmentVariable) ??
+                string.Empty;
+            string bootstrapToken = Environment.GetEnvironmentVariable(BootstrapTokenEnvironmentVariable) ??
+                string.Empty;
 
             return new ApiRuntimeOptions
             {
@@ -57,7 +74,9 @@ namespace ExportDocManager.Api.Hosting
                 DesktopAccessToken = desktopAccessToken.Trim(),
                 ProductEdition = ProductEditionCatalog.Normalize(productEdition),
                 NetworkMode = ParseBoolean(networkModeValue),
-                AllowedOrigins = NormalizeOrigins(allowedOriginsValue)
+                AllowedOrigins = NormalizeOrigins(allowedOriginsValue),
+                TrustedProxies = NormalizeTrustedProxies(trustedProxiesValue),
+                BootstrapToken = bootstrapToken.Trim()
             };
         }
 
@@ -107,6 +126,18 @@ namespace ExportDocManager.Api.Hosting
                     ? uri.GetLeftPart(UriPartial.Authority).TrimEnd('/')
                     : throw new InvalidOperationException($"允许的 Web 来源必须是有效的 HTTP/HTTPS 地址: {origin}"))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
+        private static IReadOnlyList<IPAddress> NormalizeTrustedProxies(string value)
+        {
+            return (value ?? string.Empty)
+                .Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(proxy => IPAddress.TryParse(proxy, out var address)
+                    ? address
+                    : throw new InvalidOperationException(
+                        $"可信反向代理必须是有效的 IP 地址（不接受主机名或 CIDR）：{proxy}"))
+                .Distinct()
                 .ToArray();
         }
     }

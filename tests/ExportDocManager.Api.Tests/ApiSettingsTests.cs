@@ -33,6 +33,67 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public void SettingsResponse_ForNonAdmin_ShouldHideDeploymentAndCredentialHints()
+        {
+            var settings = new AppSettings
+            {
+                System = new SystemSettings
+                {
+                    DefaultExportDirectory = @"E:\\Exports",
+                    SqliteDatabaseFileName = "team.db",
+                    PostgreSqlHost = "postgres.internal",
+                    PostgreSqlPort = 6432,
+                    PostgreSqlDatabase = "exportdoc",
+                    PostgreSqlUsername = "exportdoc_user",
+                    PostgreSqlAdditionalOptions = "Ssl Mode=Require"
+                },
+                Email = new EmailConfig
+                {
+                    SmtpHost = "smtp.internal",
+                    UserName = "sender@example.com",
+                    FromAddress = "sender@example.com"
+                },
+                WebDav = new WebDavSettings
+                {
+                    Url = "https://dav.internal/",
+                    UserName = "backup-user",
+                    Enabled = true
+                },
+                AI = new AISettings
+                {
+                    ApiEndpoint = "https://ai.internal/v1/chat/completions",
+                    ModelName = "private-model",
+                    SystemPrompt = "private prompt",
+                    ApiKey = "private-key"
+                },
+                SingleWindow = new SingleWindowSettings
+                {
+                    CustomsCooDefaults = new CustomsCooDefaultProfile { Applicant = "sensitive" }
+                }
+            };
+
+            var localResponse = ApiSettingsDtoFactory.FromSettingsForUser(
+                settings,
+                canManageSettings: false,
+                networkMode: false);
+            Assert.Equal(@"E:\\Exports", localResponse.Settings.System.DefaultExportDirectory);
+            Assert.Equal("data.db", localResponse.Settings.System.SqliteDatabaseFileName);
+            Assert.Empty(localResponse.Settings.System.PostgreSqlHost);
+            Assert.Equal(5432, localResponse.Settings.System.PostgreSqlPort);
+            Assert.Empty(localResponse.Settings.Email.SmtpHost);
+            Assert.Empty(localResponse.Settings.WebDav.Url);
+            Assert.Empty(localResponse.Settings.AI.ApiEndpoint);
+            Assert.Empty(localResponse.Settings.SingleWindow.CustomsCooDefaults.Applicant);
+            Assert.False(localResponse.Secrets.AiApiKeySet);
+
+            var networkResponse = ApiSettingsDtoFactory.FromSettingsForUser(
+                settings,
+                canManageSettings: false,
+                networkMode: true);
+            Assert.Empty(networkResponse.Settings.System.DefaultExportDirectory);
+        }
+
+        [Fact]
         public void SettingsResponse_ShouldPreserveBatchExportItemSelectionAndSealState()
         {
             var settings = new AppSettings

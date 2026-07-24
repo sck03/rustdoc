@@ -3,6 +3,7 @@ using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -16,6 +17,16 @@ namespace ExportDocManager.Api.Hosting
                 new ApiErrorResponse(string.IsNullOrWhiteSpace(message) ? "操作失败。" : message),
                 statusCode: StatusCodes.Status409Conflict);
         }
+
+        private static IResult WritePayloadTooLarge(PayloadLimitExceededException exception)
+        {
+            return Results.Json(
+                new ApiErrorResponse(exception?.Message ?? "上传内容超过允许大小。"),
+                statusCode: StatusCodes.Status413PayloadTooLarge);
+        }
+
+        private static IResult WritePayloadTooLarge(long maximumBytes) =>
+            WritePayloadTooLarge(new PayloadLimitExceededException(maximumBytes));
 
         private static IResult WriteForbidden(string message)
         {

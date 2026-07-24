@@ -31,7 +31,9 @@
     "test:font-policy:release": "node ../../scripts/verify-font-license-policy.mjs --require-files",
     "test:visual-baselines": "node ../../scripts/test_frontend_visual_baselines.mjs",
     "test:visual-baselines:update": "node ../../scripts/update_frontend_visual_baselines.mjs",
-    "test:browser-session-contracts": "node ../../scripts/test_web_runtime_browser_session.mjs",
+    "test:browser-session-contracts": "node ../../scripts/test_web_runtime_browser_session.mjs && node ../../scripts/test_login_security_contracts.mjs && node ../../scripts/test_react_router_declarative_contract.mjs",
+    "test:login-security-contracts": "node ../../scripts/test_login_security_contracts.mjs",
+    "test:router-contract": "node ../../scripts/test_react_router_declarative_contract.mjs",
     "test:scale-contracts": "node ../../scripts/test_frontend_scale_contracts.mjs",
     "test:audit-log-maintenance-model": "node ../../scripts/test_audit_log_maintenance_model.mjs",
     "test:report-template-workspace-model": "node ../../scripts/test_report_template_workspace_model.mjs",
@@ -47,7 +49,7 @@
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.30.4",
+    "react-router-dom": "7.18.1",
     "three": "^0.184.0"
   },
   "devDependencies": {

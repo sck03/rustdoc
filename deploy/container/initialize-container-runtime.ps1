@@ -4,12 +4,17 @@ param(
     [string]$PostgreSqlUsername = "exportdoc",
     [Parameter(Mandatory = $true)]
     [string]$PostgreSqlPassword,
+    [Parameter(Mandatory = $true)]
+    [string]$BootstrapToken,
     [int]$WebPort = 8080
 )
 
 $ErrorActionPreference = "Stop"
 if ($PostgreSqlPassword.Length -lt 12 -or $PostgreSqlPassword -notmatch '^[A-Za-z0-9._~!@%+=:-]+$') {
     throw "PostgreSQL 密码至少 12 位，且只能使用字母、数字和 . _ ~ ! @ % + = : -，避免 .env 转义歧义。"
+}
+if ($BootstrapToken.Length -lt 24 -or $BootstrapToken.Length -gt 512 -or $BootstrapToken -notmatch '^[A-Za-z0-9._~!@%+=:-]+$') {
+    throw "首次部署令牌必须为 24-512 位，且只能使用字母、数字和 . _ ~ ! @ % + = : -，避免 .env 转义歧义。"
 }
 $resolvedRuntimeRoot = [System.IO.Path]::GetFullPath($RuntimeRoot)
 $configRoot = Join-Path $resolvedRuntimeRoot "config"
@@ -36,9 +41,13 @@ $envLines = @(
     "POSTGRES_DB=$PostgreSqlDatabase",
     "POSTGRES_USER=$PostgreSqlUsername",
     "POSTGRES_PASSWORD=$PostgreSqlPassword",
+    "EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=$BootstrapToken",
     "EXPORTDOCMANAGER_WEB_PORT=$WebPort",
     "EXPORTDOCMANAGER_RUNTIME_ROOT=$relativeRuntimeRoot",
     "EXPORTDOCMANAGER_ALLOWED_ORIGINS=",
+    "EXPORTDOCMANAGER_CONTAINER_SUBNET=172.30.238.0/24",
+    "EXPORTDOCMANAGER_REVERSE_PROXY_IP=172.30.238.10",
+    "EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES=",
     "TZ=Asia/Shanghai"
 )
 $envLines | Set-Content -LiteralPath (Join-Path $PSScriptRoot ".env") -Encoding UTF8

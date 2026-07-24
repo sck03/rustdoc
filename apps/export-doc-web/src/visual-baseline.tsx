@@ -34,10 +34,11 @@ const pathnameByPage: Record<string, string> = {
 
 function BaselineApp() {
   if (page === "login" || page === "login-expired") {
-    return <LoginPage apiBaseUrl="http://127.0.0.1:5188" username="admin" password="" isBusy={false}
+    return <LoginPage apiBaseUrl="http://127.0.0.1:5188" username="admin" password="" bootstrapToken="" isBusy={false}
       message={page === "login-expired" ? "登录状态已失效，请重新登录后继续。为保护账号安全，系统没有重复提交刚才的操作。" : null}
       product={fullProduct}
-      onApiBaseUrlChange={() => undefined} onUsernameChange={() => undefined} onPasswordChange={() => undefined} onSubmit={(event) => event.preventDefault()} />;
+      onApiBaseUrlChange={() => undefined} onUsernameChange={() => undefined} onPasswordChange={() => undefined}
+      onBootstrapTokenChange={() => undefined} onSubmit={(event) => event.preventDefault()} />;
   }
   if (page === "state-fatal") {
     return <FrontendFatalErrorState incidentId="WEB-20260722-TEST1" onRetry={() => undefined} onReload={() => undefined} />;

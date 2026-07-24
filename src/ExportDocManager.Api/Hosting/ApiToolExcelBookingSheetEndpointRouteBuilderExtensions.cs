@@ -129,11 +129,6 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Unauthorized();
                 }
 
-                if (context.Request.ContentLength is > 25_000_000)
-                {
-                    return Results.BadRequest(new ApiErrorResponse("Excel 文件不能超过 25 MB。"));
-                }
-
                 string safeFileName = Path.GetFileName(fileName?.Trim() ?? string.Empty);
                 if (!IsSupportedExcelSourceExtension(safeFileName))
                 {
@@ -147,7 +142,11 @@ namespace ExportDocManager.Api.Hosting
                 {
                     await using (var output = File.Create(sourcePath))
                     {
-                        await context.Request.Body.CopyToAsync(output, cancellationToken);
+                        await ApiUploadLimits.CopyRequestBodyAsync(
+                            context.Request,
+                            output,
+                            ApiUploadLimits.ExcelImportBytes,
+                            cancellationToken);
                     }
 
                     if (new FileInfo(sourcePath).Length == 0)
@@ -167,6 +166,11 @@ namespace ExportDocManager.Api.Hosting
                         destinationPath,
                         deleteSourceAfterCompletion: true,
                         enableRetry: false));
+                }
+                catch (PayloadLimitExceededException ex)
+                {
+                    AtomicFileHelper.TryDeleteDirectory(uploadRoot);
+                    return WritePayloadTooLarge(ex);
                 }
                 catch
                 {

@@ -55,6 +55,7 @@ namespace ExportDocManager.Api.Hosting
             }
             services.AddSingleton<ApiCurrentUserResolver>();
             services.AddSingleton<ApiAuthorizationService>();
+            services.AddSingleton<ApiLoginAttemptService>();
             services.AddSingleton(_ => ApiBackgroundJobConcurrencyOptions.FromEnvironment());
             services.AddSingleton(_ => ApiBackgroundJobRetentionOptions.FromEnvironment());
             services.AddSingleton<ApiBackgroundJobService>();
@@ -85,8 +86,14 @@ namespace ExportDocManager.Api.Hosting
                 new BocExchangeRateService(
                     provider.GetRequiredService<ISettingsService>(),
                     provider.GetRequiredService<IHttpClientFactory>().CreateClient("ExchangeRates")));
-            services.AddScoped<IDatabaseInitializationService, DatabaseInitializationService>();
             services.AddSingleton<DatabaseInitializationCoordinator>();
+            services.AddScoped<IDatabaseInitializationService>(provider =>
+                new DatabaseInitializationService(
+                    provider.GetRequiredService<IDbContextFactory<AppDbContext>>(),
+                    databaseSettings,
+                    provider.GetRequiredService<DatabaseInitializationCoordinator>(),
+                    runtimeOptions.NetworkMode && DatabaseModeHelper.UsesPostgreSql(databaseSettings),
+                    runtimeOptions.BootstrapToken));
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IPermissionTemplateService, PermissionTemplateService>();
             services.AddScoped<BusinessDataAccessScope>();

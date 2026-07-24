@@ -17,6 +17,7 @@ namespace ExportDocManager.DataAccess
         public static void ConfigurePathProvider(IAppPathProvider pathProvider)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            SecurityHelper.ConfigurePathProvider(_pathProvider);
         }
 
         public static string BuildConnectionString(string path)

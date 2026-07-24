@@ -9,6 +9,8 @@ namespace ExportDocManager.Services.MasterData
 {
     public partial class HsCodeService
     {
+        private const int HsCodeDeleteBatchSize = 400;
+
         public async Task SaveAsync(HsCode hsCode)
         {
             if (hsCode == null)
@@ -120,16 +122,13 @@ namespace ExportDocManager.Services.MasterData
             }
 
             await using var context = await CreateDbContextAsync();
-            var items = await context.HsCodes
-                .Where(h => validIds.Contains(h.Id))
-                .ToListAsync();
-            if (items.Count == 0)
+            foreach (var batch in validIds.Chunk(HsCodeDeleteBatchSize))
             {
-                return;
+                int[] batchIds = batch.ToArray();
+                await context.HsCodes
+                    .Where(h => batchIds.Contains(h.Id))
+                    .ExecuteDeleteAsync();
             }
-
-            context.HsCodes.RemoveRange(items);
-            await context.SaveChangesAsync();
         }
 
         public async Task<List<HsCode>> GetAllLocalAsync()
@@ -155,8 +154,7 @@ namespace ExportDocManager.Services.MasterData
         public async Task ClearAllLocalAsync()
         {
             await using var context = await CreateDbContextAsync();
-            context.HsCodes.RemoveRange(context.HsCodes);
-            await context.SaveChangesAsync();
+            await context.HsCodes.ExecuteDeleteAsync();
         }
 
         private static void CopyHsCodeValues(HsCode source, HsCode target)

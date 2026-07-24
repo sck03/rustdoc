@@ -3,6 +3,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 
 namespace ExportDocManager.Infrastructure.Tests
 {
@@ -106,6 +107,28 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal("alice", auditLog.UserId);
             Assert.Equal(nameof(Customer), auditLog.EntityName);
             Assert.Equal(EntityState.Added.ToString(), auditLog.Action);
+        }
+
+        [Fact]
+        public void AuditInterceptor_ShouldFinalizeDatabaseGeneratedEntityId()
+        {
+            using var connection = new SqliteConnection("Data Source=:memory:");
+            connection.Open();
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite(connection)
+                .AddInterceptors(new AuditInterceptor(new FixedAuditUserProvider("admin")))
+                .Options;
+
+            using var context = new AppDbContext(options);
+            context.Database.EnsureCreated();
+            var customer = new Customer { CustomerNameEN = "Generated key customer" };
+
+            context.Customers.Add(customer);
+            context.SaveChanges();
+
+            var auditLog = context.AuditLogs.Single(item => item.EntityName == nameof(Customer));
+            Assert.Equal(customer.Id.ToString(), auditLog.EntityId);
+            Assert.DoesNotContain("generated-after-save", auditLog.EntityId, StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]

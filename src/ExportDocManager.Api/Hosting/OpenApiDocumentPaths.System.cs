@@ -157,6 +157,17 @@ namespace ExportDocManager.Api.Hosting
                         {
                             summary = "Login",
                             operationId = "login",
+                            parameters = new object[]
+                            {
+                                new
+                                {
+                                    name = ApiRuntimeOptions.BootstrapTokenHeaderName,
+                                    @in = "header",
+                                    required = false,
+                                    description = "Deployment bootstrap token required only when a network-mode PostgreSQL database has no application users yet.",
+                                    schema = new { type = "string", minLength = 24 }
+                                }
+                            },
                             requestBody = new
                             {
                                 required = true,
@@ -171,6 +182,7 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["400"] = new { description = "Missing username." },
                                 ["401"] = new { description = "Invalid username or password." },
+                                ["429"] = new { description = "Login attempts are temporarily rate limited." },
                                 ["503"] = new { description = "Database initialization failed." }
                             }
                         }

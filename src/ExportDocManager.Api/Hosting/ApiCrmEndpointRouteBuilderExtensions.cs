@@ -1,6 +1,7 @@
 using ExportDocManager.Services.Crm;
 using ExportDocManager.Services.Opportunities;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -94,18 +95,21 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService auth, ICrmCustomerImportService importService, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(context, tokens, auth, out var denied)) return denied;
-                if (context.Request.ContentLength is > 10_485_760)
-                    return Results.BadRequest(new ApiErrorResponse("CRM 导入文件不能超过 10 MB。"));
                 string fileName = context.Request.Query["fileName"].ToString();
                 try
                 {
                     using var input = new MemoryStream();
-                    await context.Request.Body.CopyToAsync(input, ct);
-                    if (input.Length == 0 || input.Length > 10_485_760)
-                        return Results.BadRequest(new ApiErrorResponse("CRM 导入文件为空或超过 10 MB。"));
+                    await ApiUploadLimits.CopyRequestBodyAsync(
+                        context.Request,
+                        input,
+                        ApiUploadLimits.CrmImportBytes,
+                        ct);
+                    if (input.Length == 0)
+                        return Results.BadRequest(new ApiErrorResponse("CRM 导入文件为空。"));
                     input.Position = 0;
                     return Results.Ok(ToApiDto(await importService.PreviewAsync(input, fileName, ct)));
                 }
+                catch (PayloadLimitExceededException ex) { return WritePayloadTooLarge(ex); }
                 catch (InvalidDataException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
             }).WithName("PreviewCrmCustomerImport");
 

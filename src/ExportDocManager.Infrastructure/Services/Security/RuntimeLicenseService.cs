@@ -33,6 +33,7 @@ namespace ExportDocManager.Services.Security
         private readonly Func<string> _localBindingSecretProvider;
         private readonly IRuntimeLicenseAnchorStore _anchorStore;
         private readonly ILicenseSignatureVerifier _signatureVerifier;
+        private readonly LocalSecretProtector _secretProtector;
 
         public RuntimeLicenseService(IAppPathProvider pathProvider)
             : this(pathProvider, null, null, null, null)
@@ -98,6 +99,7 @@ namespace ExportDocManager.Services.Security
             _localBindingSecretProvider = localBindingSecretProvider;
             _anchorStore = anchorStore ?? RuntimeLicenseAnchorStoreFactory.CreateDefault(pathProvider);
             _signatureVerifier = signatureVerifier ?? new EcdsaLicenseSignatureVerifier();
+            _secretProtector = new LocalSecretProtector(pathProvider);
         }
 
         public async Task<LicenseStatus> GetStatusAsync(CancellationToken cancellationToken = default)
@@ -784,7 +786,7 @@ namespace ExportDocManager.Services.Security
                 }
 
                 string encrypted = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
-                string json = SecurityHelper.Decrypt(encrypted);
+                string json = _secretProtector.Unprotect(encrypted);
                 if (string.IsNullOrWhiteSpace(json))
                 {
                     return null;
@@ -810,7 +812,7 @@ namespace ExportDocManager.Services.Security
 
             data.Signature = ComputeDataSignature(data);
             string json = JsonSerializer.Serialize(data);
-            string encrypted = SecurityHelper.Encrypt(json);
+            string encrypted = _secretProtector.Protect(json);
             await AtomicFileHelper.WriteAllTextAtomicAsync(GetLicensePath(), encrypted, Encoding.UTF8, cancellationToken)
                 .ConfigureAwait(false);
         }

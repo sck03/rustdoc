@@ -7,6 +7,8 @@ namespace ExportDocManager.Services.Security
 {
     public class UserService : IUserService
     {
+        private static readonly string DummyPasswordHash = PasswordHasher.HashPassword(
+            "ExportDocManager-Dummy-Password-Verification-Only");
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly DatabaseConnectionSettings _databaseSettings;
         private readonly ICurrentUserContext _currentUserContext;
@@ -42,16 +44,17 @@ namespace ExportDocManager.Services.Security
             }
 
             using var context = await _contextFactory.CreateDbContextAsync();
-            var normalizedUsername = (username ?? string.Empty).Trim();
-            var user = (await context.Users
+            var normalizedUsername = (username ?? string.Empty).Trim().ToUpperInvariant();
+            var user = await context.Users
                     .Include(item => item.PermissionTemplate)
                     .ThenInclude(template => template.Modules)
-                    .Where(u => u.IsActive)
-                    .ToListAsync())
-                .FirstOrDefault(u => string.Equals(u.Username, normalizedUsername, StringComparison.OrdinalIgnoreCase));
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u =>
+                        u.IsActive && u.Username.ToUpper() == normalizedUsername);
 
             if (user == null)
             {
+                _ = PasswordHasher.VerifyPassword(DummyPasswordHash, password);
                 return null;
             }
 
@@ -67,16 +70,13 @@ namespace ExportDocManager.Services.Security
         public async Task<User> GetUserByUsernameAsync(string username)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            var normalizedUsername = (username ?? string.Empty).Trim();
-            var user = (await context.Users
+            var normalizedUsername = (username ?? string.Empty).Trim().ToUpperInvariant();
+            var user = await context.Users
                     .Include(item => item.PermissionTemplate)
                     .ThenInclude(template => template.Modules)
-                    .Where(item => item.IsActive)
-                    .ToListAsync())
-                .FirstOrDefault(item => string.Equals(
-                    item.Username,
-                    normalizedUsername,
-                    StringComparison.OrdinalIgnoreCase));
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(item =>
+                        item.IsActive && item.Username.ToUpper() == normalizedUsername);
             if (user != null)
             {
                 UserPermissionAccessResolver.PopulateEffectiveModuleAccess(user);
@@ -235,14 +235,12 @@ namespace ExportDocManager.Services.Security
             User user,
             CancellationToken cancellationToken)
         {
-            var existingUsers = await context.Users
+            string normalizedUsername = user.Username.ToUpperInvariant();
+            bool duplicate = await context.Users
                 .AsNoTracking()
-                .Where(item => item.Id != user.Id)
-                .Select(item => new { item.Username })
-                .ToListAsync(cancellationToken);
-
-            bool duplicate = existingUsers.Any(item =>
-                string.Equals(item.Username?.Trim(), user.Username, StringComparison.OrdinalIgnoreCase));
+                .AnyAsync(
+                    item => item.Id != user.Id && item.Username.ToUpper() == normalizedUsername,
+                    cancellationToken);
             if (duplicate)
             {
                 throw new InvalidOperationException("用户名已存在。");

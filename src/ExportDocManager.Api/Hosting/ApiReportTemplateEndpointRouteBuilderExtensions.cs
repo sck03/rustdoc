@@ -516,6 +516,10 @@ namespace ExportDocManager.Api.Hosting
                         result.PackageVersion,
                         result.StoragePolicy));
                 }
+                catch (PayloadLimitExceededException ex)
+                {
+                    return WritePayloadTooLarge(ex);
+                }
                 catch (FileNotFoundException ex)
                 {
                     return Results.NotFound(new ApiErrorResponse(ex.Message));
@@ -578,7 +582,11 @@ namespace ExportDocManager.Api.Hosting
                     string packagePath = Path.Combine(tempRoot, fileName);
                     await using (var output = File.Create(packagePath))
                     {
-                        await context.Request.Body.CopyToAsync(output, cancellationToken);
+                        await ApiUploadLimits.CopyRequestBodyAsync(
+                            context.Request,
+                            output,
+                            ApiUploadLimits.PackageImportBytes,
+                            cancellationToken);
                     }
 
                     if (new FileInfo(packagePath).Length == 0)

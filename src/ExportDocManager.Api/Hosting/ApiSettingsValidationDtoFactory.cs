@@ -47,7 +47,7 @@ namespace ExportDocManager.Api.Hosting
                 hasWarnings,
                 messages.Any(message => message.IsAutoFixable),
                 messages,
-                CreateSanitizedSettings(prepared),
+                CreateSanitizedSettings(prepared, canManageSettings: true, networkMode: false),
                 ValidationStoragePolicy);
         }
 

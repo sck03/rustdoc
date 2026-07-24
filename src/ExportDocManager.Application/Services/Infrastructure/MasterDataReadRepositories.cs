@@ -43,5 +43,11 @@ namespace ExportDocManager.Services.Infrastructure
         Task<PagedResult<HsCode>> QueryPageAsync(HsCodeReadQuery query, CancellationToken cancellationToken = default);
 
         Task<HsCode> GetByCodeAsync(string code, CancellationToken cancellationToken = default);
+
+        Task<HsCode> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+
+        Task<IReadOnlyList<int>> FindExistingIdsAsync(
+            IReadOnlyCollection<int> ids,
+            CancellationToken cancellationToken = default);
     }
 }

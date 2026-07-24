@@ -107,6 +107,7 @@ function App() {
   const [desktopContextLoading, setDesktopContextLoading] = useState(() => isDesktopBridgeAvailable() && !defaultDesktopAccessToken);
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
+  const [bootstrapToken, setBootstrapToken] = useState("");
   const [session, setSession] = useState<SessionState | null>(() => readStoredSession());
   const [loginState, setLoginState] = useState<LoadState>("idle");
   const [message, setMessage] = useState<string | null>(null);
@@ -367,6 +368,10 @@ function App() {
           username,
           password,
         },
+      }, {
+        headers: bootstrapToken.trim()
+          ? { "X-ExportDocManager-Bootstrap-Token": bootstrapToken.trim() }
+          : undefined,
       });
       const nextSession: SessionState = {
         accessToken: response.accessToken,
@@ -377,6 +382,8 @@ function App() {
       setSession(nextSession);
       setWorkspaceNotice(null);
       writeStoredSession(nextSession);
+      setPassword("");
+      setBootstrapToken("");
       queryClient.clear();
       setLoginState("ready");
       navigate(getDefaultWorkspaceRoute(response.user.capabilities), { replace: true });
@@ -452,12 +459,14 @@ function App() {
         apiBaseUrl={apiBaseUrl}
         username={username}
         password={password}
+        bootstrapToken={bootstrapToken}
         isBusy={isBusy}
         message={message}
         product={loginProduct}
         onApiBaseUrlChange={setApiBaseUrl}
         onUsernameChange={setUsername}
         onPasswordChange={setPassword}
+        onBootstrapTokenChange={setBootstrapToken}
         onSubmit={handleLogin}
       />
     );

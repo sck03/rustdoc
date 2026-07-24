@@ -3,6 +3,7 @@ using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -164,7 +165,11 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     using var workbook = new MemoryStream();
-                    await context.Request.Body.CopyToAsync(workbook, cancellationToken);
+                    await ApiUploadLimits.CopyRequestBodyAsync(
+                        context.Request,
+                        workbook,
+                        ApiUploadLimits.ExcelImportBytes,
+                        cancellationToken);
                     if (workbook.Length == 0)
                     {
                         return Results.BadRequest(new ApiErrorResponse("参考词典 Excel 文件不能为空。"));
@@ -176,6 +181,10 @@ namespace ExportDocManager.Api.Hosting
                         options,
                         cancellationToken);
                     return Results.Ok(ApiSingleWindowDtoFactory.FromReferenceCatalogExcelPreview(preview));
+                }
+                catch (PayloadLimitExceededException ex)
+                {
+                    return WritePayloadTooLarge(ex);
                 }
                 catch (ArgumentException ex)
                 {

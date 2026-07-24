@@ -13,7 +13,9 @@ namespace ExportDocManager.Api.Hosting
                 IDatabaseInitializationService databaseInitializationService,
                 IUserService userService,
                 IApiSessionTokenService tokenService,
-                ApiAuthorizationService authorizationService) =>
+                ApiAuthorizationService authorizationService,
+                ApiLoginAttemptService loginAttempts,
+                ILogger<ApiLoginAttemptService> logger) =>
             {
                 if (string.IsNullOrWhiteSpace(request?.Username))
                 {
@@ -22,9 +24,40 @@ namespace ExportDocManager.Api.Hosting
 
                 string username = request.Username.Trim();
                 string password = request.Password ?? string.Empty;
-                var initializationResult = await databaseInitializationService.InitializeAsync(username, password);
+                string remoteAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var attemptDecision = loginAttempts.Evaluate(username, remoteAddress);
+                if (!attemptDecision.Allowed)
+                {
+                    SetRetryAfter(context, attemptDecision.RetryAfter);
+                    return Results.Json(
+                        new ApiErrorResponse("登录尝试过于频繁，请稍后再试。"),
+                        statusCode: StatusCodes.Status429TooManyRequests);
+                }
+
+                string bootstrapToken = context.Request.Headers[ApiRuntimeOptions.BootstrapTokenHeaderName].ToString();
+                var initializationResult = await databaseInitializationService.InitializeAsync(
+                    username,
+                    password,
+                    bootstrapToken);
                 if (!initializationResult.IsSuccess)
                 {
+                    if (initializationResult.IsAuthenticationFailure)
+                    {
+                        var failureDecision = loginAttempts.RecordFailure(username, remoteAddress);
+                        logger.LogWarning(
+                            "首次管理员初始化令牌校验失败。Username={Username}; RemoteAddress={RemoteAddress}; Locked={Locked}",
+                            username,
+                            remoteAddress,
+                            !failureDecision.Allowed);
+                        if (!failureDecision.Allowed)
+                        {
+                            SetRetryAfter(context, failureDecision.RetryAfter);
+                            return Results.Json(
+                                new ApiErrorResponse("登录尝试过于频繁，请稍后再试。"),
+                                statusCode: StatusCodes.Status429TooManyRequests);
+                        }
+                    }
+
                     return Results.Json(
                         new ApiErrorResponse(initializationResult.ErrorMessage),
                         statusCode: StatusCodes.Status503ServiceUnavailable);
@@ -33,9 +66,23 @@ namespace ExportDocManager.Api.Hosting
                 var user = await userService.AuthenticateAsync(username, password);
                 if (user == null)
                 {
+                    var failureDecision = loginAttempts.RecordFailure(username, remoteAddress);
+                    logger.LogWarning(
+                        "登录失败。Username={Username}; RemoteAddress={RemoteAddress}; Locked={Locked}",
+                        username,
+                        remoteAddress,
+                        !failureDecision.Allowed);
+                    if (!failureDecision.Allowed)
+                    {
+                        SetRetryAfter(context, failureDecision.RetryAfter);
+                        return Results.Json(
+                            new ApiErrorResponse("登录尝试过于频繁，请稍后再试。"),
+                            statusCode: StatusCodes.Status429TooManyRequests);
+                    }
                     return Results.Unauthorized();
                 }
 
+                loginAttempts.RecordSuccess(username, remoteAddress);
                 var token = await tokenService.IssueAsync(user, cancellationToken: context.RequestAborted);
                 return Results.Ok(new ApiLoginResponse(
                     "Bearer",
@@ -65,6 +112,12 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Ok(new ApiLogoutResponse(revoked));
             })
             .WithName("Logout");
+        }
+
+        private static void SetRetryAfter(HttpContext context, TimeSpan retryAfter)
+        {
+            int seconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
+            context.Response.Headers.RetryAfter = seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
     }
 }

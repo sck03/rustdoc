@@ -309,6 +309,10 @@ namespace ExportDocManager.Api.Hosting
             {
                 return Results.BadRequest(new ApiErrorResponse(ex.Message));
             }
+            catch (PayloadLimitExceededException ex)
+            {
+                return WritePayloadTooLarge(ex);
+            }
             catch (UnauthorizedAccessException ex)
             {
                 return Results.Json(
@@ -331,11 +335,6 @@ namespace ExportDocManager.Api.Hosting
             bool keepWorkingDirectory,
             CancellationToken cancellationToken)
         {
-            if (context.Request.ContentLength is > 50_000_000)
-            {
-                return Results.BadRequest(new ApiErrorResponse("单一窗口包不能超过 50 MB。"));
-            }
-
             string safeFileName = Path.GetFileName(fileName?.Trim() ?? string.Empty);
             if (string.IsNullOrWhiteSpace(safeFileName) || !safeFileName.EndsWith(".swpkg", StringComparison.OrdinalIgnoreCase))
             {
@@ -350,7 +349,11 @@ namespace ExportDocManager.Api.Hosting
             {
                 await using (var output = File.Create(packagePath))
                 {
-                    await context.Request.Body.CopyToAsync(output, cancellationToken);
+                    await ApiUploadLimits.CopyRequestBodyAsync(
+                        context.Request,
+                        output,
+                        ApiUploadLimits.PackageImportBytes,
+                        cancellationToken);
                 }
 
                 if (new FileInfo(packagePath).Length == 0)

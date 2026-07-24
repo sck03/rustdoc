@@ -37,7 +37,8 @@ namespace ExportDocManager.Api.Tests
                 "--data-root", dataRoot,
                 "--urls", "http://127.0.0.1:5199",
                 "--network-mode", "true",
-                "--allowed-origins", "https://erp.example.com;http://192.168.1.20:8080"
+                "--allowed-origins", "https://erp.example.com;http://192.168.1.20:8080",
+                "--trusted-proxies", "172.30.238.10;::1"
             ]);
 
             Assert.Equal(Path.GetFullPath(appRoot).TrimEnd(Path.DirectorySeparatorChar), options.AppRoot);
@@ -45,6 +46,26 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("http://127.0.0.1:5199", options.ListenUrls);
             Assert.True(options.NetworkMode);
             Assert.Equal(2, options.AllowedOrigins.Count);
+            Assert.Equal(2, options.TrustedProxies.Count);
+            Assert.Contains(IPAddress.Parse("172.30.238.10"), options.TrustedProxies);
+            Assert.Contains(IPAddress.IPv6Loopback, options.TrustedProxies);
+        }
+
+        [Fact]
+        public void ForwardedHeaders_ShouldOnlyTrustConfiguredProxyAddresses()
+        {
+            var options = ApiForwardedHeaders.CreateOptions(new ApiRuntimeOptions
+            {
+                TrustedProxies = [IPAddress.Parse("172.30.238.10")]
+            });
+
+            Assert.Equal(
+                Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
+                Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto,
+                options.ForwardedHeaders);
+            Assert.Equal(1, options.ForwardLimit);
+            Assert.Contains(IPAddress.Parse("172.30.238.10"), options.KnownProxies);
+            Assert.DoesNotContain(IPAddress.Parse("10.0.0.5"), options.KnownProxies);
         }
 
         [Fact]
@@ -119,6 +140,36 @@ namespace ExportDocManager.Api.Tests
             ApiStartupValidator.ValidateListenUrls(
                 new ApiRuntimeOptions { ListenUrls = "http://0.0.0.0:5188", NetworkMode = true },
                 postgreSql);
+        }
+
+        [Fact]
+        public void ValidateBootstrapToken_ShouldProtectFirstNetworkAdministratorInitialization()
+        {
+            var postgreSql = new DatabaseConnectionSettings
+            {
+                Provider = DatabaseConnectionSettings.PostgreSqlProvider,
+                PostgreSqlHost = "postgres",
+                PostgreSqlDatabase = "exportdoc",
+                PostgreSqlUsername = "exportdoc"
+            };
+
+            Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.ValidateBootstrapToken(
+                new ApiRuntimeOptions { NetworkMode = true },
+                postgreSql));
+
+            ApiStartupValidator.ValidateBootstrapToken(
+                new ApiRuntimeOptions { NetworkMode = true, BootstrapToken = new string('x', 24) },
+                postgreSql);
+            ApiStartupValidator.ValidateBootstrapToken(
+                new ApiRuntimeOptions { NetworkMode = false },
+                postgreSql);
+        }
+
+        [Fact]
+        public void Documentation_ShouldRequireAuthenticationOnlyInNetworkMode()
+        {
+            Assert.False(ApiEndpointAuth.RequiresDocumentationAuthentication(new ApiRuntimeOptions()));
+            Assert.True(ApiEndpointAuth.RequiresDocumentationAuthentication(new ApiRuntimeOptions { NetworkMode = true }));
         }
 
         [Fact]
@@ -219,6 +270,8 @@ namespace ExportDocManager.Api.Tests
             string json = JsonSerializer.Serialize(document);
 
             Assert.Contains("/api/auth/login", json, StringComparison.Ordinal);
+            Assert.Contains(ApiRuntimeOptions.BootstrapTokenHeaderName, json, StringComparison.Ordinal);
+            Assert.Contains("Deployment bootstrap token", json, StringComparison.Ordinal);
             Assert.Contains("/api/auth/me", json, StringComparison.Ordinal);
             Assert.Contains("ApiLoginResponse", json, StringComparison.Ordinal);
             Assert.Contains("ApiUserDto", json, StringComparison.Ordinal);
@@ -619,6 +672,16 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(PermissionAccessLevel.View, ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(HttpMethods.Get));
             Assert.Equal(PermissionAccessLevel.Operate, ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(HttpMethods.Post));
             Assert.Equal(PermissionAccessLevel.Manage, ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(HttpMethods.Delete));
+            Assert.Equal(
+                PermissionAccessLevel.Operate,
+                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
+                    "/api/reports/user-templates/42",
+                    HttpMethods.Delete));
+            Assert.Equal(
+                PermissionAccessLevel.Manage,
+                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
+                    "/api/reports/templates/example.html",
+                    HttpMethods.Delete));
         }
 
         [Theory]

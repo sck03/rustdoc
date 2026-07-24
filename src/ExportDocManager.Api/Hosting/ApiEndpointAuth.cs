@@ -21,6 +21,12 @@ namespace ExportDocManager.Api.Hosting
             string submittedToken = context.Request.Headers[ApiDesktopAccessOptions.HeaderName].ToString();
             return options.IsValid(submittedToken);
         }
+
+        public static bool RequiresDocumentationAuthentication(ApiRuntimeOptions runtimeOptions)
+        {
+            ArgumentNullException.ThrowIfNull(runtimeOptions);
+            return runtimeOptions.NetworkMode;
+        }
     }
 
     public sealed class ApiAuthenticationMiddleware
@@ -172,7 +178,7 @@ namespace ExportDocManager.Api.Hosting
             }
 
             var user = currentUserResolver.ResolveCached(context);
-            string requiredAccessLevel = GetRequiredAccessLevel(context.Request.Method);
+            string requiredAccessLevel = GetRequiredAccessLevel(context.Request.Path, context.Request.Method);
             if (!authorizationService.CanUseModule(user, requiredModule, requiredAccessLevel))
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
@@ -309,6 +315,20 @@ namespace ExportDocManager.Api.Hosting
                 : HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method)
                     ? PermissionAccessLevel.View
                     : PermissionAccessLevel.Operate;
+
+        public static string GetRequiredAccessLevel(PathString path, string method)
+        {
+            // User report templates are ownership-scoped by UserReportTemplateService.
+            // Operators may delete their own templates, while administrator-owned file
+            // templates and every other destructive endpoint still require manage.
+            if (HttpMethods.IsDelete(method) &&
+                path.StartsWithSegments("/api/reports/user-templates", StringComparison.OrdinalIgnoreCase))
+            {
+                return PermissionAccessLevel.Operate;
+            }
+
+            return GetRequiredAccessLevel(method);
+        }
     }
 
     public static class ApiAuthenticationApplicationBuilderExtensions

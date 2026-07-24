@@ -12,6 +12,9 @@ if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
 if ((Get-Content -LiteralPath $configPath -Raw).Contains("CHANGE_ME_BEFORE_START")) {
     throw "请先编辑 appsettings.json，填写 PostgreSQL 地址、账号和密码。"
 }
+if ([string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_BOOTSTRAP_TOKEN) -or $env:EXPORTDOCMANAGER_BOOTSTRAP_TOKEN.Length -lt 24) {
+    throw "请先设置至少 24 个字符的 EXPORTDOCMANAGER_BOOTSTRAP_TOKEN，用于首次 PostgreSQL 管理员初始化。"
+}
 
 $browser = Get-ChildItem -LiteralPath (Join-Path $root "Browsers") -File -Recurse -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome.exe") } |

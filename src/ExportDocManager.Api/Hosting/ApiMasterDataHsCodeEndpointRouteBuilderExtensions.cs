@@ -9,6 +9,8 @@ namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiEndpointRouteBuilderExtensions
     {
+        private const int MaximumHsCodeBatchDeleteCount = 5_000;
+
         private static void MapHsCodeMasterDataEndpoints(this IEndpointRouteBuilder endpoints)
         {
             endpoints.MapPost("/api/master-data/hs-codes/import-preview-path", async (
@@ -35,6 +37,10 @@ namespace ExportDocManager.Api.Hosting
                         cancellationToken);
                     return Results.Ok(await StoreHsCodeImportPreviewAsync(pathProvider, preview, cancellationToken));
                 }
+                catch (PayloadLimitExceededException ex)
+                {
+                    return WritePayloadTooLarge(ex);
+                }
                 catch (Exception ex) when (ex is ArgumentException or InvalidDataException or IOException or InvalidOperationException)
                 {
                     return WriteConflict(ex.Message);
@@ -56,7 +62,11 @@ namespace ExportDocManager.Api.Hosting
                     string importPath = Path.Combine(tempRoot, fileName);
                     await using (var output = File.Create(importPath))
                     {
-                        await context.Request.Body.CopyToAsync(output, cancellationToken);
+                        await ApiUploadLimits.CopyRequestBodyAsync(
+                            context.Request,
+                            output,
+                            ApiUploadLimits.ExcelImportBytes,
+                            cancellationToken);
                     }
                     if (new FileInfo(importPath).Length == 0) return Results.BadRequest(new ApiErrorResponse("HS编码导入文件不能为空。"));
                     var preview = await hsCodeService.PreviewImportAsync(
@@ -66,6 +76,10 @@ namespace ExportDocManager.Api.Hosting
                         int.TryParse(context.Request.Query["effectiveYear"], out int year) ? year : null,
                         cancellationToken);
                     return Results.Ok(await StoreHsCodeImportPreviewAsync(pathProvider, preview, cancellationToken));
+                }
+                catch (PayloadLimitExceededException ex)
+                {
+                    return WritePayloadTooLarge(ex);
                 }
                 catch (Exception ex) when (ex is ArgumentException or InvalidDataException or IOException or InvalidOperationException)
                 {
@@ -101,6 +115,10 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Ok(new ApiHsCodeImportCommitResponse(
                         true, result.AddedCount, result.UpdatedCount, result.UnchangedCount,
                         result.SuspectedObsoleteCount, result.SkippedCount, result.Message));
+                }
+                catch (PayloadLimitExceededException ex)
+                {
+                    return WritePayloadTooLarge(ex);
                 }
                 catch (Exception ex) when (ex is InvalidDataException or IOException or InvalidOperationException)
                 {
@@ -228,7 +246,11 @@ namespace ExportDocManager.Api.Hosting
                     string importPath = Path.Combine(tempRoot, fileName);
                     await using (var output = File.Create(importPath))
                     {
-                        await context.Request.Body.CopyToAsync(output, cancellationToken);
+                        await ApiUploadLimits.CopyRequestBodyAsync(
+                            context.Request,
+                            output,
+                            ApiUploadLimits.ExcelImportBytes,
+                            cancellationToken);
                     }
 
                     if (new FileInfo(importPath).Length == 0)
@@ -631,15 +653,13 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.BadRequest(new ApiErrorResponse("请先选择要删除的HS编码。"));
                 }
+                if (ids.Count > MaximumHsCodeBatchDeleteCount)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        $"单次最多删除 {MaximumHsCodeBatchDeleteCount:N0} 条HS编码；如需清空请使用独立的清空操作。"));
+                }
 
-                var rows = await repository.QueryAsync(
-                    new HsCodeReadQuery { ReturnAll = true },
-                    cancellationToken);
-                var existingIds = rows
-                    .Where(row => ids.Contains(row.Id))
-                    .Select(row => row.Id)
-                    .Distinct()
-                    .ToList();
+                var existingIds = (await repository.FindExistingIdsAsync(ids, cancellationToken)).ToList();
                 if (existingIds.Count == 0)
                 {
                     return Results.NotFound();
@@ -871,7 +891,14 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     string path = Path.Combine(tempRoot, "library.edmhs");
-                    await using (var output = File.Create(path)) await context.Request.Body.CopyToAsync(output, cancellationToken);
+                    await using (var output = File.Create(path))
+                    {
+                        await ApiUploadLimits.CopyRequestBodyAsync(
+                            context.Request,
+                            output,
+                            ApiUploadLimits.PackageImportBytes,
+                            cancellationToken);
+                    }
                     var preview = await service.PreviewPackageAsync(path, cancellationToken);
                     var result = await service.ImportPackageAsync(preview, cancellationToken);
                     return Results.Ok(new { preview.FileName, preview.HsCodeCount, preview.ExampleCount, preview.ReplacementCount, preview.FeedbackCount, preview.Warnings, result });

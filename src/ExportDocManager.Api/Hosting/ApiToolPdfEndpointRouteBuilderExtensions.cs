@@ -2,6 +2,7 @@ using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Tools;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -67,9 +68,9 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("PDF 合并只接受 .pdf 文件。"));
                 }
 
-                if (files.Sum(file => file.Length) > 100_000_000)
+                if (files.Sum(file => file.Length) > ApiUploadLimits.PdfMergeBytes)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("PDF 文件总大小不能超过 100 MB。"));
+                    return WritePayloadTooLarge(ApiUploadLimits.PdfMergeBytes);
                 }
 
                 string uploadRoot = Path.Combine(pathProvider.CacheRoot, "BrowserUploads", "PdfMerge", Guid.NewGuid().ToString("N"));
@@ -82,7 +83,11 @@ namespace ExportDocManager.Api.Hosting
                         string fileName = $"{index + 1:000}-{Path.GetFileName(files[index].FileName)}";
                         string sourcePath = Path.Combine(uploadRoot, fileName);
                         await using var output = File.Create(sourcePath);
-                        await files[index].CopyToAsync(output, cancellationToken);
+                        await ApiUploadLimits.CopyFormFileAsync(
+                            files[index],
+                            output,
+                            ApiUploadLimits.PdfMergeBytes,
+                            cancellationToken);
                         sourceFiles.Add(sourcePath);
                     }
 
@@ -94,6 +99,11 @@ namespace ExportDocManager.Api.Hosting
                         destinationPath,
                         deleteSourceDirectoryAfterCompletion: true,
                         enableRetry: false));
+                }
+                catch (PayloadLimitExceededException ex)
+                {
+                    TryDeleteDirectory(uploadRoot);
+                    return WritePayloadTooLarge(ex);
                 }
                 catch
                 {

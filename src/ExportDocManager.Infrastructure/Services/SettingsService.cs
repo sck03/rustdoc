@@ -12,6 +12,7 @@ namespace ExportDocManager.Services.Infrastructure
         private const string SettingsFileName = "appsettings.json";
 
         private readonly string _filePath;
+        private readonly LocalSecretProtector _secretProtector;
         private readonly SemaphoreSlim _saveLock = new(1, 1);
         public AppSettings Settings { get; private set; } = new AppSettings();
 
@@ -34,6 +35,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
             _filePath = ResolveSettingsPath(pathProvider, filePath);
+            _secretProtector = new LocalSecretProtector(pathProvider);
         }
 
         public async Task LoadAsync()
@@ -48,27 +50,27 @@ namespace ExportDocManager.Services.Infrastructure
                     var ep = Settings.Email?.Password;
                     if (!string.IsNullOrEmpty(ep))
                     {
-                        var dec = SecurityHelper.Decrypt(ep);
+                        var dec = _secretProtector.Unprotect(ep);
                         if (!string.IsNullOrEmpty(dec)) Settings.Email.Password = dec;
                     }
                     var wp = Settings.WebDav?.Password;
                     if (!string.IsNullOrEmpty(wp))
                     {
-                        var dec2 = SecurityHelper.Decrypt(wp);
+                        var dec2 = _secretProtector.Unprotect(wp);
                         if (!string.IsNullOrEmpty(dec2)) Settings.WebDav.Password = dec2;
                     }
 
                     var dp = Settings.System?.PostgreSqlPassword;
                     if (!string.IsNullOrEmpty(dp))
                     {
-                        var dec3 = SecurityHelper.Decrypt(dp);
+                        var dec3 = _secretProtector.Unprotect(dp);
                         if (!string.IsNullOrEmpty(dec3)) Settings.System.PostgreSqlPassword = dec3;
                     }
 
                     var aiKey = Settings.AI?.ApiKey;
                     if (!string.IsNullOrEmpty(aiKey))
                     {
-                        var dec4 = SecurityHelper.Decrypt(aiKey);
+                        var dec4 = _secretProtector.Unprotect(aiKey);
                         if (!string.IsNullOrEmpty(dec4)) Settings.AI.ApiKey = dec4;
                     }
                 }
@@ -131,22 +133,22 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 if (!string.IsNullOrEmpty(Settings.Email?.Password))
                 {
-                    Settings.Email.Password = SecurityHelper.Encrypt(Settings.Email.Password);
+                    Settings.Email.Password = _secretProtector.Protect(Settings.Email.Password);
                 }
 
                 if (!string.IsNullOrEmpty(Settings.WebDav?.Password))
                 {
-                    Settings.WebDav.Password = SecurityHelper.Encrypt(Settings.WebDav.Password);
+                    Settings.WebDav.Password = _secretProtector.Protect(Settings.WebDav.Password);
                 }
 
                 if (!string.IsNullOrEmpty(Settings.System?.PostgreSqlPassword))
                 {
-                    Settings.System.PostgreSqlPassword = SecurityHelper.Encrypt(Settings.System.PostgreSqlPassword);
+                    Settings.System.PostgreSqlPassword = _secretProtector.Protect(Settings.System.PostgreSqlPassword);
                 }
 
                 if (!string.IsNullOrEmpty(Settings.AI?.ApiKey))
                 {
-                    Settings.AI.ApiKey = SecurityHelper.Encrypt(Settings.AI.ApiKey);
+                    Settings.AI.ApiKey = _secretProtector.Protect(Settings.AI.ApiKey);
                 }
 
                 var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });

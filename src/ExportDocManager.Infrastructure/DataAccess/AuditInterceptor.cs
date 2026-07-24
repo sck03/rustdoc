@@ -4,17 +4,21 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using ExportDocManager.Models.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace ExportDocManager.DataAccess
 {
     public class AuditInterceptor : SaveChangesInterceptor
     {
+        private const string PendingEntityId = "[generated-after-save]";
         private readonly IAuditUserProvider _auditUserProvider;
+        private readonly ConditionalWeakTable<DbContext, PendingAuditState> _pendingAudits = new();
 
         public AuditInterceptor()
             : this(new SystemAuditUserProvider())
@@ -55,6 +59,35 @@ namespace ExportDocManager.DataAccess
             }
 
             return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
+
+        public override int SavedChanges(SaveChangesCompletedEventData eventData, int result)
+        {
+            FinalizePendingEntityIds(eventData.Context);
+            return base.SavedChanges(eventData, result);
+        }
+
+        public override async ValueTask<int> SavedChangesAsync(
+            SaveChangesCompletedEventData eventData,
+            int result,
+            CancellationToken cancellationToken = default)
+        {
+            await FinalizePendingEntityIdsAsync(eventData.Context, cancellationToken).ConfigureAwait(false);
+            return await base.SavedChangesAsync(eventData, result, cancellationToken).ConfigureAwait(false);
+        }
+
+        public override void SaveChangesFailed(DbContextErrorEventData eventData)
+        {
+            RemovePendingAuditState(eventData.Context);
+            base.SaveChangesFailed(eventData);
+        }
+
+        public override async Task SaveChangesFailedAsync(
+            DbContextErrorEventData eventData,
+            CancellationToken cancellationToken = default)
+        {
+            RemovePendingAuditState(eventData.Context);
+            await base.SaveChangesFailedAsync(eventData, cancellationToken).ConfigureAwait(false);
         }
 
         private static void UpdateRowVersions(DbContext context)
@@ -104,9 +137,16 @@ namespace ExportDocManager.DataAccess
                     UserId = _auditUserProvider.GetCurrentUserName()
                 };
 
-                var primaryKey = entry.Properties.FirstOrDefault(p => p.Metadata.IsPrimaryKey());
-                // Handle complex or non-string primary keys gracefully
-                auditLog.EntityId = primaryKey?.CurrentValue?.ToString() ?? "Unknown";
+                var primaryKeys = entry.Properties
+                    .Where(property => property.Metadata.IsPrimaryKey())
+                    .ToArray();
+                bool hasTemporaryKey = primaryKeys.Any(property => property.IsTemporary);
+                // Handle complex or non-string primary keys gracefully. Database-generated
+                // keys are finalized after the insert so audit rows never expose EF's
+                // negative temporary key values.
+                auditLog.EntityId = hasTemporaryKey
+                    ? PendingEntityId
+                    : FormatEntityId(primaryKeys);
 
                 var oldValues = new Dictionary<string, object>();
                 var newValues = new Dictionary<string, object>();
@@ -153,18 +193,126 @@ namespace ExportDocManager.DataAccess
                 {
                     auditLog.OldValues = oldValues.Count == 0 ? null : JsonSerializer.Serialize(oldValues, jsonOptions);
                     auditLog.NewValues = newValues.Count == 0 ? null : JsonSerializer.Serialize(newValues, jsonOptions);
-                    auditEntries.Add(auditLog);
                 }
                 catch (Exception)
                 {
                     // Fallback if serialization fails
                     auditLog.OldValues = "Serialization Error";
                     auditLog.NewValues = "Serialization Error";
-                    auditEntries.Add(auditLog);
+                }
+
+                auditEntries.Add(auditLog);
+                if (hasTemporaryKey)
+                {
+                    _pendingAudits.GetOrCreateValue(context).Entries.Add(
+                        new PendingAuditEntry(entry, auditLog));
                 }
             }
 
             return auditEntries;
+        }
+
+        private void FinalizePendingEntityIds(DbContext context)
+        {
+            var state = TakePendingAuditState(context);
+            if (state == null || state.Entries.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var pending in state.Entries)
+            {
+                string entityId = FormatEntityId(
+                    pending.SourceEntry.Properties
+                        .Where(property => property.Metadata.IsPrimaryKey())
+                        .ToArray());
+                if (!string.Equals(entityId, "Unknown", StringComparison.Ordinal))
+                {
+                    pending.AuditLog.EntityId = entityId;
+                }
+            }
+
+            PersistPendingAuditIds(context);
+        }
+
+        private async Task FinalizePendingEntityIdsAsync(
+            DbContext context,
+            CancellationToken cancellationToken)
+        {
+            var state = TakePendingAuditState(context);
+            if (state == null || state.Entries.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var pending in state.Entries)
+            {
+                string entityId = FormatEntityId(
+                    pending.SourceEntry.Properties
+                        .Where(property => property.Metadata.IsPrimaryKey())
+                        .ToArray());
+                if (!string.Equals(entityId, "Unknown", StringComparison.Ordinal))
+                {
+                    pending.AuditLog.EntityId = entityId;
+                }
+            }
+
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // The business save has already completed. Keep the explicit marker
+                // rather than converting a successful request into a false failure.
+            }
+        }
+
+        private static void PersistPendingAuditIds(DbContext context)
+        {
+            try
+            {
+                context.SaveChanges();
+            }
+            catch
+            {
+                // The original business save has completed. A visible marker is safer
+                // than failing an otherwise successful operation during audit cleanup.
+            }
+        }
+
+        private PendingAuditState TakePendingAuditState(DbContext context)
+        {
+            if (context == null || !_pendingAudits.TryGetValue(context, out var state))
+            {
+                return null;
+            }
+
+            _pendingAudits.Remove(context);
+            return state;
+        }
+
+        private void RemovePendingAuditState(DbContext context)
+        {
+            if (context != null)
+            {
+                _pendingAudits.Remove(context);
+            }
+        }
+
+        private static string FormatEntityId(IReadOnlyList<PropertyEntry> primaryKeys)
+        {
+            if (primaryKeys == null || primaryKeys.Count == 0)
+            {
+                return "Unknown";
+            }
+
+            if (primaryKeys.Any(property => property.CurrentValue == null || property.IsTemporary))
+            {
+                return "Unknown";
+            }
+
+            return string.Join(",", primaryKeys.Select(property => property.CurrentValue.ToString()));
         }
 
         private static object SanitizeAuditValue(string propertyName, object value)
@@ -195,5 +343,12 @@ namespace ExportDocManager.DataAccess
 
             return value;
         }
+
+        private sealed class PendingAuditState
+        {
+            public List<PendingAuditEntry> Entries { get; } = [];
+        }
+
+        private sealed record PendingAuditEntry(EntityEntry SourceEntry, AuditLog AuditLog);
     }
 }

@@ -46,13 +46,69 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("Healthz");
 
-            endpoints.MapGet("/openapi/v1.json", () => Results.Json(OpenApiDocumentFactory.Create(runtimeOptions)))
+            endpoints.MapGet("/openapi/v1.json", async (
+                HttpContext context,
+                ApiCurrentUserResolver currentUserResolver,
+                ApiAuthorizationService authorizationService,
+                ApiDesktopAccessOptions desktopAccessOptions) =>
+            {
+                var accessError = await GetApiDocumentationAccessErrorAsync(
+                    context,
+                    runtimeOptions,
+                    currentUserResolver,
+                    authorizationService,
+                    desktopAccessOptions);
+                if (accessError != null)
+                {
+                    return accessError;
+                }
+
+                return Results.Json(OpenApiDocumentFactory.Create(runtimeOptions));
+            })
                 .WithName("OpenApiJson");
 
-            endpoints.MapGet("/swagger/v1/swagger.json", () => Results.Json(OpenApiDocumentFactory.Create(runtimeOptions)))
+            endpoints.MapGet("/swagger/v1/swagger.json", async (
+                HttpContext context,
+                ApiCurrentUserResolver currentUserResolver,
+                ApiAuthorizationService authorizationService,
+                ApiDesktopAccessOptions desktopAccessOptions) =>
+            {
+                var accessError = await GetApiDocumentationAccessErrorAsync(
+                    context,
+                    runtimeOptions,
+                    currentUserResolver,
+                    authorizationService,
+                    desktopAccessOptions);
+                if (accessError != null)
+                {
+                    return accessError;
+                }
+
+                return Results.Json(OpenApiDocumentFactory.Create(runtimeOptions));
+            })
                 .WithName("SwaggerJson");
 
-            endpoints.MapGet("/swagger", () => Results.Content(OpenApiDocumentFactory.CreateSwaggerLandingPage(), "text/html; charset=utf-8"))
+            endpoints.MapGet("/swagger", async (
+                HttpContext context,
+                ApiCurrentUserResolver currentUserResolver,
+                ApiAuthorizationService authorizationService,
+                ApiDesktopAccessOptions desktopAccessOptions) =>
+            {
+                var accessError = await GetApiDocumentationAccessErrorAsync(
+                    context,
+                    runtimeOptions,
+                    currentUserResolver,
+                    authorizationService,
+                    desktopAccessOptions);
+                if (accessError != null)
+                {
+                    return accessError;
+                }
+
+                return Results.Content(
+                    OpenApiDocumentFactory.CreateSwaggerLandingPage(),
+                    "text/html; charset=utf-8");
+            })
                 .WithName("Swagger");
 
             endpoints.MapPost("/api/system/shutdown-maintenance", async (
@@ -137,6 +193,33 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("CleanupSystemLogs");
+        }
+
+        private static async Task<IResult> GetApiDocumentationAccessErrorAsync(
+            HttpContext context,
+            ApiRuntimeOptions runtimeOptions,
+            ApiCurrentUserResolver currentUserResolver,
+            ApiAuthorizationService authorizationService,
+            ApiDesktopAccessOptions desktopAccessOptions)
+        {
+            if (!ApiEndpointAuth.RequiresDocumentationAuthentication(runtimeOptions) ||
+                ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
+            {
+                return null;
+            }
+
+            var user = await currentUserResolver.ResolveAsync(context, context.RequestAborted)
+                .ConfigureAwait(false);
+            if (user == null)
+            {
+                return Results.Json(
+                    new ApiErrorResponse("网络部署下，API 文档仅向已登录管理员开放。"),
+                    statusCode: StatusCodes.Status401Unauthorized);
+            }
+
+            return authorizationService.CanManageSettings(user)
+                ? null
+                : WriteForbidden("只有管理员可以查看 API 文档。");
         }
 
         private static ApiShutdownMaintenanceResponse CreateShutdownMaintenanceResponse(

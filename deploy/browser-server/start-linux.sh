@@ -11,6 +11,10 @@ if grep -q 'CHANGE_ME_BEFORE_START' "$CONFIG"; then
   echo "请先编辑 appsettings.json，填写 PostgreSQL 地址、账号和密码。" >&2
   exit 1
 fi
+if [ -z "${EXPORTDOCMANAGER_BOOTSTRAP_TOKEN:-}" ] || [ "${#EXPORTDOCMANAGER_BOOTSTRAP_TOKEN}" -lt 24 ]; then
+  echo "请先设置至少 24 个字符的 EXPORTDOCMANAGER_BOOTSTRAP_TOKEN，用于首次 PostgreSQL 管理员初始化。" >&2
+  exit 1
+fi
 
 BROWSER=$(find "$ROOT/Browsers" -type f \( -name chrome-headless-shell -o -name chrome \) -print -quit 2>/dev/null || true)
 if [ -z "$BROWSER" ]; then

@@ -1,5 +1,5 @@
 import type { FormEventHandler } from "react";
-import { ArrowRight, FileText, LockKeyhole, LogIn, Server, UserRound } from "lucide-react";
+import { ArrowRight, FileText, LockKeyhole, LogIn, Server, ShieldCheck, UserRound } from "lucide-react";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import type { ProductEditionPresentation } from "../../app/productEdition.ts";
 
@@ -7,12 +7,14 @@ type LoginPageProps = {
   apiBaseUrl: string;
   username: string;
   password: string;
+  bootstrapToken: string;
   isBusy: boolean;
   message: string | null;
   product: ProductEditionPresentation;
   onApiBaseUrlChange: (value: string) => void;
   onUsernameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
+  onBootstrapTokenChange: (value: string) => void;
   onSubmit: FormEventHandler<HTMLFormElement>;
 };
 
@@ -20,12 +22,14 @@ export function LoginPage({
   apiBaseUrl,
   username,
   password,
+  bootstrapToken,
   isBusy,
   message,
   product,
   onApiBaseUrlChange,
   onUsernameChange,
   onPasswordChange,
+  onBootstrapTokenChange,
   onSubmit,
 }: LoginPageProps) {
   return (
@@ -109,6 +113,23 @@ export function LoginPage({
               </span>
             </label>
             <small>仅在无法连接服务器或管理员要求切换服务地址时修改。</small>
+            <label className="login-field">
+              <span>首次部署令牌</span>
+              <span className="login-input-shell">
+                <ShieldCheck size={17} aria-hidden="true" />
+                <input
+                  aria-label="首次部署令牌"
+                  value={bootstrapToken}
+                  onChange={(event) => onBootstrapTokenChange(event.target.value)}
+                  type="password"
+                  autoComplete="off"
+                  maxLength={512}
+                  placeholder="仅空库首次建立管理员时填写"
+                  spellCheck={false}
+                />
+              </span>
+            </label>
+            <small>由部署管理员提供，至少 24 个字符；仅随本次登录发送，登录成功后立即从页面内存清除，不会写入浏览器存储。</small>
           </details>
         </form>
       </div>

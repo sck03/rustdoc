@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.MasterData;
@@ -280,6 +281,62 @@ public sealed class HsCodeKnowledgeServiceTests
     }
 
     [Fact]
+    public async Task RefreshReplacementRelations_ShouldResolveExamplesWithBatchedCodeLookup()
+    {
+        using var factory = new SqliteFactory();
+        await using (var context = factory.CreateDbContext())
+        {
+            context.HsCodes.Add(ActiveCode("6109100090", "棉制针织或钩编的T恤衫"));
+            await context.SaveChangesAsync();
+        }
+
+        var service = new HsCodeKnowledgeService(factory);
+        await service.SaveExampleAsync(new HsCodeExampleInput(
+            0,
+            "6109100021",
+            "",
+            "男式T恤衫",
+            "100%棉",
+            "History",
+            2024,
+            "Unresolved",
+            false));
+        var preview = new HsCodeImportPreview(
+            "2026.xlsx",
+            HsCodeImportMode.CompleteSnapshot,
+            "2026税则",
+            2026,
+            1,
+            "Sheet1",
+            1,
+            100,
+            [],
+            [new HsCodeImportPreviewItem(
+                "SuspectedObsolete",
+                1,
+                "Sheet1",
+                2,
+                new HsCode { Code = "6109100021" },
+                [],
+                ["6109100090"],
+                "编码已替代")],
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            []);
+
+        await service.RefreshReplacementRelationsAsync(preview);
+
+        await using var verify = factory.CreateDbContext();
+        var example = await verify.HsCodeDeclarationExamples.SingleAsync();
+        Assert.Equal("6109100090", example.ResolvedCurrentHsCode);
+        Assert.Equal("SuggestedReplacement", example.ResolutionStatus);
+    }
+
+    [Fact]
     public async Task Package_ShouldRoundTripWithoutBusinessDataAndRejectTampering()
     {
         using var sourceFactory = new SqliteFactory();
@@ -311,6 +368,45 @@ public sealed class HsCodeKnowledgeServiceTests
     }
 
     [Fact]
+    public async Task PackageImport_ShouldMergeMoreThanOneDatabaseParameterBatch()
+    {
+        using var factory = new SqliteFactory();
+        var service = new HsCodeKnowledgeService(factory);
+        var codes = Enumerable.Range(0, 405)
+            .Select(index => new HsCode
+            {
+                Code = $"6200{index:D6}",
+                Name = $"批量测试商品 {index}",
+                Status = "ReferenceOnly",
+                SourceName = "BatchTest"
+            })
+            .ToArray();
+        var preview = new HsCodeKnowledgePackagePreview(
+            "batch.edmhs",
+            "1.0",
+            DateTimeOffset.UtcNow,
+            codes.Length,
+            0,
+            0,
+            0,
+            codes,
+            [],
+            [],
+            [],
+            []);
+
+        var first = await service.ImportPackageAsync(preview);
+        var second = await service.ImportPackageAsync(preview);
+
+        Assert.Equal(405, first.AddedHsCodes);
+        Assert.Equal(0, first.UpdatedHsCodes);
+        Assert.Equal(0, second.AddedHsCodes);
+        Assert.Equal(405, second.UpdatedHsCodes);
+        await using var verify = factory.CreateDbContext();
+        Assert.Equal(405, await verify.HsCodes.CountAsync());
+    }
+
+    [Fact]
     public async Task Package_ShouldRejectActiveCodeWithoutTrustedMetadata()
     {
         using var sourceFactory = new SqliteFactory();
@@ -336,6 +432,32 @@ public sealed class HsCodeKnowledgeServiceTests
             await Assert.ThrowsAsync<InvalidDataException>(() => target.PreviewPackageAsync(path));
         }
         finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public async Task Package_ShouldRejectDuplicateKnownEntries()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.edmhs");
+        try
+        {
+            using (var archive = ZipFile.Open(path, ZipArchiveMode.Create))
+            {
+                archive.CreateEntry("manifest.json");
+                archive.CreateEntry("manifest.json");
+                archive.CreateEntry("hs-codes.json");
+                archive.CreateEntry("declaration-examples.json");
+                archive.CreateEntry("replacement-relations.json");
+                archive.CreateEntry("search-feedback.json");
+            }
+
+            using var factory = new SqliteFactory();
+            var service = new HsCodeKnowledgeService(factory);
+            await Assert.ThrowsAsync<InvalidDataException>(() => service.PreviewPackageAsync(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]

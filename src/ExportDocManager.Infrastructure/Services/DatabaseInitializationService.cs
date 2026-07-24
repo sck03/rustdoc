@@ -4,6 +4,8 @@ using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace ExportDocManager.Services.Infrastructure
 {
@@ -13,23 +15,44 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
         private readonly DatabaseConnectionSettings _databaseSettings;
         private readonly DatabaseInitializationCoordinator _coordinator;
+        private readonly bool _requireBootstrapToken;
+        private readonly string _expectedBootstrapToken;
 
         public DatabaseInitializationService(
             IDbContextFactory<AppDbContext> dbContextFactory,
             DatabaseConnectionSettings databaseSettings,
             DatabaseInitializationCoordinator coordinator)
+            : this(dbContextFactory, databaseSettings, coordinator, false, string.Empty)
+        {
+        }
+
+        public DatabaseInitializationService(
+            IDbContextFactory<AppDbContext> dbContextFactory,
+            DatabaseConnectionSettings databaseSettings,
+            DatabaseInitializationCoordinator coordinator,
+            bool requireBootstrapToken,
+            string expectedBootstrapToken)
         {
             _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
             _databaseSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
             _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
+            _requireBootstrapToken = requireBootstrapToken;
+            _expectedBootstrapToken = expectedBootstrapToken?.Trim() ?? string.Empty;
         }
 
-        public Task<DatabaseInitializationResult> InitializeAsync(string username, string password)
+        public Task<DatabaseInitializationResult> InitializeAsync(
+            string username,
+            string password,
+            string bootstrapToken = null)
         {
-            return _coordinator.InitializeOnceAsync(() => InitializeCoreAsync(username, password));
+            return _coordinator.InitializeOnceAsync(() =>
+                InitializeCoreAsync(username, password, bootstrapToken));
         }
 
-        private async Task<DatabaseInitializationResult> InitializeCoreAsync(string username, string password)
+        private async Task<DatabaseInitializationResult> InitializeCoreAsync(
+            string username,
+            string password,
+            string bootstrapToken)
         {
             bool usesPostgreSql = DatabaseModeHelper.UsesPostgreSql(_databaseSettings);
             bool advisoryLockAcquired = false;
@@ -47,6 +70,17 @@ namespace ExportDocManager.Services.Infrastructure
                 }
 
                 await context.Database.EnsureCreatedAsync().ConfigureAwait(false);
+                bool requiresInitialAdministrator = usesPostgreSql &&
+                    !await context.Users.AsNoTracking().AnyAsync().ConfigureAwait(false);
+                if (requiresInitialAdministrator && _requireBootstrapToken &&
+                    !FixedTimeEquals(_expectedBootstrapToken, bootstrapToken))
+                {
+                    return DatabaseInitializationResult.Fail(
+                        "共享数据库首次初始化需要有效的部署初始化令牌。请联系部署管理员。",
+                        shouldResetPassword: false,
+                        isAuthenticationFailure: true);
+                }
+
                 if (!usesPostgreSql)
                 {
                     await ConfigureSingleProcessSqliteAsync(context).ConfigureAwait(false);
@@ -131,6 +165,14 @@ namespace ExportDocManager.Services.Infrastructure
                    string.Equals((username ?? string.Empty).Trim(), "admin", StringComparison.OrdinalIgnoreCase)
                 ? password ?? string.Empty
                 : string.Empty;
+        }
+
+        private static bool FixedTimeEquals(string expected, string actual)
+        {
+            byte[] expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(expected ?? string.Empty));
+            byte[] actualHash = SHA256.HashData(Encoding.UTF8.GetBytes(actual ?? string.Empty));
+            return !string.IsNullOrWhiteSpace(expected) &&
+                   CryptographicOperations.FixedTimeEquals(expectedHash, actualHash);
         }
 
         private const string DefaultInvoiceType = "实际数据";

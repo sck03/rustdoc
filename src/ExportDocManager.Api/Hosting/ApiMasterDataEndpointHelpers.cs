@@ -38,10 +38,7 @@ namespace ExportDocManager.Api.Hosting
             int id,
             CancellationToken cancellationToken)
         {
-            var rows = await repository.QueryAsync(
-                new HsCodeReadQuery { ReturnAll = true },
-                cancellationToken);
-            return rows.FirstOrDefault(row => row.Id == id);
+            return await repository.GetByIdAsync(id, cancellationToken);
         }
     }
 }

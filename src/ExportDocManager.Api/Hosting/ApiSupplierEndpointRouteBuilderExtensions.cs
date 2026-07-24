@@ -1,5 +1,6 @@
 using ExportDocManager.Services.Suppliers;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -56,13 +57,14 @@ namespace ExportDocManager.Api.Hosting
                 ISupplierFileService files, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(c, t, a, out var denied)) return denied;
-                if (c.Request.ContentLength is > 10_485_760) return Results.BadRequest(new ApiErrorResponse("供应商导入文件不能超过 10 MB。"));
                 try
                 {
-                    using var input = new MemoryStream(); await c.Request.Body.CopyToAsync(input, ct);
-                    if (input.Length == 0 || input.Length > 10_485_760) return Results.BadRequest(new ApiErrorResponse("导入文件为空或超过 10 MB。"));
+                    using var input = new MemoryStream();
+                    await ApiUploadLimits.CopyRequestBodyAsync(c.Request, input, ApiUploadLimits.SupplierImportBytes, ct);
+                    if (input.Length == 0) return Results.BadRequest(new ApiErrorResponse("导入文件为空。"));
                     input.Position = 0; return Results.Ok(ToApiDto(await files.PreviewAsync(input, c.Request.Query["fileName"].ToString(), ct)));
                 }
+                catch (PayloadLimitExceededException ex) { return WritePayloadTooLarge(ex); }
                 catch (InvalidDataException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
             }).WithName("PreviewSupplierImport");
             endpoints.MapPost("/api/suppliers/import", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,

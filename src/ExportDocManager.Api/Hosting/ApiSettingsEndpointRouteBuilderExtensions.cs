@@ -9,15 +9,21 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapGet("/api/settings", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
+                ApiAuthorizationService authorizationService,
+                ApiRuntimeOptions runtimeOptions,
                 ISettingsService settingsService) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                if (user == null)
                 {
                     return Results.Unauthorized();
                 }
 
                 await settingsService.LoadAsync();
-                return Results.Ok(ApiSettingsDtoFactory.FromSettings(settingsService.Settings));
+                return Results.Ok(ApiSettingsDtoFactory.FromSettingsForUser(
+                    settingsService.Settings,
+                    authorizationService.CanManageSettings(user),
+                    runtimeOptions.NetworkMode));
             })
             .WithName("GetSettings");
 

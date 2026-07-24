@@ -17,6 +17,9 @@ namespace ExportDocManager.Services.MasterData
         private const int SearchExampleCandidateLimit = 2000;
         private const int SearchMasterCandidateLimit = 1000;
         private const int DatabaseInClauseBatchSize = 400;
+        private const int KnowledgeResolutionBatchSize = 500;
+        private const long MaximumKnowledgeEntryBytes = 100L * 1024L * 1024L;
+        private const long MaximumKnowledgeExpandedBytes = 300L * 1024L * 1024L;
         // History discovery is an interactive review screen, not an export job. Keep each
         // request bounded so a growing invoice archive cannot turn one page load into a
         // full-database materialization. Users can narrow the window with a keyword.
@@ -951,29 +954,57 @@ namespace ExportDocManager.Services.MasterData
         {
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             DateTime? sinceUtc = since?.UtcDateTime;
-            var codes = await context.HsCodes.AsNoTracking().Where(item => !sinceUtc.HasValue || item.UpdateTime >= sinceUtc).ToListAsync(cancellationToken);
-            var examples = await context.HsCodeDeclarationExamples.AsNoTracking().Where(item => !sinceUtc.HasValue || item.UpdatedAt >= sinceUtc).ToListAsync(cancellationToken);
-            var relations = await context.HsCodeReplacementRelations.AsNoTracking().Where(item => !sinceUtc.HasValue || item.UpdatedAt >= sinceUtc).ToListAsync(cancellationToken);
-            var feedback = await context.HsCodeSearchFeedback.AsNoTracking().Where(item => !sinceUtc.HasValue || item.UpdatedAt >= sinceUtc).ToListAsync(cancellationToken);
-            var entries = new Dictionary<string, byte[]>
-            {
-                ["hs-codes.json"] = JsonSerializer.SerializeToUtf8Bytes(codes, JsonOptions),
-                ["declaration-examples.json"] = JsonSerializer.SerializeToUtf8Bytes(examples, JsonOptions),
-                ["replacement-relations.json"] = JsonSerializer.SerializeToUtf8Bytes(relations, JsonOptions),
-                ["search-feedback.json"] = JsonSerializer.SerializeToUtf8Bytes(feedback, JsonOptions)
-            };
-            var manifest = new KnowledgeManifest(PackageSchemaVersion, DateTimeOffset.UtcNow, since, entries.ToDictionary(item => item.Key, item => Sha256(item.Value)));
-            entries["manifest.json"] = JsonSerializer.SerializeToUtf8Bytes(manifest, JsonOptions);
+
             using var output = new MemoryStream();
-            using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
+            await using (var boundedOutput = new MaximumLengthWriteStream(output, MaximumPackageBytes))
             {
-                foreach (var entry in entries)
+                using var archive = new ZipArchive(boundedOutput, ZipArchiveMode.Create, leaveOpen: true);
+                long expandedBytes = 0;
+                var checksums = new Dictionary<string, string>(StringComparer.Ordinal);
+
+                async Task WriteJsonEntryAsync<T>(string name, IQueryable<T> query)
                 {
-                    var zipEntry = archive.CreateEntry(entry.Key, CompressionLevel.Optimal);
-                    await using var stream = zipEntry.Open();
-                    await stream.WriteAsync(entry.Value, cancellationToken);
+                    var zipEntry = archive.CreateEntry(name, CompressionLevel.Optimal);
+                    await using var entryStream = zipEntry.Open();
+                    using var hashingStream = new HashingQuotaWriteStream(
+                        entryStream,
+                        MaximumKnowledgeEntryBytes,
+                        MaximumKnowledgeExpandedBytes,
+                        () => expandedBytes);
+                    await JsonSerializer.SerializeAsync(
+                        hashingStream,
+                        query.AsAsyncEnumerable(),
+                        JsonOptions,
+                        cancellationToken).ConfigureAwait(false);
+                    await hashingStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                    expandedBytes += hashingStream.BytesWritten;
+                    checksums[name] = hashingStream.GetHashHex();
                 }
+
+                await WriteJsonEntryAsync(
+                    "hs-codes.json",
+                    context.HsCodes.AsNoTracking().Where(item => !sinceUtc.HasValue || item.UpdateTime >= sinceUtc));
+                await WriteJsonEntryAsync(
+                    "declaration-examples.json",
+                    context.HsCodeDeclarationExamples.AsNoTracking().Where(item => !sinceUtc.HasValue || item.UpdatedAt >= sinceUtc));
+                await WriteJsonEntryAsync(
+                    "replacement-relations.json",
+                    context.HsCodeReplacementRelations.AsNoTracking().Where(item => !sinceUtc.HasValue || item.UpdatedAt >= sinceUtc));
+                await WriteJsonEntryAsync(
+                    "search-feedback.json",
+                    context.HsCodeSearchFeedback.AsNoTracking().Where(item => !sinceUtc.HasValue || item.UpdatedAt >= sinceUtc));
+
+                var manifest = new KnowledgeManifest(
+                    PackageSchemaVersion,
+                    DateTimeOffset.UtcNow,
+                    since,
+                    checksums);
+                byte[] manifestBytes = JsonSerializer.SerializeToUtf8Bytes(manifest, JsonOptions);
+                var manifestEntry = archive.CreateEntry("manifest.json", CompressionLevel.Optimal);
+                await using var manifestStream = manifestEntry.Open();
+                await manifestStream.WriteAsync(manifestBytes, cancellationToken).ConfigureAwait(false);
             }
+
             return output.ToArray();
         }
 
@@ -984,7 +1015,16 @@ namespace ExportDocManager.Services.MasterData
             if (info.Length <= 0 || info.Length > MaximumPackageBytes) throw new InvalidDataException("HS知识库文件为空或超过100MB限制。");
             using var archive = ZipFile.OpenRead(info.FullName);
             var knownNames = new HashSet<string>(["manifest.json", "hs-codes.json", "declaration-examples.json", "replacement-relations.json", "search-feedback.json"], StringComparer.OrdinalIgnoreCase);
-            if (archive.Entries.Any(entry => !knownNames.Contains(entry.FullName) || entry.Length > MaximumPackageBytes))
+            var packageEntries = archive.Entries
+                .Where(entry => !string.IsNullOrWhiteSpace(entry.Name))
+                .ToList();
+            bool hasDuplicateEntry = packageEntries
+                .GroupBy(entry => entry.FullName, StringComparer.OrdinalIgnoreCase)
+                .Any(group => group.Count() > 1);
+            if (packageEntries.Count != knownNames.Count ||
+                hasDuplicateEntry ||
+                packageEntries.Any(entry => !knownNames.Contains(entry.FullName) || entry.Length > MaximumKnowledgeEntryBytes) ||
+                packageEntries.Sum(entry => entry.Length) > MaximumKnowledgeExpandedBytes)
                 throw new InvalidDataException("HS知识库包含未知或过大的文件。");
             byte[] manifestBytes = await ReadEntryAsync(archive, "manifest.json", cancellationToken);
             var manifest = JsonSerializer.Deserialize<KnowledgeManifest>(manifestBytes, JsonOptions)
@@ -1016,14 +1056,45 @@ namespace ExportDocManager.Services.MasterData
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
             int addedCodes = 0, updatedCodes = 0, addedExamples = 0, updatedExamples = 0, addedRelations = 0, addedFeedback = 0;
-            foreach (var source in preview.HsCodes)
+
+            var preparedCodes = preview.HsCodes
+                .Select(source => (Source: source, Code: HsCodeTextHelper.NormalizeCode(source.Code)))
+                .Where(item => !string.IsNullOrWhiteSpace(item.Code))
+                .ToList();
+            var existingCodes = new Dictionary<string, HsCode>(StringComparer.OrdinalIgnoreCase);
+            foreach (var batch in preparedCodes.Select(item => item.Code)
+                         .Distinct(StringComparer.OrdinalIgnoreCase)
+                         .Chunk(DatabaseInClauseBatchSize))
             {
-                string code = HsCodeTextHelper.NormalizeCode(source.Code);
-                if (string.IsNullOrWhiteSpace(code)) continue;
-                var target = await context.HsCodes.FirstOrDefaultAsync(item => item.NormalizedCode == code, cancellationToken);
-                if (target == null) { source.Id = 0; source.Code = code; await context.HsCodes.AddAsync(source, cancellationToken); addedCodes++; }
-                else { MergeHsCode(source, target); updatedCodes++; }
+                string[] keys = batch.ToArray();
+                var rows = await context.HsCodes
+                    .Where(item => keys.Contains(item.NormalizedCode))
+                    .ToListAsync(cancellationToken);
+                foreach (var row in rows)
+                {
+                    existingCodes.TryAdd(row.NormalizedCode, row);
+                }
             }
+
+            foreach (var (source, code) in preparedCodes)
+            {
+                source.Code = code;
+                if (existingCodes.TryGetValue(code, out var target))
+                {
+                    MergeHsCode(source, target);
+                    updatedCodes++;
+                }
+                else
+                {
+                    source.Id = 0;
+                    source.RowVersion = null;
+                    await context.HsCodes.AddAsync(source, cancellationToken);
+                    existingCodes[code] = source;
+                    addedCodes++;
+                }
+            }
+
+            var preparedExamples = new List<(HsCodeDeclarationExample Source, string Fingerprint)>(preview.Examples.Count);
             foreach (var source in preview.Examples)
             {
                 source.RawReportedHsCode = HsCodeTextHelper.NormalizeCode(source.RawReportedHsCode);
@@ -1032,21 +1103,134 @@ namespace ExportDocManager.Services.MasterData
                 source.Specification = (source.Specification ?? string.Empty).Trim();
                 source.SearchText = NormalizeSearchText($"{source.ProductName} {source.Specification}");
                 source.Fingerprint = BuildFingerprint(source.RawReportedHsCode, source.ProductName, source.Specification);
-                var target = await context.HsCodeDeclarationExamples.FirstOrDefaultAsync(item => item.Fingerprint == source.Fingerprint, cancellationToken);
-                if (target == null) { source.Id = 0; await context.HsCodeDeclarationExamples.AddAsync(source, cancellationToken); addedExamples++; }
-                else { MergeExample(source, target); updatedExamples++; }
+                source.Source = string.IsNullOrWhiteSpace(source.Source) ? "KnowledgePackage" : source.Source.Trim();
+                source.ResolutionStatus = string.IsNullOrWhiteSpace(source.ResolutionStatus)
+                    ? "Unresolved"
+                    : source.ResolutionStatus.Trim();
+                preparedExamples.Add((source, source.Fingerprint));
             }
+
+            var existingExamples = new Dictionary<string, HsCodeDeclarationExample>(StringComparer.OrdinalIgnoreCase);
+            foreach (var batch in preparedExamples.Select(item => item.Fingerprint)
+                         .Distinct(StringComparer.OrdinalIgnoreCase)
+                         .Chunk(DatabaseInClauseBatchSize))
+            {
+                string[] keys = batch.ToArray();
+                var rows = await context.HsCodeDeclarationExamples
+                    .Where(item => keys.Contains(item.Fingerprint))
+                    .ToListAsync(cancellationToken);
+                foreach (var row in rows)
+                {
+                    existingExamples.TryAdd(row.Fingerprint, row);
+                }
+            }
+
+            foreach (var (source, fingerprint) in preparedExamples)
+            {
+                if (existingExamples.TryGetValue(fingerprint, out var target))
+                {
+                    MergeExample(source, target);
+                    updatedExamples++;
+                }
+                else
+                {
+                    source.Id = 0;
+                    await context.HsCodeDeclarationExamples.AddAsync(source, cancellationToken);
+                    existingExamples[fingerprint] = source;
+                    addedExamples++;
+                }
+            }
+
+            var preparedRelations = new List<(HsCodeReplacementRelation Source, ReplacementRelationKey Key)>(preview.Replacements.Count);
             foreach (var source in preview.Replacements)
             {
-                bool exists = await context.HsCodeReplacementRelations.AnyAsync(item => item.OldCode == source.OldCode && item.NewCode == source.NewCode && item.EffectiveYear == source.EffectiveYear, cancellationToken);
-                if (!exists) { source.Id = 0; await context.HsCodeReplacementRelations.AddAsync(source, cancellationToken); addedRelations++; }
+                source.OldCode = HsCodeTextHelper.NormalizeCode(source.OldCode);
+                source.NewCode = HsCodeTextHelper.NormalizeCode(source.NewCode);
+                source.Source = string.IsNullOrWhiteSpace(source.Source) ? "KnowledgePackage" : source.Source.Trim();
+                preparedRelations.Add((source, new ReplacementRelationKey(
+                    source.OldCode,
+                    source.NewCode,
+                    source.EffectiveYear)));
             }
+
+            var existingRelations = new HashSet<ReplacementRelationKey>();
+            foreach (var batch in preparedRelations.Select(item => item.Key.OldCode)
+                         .Distinct(StringComparer.OrdinalIgnoreCase)
+                         .Chunk(DatabaseInClauseBatchSize))
+            {
+                string[] oldCodes = batch.ToArray();
+                var rows = await context.HsCodeReplacementRelations
+                    .AsNoTracking()
+                    .Where(item => oldCodes.Contains(item.OldCode))
+                    .Select(item => new { item.OldCode, item.NewCode, item.EffectiveYear })
+                    .ToListAsync(cancellationToken);
+                foreach (var row in rows)
+                {
+                    existingRelations.Add(new ReplacementRelationKey(
+                        row.OldCode,
+                        row.NewCode,
+                        row.EffectiveYear));
+                }
+            }
+
+            foreach (var (source, key) in preparedRelations)
+            {
+                if (existingRelations.Add(key))
+                {
+                    source.Id = 0;
+                    await context.HsCodeReplacementRelations.AddAsync(source, cancellationToken);
+                    addedRelations++;
+                }
+            }
+
+            var preparedFeedback = new List<(HsCodeSearchFeedback Source, string Fingerprint)>(preview.Feedback.Count);
             foreach (var source in preview.Feedback)
             {
-                var target = await context.HsCodeSearchFeedback.FirstOrDefaultAsync(item => item.Fingerprint == source.Fingerprint, cancellationToken);
-                if (target == null) { source.Id = 0; await context.HsCodeSearchFeedback.AddAsync(source, cancellationToken); addedFeedback++; }
-                else { target.AcceptedCount = Math.Max(target.AcceptedCount, source.AcceptedCount); target.RejectedCount = Math.Max(target.RejectedCount, source.RejectedCount); target.UpdatedAt = Max(target.UpdatedAt, source.UpdatedAt); }
+                source.QueryText = (source.QueryText ?? string.Empty).Trim();
+                source.ProductName = string.IsNullOrWhiteSpace(source.ProductName) ? null : source.ProductName.Trim();
+                source.Specification = string.IsNullOrWhiteSpace(source.Specification) ? null : source.Specification.Trim();
+                source.CandidateCode = HsCodeTextHelper.NormalizeCode(source.CandidateCode);
+                source.Fingerprint = BuildFingerprint(
+                    NormalizeSearchText(source.QueryText),
+                    source.CandidateCode,
+                    source.ProductName,
+                    source.Specification);
+                preparedFeedback.Add((source, source.Fingerprint));
             }
+
+            var existingFeedback = new Dictionary<string, HsCodeSearchFeedback>(StringComparer.OrdinalIgnoreCase);
+            foreach (var batch in preparedFeedback.Select(item => item.Fingerprint)
+                         .Distinct(StringComparer.OrdinalIgnoreCase)
+                         .Chunk(DatabaseInClauseBatchSize))
+            {
+                string[] keys = batch.ToArray();
+                var rows = await context.HsCodeSearchFeedback
+                    .Where(item => keys.Contains(item.Fingerprint))
+                    .ToListAsync(cancellationToken);
+                foreach (var row in rows)
+                {
+                    existingFeedback.TryAdd(row.Fingerprint, row);
+                }
+            }
+
+            foreach (var (source, fingerprint) in preparedFeedback)
+            {
+                if (existingFeedback.TryGetValue(fingerprint, out var target))
+                {
+                    target.AcceptedCount = Math.Max(target.AcceptedCount, source.AcceptedCount);
+                    target.RejectedCount = Math.Max(target.RejectedCount, source.RejectedCount);
+                    target.LastConfirmedAt = Max(target.LastConfirmedAt, source.LastConfirmedAt);
+                    target.UpdatedAt = Max(target.UpdatedAt, source.UpdatedAt);
+                }
+                else
+                {
+                    source.Id = 0;
+                    await context.HsCodeSearchFeedback.AddAsync(source, cancellationToken);
+                    existingFeedback[fingerprint] = source;
+                    addedFeedback++;
+                }
+            }
+
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return new HsCodeKnowledgeImportResult(addedCodes, updatedCodes, addedExamples, updatedExamples, addedRelations, addedFeedback,
@@ -1386,19 +1570,65 @@ namespace ExportDocManager.Services.MasterData
         {
             if (codes.Count > 500_000 || examples.Count > 1_000_000 || replacements.Count > 1_000_000 || feedback.Count > 1_000_000)
                 throw new InvalidDataException("HS知识库记录数量超过安全限制。");
+            if (codes.Any(item => string.IsNullOrWhiteSpace(HsCodeTextHelper.NormalizeCode(item.Code)) ||
+                                  HsCodeTextHelper.NormalizeCode(item.Code).Length > 20 ||
+                                  string.IsNullOrWhiteSpace(item.Name) || item.Name.Length > 200 ||
+                                  (item.SourceName?.Length ?? 0) > 200 ||
+                                  (item.Description?.Length ?? 0) > 500 ||
+                                  (item.Elements?.Length ?? 0) > 500 ||
+                                  (item.Notes?.Length ?? 0) > 1000))
+                throw new InvalidDataException("HS知识库包含无效或过长的编码字段。");
             if (codes.Any(item => string.Equals(item.Status, HsCodeValidityPolicy.ActiveStatus, StringComparison.OrdinalIgnoreCase) &&
                                   !HsCodeValidityPolicy.IsTrustedActive(item)))
                 throw new InvalidDataException("HS知识库包含缺少来源、适用年度或验证时间的有效编码。");
             if (examples.Any(item => string.IsNullOrWhiteSpace(HsCodeTextHelper.NormalizeCode(item.RawReportedHsCode)) ||
-                                     string.IsNullOrWhiteSpace(item.ProductName) || item.ProductName.Length > 300 ||
-                                     (item.Specification?.Length ?? 0) > 1500))
+                                      string.IsNullOrWhiteSpace(item.ProductName) || item.ProductName.Length > 300 ||
+                                      (item.Specification?.Length ?? 0) > 1500 ||
+                                      (item.Source?.Length ?? 0) > 100 ||
+                                      (item.ResolutionStatus?.Length ?? 0) > 30))
                 throw new InvalidDataException("HS知识库包含无效或过长的申报实例字段。");
             if (replacements.Any(item => string.IsNullOrWhiteSpace(HsCodeTextHelper.NormalizeCode(item.OldCode)) ||
-                                         string.IsNullOrWhiteSpace(HsCodeTextHelper.NormalizeCode(item.NewCode))))
+                                          string.IsNullOrWhiteSpace(HsCodeTextHelper.NormalizeCode(item.NewCode)) ||
+                                          HsCodeTextHelper.NormalizeCode(item.OldCode).Length > 20 ||
+                                          HsCodeTextHelper.NormalizeCode(item.NewCode).Length > 20 ||
+                                          (item.Source?.Length ?? 0) > 100))
                 throw new InvalidDataException("HS知识库包含无效的编码替代关系。");
             if (feedback.Any(item => string.IsNullOrWhiteSpace(HsCodeTextHelper.NormalizeCode(item.CandidateCode)) ||
-                                     item.AcceptedCount < 0 || item.RejectedCount < 0))
+                                      HsCodeTextHelper.NormalizeCode(item.CandidateCode).Length > 20 ||
+                                      (item.QueryText?.Length ?? 0) > 500 ||
+                                      (item.ProductName?.Length ?? 0) > 300 ||
+                                      (item.Specification?.Length ?? 0) > 1500 ||
+                                      item.AcceptedCount < 0 || item.RejectedCount < 0))
                 throw new InvalidDataException("HS知识库包含无效的学习记录。");
+
+            bool hasDuplicateCodes = codes
+                .Select(item => HsCodeTextHelper.NormalizeCode(item.Code))
+                .GroupBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .Any(group => group.Count() > 1);
+            bool hasDuplicateExamples = examples
+                .Select(item => BuildFingerprint(
+                    HsCodeTextHelper.NormalizeCode(item.RawReportedHsCode),
+                    (item.ProductName ?? string.Empty).Trim(),
+                    (item.Specification ?? string.Empty).Trim()))
+                .GroupBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .Any(group => group.Count() > 1);
+            bool hasDuplicateRelations = replacements
+                .Select(item => new ReplacementRelationKey(
+                    HsCodeTextHelper.NormalizeCode(item.OldCode),
+                    HsCodeTextHelper.NormalizeCode(item.NewCode),
+                    item.EffectiveYear))
+                .GroupBy(value => value)
+                .Any(group => group.Count() > 1);
+            bool hasDuplicateFeedback = feedback
+                .Select(item => BuildFingerprint(
+                    NormalizeSearchText(item.QueryText),
+                    HsCodeTextHelper.NormalizeCode(item.CandidateCode),
+                    item.ProductName,
+                    item.Specification))
+                .GroupBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .Any(group => group.Count() > 1);
+            if (hasDuplicateCodes || hasDuplicateExamples || hasDuplicateRelations || hasDuplicateFeedback)
+                throw new InvalidDataException("HS知识库包含重复的业务记录。");
         }
 
         private static string NormalizeResolutionStatus(string status, string currentCode, string rawCode)
@@ -1436,18 +1666,66 @@ namespace ExportDocManager.Services.MasterData
 
         private async Task ResolveExamplesAsync(AppDbContext context, CancellationToken cancellationToken)
         {
-            var codes = await context.HsCodes.AsNoTracking().ToListAsync(cancellationToken);
-            var map = codes.Where(item => !string.IsNullOrWhiteSpace(item.NormalizedCode)).ToDictionary(item => item.NormalizedCode, StringComparer.OrdinalIgnoreCase);
-            var relations = await context.HsCodeReplacementRelations.AsNoTracking().ToListAsync(cancellationToken);
-            var examples = await context.HsCodeDeclarationExamples.ToListAsync(cancellationToken);
-            foreach (var example in examples)
+            int lastId = 0;
+            while (true)
             {
-                var resolution = ResolveCurrentCode(example, map, relations);
-                example.ResolvedCurrentHsCode = resolution.CurrentCode;
-                example.ResolutionStatus = resolution.Status;
-                example.UpdatedAt = DateTime.UtcNow;
+                var examples = await context.HsCodeDeclarationExamples
+                    .Where(item => item.Id > lastId)
+                    .OrderBy(item => item.Id)
+                    .Take(KnowledgeResolutionBatchSize)
+                    .ToListAsync(cancellationToken);
+                if (examples.Count == 0)
+                {
+                    break;
+                }
+
+                var rawCodes = examples
+                    .Select(item => HsCodeTextHelper.NormalizeCode(item.RawReportedHsCode))
+                    .Where(code => !string.IsNullOrWhiteSpace(code))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                var relations = new List<HsCodeReplacementRelation>();
+                foreach (var batch in rawCodes.Chunk(DatabaseInClauseBatchSize))
+                {
+                    string[] batchCodes = batch.ToArray();
+                    relations.AddRange(await context.HsCodeReplacementRelations
+                        .AsNoTracking()
+                        .Where(item => batchCodes.Contains(item.OldCode))
+                        .ToListAsync(cancellationToken));
+                }
+
+                var lookupCodes = examples
+                    .SelectMany(item => new[] { item.RawReportedHsCode, item.ResolvedCurrentHsCode })
+                    .Concat(relations.Select(item => item.NewCode))
+                    .Select(HsCodeTextHelper.NormalizeCode)
+                    .Where(code => !string.IsNullOrWhiteSpace(code))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                var map = new Dictionary<string, HsCode>(StringComparer.OrdinalIgnoreCase);
+                foreach (var batch in lookupCodes.Chunk(DatabaseInClauseBatchSize))
+                {
+                    var rows = await context.HsCodes
+                        .AsNoTracking()
+                        .Where(item => batch.Contains(item.NormalizedCode))
+                        .ToListAsync(cancellationToken);
+                    foreach (var row in rows)
+                    {
+                        map[row.NormalizedCode] = row;
+                    }
+                }
+
+                foreach (var example in examples)
+                {
+                    var resolution = ResolveCurrentCode(example, map, relations);
+                    example.ResolvedCurrentHsCode = resolution.CurrentCode;
+                    example.ResolutionStatus = resolution.Status;
+                    example.UpdatedAt = DateTime.UtcNow;
+                }
+
+                await context.SaveChangesAsync(cancellationToken);
+                lastId = examples[^1].Id;
+                context.ChangeTracker.Clear();
             }
-            await context.SaveChangesAsync(cancellationToken);
         }
 
         private static void MergeHsCode(HsCode source, HsCode target)
@@ -1504,13 +1782,183 @@ namespace ExportDocManager.Services.MasterData
         private static async Task<byte[]> ReadEntryAsync(ZipArchive archive, string name, CancellationToken cancellationToken)
         {
             var entry = archive.GetEntry(name) ?? throw new InvalidDataException($"HS知识库缺少文件：{name}。");
+            if (entry.Length > MaximumKnowledgeEntryBytes)
+            {
+                throw new InvalidDataException($"HS知识库文件过大：{name}。");
+            }
             await using var stream = entry.Open();
             using var output = new MemoryStream();
-            await stream.CopyToAsync(output, cancellationToken);
+            await BoundedStreamHelper.CopyToAsync(
+                stream,
+                output,
+                MaximumKnowledgeEntryBytes,
+                cancellationToken);
             return output.ToArray();
         }
 
+        private sealed class HashingQuotaWriteStream : Stream
+        {
+            private readonly Stream _inner;
+            private readonly IncrementalHash _hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            private readonly long _maximumEntryBytes;
+            private readonly long _maximumTotalBytes;
+            private readonly Func<long> _totalBytesProvider;
+            private bool _hashFinalized;
+
+            public HashingQuotaWriteStream(
+                Stream inner,
+                long maximumEntryBytes,
+                long maximumTotalBytes,
+                Func<long> totalBytesProvider)
+            {
+                _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+                _maximumEntryBytes = maximumEntryBytes;
+                _maximumTotalBytes = maximumTotalBytes;
+                _totalBytesProvider = totalBytesProvider ?? throw new ArgumentNullException(nameof(totalBytesProvider));
+            }
+
+            public long BytesWritten { get; private set; }
+
+            public string GetHashHex()
+            {
+                if (_hashFinalized)
+                {
+                    throw new InvalidOperationException("HS知识库导出校验和已读取。");
+                }
+
+                _hashFinalized = true;
+                return Convert.ToHexString(_hash.GetHashAndReset()).ToLowerInvariant();
+            }
+
+            public override bool CanRead => false;
+            public override bool CanSeek => false;
+            public override bool CanWrite => true;
+            public override long Length => BytesWritten;
+            public override long Position
+            {
+                get => BytesWritten;
+                set => throw new NotSupportedException();
+            }
+
+            public override void Flush() => _inner.Flush();
+
+            public override Task FlushAsync(CancellationToken cancellationToken) =>
+                _inner.FlushAsync(cancellationToken);
+
+            public override int Read(byte[] buffer, int offset, int count) =>
+                throw new NotSupportedException();
+
+            public override long Seek(long offset, SeekOrigin origin) =>
+                throw new NotSupportedException();
+
+            public override void SetLength(long value) =>
+                throw new NotSupportedException();
+
+            public override void Write(byte[] buffer, int offset, int count)
+            {
+                ArgumentNullException.ThrowIfNull(buffer);
+                ValidateWrite(count);
+                _hash.AppendData(buffer, offset, count);
+                _inner.Write(buffer, offset, count);
+                BytesWritten += count;
+            }
+
+            public override async ValueTask WriteAsync(
+                ReadOnlyMemory<byte> buffer,
+                CancellationToken cancellationToken = default)
+            {
+                ValidateWrite(buffer.Length);
+                _hash.AppendData(buffer.Span);
+                await _inner.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
+                BytesWritten += buffer.Length;
+            }
+
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    _hash.Dispose();
+                }
+
+                base.Dispose(disposing);
+            }
+
+            private void ValidateWrite(int count)
+            {
+                if (count < 0 || BytesWritten > _maximumEntryBytes - count)
+                {
+                    throw new PayloadLimitExceededException(_maximumEntryBytes);
+                }
+
+                long totalBytes = _totalBytesProvider();
+                if (totalBytes > _maximumTotalBytes - BytesWritten - count)
+                {
+                    throw new PayloadLimitExceededException(_maximumTotalBytes);
+                }
+            }
+        }
+
+        private sealed class MaximumLengthWriteStream : Stream
+        {
+            private readonly Stream _inner;
+            private readonly long _maximumBytes;
+
+            public MaximumLengthWriteStream(Stream inner, long maximumBytes)
+            {
+                _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+                _maximumBytes = maximumBytes;
+            }
+
+            private long BytesWritten { get; set; }
+            public override bool CanRead => _inner.CanRead;
+            public override bool CanSeek => _inner.CanSeek;
+            public override bool CanWrite => _inner.CanWrite;
+            public override long Length => _inner.Length;
+            public override long Position { get => _inner.Position; set => _inner.Position = value; }
+            public override void Flush() => _inner.Flush();
+            public override Task FlushAsync(CancellationToken cancellationToken) => _inner.FlushAsync(cancellationToken);
+            public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+            public override long Seek(long offset, SeekOrigin origin) => _inner.Seek(offset, origin);
+            public override void SetLength(long value) => _inner.SetLength(value);
+
+            public override void Write(byte[] buffer, int offset, int count)
+            {
+                ArgumentNullException.ThrowIfNull(buffer);
+                ValidateWrite(count);
+                _inner.Write(buffer, offset, count);
+                BytesWritten += count;
+            }
+
+            public override async ValueTask WriteAsync(
+                ReadOnlyMemory<byte> buffer,
+                CancellationToken cancellationToken = default)
+            {
+                ValidateWrite(buffer.Length);
+                await _inner.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
+                BytesWritten += buffer.Length;
+            }
+
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    _inner.Dispose();
+                }
+
+                base.Dispose(disposing);
+            }
+
+            private void ValidateWrite(int count)
+            {
+                if (count < 0 || BytesWritten > _maximumBytes - count)
+                {
+                    throw new PayloadLimitExceededException(_maximumBytes);
+                }
+            }
+        }
+
         private sealed record KnowledgeManifest(string SchemaVersion, DateTimeOffset ExportedAt, DateTimeOffset? Since, Dictionary<string, string> Checksums);
+        private readonly record struct ReplacementRelationKey(string OldCode, string NewCode, int? EffectiveYear);
         private sealed record CurrentCodeResolution(string CurrentCode, string Status, IReadOnlyList<string> Replacements, bool CanUse);
         private sealed record KnowledgeCandidate(
             HsCodeDeclarationExample Example,

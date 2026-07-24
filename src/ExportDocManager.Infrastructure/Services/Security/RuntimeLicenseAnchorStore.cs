@@ -66,11 +66,14 @@ namespace ExportDocManager.Services.Security
     public sealed class FileRuntimeLicenseAnchorStore : IRuntimeLicenseAnchorStore
     {
         private readonly string _path;
+        private readonly LocalSecretProtector _secretProtector;
 
         public FileRuntimeLicenseAnchorStore(string path, string storageDescription = "")
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(path);
             _path = Path.GetFullPath(path);
+            _secretProtector = new LocalSecretProtector(
+                Path.GetDirectoryName(_path) ?? throw new InvalidOperationException("授权锚点目录无效。"));
             StorageDescription = string.IsNullOrWhiteSpace(storageDescription)
                 ? _path
                 : storageDescription;
@@ -87,7 +90,8 @@ namespace ExportDocManager.Services.Security
 
             try
             {
-                string payload = await File.ReadAllTextAsync(_path, cancellationToken).ConfigureAwait(false);
+                string encrypted = await File.ReadAllTextAsync(_path, cancellationToken).ConfigureAwait(false);
+                string payload = _secretProtector.Unprotect(encrypted);
                 return RuntimeLicenseAnchorCodec.Decode(payload);
             }
             catch
@@ -98,7 +102,7 @@ namespace ExportDocManager.Services.Security
 
         public async Task SaveAsync(RuntimeLicenseAnchorData data, CancellationToken cancellationToken = default)
         {
-            string payload = RuntimeLicenseAnchorCodec.Encode(data);
+            string payload = _secretProtector.Protect(RuntimeLicenseAnchorCodec.Encode(data));
             await AtomicFileHelper.WriteAllTextAtomicAsync(_path, payload, Encoding.UTF8, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -388,12 +392,14 @@ namespace ExportDocManager.Services.Security
 
     internal static class RuntimeLicenseAnchorCodec
     {
+        private const string PayloadPrefix = "runtime-license-anchor-v1:";
+
         public static string Encode(RuntimeLicenseAnchorData data)
         {
             ArgumentNullException.ThrowIfNull(data);
             data.Signature = ComputeSignature(data);
             string json = JsonSerializer.Serialize(data);
-            return SecurityHelper.Encrypt(json);
+            return PayloadPrefix + Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
         }
 
         public static RuntimeLicenseAnchorData Decode(string payload)
@@ -405,11 +411,13 @@ namespace ExportDocManager.Services.Security
 
             try
             {
-                string json = SecurityHelper.Decrypt(payload);
-                if (string.IsNullOrWhiteSpace(json))
+                if (!payload.StartsWith(PayloadPrefix, StringComparison.Ordinal))
                 {
                     return null;
                 }
+
+                string json = Encoding.UTF8.GetString(
+                    Convert.FromBase64String(payload[PayloadPrefix.Length..]));
 
                 var data = JsonSerializer.Deserialize<RuntimeLicenseAnchorData>(json);
                 if (data == null ||

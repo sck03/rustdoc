@@ -89,11 +89,17 @@ namespace ExportDocManager.Services.MasterData
         public async Task<List<HsCode>> SearchAsync(string keyword)
         {
             var normalizedKeyword = string.IsNullOrWhiteSpace(keyword) ? string.Empty : keyword.Trim();
+            if (string.IsNullOrWhiteSpace(normalizedKeyword))
+            {
+                // An empty smart-search query must never materialize the entire shared
+                // HS catalogue. The paged list endpoint is the explicit browse path.
+                return [];
+            }
             var rows = await GetReadRepository().QueryAsync(new HsCodeReadQuery
             {
                 Keyword = normalizedKeyword,
                 MaxCount = 100,
-                ReturnAll = string.IsNullOrWhiteSpace(normalizedKeyword),
+                ReturnAll = false,
                 PageSize = 100
             });
             return DeduplicateByCode(rows).ToList();

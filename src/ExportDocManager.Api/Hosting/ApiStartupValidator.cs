@@ -19,6 +19,7 @@ namespace ExportDocManager.Api.Hosting
             ArgumentNullException.ThrowIfNull(runtimeOptions);
 
             ValidateListenUrls(runtimeOptions, databaseSettings);
+            ValidateBootstrapToken(runtimeOptions, databaseSettings);
             ValidateRuntimeDirectories(pathProvider);
             ValidateDatabasePath(pathProvider, databaseSettings);
         }
@@ -85,6 +86,26 @@ namespace ExportDocManager.Api.Hosting
                 !DatabaseModeHelper.HasCompletePostgreSqlConfiguration(databaseSettings))
             {
                 throw new InvalidOperationException("局域网/容器 network mode 必须使用已完整配置的 PostgreSQL 数据库。");
+            }
+
+        }
+
+        public static void ValidateBootstrapToken(
+            ApiRuntimeOptions runtimeOptions,
+            DatabaseConnectionSettings databaseSettings)
+        {
+            ArgumentNullException.ThrowIfNull(runtimeOptions);
+            ArgumentNullException.ThrowIfNull(databaseSettings);
+            if (!runtimeOptions.NetworkMode || !DatabaseModeHelper.UsesPostgreSql(databaseSettings))
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(runtimeOptions.BootstrapToken) ||
+                runtimeOptions.BootstrapToken.Length < 24)
+            {
+                throw new InvalidOperationException(
+                    $"network mode 必须配置至少 24 个字符的 {ApiRuntimeOptions.BootstrapTokenEnvironmentVariable}，用于保护首次管理员初始化。");
             }
         }
 
