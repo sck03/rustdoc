@@ -54,7 +54,7 @@ let cdp;
 const results = [];
 try {
   await waitForHttp(`http://127.0.0.1:${port}/visual-baseline.html`);
-  chrome = await startChrome({ browserExecutable, userDataDir: profileRoot, timeoutMs: 30000 });
+  chrome = await startChrome({ browserExecutable, userDataDir: profileRoot, timeoutMs: 60000 });
   cdp = await CdpClient.connect(chrome.browserWebSocketUrl);
   const page = await createPageSession(cdp);
 

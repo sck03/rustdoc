@@ -2,13 +2,42 @@ import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
-import { fetchJson, waitFor } from "./web-runtime-smoke-common.mjs";
+import { waitForDevToolsUrl } from "./chromium-cdp.mjs";
 
 export async function startChrome(options) {
-  const debugPort = await getFreePort();
+  const runtime = detectChromeRuntime();
+  const args = buildChromeLaunchArguments(options, runtime);
+  const chrome = spawn(options.browserExecutable, args, {
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+
+  try {
+    const browserWebSocketUrl = await waitForDevToolsUrl(
+      chrome,
+      `Chrome (${options.browserExecutable})`,
+      options.timeoutMs,
+    );
+    const debugPort = Number.parseInt(new URL(browserWebSocketUrl).port, 10);
+    if (!Number.isInteger(debugPort) || debugPort <= 0) {
+      throw new Error(`Chrome returned an invalid DevTools endpoint: ${browserWebSocketUrl}`);
+    }
+
+    return { process: chrome, debugPort, browserWebSocketUrl };
+  } catch (error) {
+    if (chrome.exitCode === null && chrome.signalCode === null) {
+      chrome.kill();
+      await waitForChildExit(chrome, 5000);
+    }
+    throw error;
+  }
+}
+
+export function buildChromeLaunchArguments(options, runtime = detectChromeRuntime()) {
   const executableName = path.basename(options.browserExecutable).toLowerCase();
   const args = [
-    `--remote-debugging-port=${debugPort}`,
+    "--remote-debugging-address=127.0.0.1",
+    "--remote-debugging-port=0",
     `--user-data-dir=${options.userDataDir}`,
     "--disable-background-networking",
     "--disable-default-apps",
@@ -26,44 +55,41 @@ export async function startChrome(options) {
     args.unshift("--headless=new");
   }
 
-  if (typeof process.getuid === "function" && process.getuid() === 0) {
+  if (runtime.platform === "linux") {
+    args.unshift("--disable-dev-shm-usage");
+  }
+
+  if (runtime.platform === "linux" && (runtime.isCi || runtime.isRoot)) {
     args.unshift("--no-sandbox");
   }
 
-  const chrome = spawn(options.browserExecutable, args, {
-    stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true,
-  });
+  return args;
+}
 
-  let stderr = "";
-  chrome.stderr.on("data", (chunk) => {
-    stderr += chunk.toString();
-  });
-
-  chrome.on("exit", (code, signal) => {
-    if (code !== 0 && code !== null) {
-      stderr += `\nChrome exited with code ${code}.`;
-    }
-
-    if (signal) {
-      stderr += `\nChrome exited with signal ${signal}.`;
-    }
-  });
-
-  const version = await waitFor(async () => {
-    if (chrome.exitCode !== null) {
-      throw new Error(`Chrome exited before DevTools was ready.${stderr ? `\n${stderr}` : ""}`);
-    }
-
-    const currentVersion = await fetchJson(`http://127.0.0.1:${debugPort}/json/version`).catch(() => null);
-    return currentVersion?.webSocketDebuggerUrl ? currentVersion : null;
-  }, options.timeoutMs, "Timed out waiting for Chrome DevTools.");
-
+function detectChromeRuntime() {
   return {
-    process: chrome,
-    debugPort,
-    browserWebSocketUrl: version.webSocketDebuggerUrl,
+    platform: process.platform,
+    isCi: Boolean(process.env.CI),
+    isRoot: typeof process.getuid === "function" && process.getuid() === 0,
   };
+}
+
+function waitForChildExit(child, timeoutMs) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      child.off("exit", onExit);
+      resolve();
+    }, timeoutMs);
+    function onExit() {
+      clearTimeout(timer);
+      resolve();
+    }
+    child.once("exit", onExit);
+  });
 }
 
 export async function getFreePort() {

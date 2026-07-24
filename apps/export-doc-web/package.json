@@ -31,6 +31,7 @@
     "test:font-policy:release": "node ../../scripts/verify-font-license-policy.mjs --require-files",
     "test:visual-baselines": "node ../../scripts/test_frontend_visual_baselines.mjs",
     "test:visual-baselines:update": "node ../../scripts/update_frontend_visual_baselines.mjs",
+    "test:browser-session-contracts": "node ../../scripts/test_web_runtime_browser_session.mjs",
     "test:scale-contracts": "node ../../scripts/test_frontend_scale_contracts.mjs",
     "test:audit-log-maintenance-model": "node ../../scripts/test_audit_log_maintenance_model.mjs",
     "test:report-template-workspace-model": "node ../../scripts/test_report_template_workspace_model.mjs",

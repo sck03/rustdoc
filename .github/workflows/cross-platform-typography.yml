@@ -12,7 +12,12 @@ on:
       - "scripts/verify-font-license-policy.mjs"
       - "scripts/compare-report-pdf-metrics.mjs"
       - "scripts/extract-report-pdf-layout.py"
+      - "scripts/provision-chrome-for-testing.ps1"
       - "scripts/report-layout-requirements.txt"
+      - "scripts/test_frontend_scale_contracts.mjs"
+      - "scripts/test_web_runtime_browser_session.mjs"
+      - "scripts/lib/chromium-cdp.mjs"
+      - "scripts/lib/web-runtime-browser-session.mjs"
       - "src/ExportDocManager.Infrastructure/Services/Reporting/**"
       - "tests/ExportDocManager.Infrastructure.Tests/ReportHtmlServiceInfrastructureTests.cs"
       - ".github/workflows/cross-platform-typography.yml"
@@ -25,7 +30,12 @@ on:
       - "scripts/verify-font-license-policy.mjs"
       - "scripts/compare-report-pdf-metrics.mjs"
       - "scripts/extract-report-pdf-layout.py"
+      - "scripts/provision-chrome-for-testing.ps1"
       - "scripts/report-layout-requirements.txt"
+      - "scripts/test_frontend_scale_contracts.mjs"
+      - "scripts/test_web_runtime_browser_session.mjs"
+      - "scripts/lib/chromium-cdp.mjs"
+      - "scripts/lib/web-runtime-browser-session.mjs"
       - "src/ExportDocManager.Infrastructure/Services/Reporting/**"
       - "tests/ExportDocManager.Infrastructure.Tests/ReportHtmlServiceInfrastructureTests.cs"
       - ".github/workflows/cross-platform-typography.yml"
@@ -80,7 +90,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Set up Python for PDF layout evidence
         uses: actions/setup-python@v6
@@ -104,6 +114,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci --prefix apps/export-doc-web
+
+      - name: Validate browser session contracts
+        run: npm --prefix apps/export-doc-web run test:browser-session-contracts
 
       - name: Validate density, scaling and native font rendering
         env:

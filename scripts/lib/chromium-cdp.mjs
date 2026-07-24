@@ -1,10 +1,10 @@
-export function waitForDevToolsUrl(child, slug) {
+export function waitForDevToolsUrl(child, slug, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     let output = "";
     let settled = false;
     const timer = setTimeout(() => {
       finish(new Error(`${slug}: timed out waiting for Chrome DevTools endpoint.\n${output}`));
-    }, 30000);
+    }, timeoutMs);
 
     function finish(error, value) {
       if (settled) {
@@ -13,6 +13,10 @@ export function waitForDevToolsUrl(child, slug) {
 
       settled = true;
       clearTimeout(timer);
+      child.stdout.off("data", consume);
+      child.stderr.off("data", consume);
+      child.off("error", onError);
+      child.off("exit", onExit);
       if (error) {
         reject(error);
       } else {
@@ -28,12 +32,18 @@ export function waitForDevToolsUrl(child, slug) {
       }
     }
 
+    function onError(error) {
+      finish(error);
+    }
+
+    function onExit(code, signal) {
+      finish(new Error(`${slug}: Chrome exited before DevTools endpoint was ready (${code ?? signal}).\n${output}`));
+    }
+
     child.stdout.on("data", consume);
     child.stderr.on("data", consume);
-    child.once("error", (error) => finish(error));
-    child.once("exit", (code, signal) => {
-      finish(new Error(`${slug}: Chrome exited before DevTools endpoint was ready (${code ?? signal}).\n${output}`));
-    });
+    child.once("error", onError);
+    child.once("exit", onExit);
   });
 }
 
@@ -76,7 +86,12 @@ export class CdpClient {
 
   static connect(url) {
     return new Promise((resolve, reject) => {
-      const socket = new WebSocket(url);
+      if (typeof globalThis.WebSocket !== "function") {
+        reject(new Error(`Node.js ${process.versions.node} does not provide the global WebSocket required by the Chrome DevTools client. Use Node.js 22 or newer.`));
+        return;
+      }
+
+      const socket = new globalThis.WebSocket(url);
       const timer = setTimeout(() => {
         reject(new Error(`Timed out connecting to DevTools socket: ${url}`));
       }, 30000);
