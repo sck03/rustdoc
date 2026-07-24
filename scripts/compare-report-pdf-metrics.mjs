@@ -128,6 +128,11 @@ const summary = {
 writeFileSync(path.join(root, "cross-platform-report-summary.json"), `${JSON.stringify(summary, null, 2)}\n`, "utf8");
 
 if (failures.length > 0) {
+  if (process.env.GITHUB_ACTIONS === "true") {
+    for (const failure of failures) {
+      process.stderr.write(`::error title=Cross-platform report mismatch::${escapeWorkflowCommand(failure)}\n`);
+    }
+  }
   throw new Error(`Cross-platform report comparison failed:\n${failures.join("\n")}`);
 }
 
@@ -171,4 +176,11 @@ function calculateMaximumLineTopSpread(entries) {
     }
   }
   return maximum;
+}
+
+function escapeWorkflowCommand(value) {
+  return String(value)
+    .replaceAll("%", "%25")
+    .replaceAll("\r", "%0D")
+    .replaceAll("\n", "%0A");
 }

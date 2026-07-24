@@ -187,6 +187,7 @@ jobs:
         run: node scripts/compare-report-pdf-metrics.mjs artifacts/cross-platform-report-metrics
 
       - name: Upload comparison summary
+        if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
           name: cross-platform-report-comparison
