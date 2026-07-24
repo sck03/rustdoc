@@ -184,7 +184,18 @@ function HistoryLearning({ client, canOperate }: { client: ExportDocManagerApiCl
     {feedback ? <InlineNotice tone={feedback.tone}>{feedback.message}</InlineNotice> : null}
     {candidates.isLoading ? <PageState tone="loading" title="正在分析历史资料" description="系统正在扫描商品、历史发票和已保存申报经验。" /> : null}
     {candidates.isError ? <PageState tone="error" title="历史资料分析失败" description={readApiError(candidates.error)} /> : null}
-    <div className="knowledge-table">{candidates.data?.items.map(item => <article key={item.fingerprint}><div><strong>{item.productName}</strong><span>{item.rawCode}{item.currentCode && item.currentCode !== item.rawCode ? ` → ${item.currentCode}` : ""}</span><p>{item.specification || "暂无规格"}</p><small>{item.source} · 历史出现 {item.sourceCount} 次</small></div><div><span className="status-pill">{knowledgeStatusLabel(item.resolutionStatus)}</span>{canOperate ? <button className="command-button" type="button" disabled={!item.canConfirm || confirm.isPending} onClick={() => confirm.mutate(item)}>{item.canConfirm ? "确认加入" : "需先处理编码"}</button> : null}</div></article>)}</div>
+    <div className="knowledge-table history-candidate-list">{candidates.data?.items.map(item => <article className="history-candidate-card" key={item.fingerprint}>
+      <div className="history-candidate-main">
+        <div className="history-candidate-heading">
+          <strong>{item.productName}</strong>
+          <code>{item.rawCode}{item.currentCode && item.currentCode !== item.rawCode ? ` → ${item.currentCode}` : ""}</code>
+        </div>
+        <p className="history-candidate-specification">{item.specification || "暂无规格"}</p>
+        {item.variantCount > 0 ? <div className="history-candidate-variants"><small>历史款式</small><span>{item.variantSamples.join("、")}{item.variantCount > item.variantSamples.length ? ` 等 ${item.variantCount} 个` : ""}</span></div> : null}
+        <div className="history-candidate-meta"><span>{item.source}</span><span>历史资料 {item.sourceCount} 条</span>{item.variantCount > 0 ? <span>{item.variantCount} 个不同款式</span> : null}</div>
+      </div>
+      <div className="history-candidate-actions"><span className="status-pill">{knowledgeStatusLabel(item.resolutionStatus)}</span>{canOperate ? <button className="command-button" type="button" disabled={!item.canConfirm || confirm.isPending} onClick={() => confirm.mutate(item)}>{item.canConfirm ? "确认加入" : "需先处理编码"}</button> : null}</div>
+    </article>)}</div>
     {candidates.data?.totalCount === 0 ? <PageState title="没有新的待确认资料" description="已确认或重复的历史经验不会再次进入候选列表。" /> : null}
     <ListPaginationControls pageNumber={pageNumber} totalPages={Math.max(1, Math.ceil((candidates.data?.totalCount ?? 0) / pageSize))} totalCount={candidates.data?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={candidates.isFetching} onPageChange={setPageNumber} onPageSizeChange={setPageSize}/>
   </div>;

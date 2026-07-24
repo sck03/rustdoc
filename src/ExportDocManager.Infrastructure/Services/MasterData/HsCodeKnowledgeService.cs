@@ -300,11 +300,12 @@ namespace ExportDocManager.Services.MasterData
             var rows = new List<HistorySourceRow>();
 
             rows.AddRange((await context.Products.AsNoTracking().Where(item => item.HSCode != null && item.HSCode != "").Take(5000).ToListAsync(cancellationToken))
-                .Select(item => new HistorySourceRow(item.HSCode, Prefer(item.NameCN, item.NameEN), $"{item.Material} {item.Brand} {item.Elements} {item.Description}", "商品主数据")));
+                .Select(item => new HistorySourceRow(item.HSCode, Prefer(item.NameCN, item.NameEN), $"{item.Material} {item.Brand} {item.Elements} {item.Description}", "商品主数据", string.Empty)));
             rows.AddRange((await context.Items.AsNoTracking().Where(item => item.HSCode != null && item.HSCode != "").Take(10000).ToListAsync(cancellationToken))
-                .Select(item => new HistorySourceRow(item.HSCode, Prefer(item.StyleNameCN, item.StyleName), $"{item.FabricComposition} {item.Brand} {item.StyleNo}", "历史商业发票")));
+                .Select(item => new HistorySourceRow(item.HSCode, NormalizeHistoryProductName(Prefer(item.StyleNameCN, item.StyleName)),
+                    JoinHistorySpecification(item.FabricComposition, item.Brand), "历史商业发票", item.StyleNo)));
             rows.AddRange((await context.CustomsCooItems.AsNoTracking().Where(item => item.HSCode != "").Take(5000).ToListAsync(cancellationToken))
-                .Select(item => new HistorySourceRow(item.HSCode, Prefer(item.GoodsName, item.GoodsNameE), item.GoodsDesc, "历史报关资料")));
+                .Select(item => new HistorySourceRow(item.HSCode, Prefer(item.GoodsName, item.GoodsNameE), item.GoodsDesc, "历史报关资料", item.SourceStyleNo)));
 
             var candidates = rows.Where(item => !string.IsNullOrWhiteSpace(item.Code) && !string.IsNullOrWhiteSpace(item.Name))
                 .Select(item => item with { Code = HsCodeTextHelper.NormalizeCode(item.Code), Name = item.Name.Trim(), Specification = (item.Specification ?? string.Empty).Trim() })
@@ -313,11 +314,17 @@ namespace ExportDocManager.Services.MasterData
                 .Select(group =>
                 {
                     var first = group.First();
+                    var variants = group.Select(item => (item.Variant ?? string.Empty).Trim())
+                        .Where(item => item.Length > 0)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
                     string fingerprint = BuildFingerprint(first.Code, first.Name, first.Specification);
                     var resolution = ResolveCurrentCode(new HsCodeDeclarationExample { RawReportedHsCode = first.Code }, codeMap, relations);
                     return new HsCodeHistoryLearningCandidate(fingerprint, first.Code, resolution.CurrentCode ?? string.Empty,
                         first.Name, first.Specification, string.Join("、", group.Select(item => item.Source).Distinct()), group.Count(),
-                        resolution.Status, resolution.Replacements, !known.Contains(fingerprint) && resolution.CanUse);
+                        variants.Count, variants.Take(5).ToList(), resolution.Status, resolution.Replacements,
+                        !known.Contains(fingerprint) && resolution.CanUse);
                 })
                 .Where(item => !known.Contains(item.Fingerprint))
                 .OrderByDescending(item => item.CanConfirm).ThenByDescending(item => item.SourceCount).ThenBy(item => item.ProductName)
@@ -1091,6 +1098,19 @@ namespace ExportDocManager.Services.MasterData
         }
 
         private static string Prefer(string primary, string fallback) => string.IsNullOrWhiteSpace(primary) ? fallback : primary.Trim();
+
+        private static string NormalizeHistoryProductName(string value)
+        {
+            string name = (value ?? string.Empty).Normalize(NormalizationForm.FormKC).Trim();
+            int separator = name.LastIndexOf('-');
+            if (separator > 0 && name[(separator + 1)..].All(char.IsDigit))
+                return name[..separator].TrimEnd();
+            return name;
+        }
+
+        private static string JoinHistorySpecification(params string[] values) => string.Join(" · ",
+            values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()));
+
         private static int? Max(int? left, int? right) => !left.HasValue ? right : !right.HasValue ? left : Math.Max(left.Value, right.Value);
         private static DateTime? Max(DateTime? left, DateTime? right) => !left.HasValue ? right : !right.HasValue ? left : left > right ? left : right;
         private static DateTime Max(DateTime left, DateTime right) => left > right ? left : right;
@@ -1113,7 +1133,7 @@ namespace ExportDocManager.Services.MasterData
             IReadOnlyList<string> MatchReasons,
             IReadOnlyList<string> ConflictWarnings);
         private sealed record AttributeAssessment(int Penalty, IReadOnlyList<string> MatchReasons, IReadOnlyList<string> ConflictWarnings);
-        private sealed record HistorySourceRow(string Code, string Name, string Specification, string Source);
+        private sealed record HistorySourceRow(string Code, string Name, string Specification, string Source, string Variant);
     }
 
 }

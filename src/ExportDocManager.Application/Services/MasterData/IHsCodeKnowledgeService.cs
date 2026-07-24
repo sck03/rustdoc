@@ -45,7 +45,8 @@ namespace ExportDocManager.Services.MasterData
         bool Accepted);
 
     public sealed record HsCodeHistoryLearningCandidate(string Fingerprint, string RawCode, string CurrentCode,
-        string ProductName, string Specification, string Source, int SourceCount, string ResolutionStatus,
+        string ProductName, string Specification, string Source, int SourceCount, int VariantCount,
+        IReadOnlyList<string> VariantSamples, string ResolutionStatus,
         IReadOnlyList<string> ReplacementCandidates, bool CanConfirm);
 
     public sealed record HsCodeHistoryCandidatePage(

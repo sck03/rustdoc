@@ -1268,7 +1268,7 @@ namespace ExportDocManager.Api.Hosting
                         ["HsCodeHistoryLearningCandidate"] = new
                         {
                             type = "object",
-                            required = new[] { "fingerprint", "rawCode", "currentCode", "productName", "specification", "source", "sourceCount", "resolutionStatus", "replacementCandidates", "canConfirm" },
+                            required = new[] { "fingerprint", "rawCode", "currentCode", "productName", "specification", "source", "sourceCount", "variantCount", "variantSamples", "resolutionStatus", "replacementCandidates", "canConfirm" },
                             properties = new Dictionary<string, object>
                             {
                                 ["fingerprint"] = StringProperty("Candidate fingerprint."),
@@ -1278,6 +1278,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["specification"] = StringProperty("Specification."),
                                 ["source"] = StringProperty("Historical source."),
                                 ["sourceCount"] = new { type = "integer", format = "int32" },
+                                ["variantCount"] = new { type = "integer", format = "int32" },
+                                ["variantSamples"] = new { type = "array", items = new { type = "string" } },
                                 ["resolutionStatus"] = StringProperty("Resolution status."),
                                 ["replacementCandidates"] = new { type = "array", items = new { type = "string" } },
                                 ["canConfirm"] = new { type = "boolean" }

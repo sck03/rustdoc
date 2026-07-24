@@ -72,6 +72,38 @@ public sealed class HsCodeKnowledgeServiceTests
     }
 
     [Fact]
+    public async Task HistoryDiscovery_ShouldMergeInvoiceVariantsWithoutChangingProductName()
+    {
+        using var factory = new SqliteFactory();
+        await using (var context = factory.CreateDbContext())
+        {
+            context.HsCodes.Add(ActiveCode("6110300090", "化纤制针织女式非起绒套头衫"));
+            context.Invoices.Add(new Invoice
+            {
+                InvoiceNo = "HISTORY-001",
+                Type = "CommercialInvoice",
+                Items =
+                [
+                    new Item { StyleNameCN = "化纤制针织女式非起绒套头衫", FabricComposition = "51%涤44%棉5%氨纶", Brand = "PETROL INDUSTRIES", StyleNo = "YLAW1320", HSCode = "6110300090" },
+                    new Item { StyleNameCN = "化纤制针织女式非起绒套头衫-2", FabricComposition = "51%涤44%棉5%氨纶", Brand = "PETROL INDUSTRIES", StyleNo = "YLAW1320-1", HSCode = "6110300090" },
+                    new Item { StyleNameCN = "化纤制针织女式非起绒套头衫-3", FabricComposition = "51%涤44%棉5%氨纶", Brand = "PETROL INDUSTRIES", StyleNo = "YLAW1320-2", HSCode = "6110300090" }
+                ]
+            });
+            await context.SaveChangesAsync();
+        }
+
+        var candidate = Assert.Single((await new HsCodeKnowledgeService(factory)
+            .DiscoverHistoryCandidatesAsync("套头衫", 1, 30)).Items);
+
+        Assert.Equal("化纤制针织女式非起绒套头衫", candidate.ProductName);
+        Assert.Equal("51%涤44%棉5%氨纶 · PETROL INDUSTRIES", candidate.Specification);
+        Assert.Equal(3, candidate.SourceCount);
+        Assert.Equal(3, candidate.VariantCount);
+        Assert.Equal(["YLAW1320", "YLAW1320-1", "YLAW1320-2"], candidate.VariantSamples);
+        Assert.DoesNotContain("-2", candidate.ProductName, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RemoteResults_ShouldStayInCandidatePoolUntilUserConfirms()
     {
         using var factory = new SqliteFactory();

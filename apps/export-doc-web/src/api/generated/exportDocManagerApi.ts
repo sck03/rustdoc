@@ -2885,6 +2885,8 @@ export interface HsCodeHistoryLearningCandidate {
   source: string;
   sourceCount: number;
   specification: string;
+  variantCount: number;
+  variantSamples: string[];
 }
 
 export interface HsCodeKnowledgeExample {

@@ -237,6 +237,17 @@ for (const motionContract of [
 }
 
 const themeCss = fs.readFileSync(path.join(root, "theme.css"), "utf8");
+for (const saveActionContract of [
+  ".invoice-editor-sticky-actions > div > span",
+  ".invoice-editor-sticky-actions .command-button:disabled",
+]) {
+  if (!themeCss.includes(saveActionContract)) {
+    failures.push(`theme.css: 发票顶部保存操作缺少清晰的状态文字或禁用按钮对比度契约 ${saveActionContract}`);
+  }
+}
+if (themeCss.includes(".invoice-editor-sticky-actions span {")) {
+  failures.push("theme.css: 发票保存区状态文字选择器不得覆盖按钮组件内部文字");
+}
 for (const reducedMotionContract of [
   "@media (prefers-reduced-motion: reduce)",
   "animation-duration: 0.01ms !important",

@@ -2152,9 +2152,21 @@ html[data-interface-density="compact"] :where(th, td) {
   white-space: nowrap;
 }
 
-.invoice-editor-sticky-actions span {
+.invoice-editor-sticky-actions > div > span {
   color: var(--edm-ink-500);
   font-size: 12px;
+}
+
+.invoice-editor-sticky-actions .command-button:disabled {
+  color: #effaf8;
+  background: #477c76;
+  border-color: #376a64;
+  box-shadow: none;
+  opacity: 1;
+}
+
+.invoice-editor-sticky-actions .command-button:disabled svg {
+  color: #d8efeb;
 }
 
 .report-template-sticky-header {
