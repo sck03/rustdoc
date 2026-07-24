@@ -4,7 +4,7 @@ import { buildChromeLaunchArguments } from "./lib/web-runtime-browser-session.mj
 assert.equal(
   typeof globalThis.WebSocket,
   "function",
-  `Node.js ${process.versions.node} must provide the global WebSocket used by the Chrome DevTools client.`,
+  `Node.js ${process.versions.node} must satisfy the Node.js 24 CI baseline and provide the global WebSocket used by the Chrome DevTools client.`,
 );
 
 const options = {

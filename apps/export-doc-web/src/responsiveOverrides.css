@@ -849,6 +849,7 @@
     .segmented-control button,
     .density-toggle-button
   ) {
+    min-width: var(--edm-touch-target);
     min-height: var(--edm-touch-target) !important;
   }
 

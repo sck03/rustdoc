@@ -87,7 +87,7 @@ export class CdpClient {
   static connect(url) {
     return new Promise((resolve, reject) => {
       if (typeof globalThis.WebSocket !== "function") {
-        reject(new Error(`Node.js ${process.versions.node} does not provide the global WebSocket required by the Chrome DevTools client. Use Node.js 22 or newer.`));
+        reject(new Error(`Node.js ${process.versions.node} does not provide the global WebSocket required by the Chrome DevTools client. Use the project CI baseline, Node.js 24 or newer.`));
         return;
       }
 
