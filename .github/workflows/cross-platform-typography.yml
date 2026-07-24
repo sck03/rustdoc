@@ -119,12 +119,13 @@ jobs:
         run: npm --prefix apps/export-doc-web run test:browser-session-contracts
 
       - name: Validate density, scaling and native font rendering
+        timeout-minutes: 5
         env:
           EXPORTDOCMANAGER_SCALE_PROFILE_FILTER: ${{ matrix.scale_profiles }}
         run: npm --prefix apps/export-doc-web run test:scale-contracts
 
       - name: Upload frontend scale evidence
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-scale-${{ matrix.slug }}
           path: artifacts/frontend-scale-contracts
@@ -147,7 +148,7 @@ jobs:
         run: python scripts/extract-report-pdf-layout.py .codex-runtime/ExportDocManager.Infrastructure.Tests
 
       - name: Upload rendered PDFs and metrics
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: cross-platform-report-${{ matrix.slug }}
           path: |
@@ -166,7 +167,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Download platform report artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: cross-platform-report-*
           path: artifacts/cross-platform-report-metrics
@@ -177,7 +178,7 @@ jobs:
         run: node scripts/compare-report-pdf-metrics.mjs artifacts/cross-platform-report-metrics
 
       - name: Upload comparison summary
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: cross-platform-report-comparison
           path: artifacts/cross-platform-report-metrics/cross-platform-report-summary.json

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { CdpClient } from "./lib/chromium-cdp.mjs";
 import { buildChromeLaunchArguments } from "./lib/web-runtime-browser-session.mjs";
 
 assert.equal(
@@ -38,5 +39,39 @@ const windowsChromeArguments = buildChromeLaunchArguments(
 assert(windowsChromeArguments.includes("--headless=new"));
 assert(!windowsChromeArguments.includes("--disable-dev-shm-usage"));
 assert(!windowsChromeArguments.includes("--no-sandbox"));
+
+class FakeSocket extends EventTarget {
+  constructor({ respond }) {
+    super();
+    this.respond = respond;
+  }
+
+  send(payload) {
+    if (!this.respond) return;
+    const { id } = JSON.parse(payload);
+    queueMicrotask(() => {
+      this.dispatchEvent(new MessageEvent("message", {
+        data: JSON.stringify({ id, result: { acknowledged: true } }),
+      }));
+    });
+  }
+
+  close() {
+    this.dispatchEvent(new Event("close"));
+  }
+}
+
+const responsiveClient = new CdpClient(new FakeSocket({ respond: true }), 25);
+assert.deepEqual(await responsiveClient.send("Runtime.enable"), { acknowledged: true });
+assert.equal(responsiveClient.pending.size, 0);
+responsiveClient.close();
+
+const stalledClient = new CdpClient(new FakeSocket({ respond: false }), 25);
+await assert.rejects(
+  stalledClient.send("Runtime.evaluate", {}, "scale-contract-session"),
+  /Timed out waiting for DevTools command: Runtime\.evaluate in session scale-contract-session\./,
+);
+assert.equal(stalledClient.pending.size, 0);
+stalledClient.close();
 
 process.stdout.write("web-runtime-browser-session tests passed\n");

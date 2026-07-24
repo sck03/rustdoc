@@ -224,7 +224,7 @@ jobs:
           "path=$archive" | Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Upload browser server artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: export-doc-manager-browser-server-${{ inputs.platform }}-${{ inputs.runtime_identifier }}-${{ steps.version.outputs.value }}
           path: ${{ steps.archive.outputs.path }}

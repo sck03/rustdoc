@@ -59,6 +59,7 @@ try {
   const page = await createPageSession(cdp);
 
   for (const profile of profiles) {
+    process.stdout.write(`[scale] Starting profile ${profile.name}.\n`);
     await page.send("Emulation.setDeviceMetricsOverride", {
       width: profile.width,
       height: profile.height,
@@ -72,6 +73,8 @@ try {
 
     for (const density of densities) {
       for (const pageName of pages) {
+        const scene = `${profile.name}/${density}/${pageName}`;
+        process.stdout.write(`[scale] Running ${scene}.\n`);
         const url = `http://127.0.0.1:${port}/visual-baseline.html?page=${pageName}&density=${density}`;
         await page.send("Page.navigate", { url });
         await waitForReady(page);
@@ -92,6 +95,7 @@ try {
         }
 
         results.push({ page: pageName, density, profile, url, screenshotPath, passed, ...value });
+        process.stdout.write(`[scale] ${passed ? "Passed" : "Failed"} ${scene}.\n`);
       }
     }
   }

@@ -225,7 +225,7 @@ jobs:
         run: ./scripts/verify-package-payload.ps1 -PackageRoot ./artifacts/tauri-bundle/resources -Profile Desktop -RuntimeIdentifier ${{ inputs.runtime_identifier }}
 
       - name: Upload desktop package artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: export-doc-manager-${{ inputs.platform }}-${{ inputs.architecture }}-${{ inputs.edition }}-${{ steps.version.outputs.value }}
           path: artifacts/cargo-target-exportdoc/**/release/bundle/**

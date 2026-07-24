@@ -67,8 +67,9 @@ export async function getPageWebSocketUrl(browserWebSocketUrl, slug) {
 }
 
 export class CdpClient {
-  constructor(socket) {
+  constructor(socket, commandTimeoutMs = 30000) {
     this.socket = socket;
+    this.commandTimeoutMs = commandTimeoutMs;
     this.nextId = 1;
     this.pending = new Map();
     this.eventWaiters = [];
@@ -78,9 +79,15 @@ export class CdpClient {
     this.socket.addEventListener("close", () => {
       const error = new Error("Chrome DevTools socket closed.");
       for (const waiter of this.pending.values()) {
+        clearTimeout(waiter.timer);
         waiter.reject(error);
       }
       this.pending.clear();
+      for (const waiter of this.eventWaiters) {
+        clearTimeout(waiter.timer);
+        waiter.reject(error);
+      }
+      this.eventWaiters = [];
     });
   }
 
@@ -113,6 +120,7 @@ export class CdpClient {
     if (message.id && this.pending.has(message.id)) {
       const waiter = this.pending.get(message.id);
       this.pending.delete(message.id);
+      clearTimeout(waiter.timer);
       if (message.error) {
         waiter.reject(new Error(`${message.error.message || "CDP error"}: ${message.error.data || ""}`));
       } else {
@@ -142,8 +150,19 @@ export class CdpClient {
 
     const payload = JSON.stringify(message);
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.socket.send(payload);
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        const target = sessionId ? ` in session ${sessionId}` : "";
+        reject(new Error(`Timed out waiting for DevTools command: ${method}${target}.`));
+      }, this.commandTimeoutMs);
+      this.pending.set(id, { resolve, reject, timer });
+      try {
+        this.socket.send(payload);
+      } catch (error) {
+        clearTimeout(timer);
+        this.pending.delete(id);
+        reject(error);
+      }
     });
   }
 
