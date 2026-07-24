@@ -708,14 +708,10 @@ export function InvoiceMarksAndItemsPanel({
           </button>
         </div>
       </div>
-      {isFocusedWorkbench ? (
-        <details className="invoice-items-support-details">
-          <summary>唛头与特殊条款</summary>
-          <div className="invoice-items-support-details-body">{supportFields}</div>
-        </details>
-      ) : (
-        supportFields
-      )}
+      <details className="invoice-items-support-details">
+        <summary>唛头与特殊条款</summary>
+        <div className="invoice-items-support-details-body">{supportFields}</div>
+      </details>
       <InvoiceItemsEditor
         client={client}
         items={invoice.items}

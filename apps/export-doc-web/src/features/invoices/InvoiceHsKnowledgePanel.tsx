@@ -6,6 +6,7 @@ import type {
   HsCodeKnowledgeSearchItem,
 } from "../../api/index.ts";
 import { normalizeText, readApiError } from "../../ui/formUtils.ts";
+import { buildInvoiceHsQuery } from "./invoiceHsKnowledgeModel.ts";
 
 export function InvoiceHsKnowledgePanel({
   client,
@@ -30,7 +31,7 @@ export function InvoiceHsKnowledgePanel({
     if (!open) return;
     setDraft(suggestedQuery);
     setResults([]);
-    setMessage(suggestedQuery ? "可直接查询当前明细，也可以补充材质、用途或规格。" : "请先填写中文品名或英文品名。");
+    setMessage(suggestedQuery ? "可直接查询当前明细，也可以补充材质、用途、规格或 HS 编码前缀。" : "请先填写中文品名、英文品名或至少 4 位 HS 编码。");
   }, [open, suggestedQuery]);
 
   async function search(event?: FormEvent) {
@@ -99,7 +100,7 @@ export function InvoiceHsKnowledgePanel({
           <button className="icon-button" type="button" title="关闭" aria-label="关闭" onClick={onClose}><X size={18}/></button>
         </header>
         <form className="invoice-hs-search" onSubmit={search}>
-          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="商品名称、材质、用途、规格" />
+          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="商品名称、材质、用途、规格或至少 4 位 HS 编码" />
           <button className="command-button" type="submit" disabled={busy || !draft.trim()}><Search size={16}/>{busy ? "查询中" : "查询"}</button>
         </form>
         {message ? <div className="invoice-hs-message">{message}</div> : null}
@@ -122,14 +123,6 @@ export function InvoiceHsKnowledgePanel({
       </aside>
     </div>
   );
-}
-
-function buildInvoiceHsQuery(item: ApiInvoiceItemDto | null) {
-  if (!item) return "";
-  return [item.styleNameCN, item.styleName, item.fabricComposition, item.brand]
-    .map(normalizeText)
-    .filter(Boolean)
-    .join(" ");
 }
 
 function parsePercent(value?: string) {

@@ -392,9 +392,10 @@ export function createInvoiceItemTableSmokeScene(runtime) {
       `(() => {
         const section = document.querySelector(':is([aria-label="商品明细"], [aria-label="唛头和明细"])');
         const table = section ? section.querySelector('.item-editor-table') : null;
+        const supportDetails = section ? section.querySelector('.invoice-items-support-details') : null;
         const buttons = section ? Array.from(section.querySelectorAll('button')) : [];
         const workbenchButton = buttons.find((button) => (button.innerText || '').includes('明细工作台'));
-        return Boolean(section && table && workbenchButton && !workbenchButton.disabled);
+        return Boolean(section && table && supportDetails && !supportDetails.open && workbenchButton && !workbenchButton.disabled);
       })()`,
       timeoutMs,
       "Timed out waiting for invoice item workbench entry.",

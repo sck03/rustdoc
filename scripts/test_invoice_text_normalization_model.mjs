@@ -14,12 +14,16 @@ fs.mkdirSync(workspace, { recursive: true });
 const modelPath = path
   .join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "invoiceModel.ts")
   .replaceAll("\\", "/");
-fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; globalThis.__model = model;`, "utf8");
+const hsModelPath = path
+  .join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "invoiceHsKnowledgeModel.ts")
+  .replaceAll("\\", "/");
+fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as hsModel from ${JSON.stringify(hsModelPath)}; globalThis.__model = model; globalThis.__hsModel = hsModel;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
 
 const model = globalThis.__model;
+const hsModel = globalThis.__hsModel;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const draft = model.uppercaseInvoiceEnglishText({
   ...model.createEmptyInvoice(),
@@ -54,4 +58,6 @@ assert(draft.items[0].styleNameCN === "棉制男式T恤衫" && draft.items[0].un
 
 const imported = model.readRouteInvoiceDraft({ invoiceDraft: { ...draft, customerNameEN: "mixed Case buyer" } });
 assert(imported?.customerNameEN === "MIXED CASE BUYER", "routed Excel draft uppercased automatically");
+assert(hsModel.buildInvoiceHsQuery({ hsCode: "6110", styleNameCN: "化纤制套头衫" }) === "6110", "HS code prefix takes priority");
+assert(hsModel.buildInvoiceHsQuery({ hsCode: "61", styleNameCN: "化纤制套头衫", styleName: "PULLOVER" }) === "化纤制套头衫 PULLOVER", "short HS code falls back to product names");
 process.stdout.write("invoice-text-normalization model tests passed\n");

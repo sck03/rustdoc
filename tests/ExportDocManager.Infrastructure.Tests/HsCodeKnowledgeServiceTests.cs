@@ -47,6 +47,27 @@ public sealed class HsCodeKnowledgeServiceTests
     }
 
     [Fact]
+    public async Task Search_ShouldMatchTrustedHsCodesByCodePrefix()
+    {
+        using var factory = new SqliteFactory();
+        await using (var context = factory.CreateDbContext())
+        {
+            context.HsCodes.AddRange(
+                ActiveCode("6110300090", "化纤制针织女式套头衫"),
+                ActiveCode("6109100090", "棉制针织T恤衫"));
+            await context.SaveChangesAsync();
+        }
+
+        var result = await new HsCodeKnowledgeService(factory).SearchAsync("6110");
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal("6110300090", item.CurrentCode);
+        Assert.True(item.CanUse);
+        Assert.Contains("6110", Assert.Single(item.MatchReasons), StringComparison.Ordinal);
+        Assert.Contains("HS 编码前缀", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task HistoryDiscovery_ShouldRequireExplicitConfirmationBeforeLearning()
     {
         using var factory = new SqliteFactory();

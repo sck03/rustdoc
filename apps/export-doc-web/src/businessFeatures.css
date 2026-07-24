@@ -61,8 +61,8 @@
   min-height: 120px;
 }
 
-.invoice-items-focus-panel .shipping-mark-textarea-field textarea,
-.invoice-items-focus-panel .invoice-special-terms-field textarea {
+.invoice-items-support-details .shipping-mark-textarea-field textarea,
+.invoice-items-support-details .invoice-special-terms-field textarea {
   min-height: 82px;
 }
 
@@ -102,6 +102,12 @@
 .shipping-mark-textarea-field textarea {
   min-height: 108px;
   resize: vertical;
+}
+
+@media (max-width: 760px) {
+  .invoice-items-support-details-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .shipping-mark-image-panel {
