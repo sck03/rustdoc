@@ -1,7 +1,6 @@
 import type { FormEventHandler } from "react";
 import { ArrowRight, FileText, LockKeyhole, LogIn, Server, UserRound } from "lucide-react";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
-import { LoginBackgroundScene } from "./LoginBackgroundScene.tsx";
 import type { ProductEditionPresentation } from "../../app/productEdition.ts";
 
 type LoginPageProps = {
@@ -31,7 +30,6 @@ export function LoginPage({
 }: LoginPageProps) {
   return (
     <main className="login-screen">
-      <LoginBackgroundScene />
       <div className="login-grid-overlay" aria-hidden="true" />
       <div className="login-composition">
         <section className="login-brand-copy" aria-label="系统名称">
@@ -39,9 +37,15 @@ export function LoginPage({
             <span className="login-app-icon">
               <FileText size={28} aria-hidden="true" />
             </span>
-            <span>{product.englishName}</span>
+            <span className="login-brand-lockup-copy">
+              <strong>{product.productName}</strong>
+              <small>{product.englishName}</small>
+            </span>
           </div>
-          <h1>{product.displayName}</h1>
+          <div className="login-title-row">
+            <h1>{product.productName}</h1>
+            <span className="login-edition-badge">{product.editionName}</span>
+          </div>
           <p>{product.loginTagline}</p>
         </section>
 
@@ -50,6 +54,7 @@ export function LoginPage({
             <div>
               <p className="login-kicker">工作区</p>
               <h2>登录</h2>
+              <p className="login-card-subtitle">使用管理员分配的账号进入业务工作台</p>
             </div>
             <span className="login-card-mark">
               <LogIn size={20} aria-hidden="true" />
@@ -90,7 +95,7 @@ export function LoginPage({
           </button>
 
           <details className="login-connection-settings">
-            <summary>连接设置</summary>
+            <summary>服务器连接设置</summary>
             <label className="login-field">
               <span>API 地址</span>
               <span className="login-input-shell">

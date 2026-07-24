@@ -145,6 +145,21 @@ try {
         const compactNavigationWidth = !isShelllessPage && ${viewport.width} >= 861 && ${viewport.width} <= 1180
           ? document.querySelector(".workspace-nav")?.getBoundingClientRect().width ?? 1000
           : null;
+        const mobileNavigation = !isShelllessPage && ${viewport.width} <= 860
+          ? (() => {
+              const navigation = document.querySelector(".workspace-nav");
+              const list = document.querySelector(".nav-list");
+              const toggle = document.querySelector(".mobile-nav-toggle");
+              const content = document.querySelector(".workspace-content");
+              return {
+                initiallyClosed: Boolean(navigation && list && toggle)
+                  && getComputedStyle(list).display === "none"
+                  && toggle.getAttribute("aria-expanded") === "false"
+                  && navigation.getBoundingClientRect().height <= 96,
+                firstContentTop: content?.getBoundingClientRect().top ?? 9999,
+              };
+            })()
+          : { initiallyClosed: true, firstContentTop: 0 };
         const connectivityNoticeMatches = ${JSON.stringify(pageName)} === "state-offline"
           ? visible(".workspace-connectivity-notice")
           : ${JSON.stringify(pageName)} === "state-offline-local"
@@ -169,6 +184,8 @@ try {
           reportMinimumSelectionFieldWidth: reportLayout.minimumSelectionFieldWidth,
           reportResponsivePlacementMatches: reportLayout.responsivePlacementMatches,
           compactNavigationWidth,
+          mobileNavigationInitiallyClosed: mobileNavigation.initiallyClosed,
+          mobileFirstContentTop: mobileNavigation.firstContentTop,
           connectivityNoticeMatches,
           routeRedirectNoticeMatches,
           serviceUnavailableNoticeMatches,
@@ -180,6 +197,31 @@ try {
         };
       })()`, true);
       const value = audit.value;
+      const mobileNavigationInteraction = await evaluate(page, `(async () => {
+        const isShelllessPage = ["login", "login-expired", "state-fatal"].includes(${JSON.stringify(pageName)});
+        if (isShelllessPage || ${viewport.width} > 860) {
+          return { mobileNavigationInteractionPassed: true };
+        }
+        const toggle = document.querySelector(".mobile-nav-toggle");
+        const list = document.querySelector(".nav-list");
+        const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        if (!(toggle instanceof HTMLButtonElement) || !(list instanceof HTMLElement)) {
+          return { mobileNavigationInteractionPassed: false };
+        }
+        toggle.click();
+        await settle();
+        const opened = toggle.getAttribute("aria-expanded") === "true"
+          && getComputedStyle(list).display !== "none"
+          && Boolean(document.querySelector(".workspace-nav-backdrop"));
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        await settle();
+        const closed = toggle.getAttribute("aria-expanded") === "false"
+          && getComputedStyle(list).display === "none"
+          && !document.querySelector(".workspace-nav-backdrop")
+          && document.activeElement === toggle;
+        return { mobileNavigationInteractionPassed: opened && closed };
+      })()`, true);
+      const mobileNavigationInteractionValue = mobileNavigationInteraction.value ?? { mobileNavigationInteractionPassed: false };
       const screenshotPath = path.join(outputRoot, `${pageName}-${viewport.name}.png`);
       await captureScreenshot(page, screenshotPath, { captureBeyondViewport: false });
       const approvedPath = path.join(approvedRoot, path.basename(screenshotPath));
@@ -194,13 +236,16 @@ try {
         && value.reportMinimumSelectionFieldWidth >= 128
         && value.reportResponsivePlacementMatches
         && (value.compactNavigationWidth === null || value.compactNavigationWidth <= 80)
+        && value.mobileNavigationInitiallyClosed
+        && (viewport.width > 860 || value.mobileFirstContentTop <= viewport.height * 0.6)
+        && mobileNavigationInteractionValue.mobileNavigationInteractionPassed
         && value.connectivityNoticeMatches
         && value.routeRedirectNoticeMatches
         && value.serviceUnavailableNoticeMatches
         && (value.invoiceDetailColumnCount === null || value.invoiceDetailColumnCount >= 20)
         && value.workspaceNavigation && value.expectedStickyControl && value.expectedDialog
         && pixelComparison.passed;
-      results.push({ page: pageName, viewport, url, screenshotPath, approvedPath, pixelComparison, passed, axeViolations, ...value });
+      results.push({ page: pageName, viewport, url, screenshotPath, approvedPath, pixelComparison, passed, axeViolations, ...value, ...mobileNavigationInteractionValue });
     }
   }
 

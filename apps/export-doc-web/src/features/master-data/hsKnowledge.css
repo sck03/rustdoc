@@ -152,6 +152,7 @@
 .knowledge-workflow small { color: #566762; font-size: var(--edm-font-size-xs); line-height: 1.35; }
 .knowledge-workflow > div.active { background: #ffffff; border-color: #83b9af; box-shadow: 0 4px 13px rgba(15, 118, 110, .09); }
 .knowledge-workflow > div.active > span { background: #0f766e; }
+.knowledge-workflow > div > em { display: none; font-style: normal; }
 
 @media (max-width: 760px) {
   .page-heading,
@@ -178,8 +179,13 @@
 
 .remote-candidate-card {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(300px, 520px);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 400px);
+  align-items: start;
   gap: 16px;
+}
+
+.remote-candidate-card-selectable {
+  grid-template-columns: auto minmax(0, 1fr) minmax(280px, 400px);
 }
 
 .remote-candidate-evidence { min-width: 0; }
@@ -269,8 +275,10 @@
 }
 
 @media (max-width: 1100px) {
-  .remote-candidate-card { grid-template-columns: auto minmax(0, 1fr); }
-  .remote-candidate-actions { grid-column: 2; justify-content: flex-start; }
+  .remote-candidate-card { grid-template-columns: minmax(0, 1fr); }
+  .remote-candidate-card-selectable { grid-template-columns: auto minmax(0, 1fr); }
+  .remote-candidate-card-selectable .remote-candidate-actions { grid-column: 2; }
+  .remote-candidate-actions { grid-column: auto; justify-content: flex-start; }
 }
 
 @media (max-width: 680px) {
@@ -279,6 +287,49 @@
   .remote-candidate-actions { grid-column: auto; }
   .remote-code-comparison { grid-template-columns: 1fr; }
   .remote-code-comparison i { transform: rotate(90deg); justify-self: center; }
+
+  .knowledge-workflow {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 8px;
+    overflow: visible;
+  }
+
+  .knowledge-workflow > div {
+    display: none;
+  }
+
+  .knowledge-workflow > div.current {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    min-width: 0;
+    padding: 10px 11px;
+  }
+
+  .knowledge-workflow > div.current > span {
+    grid-row: 1 / span 2;
+  }
+
+  .knowledge-workflow > div.current > strong,
+  .knowledge-workflow > div.current > small {
+    grid-column: 2;
+  }
+
+  .knowledge-workflow > div.current > em {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    min-height: 28px;
+    padding: 0 8px;
+    color: #49615c;
+    background: #edf5f3;
+    border: 1px solid #c7d9d5;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 750;
+    white-space: nowrap;
+  }
 }
 .hs-knowledge-surface .knowledge-editor textarea{background:#fff;border:1.5px solid #91aab2;box-shadow:inset 0 1px 2px rgb(15 23 42 / 5%)}
 .hs-knowledge-surface .knowledge-editor textarea:hover{border-color:#708f99}

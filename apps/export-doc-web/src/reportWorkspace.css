@@ -134,7 +134,7 @@
 .report-template-sidebar {
   display: grid;
   grid-template-columns: minmax(0, 1.8fr) repeat(3, minmax(0, 1fr));
-  align-items: stretch;
+  align-items: start;
   gap: 10px;
   padding: 12px;
   overflow: visible;
@@ -174,7 +174,7 @@
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
-  min-height: 62px;
+  min-height: 54px;
   padding: 8px 10px;
   cursor: pointer;
 }

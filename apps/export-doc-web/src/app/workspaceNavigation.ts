@@ -108,9 +108,9 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
   },
   {
     key: "hs-knowledge",
-    label: "知识中心库",
+    label: "HS 归类与税则",
     icon: BookOpen,
-    items: [{ label: "HS 编码库", to: "/master-data/hs-knowledge/search", icon: BookOpen, isActive: isHsKnowledgeRoute, workspace: "document", moduleKey: "document.master-data" }],
+    items: [{ label: "HS 编码知识", to: "/master-data/hs-knowledge/search", icon: BookOpen, isActive: isHsKnowledgeRoute, workspace: "document", moduleKey: "document.master-data" }],
   },
   {
     key: "master-data",
@@ -241,7 +241,7 @@ export function getWorkspaceContext(pathname: string): WorkspaceContext {
     return getSingleWindowWorkspaceContext(pathname);
   }
   if (pathname.startsWith("/master-data/hs-knowledge")) {
-    return createWorkspaceContext("知识中心库", "HS 编码知识中心", "查询、维护和迁移本公司的税则与申报经验", BookOpen);
+    return createWorkspaceContext("HS 归类与税则", "HS 编码知识中心", "查询、维护和迁移本公司的税则与申报经验", BookOpen);
   }
   if (pathname.startsWith("/master-data")) {
     return createWorkspaceContext("基础资料", "主数据维护", "统一维护客户、出口商、商品、港口、单位与 HS 编码", Database);

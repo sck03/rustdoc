@@ -209,6 +209,41 @@ for (const file of walk(root)) {
         failures.push(`${sourceRelativePath}: 工作区通知缺少统一反馈、可见容器或关闭操作：${requiredWorkspaceNoticeView}`);
       }
     }
+    for (const mobileNavigationContract of [
+      'aria-controls="workspace-primary-navigation"',
+      "workspace-nav-backdrop",
+      'event.key === "Escape"',
+      'event.key !== "Tab"',
+      'documentElement.style.overflow = "hidden"',
+    ]) {
+      if (!sourceText.includes(mobileNavigationContract)) {
+        failures.push(`${sourceRelativePath}: 手机导航缺少抽屉关闭、焦点循环或背景滚动保护：${mobileNavigationContract}`);
+      }
+    }
+  }
+}
+
+const responsiveCss = fs.readFileSync(path.join(root, "responsiveOverrides.css"), "utf8");
+for (const motionContract of [
+  "@keyframes login-ambient-sweep",
+  "@keyframes login-grid-drift",
+  "@keyframes login-brand-enter",
+  "@keyframes login-card-enter",
+  ".login-submit-button:hover:not(:disabled) svg",
+]) {
+  if (!responsiveCss.includes(motionContract)) {
+    failures.push(`responsiveOverrides.css: 登录页轻量 CSS 动效契约缺少 ${motionContract}`);
+  }
+}
+
+const themeCss = fs.readFileSync(path.join(root, "theme.css"), "utf8");
+for (const reducedMotionContract of [
+  "@media (prefers-reduced-motion: reduce)",
+  "animation-duration: 0.01ms !important",
+  "animation-iteration-count: 1 !important",
+]) {
+  if (!themeCss.includes(reducedMotionContract)) {
+    failures.push(`theme.css: 减少动态模式缺少 ${reducedMotionContract}`);
   }
 }
 

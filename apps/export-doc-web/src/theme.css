@@ -999,6 +999,10 @@ tbody tr:hover {
     grid-row: auto;
   }
 
+  .template-package-panel {
+    grid-column: 1 / -1;
+  }
+
   .template-user-panel,
   .template-admin-panel,
   .template-package-panel {
@@ -1170,6 +1174,9 @@ tbody tr:hover {
   *,
   *::before,
   *::after {
+    animation-delay: 0ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
@@ -2052,6 +2059,10 @@ html[data-interface-density="compact"] :where(th, td) {
 }
 
 .mobile-nav-toggle {
+  display: none;
+}
+
+.workspace-nav-backdrop {
   display: none;
 }
 

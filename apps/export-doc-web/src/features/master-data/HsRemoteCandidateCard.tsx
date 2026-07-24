@@ -37,7 +37,7 @@ export function HsRemoteCandidateCard({
   statusLabel: (status?: string) => string;
   formatVerifiedAt: (value?: string) => string;
 }) {
-  return <article className="remote-candidate-card">
+  return <article className={canOperate && allowSelection ? "remote-candidate-card remote-candidate-card-selectable" : "remote-candidate-card"}>
     {canOperate && allowSelection ? <input type="checkbox" aria-label={`选择 ${candidate.productName}`} checked={selected} onChange={onToggle} /> : null}
     <div className="remote-candidate-evidence">
       <div className="remote-candidate-title"><strong>{candidate.productName}</strong><span className="status-pill">{statusLabel(candidate.resolutionStatus)}</span></div>

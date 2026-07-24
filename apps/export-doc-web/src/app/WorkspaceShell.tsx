@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -72,6 +72,8 @@ export function WorkspaceShell({
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [interfaceDensity, setInterfaceDensity] = useState(readInterfaceDensity);
+  const mobileNavToggleRef = useRef<HTMLButtonElement | null>(null);
+  const mobileNavRef = useRef<HTMLElement | null>(null);
   const workspaceDeviceMode = useWorkspaceDeviceMode();
   const isOnline = useOnlineStatus(connectivityOverride);
   const { availability: serviceAvailability, retry: retryServiceAvailability } = useServiceAvailability({
@@ -107,16 +109,81 @@ export function WorkspaceShell({
   }, [pathname]);
 
   useEffect(() => {
+    if (!isMobileNavOpen) {
+      return undefined;
+    }
+
+    const documentElement = document.documentElement;
+    const previousOverflow = documentElement.style.overflow;
+    documentElement.style.overflow = "hidden";
+    documentElement.dataset.mobileNavigationOpen = "true";
+
+    const focusableElements = () => [
+      mobileNavToggleRef.current,
+      ...Array.from(mobileNavRef.current?.querySelectorAll<HTMLElement>("a[href], button:not(:disabled)") ?? []),
+    ].filter((element): element is HTMLElement => Boolean(element));
+
+    const focusInitialNavigationItem = window.requestAnimationFrame(() => {
+      const preferredTarget = mobileNavRef.current?.querySelector<HTMLElement>('[aria-current="page"]')
+        ?? mobileNavRef.current?.querySelector<HTMLElement>("button, a[href]");
+      preferredTarget?.focus();
+    });
+
+    const handleNavigationKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setIsMobileNavOpen(false);
+        window.requestAnimationFrame(() => mobileNavToggleRef.current?.focus());
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusable = focusableElements();
+      if (focusable.length === 0) {
+        return;
+      }
+
+      const currentIndex = focusable.indexOf(document.activeElement as HTMLElement);
+      if (event.shiftKey && currentIndex <= 0) {
+        event.preventDefault();
+        focusable[focusable.length - 1]?.focus();
+      } else if (!event.shiftKey && currentIndex === focusable.length - 1) {
+        event.preventDefault();
+        focusable[0]?.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleNavigationKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusInitialNavigationItem);
+      window.removeEventListener("keydown", handleNavigationKeyDown);
+      documentElement.style.overflow = previousOverflow;
+      delete documentElement.dataset.mobileNavigationOpen;
+    };
+  }, [isMobileNavOpen]);
+
+  useEffect(() => {
     applyInterfaceDensity(interfaceDensity);
   }, [interfaceDensity]);
 
   useEffect(() => {
     const compactWorkspace = window.matchMedia("(min-width: 861px) and (max-width: 1180px)");
+    const mobileWorkspace = window.matchMedia("(max-width: 860px)");
     const applyWorkspaceWidth = (matches: boolean) => setIsNavCollapsed(matches);
     applyWorkspaceWidth(compactWorkspace.matches);
     const handleChange = (event: MediaQueryListEvent) => applyWorkspaceWidth(event.matches);
+    const handleMobileChange = (event: MediaQueryListEvent) => {
+      if (!event.matches) setIsMobileNavOpen(false);
+    };
     compactWorkspace.addEventListener("change", handleChange);
-    return () => compactWorkspace.removeEventListener("change", handleChange);
+    mobileWorkspace.addEventListener("change", handleMobileChange);
+    return () => {
+      compactWorkspace.removeEventListener("change", handleChange);
+      mobileWorkspace.removeEventListener("change", handleMobileChange);
+    };
   }, []);
 
   function toggleGroup(groupKey: string) {
@@ -163,10 +230,12 @@ export function WorkspaceShell({
         </div>
 
         <button
+          ref={mobileNavToggleRef}
           className="mobile-nav-toggle"
           type="button"
           aria-label={isMobileNavOpen ? "关闭主导航" : "打开主导航"}
           aria-expanded={isMobileNavOpen}
+          aria-controls="workspace-primary-navigation"
           onClick={() => setIsMobileNavOpen((current) => !current)}
         >
           {isMobileNavOpen ? <X size={19} aria-hidden="true" /> : <Menu size={19} aria-hidden="true" />}
@@ -174,13 +243,13 @@ export function WorkspaceShell({
 
         <div className="workspace-product-badge" role="status" aria-label="产品运行模式">
           <span className="workspace-product-badge-dot" aria-hidden="true" />
-          <span>{isDesktopRuntime ? "本地优先 · 桌面运行" : "局域网 / 容器协同"}</span>
+          <span>{isDesktopRuntime ? "本机运行" : "多人协作"}</span>
         </div>
 
         {isNavCollapsed ? (
           <WorkspaceNavRail groups={visibleGroups} pathname={pathname} />
         ) : (
-          <nav className="nav-list" aria-label="主导航">
+          <nav ref={mobileNavRef} id="workspace-primary-navigation" className="nav-list" aria-label="主导航">
             {visibleGroups.map((group) => (
               <WorkspaceNavGroup
                 key={group.key}
@@ -207,6 +276,18 @@ export function WorkspaceShell({
           </button>
         </div>
       </aside>
+
+      {isMobileNavOpen ? (
+        <button
+          className="workspace-nav-backdrop"
+          type="button"
+          aria-label="关闭主导航"
+          onClick={() => {
+            setIsMobileNavOpen(false);
+            window.requestAnimationFrame(() => mobileNavToggleRef.current?.focus());
+          }}
+        />
+      ) : null}
 
       <main className="workspace-main">
         <header className="workspace-header">
@@ -285,7 +366,7 @@ export function WorkspaceShell({
 }
 
 function renderUserWorkspaceLabel(user: ApiUserDto) {
-  if (user.capabilities.canManageSettings) return "系统管理员";
+  if (user.capabilities.canManageSettings) return "管理员";
   if (user.role?.trim().toLowerCase() === "sales") return "业务员";
   if (user.role?.trim().toLowerCase() === "finance") return "财务人员";
   return "单证人员";
