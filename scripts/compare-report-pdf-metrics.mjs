@@ -74,8 +74,12 @@ for (const [slug, entries] of [...groups.entries()].sort(([left], [right]) => le
   if (layoutLineCounts.length !== 1) failures.push(`${slug}: extracted line counts differ (${layoutLineCounts.join(", ")})`);
   if (overlapCounts.some((count) => count !== 0)) failures.push(`${slug}: at least one platform contains overlapping PDF text`);
   if (maximumLineTopSpread > 2.5) failures.push(`${slug}: equivalent text lines move vertically by more than 2.5pt across platforms`);
-  if (maximumLineLeftSpread > 1) failures.push(`${slug}: equivalent text lines move left by more than 1pt across platforms`);
-  if (maximumLineRightSpread > 1) failures.push(`${slug}: equivalent text lines move right by more than 1pt across platforms`);
+  if (maximumLineLeftSpread > 1) {
+    failures.push(`${slug}: equivalent text lines have ${formatPoints(maximumLineLeftSpread)}pt maximum left-edge spread`);
+  }
+  if (maximumLineRightSpread > 1) {
+    failures.push(`${slug}: equivalent text lines have ${formatPoints(maximumLineRightSpread)}pt maximum right-edge spread`);
+  }
   if (layoutEntries.length > 0 && pageCounts.length === 1 && layoutPageCounts.some((count) => count !== pageCounts[0])) {
     failures.push(`${slug}: PDF structure page count and extracted layout page count disagree`);
   }
@@ -165,6 +169,10 @@ function spread(values) {
 function ratio(values) {
   const minimum = Math.min(...values);
   return minimum > 0 ? Math.max(...values) / minimum : Number.POSITIVE_INFINITY;
+}
+
+function formatPoints(value) {
+  return Number.isFinite(value) ? value.toFixed(2) : "infinite";
 }
 
 function calculateMaximumLineTopSpread(entries) {
