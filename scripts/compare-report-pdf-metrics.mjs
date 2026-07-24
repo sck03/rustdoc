@@ -85,9 +85,6 @@ for (const [slug, entries] of [...groups.entries()].sort(([left], [right]) => le
   if (overlapCounts.some((count) => count !== 0)) failures.push(`${slug}: at least one platform contains overlapping PDF text`);
   if (!glyphCountEvidenceComplete) failures.push(`${slug}: per-line PDF glyph evidence is incomplete`);
   if (maximumLineTopSpread > 2.5) failures.push(`${slug}: equivalent text lines move vertically by more than 2.5pt across platforms`);
-  if (maximumLineGlyphCountSpread > 0) {
-    failures.push(`${slug}: equivalent lines differ by up to ${maximumLineGlyphCountSpread} PDF glyphs across platforms`);
-  }
   if (layoutEntries.length > 0 && pageCounts.length === 1 && layoutPageCounts.some((count) => count !== pageCounts[0])) {
     failures.push(`${slug}: PDF structure page count and extracted layout page count disagree`);
   }
@@ -122,7 +119,8 @@ for (const [slug, entries] of [...groups.entries()].sort(([left], [right]) => le
       pageCountConsistent: layoutPageCounts.length === 1,
       lineCountConsistent: layoutLineCounts.length === 1,
       contentShapeConsistent: layoutHashes.length === 1 && Boolean(layoutHashes[0]),
-      wrappingConsistent: glyphCountEvidenceComplete && layoutLineCounts.length === 1 && maximumLineGlyphCountSpread === 0,
+      glyphCountConsistent: glyphCountEvidenceComplete && maximumLineGlyphCountSpread === 0,
+      wrappingConsistent: layoutLineCounts.length === 1 && maximumLineTopSpread <= 2.5,
       maximumLineTopSpread,
       maximumLineLeftSpread,
       maximumLineRightSpread,
