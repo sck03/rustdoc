@@ -38,8 +38,8 @@
         .inline-info .left { flex: 1; }
         .inline-info .right { flex: 1; text-align: right; }
         .inline-info .right span { font-size: 12px; }
-        .address { white-space: pre-line; font-size: 10px; }
-        .terms { margin-top: 10px; font-size: 10px; white-space: pre-line; }
+        .address { white-space: pre-line; font-size: 9.5px; }
+        .terms { margin-top: 10px; font-size: 9.5px; white-space: pre-line; }
         .signature {
             margin-top: 20px;
             display: flex;
@@ -68,6 +68,7 @@
         thead { display: table-header-group; }
         tbody tr { break-inside: avoid; page-break-inside: avoid; }
         th { border: 1px solid black; padding: 8px; text-align: left; background-color: #f2f2f2; font-weight: bold; }
+        th:not(:first-child) { white-space: nowrap; font-size: 9px; }
         td { padding: 8px; text-align: left; border-left: 1px solid black; border-right: 1px solid black; }
         .total-row td { border: 1px solid black; border-top: 1px solid black; font-weight: bold; font-size: 10px; }
     </style>

@@ -37,10 +37,10 @@
             position: relative;
             top: 0;
         }
-        .inline-info .left { flex: 1; min-width: 0; }
-        .inline-info .right { flex: 1; min-width: 0; text-align: right; }
+        .inline-info .left { flex: 0 0 68%; min-width: 0; }
+        .inline-info .right { flex: 0 0 32%; min-width: 0; text-align: right; }
         .inline-info .right span { font-size: 9px; }
-        .address { white-space: pre-line; font-size: 9px; }
+        .address { display: inline-block; max-width: 100%; white-space: pre-line; overflow-wrap: anywhere; font-size: 9px; }
         table { width: 100%; border: 1px solid #111; border-collapse: collapse; table-layout: fixed; margin-top: 10px; }
         thead { display: table-header-group; }
         tr { break-inside: avoid; page-break-inside: avoid; }

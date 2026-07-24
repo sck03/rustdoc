@@ -22,7 +22,8 @@ from typing import Any
 import pdfplumber
 
 
-LINE_TOP_TOLERANCE_POINTS = 2.25
+# Chrome Type3 glyph tops vary by up to 2.58pt across OSes; 3pt merges distinct invoice columns.
+LINE_TOP_TOLERANCE_POINTS = 2.75
 OVERLAP_TOLERANCE_POINTS = 1.0
 
 
