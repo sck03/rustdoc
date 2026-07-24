@@ -71,20 +71,22 @@ for (const [slug, entries] of [...groups.entries()].sort(([left], [right]) => le
   const maximumLineTopSpread = calculateMaximumLineTopSpread(layoutEntries);
   const maximumLineLeftSpread = calculateMaximumLineCoordinateSpread(layoutEntries, "lineLefts");
   const maximumLineRightSpread = calculateMaximumLineCoordinateSpread(layoutEntries, "lineRights");
-  const maximumLineWrapLengthSpread = calculateMaximumLineCoordinateSpread(layoutEntries, "lineWrapLengths");
-  const wrapLengthEvidenceComplete = layoutEntries.every((entry) =>
-    entry.pages?.every((page) => page.lineWrapLengths?.length === page.lineTops?.length),
+  const maximumLineGlyphCountSpread = calculateMaximumLineCoordinateSpread(layoutEntries, "lineGlyphCounts");
+  const glyphCountEvidenceComplete = layoutEntries.every((entry) =>
+    entry.pages?.every((page) =>
+      page.lineGlyphCounts?.length === page.lineTops?.length && page.lineGlyphCounts.every((count) => count > 0),
+    ),
   );
-  if (layoutSchemaVersions.length !== 1 || layoutSchemaVersions[0] !== 3) {
-    failures.push(`${slug}: expected PDF layout schema 3 (${layoutSchemaVersions.join(", ") || "missing"})`);
+  if (layoutSchemaVersions.length !== 1 || layoutSchemaVersions[0] !== 4) {
+    failures.push(`${slug}: expected PDF layout schema 4 (${layoutSchemaVersions.join(", ") || "missing"})`);
   }
   if (layoutPageCounts.length !== 1) failures.push(`${slug}: extracted layout page counts differ (${layoutPageCounts.join(", ")})`);
   if (layoutLineCounts.length !== 1) failures.push(`${slug}: extracted line counts differ (${layoutLineCounts.join(", ")})`);
   if (overlapCounts.some((count) => count !== 0)) failures.push(`${slug}: at least one platform contains overlapping PDF text`);
-  if (!wrapLengthEvidenceComplete) failures.push(`${slug}: normalized line-length evidence is incomplete`);
+  if (!glyphCountEvidenceComplete) failures.push(`${slug}: per-line PDF glyph evidence is incomplete`);
   if (maximumLineTopSpread > 2.5) failures.push(`${slug}: equivalent text lines move vertically by more than 2.5pt across platforms`);
-  if (maximumLineWrapLengthSpread > 0) {
-    failures.push(`${slug}: equivalent lines differ by up to ${maximumLineWrapLengthSpread} normalized characters across platforms`);
+  if (maximumLineGlyphCountSpread > 0) {
+    failures.push(`${slug}: equivalent lines differ by up to ${maximumLineGlyphCountSpread} PDF glyphs across platforms`);
   }
   if (layoutEntries.length > 0 && pageCounts.length === 1 && layoutPageCounts.some((count) => count !== pageCounts[0])) {
     failures.push(`${slug}: PDF structure page count and extracted layout page count disagree`);
@@ -120,11 +122,11 @@ for (const [slug, entries] of [...groups.entries()].sort(([left], [right]) => le
       pageCountConsistent: layoutPageCounts.length === 1,
       lineCountConsistent: layoutLineCounts.length === 1,
       contentShapeConsistent: layoutHashes.length === 1 && Boolean(layoutHashes[0]),
-      wrappingConsistent: wrapLengthEvidenceComplete && layoutLineCounts.length === 1 && maximumLineWrapLengthSpread === 0,
+      wrappingConsistent: glyphCountEvidenceComplete && layoutLineCounts.length === 1 && maximumLineGlyphCountSpread === 0,
       maximumLineTopSpread,
       maximumLineLeftSpread,
       maximumLineRightSpread,
-      maximumLineWrapLengthSpread,
+      maximumLineGlyphCountSpread,
     },
   });
 }
