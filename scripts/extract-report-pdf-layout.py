@@ -44,6 +44,17 @@ def sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest().upper()
 
 
+def wrapping_shape(value: str) -> str:
+    """Describe line composition without depending on PDF Unicode mappings."""
+    shape: list[str] = []
+    for character in unicodedata.normalize("NFKD", normalize_text(value)):
+        category = unicodedata.category(character)
+        if category.startswith("M"):
+            continue
+        shape.append(" " if character.isspace() else category[0])
+    return re.sub(r"\s+", " ", "".join(shape)).strip()
+
+
 def group_words_into_lines(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
     lines: list[dict[str, Any]] = []
     for word in sorted(words, key=lambda item: (float(item["top"]), float(item["x0"]))):
@@ -68,6 +79,7 @@ def group_words_into_lines(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "left": round(min(float(item["x0"]) for item in line_words), 2),
                 "right": round(max(float(item["x1"]) for item in line_words), 2),
                 "textHash": sha256_text(text),
+                "wrapHash": sha256_text(wrapping_shape(text)),
                 "textLength": len(text),
             }
         )
@@ -105,7 +117,7 @@ def find_text_overlaps(words: list[dict[str, Any]], page_number: int) -> list[di
 
 def extract_pdf_layout(pdf_path: Path) -> dict[str, Any]:
     pages: list[dict[str, Any]] = []
-    all_line_hashes: list[str] = []
+    all_wrap_hashes: list[str] = []
     overlaps: list[dict[str, Any]] = []
 
     with pdfplumber.open(pdf_path) as pdf:
@@ -123,7 +135,8 @@ def extract_pdf_layout(pdf_path: Path) -> dict[str, Any]:
             page_overlaps = find_text_overlaps(words, page_number)
             overlaps.extend(page_overlaps)
             line_hashes = [line["textHash"] for line in lines]
-            all_line_hashes.extend(line_hashes)
+            line_wrap_hashes = [line["wrapHash"] for line in lines]
+            all_wrap_hashes.extend(line_wrap_hashes)
             pages.append(
                 {
                     "pageNumber": page_number,
@@ -132,6 +145,7 @@ def extract_pdf_layout(pdf_path: Path) -> dict[str, Any]:
                     "wordCount": len(words),
                     "lineCount": len(lines),
                     "lineHashes": line_hashes,
+                    "lineWrapHashes": line_wrap_hashes,
                     "lineTops": [line["top"] for line in lines],
                     "lineLefts": [line["left"] for line in lines],
                     "lineRights": [line["right"] for line in lines],
@@ -146,7 +160,7 @@ def extract_pdf_layout(pdf_path: Path) -> dict[str, Any]:
         )
 
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "slug": pdf_path.stem,
         "sourceFile": pdf_path.name,
         "operatingSystem": platform.platform(),
@@ -155,7 +169,7 @@ def extract_pdf_layout(pdf_path: Path) -> dict[str, Any]:
         "pdfplumberVersion": pdfplumber.__version__,
         "pageCount": len(pages),
         "lineCount": sum(page["lineCount"] for page in pages),
-        "layoutHash": sha256_text("\n".join(all_line_hashes)),
+        "layoutHash": sha256_text("\n".join(all_wrap_hashes)),
         "overlapCount": 0,
         "pages": pages,
     }

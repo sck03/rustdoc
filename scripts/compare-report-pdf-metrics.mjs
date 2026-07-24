@@ -186,15 +186,15 @@ function describeFirstLayoutMismatch(entries) {
   if (entries.length <= 1) return "layout mismatch cannot be localized without multiple platform results";
   const maximumPages = Math.max(...entries.map((entry) => entry.pages?.length ?? 0));
   for (let pageIndex = 0; pageIndex < maximumPages; pageIndex += 1) {
-    const maximumLines = Math.max(...entries.map((entry) => entry.pages?.[pageIndex]?.lineHashes?.length ?? 0));
+    const maximumLines = Math.max(...entries.map((entry) => lineWrapHashes(entry.pages?.[pageIndex]).length));
     for (let lineIndex = 0; lineIndex < maximumLines; lineIndex += 1) {
-      const hashes = entries.map((entry) => entry.pages?.[pageIndex]?.lineHashes?.[lineIndex] ?? "<missing>");
+      const hashes = entries.map((entry) => lineWrapHashes(entry.pages?.[pageIndex])[lineIndex] ?? "<missing>");
       if (unique(hashes).length === 1) continue;
 
       const platforms = entries.map((entry) => {
         const page = entry.pages?.[pageIndex];
         const operatingSystem = String(entry.operatingSystem || "unknown").split("-")[0];
-        const hash = String(page?.lineHashes?.[lineIndex] ?? "missing").slice(0, 12);
+        const hash = String(lineWrapHashes(page)[lineIndex] ?? "missing").slice(0, 12);
         const top = page?.lineTops?.[lineIndex] ?? "missing";
         const left = page?.lineLefts?.[lineIndex] ?? "missing";
         const right = page?.lineRights?.[lineIndex] ?? "missing";
@@ -204,6 +204,10 @@ function describeFirstLayoutMismatch(entries) {
     }
   }
   return "layout hashes differ although all extracted line hashes match";
+}
+
+function lineWrapHashes(page) {
+  return page?.lineWrapHashes ?? page?.lineHashes ?? [];
 }
 
 function escapeWorkflowCommand(value) {
