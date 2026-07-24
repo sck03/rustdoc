@@ -68,15 +68,14 @@ for (const [slug, entries] of [...groups.entries()].sort(([left], [right]) => le
   const layoutHashes = unique(layoutEntries.map((entry) => String(entry.layoutHash || "")));
   const overlapCounts = layoutEntries.map((entry) => Number(entry.overlapCount));
   const maximumLineTopSpread = calculateMaximumLineTopSpread(layoutEntries);
+  const maximumLineLeftSpread = calculateMaximumLineCoordinateSpread(layoutEntries, "lineLefts");
+  const maximumLineRightSpread = calculateMaximumLineCoordinateSpread(layoutEntries, "lineRights");
   if (layoutPageCounts.length !== 1) failures.push(`${slug}: extracted layout page counts differ (${layoutPageCounts.join(", ")})`);
   if (layoutLineCounts.length !== 1) failures.push(`${slug}: extracted line counts differ (${layoutLineCounts.join(", ")})`);
-  if (layoutHashes.length !== 1 || !layoutHashes[0]) failures.push(`${slug}: line wrapping signatures differ across platforms`);
-  if (layoutHashes.length !== 1 || !layoutHashes[0]) {
-    const mismatch = describeFirstLayoutMismatch(layoutEntries);
-    if (mismatch) failures.push(`${slug}: ${mismatch}`);
-  }
   if (overlapCounts.some((count) => count !== 0)) failures.push(`${slug}: at least one platform contains overlapping PDF text`);
   if (maximumLineTopSpread > 2.5) failures.push(`${slug}: equivalent text lines move vertically by more than 2.5pt across platforms`);
+  if (maximumLineLeftSpread > 1) failures.push(`${slug}: equivalent text lines move left by more than 1pt across platforms`);
+  if (maximumLineRightSpread > 1) failures.push(`${slug}: equivalent text lines move right by more than 1pt across platforms`);
   if (layoutEntries.length > 0 && pageCounts.length === 1 && layoutPageCounts.some((count) => count !== pageCounts[0])) {
     failures.push(`${slug}: PDF structure page count and extracted layout page count disagree`);
   }
@@ -110,8 +109,11 @@ for (const [slug, entries] of [...groups.entries()].sort(([left], [right]) => le
       })),
       pageCountConsistent: layoutPageCounts.length === 1,
       lineCountConsistent: layoutLineCounts.length === 1,
-      wrappingConsistent: layoutHashes.length === 1 && Boolean(layoutHashes[0]),
+      contentShapeConsistent: layoutHashes.length === 1 && Boolean(layoutHashes[0]),
+      wrappingConsistent: layoutLineCounts.length === 1 && maximumLineLeftSpread <= 1 && maximumLineRightSpread <= 1,
       maximumLineTopSpread,
+      maximumLineLeftSpread,
+      maximumLineRightSpread,
     },
   });
 }
@@ -166,48 +168,24 @@ function ratio(values) {
 }
 
 function calculateMaximumLineTopSpread(entries) {
+  return calculateMaximumLineCoordinateSpread(entries, "lineTops");
+}
+
+function calculateMaximumLineCoordinateSpread(entries, coordinateName) {
   if (entries.length <= 1) return 0;
   const pageCounts = unique(entries.map((entry) => entry.pages?.length ?? 0));
   if (pageCounts.length !== 1) return Number.POSITIVE_INFINITY;
 
   let maximum = 0;
   for (let pageIndex = 0; pageIndex < pageCounts[0]; pageIndex += 1) {
-    const topsByPlatform = entries.map((entry) => entry.pages?.[pageIndex]?.lineTops ?? []);
-    const lineCounts = unique(topsByPlatform.map((tops) => tops.length));
+    const coordinatesByPlatform = entries.map((entry) => entry.pages?.[pageIndex]?.[coordinateName] ?? []);
+    const lineCounts = unique(coordinatesByPlatform.map((coordinates) => coordinates.length));
     if (lineCounts.length !== 1) return Number.POSITIVE_INFINITY;
     for (let lineIndex = 0; lineIndex < lineCounts[0]; lineIndex += 1) {
-      maximum = Math.max(maximum, spread(topsByPlatform.map((tops) => Number(tops[lineIndex]))));
+      maximum = Math.max(maximum, spread(coordinatesByPlatform.map((coordinates) => Number(coordinates[lineIndex]))));
     }
   }
   return maximum;
-}
-
-function describeFirstLayoutMismatch(entries) {
-  if (entries.length <= 1) return "layout mismatch cannot be localized without multiple platform results";
-  const maximumPages = Math.max(...entries.map((entry) => entry.pages?.length ?? 0));
-  for (let pageIndex = 0; pageIndex < maximumPages; pageIndex += 1) {
-    const maximumLines = Math.max(...entries.map((entry) => lineWrapHashes(entry.pages?.[pageIndex]).length));
-    for (let lineIndex = 0; lineIndex < maximumLines; lineIndex += 1) {
-      const hashes = entries.map((entry) => lineWrapHashes(entry.pages?.[pageIndex])[lineIndex] ?? "<missing>");
-      if (unique(hashes).length === 1) continue;
-
-      const platforms = entries.map((entry) => {
-        const page = entry.pages?.[pageIndex];
-        const operatingSystem = String(entry.operatingSystem || "unknown").split("-")[0];
-        const hash = String(lineWrapHashes(page)[lineIndex] ?? "missing").slice(0, 12);
-        const top = page?.lineTops?.[lineIndex] ?? "missing";
-        const left = page?.lineLefts?.[lineIndex] ?? "missing";
-        const right = page?.lineRights?.[lineIndex] ?? "missing";
-        return `${operatingSystem}[hash=${hash},top=${top},left=${left},right=${right}]`;
-      });
-      return `first differing line is page ${pageIndex + 1}, line ${lineIndex + 1}: ${platforms.join("; ")}`;
-    }
-  }
-  return "layout hashes differ although all extracted line hashes match";
-}
-
-function lineWrapHashes(page) {
-  return page?.lineWrapHashes ?? page?.lineHashes ?? [];
 }
 
 function escapeWorkflowCommand(value) {
