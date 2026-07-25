@@ -1,4 +1,4 @@
-import type { ApiInvoiceItemDto, ApiProductDto, ExportDocManagerApiClient, HsCodeKnowledgeSearchItem } from "../../api/index.ts";
+import type { ApiInvoiceItemDto, ApiProductDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput, HsCodeKnowledgeSearchItem } from "../../api/index.ts";
 import { InvoiceHsKnowledgePanel } from "./InvoiceHsKnowledgePanel.tsx";
 import { InvoiceItemsAssist, type UnitCandidateDialogState } from "./InvoiceItemsAssist.tsx";
 
@@ -6,7 +6,7 @@ type Props = {
   client: ExportDocManagerApiClient; focusedRowIndex: number | null; isBusy: boolean; isProductPickerOpen: boolean; isHsKnowledgeOpen: boolean;
   items: ApiInvoiceItemDto[]; productKeyword: string; products: ApiProductDto[]; productLibraryPageNumber: number; productLibraryPageSize: number; productLibraryTotalCount: number; productLibraryTotalPages: number; readOnly: boolean; unitCandidateDialog: UnitCandidateDialogState | null;
   onApplyProduct(product: ApiProductDto): void; onApplyUnitCandidate(candidate: string): void; onCloseProductPicker(): void; onCloseUnitCandidates(): void;
-  onRefresh(): void; onSearch(keyword: string): void; onProductLibraryPageChange(pageNumber: number): void; onProductLibraryPageSizeChange(pageSize: number): void; onCloseHsKnowledge(): void; onApplyHs(patch: Partial<ApiInvoiceItemDto>, result: HsCodeKnowledgeSearchItem, feedbackRecorded: boolean): void;
+  onRefresh(): void; onSearch(keyword: string): void; onProductLibraryPageChange(pageNumber: number): void; onProductLibraryPageSizeChange(pageSize: number): void; onCloseHsKnowledge(): void; onApplyHs(patch: Partial<ApiInvoiceItemDto>, result: HsCodeKnowledgeSearchItem, pendingFeedback: HsCodeKnowledgeFeedbackInput): void;
 };
 
 export function InvoiceItemsEditorDialogs(props: Props) {

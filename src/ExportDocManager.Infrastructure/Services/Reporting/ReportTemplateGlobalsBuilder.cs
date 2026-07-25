@@ -81,6 +81,7 @@ namespace ExportDocManager.Services.Reporting
             scriptObject.Import("format_date", new Func<DateTime, string, string>((date, format) => date.ToString(format)));
             scriptObject.Import("format_number", new Func<decimal, string, string>((number, format) => number.ToString(format)));
             scriptObject.Import("format_currency", new Func<decimal, string, string>((number, currency) => $"{currency} {number:N2}"));
+            scriptObject.Import("format_unit_price", new Func<decimal, string>(ItemPricePrecisionPolicy.Format));
         }
 
         private static string ConvertNumberToWords(decimal number) => NumberHelper.ToEnglishWords(number) + " ONLY";

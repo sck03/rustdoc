@@ -34,6 +34,7 @@ namespace ExportDocManager.Models.Entities
         public decimal NWPerCtn { get; set; }
         public decimal GWTotal { get; set; }
         public decimal NWTotal { get; set; }
+        public string PriceCalculationMode { get; set; } = ItemPriceCalculationModeCatalog.UnitPriceDriven;
         public decimal UnitPrice { get; set; }
         public decimal TotalPrice { get; set; }
         public decimal PurchasePrice { get; set; } // Added for Profit Analysis
@@ -88,9 +89,41 @@ namespace ExportDocManager.Models.Entities
         /// </summary>
         public void CalculateTotalPrice()
         {
-            TotalPrice = Quantity > 0 && UnitPrice > 0
-                ? Quantity * UnitPrice
+            PriceCalculationMode = ItemPriceCalculationModeCatalog.UnitPriceDriven;
+            UnitPrice = ItemPricePrecisionPolicy.Round(UnitPrice);
+            TotalPrice = decimal.Round(Quantity * UnitPrice, 2, MidpointRounding.AwayFromZero);
+        }
+
+        /// <summary>
+        /// Keeps the entered line amount and derives the display unit price.
+        /// 保留手工录入的行金额，并按数量反算展示单价。
+        /// </summary>
+        public void CalculateUnitPriceFromTotal()
+        {
+            PriceCalculationMode = ItemPriceCalculationModeCatalog.LineAmountDriven;
+            TotalPrice = decimal.Round(TotalPrice, 2, MidpointRounding.AwayFromZero);
+            UnitPrice = Quantity > 0
+                ? ItemPricePrecisionPolicy.Round(TotalPrice / Quantity)
                 : 0m;
+        }
+
+        /// <summary>
+        /// Recalculates prices according to the current authoritative value.
+        /// 根据当前核算方式重算单价或行金额。
+        /// </summary>
+        public void RecalculatePrice()
+        {
+            PriceCalculationMode = ItemPriceCalculationModeCatalog.Normalize(PriceCalculationMode);
+            if (string.Equals(
+                    PriceCalculationMode,
+                    ItemPriceCalculationModeCatalog.LineAmountDriven,
+                    StringComparison.Ordinal))
+            {
+                CalculateUnitPriceFromTotal();
+                return;
+            }
+
+            CalculateTotalPrice();
         }
 
         /// <summary>
@@ -122,7 +155,7 @@ namespace ExportDocManager.Models.Entities
             CalculateVolume();
             CalculateTotalGW();
             CalculateTotalNW();
-            CalculateTotalPrice();
+            RecalculatePrice();
             CalculatePurchaseTotal();
         }
 
@@ -160,6 +193,7 @@ namespace ExportDocManager.Models.Entities
                 NWPerCtn = this.NWPerCtn,
                 GWTotal = this.GWTotal,
                 NWTotal = this.NWTotal,
+                PriceCalculationMode = this.PriceCalculationMode,
                 UnitPrice = this.UnitPrice,
                 TotalPrice = this.TotalPrice,
                 PurchasePrice = this.PurchasePrice,
@@ -196,7 +230,7 @@ namespace ExportDocManager.Models.Entities
                     CalculateVolume();
                     CalculateTotalGW();
                     CalculateTotalNW();
-                    CalculateTotalPrice();
+                    RecalculatePrice();
                     CalculatePurchaseTotal();
                     break;
                 case 9: UnitEN = value; break;
@@ -243,7 +277,10 @@ namespace ExportDocManager.Models.Entities
                     UnitPrice = NumberHelper.ParseDecimal(value);
                     CalculateTotalPrice();
                     break;
-                case 24: TotalPrice = NumberHelper.ParseDecimal(value); break;
+                case 24:
+                    TotalPrice = NumberHelper.ParseDecimal(value);
+                    CalculateUnitPriceFromTotal();
+                    break;
                 case 25: 
                     PurchasePrice = NumberHelper.ParseDecimal(value); 
                     CalculatePurchaseTotal();

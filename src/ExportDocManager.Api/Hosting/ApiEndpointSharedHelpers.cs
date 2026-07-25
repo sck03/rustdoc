@@ -2,6 +2,7 @@ using System.Text.Json;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
@@ -16,6 +17,18 @@ namespace ExportDocManager.Api.Hosting
             return Results.Json(
                 new ApiErrorResponse(string.IsNullOrWhiteSpace(message) ? "操作失败。" : message),
                 statusCode: StatusCodes.Status409Conflict);
+        }
+
+        private static IResult WriteInvoiceSaveFailure(SaveResult result)
+        {
+            string message = string.IsNullOrWhiteSpace(result?.ErrorMessage) ? "保存发票失败。" : result.ErrorMessage;
+            return result?.FailureKind switch
+            {
+                SaveFailureKind.Validation => Results.BadRequest(new ApiErrorResponse(message)),
+                SaveFailureKind.Forbidden => WriteForbidden(message),
+                SaveFailureKind.Conflict => WriteConflict(message),
+                _ => Results.Json(new ApiErrorResponse("保存发票失败，请稍后重试。"), statusCode: StatusCodes.Status500InternalServerError)
+            };
         }
 
         private static IResult WritePayloadTooLarge(PayloadLimitExceededException exception)

@@ -46,8 +46,8 @@ namespace ExportDocManager.Application.Tests
                         UnitCN = "件",
                         Cartons = 10,
                         CtnUnitEN = "cartons",
-                        UnitPrice = 10.2m,
-                        TotalPrice = 1020m
+                        UnitPrice = 10.23456m,
+                        TotalPrice = 1023.46m
                     }
                 ],
                 Customer = new Customer
@@ -84,6 +84,9 @@ namespace ExportDocManager.Application.Tests
             Assert.Equal("PCS", goods.GoodsUnitE);
             Assert.Equal("156", goods.GoodsOriginCountry);
             Assert.Equal("CHINA", goods.GoodsOriginCountryEn);
+            Assert.Equal("10.23456", goods.InvPrice);
+            Assert.Equal("1023.46", goods.InvValue);
+            Assert.Equal("1023.46", goods.FobValue);
         }
 
         [Fact]

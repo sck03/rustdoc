@@ -17,6 +17,7 @@ export const queryKeys = {
   ) => ["audit-logs", { pageNumber, pageSize, filters }] as const,
   auditLogsRoot: () => ["audit-logs"] as const,
   invoice: (invoiceId: number) => ["invoice", invoiceId] as const,
+  invoiceStatusHistory: (invoiceId: number) => ["invoice", invoiceId, "status-history"] as const,
   invoiceParties: () => ["master-data", "invoice-parties"] as const,
   invoices: (pageNumber: number, pageSize: number, keyword: string) => ["invoices", { pageNumber, pageSize, keyword }] as const,
   invoicesRoot: () => ["invoices"] as const,

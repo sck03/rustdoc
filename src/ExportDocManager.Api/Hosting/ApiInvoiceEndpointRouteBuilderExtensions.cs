@@ -140,11 +140,12 @@ namespace ExportDocManager.Api.Hosting
                     invoice,
                     invoice.Items?.ToList() ?? new List<Item>(),
                     ApiInvoiceDtoFactory.CreateCustomerForAutoCreation(invoice),
-                    ApiInvoiceDtoFactory.CreateExporterForAutoCreation(invoice));
+                    ApiInvoiceDtoFactory.CreateExporterForAutoCreation(invoice),
+                    request.PendingHsFeedback);
 
                 if (!result.Success || result.SavedInvoice == null)
                 {
-                    return WriteConflict(result.ErrorMessage ?? "保存发票失败。");
+                    return WriteInvoiceSaveFailure(result);
                 }
 
                 var response = new ApiInvoiceSaveResponse(
@@ -188,6 +189,11 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("发票号不能为空。"));
                 }
 
+                if (string.IsNullOrWhiteSpace(request.RowVersion))
+                {
+                    return Results.BadRequest(new ApiErrorResponse("更新发票必须提交版本号，请刷新后重试。"));
+                }
+
                 var existing = await invoiceService.GetInvoiceByIdAsync(id);
                 if (existing == null)
                 {
@@ -211,11 +217,12 @@ namespace ExportDocManager.Api.Hosting
                     invoice,
                     invoice.Items?.ToList() ?? new List<Item>(),
                     ApiInvoiceDtoFactory.CreateCustomerForAutoCreation(invoice),
-                    ApiInvoiceDtoFactory.CreateExporterForAutoCreation(invoice));
+                    ApiInvoiceDtoFactory.CreateExporterForAutoCreation(invoice),
+                    request.PendingHsFeedback);
 
                 if (!result.Success || result.SavedInvoice == null)
                 {
-                    return WriteConflict(result.ErrorMessage ?? "保存发票失败。");
+                    return WriteInvoiceSaveFailure(result);
                 }
 
                 return Results.Ok(new ApiInvoiceSaveResponse(
@@ -258,7 +265,136 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("DeleteInvoice");
 
+            endpoints.MapPost("/api/invoices/{id:int}/status", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                ApiAuthorizationService authorizationService,
+                IInvoiceService invoiceService,
+                int id,
+                ApiInvoiceStatusTransitionRequest request) =>
+            {
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                if (user == null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                if (id <= 0)
+                {
+                    return Results.BadRequest(new ApiErrorResponse("发票ID必须大于0。"));
+                }
+
+                if (request == null || string.IsNullOrWhiteSpace(request.TargetStatus) ||
+                    string.IsNullOrWhiteSpace(request.RowVersion))
+                {
+                    return Results.BadRequest(new ApiErrorResponse("状态流转必须包含目标状态和发票版本号。"));
+                }
+
+                string targetStatus = InvoiceStatusCatalog.Normalize(request.TargetStatus);
+                if (string.Equals(targetStatus, InvoiceStatusCatalog.Cancelled, StringComparison.OrdinalIgnoreCase) &&
+                    !authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentInvoices, PermissionAccessLevel.Manage))
+                {
+                    return WriteForbidden("只有管理权限可以作废发票。");
+                }
+
+                byte[] rowVersion;
+                try
+                {
+                    rowVersion = Convert.FromBase64String(request.RowVersion);
+                }
+                catch (FormatException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse("发票版本号必须是有效的 Base64 字符串。"));
+                }
+
+                try
+                {
+                    var invoice = await invoiceService.TransitionInvoiceStatusAsync(
+                        new InvoiceStatusTransitionRequest(id, targetStatus, rowVersion, request.Note));
+                    return invoice == null
+                        ? Results.NotFound()
+                        : Results.Ok(new ApiInvoiceSaveResponse(
+                            true,
+                            invoice.Id,
+                            true,
+                            ApiInvoiceDtoFactory.FromInvoiceDetail(invoice)));
+                }
+                catch (InvoiceValidationException ex)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                }
+                catch (InvoiceConflictException ex)
+                {
+                    return Results.Conflict(new ApiErrorResponse(ex.Message));
+                }
+                catch (Exception ex)
+                {
+                    return WriteConflict(ex.Message);
+                }
+            })
+            .WithName("TransitionInvoiceStatus");
+
             endpoints.MapPost("/api/invoices/{id:int}/unverify", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                ApiAuthorizationService authorizationService,
+                IInvoiceService invoiceService,
+                int id,
+                ApiInvoiceUnverifyRequest request) =>
+            {
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                if (user == null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentInvoices, PermissionAccessLevel.Manage))
+                {
+                    return WriteForbidden("只有管理权限可以反审核发票。");
+                }
+
+                if (id <= 0 || request == null || string.IsNullOrWhiteSpace(request.RowVersion))
+                {
+                    return Results.BadRequest(new ApiErrorResponse("反审核必须包含发票ID和版本号。"));
+                }
+
+                byte[] rowVersion;
+                try
+                {
+                    rowVersion = Convert.FromBase64String(request.RowVersion);
+                }
+                catch (FormatException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse("发票版本号必须是有效的 Base64 字符串。"));
+                }
+
+                try
+                {
+                    var invoice = await invoiceService.UnverifyInvoiceAsync(id, rowVersion, request.Note);
+                    return invoice == null
+                        ? Results.NotFound()
+                        : Results.Ok(new ApiInvoiceSaveResponse(
+                            true,
+                            invoice.Id,
+                            true,
+                            ApiInvoiceDtoFactory.FromInvoiceDetail(invoice)));
+                }
+                catch (InvoiceValidationException ex)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                }
+                catch (InvoiceConflictException ex)
+                {
+                    return Results.Conflict(new ApiErrorResponse(ex.Message));
+                }
+                catch (Exception ex)
+                {
+                    return WriteConflict(ex.Message);
+                }
+            })
+            .WithName("UnverifyInvoice");
+
+            endpoints.MapGet("/api/invoices/{id:int}/status-history", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
@@ -274,29 +410,18 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("发票ID必须大于0。"));
                 }
 
-                Invoice invoice;
-                try
-                {
-                    invoice = await invoiceService.UnverifyInvoiceAsync(id);
-                }
-                catch (InvalidOperationException ex)
-                {
-                    return Results.Conflict(new ApiErrorResponse(ex.Message));
-                }
-                catch (Exception ex)
-                {
-                    return WriteConflict(ex.Message);
-                }
-
-                return invoice == null
-                    ? Results.NotFound()
-                    : Results.Ok(new ApiInvoiceSaveResponse(
-                        true,
-                        invoice.Id,
-                        true,
-                        ApiInvoiceDtoFactory.FromInvoiceDetail(invoice)));
+                var history = await invoiceService.ListInvoiceStatusHistoryAsync(id);
+                return Results.Ok(history.Select(item => new ApiInvoiceStatusHistoryDto(
+                    item.Id,
+                    item.InvoiceId,
+                    InvoiceStatusCatalog.Normalize(item.FromStatus),
+                    InvoiceStatusCatalog.Normalize(item.ToStatus),
+                    item.Note,
+                    item.ChangedByUserId,
+                    item.ChangedByUsername,
+                    item.ChangedAt)).ToList());
             })
-            .WithName("UnverifyInvoice");
+            .WithName("ListInvoiceStatusHistory");
 
             endpoints.MapPost("/api/invoices/{id:int}/clone", async (
                 HttpContext context,
@@ -393,7 +518,6 @@ namespace ExportDocManager.Api.Hosting
                     CopyHeader = true,
                     CopyItems = true,
                     ResetDates = false,
-                    ResetStatus = true,
                     ClearAmounts = false
                 };
 

@@ -104,6 +104,7 @@ namespace ExportDocManager.Api.Hosting
                 NWPerCtn = item.NWPerCtn,
                 GWTotal = item.GWTotal,
                 NWTotal = item.NWTotal,
+                PriceCalculationMode = ItemPriceCalculationModeCatalog.Normalize(item.PriceCalculationMode),
                 UnitPrice = item.UnitPrice,
                 TotalPrice = item.TotalPrice,
                 PurchasePrice = item.PurchasePrice,

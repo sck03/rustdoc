@@ -2260,6 +2260,122 @@ html[data-interface-density="compact"] :where(th, td) {
   flex-wrap: wrap;
 }
 
+.invoice-status-field-value {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 11px;
+  background: #f4f8f7;
+  border: 1px solid #d9e6e2;
+  border-radius: 8px;
+}
+
+.invoice-status-field-value small {
+  color: var(--edm-ink-500);
+  font-size: 11px;
+  text-align: right;
+}
+
+.invoice-status-history {
+  margin-top: 14px;
+  overflow: hidden;
+  background: #f8fbfa;
+  border: 1px solid #dce8e5;
+  border-radius: 10px;
+}
+
+.invoice-status-history > summary {
+  padding: 11px 13px;
+  color: var(--edm-ink-700);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.invoice-status-history[open] > summary {
+  border-bottom: 1px solid #e1ebe8;
+}
+
+.invoice-status-history > .form-field-description,
+.invoice-status-history > .inline-notice {
+  margin: 12px;
+}
+
+.invoice-status-history-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invoice-status-history-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e5eeeb;
+}
+
+.invoice-status-history-list li:last-child {
+  border-bottom: 0;
+}
+
+.invoice-status-history-list li > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.invoice-status-history-list strong {
+  color: var(--edm-ink-800);
+  font-size: 13px;
+}
+
+.invoice-status-history-list span,
+.invoice-status-history-list small {
+  color: var(--edm-ink-500);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.invoice-status-history-list small {
+  white-space: nowrap;
+}
+
+.invoice-status-reason-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+}
+
+.invoice-status-reason-field > span {
+  color: var(--edm-ink-700);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.invoice-status-reason-field > span strong {
+  margin-left: 5px;
+  color: #a43a2b;
+  font-size: 11px;
+}
+
+.invoice-status-reason-field textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
+.invoice-status-reason-field small {
+  color: var(--edm-ink-500);
+  font-size: 11px;
+  text-align: right;
+}
+
 .command-button:focus-visible,
 .icon-button:focus-visible,
 .page-jump-control button:focus-visible,
@@ -2311,6 +2427,22 @@ dialog::backdrop {
 }
 
 @media (max-width: 860px) {
+  .invoice-status-field-value,
+  .invoice-status-history-list li {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-status-field-value {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .invoice-status-field-value small,
+  .invoice-status-history-list small {
+    text-align: left;
+    white-space: normal;
+  }
+
   .workspace-nav {
     position: sticky;
     top: 0;

@@ -265,7 +265,7 @@
                         <span class="item-details">
                             {{ if $item.Cartons > 0 }}<span>{{ $item.Cartons | math.format 'G29' }}{{ $item.CtnUnitEN }}</span>{{ end }}
                             {{ if $item.Quantity > 0 }}<span>{{ $item.Quantity | math.format 'G29' }}{{ $item.UnitEN }}</span>{{ end }}
-                            <span>@{{ Invoice.Currency }}{{ $item.UnitPrice | math.format 'G29' }}</span>
+                            <span>@{{ Invoice.Currency }}{{ format_unit_price $item.UnitPrice }}</span>
                         </span>
                     </span>
                 </td>

@@ -6,6 +6,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.MasterData;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -36,7 +37,8 @@ namespace ExportDocManager.Services.Core
             Invoice invoice,
             List<Item> items,
             Customer customer,
-            Exporter exporter)
+            Exporter exporter,
+            IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null)
         {
             var result = new SaveResult();
 
@@ -84,21 +86,13 @@ namespace ExportDocManager.Services.Core
                         }
 
                         invoice.Items = items ?? invoice.Items ?? new List<Item>();
-
-                        if (invoice.Id == 0)
-                        {
-                            invoice.Id = await _businessDataAccessScope
-                                .ApplyInvoiceScope(context.Invoices.AsNoTracking())
-                                .Where(item => item.InvoiceNo == invoice.InvoiceNo && item.Type == invoice.Type)
-                                .Select(item => item.Id)
-                                .FirstOrDefaultAsync();
-                        }
+                        _businessDataAccessScope.ApplyOwner(invoice);
 
                         var saveResult = new SaveResult
                         {
                             IsUpdate = invoice.Id != 0
                         };
-                        await SaveInvoiceCoreAsync(context, invoice);
+                        await SaveInvoiceCoreAsync(context, invoice, pendingHsFeedback);
 
                         saveResult.SavedInvoice = invoice;
                         saveResult.Success = true;
@@ -109,12 +103,32 @@ namespace ExportDocManager.Services.Core
             {
                 Log.Error(ex, "保存发票流程失败");
                 result.ErrorMessage = "保存失败: 该发票数据已被其他用户修改，请刷新后重试。";
+                result.FailureKind = SaveFailureKind.Conflict;
+                return result;
+            }
+            catch (InvoiceValidationException ex)
+            {
+                result.ErrorMessage = ex.Message;
+                result.FailureKind = SaveFailureKind.Validation;
+                return result;
+            }
+            catch (InvoiceConflictException ex)
+            {
+                result.ErrorMessage = ex.Message;
+                result.FailureKind = SaveFailureKind.Conflict;
+                return result;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                result.ErrorMessage = ex.Message;
+                result.FailureKind = SaveFailureKind.Forbidden;
                 return result;
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "保存发票流程失败");
                 result.ErrorMessage = $"保存失败: {ex.Message}";
+                result.FailureKind = SaveFailureKind.Unexpected;
                 return result;
             }
         }
@@ -129,7 +143,23 @@ namespace ExportDocManager.Services.Core
                     _contextFactory,
                     async (context, _) =>
                     {
-                        await SaveInvoiceCoreAsync(context, invoice);
+                        // This legacy application-service entry point has no request DTO
+                        // carrying a concurrency token. Hydrate the token from the current
+                        // row before delegating to the strict save path. HTTP callers use
+                        // SaveInvoiceWithAutoCreationAsync and must still provide the token.
+                        if (invoice.Id > 0 && (invoice.RowVersion == null || invoice.RowVersion.Length == 0))
+                        {
+                            invoice.RowVersion = await context.Invoices
+                                .AsNoTracking()
+                                .Where(item => item.Id == invoice.Id)
+                                .Select(item => item.RowVersion)
+                                .FirstOrDefaultAsync();
+                        }
+                        await SaveInvoiceCoreAsync(
+                            context,
+                            invoice,
+                            pendingHsFeedback: null,
+                            requireRowVersion: false);
                     });
                 return true;
             }

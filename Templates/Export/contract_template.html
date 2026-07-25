@@ -110,7 +110,7 @@
         <tr>
             <td>{{ item.StyleNo }} {{ item.StyleName }}</td>
             <td>{{ item.Quantity | math.format 'G29' }}{{ item.UnitEN }}</td>
-            <td>{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'G29' }}</td>
+            <td>{{ Invoice.Currency }}{{ format_unit_price item.UnitPrice }}</td>
             <td>{{ Invoice.Currency }}{{ item.TotalPrice | math.format 'F2' }}</td>
         </tr>
         {{ end }}

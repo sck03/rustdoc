@@ -865,6 +865,12 @@
   white-space: nowrap;
 }
 
+.item-price-calculation-hint {
+  flex: 1 1 320px;
+  min-width: 220px;
+  color: #195f59;
+}
+
 .small-empty {
   height: 120px;
 }

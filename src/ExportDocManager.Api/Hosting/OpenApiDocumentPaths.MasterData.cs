@@ -285,6 +285,26 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
+                    ["/api/master-data/hs-codes/search-remote/capture"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Search HS codes and capture remote evidence for review",
+                            operationId = "captureRemoteHsCodes",
+                            requestBody = new
+                            {
+                                required = true,
+                                content = JsonContent("ApiHsCodeRemoteSearchRequest")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Remote results returned and declaration evidence captured in the pending candidate pool.", content = JsonContent("ApiHsCodeSearchResponse") },
+                                ["400"] = new { description = "Missing search keyword." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["409"] = new { description = "Remote search or capture failed." }
+                            }
+                        }
+                    },
                     ["/api/master-data/hs-codes/fetch-remote-detail"] = new
                     {
                         post = new
@@ -570,7 +590,8 @@ namespace ExportDocManager.Api.Hosting
                             responses = new Dictionary<string, object>
                             {
                                 ["200"] = new { description = "HS knowledge package.", content = BinaryContent() },
-                                ["401"] = new { description = "Missing or invalid bearer token." }
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Manage permission required." }
                             }
                         }
                     },

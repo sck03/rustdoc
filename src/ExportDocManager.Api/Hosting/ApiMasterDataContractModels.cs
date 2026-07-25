@@ -207,6 +207,8 @@ namespace ExportDocManager.Api.Hosting
         int StandardCodeCount = 0,
         int DeclarationExampleCount = 0);
 
+    public sealed record ApiHsCodeRemoteSearchRequest(string Keyword);
+
     public sealed record ApiHsCodeRemoteDetailResolutionResponse(
         IReadOnlyList<ApiHsCodeDto> Items,
         IReadOnlyList<ApiHsCodeDto> RemovedItems,

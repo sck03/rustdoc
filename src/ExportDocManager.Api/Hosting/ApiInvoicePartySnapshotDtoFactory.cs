@@ -51,7 +51,10 @@ namespace ExportDocManager.Api.Hosting
             target.OwnerUserId = existing.OwnerUserId;
             target.DepartmentId = existing.DepartmentId ?? string.Empty;
             target.CompanyScope = existing.CompanyScope ?? string.Empty;
-            target.RowVersion ??= existing.RowVersion?.ToArray();
+            if (target.RowVersion == null || target.RowVersion.Length == 0)
+            {
+                target.RowVersion = existing.RowVersion?.ToArray();
+            }
         }
 
         private static bool HasCustomerSnapshot(Invoice invoice)

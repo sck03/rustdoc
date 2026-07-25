@@ -3,6 +3,7 @@ import { Check, Search, ShieldCheck, X } from "lucide-react";
 import type {
   ApiInvoiceItemDto,
   ExportDocManagerApiClient,
+  HsCodeKnowledgeFeedbackInput,
   HsCodeKnowledgeSearchItem,
 } from "../../api/index.ts";
 import { normalizeText, readApiError } from "../../ui/formUtils.ts";
@@ -18,7 +19,7 @@ export function InvoiceHsKnowledgePanel({
   client: ExportDocManagerApiClient;
   item: ApiInvoiceItemDto | null;
   open: boolean;
-  onApply: (patch: Partial<ApiInvoiceItemDto>, result: HsCodeKnowledgeSearchItem, feedbackRecorded: boolean) => void;
+  onApply: (patch: Partial<ApiInvoiceItemDto>, result: HsCodeKnowledgeSearchItem, pendingFeedback: HsCodeKnowledgeFeedbackInput) => void;
   onClose: () => void;
 }) {
   const suggestedQuery = useMemo(() => buildInvoiceHsQuery(item), [item]);
@@ -65,28 +66,20 @@ export function InvoiceHsKnowledgePanel({
       const standard = await client.getInvoiceHsCode({ code: result.currentCode });
       if (!isTrustedActiveHsCode(standard)) throw new Error("该编码已不再是经过年度验证的当前有效编码，请重新查询。");
       const feedbackContext = buildInvoiceHsFeedbackContext(item, result.name, result.specification);
-      let feedbackRecorded = false;
-      try {
-        await client.recordInvoiceHsCodeKnowledgeFeedback({
-          body: {
-            queryText: draft.trim(),
-            productName: feedbackContext.productName,
-            specification: feedbackContext.specification,
-            candidateCode: result.currentCode,
-            accepted: true,
-          },
-        });
-        feedbackRecorded = true;
-      } catch {
-        // Feedback improves future ranking but must not block the user's explicit invoice fill action.
-      }
+      const pendingFeedback: HsCodeKnowledgeFeedbackInput = {
+        queryText: draft.trim(),
+        productName: feedbackContext.productName,
+        specification: feedbackContext.specification,
+        candidateCode: result.currentCode,
+        accepted: true,
+      };
       const patch: Partial<ApiInvoiceItemDto> = { hsCode: result.currentCode };
       if (!normalizeText(item?.unitCN) && normalizeText(standard.unit)) patch.unitCN = normalizeText(standard.unit);
       if (!(item?.taxRebateRate ?? 0)) {
         const rate = parsePercent(standard.rebateRate);
         if (rate != null) patch.taxRebateRate = rate;
       }
-      onApply(patch, result, feedbackRecorded);
+      onApply(patch, result, pendingFeedback);
       onClose();
     } catch (error) {
       setMessage(readApiError(error));

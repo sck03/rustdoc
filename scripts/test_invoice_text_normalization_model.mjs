@@ -17,13 +17,17 @@ const modelPath = path
 const hsModelPath = path
   .join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "invoiceHsKnowledgeModel.ts")
   .replaceAll("\\", "/");
-fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as hsModel from ${JSON.stringify(hsModelPath)}; globalThis.__model = model; globalThis.__hsModel = hsModel;`, "utf8");
+const itemModelPath = path
+  .join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "invoiceItemsEditorModel.ts")
+  .replaceAll("\\", "/");
+fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as hsModel from ${JSON.stringify(hsModelPath)}; import * as itemModel from ${JSON.stringify(itemModelPath)}; globalThis.__model = model; globalThis.__hsModel = hsModel; globalThis.__itemModel = itemModel;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
 
 const model = globalThis.__model;
 const hsModel = globalThis.__hsModel;
+const itemModel = globalThis.__itemModel;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const draft = model.uppercaseInvoiceEnglishText({
   ...model.createEmptyInvoice(),
@@ -70,4 +74,8 @@ const feedbackContext = hsModel.buildInvoiceHsFeedbackContext({
 assert(feedbackContext.productName === "化纤制针织女式非起绒套头衫", "HS feedback learns the current invoice product name");
 assert(feedbackContext.specification.includes("LADIES PULLOVER") && feedbackContext.specification.includes("51%涤44%棉5%氨纶") && feedbackContext.specification.includes("PETROL INDUSTRIES"), "HS feedback keeps reusable product attributes");
 assert(!feedbackContext.specification.includes("YLAW1320-2"), "HS feedback does not split identical products by style number");
+assert(itemModel.invoiceItemUnitPriceDisplayValue(12) === "12.00", "ordinary unit price uses two decimals");
+assert(itemModel.invoiceItemUnitPriceDisplayValue(12.3) === "12.30", "ordinary fractional unit price uses two decimals");
+assert(itemModel.invoiceItemUnitPriceDisplayValue(100 / 3) === "33.33333", "derived unit price uses five decimals");
+assert(itemModel.invoiceItemUnitPriceDisplayValue(14.2857) === "14.28570", "extended unit price keeps a stable five-decimal display");
 process.stdout.write("invoice-text-normalization model tests passed\n");

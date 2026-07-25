@@ -62,7 +62,7 @@ namespace ExportDocManager.Services.Reporting
             Export("商品明细", "HS编码 (Item HS Code)", "{{ item.HsCode }}"),
             Export("商品明细", "商品数量 (Item Qty)", "{{ item.Quantity }}"),
             Export("商品明细", "数量单位 (Item Qty Unit)", "{{ item.UnitEN }}"),
-            Export("商品明细", "单价 (Item Unit Price)", "{{ item.UnitPrice }}"),
+            Export("商品明细", "单价 (Item Unit Price)", "{{ format_unit_price item.UnitPrice }}"),
             Export("商品明细", "总价 (Item Total Price)", "{{ item.TotalPrice }}"),
             Export("商品明细", "箱数 (Item Cartons)", "{{ item.Cartons }}"),
             Export("商品明细", "箱数单位 (Item Ctn Unit)", "{{ item.CtnUnitEN }}"),

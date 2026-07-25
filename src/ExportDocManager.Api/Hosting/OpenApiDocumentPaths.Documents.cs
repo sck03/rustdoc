@@ -912,6 +912,11 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 PathParameter("id", "integer", "int32", "Invoice id.")
                             },
+                            requestBody = new
+                            {
+                                required = true,
+                                content = JsonContent("ApiInvoiceUnverifyRequest")
+                            },
                             responses = new Dictionary<string, object>
                             {
                                 ["200"] = new
@@ -923,6 +928,51 @@ namespace ExportDocManager.Api.Hosting
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "Invoice not found or outside the current user's business scope." },
                                 ["409"] = new { description = "Invoice is not in a locked status or could not be updated." }
+                            }
+                        }
+                    },
+                    ["/api/invoices/{id}/status"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Advance or cancel an invoice status",
+                            operationId = "transitionInvoiceStatus",
+                            parameters = new object[]
+                            {
+                                PathParameter("id", "integer", "int32", "Invoice id.")
+                            },
+                            requestBody = new
+                            {
+                                required = true,
+                                content = JsonContent("ApiInvoiceStatusTransitionRequest")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Invoice status changed.", content = JsonContent("ApiInvoiceSaveResponse") },
+                                ["400"] = new { description = "Invalid transition or payload." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Manage permission required for cancellation." },
+                                ["404"] = new { description = "Invoice not found or outside the current user's business scope." },
+                                ["409"] = new { description = "Invoice was changed by another user." }
+                            }
+                        }
+                    },
+                    ["/api/invoices/{id}/status-history"] = new
+                    {
+                        get = new
+                        {
+                            summary = "List invoice status history",
+                            operationId = "listInvoiceStatusHistory",
+                            parameters = new object[]
+                            {
+                                PathParameter("id", "integer", "int32", "Invoice id.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Status history ordered from newest to oldest.", content = JsonContent("ApiInvoiceStatusHistoryDtoArray") },
+                                ["400"] = new { description = "Invalid invoice id." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["404"] = new { description = "Invoice not found or outside the current user's business scope." }
                             }
                         }
                     },
@@ -1068,7 +1118,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["200"] = new
                                 {
-                                    description = "Package checksum and invoice import preview. Preview checks existing invoices by InvoiceNo + Type and does not read payment/reimbursement data.",
+                                    description = "Package checksum and invoice import preview. Preview checks existing invoices by company scope + InvoiceNo + Type and does not read payment/reimbursement data.",
                                     content = JsonContent("ApiInvoiceTransferPreviewResponse")
                                 },
                                 ["400"] = new { description = "Invalid package path or package format." },
@@ -1113,7 +1163,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["200"] = new
                                 {
-                                    description = "Package was imported into the runtime database according to the selected conflict action. Actual/customs records remain independent by InvoiceNo + Type.",
+                                    description = "Package was imported into the runtime database according to the selected conflict action. Actual/customs records remain independent by company scope + InvoiceNo + Type.",
                                     content = JsonContent("ApiInvoiceTransferImportResponse")
                                 },
                                 ["400"] = new { description = "Invalid package path, package format, or conflict action." },

@@ -318,6 +318,11 @@ namespace ExportDocManager.Api.Hosting
 
         public static string GetRequiredAccessLevel(PathString path, string method)
         {
+            if (path.Equals("/api/master-data/hs-knowledge/export", StringComparison.OrdinalIgnoreCase))
+            {
+                return PermissionAccessLevel.Manage;
+            }
+
             // User report templates are ownership-scoped by UserReportTemplateService.
             // Operators may delete their own templates, while administrator-owned file
             // templates and every other destructive endpoint still require manage.

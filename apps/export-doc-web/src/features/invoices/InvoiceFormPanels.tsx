@@ -5,18 +5,21 @@ import {
   ApiExporterDto,
   ApiInvoiceDetailDto,
   ApiInvoiceItemDto,
+  ApiInvoiceStatusHistoryDto,
   ApiProductDto,
   ApiUnitDto,
   ExportDocManagerApiClient,
+  HsCodeKnowledgeFeedbackInput,
 } from "../../api/index.ts";
 import { DateField, EditableComboField, NumberField, SelectField, TextAreaField, TextField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { CustomOptionMap, getCustomOptions } from "../custom-options/customOptionModel.ts";
 import { type InvoiceItemCellSelection, InvoiceItemsEditor } from "./InvoiceItemsEditor.tsx";
 import { type EditableInvoiceItemField } from "./invoiceItemTableModel.ts";
 import { ShippingMarkEditorDialog } from "./ShippingMarkEditorDialog.tsx";
-import { getInvoiceStatusOptions, invoiceTypeOptions, normalizeInvoiceStatus, normalizeInvoiceType } from "./invoiceModel.ts";
+import { getInvoiceStatusActionLabel, getInvoiceStatusLabel, invoiceTypeOptions, normalizeInvoiceType } from "./invoiceModel.ts";
 
 type InvoicePatch = Partial<ApiInvoiceDetailDto>;
 
@@ -26,10 +29,18 @@ export function InvoiceBasicInfoPanel({
   canCloneInvoiceType,
   cloneInvoiceTypeLabel,
   canUnverifyInvoice,
+  canTransitionStatus,
+  canCancelStatus,
   isEditable,
   isBusy,
   isCloneInvoiceTypeBusy,
   isUnverifyInvoiceBusy,
+  isTransitionStatusBusy,
+  onTransitionStatus,
+  onCancelStatus,
+  statusHistory,
+  statusHistoryLoading,
+  statusHistoryMessage,
   onChange,
   onCloneInvoiceType,
   onUnverifyInvoice,
@@ -43,15 +54,23 @@ export function InvoiceBasicInfoPanel({
   canCloneInvoiceType: boolean;
   cloneInvoiceTypeLabel: string;
   canUnverifyInvoice: boolean;
+  canTransitionStatus: boolean;
+  canCancelStatus: boolean;
   isEditable: boolean;
   isBusy: boolean;
   isCloneInvoiceTypeBusy: boolean;
   isUnverifyInvoiceBusy: boolean;
+  isTransitionStatusBusy: boolean;
   onChange: (next: InvoicePatch) => void;
   onCloneInvoiceType: () => void;
   onUnverifyInvoice: () => void;
+  onTransitionStatus: () => void;
+  onCancelStatus: () => void;
   onOpenCustomsCoo: () => void;
   onOpenAgentConsignment: () => void;
+  statusHistory?: ApiInvoiceStatusHistoryDto[];
+  statusHistoryLoading?: boolean;
+  statusHistoryMessage?: string | null;
   customOptions?: CustomOptionMap;
   onCommitCustomOption?: (optionType: string, value: string) => void;
 }) {
@@ -94,6 +113,26 @@ export function InvoiceBasicInfoPanel({
               <span>反审核</span>
             </button>
           ) : null}
+          {canTransitionStatus ? (
+            <button
+              className="command-button secondary"
+              type="button"
+              disabled={isBusy || isTransitionStatusBusy}
+              onClick={onTransitionStatus}
+            >
+              <span>{getInvoiceStatusActionLabel(invoice.status)}</span>
+            </button>
+          ) : null}
+          {canCancelStatus ? (
+            <button
+              className="command-button danger"
+              type="button"
+              disabled={isBusy || isTransitionStatusBusy}
+              onClick={onCancelStatus}
+            >
+              <span>作废</span>
+            </button>
+          ) : null}
           <button className="command-button" type="submit" disabled={isBusy || !isEditable}>
             <Save size={17} aria-hidden="true" />
             <span>保存</span>
@@ -122,14 +161,13 @@ export function InvoiceBasicInfoPanel({
           onChange={(value) => onChange({ supervisionMode: value })}
           onCommit={(value) => onCommitCustomOption?.("SupervisionMode", value)}
         />
-        <SelectField
-          label="状态"
-          value={normalizeInvoiceStatus(invoice.status)}
-          disabled={!isEditable}
-          includeEmptyOption={false}
-          options={getInvoiceStatusOptions(invoice.status)}
-          onChange={(value) => onChange({ status: normalizeInvoiceStatus(value) })}
-        />
+        <div className="form-field form-field-disabled invoice-status-field" aria-label="状态">
+          <span className="form-field-label"><span>状态</span></span>
+          <div className="invoice-status-field-value">
+            <BusinessStatusBadge value={getInvoiceStatusLabel(invoice.status)} />
+            <small>通过状态操作推进，不能直接编辑</small>
+          </div>
+        </div>
         <SelectField
           label="业务类型"
           value={normalizeInvoiceType(invoice.type)}
@@ -138,8 +176,37 @@ export function InvoiceBasicInfoPanel({
           options={invoiceTypeOptions}
           onChange={(value) => onChange({ type: normalizeInvoiceType(value) })}
         />
-        <NumberField label="总金额" value={invoice.totalAmount} disabled={!isEditable} onChange={(value) => onChange({ totalAmount: value })} />
+        <NumberField
+          label="总金额"
+          value={invoice.totalAmount}
+          disabled
+          description="由商品明细行金额合计；修改单价或行金额会自动联动"
+          onChange={() => undefined}
+        />
       </div>
+      {statusHistory !== undefined || statusHistoryLoading || statusHistoryMessage ? (
+        <details className="invoice-status-history">
+          <summary>状态记录{statusHistory?.length ? `（${statusHistory.length}）` : ""}</summary>
+          {statusHistoryLoading ? <p className="form-field-description">正在加载状态记录…</p> : null}
+          {statusHistoryMessage ? <InlineNotice tone="warning">{statusHistoryMessage}</InlineNotice> : null}
+          {!statusHistoryLoading && !statusHistoryMessage && !(statusHistory?.length) ? (
+            <p className="form-field-description">暂时没有状态变更记录。</p>
+          ) : null}
+          {statusHistory?.length ? (
+            <ol className="invoice-status-history-list">
+              {statusHistory.map((entry) => (
+                <li key={entry.id}>
+                  <div>
+                    <strong>{getInvoiceStatusLabel(entry.fromStatus)} → {getInvoiceStatusLabel(entry.toStatus)}</strong>
+                    <span>{entry.note || "未填写备注"}</span>
+                  </div>
+                  <small>{entry.changedByUsername || "系统"} · {new Date(entry.changedAt).toLocaleString("zh-CN", { hour12: false })}</small>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </details>
+      ) : null}
     </section>
   );
 }
@@ -387,14 +454,14 @@ export function InvoiceShippingTermsPanel({
 }) {
   const totalsFields = (
     <>
-      <NumberField label="总箱数" value={invoice.totalCartons ?? 0} disabled={!isEditable} onChange={(value) => onChange({ totalCartons: value })} />
-      <NumberField label="总数量" value={invoice.totalQuantity ?? 0} disabled={!isEditable} onChange={(value) => onChange({ totalQuantity: value })} />
-      <NumberField label="总毛重" value={invoice.totalGrossWeight ?? 0} disabled={!isEditable} onChange={(value) => onChange({ totalGrossWeight: value })} />
-      <NumberField label="总净重" value={invoice.totalNetWeight ?? 0} disabled={!isEditable} onChange={(value) => onChange({ totalNetWeight: value })} />
-      <NumberField label="总体积" value={invoice.totalVolume ?? 0} disabled={!isEditable} onChange={(value) => onChange({ totalVolume: value })} />
-      <NumberField label="采购总额" value={invoice.totalPurchaseAmount ?? 0} disabled onChange={() => undefined} />
-      <NumberField label="退税总额" value={invoice.totalTaxRefundAmount ?? 0} disabled onChange={() => undefined} />
-      <NumberField label="利润总额" value={invoice.totalProfit ?? 0} disabled onChange={() => undefined} />
+      <NumberField label="总箱数" value={invoice.totalCartons ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
+      <NumberField label="总数量" value={invoice.totalQuantity ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
+      <NumberField label="总毛重" value={invoice.totalGrossWeight ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
+      <NumberField label="总净重" value={invoice.totalNetWeight ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
+      <NumberField label="总体积" value={invoice.totalVolume ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
+      <NumberField label="采购总额" value={invoice.totalPurchaseAmount ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
+      <NumberField label="退税总额" value={invoice.totalTaxRefundAmount ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
+      <NumberField label="利润总额" value={invoice.totalProfit ?? 0} disabled description="按币种和汇率自动计算" onChange={() => undefined} />
     </>
   );
 
@@ -479,6 +546,7 @@ export function InvoiceMarksAndItemsPanel({
   onSaveItemToProductLibrary,
   onSearchProductLibrary,
   onUndoItemEdit,
+  onHsKnowledgeFeedback,
   productLibraryMessage,
   productLibraryProducts,
   productLibraryPageNumber,
@@ -523,6 +591,7 @@ export function InvoiceMarksAndItemsPanel({
   onSaveItemToProductLibrary: (index: number) => void;
   onSearchProductLibrary: (keyword: string) => void;
   onUndoItemEdit: () => void;
+  onHsKnowledgeFeedback: (feedback: HsCodeKnowledgeFeedbackInput) => void;
   productLibraryMessage: string | null;
   productLibraryProducts: ApiProductDto[];
   productLibraryPageNumber: number;
@@ -721,6 +790,7 @@ export function InvoiceMarksAndItemsPanel({
         canUndoItemEdit={canUndoItemEdit}
         blankRowCount={invoiceItemBlankRowCount}
         currency={invoice.currency}
+        exchangeRate={invoice.exchangeRate}
         isProductLibraryBusy={isProductLibraryBusy}
         readOnly={!isEditable}
         onAddItem={onAddItem}
@@ -739,6 +809,7 @@ export function InvoiceMarksAndItemsPanel({
         onSaveItemToProductLibrary={onSaveItemToProductLibrary}
         onSearchProductLibrary={onSearchProductLibrary}
         onUndoItemEdit={onUndoItemEdit}
+        onHsKnowledgeFeedback={onHsKnowledgeFeedback}
         productLibraryMessage={productLibraryMessage}
         productLibraryProducts={productLibraryProducts}
         productLibraryPageNumber={productLibraryPageNumber}

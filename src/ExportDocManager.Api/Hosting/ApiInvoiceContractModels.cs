@@ -1,4 +1,6 @@
 using ExportDocManager.Models.DTOs;
+using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.MasterData;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -78,6 +80,8 @@ namespace ExportDocManager.Api.Hosting
         public string Status { get; init; } = string.Empty;
         public string RowVersion { get; init; } = string.Empty;
         public IReadOnlyList<ApiInvoiceItemDto> Items { get; init; } = Array.Empty<ApiInvoiceItemDto>();
+        public IReadOnlyList<HsCodeKnowledgeFeedbackInput> PendingHsFeedback { get; init; } =
+            Array.Empty<HsCodeKnowledgeFeedbackInput>();
     }
 
     public sealed class ApiInvoiceItemDto
@@ -107,6 +111,7 @@ namespace ExportDocManager.Api.Hosting
         public decimal NWPerCtn { get; init; }
         public decimal GWTotal { get; init; }
         public decimal NWTotal { get; init; }
+        public string PriceCalculationMode { get; init; } = ItemPriceCalculationModeCatalog.UnitPriceDriven;
         public decimal UnitPrice { get; init; }
         public decimal TotalPrice { get; init; }
         public decimal PurchasePrice { get; init; }
@@ -144,6 +149,29 @@ namespace ExportDocManager.Api.Hosting
         int Id,
         ApiInvoiceDetailDto Invoice,
         string Message);
+
+    public sealed class ApiInvoiceStatusTransitionRequest
+    {
+        public string TargetStatus { get; init; } = string.Empty;
+        public string RowVersion { get; init; } = string.Empty;
+        public string Note { get; init; } = string.Empty;
+    }
+
+    public sealed class ApiInvoiceUnverifyRequest
+    {
+        public string RowVersion { get; init; } = string.Empty;
+        public string Note { get; init; } = string.Empty;
+    }
+
+    public sealed record ApiInvoiceStatusHistoryDto(
+        int Id,
+        int InvoiceId,
+        string FromStatus,
+        string ToStatus,
+        string Note,
+        int? ChangedByUserId,
+        string ChangedByUsername,
+        DateTime ChangedAt);
 
     public sealed class ApiShippingMarkImageSaveRequest
     {

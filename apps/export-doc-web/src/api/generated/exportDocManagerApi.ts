@@ -1221,6 +1221,10 @@ export interface ApiHsCodeRemoteReferenceEntry {
   name: string;
 }
 
+export interface ApiHsCodeRemoteSearchRequest {
+  keyword: string;
+}
+
 export interface ApiHsCodeSearchResponse {
   count: number;
   declarationExampleCount?: number;
@@ -1269,7 +1273,7 @@ export interface ApiInvoiceBookingSheetRequest {
 
 export interface ApiInvoiceCloneRequest {
   newInvoiceNo: string;
-  options?: { clearAmounts?: boolean; copyHeader?: boolean; copyItems?: boolean; resetDates?: boolean; resetStatus?: boolean };
+  options?: { clearAmounts?: boolean; copyHeader?: boolean; copyItems?: boolean; resetDates?: boolean };
 }
 
 export interface ApiInvoiceCloneResponse {
@@ -1280,7 +1284,7 @@ export interface ApiInvoiceCloneResponse {
 }
 
 export interface ApiInvoiceCloneTypeRequest {
-  options?: { clearAmounts?: boolean; copyHeader?: boolean; copyItems?: boolean; resetDates?: boolean; resetStatus?: boolean };
+  options?: { clearAmounts?: boolean; copyHeader?: boolean; copyItems?: boolean; resetDates?: boolean };
   targetType: string;
 }
 
@@ -1325,6 +1329,7 @@ export interface ApiInvoiceDetailDto {
   notifyPartyName?: string;
   ownerUserId?: number;
   paymentTerms?: string;
+  pendingHsFeedback?: HsCodeKnowledgeFeedbackInput[];
   portOfDestination?: string;
   portOfLoading?: string;
   rowVersion?: string;
@@ -1419,6 +1424,7 @@ export interface ApiInvoiceItemDto {
   origin?: string;
   pcsPerCtn?: number;
   poNumber?: string;
+  priceCalculationMode: string;
   purchasePrice?: number;
   purchaseTotal?: number;
   quantity: number;
@@ -1492,6 +1498,25 @@ export interface ApiInvoiceSaveResponse {
   success: boolean;
 }
 
+export interface ApiInvoiceStatusHistoryDto {
+  changedAt: string;
+  changedByUserId?: number;
+  changedByUsername?: string;
+  fromStatus: string;
+  id: number;
+  invoiceId: number;
+  note: string;
+  toStatus: string;
+}
+
+export type ApiInvoiceStatusHistoryDtoArray = ApiInvoiceStatusHistoryDto[];
+
+export interface ApiInvoiceStatusTransitionRequest {
+  note?: string;
+  rowVersion: string;
+  targetStatus: string;
+}
+
 export interface ApiInvoiceTransferExportResponse {
   invoiceId: number;
   message: string;
@@ -1543,6 +1568,11 @@ export interface ApiInvoiceTransferPreviewResponse {
   checksumValid: boolean;
   preview: ApiInvoiceTransferPreviewDto;
   storagePolicy: string;
+}
+
+export interface ApiInvoiceUnverifyRequest {
+  note: string;
+  rowVersion: string;
 }
 
 export interface ApiLetterOfCreditImportRequest {
@@ -3308,6 +3338,10 @@ export interface CancelJobRequest {
   jobId: string;
 }
 
+export interface CaptureRemoteHsCodesRequest {
+  body: ApiHsCodeRemoteSearchRequest;
+}
+
 export interface CleanupAuditLogsRequest {
   body: ApiAuditLogCleanupRequest;
 }
@@ -3836,6 +3870,10 @@ export interface ListHsCodesRequest {
   keyword?: string;
 }
 
+export interface ListInvoiceStatusHistoryRequest {
+  id: number;
+}
+
 export interface ListInvoicesRequest {
   pageNumber?: number;
   pageSize?: number;
@@ -4295,6 +4333,11 @@ export interface TransferSharedDatabaseOwnershipRequest {
   body: ApiSharedDatabaseOwnershipTransferRequest;
 }
 
+export interface TransitionInvoiceStatusRequest {
+  id: number;
+  body: ApiInvoiceStatusTransitionRequest;
+}
+
 export interface UnlockAgentConsignmentFieldsRequest {
   invoiceId: number;
   body: ApiSingleWindowUnlockFieldsRequest;
@@ -4307,6 +4350,7 @@ export interface UnlockCustomsCooFieldsRequest {
 
 export interface UnverifyInvoiceRequest {
   id: number;
+  body: ApiInvoiceUnverifyRequest;
 }
 
 export interface UpdateCrmContactRequest {
@@ -4561,6 +4605,14 @@ export class ExportDocManagerApiClient {
   public cancelJob(request: CancelJobRequest, init?: RequestInit): Promise<ApiCommandResponse> {
     const path = `/api/jobs/${encodePath(request.jobId)}/cancel`;
     return this.request<ApiCommandResponse>("POST", path, { init });
+  }
+
+  public captureRemoteHsCodes(request: CaptureRemoteHsCodesRequest, init?: RequestInit): Promise<ApiHsCodeSearchResponse> {
+    const path = "/api/master-data/hs-codes/search-remote/capture";
+    return this.request<ApiHsCodeSearchResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public checkReportTemplateStorage(init?: RequestInit): Promise<ApiReportTemplateStorageStatusResponse> {
@@ -5595,6 +5647,11 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listInvoiceStatusHistory(request: ListInvoiceStatusHistoryRequest, init?: RequestInit): Promise<ApiInvoiceStatusHistoryDtoArray> {
+    const path = `/api/invoices/${encodePath(request.id)}/status-history`;
+    return this.request<ApiInvoiceStatusHistoryDtoArray>("GET", path, { init });
+  }
+
   public listInvoices(request: ListInvoicesRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiInvoiceListItemDto> {
     const path = "/api/invoices";
     return this.request<ApiPagedResponseOfApiInvoiceListItemDto>("GET", path, {
@@ -6489,6 +6546,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public transitionInvoiceStatus(request: TransitionInvoiceStatusRequest, init?: RequestInit): Promise<ApiInvoiceSaveResponse> {
+    const path = `/api/invoices/${encodePath(request.id)}/status`;
+    return this.request<ApiInvoiceSaveResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public unlockAgentConsignmentFields(request: UnlockAgentConsignmentFieldsRequest, init?: RequestInit): Promise<ApiAgentConsignmentUnlockFieldsResponse> {
     const path = `/api/single-window/acd/${encodePath(request.invoiceId)}/unlock-fields`;
     return this.request<ApiAgentConsignmentUnlockFieldsResponse>("POST", path, {
@@ -6507,7 +6572,10 @@ export class ExportDocManagerApiClient {
 
   public unverifyInvoice(request: UnverifyInvoiceRequest, init?: RequestInit): Promise<ApiInvoiceSaveResponse> {
     const path = `/api/invoices/${encodePath(request.id)}/unverify`;
-    return this.request<ApiInvoiceSaveResponse>("POST", path, { init });
+    return this.request<ApiInvoiceSaveResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public updateCrmContact(request: UpdateCrmContactRequest, init?: RequestInit): Promise<ApiCrmContactDto> {

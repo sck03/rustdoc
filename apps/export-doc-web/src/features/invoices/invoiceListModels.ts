@@ -1,7 +1,7 @@
 import type { ApiExcelImportPreviewResponse, ApiInvoiceListItemDto, ApiInvoiceTransferPreviewResponse, SingleWindowExportReview } from "../../api/index.ts";
 import type { SingleWindowBusinessType } from "./invoiceListFileNames.ts";
 
-export type InvoiceCopyDraft = { source: ApiInvoiceListItemDto; newInvoiceNo: string; copyHeader: boolean; copyItems: boolean; resetStatus: boolean; resetDates: boolean; clearAmounts: boolean };
+export type InvoiceCopyDraft = { source: ApiInvoiceListItemDto; newInvoiceNo: string; copyHeader: boolean; copyItems: boolean; resetDates: boolean; clearAmounts: boolean };
 
 export type InvoiceTransferConflictAction = "Skip" | "Overwrite" | "NewInvoiceNo" | "AppendItems";
 export type InvoiceTransferImportDraft = {

@@ -76,6 +76,8 @@ namespace ExportDocManager.Services.Data
                         if (detectedLayout == null && string.IsNullOrEmpty(quantity) && string.IsNullOrEmpty(styleNo))
                             break;
 
+                        string unitPriceText = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.UnitPriceCol ?? settings.UnitPriceCol);
+                        string totalPriceText = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.TotalPriceCol ?? settings.TotalPriceCol);
                         var item = new Item
                         {
                             InvoiceId = invoice.Id,
@@ -100,17 +102,17 @@ namespace ExportDocManager.Services.Data
                             GWTotal = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.GWTotalCol ?? settings.GWTotalCol)),
                             NWPerCtn = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.NWPerCtnCol ?? settings.NWPerCtnCol)),
                             NWTotal = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.NWTotalCol ?? settings.NWTotalCol)),
-                            UnitPrice = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.UnitPriceCol ?? settings.UnitPriceCol)),
-                            TotalPrice = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.TotalPriceCol ?? settings.TotalPriceCol))
+                            UnitPrice = ParseExcelDecimal(unitPriceText),
+                            TotalPrice = ParseExcelDecimal(totalPriceText)
                         };
 
                         NormalizeItemDescriptionLanguages(item);
                         NormalizeItemDescriptionAndBrand(item);
                         ApplyDimensionsFromSingleCell(item, GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.DimensionCol ?? 0));
-                        if (item.UnitPrice == 0 && item.Quantity != 0 && item.TotalPrice != 0)
-                        {
-                            item.UnitPrice = Math.Round(item.TotalPrice / item.Quantity, 4, MidpointRounding.AwayFromZero);
-                        }
+                        NormalizeImportedItemPrice(
+                            item,
+                            hasUnitPriceValue: !string.IsNullOrWhiteSpace(unitPriceText),
+                            hasTotalPriceValue: !string.IsNullOrWhiteSpace(totalPriceText));
 
                         invoice.Items.Add(item);
                         blankRowCount = 0;
@@ -142,8 +144,32 @@ namespace ExportDocManager.Services.Data
                 invoice.TotalGrossWeight = invoice.Items.Sum(i => i.GWTotal);
                 invoice.TotalNetWeight = invoice.Items.Sum(i => i.NWTotal);
                 invoice.TotalVolume = invoice.Items.Sum(i => i.Volume);
-                invoice.TotalAmount = invoice.Items.Sum(i => i.TotalPrice);
+                invoice.TotalAmount = decimal.Round(
+                    invoice.Items.Sum(i => i.TotalPrice),
+                    2,
+                    MidpointRounding.AwayFromZero);
             }
+        }
+
+        private static void NormalizeImportedItemPrice(Item item, bool hasUnitPriceValue, bool hasTotalPriceValue)
+        {
+            if (item == null)
+            {
+                return;
+            }
+
+            bool calculatedTotalMatches = item.Quantity > 0 &&
+                decimal.Round(item.Quantity * item.UnitPrice, 2, MidpointRounding.AwayFromZero) ==
+                decimal.Round(item.TotalPrice, 2, MidpointRounding.AwayFromZero);
+
+            if (hasTotalPriceValue && (!hasUnitPriceValue || !calculatedTotalMatches))
+            {
+                item.CalculateUnitPriceFromTotal();
+                return;
+            }
+
+            item.PriceCalculationMode = ItemPriceCalculationModeCatalog.UnitPriceDriven;
+            item.CalculateTotalPrice();
         }
 
         private static void NormalizeItemDescriptionAndBrand(Item item)

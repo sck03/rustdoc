@@ -288,7 +288,6 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IHsCodeService hsCodeService,
-                IHsCodeKnowledgeService knowledgeService,
                 string keyword,
                 CancellationToken cancellationToken) =>
             {
@@ -305,7 +304,6 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     var evidence = await hsCodeService.SearchRemoteEvidenceAsync(keyword.Trim(), cancellationToken);
-                    await knowledgeService.CaptureRemoteEvidenceAsync(keyword.Trim(), evidence, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
                     var standardRecords = evidence.Records
                         .Where(record => record.Kind == HsCodeRemoteRecordKind.StandardCode && !record.IsExpired)
@@ -320,7 +318,7 @@ namespace ExportDocManager.Api.Hosting
                         items,
                         items.Count,
                         "remote",
-                        "远程HS编码查询只读取在线来源；标准编码与申报实例分开显示，确认保存时才写当前运行数据根数据库。",
+                        "远程HS编码查询只读取在线来源；不会写入候选池。需要进入待审核候选池时，请使用“查询并加入候选”。",
                         standardRecords.Count,
                         evidence.Records.Count(record => record.Kind == HsCodeRemoteRecordKind.DeclarationExample)));
                 }
@@ -334,6 +332,58 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("SearchRemoteHsCodes");
+
+            endpoints.MapPost("/api/master-data/hs-codes/search-remote/capture", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                IHsCodeService hsCodeService,
+                IHsCodeKnowledgeService knowledgeService,
+                ApiHsCodeRemoteSearchRequest request,
+                CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                if (request == null || string.IsNullOrWhiteSpace(request.Keyword))
+                {
+                    return Results.BadRequest(new ApiErrorResponse("HS编码远程查询关键字不能为空。"));
+                }
+
+                try
+                {
+                    string keyword = request.Keyword.Trim();
+                    var evidence = await hsCodeService.SearchRemoteEvidenceAsync(keyword, cancellationToken);
+                    await knowledgeService.CaptureRemoteEvidenceAsync(keyword, evidence, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var standardRecords = evidence.Records
+                        .Where(record => record.Kind == HsCodeRemoteRecordKind.StandardCode && !record.IsExpired)
+                        .GroupBy(record => HsCodeTextHelper.NormalizeCode(record.Item.Code), StringComparer.OrdinalIgnoreCase)
+                        .Select(group => group
+                            .OrderByDescending(record => record.InstanceCount.HasValue)
+                            .ThenByDescending(record => !string.IsNullOrWhiteSpace(record.Item.Description))
+                            .First())
+                        .ToList();
+                    var items = standardRecords.Select(ApiMasterDataDtoFactory.FromRemoteRecord).ToList();
+                    return Results.Ok(new ApiHsCodeSearchResponse(
+                        items,
+                        items.Count,
+                        "remote",
+                        "联网查询结果已返回，申报实例已进入待审核候选池；确认后才会进入正式共享实例库。",
+                        standardRecords.Count,
+                        evidence.Records.Count(record => record.Kind == HsCodeRemoteRecordKind.DeclarationExample)));
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    return WriteConflict(ex.Message);
+                }
+            })
+            .WithName("CaptureRemoteHsCodes");
 
             endpoints.MapPost("/api/master-data/hs-codes/fetch-remote-detail", async (
                 HttpContext context,
@@ -874,10 +924,14 @@ namespace ExportDocManager.Api.Hosting
             }).WithName("ResetHsCodeRemoteCandidates");
 
             endpoints.MapGet("/api/master-data/hs-knowledge/export", async (
-                HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
+                HttpContext context, IApiSessionTokenService tokenService, ApiAuthorizationService authorizationService,
+                IHsCodeKnowledgeService service,
                 DateTimeOffset? since, CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                if (user == null) return Results.Unauthorized();
+                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentMasterData, PermissionAccessLevel.Manage))
+                    return WriteForbidden("只有管理权限可以导出共享 HS 知识包。");
                 byte[] package = await service.ExportPackageAsync(since, cancellationToken);
                 return Results.File(package, "application/vnd.exportdocmanager.hs-knowledge+zip", $"ExportDocManager-HsLibrary-{DateTime.Now:yyyyMMdd}.edmhs");
             }).WithName("ExportHsCodeKnowledge");

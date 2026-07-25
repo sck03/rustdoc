@@ -190,30 +190,26 @@ namespace ExportDocManager.Models.Entities
                 totalTaxRefund += item.TaxRefundAmount;
             }
 
-            TotalCartons = totalCartons;
-            TotalQuantity = totalQuantity;
-            TotalGrossWeight = totalGW;
-            TotalNetWeight = totalNW;
-            TotalVolume = totalVolume;
-            TotalAmount = totalAmount;
-            TotalPurchaseAmount = totalPurchase;
-            TotalTaxRefundAmount = totalTaxRefund;
+            TotalCartons = decimal.Round(totalCartons, 2, MidpointRounding.AwayFromZero);
+            TotalQuantity = decimal.Round(totalQuantity, 2, MidpointRounding.AwayFromZero);
+            TotalGrossWeight = decimal.Round(totalGW, 2, MidpointRounding.AwayFromZero);
+            TotalNetWeight = decimal.Round(totalNW, 2, MidpointRounding.AwayFromZero);
+            TotalVolume = decimal.Round(totalVolume, 3, MidpointRounding.AwayFromZero);
+            TotalAmount = decimal.Round(totalAmount, 2, MidpointRounding.AwayFromZero);
+            TotalPurchaseAmount = decimal.Round(totalPurchase, 2, MidpointRounding.AwayFromZero);
+            TotalTaxRefundAmount = decimal.Round(totalTaxRefund, 2, MidpointRounding.AwayFromZero);
             
-            // Calculate Profit in RMB (assuming ExchangeRate converts Sales Currency to RMB)
-            decimal rate = ExchangeRate ?? 0;
-            if (rate > 0)
+            // Profit is meaningful only when a conversion rate is known. CNY is
+            // already the reporting currency and therefore has an implicit rate of 1.
+            decimal? rate = ExchangeRate;
+            if (!rate.HasValue && string.Equals(Currency, "CNY", StringComparison.OrdinalIgnoreCase))
             {
-                TotalProfit = (TotalAmount * rate) - TotalPurchaseAmount + TotalTaxRefundAmount;
+                rate = 1m;
             }
-            else
-            {
-                // If no exchange rate, we cannot accurately calculate profit mixing currencies.
-                // We'll leave it as simple subtraction if currencies happen to be same, or 0?
-                // For now, let's just subtract, but this is likely wrong for USD vs RMB.
-                // Better to set to 0 or leave as is? 
-                // Let's leave as is for now to avoid breaking existing logic if user has same currency.
-                TotalProfit = TotalAmount - TotalPurchaseAmount + TotalTaxRefundAmount;
-            }
+
+            TotalProfit = rate is > 0
+                ? decimal.Round(TotalAmount * rate.Value - TotalPurchaseAmount + TotalTaxRefundAmount, 2, MidpointRounding.AwayFromZero)
+                : 0m;
         }
     }
 }

@@ -339,39 +339,8 @@ namespace ExportDocManager.Services.MasterData
 
         public async Task RecordFeedbackAsync(HsCodeKnowledgeFeedbackInput input, CancellationToken cancellationToken = default)
         {
-            ArgumentNullException.ThrowIfNull(input);
-            string queryText = ValidateTextLength(input.QueryText, MaximumKnowledgeQueryLength, "查询条件");
-            string productName = ValidateTextLength(input.ProductName, 300, "商品名称");
-            string specification = ValidateTextLength(input.Specification, 1500, "规格与申报要素");
-            string code = HsCodeTextHelper.NormalizeCode(input.CandidateCode);
-            if (string.IsNullOrWhiteSpace(code)) throw new InvalidOperationException("确认结果必须包含HS编码。");
-            if (code.Length > 20) throw new ArgumentException("HS 编码不能超过 20 个字符。", nameof(input));
-            string fingerprint = BuildFingerprint(NormalizeSearchText(queryText), code, productName, specification);
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            if (input.Accepted &&
-                !await HasTrustedActiveCodeAsync(context, code, cancellationToken))
-                throw new InvalidOperationException("确认适用前必须选择已验证年度税则中的当前有效编码。");
-            var entity = await context.HsCodeSearchFeedback.FirstOrDefaultAsync(item => item.Fingerprint == fingerprint, cancellationToken);
-            DateTime now = DateTime.UtcNow;
-            if (entity == null)
-            {
-                entity = new HsCodeSearchFeedback { Fingerprint = fingerprint };
-                await context.HsCodeSearchFeedback.AddAsync(entity, cancellationToken);
-            }
-            entity.QueryText = queryText;
-            entity.ProductName = productName;
-            entity.Specification = specification;
-            entity.CandidateCode = code;
-            if (input.Accepted) { entity.AcceptedCount++; entity.LastConfirmedAt = now; }
-            else entity.RejectedCount++;
-            entity.UpdatedAt = now;
-            if (input.Accepted)
-            {
-                var exampleInput = new HsCodeExampleInput(0, code, code,
-                    string.IsNullOrWhiteSpace(productName) ? queryText : productName,
-                    specification, "UserConfirmed", DateTime.Now.Year, "ManuallyVerified", true);
-                await UpsertExampleInContextAsync(context, exampleInput, now, cancellationToken, incrementUseCount: false);
-            }
+            await HsCodeKnowledgeFeedbackWriter.RecordInContextAsync(context, input, cancellationToken);
             await context.SaveChangesAsync(cancellationToken);
         }
 
@@ -859,7 +828,8 @@ namespace ExportDocManager.Services.MasterData
                 {
                     string fingerprint = BuildFingerprint(candidate.RawReportedHsCode, candidate.ProductName, candidate.Specification);
                     var learnedExample = await context.HsCodeDeclarationExamples.FirstOrDefaultAsync(
-                        item => item.Fingerprint == fingerprint && item.Source.StartsWith("RemoteConfirmed:"),
+                        item => item.Fingerprint == fingerprint &&
+                            item.Source == BuildRemoteConfirmationSource(candidate),
                         cancellationToken);
                     if (learnedExample != null) context.HsCodeDeclarationExamples.Remove(learnedExample);
                 }
@@ -890,21 +860,48 @@ namespace ExportDocManager.Services.MasterData
             string currentCode = HsCodeTextHelper.NormalizeCode(input.CurrentCode);
             if (!await HasTrustedActiveCodeAsync(context, currentCode, cancellationToken))
                 throw new InvalidOperationException("确认前必须选择已验证年度税则中的当前有效 HS 编码。");
-            await UpsertExampleInContextAsync(context, new HsCodeExampleInput(
-                0,
-                candidate.RawReportedHsCode,
-                currentCode,
-                candidate.ProductName,
-                candidate.Specification,
-                $"RemoteConfirmed:{candidate.Source}",
-                null,
-                "ManuallyVerified",
-                true), now, cancellationToken);
+            string fingerprint = BuildFingerprint(candidate.RawReportedHsCode, candidate.ProductName, candidate.Specification);
+            var existingExample = await context.HsCodeDeclarationExamples
+                .FirstOrDefaultAsync(item => item.Fingerprint == fingerprint, cancellationToken);
+            if (existingExample != null)
+            {
+                string existingCode = HsCodeTextHelper.NormalizeCode(existingExample.ResolvedCurrentHsCode);
+                if (!string.IsNullOrWhiteSpace(existingCode) &&
+                    !string.Equals(existingCode, currentCode, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("同一商品已有指向其他 HS 编码的正式实例，请先在实例库中处理冲突。");
+                }
+
+                // An existing company/manual instance is not owned by this remote
+                // review. Keep it intact so resetting the candidate can never delete
+                // or rewrite knowledge created by another workflow.
+            }
+            else
+            {
+                await UpsertExampleInContextAsync(context, new HsCodeExampleInput(
+                    0,
+                    candidate.RawReportedHsCode,
+                    currentCode,
+                    candidate.ProductName,
+                    candidate.Specification,
+                    BuildRemoteConfirmationSource(candidate),
+                    null,
+                    "ManuallyVerified",
+                    true), now, cancellationToken);
+            }
             candidate.SuggestedCurrentHsCode = currentCode;
             candidate.ReviewStatus = "Confirmed";
             candidate.ReviewedAt = now;
             if (saveChanges) await context.SaveChangesAsync(cancellationToken);
             return true;
+        }
+
+        private static string BuildRemoteConfirmationSource(HsCodeRemoteCandidate candidate)
+        {
+            string source = string.IsNullOrWhiteSpace(candidate?.Source) ? "remote" : candidate.Source.Trim();
+            string suffix = $"RemoteConfirmed:{candidate?.Id ?? 0}:";
+            int maximumSourceLength = 100 - suffix.Length;
+            return suffix + source[..Math.Min(source.Length, Math.Max(1, maximumSourceLength))];
         }
 
         private static Task<bool> HasTrustedActiveCodeAsync(
@@ -1557,7 +1554,7 @@ namespace ExportDocManager.Services.MasterData
             return grams;
         }
 
-        private static string BuildFingerprint(params string[] values) =>
+        internal static string BuildFingerprint(params string[] values) =>
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("|", values.Select(value => (value ?? string.Empty).Trim().ToUpperInvariant())))));
 
         private static string Sha256(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
@@ -1638,7 +1635,7 @@ namespace ExportDocManager.Services.MasterData
             return "Unresolved";
         }
 
-        private static async Task UpsertExampleInContextAsync(
+        internal static async Task UpsertExampleInContextAsync(
             AppDbContext context,
             HsCodeExampleInput input,
             DateTime now,

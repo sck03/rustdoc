@@ -83,18 +83,21 @@ namespace ExportDocManager.Services.Core
                             throw new InvalidOperationException("目标发票类型必须与源发票类型不同。");
                         }
 
-                        var targetExists = await _businessDataAccessScope
-                            .ApplyInvoiceScope(context.Invoices.AsNoTracking())
-                            .AnyAsync(x => x.InvoiceNo == originalInvoice.InvoiceNo && x.Type == normalizedTargetType);
+                        var newInvoice = CreateInvoiceClone(originalInvoice, originalInvoice.InvoiceNo, cloneOptions);
+                        newInvoice.Type = normalizedTargetType;
+                        newInvoice.OwnerUserId = null;
+                        _businessDataAccessScope.ApplyOwner(newInvoice);
+
+                        var targetExists = await context.Invoices
+                            .AsNoTracking()
+                            .AnyAsync(x => x.CompanyScope == newInvoice.CompanyScope &&
+                                x.InvoiceNo == newInvoice.InvoiceNo &&
+                                x.Type == newInvoice.Type);
                         if (targetExists)
                         {
                             throw new InvalidOperationException($"同一发票号的{normalizedTargetType}已存在，未覆盖。");
                         }
 
-                        var newInvoice = CreateInvoiceClone(originalInvoice, originalInvoice.InvoiceNo, cloneOptions);
-                        newInvoice.Type = normalizedTargetType;
-                        newInvoice.OwnerUserId = null;
-                        _businessDataAccessScope.ApplyOwner(newInvoice);
                         if (cloneOptions.CopyItems)
                         {
                             newInvoice.Items = await CreateItemClonesAsync(context, originalId, cloneOptions);
@@ -143,10 +146,9 @@ namespace ExportDocManager.Services.Core
                 newInvoice.ShipmentDate = today;
             }
 
-            if (options.ResetStatus)
-            {
-                newInvoice.Status = InvoiceStatusCatalog.Draft;
-            }
+            // A clone is a new business document and must always re-enter the
+            // auditable workflow from Draft, regardless of the source status.
+            newInvoice.Status = InvoiceStatusCatalog.Draft;
 
             if (options.ClearAmounts)
             {
@@ -201,6 +203,9 @@ namespace ExportDocManager.Services.Core
 
         private static void ClearItemAmounts(Item item)
         {
+            // 清空金额后，复制出的空白行应回到“单价驱动”默认模式；否则原单据
+            // 若曾以行金额为准，用户重新填写数量/单价时会继续误保留旧核算语义。
+            item.PriceCalculationMode = ItemPriceCalculationModeCatalog.UnitPriceDriven;
             item.UnitPrice = 0;
             item.TotalPrice = 0;
             item.PurchasePrice = 0;

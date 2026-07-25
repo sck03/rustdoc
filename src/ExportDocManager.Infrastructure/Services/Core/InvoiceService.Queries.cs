@@ -71,9 +71,11 @@ namespace ExportDocManager.Services.Core
             try
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
+                string normalizedInvoiceNo = invoiceNo?.Trim() ?? string.Empty;
+                string normalizedType = InvoiceTypeCatalog.Normalize(type);
                 return await _businessDataAccessScope
                     .ApplyInvoiceScope(context.Invoices.AsNoTracking())
-                    .FirstOrDefaultAsync(x => x.InvoiceNo == invoiceNo && x.Type == type);
+                    .FirstOrDefaultAsync(x => x.InvoiceNo == normalizedInvoiceNo && x.Type == normalizedType);
             }
             catch (Exception ex)
             {
@@ -86,9 +88,10 @@ namespace ExportDocManager.Services.Core
             try
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
+                string normalizedInvoiceNo = invoiceNo?.Trim() ?? string.Empty;
                 return await _businessDataAccessScope
                     .ApplyInvoiceScope(context.Invoices.AsNoTracking())
-                    .AnyAsync(x => x.InvoiceNo == invoiceNo);
+                    .AnyAsync(x => x.InvoiceNo == normalizedInvoiceNo);
             }
             catch (Exception ex)
             {

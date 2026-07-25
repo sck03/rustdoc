@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.Models.DTOs;
+using ExportDocManager.Models.Entities;
 
 namespace ExportDocManager.Api.Tests
 {
@@ -124,7 +125,6 @@ namespace ExportDocManager.Api.Tests
                         CopyHeader = true,
                         CopyItems = true,
                         ResetDates = false,
-                        ResetStatus = true,
                         ClearAmounts = false
                     }));
             Assert.Equal(HttpStatusCode.OK, cloneResponse.StatusCode);
@@ -149,6 +149,54 @@ namespace ExportDocManager.Api.Tests
 
             var getAfterDeleteResponse = await adminClient.GetAsync($"/api/invoices/{created.Id}");
             Assert.Equal(HttpStatusCode.NotFound, getAfterDeleteResponse.StatusCode);
+        }
+
+        [Fact]
+        public async Task InvoiceSave_ShouldPreserveLineAmountAndDeriveFiveDecimalUnitPrice()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-line-amount-pricing",
+                "api-line-amount-pricing.db");
+            using var anonymousClient = harness.CreateClient();
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+
+            var response = await adminClient.PostAsJsonAsync(
+                "/api/invoices",
+                CreateInvoiceRequest(
+                    "INV-LINE-AMOUNT-001",
+                    totalAmount: 100m,
+                    quantity: 3m,
+                    unitPrice: 0m,
+                    lineAmount: 100m,
+                    priceCalculationMode: ItemPriceCalculationModeCatalog.LineAmountDriven));
+
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            var saved = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(response);
+            var item = Assert.Single(saved.Invoice.Items);
+
+            Assert.Equal(ItemPriceCalculationModeCatalog.LineAmountDriven, item.PriceCalculationMode);
+            Assert.Equal(33.33333m, item.UnitPrice);
+            Assert.Equal(100.00m, item.TotalPrice);
+            Assert.Equal(100.00m, saved.Invoice.TotalAmount);
+
+            var cloneResponse = await adminClient.PostAsJsonAsync(
+                $"/api/invoices/{saved.Id}/clone",
+                new ApiInvoiceCloneRequest(
+                    "INV-LINE-AMOUNT-EMPTY",
+                    new InvoiceCloneOptions
+                    {
+                        CopyHeader = true,
+                        CopyItems = true,
+                        ResetDates = false,
+                        ClearAmounts = true
+                    }));
+            Assert.Equal(HttpStatusCode.OK, cloneResponse.StatusCode);
+            var clone = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceCloneResponse>(cloneResponse);
+            var clonedItem = Assert.Single(clone.Invoice.Items);
+            Assert.Equal(ItemPriceCalculationModeCatalog.UnitPriceDriven, clonedItem.PriceCalculationMode);
+            Assert.Equal(0m, clonedItem.UnitPrice);
+            Assert.Equal(0m, clonedItem.TotalPrice);
         }
 
         [Fact]
@@ -246,7 +294,6 @@ namespace ExportDocManager.Api.Tests
                         CopyHeader = true,
                         CopyItems = true,
                         ResetDates = false,
-                        ResetStatus = true,
                         ClearAmounts = false
                     }));
             Assert.Equal(HttpStatusCode.OK, cloneResponse.StatusCode);
@@ -305,6 +352,18 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.Created, sourceResponse.StatusCode);
             var source = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(sourceResponse);
 
+            var verifySourceResponse = await adminClient.PostAsJsonAsync(
+                $"/api/invoices/{source.Id}/status",
+                new ApiInvoiceStatusTransitionRequest
+                {
+                    TargetStatus = InvoiceStatusCatalog.Verified,
+                    RowVersion = source.Invoice.RowVersion,
+                    Note = "锁定源发票后验证单据包导入边界"
+                });
+            Assert.Equal(HttpStatusCode.OK, verifySourceResponse.StatusCode);
+            source = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(verifySourceResponse);
+            Assert.Equal(InvoiceStatusCatalog.Verified, source.Invoice.Status);
+
             var customsResponse = await adminClient.PostAsJsonAsync(
                 "/api/invoices",
                 CreateInvoiceRequest(
@@ -335,6 +394,13 @@ namespace ExportDocManager.Api.Tests
             Assert.True(preview.Preview.InvoiceExists);
             Assert.True(preview.Preview.InvoiceMatches);
 
+            var overwriteLockedResponse = await adminClient.PostAsync(
+                "/api/invoices/transfer-package/upload/import?fileName=actual-source.edpkg&conflictAction=Overwrite&allowInvalidChecksum=false",
+                new ByteArrayContent(packageBytes));
+            Assert.Equal(HttpStatusCode.Conflict, overwriteLockedResponse.StatusCode);
+            var overwriteLockedError = await ApiIntegrationTestHarness.ReadJsonAsync<ApiErrorResponse>(overwriteLockedResponse);
+            Assert.Contains("反审核", overwriteLockedError.Message, StringComparison.Ordinal);
+
             var importResponse = await adminClient.PostAsync(
                 "/api/invoices/transfer-package/upload/import?fileName=actual-source.edpkg&conflictAction=NewInvoiceNo&newInvoiceNo=TRANSFER-TARGET-001&allowInvalidChecksum=false",
                 new ByteArrayContent(packageBytes));
@@ -352,6 +418,11 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(2, sameNoPage.TotalCount);
             Assert.Contains(sameNoPage.Items, item => item.Id == customs.Id && item.Type == "报关数据" && item.TotalAmount == 90m);
             Assert.Contains(sameNoPage.Items, item => item.Id == importResult.Result.InvoiceId && item.Type == "实际数据" && item.TotalAmount == 180m);
+
+            var importedInvoiceResponse = await adminClient.GetAsync($"/api/invoices/{importResult.Result.InvoiceId}");
+            Assert.Equal(HttpStatusCode.OK, importedInvoiceResponse.StatusCode);
+            var importedInvoice = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceDetailDto>(importedInvoiceResponse);
+            Assert.Equal(InvoiceStatusCatalog.Draft, importedInvoice.Status);
         }
 
         [Fact]
@@ -372,11 +443,23 @@ namespace ExportDocManager.Api.Tests
                 "/api/invoices",
                 CreateInvoiceRequest(
                     "INV-UNVERIFY-001",
-                    status: "Verified",
+                    status: "Draft",
                     type: "实际数据",
                     totalAmount: 320m));
             Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
             var created = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(createResponse);
+            Assert.Equal("Draft", created.Invoice.Status);
+
+            var verifyResponse = await adminClient.PostAsJsonAsync(
+                $"/api/invoices/{created.Id}/status",
+                new ApiInvoiceStatusTransitionRequest
+                {
+                    TargetStatus = "Verified",
+                    RowVersion = created.Invoice.RowVersion,
+                    Note = "测试核对"
+                });
+            Assert.Equal(HttpStatusCode.OK, verifyResponse.StatusCode);
+            created = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(verifyResponse);
             Assert.Equal("Verified", created.Invoice.Status);
 
             var lockedUpdateResponse = await adminClient.PutAsJsonAsync(
@@ -394,7 +477,13 @@ namespace ExportDocManager.Api.Tests
             var lockedUpdateError = await ApiIntegrationTestHarness.ReadJsonAsync<ApiErrorResponse>(lockedUpdateResponse);
             Assert.Contains("反审核", lockedUpdateError.Message, StringComparison.Ordinal);
 
-            var unverifyResponse = await adminClient.PostAsync($"/api/invoices/{created.Id}/unverify", null);
+            var unverifyResponse = await adminClient.PostAsJsonAsync(
+                $"/api/invoices/{created.Id}/unverify",
+                new ApiInvoiceUnverifyRequest
+                {
+                    RowVersion = created.Invoice.RowVersion,
+                    Note = "测试反审核"
+                });
             Assert.Equal(HttpStatusCode.OK, unverifyResponse.StatusCode);
             var unverified = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(unverifyResponse);
 
@@ -406,6 +495,17 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("实际数据", unverified.Invoice.Type);
             Assert.Equal(320m, unverified.Invoice.TotalAmount);
             Assert.Single(unverified.Invoice.Items);
+
+            var historyResponse = await adminClient.GetAsync($"/api/invoices/{created.Id}/status-history");
+            Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
+            var history = await ApiIntegrationTestHarness.ReadJsonAsync<List<ApiInvoiceStatusHistoryDto>>(historyResponse);
+            Assert.Equal(2, history.Count);
+            Assert.Equal("Verified", history[0].FromStatus);
+            Assert.Equal("Draft", history[0].ToStatus);
+            Assert.Equal("测试反审核", history[0].Note);
+            Assert.Equal("Draft", history[1].FromStatus);
+            Assert.Equal("Verified", history[1].ToStatus);
+            Assert.Equal("测试核对", history[1].Note);
 
             var getResponse = await adminClient.GetAsync($"/api/invoices/{created.Id}");
             Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
@@ -428,8 +528,14 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("Draft", draftUpdated.Invoice.Status);
             Assert.Equal(430m, draftUpdated.Invoice.TotalAmount);
 
-            var repeatResponse = await adminClient.PostAsync($"/api/invoices/{created.Id}/unverify", null);
-            Assert.Equal(HttpStatusCode.Conflict, repeatResponse.StatusCode);
+            var repeatResponse = await adminClient.PostAsJsonAsync(
+                $"/api/invoices/{created.Id}/unverify",
+                new ApiInvoiceUnverifyRequest
+                {
+                    RowVersion = draftUpdated.Invoice.RowVersion,
+                    Note = "重复反审核"
+                });
+            Assert.Equal(HttpStatusCode.BadRequest, repeatResponse.StatusCode);
             var repeatError = await ApiIntegrationTestHarness.ReadJsonAsync<ApiErrorResponse>(repeatResponse);
             Assert.Contains("无需反审核", repeatError.Message, StringComparison.Ordinal);
         }
@@ -445,11 +551,15 @@ namespace ExportDocManager.Api.Tests
             decimal? exchangeRate = null,
             int itemId = 0,
             int itemInvoiceId = 0,
-            string type = "Export",
+            string type = "实际数据",
             string status = "",
             string shippingMarks = "",
             string shippingMarksType = "Text",
-            string shippingMarksImage = "")
+            string shippingMarksImage = "",
+            decimal quantity = 10m,
+            decimal? unitPrice = null,
+            decimal? lineAmount = null,
+            string priceCalculationMode = ItemPriceCalculationModeCatalog.UnitPriceDriven)
         {
             return new ApiInvoiceDetailDto
             {
@@ -493,11 +603,12 @@ namespace ExportDocManager.Api.Tests
                         InvoiceId = itemInvoiceId,
                         StyleNo = "API-STYLE",
                         StyleName = "API Jacket",
-                        Quantity = 10m,
+                        Quantity = quantity,
                         UnitEN = "PCS",
                         Cartons = 1m,
-                        UnitPrice = totalAmount / 10m,
-                        TotalPrice = totalAmount
+                        PriceCalculationMode = priceCalculationMode,
+                        UnitPrice = unitPrice ?? totalAmount / quantity,
+                        TotalPrice = lineAmount ?? totalAmount
                     }
                 ]
             };

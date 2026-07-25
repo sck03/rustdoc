@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.MasterData;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -48,12 +49,77 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> UnverifyInvoiceAsync(int id)
+        public async Task<Invoice> TransitionInvoiceStatusAsync(InvoiceStatusTransitionRequest request)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            if (request.InvoiceId <= 0)
+            {
+                return null;
+            }
+
+            ValidateExpectedRowVersion(request.ExpectedRowVersion);
+            string targetStatus = InvoiceStatusCatalog.Normalize(request.TargetStatus);
+            string note = NormalizeStatusNote(request.Note, targetStatus == InvoiceStatusCatalog.Cancelled);
+
+            try
+            {
+                return await AppDbContextExecution.ExecuteInTransactionAsync(
+                    _contextFactory,
+                    async (context, _) =>
+                    {
+                        var invoice = await _businessDataAccessScope
+                            .ApplyInvoiceScope(context.Invoices.Include(item => item.Items))
+                            .FirstOrDefaultAsync(item => item.Id == request.InvoiceId);
+                        if (invoice == null)
+                        {
+                            return null;
+                        }
+
+                        if (!invoice.RowVersion.SequenceEqual(request.ExpectedRowVersion))
+                        {
+                            throw new DbUpdateConcurrencyException();
+                        }
+
+                        if (!InvoiceStatusCatalog.IsKnown(targetStatus) ||
+                            !InvoiceStatusCatalog.CanTransition(invoice.Status, targetStatus))
+                        {
+                            throw new InvoiceValidationException(
+                                $"发票不能从“{InvoiceStatusCatalog.GetDisplayName(invoice.Status)}”直接流转到“{InvoiceStatusCatalog.GetDisplayName(targetStatus)}”。");
+                        }
+
+                        await InvoiceBusinessValidator.ValidateNormalizeAndCalculateAsync(
+                            context,
+                            invoice,
+                            invoice.Items,
+                            isNew: false,
+                            existingStatus: invoice.Status,
+                            CancellationToken.None).ConfigureAwait(false);
+                        InvoiceBusinessValidator.ValidateForStatusTransition(invoice, targetStatus);
+
+                        string fromStatus = invoice.Status;
+                        invoice.Status = targetStatus;
+                        await PopulateMissingInvoiceSnapshotsAsync(context, invoice);
+                        await AddStatusHistoryAsync(context, invoice.Id, fromStatus, targetStatus, note);
+                        await context.SaveChangesAsync();
+
+                        return invoice;
+                    });
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new InvoiceConflictException("状态流转失败：该发票已被其他用户修改，请刷新后重试。");
+            }
+        }
+
+        public async Task<Invoice> UnverifyInvoiceAsync(int id, byte[] expectedRowVersion, string note)
         {
             if (id <= 0)
             {
                 return null;
             }
+
+            ValidateExpectedRowVersion(expectedRowVersion);
+            string normalizedNote = NormalizeStatusNote(note, required: true);
 
             try
             {
@@ -69,13 +135,25 @@ namespace ExportDocManager.Services.Core
                             return null;
                         }
 
-                        if (!InvoiceStatusCatalog.CanUnverify(invoice.Status))
+                        if (!invoice.RowVersion.SequenceEqual(expectedRowVersion))
                         {
-                            throw new InvalidOperationException("当前发票不是已锁定状态，无需反审核。");
+                            throw new DbUpdateConcurrencyException();
                         }
 
+                        if (!InvoiceStatusCatalog.CanUnverify(invoice.Status))
+                        {
+                            throw new InvoiceValidationException("当前发票不是已锁定状态，无需反审核。");
+                        }
+
+                        string fromStatus = invoice.Status;
                         invoice.Status = InvoiceStatusCatalog.Draft;
                         await PopulateMissingInvoiceSnapshotsAsync(context, invoice);
+                        await AddStatusHistoryAsync(
+                            context,
+                            invoice.Id,
+                            fromStatus,
+                            InvoiceStatusCatalog.Draft,
+                            normalizedNote);
                         await context.SaveChangesAsync();
 
                         return invoice;
@@ -83,51 +161,98 @@ namespace ExportDocManager.Services.Core
             }
             catch (DbUpdateConcurrencyException)
             {
-                throw new Exception("反审核失败: 该发票数据已被其他用户修改或删除，请刷新后重试。");
-            }
-            catch (InvalidOperationException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"反审核发票失败: {ex.Message}", ex);
+                throw new InvoiceConflictException("反审核失败：该发票已被其他用户修改，请刷新后重试。");
             }
         }
 
-        private async Task SaveInvoiceCoreAsync(AppDbContext context, Invoice invoice)
+        public async Task<IReadOnlyList<InvoiceStatusHistory>> ListInvoiceStatusHistoryAsync(int invoiceId)
+        {
+            if (invoiceId <= 0)
+            {
+                return [];
+            }
+
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            if (!await _businessDataAccessScope.CanAccessInvoiceAsync(context, invoiceId).ConfigureAwait(false))
+            {
+                return [];
+            }
+
+            return await context.InvoiceStatusHistories
+                .AsNoTracking()
+                .Where(item => item.InvoiceId == invoiceId)
+                .OrderByDescending(item => item.ChangedAt)
+                .ThenByDescending(item => item.Id)
+                .ToListAsync()
+                .ConfigureAwait(false);
+        }
+
+        private async Task SaveInvoiceCoreAsync(
+            AppDbContext context,
+            Invoice invoice,
+            IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback,
+            bool requireRowVersion = true)
         {
             ArgumentNullException.ThrowIfNull(context);
             ArgumentNullException.ThrowIfNull(invoice);
 
             NormalizeInvoiceDates(invoice);
-            var items = invoice.Items;
+            var items = invoice.Items ?? [];
+            bool isNew = invoice.Id == 0;
+            string existingStatus = InvoiceStatusCatalog.Draft;
+
+            _businessDataAccessScope.ApplyOwner(invoice);
+            if (!isNew)
+            {
+                if (requireRowVersion && (invoice.RowVersion == null || invoice.RowVersion.Length == 0))
+                {
+                    throw new InvoiceValidationException("更新发票必须提交版本号，请刷新后重试。");
+                }
+
+                if (!await _businessDataAccessScope.CanAccessInvoiceAsync(
+                        context,
+                        invoice.Id).ConfigureAwait(false))
+                {
+                    throw new UnauthorizedAccessException("无权限修改该发票。");
+                }
+
+                existingStatus = await _businessDataAccessScope
+                    .ApplyInvoiceScope(context.Invoices.AsNoTracking())
+                    .Where(item => item.Id == invoice.Id)
+                    .Select(item => item.Status)
+                    .FirstOrDefaultAsync();
+                if (!InvoiceStatusCatalog.IsEditable(existingStatus))
+                {
+                    throw new InvoiceConflictException("当前发票已锁定，请先反审核后再编辑。");
+                }
+            }
+
+            await InvoiceBusinessValidator.ValidateNormalizeAndCalculateAsync(
+                context,
+                invoice,
+                items,
+                isNew,
+                existingStatus,
+                CancellationToken.None).ConfigureAwait(false);
+
+            if (await context.Invoices.AsNoTracking().AnyAsync(item =>
+                    item.Id != invoice.Id &&
+                    item.CompanyScope == invoice.CompanyScope &&
+                    item.InvoiceNo == invoice.InvoiceNo &&
+                    item.Type == invoice.Type))
+            {
+                throw new InvoiceConflictException(
+                    $"发票号“{invoice.InvoiceNo}”的{invoice.Type}已经存在，未覆盖原发票。请打开已有记录或使用复制功能创建新单号。");
+            }
+
+            items = invoice.Items;
             invoice.Items = null;
 
             try
             {
                 await PopulateMissingInvoiceSnapshotsAsync(context, invoice);
-                _businessDataAccessScope.ApplyOwner(invoice);
-
                 if (invoice.Id > 0)
                 {
-                    if (!await _businessDataAccessScope.CanAccessInvoiceAsync(
-                            context,
-                            invoice.Id).ConfigureAwait(false))
-                    {
-                        throw new UnauthorizedAccessException("无权限修改该发票。");
-                    }
-
-                    var existingStatus = await _businessDataAccessScope
-                        .ApplyInvoiceScope(context.Invoices.AsNoTracking())
-                        .Where(item => item.Id == invoice.Id)
-                        .Select(item => item.Status)
-                        .FirstOrDefaultAsync();
-                    if (!InvoiceStatusCatalog.IsEditable(existingStatus))
-                    {
-                        throw new InvalidOperationException("当前发票已锁定，请先反审核后再编辑。");
-                    }
-
                     context.Invoices.Update(invoice);
                 }
                 else
@@ -141,11 +266,68 @@ namespace ExportDocManager.Services.Core
                 {
                     await _itemService.SaveItemsAsync(context, invoice.Id, items);
                 }
+
+                try
+                {
+                    await HsCodeKnowledgeFeedbackWriter.RecordInvoiceFeedbackAsync(
+                        context,
+                        items,
+                        pendingHsFeedback,
+                        CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+                {
+                    throw new InvoiceValidationException($"HS 编码确认记录无效：{ex.Message}");
+                }
             }
             finally
             {
                 invoice.Items = items;
             }
+        }
+
+        private async Task AddStatusHistoryAsync(
+            AppDbContext context,
+            int invoiceId,
+            string fromStatus,
+            string toStatus,
+            string note)
+        {
+            var currentUser = _businessDataAccessScope.CurrentUser;
+            await context.InvoiceStatusHistories.AddAsync(new InvoiceStatusHistory
+            {
+                InvoiceId = invoiceId,
+                FromStatus = InvoiceStatusCatalog.Normalize(fromStatus),
+                ToStatus = InvoiceStatusCatalog.Normalize(toStatus),
+                Note = note,
+                ChangedByUserId = currentUser?.Id > 0 ? currentUser.Id : null,
+                ChangedByUsername = currentUser?.Username?.Trim() ?? string.Empty,
+                ChangedAt = DateTime.UtcNow
+            });
+        }
+
+        private static void ValidateExpectedRowVersion(byte[] expectedRowVersion)
+        {
+            if (expectedRowVersion == null || expectedRowVersion.Length == 0)
+            {
+                throw new InvoiceValidationException("状态操作必须提交发票版本号，请刷新后重试。");
+            }
+        }
+
+        private static string NormalizeStatusNote(string note, bool required)
+        {
+            string normalized = note?.Trim() ?? string.Empty;
+            if (required && string.IsNullOrWhiteSpace(normalized))
+            {
+                throw new InvoiceValidationException("请填写状态变更原因。");
+            }
+
+            if (normalized.Length > 500)
+            {
+                throw new InvoiceValidationException("状态变更说明不能超过 500 个字符。");
+            }
+
+            return normalized;
         }
 
         private static async Task PopulateMissingInvoiceSnapshotsAsync(AppDbContext context, Invoice invoice)

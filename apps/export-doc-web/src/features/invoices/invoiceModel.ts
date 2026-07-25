@@ -1,6 +1,7 @@
-import { ApiInvoiceDetailDto } from "../../api/index.ts";
+import { ApiInvoiceDetailDto, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import { dateInputToApiDate, readNumber, toDateInputValue } from "../../ui/formUtils.ts";
 import {
+  calculateInvoiceTotals,
   createEmptyInvoiceItem,
   isMeaningfulInvoiceItem,
   normalizeInvoiceItemForSave,
@@ -32,7 +33,11 @@ export function getCounterpartInvoiceType(value?: string) {
 
 export function normalizeInvoiceStatus(value?: string) {
   const normalized = value?.trim() ?? "";
-  return normalized || "Draft";
+  if (!normalized) {
+    return "Draft";
+  }
+
+  return invoiceStatusOptions.find((option) => option.value.toLowerCase() === normalized.toLowerCase())?.value ?? normalized;
 }
 
 export function canUnverifyInvoiceStatus(value?: string) {
@@ -44,16 +49,33 @@ export function isInvoiceEditableStatus(value?: string) {
   return !canUnverifyInvoiceStatus(value);
 }
 
-export function getInvoiceStatusOptions(value?: string) {
-  const normalized = normalizeInvoiceStatus(value);
-  return invoiceStatusOptions.some((option) => option.value === normalized)
-    ? invoiceStatusOptions
-    : [...invoiceStatusOptions, { value: normalized, label: normalized }];
-}
-
 export function getInvoiceStatusLabel(value?: string) {
   const normalized = normalizeInvoiceStatus(value);
   return invoiceStatusOptions.find((option) => option.value === normalized)?.label ?? value?.trim() ?? "-";
+}
+
+export function getNextInvoiceStatus(value?: string) {
+  switch (normalizeInvoiceStatus(value)) {
+    case "Draft": return "Verified";
+    case "Verified": return "Shipped";
+    case "Shipped": return "Completed";
+    default: return "";
+  }
+}
+
+export function getInvoiceStatusActionLabel(value?: string) {
+  switch (getNextInvoiceStatus(value)) {
+    case "Verified": return "提交核对";
+    case "Shipped": return "确认出运";
+    case "Completed": return "确认结汇";
+    default: return "";
+  }
+}
+
+export function canTransitionInvoiceStatus(value?: string, target?: string) {
+  const current = normalizeInvoiceStatus(value);
+  const next = normalizeInvoiceStatus(target);
+  return getNextInvoiceStatus(current) === next || (next === "Cancelled" && current !== "Cancelled");
 }
 
 export function createEmptyInvoice(): ApiInvoiceDetailDto {
@@ -192,8 +214,17 @@ export function readRouteInvoiceImportAction(state: unknown): RouteInvoiceImport
   return action === "Overwrite" || action === "AppendItems" ? action : null;
 }
 
-export function normalizeInvoiceForSave(invoice: ApiInvoiceDetailDto, id: number): ApiInvoiceDetailDto {
+export function normalizeInvoiceForSave(
+  invoice: ApiInvoiceDetailDto,
+  id: number,
+  pendingHsFeedback: HsCodeKnowledgeFeedbackInput[] = [],
+): ApiInvoiceDetailDto {
   const items = (invoice.items ?? []).map(normalizeInvoiceItemForSave).filter(isMeaningfulInvoiceItem);
+  const calculatedTotals = calculateInvoiceTotals(
+    items,
+    invoice.exchangeRate,
+    invoice.currency,
+  );
 
   return {
     ...invoice,
@@ -246,6 +277,8 @@ export function normalizeInvoiceForSave(invoice: ApiInvoiceDetailDto, id: number
     letterOfCreditNo: invoice.letterOfCreditNo?.trim() ?? "",
     letterOfCreditSourcePath: invoice.letterOfCreditSourcePath?.trim() ?? "",
     letterOfCreditContent: invoice.letterOfCreditContent ?? "",
+    pendingHsFeedback,
     items,
+    ...calculatedTotals,
   };
 }

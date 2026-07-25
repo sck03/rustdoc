@@ -148,7 +148,11 @@ export function useInvoiceItemsWorkspace({
           redo: [],
         }));
       }
-      return { ...current, items: nextItems, ...calculateInvoiceTotals(nextItems) };
+      return {
+        ...current,
+        items: nextItems,
+        ...calculateInvoiceTotals(nextItems, current.exchangeRate, current.currency),
+      };
     });
     setSuccessMessage(null);
   }

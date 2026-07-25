@@ -10,6 +10,7 @@ namespace ExportDocManager.DataAccess
         public DbSet<Customer> Customers { get; set; }
         public DbSet<Exporter> Exporters { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
+        public DbSet<InvoiceStatusHistory> InvoiceStatusHistories { get; set; }
         public DbSet<Item> Items { get; set; }
         public DbSet<CustomOption> CustomOptions { get; set; }
         public DbSet<Payee> Payees { get; set; }
@@ -75,8 +76,16 @@ namespace ExportDocManager.DataAccess
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Invoice>()
-                .HasIndex(i => new { i.InvoiceNo, i.Type })
+                .HasIndex(i => new { i.CompanyScope, i.InvoiceNo, i.Type })
                 .IsUnique();
+
+            modelBuilder.Entity<InvoiceStatusHistory>()
+                .HasIndex(item => new { item.InvoiceId, item.ChangedAt });
+            modelBuilder.Entity<InvoiceStatusHistory>()
+                .HasOne<Invoice>()
+                .WithMany()
+                .HasForeignKey(item => item.InvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // 添加性能优化索引
             modelBuilder.Entity<Invoice>().HasIndex(i => i.InvoiceDate);
@@ -423,9 +432,18 @@ namespace ExportDocManager.DataAccess
             invoiceEntity.Property(i => i.TotalTaxRefundAmount).HasColumnType("decimal(18, 2)");
             invoiceEntity.Property(i => i.TotalProfit).HasColumnType("decimal(18, 2)");
 
+            var invoiceStatusHistoryEntity = modelBuilder.Entity<InvoiceStatusHistory>();
+            invoiceStatusHistoryEntity.Property(item => item.FromStatus).HasMaxLength(30);
+            invoiceStatusHistoryEntity.Property(item => item.ToStatus).HasMaxLength(30);
+            invoiceStatusHistoryEntity.Property(item => item.Note).HasMaxLength(500);
+            invoiceStatusHistoryEntity.Property(item => item.ChangedByUsername).HasMaxLength(50);
+
             var itemEntity = modelBuilder.Entity<Item>();
+            itemEntity.Property(i => i.PriceCalculationMode)
+                .HasMaxLength(30)
+                .HasDefaultValue(ItemPriceCalculationModeCatalog.UnitPriceDriven);
             itemEntity.Property(i => i.Quantity).HasColumnType("decimal(18, 2)"); // Keep some precision for pieces
-            itemEntity.Property(i => i.UnitPrice).HasColumnType("decimal(18, 4)");
+            itemEntity.Property(i => i.UnitPrice).HasColumnType("decimal(18, 5)");
             itemEntity.Property(i => i.TotalPrice).HasColumnType("decimal(18, 2)");
             itemEntity.Property(i => i.Cartons).HasColumnType("decimal(18, 2)");
             itemEntity.Property(i => i.NWTotal).HasColumnType("decimal(18, 2)");

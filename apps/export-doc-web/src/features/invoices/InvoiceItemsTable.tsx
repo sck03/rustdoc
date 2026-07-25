@@ -160,7 +160,7 @@ export function InvoiceItemsTable(props:Props){
         <span>箱数 {formatPlainNumber(totals.totalCartons ?? 0)}</span>
         <span>毛重 {formatPlainNumber(totals.totalGrossWeight ?? 0)}</span>
         <span>体积 {formatPlainNumber(totals.totalVolume ?? 0)}</span>
-        <span>金额 {formatAmount(totals.totalAmount ?? 0, currency)}</span>
+        <span>金额合计 {formatAmount(totals.totalAmount ?? 0, currency)}</span>
       </div>
 
  </>;

@@ -1,7 +1,13 @@
 import { memo, type KeyboardEvent, type MouseEvent, useEffect, useId, useRef, useState } from "react";
 import type { ApiInvoiceItemDto } from "../../api/index.ts";
 import type { EditableInvoiceItemField, InvoiceItemColumnDefinition } from "./invoiceItemTableModel.ts";
-import { invoiceItemNumberInputValue, readItemNumberValue, readItemTextValue, readInvoiceItemNumberInput } from "./invoiceItemsEditorModel.ts";
+import {
+  invoiceItemNumberInputValue,
+  invoiceItemUnitPriceDisplayValue,
+  readItemNumberValue,
+  readItemTextValue,
+  readInvoiceItemNumberInput,
+} from "./invoiceItemsEditorModel.ts";
 import { normalizeText } from "../../ui/formUtils.ts";
 import { filterInvoiceItemHistoryOptionsByPrefix } from "./invoiceItemHistory.ts";
 
@@ -35,10 +41,12 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
   const [isFocused, setIsFocused] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [activeOptionIndex, setActiveOptionIndex] = useState(0);
-  const currentInputText =
-    column.kind === "number"
-      ? invoiceItemNumberInputValue(readItemNumberValue(item, column.field))
-      : readItemTextValue(item, column.field);
+  const currentNumberValue = column.kind === "number" ? readItemNumberValue(item, column.field) : undefined;
+  const currentInputText = column.kind === "number"
+    ? column.field === "unitPrice" && !isFocused
+      ? invoiceItemUnitPriceDisplayValue(currentNumberValue)
+      : invoiceItemNumberInputValue(currentNumberValue)
+    : readItemTextValue(item, column.field);
   const inlineOptions = filterInvoiceItemHistoryOptionsByPrefix(options ?? [], currentInputText).slice(0, 6);
   const canShowInlineOptions = isFocused && isHistoryOpen && !disabled && inlineOptions.length > 0;
   const activeOptionId = canShowInlineOptions ? `${historyPanelId}-option-${activeOptionIndex}` : undefined;
@@ -200,14 +208,21 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
           ref={inputRef}
           className={`item-cell-input item-number-input${selected ? " item-cell-selected" : ""}`}
           type="number"
-          step="0.01"
+          step={column.field === "unitPrice" ? "0.00001" : column.field === "purchasePrice" ? "0.0001" : "0.01"}
+          title={column.field === "unitPrice"
+            ? item.priceCalculationMode === "LineAmountDriven"
+              ? "当前行以金额为准；修改单价后将切换为单价核算并重算金额"
+              : "当前行以单价为准；修改单价会自动重算金额"
+            : column.field === "totalPrice"
+              ? "直接修改行金额会反算单价，并保持该行金额"
+              : undefined}
           aria-label={ariaLabel}
           aria-controls={canShowInlineOptions ? historyPanelId : undefined}
           aria-expanded={canShowInlineOptions}
           aria-activedescendant={activeOptionId}
           data-invoice-item-row={index}
           data-invoice-item-field={column.field}
-          value={invoiceItemNumberInputValue(readItemNumberValue(item, column.field))}
+          value={currentInputText}
           disabled={disabled}
           onFocus={handleFocus}
           onMouseDown={onMouseDown}
@@ -271,4 +286,3 @@ function areStringArraysEqual(previous?: string[], next?: string[]) {
 
   return previous.every((value, index) => value === next[index]);
 }
-

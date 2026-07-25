@@ -243,7 +243,7 @@ namespace ExportDocManager.Api.Tests
                         Quantity = 10m,
                         UnitEN = "PCS",
                         Cartons = 2m,
-                        UnitPrice = 12m,
+                        UnitPrice = totalAmount / 10m,
                         TotalPrice = totalAmount
                     }
                 ]

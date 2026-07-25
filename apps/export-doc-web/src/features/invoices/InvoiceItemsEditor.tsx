@@ -30,7 +30,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto } from "../../api/index.ts";
+import { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import { normalizeText } from "../../ui/formUtils.ts";
 import { InvoiceItemHistoryOptionCache } from "./invoiceItemHistory.ts";
 import { InvoiceItemShortcutGuide } from "./InvoiceItemShortcutGuide.tsx";
@@ -63,6 +63,7 @@ export function InvoiceItemsEditor({
   canUndoItemEdit,
   blankRowCount = 0,
   currency,
+  exchangeRate,
   focusedWorkbench = false,
   isProductLibraryBusy,
   readOnly = false,
@@ -82,6 +83,7 @@ export function InvoiceItemsEditor({
   onSaveItemToProductLibrary,
   onSearchProductLibrary,
   onUndoItemEdit,
+  onHsKnowledgeFeedback,
   productLibraryMessage,
   productLibraryProducts,
   productLibraryPageNumber,
@@ -258,7 +260,10 @@ export function InvoiceItemsEditor({
   const visibleColumnFields = useMemo(() => new Set(visibleColumns.map((column) => column.field)), [visibleColumns]);
   const activeFocusedCell = focusedCell && visibleColumnFields.has(focusedCell.field) ? focusedCell : null;
   const focusedRowIndex = activeFocusedCell?.rowIndex ?? null;
-  const totals = useMemo(() => calculateInvoiceTotals(items), [items]);
+  const totals = useMemo(
+    () => calculateInvoiceTotals(items, exchangeRate, currency),
+    [currency, exchangeRate, items],
+  );
   const meaningfulItemCount = useMemo(() => items.filter(isMeaningfulInvoiceItem).length, [items]);
   const selectedCells = useMemo(
     () => readSelectedCells(selectedCellKeys, items.length, visibleColumns),
@@ -867,7 +872,7 @@ export function InvoiceItemsEditor({
         products={productLibraryProducts} productLibraryPageNumber={productLibraryPageNumber} productLibraryPageSize={productLibraryPageSize} productLibraryTotalCount={productLibraryTotalCount} productLibraryTotalPages={productLibraryTotalPages} readOnly={readOnly} unitCandidateDialog={unitCandidateDialog} onApplyProduct={applyPickedProduct}
         onApplyUnitCandidate={applyUnitCandidate} onCloseProductPicker={() => setIsProductPickerOpen(false)} onCloseUnitCandidates={() => setUnitCandidateDialog(null)}
         onRefresh={onRefreshProductLibrary} onSearch={(keyword) => { setProductKeyword(keyword); onSearchProductLibrary(keyword); }} onProductLibraryPageChange={onProductLibraryPageChange} onProductLibraryPageSizeChange={onProductLibraryPageSizeChange}
-        onCloseHsKnowledge={() => setIsHsKnowledgeOpen(false)} onApplyHs={(patch, result, feedbackRecorded) => { if (focusedRowIndex == null || readOnly) return; markInvoiceItemMutationFrom(focusedRowIndex); onChangeItem(focusedRowIndex, patch); setEditorMessage(feedbackRecorded ? `已回填 HS 编码 ${result.currentCode}；本次确认已进入本地学习记录。` : `已回填 HS 编码 ${result.currentCode}；学习记录暂未写入，不影响本次发票。`); }} />
+        onCloseHsKnowledge={() => setIsHsKnowledgeOpen(false)} onApplyHs={(patch, result, pendingFeedback) => { if (focusedRowIndex == null || readOnly) return; markInvoiceItemMutationFrom(focusedRowIndex); onChangeItem(focusedRowIndex, patch); onHsKnowledgeFeedback(pendingFeedback); setEditorMessage(`已回填 HS 编码 ${result.currentCode}；确认记录将在发票保存时一并提交。`); }} />
       <InvoiceItemsTable
         activeFocusedCell={activeFocusedCell} activeFocusedCellOptions={activeFocusedCellOptions} currency={currency}
         displayItems={displayItems} invoiceItemTableMinWidth={invoiceItemTableMinWidth} itemsCount={items.length}

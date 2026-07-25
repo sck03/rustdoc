@@ -162,7 +162,6 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
             copyHeader: draft.copyHeader,
             copyItems: draft.copyItems,
             resetDates: draft.resetDates,
-            resetStatus: draft.resetStatus,
             clearAmounts: draft.clearAmounts,
           },
         },
@@ -308,7 +307,6 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
       newInvoiceNo: buildDefaultCopyInvoiceNo(invoice.invoiceNo),
       copyHeader: true,
       copyItems: true,
-      resetStatus: true,
       resetDates: true,
       clearAmounts: false,
     });

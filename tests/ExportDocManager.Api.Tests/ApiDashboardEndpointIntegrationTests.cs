@@ -105,7 +105,7 @@ namespace ExportDocManager.Api.Tests
             decimal totalAmount,
             decimal purchaseTotal,
             decimal taxRebateRate,
-            string type = "Export")
+            string type = "实际数据")
         {
             var invoiceDate = DateTime.Today;
             var response = await client.PostAsJsonAsync(
@@ -122,7 +122,7 @@ namespace ExportDocManager.Api.Tests
                     ExporterNameCN = "仪表盘出口商",
                     Currency = "USD",
                     Type = type,
-                    Status = status,
+                    Status = InvoiceStatusCatalog.Draft,
                     TotalAmount = totalAmount,
                     TotalPurchaseAmount = purchaseTotal,
                     Items =
@@ -145,7 +145,30 @@ namespace ExportDocManager.Api.Tests
                 });
 
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-            return await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(response);
+            var created = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(response);
+            var transitionTargets = status switch
+            {
+                InvoiceStatusCatalog.Verified => new[] { InvoiceStatusCatalog.Verified },
+                InvoiceStatusCatalog.Shipped => new[] { InvoiceStatusCatalog.Verified, InvoiceStatusCatalog.Shipped },
+                InvoiceStatusCatalog.Completed => new[] { InvoiceStatusCatalog.Verified, InvoiceStatusCatalog.Shipped, InvoiceStatusCatalog.Completed },
+                InvoiceStatusCatalog.Cancelled => new[] { InvoiceStatusCatalog.Cancelled },
+                _ => Array.Empty<string>()
+            };
+            foreach (string targetStatus in transitionTargets)
+            {
+                var transitionResponse = await client.PostAsJsonAsync(
+                    $"/api/invoices/{created.Id}/status",
+                    new ApiInvoiceStatusTransitionRequest
+                    {
+                        TargetStatus = targetStatus,
+                        RowVersion = created.Invoice.RowVersion,
+                        Note = $"测试状态变更为 {targetStatus}"
+                    });
+                Assert.Equal(HttpStatusCode.OK, transitionResponse.StatusCode);
+                created = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(transitionResponse);
+            }
+
+            return created;
         }
 
         private static async Task SetInvoiceDashboardTotalsAsync(

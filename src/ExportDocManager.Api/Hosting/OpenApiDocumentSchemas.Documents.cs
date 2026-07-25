@@ -1,3 +1,5 @@
+using ExportDocManager.Models.Entities;
+
 namespace ExportDocManager.Api.Hosting
 {
     public static partial class OpenApiDocumentFactory
@@ -722,7 +724,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["totalGrossWeight"] = DecimalProperty("Total gross weight."),
                                 ["totalNetWeight"] = DecimalProperty("Total net weight."),
                                 ["totalVolume"] = DecimalProperty("Total volume."),
-                                ["totalAmount"] = DecimalProperty("Total amount."),
+                                ["totalAmount"] = DecimalProperty("Total amount calculated from invoice line amounts."),
                                 ["totalPurchaseAmount"] = DecimalProperty("Total purchase amount."),
                                 ["totalTaxRefundAmount"] = DecimalProperty("Total tax refund amount."),
                                 ["totalProfit"] = DecimalProperty("Total profit."),
@@ -750,11 +752,17 @@ namespace ExportDocManager.Api.Hosting
                                 ["spare2"] = StringProperty("Spare field 2."),
                                 ["spare3"] = StringProperty("Spare field 3."),
                                 ["customFieldsJson"] = StringProperty("Custom fields JSON."),
-                                ["items"] = new
-                                {
-                                    type = "array",
-                                    items = RefSchema("ApiInvoiceItemDto")
-                                }
+                                 ["items"] = new
+                                 {
+                                     type = "array",
+                                     items = RefSchema("ApiInvoiceItemDto")
+                                 },
+                                 ["pendingHsFeedback"] = new
+                                 {
+                                     type = "array",
+                                     description = "HS suggestions selected in the editor; persisted together with the invoice transaction.",
+                                     items = RefSchema("HsCodeKnowledgeFeedbackInput")
+                                 }
                             }
                         },
                         ["ApiInvoiceItemDto"] = new
@@ -767,6 +775,7 @@ namespace ExportDocManager.Api.Hosting
                                 "styleNo",
                                 "styleName",
                                 "quantity",
+                                "priceCalculationMode",
                                 "unitPrice",
                                 "totalPrice"
                             },
@@ -797,8 +806,14 @@ namespace ExportDocManager.Api.Hosting
                                 ["nwPerCtn"] = DecimalProperty("Net weight per carton."),
                                 ["gwTotal"] = DecimalProperty("Total gross weight."),
                                 ["nwTotal"] = DecimalProperty("Total net weight."),
-                                ["unitPrice"] = DecimalProperty("Unit price."),
-                                ["totalPrice"] = DecimalProperty("Total price."),
+                                ["priceCalculationMode"] = new
+                                {
+                                    type = "string",
+                                    description = "Authoritative price input for the row: UnitPriceDriven or LineAmountDriven.",
+                                    @enum = new[] { ItemPriceCalculationModeCatalog.UnitPriceDriven, ItemPriceCalculationModeCatalog.LineAmountDriven }
+                                },
+                                ["unitPrice"] = DecimalProperty("Unit price, stored to at most five decimal places; ordinary values display with two decimals."),
+                                ["totalPrice"] = DecimalProperty("Authoritative line amount rounded to two decimal places."),
                                 ["purchasePrice"] = DecimalProperty("Purchase price."),
                                 ["purchaseTotal"] = DecimalProperty("Purchase total."),
                                 ["taxRebateRate"] = DecimalProperty("Tax rebate rate."),
@@ -819,7 +834,49 @@ namespace ExportDocManager.Api.Hosting
                                 ["id"] = new { type = "integer", format = "int32" },
                                 ["isUpdate"] = new { type = "boolean" },
                                 ["invoice"] = RefSchema("ApiInvoiceDetailDto")
+                             }
+                         },
+                        ["ApiInvoiceStatusTransitionRequest"] = new
+                        {
+                            type = "object",
+                            required = new[] { "targetStatus", "rowVersion" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["targetStatus"] = StringProperty("Target status: Verified, Shipped, Completed, or Cancelled."),
+                                ["rowVersion"] = StringProperty("Expected concurrency row version encoded as base64."),
+                                ["note"] = StringProperty("Optional status change note; required when cancelling.")
                             }
+                        },
+                        ["ApiInvoiceUnverifyRequest"] = new
+                        {
+                            type = "object",
+                            required = new[] { "rowVersion", "note" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["rowVersion"] = StringProperty("Expected concurrency row version encoded as base64."),
+                                ["note"] = StringProperty("Reason for returning the invoice to Draft.")
+                            }
+                        },
+                        ["ApiInvoiceStatusHistoryDto"] = new
+                        {
+                            type = "object",
+                            required = new[] { "id", "invoiceId", "fromStatus", "toStatus", "note", "changedAt" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["id"] = new { type = "integer", format = "int32" },
+                                ["invoiceId"] = new { type = "integer", format = "int32" },
+                                ["fromStatus"] = StringProperty("Display name of the previous status."),
+                                ["toStatus"] = StringProperty("Display name of the new status."),
+                                ["note"] = StringProperty("Status change note."),
+                                ["changedByUserId"] = new { type = "integer", format = "int32", nullable = true },
+                                ["changedByUsername"] = StringProperty("Operator username."),
+                                ["changedAt"] = new { type = "string", format = "date-time" }
+                            }
+                        },
+                        ["ApiInvoiceStatusHistoryDtoArray"] = new
+                        {
+                            type = "array",
+                            items = RefSchema("ApiInvoiceStatusHistoryDto")
                         },
                         ["ApiInvoiceCloneRequest"] = new
                         {
@@ -837,7 +894,6 @@ namespace ExportDocManager.Api.Hosting
                                         ["copyHeader"] = new { type = "boolean" },
                                         ["copyItems"] = new { type = "boolean" },
                                         ["resetDates"] = new { type = "boolean" },
-                                        ["resetStatus"] = new { type = "boolean" },
                                         ["clearAmounts"] = new { type = "boolean" }
                                     }
                                 }
@@ -871,7 +927,6 @@ namespace ExportDocManager.Api.Hosting
                                         ["copyHeader"] = new { type = "boolean" },
                                         ["copyItems"] = new { type = "boolean" },
                                         ["resetDates"] = new { type = "boolean" },
-                                        ["resetStatus"] = new { type = "boolean" },
                                         ["clearAmounts"] = new { type = "boolean" }
                                     }
                                 }
@@ -1560,6 +1615,15 @@ namespace ExportDocManager.Api.Hosting
                                 ["storagePolicy"] = StringProperty("Runtime storage policy for remote HS code search."),
                                 ["standardCodeCount"] = new { type = "integer", format = "int32" },
                                 ["declarationExampleCount"] = new { type = "integer", format = "int32" }
+                            }
+                        },
+                        ["ApiHsCodeRemoteSearchRequest"] = new
+                        {
+                            type = "object",
+                            required = new[] { "keyword" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["keyword"] = StringProperty("HS code, code prefix, product name, or search keyword.")
                             }
                         },
                         ["ApiHsCodeRemoteDetailResolutionResponse"] = new

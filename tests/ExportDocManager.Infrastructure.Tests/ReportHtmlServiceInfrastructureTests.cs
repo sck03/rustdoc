@@ -27,7 +27,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 string templatePath = Path.Combine(templateDirectory, "invoice_template.html");
                 await File.WriteAllTextAsync(
                     templatePath,
-                    "<html><body><h1>{{ Invoice.InvoiceNo }}</h1><p>{{ Customer.CustomerNameEN }}</p></body></html>");
+                    "<html><body><h1>{{ Invoice.InvoiceNo }}</h1><p>{{ Customer.CustomerNameEN }}</p>{{ for item in items }}<p>{{ format_unit_price item.UnitPrice }}</p>{{ end }}</body></html>");
 
                 await using var factory = new TestDbContextFactory();
                 int invoiceId = await SeedInvoiceAsync(factory);
@@ -45,6 +45,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.Equal(templatePath, result.TemplatePath);
                 Assert.Contains("INV-HTML-001", result.Html, StringComparison.Ordinal);
                 Assert.Contains("Acme Trading", result.Html, StringComparison.Ordinal);
+                Assert.Contains("33.33333", result.Html, StringComparison.Ordinal);
                 Assert.StartsWith(Path.Combine(appRoot, "Templates"), result.TemplatePath, StringComparison.OrdinalIgnoreCase);
                 Assert.False(result.TemplatePath.StartsWith(dataRoot, StringComparison.OrdinalIgnoreCase));
             }
@@ -648,7 +649,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 Currency = "USD",
                 ShippingMarks = "N/M",
                 ShippingMarksType = "Text",
-                TotalAmount = 18.5m,
+                TotalAmount = 66.67m,
                 Items =
                 [
                     new Item
@@ -664,7 +665,8 @@ namespace ExportDocManager.Infrastructure.Tests
                         GWTotal = 1.2m,
                         NWTotal = 1m,
                         Volume = 0.01m,
-                        TotalPrice = 18.5m
+                        UnitPrice = 33.33333m,
+                        TotalPrice = 66.67m
                     }
                 ]
             };

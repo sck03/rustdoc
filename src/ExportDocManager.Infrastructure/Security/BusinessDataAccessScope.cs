@@ -47,6 +47,18 @@ namespace ExportDocManager.Services.Security
             }
 
             int userId = user?.Id ?? 0;
+            string departmentId = NormalizeScope(user?.DepartmentId);
+            string companyScope = NormalizeScope(user?.CompanyScope);
+            if (userId > 0 &&
+                CanManageModule(user, PermissionModuleCatalog.DocumentInvoices) &&
+                !string.IsNullOrWhiteSpace(departmentId) &&
+                !string.IsNullOrWhiteSpace(companyScope))
+            {
+                return query.Where(invoice =>
+                    invoice.OwnerUserId == userId ||
+                    invoice.DepartmentId == departmentId && invoice.CompanyScope == companyScope);
+            }
+
             return userId > 0
                 ? query.Where(invoice => invoice.OwnerUserId == userId)
                 : query.Where(_ => false);
@@ -366,6 +378,13 @@ namespace ExportDocManager.Services.Security
         private static string NormalizeScope(string value)
         {
             return (value ?? string.Empty).Trim();
+        }
+
+        private static bool CanManageModule(User user, string moduleKey)
+        {
+            return user?.EffectiveModuleAccess != null &&
+                user.EffectiveModuleAccess.TryGetValue(moduleKey, out string accessLevel) &&
+                PermissionAccessLevel.Rank(accessLevel) >= PermissionAccessLevel.Rank(PermissionAccessLevel.Manage);
         }
     }
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Edit3, Minimize2, PackageSearch, Save, Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -27,10 +27,15 @@ import {
 import { InvoiceLetterOfCreditPanel } from "./InvoiceLetterOfCreditPanel.tsx";
 import { InvoiceProfitAnalysisPanel } from "./InvoiceProfitAnalysisPanel.tsx";
 import { InvoiceReportPreviewPanel } from "./InvoiceReportPreviewPanel.tsx";
+import { InvoiceStatusReasonDialog } from "./InvoiceStatusReasonDialog.tsx";
 import {
   canUnverifyInvoiceStatus,
+  canTransitionInvoiceStatus,
   createEmptyInvoice,
   getCounterpartInvoiceType,
+  getInvoiceStatusActionLabel,
+  getInvoiceStatusLabel,
+  getNextInvoiceStatus,
   isInvoiceEditableStatus,
   normalizeInvoiceForSave,
   normalizeInvoiceStatus,
@@ -46,6 +51,7 @@ import {
   mergeRouteInvoiceImportDraft,
   readInvoiceItemBlankRowCount,
 } from "./invoiceEditorHelpers.ts";
+import { calculateInvoiceTotals } from "./invoiceItemsEditorModel.ts";
 import { useInvoiceItemsWorkspace } from "./useInvoiceItemsWorkspace.ts";
 
 export function InvoiceEditorPage({
@@ -87,6 +93,9 @@ export function InvoiceEditorPage({
     mode === "new" ? normalizeInvoiceStatus(routeInvoiceDraft?.status) : "",
   );
   const [persistedInvoiceSnapshot, setPersistedInvoiceSnapshot] = useState<string | null>(null);
+  const [pendingHsFeedback, setPendingHsFeedback] = useState<HsCodeKnowledgeFeedbackInput[]>([]);
+  const [cancelReason, setCancelReason] = useState("");
+  const [isCancelReasonDialogOpen, setIsCancelReasonDialogOpen] = useState(false);
   const [appliedRouteInvoiceImportKey, setAppliedRouteInvoiceImportKey] = useState<string | null>(null);
 
   const parsedInvoiceId = Number(invoiceId);
@@ -116,6 +125,13 @@ export function InvoiceEditorPage({
     queryKey: queryKeys.invoice(parsedInvoiceId),
     queryFn: () => client.getInvoice({ id: parsedInvoiceId }),
     enabled: !isNew && isInvoiceIdValid,
+  });
+
+  const statusHistoryQuery = useQuery({
+    queryKey: queryKeys.invoiceStatusHistory(parsedInvoiceId),
+    queryFn: () => client.listInvoiceStatusHistory({ id: parsedInvoiceId }),
+    enabled: !isNew && isInvoiceIdValid,
+    staleTime: 30 * 1000,
   });
 
   const partiesQuery = useQuery({
@@ -157,6 +173,7 @@ export function InvoiceEditorPage({
       setInvoice(nextInvoice);
       setPersistedInvoiceSnapshot(buildInvoiceSnapshot(nextInvoice, 0));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(nextInvoice.status));
+      setPendingHsFeedback([]);
       itemsWorkspace.reset();
       setMessage(null);
       setConcurrencyMessage(null);
@@ -168,6 +185,7 @@ export function InvoiceEditorPage({
       setInvoice(null);
       setPersistedInvoiceSnapshot(null);
       setPersistedInvoiceStatus("");
+      setPendingHsFeedback([]);
       itemsWorkspace.reset();
       setMessage("发票 ID 无效。");
       setSuccessMessage(null);
@@ -191,6 +209,7 @@ export function InvoiceEditorPage({
       setInvoice(nextInvoice);
       setPersistedInvoiceSnapshot(buildInvoiceSnapshot(invoiceQuery.data, parsedInvoiceId));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(invoiceQuery.data.status));
+      setPendingHsFeedback([]);
       itemsWorkspace.reset();
       setMessage(null);
       if (appliedImportAction && routeInvoiceImportKey) {
@@ -228,6 +247,7 @@ export function InvoiceEditorPage({
         : client.updateInvoice({ id: parsedInvoiceId, body }),
     onSuccess: async (response) => {
       setInvoice(response.invoice);
+      setPendingHsFeedback([]);
       setPersistedInvoiceSnapshot(buildInvoiceSnapshot(response.invoice, response.id));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(response.invoice.status));
       itemsWorkspace.resetEditHistory();
@@ -263,7 +283,6 @@ export function InvoiceEditorPage({
             copyHeader: true,
             copyItems: true,
             resetDates: false,
-            resetStatus: true,
             clearAmounts: false,
           },
         },
@@ -288,9 +307,16 @@ export function InvoiceEditorPage({
   });
 
   const unverifyInvoiceMutation = useMutation({
-    mutationFn: () => client.unverifyInvoice({ id: parsedInvoiceId }),
+    mutationFn: () => client.unverifyInvoice({
+      id: parsedInvoiceId,
+      body: {
+        rowVersion: invoice?.rowVersion ?? "",
+        note: "用户申请反审核，返回草稿后重新核对。",
+      },
+    }),
     onSuccess: async (response) => {
       setInvoice(response.invoice);
+      setPendingHsFeedback([]);
       setPersistedInvoiceSnapshot(buildInvoiceSnapshot(response.invoice, response.id));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(response.invoice.status));
       setMessage(null);
@@ -300,6 +326,37 @@ export function InvoiceEditorPage({
         queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.invoiceStatusHistory(response.id) }),
+      ]);
+    },
+    onError: (error) => {
+      setMessage(readApiError(error));
+      setSuccessMessage(null);
+    },
+  });
+
+  const statusTransitionMutation = useMutation({
+    mutationFn: ({ targetStatus, note }: { targetStatus: string; note: string }) => client.transitionInvoiceStatus({
+      id: parsedInvoiceId,
+      body: {
+        targetStatus,
+        rowVersion: invoice?.rowVersion ?? "",
+        note,
+      },
+    }),
+    onSuccess: async (response) => {
+      setInvoice(response.invoice);
+      setPendingHsFeedback([]);
+      setPersistedInvoiceSnapshot(buildInvoiceSnapshot(response.invoice, response.id));
+      setPersistedInvoiceStatus(normalizeInvoiceStatus(response.invoice.status));
+      setMessage(null);
+      setSuccessMessage(`发票状态已更新为“${getInvoiceStatusLabel(response.invoice.status)}”。`);
+      queryClient.setQueryData(queryKeys.invoice(response.id), response.invoice);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.invoiceStatusHistory(response.id) }),
       ]);
     },
     onError: (error) => {
@@ -359,6 +416,7 @@ export function InvoiceEditorPage({
     invoiceQuery.isFetching ||
     saveInvoiceMutation.isPending ||
     cloneInvoiceTypeMutation.isPending ||
+    statusTransitionMutation.isPending ||
     unverifyInvoiceMutation.isPending ||
     deleteInvoiceMutation.isPending ||
     isLetterOfCreditBusy;
@@ -372,8 +430,8 @@ export function InvoiceEditorPage({
   const cloneInvoiceTypeLabel = `生成${targetInvoiceType}`;
   const canUnverifyInvoice = !isNew && isInvoiceIdValid && canUnverifyInvoiceStatus(invoice?.status);
   const currentInvoiceDraft = useMemo(
-    () => (invoice ? normalizeInvoiceForSave(invoice, isNew || !isInvoiceIdValid ? 0 : parsedInvoiceId) : undefined),
-    [invoice, isInvoiceIdValid, isNew, parsedInvoiceId],
+    () => (invoice ? normalizeInvoiceForSave(invoice, isNew || !isInvoiceIdValid ? 0 : parsedInvoiceId, pendingHsFeedback) : undefined),
+    [invoice, isInvoiceIdValid, isNew, parsedInvoiceId, pendingHsFeedback],
   );
   const currentInvoiceSnapshot = useMemo(
     () => (currentInvoiceDraft ? JSON.stringify(currentInvoiceDraft) : null),
@@ -400,7 +458,36 @@ export function InvoiceEditorPage({
       return;
     }
 
-    setInvoice((current) => (current ? { ...current, ...next } : current));
+    setInvoice((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const merged = { ...current, ...next };
+      if ("exchangeRate" in next || "currency" in next) {
+        return {
+          ...merged,
+          ...calculateInvoiceTotals(
+            merged.items ?? [],
+            merged.exchangeRate,
+            merged.currency,
+          ),
+        };
+      }
+
+      return merged;
+    });
+    setSuccessMessage(null);
+  }
+
+  function handleHsKnowledgeFeedback(feedback: HsCodeKnowledgeFeedbackInput) {
+    setPendingHsFeedback((current) => {
+      const key = `${feedback.queryText.trim().toLowerCase()}|${feedback.candidateCode.trim()}|${feedback.productName.trim().toLowerCase()}|${feedback.specification.trim().toLowerCase()}`;
+      const next = current.filter((item) =>
+        `${item.queryText.trim().toLowerCase()}|${item.candidateCode.trim()}|${item.productName.trim().toLowerCase()}|${item.specification.trim().toLowerCase()}` !== key,
+      );
+      return [...next, feedback].slice(-100);
+    });
     setSuccessMessage(null);
   }
 
@@ -438,7 +525,7 @@ export function InvoiceEditorPage({
     setMessage(null);
     setSuccessMessage(null);
 
-    const body = normalizeInvoiceForSave(invoice, isNew ? 0 : parsedInvoiceId);
+    const body = normalizeInvoiceForSave(invoice, isNew ? 0 : parsedInvoiceId, pendingHsFeedback);
     saveInvoiceMutation.mutate(body);
   }
 
@@ -454,7 +541,7 @@ export function InvoiceEditorPage({
 
     window.addEventListener("keydown", handleDocumentKeyDown);
     return () => window.removeEventListener("keydown", handleDocumentKeyDown);
-  }, [invoice, isBusy, isInvoiceEditable, isNew, parsedInvoiceId]);
+  }, [invoice, isBusy, isInvoiceEditable, isNew, parsedInvoiceId, pendingHsFeedback]);
 
   async function handleCloneInvoiceType() {
     if (!invoicePermission.canOperate || !invoice || isNew || !isInvoiceIdValid) {
@@ -482,7 +569,7 @@ export function InvoiceEditorPage({
   }
 
   async function handleUnverifyInvoice() {
-    if (!invoicePermission.canOperate || !invoice || isNew || !isInvoiceIdValid || !canUnverifyInvoiceStatus(invoice.status)) {
+    if (!invoicePermission.canManage || !invoice || isNew || !isInvoiceIdValid || !canUnverifyInvoiceStatus(invoice.status)) {
       return;
     }
 
@@ -500,6 +587,71 @@ export function InvoiceEditorPage({
     setMessage(null);
     setSuccessMessage(null);
     unverifyInvoiceMutation.mutate();
+  }
+
+  async function handleTransitionInvoiceStatus(targetStatusOverride?: string, noteOverride?: string) {
+    if (!invoicePermission.canOperate || !invoice || isNew || !isInvoiceIdValid || statusTransitionMutation.isPending) {
+      return;
+    }
+
+    const targetStatus = getNextInvoiceStatus(invoice.status);
+    const canCancel = invoicePermission.canManage && normalizeInvoiceStatus(invoice.status) !== "Cancelled";
+    const requestedTarget = targetStatusOverride || targetStatus || (canCancel ? "Cancelled" : "");
+    if (requestedTarget === "Cancelled" && !canCancel) {
+      return;
+    }
+    if (!requestedTarget || !canTransitionInvoiceStatus(invoice.status, requestedTarget)) {
+      return;
+    }
+
+    if (hasUnsavedInvoiceChanges) {
+      setMessage("请先保存当前发票修改，再执行状态流转。状态操作只针对服务器上已保存的版本。");
+      return;
+    }
+
+    const targetLabel = requestedTarget === "Verified" ? "已核对" : requestedTarget === "Shipped" ? "已出运" : requestedTarget === "Completed" ? "已结汇" : "已作废";
+    let note = `用户确认状态变更为${targetLabel}。`;
+    if (requestedTarget === "Cancelled") {
+      const normalizedNote = noteOverride?.trim() ?? "";
+      if (!normalizedNote) {
+        setCancelReason("");
+        setIsCancelReasonDialogOpen(true);
+        return;
+      }
+      note = normalizedNote;
+    }
+
+    if (!await requestConfirmation({
+      title: requestedTarget === "Cancelled" ? "作废发票" : getInvoiceStatusActionLabel(invoice.status),
+      description: `将发票状态变更为“${targetLabel}”。`,
+      details: ["状态变更会写入审计记录。", "如需继续编辑，锁定状态必须由管理人员反审核。"],
+      confirmLabel: `确认${targetLabel}`,
+      tone: requestedTarget === "Cancelled" ? "danger" : "warning",
+    })) {
+      return;
+    }
+
+    setMessage(null);
+    setSuccessMessage(null);
+    statusTransitionMutation.mutate({ targetStatus: requestedTarget, note });
+  }
+
+  function closeCancelReasonDialog() {
+    if (!statusTransitionMutation.isPending) {
+      setIsCancelReasonDialogOpen(false);
+      setCancelReason("");
+    }
+  }
+
+  function confirmCancelReasonDialog() {
+    const note = cancelReason.trim();
+    if (!note) {
+      return;
+    }
+
+    setIsCancelReasonDialogOpen(false);
+    setCancelReason("");
+    void handleTransitionInvoiceStatus("Cancelled", note);
   }
 
   async function handleDeleteInvoice() {
@@ -598,6 +750,7 @@ export function InvoiceEditorPage({
       isFocusedWorkbench={isInvoiceItemsWorkbenchMode}
       isProductLibraryBusy={isProductLibraryBusy}
       onChange={patchInvoice}
+      onHsKnowledgeFeedback={handleHsKnowledgeFeedback}
       onAddItem={itemsWorkspace.addItem}
       onApplyProductLibraryItem={itemsWorkspace.applyProductLibraryItem}
       onChangeItem={itemsWorkspace.patchItem}
@@ -721,11 +874,16 @@ export function InvoiceEditorPage({
                   canOpenSingleWindowDocuments={!isNew && isInvoiceIdValid && singleWindowPermission.canOperate}
                   canCloneInvoiceType={!isNew && isInvoiceIdValid && invoicePermission.canOperate}
                   cloneInvoiceTypeLabel={cloneInvoiceTypeLabel}
-                  canUnverifyInvoice={invoicePermission.canOperate && canUnverifyInvoice}
+                  canUnverifyInvoice={invoicePermission.canManage && canUnverifyInvoice}
+                  canTransitionStatus={!isNew && isInvoiceIdValid && invoicePermission.canOperate && Boolean(getNextInvoiceStatus(invoice.status))}
+                  canCancelStatus={!isNew && isInvoiceIdValid && invoicePermission.canManage && normalizeInvoiceStatus(invoice.status) !== "Cancelled"}
                   isEditable={isInvoiceEditable}
                   isBusy={isBusy}
                   isCloneInvoiceTypeBusy={cloneInvoiceTypeMutation.isPending}
                   isUnverifyInvoiceBusy={unverifyInvoiceMutation.isPending}
+                  isTransitionStatusBusy={statusTransitionMutation.isPending}
+                  onTransitionStatus={() => void handleTransitionInvoiceStatus()}
+                  onCancelStatus={() => void handleTransitionInvoiceStatus("Cancelled")}
                   onChange={patchInvoice}
                   onCloneInvoiceType={handleCloneInvoiceType}
                   onUnverifyInvoice={handleUnverifyInvoice}
@@ -733,6 +891,9 @@ export function InvoiceEditorPage({
                   onOpenAgentConsignment={handleOpenAgentConsignment}
                   customOptions={invoiceCustomOptions}
                   onCommitCustomOption={commitInvoiceCustomOption}
+                  statusHistory={statusHistoryQuery.data}
+                  statusHistoryLoading={statusHistoryQuery.isFetching}
+                  statusHistoryMessage={statusHistoryQuery.isError ? readApiError(statusHistoryQuery.error) : null}
                 />
 
                 <InvoicePartiesPanel
@@ -805,6 +966,17 @@ export function InvoiceEditorPage({
             </>
           )}
         </form>
+      ) : null}
+      {isCancelReasonDialogOpen ? (
+        <InvoiceStatusReasonDialog
+          title="填写作废原因"
+          description="原因会写入发票状态审计记录，便于后续核查。"
+          value={cancelReason}
+          isBusy={statusTransitionMutation.isPending}
+          onChange={setCancelReason}
+          onCancel={closeCancelReasonDialog}
+          onConfirm={confirmCancelReasonDialog}
+        />
       ) : null}
     </section>
   );

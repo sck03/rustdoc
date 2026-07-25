@@ -1,4 +1,4 @@
-import type { ApiInvoiceDetailDto, ApiInvoiceItemDto } from "../../api/index.ts";
+import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import { readNumber } from "../../ui/formUtils.ts";
 import { calculateInvoiceTotals, createEmptyInvoiceItem } from "./InvoiceItemsEditor.tsx";
 import { normalizeInvoiceForSave, type RouteInvoiceImportAction } from "./invoiceModel.ts";
@@ -22,7 +22,11 @@ export function mergeRouteInvoiceImportDraft(
 
   if (action === "AppendItems") {
     const items = [...(existing.items ?? []), ...importedItems];
-    return { ...existing, items, ...calculateInvoiceTotals(items) };
+    return {
+      ...existing,
+      items,
+      ...calculateInvoiceTotals(items, existing.exchangeRate, existing.currency),
+    };
   }
 
   return {
@@ -34,12 +38,16 @@ export function mergeRouteInvoiceImportDraft(
     companyScope: existing.companyScope,
     rowVersion: existing.rowVersion,
     items: importedItems,
-    ...calculateInvoiceTotals(importedItems),
+    ...calculateInvoiceTotals(
+      importedItems,
+      importedDraft.exchangeRate,
+      importedDraft.currency,
+    ),
   };
 }
 
-export function buildInvoiceSnapshot(invoice: ApiInvoiceDetailDto, id: number) {
-  return JSON.stringify(normalizeInvoiceForSave(invoice, id));
+export function buildInvoiceSnapshot(invoice: ApiInvoiceDetailDto, id: number, pendingHsFeedback: HsCodeKnowledgeFeedbackInput[] = []) {
+  return JSON.stringify(normalizeInvoiceForSave(invoice, id, pendingHsFeedback));
 }
 
 export function readInvoiceItemBlankRowCount(settings?: Record<string, unknown>) {

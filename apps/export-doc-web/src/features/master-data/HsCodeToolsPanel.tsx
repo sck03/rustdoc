@@ -121,8 +121,10 @@ export function HsCodeToolsPanel({
 
   const remoteSearchMutation = useMutation({
     mutationFn: (request: { keyword: string; requestId: number }) =>
-      client.searchRemoteHsCodes({
-        keyword: request.keyword,
+      client.captureRemoteHsCodes({
+        body: {
+          keyword: request.keyword,
+        },
       }),
     onSuccess: async (response, request) => {
       if (!isCurrentRemoteDetailRequest(request.requestId)) {
@@ -338,7 +340,7 @@ export function HsCodeToolsPanel({
       <div className="section-header">
         <div>
           <h2>{mode === "import" ? "年度税则智能导入" : mode === "remote" ? "联网补充" : "HS 编码工具"}</h2>
-          <span>{mode === "import" ? "识别工作表和字段，预检差异后才写入本地库" : mode === "remote" ? "查询第三方申报实例并沉淀到本地知识库" : remoteResultStatus}</span>
+          <span>{mode === "import" ? "识别工作表和字段，预检差异后才写入本地库" : mode === "remote" ? "查询第三方申报实例并进入待审核候选池" : remoteResultStatus}</span>
         </div>
       </div>
 

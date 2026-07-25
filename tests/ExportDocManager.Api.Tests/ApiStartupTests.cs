@@ -10,6 +10,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Data;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
@@ -2768,7 +2769,8 @@ namespace ExportDocManager.Api.Tests
                 Invoice invoice,
                 List<Item> items,
                 Customer customer,
-                Exporter exporter)
+                Exporter exporter,
+                IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null)
             {
                 throw new NotSupportedException();
             }
@@ -2815,7 +2817,17 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> UnverifyInvoiceAsync(int id)
+            public Task<Invoice> TransitionInvoiceStatusAsync(InvoiceStatusTransitionRequest request)
+            {
+                throw new NotSupportedException();
+            }
+
+            public Task<Invoice> UnverifyInvoiceAsync(int id, byte[] expectedRowVersion, string note)
+            {
+                throw new NotSupportedException();
+            }
+
+            public Task<IReadOnlyList<InvoiceStatusHistory>> ListInvoiceStatusHistoryAsync(int invoiceId)
             {
                 throw new NotSupportedException();
             }
@@ -2935,7 +2947,8 @@ namespace ExportDocManager.Api.Tests
                 Invoice invoice,
                 List<Item> items,
                 Customer customer,
-                Exporter exporter)
+                Exporter exporter,
+                IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null)
             {
                 throw new NotSupportedException();
             }
@@ -2975,7 +2988,17 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> UnverifyInvoiceAsync(int id)
+            public Task<Invoice> TransitionInvoiceStatusAsync(InvoiceStatusTransitionRequest request)
+            {
+                throw new NotSupportedException();
+            }
+
+            public Task<Invoice> UnverifyInvoiceAsync(int id, byte[] expectedRowVersion, string note)
+            {
+                throw new NotSupportedException();
+            }
+
+            public Task<IReadOnlyList<InvoiceStatusHistory>> ListInvoiceStatusHistoryAsync(int invoiceId)
             {
                 throw new NotSupportedException();
             }

@@ -12,7 +12,6 @@ namespace ExportDocManager.Application.Tests
 
             Assert.True(options.CopyHeader);
             Assert.True(options.CopyItems);
-            Assert.True(options.ResetStatus);
             Assert.True(options.ResetDates);
             Assert.False(options.ClearAmounts);
         }

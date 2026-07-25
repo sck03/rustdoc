@@ -9,7 +9,7 @@ namespace ExportDocManager.Api.Hosting
     public static partial class ApiEndpointRouteBuilderExtensions
     {
         private const string InvoiceTransferStoragePolicy =
-            "发票单据包只读取/写入用户显式选择的 .edpkg 路径；导出临时 JSON 写运行数据根 Cache/InvoiceTransfer 后立即清理；导入只写当前发票/商品/客户/出口商业务表，不读取付款/报销表，不创建默认导出目录或系统 C 盘用户目录落点。同号发票按 InvoiceNo + Type 判断，实际数据和报关数据互不覆盖。";
+            "发票单据包只读取/写入用户显式选择的 .edpkg 路径；导出临时 JSON 写运行数据根 Cache/InvoiceTransfer 后立即清理；导入只写当前发票/商品/客户/出口商业务表，不读取付款/报销表，不创建默认导出目录或系统 C 盘用户目录落点。同公司范围内按 InvoiceNo + Type 判断，实际数据和报关数据互不覆盖。";
 
         private static void MapInvoiceTransferEndpoints(this IEndpointRouteBuilder endpoints)
         {
@@ -157,6 +157,10 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
                 catch (InvalidDataException ex)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                }
+                catch (InvoiceValidationException ex)
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
@@ -358,6 +362,10 @@ namespace ExportDocManager.Api.Hosting
                 return WritePayloadTooLarge(ex);
             }
             catch (InvalidDataException ex)
+            {
+                return Results.BadRequest(new ApiErrorResponse(ex.Message));
+            }
+            catch (InvoiceValidationException ex)
             {
                 return Results.BadRequest(new ApiErrorResponse(ex.Message));
             }

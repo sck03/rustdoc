@@ -189,32 +189,99 @@ namespace ExportDocManager.Services.Core
                     var importItems = CloneItems(pkg.Items);
                     var importInvoice = CloneInvoice(pkg.Invoice);
 
+                    importInvoice.Id = 0;
+                    importInvoice.RowVersion = null;
+                    importInvoice.CustomerId = customerId;
+                    importInvoice.ExporterId = exporterId;
+                    importInvoice.OwnerUserId = null;
+                    _businessDataAccessScope.ApplyOwner(importInvoice);
+
+                    // The visibility scope may hide another department's invoice, but the
+                    // company-scoped unique key must still be honored. Keep the preview
+                    // usable without exposing the hidden record ID.
+                    bool companyScopedConflict = await context.Invoices.AsNoTracking().AnyAsync(
+                        item => item.CompanyScope == importInvoice.CompanyScope &&
+                            item.InvoiceNo == importInvoice.InvoiceNo &&
+                            item.Type == importInvoice.Type,
+                        token);
+                    if (companyScopedConflict && !preview.InvoiceExists)
+                    {
+                        preview.InvoiceExists = true;
+                        preview.InvoiceMatches = false;
+                        preview.ExistingInvoiceId = 0;
+                    }
+
+                    if (preview.InvoiceExists && action == InvoiceImportConflictAction.Skip)
+                    {
+                        return new InvoiceImportResult
+                        {
+                            Success = true,
+                            Message = preview.InvoiceMatches
+                                ? "目标库中已存在完全相同的单据，已跳过导入。"
+                                : "目标公司范围已有相同发票号和类型，已跳过导入。",
+                            ActionTaken = action,
+                            InvoiceId = preview.ExistingInvoiceId > 0 ? preview.ExistingInvoiceId : null,
+                            FinalInvoiceNo = preview.InvoiceNo
+                        };
+                    }
+
+                    if (preview.InvoiceExists && preview.ExistingInvoiceId <= 0 &&
+                        action is not InvoiceImportConflictAction.Skip and not InvoiceImportConflictAction.NewInvoiceNo)
+                    {
+                        throw new InvalidOperationException("目标公司范围已有相同发票号和类型，但当前账号无权覆盖；请改用新发票号导入。");
+                    }
+
+                    Invoice existingInvoiceForMutation = null;
+                    if (preview.InvoiceExists && preview.ExistingInvoiceId > 0 &&
+                        action is InvoiceImportConflictAction.Overwrite or InvoiceImportConflictAction.AppendItems)
+                    {
+                        existingInvoiceForMutation = await _businessDataAccessScope
+                            .ApplyInvoiceScope(context.Invoices.AsNoTracking())
+                            .FirstOrDefaultAsync(item => item.Id == preview.ExistingInvoiceId, token);
+                        if (existingInvoiceForMutation == null)
+                        {
+                            throw new InvalidOperationException("目标发票已不存在或当前账号无权修改，请刷新后重试。");
+                        }
+
+                        if (!InvoiceStatusCatalog.IsEditable(existingInvoiceForMutation.Status))
+                        {
+                            throw new InvalidOperationException("目标发票已锁定，请先反审核回草稿后再导入覆盖或追加明细。");
+                        }
+                    }
+
                     var targetInvoiceNo = importInvoice.InvoiceNo;
                     if (preview.InvoiceExists && action == InvoiceImportConflictAction.NewInvoiceNo)
                     {
                         targetInvoiceNo = await ResolveInvoiceNoAsync(
                             context,
+                            importInvoice.CompanyScope,
                             importInvoice.InvoiceNo,
                             importInvoice.Type,
                             newInvoiceNo,
                             token);
                     }
 
-                    importInvoice.Id = 0;
-                    importInvoice.RowVersion = null;
                     importInvoice.InvoiceNo = targetInvoiceNo;
-                    importInvoice.CustomerId = customerId;
-                    importInvoice.ExporterId = exporterId;
-                    importInvoice.OwnerUserId = null;
-                    _businessDataAccessScope.ApplyOwner(importInvoice);
+                    importInvoice.Status = InvoiceStatusCatalog.Draft;
                     importInvoice.Items = importItems;
-                    importInvoice.CalculateTotals();
+                    await InvoiceBusinessValidator.ValidateNormalizeAndCalculateAsync(
+                        context,
+                        importInvoice,
+                        importItems,
+                        isNew: existingInvoiceForMutation == null,
+                        existingStatus: existingInvoiceForMutation?.Status ?? InvoiceStatusCatalog.Draft,
+                        token).ConfigureAwait(false);
+                    importItems = importInvoice.Items?.ToList() ?? [];
                     importInvoice.Items = null;
 
                     int finalInvoiceId;
                     if (preview.InvoiceExists && action == InvoiceImportConflictAction.Overwrite)
                     {
-                        importInvoice.Id = preview.ExistingInvoiceId;
+                        importInvoice.Id = existingInvoiceForMutation.Id;
+                        importInvoice.OwnerUserId = existingInvoiceForMutation.OwnerUserId;
+                        importInvoice.DepartmentId = existingInvoiceForMutation.DepartmentId;
+                        importInvoice.CompanyScope = existingInvoiceForMutation.CompanyScope;
+                        importInvoice.RowVersion = existingInvoiceForMutation.RowVersion?.ToArray();
                         context.Invoices.Update(importInvoice);
                         await context.SaveChangesAsync(token);
                         await ReplaceItemsAsync(context, importInvoice.Id, importItems, token);
@@ -319,13 +386,38 @@ namespace ExportDocManager.Services.Core
                     preview.InvoiceMatches = CompareInvoice(existing, pkg.Invoice) &&
                                              await CompareItemsAsync(context, existing.Id, pkg.Items, cancellationToken);
                 }
+
+                if (!preview.InvoiceExists)
+                {
+                    string companyScope = ResolveImportCompanyScope(pkg.Invoice.CompanyScope);
+                    bool hiddenCompanyScopedConflict = await context.Invoices.AsNoTracking().AnyAsync(
+                        i => i.CompanyScope == companyScope &&
+                            i.InvoiceNo == preview.InvoiceNo &&
+                            i.Type == preview.Type,
+                        cancellationToken);
+                    if (hiddenCompanyScopedConflict)
+                    {
+                        preview.InvoiceExists = true;
+                        preview.InvoiceMatches = false;
+                        preview.ExistingInvoiceId = 0;
+                    }
+                }
             }
 
             return preview;
         }
 
+        private string ResolveImportCompanyScope(string packageCompanyScope)
+        {
+            var currentUser = _businessDataAccessScope.CurrentUser;
+            return currentUser != null && currentUser.Id > 0
+                ? (currentUser.CompanyScope ?? string.Empty).Trim()
+                : (packageCompanyScope ?? string.Empty).Trim();
+        }
+
         private async Task<string> ResolveInvoiceNoAsync(
             AppDbContext context,
+            string companyScope,
             string baseInvoiceNo,
             string invoiceType,
             string requestedInvoiceNo,
@@ -337,7 +429,12 @@ namespace ExportDocManager.Services.Core
             var candidate = seed;
             var counter = 1;
 
-            while (await context.Invoices.AnyAsync(i => i.InvoiceNo == candidate && i.Type == invoiceType, cancellationToken))
+            string normalizedCompanyScope = (companyScope ?? string.Empty).Trim();
+            while (await context.Invoices.AnyAsync(
+                i => i.CompanyScope == normalizedCompanyScope &&
+                    i.InvoiceNo == candidate &&
+                    i.Type == invoiceType,
+                cancellationToken))
             {
                 candidate = seed + counter;
                 counter++;
@@ -357,6 +454,14 @@ namespace ExportDocManager.Services.Core
             {
                 throw new InvalidDataException("单据包缺少发票数据");
             }
+
+            string normalizedType = InvoiceTypeCatalog.Normalize(package.Invoice.Type);
+            if (!InvoiceTypeCatalog.IsKnown(normalizedType))
+            {
+                throw new InvalidDataException("单据包发票类型只能是“实际数据”或“报关数据”。");
+            }
+
+            package.Invoice.Type = normalizedType;
         }
 
         private static string ComputeSha256(byte[] data)
@@ -454,8 +559,18 @@ namespace ExportDocManager.Services.Core
                 return false;
             }
 
-            var currentItems = existing.OrderBy(x => x.StyleNo).ThenBy(x => x.Quantity).ThenBy(x => x.UnitPrice).ToList();
-            var importedItems = incoming.OrderBy(x => x.StyleNo).ThenBy(x => x.Quantity).ThenBy(x => x.UnitPrice).ToList();
+            var currentItems = existing
+                .OrderBy(x => x.StyleNo)
+                .ThenBy(x => x.Quantity)
+                .ThenBy(x => x.UnitPrice)
+                .ThenBy(x => x.TotalPrice)
+                .ToList();
+            var importedItems = incoming
+                .OrderBy(x => x.StyleNo)
+                .ThenBy(x => x.Quantity)
+                .ThenBy(x => x.UnitPrice)
+                .ThenBy(x => x.TotalPrice)
+                .ToList();
 
             for (var i = 0; i < currentItems.Count; i++)
             {
@@ -463,7 +578,12 @@ namespace ExportDocManager.Services.Core
                 var importedItem = importedItems[i];
                 if (currentItem.StyleNo != importedItem.StyleNo ||
                     currentItem.Quantity != importedItem.Quantity ||
-                    currentItem.UnitPrice != importedItem.UnitPrice)
+                    currentItem.UnitPrice != importedItem.UnitPrice ||
+                    currentItem.TotalPrice != importedItem.TotalPrice ||
+                    !string.Equals(
+                        ItemPriceCalculationModeCatalog.Normalize(currentItem.PriceCalculationMode),
+                        ItemPriceCalculationModeCatalog.Normalize(importedItem.PriceCalculationMode),
+                        StringComparison.Ordinal))
                 {
                     return false;
                 }

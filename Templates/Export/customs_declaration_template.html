@@ -313,7 +313,7 @@
                 <td colspan="2">{{ item.HSCode }}</td>
                 <td colspan="4" class="customs-item-description">{{ if item.StyleNameCN && item.StyleNameCN != "" }}{{ item.StyleNameCN }}{{ else }}{{ item.StyleName }}{{ end }}</td>
                 <td class="customs-item-number">{{ item.Quantity }}{{ item.UnitCN }}</td>
-                <td colspan="2" class="customs-item-number">{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'F2' }} </td>
+                <td colspan="2" class="customs-item-number">{{ Invoice.Currency }}{{ format_unit_price item.UnitPrice }} </td>
                 <td>中国</td>
                 <td colspan="2" class="customs-item-country">{{ Invoice.DestinationCountry }}</td>
                 <td class="customs-item-country">{{ item.Origin }}</td>
@@ -406,7 +406,7 @@
                 <td colspan="2">{{ item.HSCode }}</td>
                 <td colspan="4" class="customs-item-description">{{ if item.StyleNameCN && item.StyleNameCN != "" }}{{ item.StyleNameCN }}{{ else }}{{ item.StyleName }}{{ end }}</td>
                 <td class="customs-item-number">{{ item.Quantity }}{{ item.UnitCN }}</td>
-                <td colspan="2" class="customs-item-number">{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'F2' }} </td>
+                <td colspan="2" class="customs-item-number">{{ Invoice.Currency }}{{ format_unit_price item.UnitPrice }} </td>
                 <td>中国</td>
                 <td colspan="2" class="customs-item-country">{{ Invoice.DestinationCountry }}</td>
                 <td class="customs-item-country">{{ item.Origin }}</td>
@@ -463,7 +463,7 @@
                 <td colspan="2">{{ item.HSCode }}</td>
                 <td colspan="4" class="customs-item-description">{{ if item.StyleNameCN && item.StyleNameCN != "" }}{{ item.StyleNameCN }}{{ else }}{{ item.StyleName }}{{ end }}</td>
                 <td class="customs-item-number">{{ item.Quantity }}{{ item.UnitCN }}</td>
-                <td colspan="2" class="customs-item-number">{{ Invoice.Currency }}{{ item.UnitPrice | math.format 'F2' }} </td>
+                <td colspan="2" class="customs-item-number">{{ Invoice.Currency }}{{ format_unit_price item.UnitPrice }} </td>
                 <td>中国</td>
                 <td colspan="2" class="customs-item-country">{{ Invoice.DestinationCountry }}</td>
                 <td class="customs-item-country">{{ item.Origin }}</td>

@@ -26,6 +26,7 @@ export function InvoiceItemShortcutGuide() {
         <Keyboard size={16} aria-hidden="true" />
         <strong>键盘操作</strong>
       </div>
+      <span className="item-price-calculation-hint">单价自动计算金额；直接修改金额会反算单价（普通值 2 位，必要时最多 5 位；金额 2 位）</span>
       <div className="item-shortcut-list">
         {primaryShortcuts.map((shortcut) => (
           <span className="item-shortcut" key={`${shortcut.keys}-${shortcut.action}`}>
