@@ -18,6 +18,7 @@ import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { CustomOptionMap, getCustomOptions } from "../custom-options/customOptionModel.ts";
 import { type InvoiceItemCellSelection, InvoiceItemsEditor } from "./InvoiceItemsEditor.tsx";
 import { type EditableInvoiceItemField } from "./invoiceItemTableModel.ts";
+import { invoiceItemVolumeDisplayValue, invoiceItemWeightDisplayValue } from "./invoiceItemsEditorModel.ts";
 import { ShippingMarkEditorDialog } from "./ShippingMarkEditorDialog.tsx";
 import { getInvoiceStatusActionLabel, getInvoiceStatusLabel, invoiceTypeOptions, normalizeInvoiceType } from "./invoiceModel.ts";
 
@@ -456,9 +457,9 @@ export function InvoiceShippingTermsPanel({
     <>
       <NumberField label="总箱数" value={invoice.totalCartons ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
       <NumberField label="总数量" value={invoice.totalQuantity ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
-      <NumberField label="总毛重" value={invoice.totalGrossWeight ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
-      <NumberField label="总净重" value={invoice.totalNetWeight ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
-      <NumberField label="总体积" value={invoice.totalVolume ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
+      <NumberField label="总毛重" value={invoice.totalGrossWeight ?? 0} disabled step="0.01" formatValue={invoiceItemWeightDisplayValue} description="由商品明细自动汇总" onChange={() => undefined} />
+      <NumberField label="总净重" value={invoice.totalNetWeight ?? 0} disabled step="0.01" formatValue={invoiceItemWeightDisplayValue} description="由商品明细自动汇总" onChange={() => undefined} />
+      <NumberField label="总体积" value={invoice.totalVolume ?? 0} disabled step="0.001" formatValue={invoiceItemVolumeDisplayValue} description="由商品明细自动汇总" onChange={() => undefined} />
       <NumberField label="采购总额" value={invoice.totalPurchaseAmount ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
       <NumberField label="退税总额" value={invoice.totalTaxRefundAmount ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
       <NumberField label="利润总额" value={invoice.totalProfit ?? 0} disabled description="按币种和汇率自动计算" onChange={() => undefined} />

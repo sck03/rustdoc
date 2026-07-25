@@ -62,12 +62,38 @@ namespace ExportDocManager.Domain.Tests
         [InlineData("12", "12.00")]
         [InlineData("12.3", "12.30")]
         [InlineData("33.33333", "33.33333")]
-        [InlineData("14.2857", "14.28570")]
-        public void UnitPriceDisplay_ShouldUseTwoOrFiveDecimalPlaces(string value, string expected)
+        [InlineData("14.2857", "14.2857")]
+        [InlineData("14.225", "14.225")]
+        public void UnitPriceDisplay_ShouldUseTwoOrAtMostFiveDecimalPlaces(string value, string expected)
         {
             Assert.Equal(
                 expected,
                 ItemPricePrecisionPolicy.Format(decimal.Parse(value, CultureInfo.InvariantCulture)));
+        }
+
+        [Fact]
+        public void Measurements_ShouldRoundWeightsToTwoAndVolumeToThreeDecimals()
+        {
+            var item = new Item
+            {
+                Quantity = 10m,
+                PcsPerCtn = 10m,
+                Length = 100m,
+                Width = 100m,
+                Height = 123.456m,
+                GWPerCtn = 1.236m,
+                NWPerCtn = 0.124m,
+            };
+
+            item.RecalculateAll();
+
+            Assert.Equal(1.24m, item.GWPerCtn);
+            Assert.Equal(1.24m, item.GWTotal);
+            Assert.Equal(0.12m, item.NWPerCtn);
+            Assert.Equal(0.12m, item.NWTotal);
+            Assert.Equal(1.235m, item.Volume);
+            Assert.Equal(1.24m, ItemMeasurementPrecisionPolicy.RoundWeight(1.236m));
+            Assert.Equal(1.235m, ItemMeasurementPrecisionPolicy.RoundVolume(1.23456m));
         }
     }
 }

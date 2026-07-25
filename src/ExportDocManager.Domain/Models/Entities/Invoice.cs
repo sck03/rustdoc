@@ -192,9 +192,9 @@ namespace ExportDocManager.Models.Entities
 
             TotalCartons = decimal.Round(totalCartons, 2, MidpointRounding.AwayFromZero);
             TotalQuantity = decimal.Round(totalQuantity, 2, MidpointRounding.AwayFromZero);
-            TotalGrossWeight = decimal.Round(totalGW, 2, MidpointRounding.AwayFromZero);
-            TotalNetWeight = decimal.Round(totalNW, 2, MidpointRounding.AwayFromZero);
-            TotalVolume = decimal.Round(totalVolume, 3, MidpointRounding.AwayFromZero);
+            TotalGrossWeight = ItemMeasurementPrecisionPolicy.RoundWeight(totalGW);
+            TotalNetWeight = ItemMeasurementPrecisionPolicy.RoundWeight(totalNW);
+            TotalVolume = ItemMeasurementPrecisionPolicy.RoundVolume(totalVolume);
             TotalAmount = decimal.Round(totalAmount, 2, MidpointRounding.AwayFromZero);
             TotalPurchaseAmount = decimal.Round(totalPurchase, 2, MidpointRounding.AwayFromZero);
             TotalTaxRefundAmount = decimal.Round(totalTaxRefund, 2, MidpointRounding.AwayFromZero);

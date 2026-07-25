@@ -2,8 +2,8 @@ import { memo, type KeyboardEvent, type MouseEvent, useEffect, useId, useRef, us
 import type { ApiInvoiceItemDto } from "../../api/index.ts";
 import type { EditableInvoiceItemField, InvoiceItemColumnDefinition } from "./invoiceItemTableModel.ts";
 import {
+  invoiceItemNumberDisplayValue,
   invoiceItemNumberInputValue,
-  invoiceItemUnitPriceDisplayValue,
   readItemNumberValue,
   readItemTextValue,
   readInvoiceItemNumberInput,
@@ -43,8 +43,8 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
   const [activeOptionIndex, setActiveOptionIndex] = useState(0);
   const currentNumberValue = column.kind === "number" ? readItemNumberValue(item, column.field) : undefined;
   const currentInputText = column.kind === "number"
-    ? column.field === "unitPrice" && !isFocused
-      ? invoiceItemUnitPriceDisplayValue(currentNumberValue)
+    ? !isFocused
+      ? invoiceItemNumberDisplayValue(column.field, currentNumberValue)
       : invoiceItemNumberInputValue(currentNumberValue)
     : readItemTextValue(item, column.field);
   const inlineOptions = filterInvoiceItemHistoryOptionsByPrefix(options ?? [], currentInputText).slice(0, 6);
@@ -208,7 +208,13 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
           ref={inputRef}
           className={`item-cell-input item-number-input${selected ? " item-cell-selected" : ""}`}
           type="number"
-          step={column.field === "unitPrice" ? "0.00001" : column.field === "purchasePrice" ? "0.0001" : "0.01"}
+          step={column.field === "unitPrice"
+            ? "0.00001"
+            : column.field === "purchasePrice"
+              ? "0.0001"
+              : column.field === "volume"
+                ? "0.001"
+                : "0.01"}
           title={column.field === "unitPrice"
             ? item.priceCalculationMode === "LineAmountDriven"
               ? "当前行以金额为准；修改单价后将切换为单价核算并重算金额"

@@ -282,8 +282,8 @@ namespace ExportDocManager.Services.Data
                 Cartons = cartons,
                 CtnUnitEN = DetectBookingSheetCartonUnit(worksheet, table, row),
                 CtnUnitCN = "箱",
-                GWTotal = grossWeight,
-                Volume = measurement
+                GWTotal = ItemMeasurementPrecisionPolicy.RoundWeight(grossWeight),
+                Volume = ItemMeasurementPrecisionPolicy.RoundVolume(measurement)
             };
         }
 
@@ -404,4 +404,3 @@ namespace ExportDocManager.Services.Data
         }
     }
 }
-

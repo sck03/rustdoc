@@ -60,7 +60,7 @@ namespace ExportDocManager.Models.Entities
         public void CalculateVolume()
         {
             Volume = Length > 0 && Width > 0 && Height > 0 && Cartons > 0
-                ? Length * Width * Height / 1000000m * Cartons
+                ? ItemMeasurementPrecisionPolicy.RoundVolume(Length * Width * Height / 1000000m * Cartons)
                 : 0m;
         }
 
@@ -69,8 +69,9 @@ namespace ExportDocManager.Models.Entities
         /// </summary>
         public void CalculateTotalGW()
         {
+            GWPerCtn = ItemMeasurementPrecisionPolicy.RoundWeight(GWPerCtn);
             GWTotal = GWPerCtn > 0 && Cartons > 0
-                ? GWPerCtn * Cartons
+                ? ItemMeasurementPrecisionPolicy.RoundWeight(GWPerCtn * Cartons)
                 : 0m;
         }
 
@@ -79,8 +80,9 @@ namespace ExportDocManager.Models.Entities
         /// </summary>
         public void CalculateTotalNW()
         {
+            NWPerCtn = ItemMeasurementPrecisionPolicy.RoundWeight(NWPerCtn);
             NWTotal = NWPerCtn > 0 && Cartons > 0
-                ? NWPerCtn * Cartons
+                ? ItemMeasurementPrecisionPolicy.RoundWeight(NWPerCtn * Cartons)
                 : 0m;
         }
 
@@ -262,17 +264,17 @@ namespace ExportDocManager.Models.Entities
                     Height = NumberHelper.ParseDecimal(value);
                     CalculateVolume();
                     break;
-                case 18: Volume = NumberHelper.ParseDecimal(value); break;
+                case 18: Volume = ItemMeasurementPrecisionPolicy.RoundVolume(NumberHelper.ParseDecimal(value)); break;
                 case 19: // GWPerCtn
-                    GWPerCtn = NumberHelper.ParseDecimal(value);
+                    GWPerCtn = ItemMeasurementPrecisionPolicy.RoundWeight(NumberHelper.ParseDecimal(value));
                     CalculateTotalGW();
                     break;
-                case 20: GWTotal = NumberHelper.ParseDecimal(value); break;
+                case 20: GWTotal = ItemMeasurementPrecisionPolicy.RoundWeight(NumberHelper.ParseDecimal(value)); break;
                 case 21: // NWPerCtn
-                    NWPerCtn = NumberHelper.ParseDecimal(value);
+                    NWPerCtn = ItemMeasurementPrecisionPolicy.RoundWeight(NumberHelper.ParseDecimal(value));
                     CalculateTotalNW();
                     break;
-                case 22: NWTotal = NumberHelper.ParseDecimal(value); break;
+                case 22: NWTotal = ItemMeasurementPrecisionPolicy.RoundWeight(NumberHelper.ParseDecimal(value)); break;
                 case 23: // UnitPrice
                     UnitPrice = NumberHelper.ParseDecimal(value);
                     CalculateTotalPrice();

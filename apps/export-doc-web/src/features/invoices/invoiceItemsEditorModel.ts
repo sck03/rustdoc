@@ -16,6 +16,9 @@ export const invoiceItemPriceCalculationModes = {
 export type InvoiceItemPriceCalculationMode = typeof invoiceItemPriceCalculationModes[keyof typeof invoiceItemPriceCalculationModes];
 export const invoiceItemUnitPriceStandardScale = 2;
 export const invoiceItemUnitPriceMaximumScale = 5;
+export const invoiceItemWeightScale = 2;
+export const invoiceItemVolumeScale = 3;
+const invoiceItemWeightFields = new Set<EditableInvoiceItemField>(["gwPerCtn", "gwTotal", "nwPerCtn", "nwTotal"]);
 
 export function isUnitLookupSourceField(field: EditableInvoiceItemField): field is UnitLookupSourceField {
   return field === "unitEN" || field === "ctnUnitEN";
@@ -292,10 +295,39 @@ export function invoiceItemUnitPriceDisplayValue(value?: number) {
   }
 
   const normalized = roundUnitPrice(Number(value));
-  const scale = roundTo(normalized, invoiceItemUnitPriceStandardScale) === normalized
-    ? invoiceItemUnitPriceStandardScale
-    : invoiceItemUnitPriceMaximumScale;
-  return normalized.toFixed(scale);
+  if (roundTo(normalized, invoiceItemUnitPriceStandardScale) === normalized) {
+    return normalized.toFixed(invoiceItemUnitPriceStandardScale);
+  }
+
+  return normalized.toFixed(invoiceItemUnitPriceMaximumScale).replace(/0+$/, "");
+}
+
+export function invoiceItemNumberDisplayValue(field: EditableInvoiceItemField, value?: number) {
+  if (!Number.isFinite(value)) {
+    return "";
+  }
+
+  if (field === "unitPrice") {
+    return invoiceItemUnitPriceDisplayValue(value);
+  }
+
+  if (invoiceItemWeightFields.has(field)) {
+    return invoiceItemWeightDisplayValue(value);
+  }
+
+  if (field === "volume") {
+    return invoiceItemVolumeDisplayValue(value);
+  }
+
+  return invoiceItemNumberInputValue(value);
+}
+
+export function invoiceItemWeightDisplayValue(value?: number) {
+  return Number.isFinite(value) ? roundWeight(Number(value)).toFixed(invoiceItemWeightScale) : "";
+}
+
+export function invoiceItemVolumeDisplayValue(value?: number) {
+  return Number.isFinite(value) ? roundVolume(Number(value)).toFixed(invoiceItemVolumeScale) : "";
 }
 
 export function readInvoiceItemNumberInput(value: string) {
@@ -330,6 +362,25 @@ export function recalculateInvoiceItem(item: ApiInvoiceItemDto, changedFields: s
   const totalPriceChanged = hasChanged(changedFields, ["totalPrice"]);
   const unitPriceChanged = hasChanged(changedFields, ["unitPrice"]);
   const quantityChanged = hasChanged(changedFields, ["quantity"]);
+  const volumeChanged = hasChanged(changedFields, ["volume"]);
+  const grossWeightChanged = hasChanged(changedFields, ["gwPerCtn", "gwTotal"]);
+  const netWeightChanged = hasChanged(changedFields, ["nwPerCtn", "nwTotal"]);
+
+  if (hasChanged(changedFields, ["gwPerCtn"])) {
+    next.gwPerCtn = roundWeight(numberValue(next.gwPerCtn));
+  }
+  if (hasChanged(changedFields, ["nwPerCtn"])) {
+    next.nwPerCtn = roundWeight(numberValue(next.nwPerCtn));
+  }
+  if (hasChanged(changedFields, ["gwTotal"])) {
+    next.gwTotal = roundWeight(numberValue(next.gwTotal));
+  }
+  if (hasChanged(changedFields, ["nwTotal"])) {
+    next.nwTotal = roundWeight(numberValue(next.nwTotal));
+  }
+  if (volumeChanged) {
+    next.volume = roundVolume(numberValue(next.volume));
+  }
 
   if (totalPriceChanged) {
     next.priceCalculationMode = invoiceItemPriceCalculationModes.lineAmountDriven;
@@ -364,22 +415,29 @@ export function recalculateInvoiceItem(item: ApiInvoiceItemDto, changedFields: s
   if (hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons", "length", "width", "height"])) {
     next.volume =
       numberValue(next.length) > 0 && numberValue(next.width) > 0 && numberValue(next.height) > 0 && effectiveCartons > 0
-        ? roundMeasure((numberValue(next.length) * numberValue(next.width) * numberValue(next.height) * effectiveCartons) / 1000000)
+        ? roundVolume((numberValue(next.length) * numberValue(next.width) * numberValue(next.height) * effectiveCartons) / 1000000)
         : 0;
   }
 
   if (hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons", "gwPerCtn"])) {
     next.gwTotal =
       numberValue(next.gwPerCtn) > 0 && effectiveCartons > 0
-        ? roundMoney(numberValue(next.gwPerCtn) * effectiveCartons)
+        ? roundWeight(numberValue(next.gwPerCtn) * effectiveCartons)
         : 0;
   }
 
   if (hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons", "nwPerCtn"])) {
     next.nwTotal =
       numberValue(next.nwPerCtn) > 0 && effectiveCartons > 0
-        ? roundMoney(numberValue(next.nwPerCtn) * effectiveCartons)
+        ? roundWeight(numberValue(next.nwPerCtn) * effectiveCartons)
         : 0;
+  }
+
+  if (!grossWeightChanged && hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons"])) {
+    next.gwTotal = roundWeight(numberValue(next.gwTotal));
+  }
+  if (!netWeightChanged && hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons"])) {
+    next.nwTotal = roundWeight(numberValue(next.nwTotal));
   }
 
   return next;
@@ -425,15 +483,15 @@ export function calculateInvoiceTotals(
   return {
     totalAmount: finalAmount,
     totalCartons: roundMoney(totals.cartons),
-    totalGrossWeight: roundMoney(totals.grossWeight),
-    totalNetWeight: roundMoney(totals.netWeight),
+    totalGrossWeight: roundWeight(totals.grossWeight),
+    totalNetWeight: roundWeight(totals.netWeight),
     totalProfit: effectiveRate > 0
       ? roundMoney(finalAmount * effectiveRate - totals.purchaseAmount + totals.taxRefundAmount)
       : 0,
     totalPurchaseAmount: roundMoney(totals.purchaseAmount),
     totalQuantity: roundMoney(totals.quantity),
     totalTaxRefundAmount: roundMoney(totals.taxRefundAmount),
-    totalVolume: roundMeasure(totals.volume),
+    totalVolume: roundVolume(totals.volume),
   };
 }
 
@@ -447,15 +505,15 @@ export function normalizeInvoiceItemForSave(item: ApiInvoiceItemDto): ApiInvoice
     ctnUnitEN: normalizeText(item.ctnUnitEN),
     customFieldsJson: normalizeText(item.customFieldsJson),
     fabricComposition: normalizeText(item.fabricComposition),
-    gwPerCtn: normalizeOptionalInvoiceItemNumber(item.gwPerCtn),
-    gwTotal: normalizeOptionalInvoiceItemNumber(item.gwTotal),
+    gwPerCtn: roundOptionalWeight(item.gwPerCtn),
+    gwTotal: roundOptionalWeight(item.gwTotal),
     height: normalizeOptionalInvoiceItemNumber(item.height),
     hsCode: normalizeText(item.hsCode),
     id: numberValue(item.id),
     invoiceId: numberValue(item.invoiceId),
     length: normalizeOptionalInvoiceItemNumber(item.length),
-    nwPerCtn: normalizeOptionalInvoiceItemNumber(item.nwPerCtn),
-    nwTotal: normalizeOptionalInvoiceItemNumber(item.nwTotal),
+    nwPerCtn: roundOptionalWeight(item.nwPerCtn),
+    nwTotal: roundOptionalWeight(item.nwTotal),
     origin: normalizeText(item.origin),
     pcsPerCtn: normalizeOptionalInvoiceItemNumber(item.pcsPerCtn),
     poNumber: normalizeText(item.poNumber),
@@ -474,7 +532,7 @@ export function normalizeInvoiceItemForSave(item: ApiInvoiceItemDto): ApiInvoice
     unitEN: normalizeText(item.unitEN),
     unitPrice: numberValue(item.unitPrice),
     priceCalculationMode: normalizePriceCalculationMode(item.priceCalculationMode),
-    volume: normalizeOptionalInvoiceItemNumber(item.volume),
+    volume: roundOptionalVolume(item.volume),
     width: normalizeOptionalInvoiceItemNumber(item.width),
   };
 
@@ -544,8 +602,26 @@ export function roundUnitPrice(value: number) {
   return roundTo(value, invoiceItemUnitPriceMaximumScale);
 }
 
+export function roundWeight(value: number) {
+  return roundTo(value, invoiceItemWeightScale);
+}
+
+export function roundVolume(value: number) {
+  return roundTo(value, invoiceItemVolumeScale);
+}
+
 export function roundMeasure(value: number) {
-  return roundTo(value, 4);
+  return roundVolume(value);
+}
+
+function roundOptionalWeight(value?: number) {
+  const normalized = normalizeOptionalInvoiceItemNumber(value);
+  return normalized === undefined ? undefined : roundWeight(normalized);
+}
+
+function roundOptionalVolume(value?: number) {
+  const normalized = normalizeOptionalInvoiceItemNumber(value);
+  return normalized === undefined ? undefined : roundVolume(normalized);
 }
 
 export function roundTo(value: number, digits: number) {

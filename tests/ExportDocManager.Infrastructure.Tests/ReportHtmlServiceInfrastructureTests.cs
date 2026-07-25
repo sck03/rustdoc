@@ -249,6 +249,10 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.DoesNotContain("Style:", template, StringComparison.Ordinal);
             }
 
+            Assert.Contains("format_weight item.GWTotal", packingList, StringComparison.Ordinal);
+            Assert.Contains("format_weight item.NWTotal", packingList, StringComparison.Ordinal);
+            Assert.Contains("format_volume item.Volume", packingList, StringComparison.Ordinal);
+
             string repositoryRoot = FindRepositoryRoot();
             string customs = File.ReadAllText(Path.Combine(repositoryRoot, "Templates", "Export", "customs_declaration_template.html"));
             string builtInPackingList = File.ReadAllText(Path.Combine(repositoryRoot, "Templates", "Export", "packing_list_template.html"));

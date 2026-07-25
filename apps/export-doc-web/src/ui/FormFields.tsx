@@ -233,6 +233,7 @@ export function NumberField({
   className,
   description,
   step = "0.01",
+  formatValue,
   onChange,
 }: {
   label: string;
@@ -242,6 +243,7 @@ export function NumberField({
   className?: string;
   description?: string;
   step?: string;
+  formatValue?: (value?: number) => string;
   onChange: (value: number) => void;
 }) {
   return (
@@ -250,7 +252,7 @@ export function NumberField({
       <input
         type="number"
         step={step}
-        value={numberInputValue(value)}
+        value={formatValue ? formatValue(value) : numberInputValue(value)}
         required={required}
         disabled={disabled}
         aria-describedby={descriptionId}

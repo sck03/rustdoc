@@ -200,6 +200,16 @@ namespace ExportDocManager.Services.Core
             item.Spare3 = NormalizeText(item.Spare3, 500, "明细备用字段3");
             item.CustomFieldsJson = NormalizeJson(item.CustomFieldsJson, 50_000, "明细扩展字段");
 
+            // Keep the persisted invoice measurement precision stable before
+            // validation and recalculation. This also normalizes rows imported
+            // from spreadsheets that contain more display digits than the UI
+            // supports.
+            item.Volume = ItemMeasurementPrecisionPolicy.RoundVolume(item.Volume);
+            item.GWPerCtn = ItemMeasurementPrecisionPolicy.RoundWeight(item.GWPerCtn);
+            item.NWPerCtn = ItemMeasurementPrecisionPolicy.RoundWeight(item.NWPerCtn);
+            item.GWTotal = ItemMeasurementPrecisionPolicy.RoundWeight(item.GWTotal);
+            item.NWTotal = ItemMeasurementPrecisionPolicy.RoundWeight(item.NWTotal);
+
             if (!string.IsNullOrWhiteSpace(item.HSCode) &&
                 (item.HSCode.Length is < 6 or > 20 || !item.HSCode.All(char.IsDigit)))
             {
@@ -308,10 +318,10 @@ namespace ExportDocManager.Services.Core
                 ? RoundMeasure(item.Length * item.Width * item.Height * item.Cartons / 1_000_000m)
                 : 0m;
             item.GWTotal = item.GWPerCtn > 0 && item.Cartons > 0
-                ? RoundMoney(item.GWPerCtn * item.Cartons)
+                ? ItemMeasurementPrecisionPolicy.RoundWeight(item.GWPerCtn * item.Cartons)
                 : 0m;
             item.NWTotal = item.NWPerCtn > 0 && item.Cartons > 0
-                ? RoundMoney(item.NWPerCtn * item.Cartons)
+                ? ItemMeasurementPrecisionPolicy.RoundWeight(item.NWPerCtn * item.Cartons)
                 : 0m;
         }
 
@@ -320,9 +330,9 @@ namespace ExportDocManager.Services.Core
             var items = invoice.Items ?? [];
             invoice.TotalCartons = RoundMoney(items.Sum(item => item.Cartons));
             invoice.TotalQuantity = RoundMoney(items.Sum(item => item.Quantity));
-            invoice.TotalGrossWeight = RoundMoney(items.Sum(item => item.GWTotal));
-            invoice.TotalNetWeight = RoundMoney(items.Sum(item => item.NWTotal));
-            invoice.TotalVolume = RoundMeasure(items.Sum(item => item.Volume));
+            invoice.TotalGrossWeight = ItemMeasurementPrecisionPolicy.RoundWeight(items.Sum(item => item.GWTotal));
+            invoice.TotalNetWeight = ItemMeasurementPrecisionPolicy.RoundWeight(items.Sum(item => item.NWTotal));
+            invoice.TotalVolume = ItemMeasurementPrecisionPolicy.RoundVolume(items.Sum(item => item.Volume));
             invoice.TotalAmount = RoundMoney(items.Sum(item => item.TotalPrice));
             invoice.TotalPurchaseAmount = RoundMoney(items.Sum(item => item.PurchaseTotal));
             invoice.TotalTaxRefundAmount = RoundMoney(items.Sum(item => item.TaxRefundAmount));
@@ -388,6 +398,6 @@ namespace ExportDocManager.Services.Core
             ItemPricePrecisionPolicy.Round(value);
 
         private static decimal RoundMeasure(decimal value) =>
-            decimal.Round(value, 3, MidpointRounding.AwayFromZero);
+            ItemMeasurementPrecisionPolicy.RoundVolume(value);
     }
 }

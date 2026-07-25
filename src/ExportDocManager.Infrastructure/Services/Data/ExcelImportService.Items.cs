@@ -109,6 +109,7 @@ namespace ExportDocManager.Services.Data
                         NormalizeItemDescriptionLanguages(item);
                         NormalizeItemDescriptionAndBrand(item);
                         ApplyDimensionsFromSingleCell(item, GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.DimensionCol ?? 0));
+                        NormalizeImportedItemMeasurements(item);
                         NormalizeImportedItemPrice(
                             item,
                             hasUnitPriceValue: !string.IsNullOrWhiteSpace(unitPriceText),
@@ -141,9 +142,9 @@ namespace ExportDocManager.Services.Data
             {
                 invoice.TotalCartons = invoice.Items.Sum(i => i.Cartons);
                 invoice.TotalQuantity = invoice.Items.Sum(i => i.Quantity);
-                invoice.TotalGrossWeight = invoice.Items.Sum(i => i.GWTotal);
-                invoice.TotalNetWeight = invoice.Items.Sum(i => i.NWTotal);
-                invoice.TotalVolume = invoice.Items.Sum(i => i.Volume);
+                invoice.TotalGrossWeight = ItemMeasurementPrecisionPolicy.RoundWeight(invoice.Items.Sum(i => i.GWTotal));
+                invoice.TotalNetWeight = ItemMeasurementPrecisionPolicy.RoundWeight(invoice.Items.Sum(i => i.NWTotal));
+                invoice.TotalVolume = ItemMeasurementPrecisionPolicy.RoundVolume(invoice.Items.Sum(i => i.Volume));
                 invoice.TotalAmount = decimal.Round(
                     invoice.Items.Sum(i => i.TotalPrice),
                     2,
@@ -170,6 +171,20 @@ namespace ExportDocManager.Services.Data
 
             item.PriceCalculationMode = ItemPriceCalculationModeCatalog.UnitPriceDriven;
             item.CalculateTotalPrice();
+        }
+
+        private static void NormalizeImportedItemMeasurements(Item item)
+        {
+            if (item == null)
+            {
+                return;
+            }
+
+            item.Volume = ItemMeasurementPrecisionPolicy.RoundVolume(item.Volume);
+            item.GWPerCtn = ItemMeasurementPrecisionPolicy.RoundWeight(item.GWPerCtn);
+            item.GWTotal = ItemMeasurementPrecisionPolicy.RoundWeight(item.GWTotal);
+            item.NWPerCtn = ItemMeasurementPrecisionPolicy.RoundWeight(item.NWPerCtn);
+            item.NWTotal = ItemMeasurementPrecisionPolicy.RoundWeight(item.NWTotal);
         }
 
         private static void NormalizeItemDescriptionAndBrand(Item item)

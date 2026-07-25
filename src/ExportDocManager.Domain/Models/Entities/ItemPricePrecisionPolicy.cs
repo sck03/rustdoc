@@ -27,8 +27,17 @@ namespace ExportDocManager.Models.Entities
         public static string Format(decimal value)
         {
             decimal normalized = Round(value);
-            int scale = NeedsExtendedDisplay(normalized) ? MaximumScale : StandardDisplayScale;
-            return normalized.ToString($"F{scale}", CultureInfo.InvariantCulture);
+            if (!NeedsExtendedDisplay(normalized))
+            {
+                return normalized.ToString($"F{StandardDisplayScale}", CultureInfo.InvariantCulture);
+            }
+
+            // Extended prices use at most five decimals. Trailing zeroes do not
+            // carry business meaning, so keep the shortest readable value while
+            // retaining every significant digit (14.28570 -> 14.2857).
+            return normalized
+                .ToString($"F{MaximumScale}", CultureInfo.InvariantCulture)
+                .TrimEnd('0');
         }
     }
 }

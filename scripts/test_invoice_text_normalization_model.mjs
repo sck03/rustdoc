@@ -77,5 +77,8 @@ assert(!feedbackContext.specification.includes("YLAW1320-2"), "HS feedback does 
 assert(itemModel.invoiceItemUnitPriceDisplayValue(12) === "12.00", "ordinary unit price uses two decimals");
 assert(itemModel.invoiceItemUnitPriceDisplayValue(12.3) === "12.30", "ordinary fractional unit price uses two decimals");
 assert(itemModel.invoiceItemUnitPriceDisplayValue(100 / 3) === "33.33333", "derived unit price uses five decimals");
-assert(itemModel.invoiceItemUnitPriceDisplayValue(14.2857) === "14.28570", "extended unit price keeps a stable five-decimal display");
+assert(itemModel.invoiceItemUnitPriceDisplayValue(14.2857) === "14.2857", "extended unit price trims insignificant trailing zeroes");
+assert(itemModel.invoiceItemUnitPriceDisplayValue(14.225) === "14.225", "extended unit price keeps meaningful three decimals");
+assert(itemModel.invoiceItemWeightDisplayValue(1.236) === "1.24", "gross/net weight uses two decimals");
+assert(itemModel.invoiceItemVolumeDisplayValue(1.23456) === "1.235", "volume uses three decimals");
 process.stdout.write("invoice-text-normalization model tests passed\n");

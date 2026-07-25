@@ -420,6 +420,10 @@ namespace ExportDocManager.DataAccess
 
             modelBuilder.Entity<Product>().Property(p => p.TaxRebateRate).HasDefaultValue(0m);
 
+            var productEntity = modelBuilder.Entity<Product>();
+            productEntity.Property(p => p.GWPerCtn).HasColumnType("decimal(18, 2)");
+            productEntity.Property(p => p.NWPerCtn).HasColumnType("decimal(18, 2)");
+
             // Define precision for Invoice and Item decimal properties
             var invoiceEntity = modelBuilder.Entity<Invoice>();
             invoiceEntity.Property(i => i.DepartmentId).HasMaxLength(50);
@@ -446,6 +450,8 @@ namespace ExportDocManager.DataAccess
             itemEntity.Property(i => i.UnitPrice).HasColumnType("decimal(18, 5)");
             itemEntity.Property(i => i.TotalPrice).HasColumnType("decimal(18, 2)");
             itemEntity.Property(i => i.Cartons).HasColumnType("decimal(18, 2)");
+            itemEntity.Property(i => i.GWPerCtn).HasColumnType("decimal(18, 2)");
+            itemEntity.Property(i => i.NWPerCtn).HasColumnType("decimal(18, 2)");
             itemEntity.Property(i => i.NWTotal).HasColumnType("decimal(18, 2)");
             itemEntity.Property(i => i.GWTotal).HasColumnType("decimal(18, 2)");
             itemEntity.Property(i => i.Volume).HasColumnType("decimal(18, 3)");

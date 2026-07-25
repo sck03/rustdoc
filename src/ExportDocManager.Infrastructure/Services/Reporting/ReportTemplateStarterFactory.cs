@@ -251,9 +251,9 @@ namespace ExportDocManager.Services.Reporting
                     </td>
                     <td>{{ item.Cartons }}{{ item.CtnUnitEN }}</td>
                     <td>{{ item.Quantity }}{{ item.UnitEN }}</td>
-                    <td class="number-cell">{{ item.GWTotal }}KGS</td>
-                    <td class="number-cell">{{ item.NWTotal }}KGS</td>
-                    <td class="number-cell">{{ item.Volume }}CBM</td>
+                    <td class="number-cell">{{ format_weight item.GWTotal }}KGS</td>
+                    <td class="number-cell">{{ format_weight item.NWTotal }}KGS</td>
+                    <td class="number-cell">{{ format_volume item.Volume }}CBM</td>
                 </tr>
                 {{ else }}
                 <tr>
@@ -264,9 +264,9 @@ namespace ExportDocManager.Services.Reporting
                     </td>
                     <td>{{ item.Cartons }}{{ item.CtnUnitEN }}</td>
                     <td>{{ item.Quantity }}{{ item.UnitEN }}</td>
-                    <td class="number-cell">{{ item.GWTotal }}KGS</td>
-                    <td class="number-cell">{{ item.NWTotal }}KGS</td>
-                    <td class="number-cell">{{ item.Volume }}CBM</td>
+                    <td class="number-cell">{{ format_weight item.GWTotal }}KGS</td>
+                    <td class="number-cell">{{ format_weight item.NWTotal }}KGS</td>
+                    <td class="number-cell">{{ format_volume item.Volume }}CBM</td>
                 </tr>
                 {{ end }}
                 {{ end }}
@@ -274,9 +274,9 @@ namespace ExportDocManager.Services.Reporting
                     <td colspan="2">TOTAL:</td>
                     <td class="number-cell">{{ Invoice.TotalCartons }}</td>
                     <td class="number-cell">{{ Invoice.TotalQuantity }}</td>
-                    <td class="number-cell">{{ Invoice.TotalGrossWeight }}KGS</td>
-                    <td class="number-cell">{{ Invoice.TotalNetWeight }}KGS</td>
-                    <td class="number-cell">{{ Invoice.TotalVolume }}CBM</td>
+                    <td class="number-cell">{{ format_weight Invoice.TotalGrossWeight }}KGS</td>
+                    <td class="number-cell">{{ format_weight Invoice.TotalNetWeight }}KGS</td>
+                    <td class="number-cell">{{ format_volume Invoice.TotalVolume }}CBM</td>
                 </tr>
             </tbody>
         </table>
