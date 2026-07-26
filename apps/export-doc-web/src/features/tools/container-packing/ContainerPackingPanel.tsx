@@ -118,7 +118,7 @@ export function ContainerPackingPanel({
 
   const projectsQuery = useQuery({
     queryKey: queryKeys.containerPackingProjects(),
-    queryFn: () => client.listContainerPackingProjects(),
+    queryFn: () => client.listContainerPackingProjects({ limit: 100 }),
   });
   const containerTypesQuery = useQuery({
     queryKey: queryKeys.containerPackingContainerTypes(),
@@ -153,7 +153,7 @@ export function ContainerPackingPanel({
   const canSaveProject = canOperate && canAnalyze && projectName.trim().length > 0;
   const canLoadProject = Number.parseInt(selectedProjectId, 10) > 0;
   const canSaveContainerType =
-    canOperate &&
+    canManage &&
     container.containerType.trim().length > 0 &&
     readPositiveIntegerInput(container.length, 0) > 0 &&
     readPositiveIntegerInput(container.width, 0) > 0 &&

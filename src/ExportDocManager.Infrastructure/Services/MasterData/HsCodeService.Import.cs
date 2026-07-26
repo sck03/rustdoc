@@ -8,6 +8,8 @@ namespace ExportDocManager.Services.MasterData
 {
     public partial class HsCodeService
     {
+        private const int ImportInClauseBatchSize = 400;
+
         private static readonly IReadOnlyDictionary<string, string[]> ImportHeaderAliases =
             new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
             {
@@ -55,11 +57,11 @@ namespace ExportDocManager.Services.MasterData
 
             var parsedRows = ParseImportRows(detected, cancellationToken);
             await using var context = await CreateDbContextAsync(cancellationToken);
-            var existing = await context.HsCodes.AsNoTracking().ToListAsync(cancellationToken);
-            var existingMap = existing
-                .Where(item => !string.IsNullOrWhiteSpace(item.NormalizedCode))
-                .GroupBy(item => item.NormalizedCode, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(group => group.Key, group => group.OrderBy(item => item.Id).First(), StringComparer.OrdinalIgnoreCase);
+            var existingMap = await LoadExistingMapAsync(
+                context,
+                parsedRows.Where(row => row.Item != null).Select(row => row.Item.NormalizedCode),
+                mode == HsCodeImportMode.CompleteSnapshot,
+                cancellationToken);
 
             var items = BuildPreviewItems(parsedRows, existingMap, detected, mode);
             string normalizedSource = string.IsNullOrWhiteSpace(sourceName)
@@ -109,11 +111,6 @@ namespace ExportDocManager.Services.MasterData
             ArgumentNullException.ThrowIfNull(preview);
             await using var context = await CreateDbContextAsync(cancellationToken);
             await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-            var existing = await context.HsCodes.ToListAsync(cancellationToken);
-            var existingMap = existing
-                .Where(item => !string.IsNullOrWhiteSpace(item.NormalizedCode))
-                .GroupBy(item => item.NormalizedCode, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(group => group.Key, group => group.OrderBy(item => item.Id).First(), StringComparer.OrdinalIgnoreCase);
             int added = 0;
             int updated = 0;
             int unchanged = 0;
@@ -121,65 +118,86 @@ namespace ExportDocManager.Services.MasterData
             int skipped = 0;
             DateTime now = DateTime.Now;
 
-            foreach (var previewItem in preview.Items)
+            // Process the preview in bounded batches.  This keeps EF tracking
+            // and the SQL IN clause bounded for large annual tax schedules,
+            // while retaining one transaction for the whole import.
+            foreach (var previewBatch in preview.Items.Chunk(ImportInClauseBatchSize))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var imported = previewItem.Item;
-                string code = HsCodeTextHelper.NormalizeCode(imported?.Code);
-                if (string.IsNullOrWhiteSpace(code) || previewItem.ChangeType is "Invalid" or "Conflict")
-                {
-                    skipped++;
-                    continue;
-                }
+                var codes = previewBatch
+                    .Select(item => HsCodeTextHelper.NormalizeCode(item.Item?.Code))
+                    .Where(code => !string.IsNullOrWhiteSpace(code))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                var existingMap = await LoadExistingMapAsync(
+                    context,
+                    codes,
+                    includeAll: false,
+                    cancellationToken,
+                    tracking: true);
 
-                if (previewItem.ChangeType == "SuspectedObsolete")
+                foreach (var previewItem in previewBatch)
                 {
-                    if (existingMap.TryGetValue(code, out var obsoleteItem))
+                    var imported = previewItem.Item;
+                    string code = HsCodeTextHelper.NormalizeCode(imported?.Code);
+                    if (string.IsNullOrWhiteSpace(code) || previewItem.ChangeType is "Invalid" or "Conflict")
                     {
-                        obsoleteItem.Status = "SuspectedObsolete";
-                        obsoleteItem.ReplacedByCodes = string.Join(",", previewItem.ReplacementCandidates ?? []);
-                        obsoleteItem.UpdateTime = now;
-                        obsolete++;
+                        skipped++;
+                        continue;
                     }
-                    continue;
-                }
+                    if (previewItem.ChangeType == "SuspectedObsolete")
+                    {
+                        if (existingMap.TryGetValue(code, out var obsoleteItem))
+                        {
+                            obsoleteItem.Status = "SuspectedObsolete";
+                            obsoleteItem.ReplacedByCodes = string.Join(",", previewItem.ReplacementCandidates ?? []);
+                            obsoleteItem.UpdateTime = now;
+                            obsolete++;
+                        }
+                        continue;
+                    }
 
-                if (!existingMap.TryGetValue(code, out var target))
-                {
-                    imported.Id = 0;
-                    imported.Code = code;
-                    imported.Status = "Active";
-                    imported.SourceName = preview.SourceName;
-                    imported.EffectiveYear = preview.EffectiveYear;
-                    imported.LastVerifiedAt = now;
-                    imported.UpdateTime = now;
-                    await context.HsCodes.AddAsync(imported, cancellationToken);
-                    existingMap[code] = imported;
-                    added++;
-                    continue;
-                }
+                    if (!existingMap.TryGetValue(code, out var target))
+                    {
+                        imported.Id = 0;
+                        imported.Code = code;
+                        imported.Status = "Active";
+                        imported.SourceName = preview.SourceName;
+                        imported.EffectiveYear = preview.EffectiveYear;
+                        imported.LastVerifiedAt = now;
+                        imported.UpdateTime = now;
+                        await context.HsCodes.AddAsync(imported, cancellationToken);
+                        // Keep duplicate rows in the same preview batch from
+                        // creating multiple entities before the next save.
+                        existingMap[code] = imported;
+                        added++;
+                        continue;
+                    }
 
-                if (previewItem.ChangeType == "Unchanged")
-                {
+                    if (previewItem.ChangeType == "Unchanged")
+                    {
+                        target.Status = "Active";
+                        target.SourceName = Coalesce(imported.SourceName, preview.SourceName, target.SourceName);
+                        target.EffectiveYear = preview.EffectiveYear ?? target.EffectiveYear;
+                        target.LastVerifiedAt = now;
+                        unchanged++;
+                        continue;
+                    }
+
+                    MergeNonEmptyHsCodeValues(imported, target);
                     target.Status = "Active";
                     target.SourceName = Coalesce(imported.SourceName, preview.SourceName, target.SourceName);
                     target.EffectiveYear = preview.EffectiveYear ?? target.EffectiveYear;
                     target.LastVerifiedAt = now;
-                    unchanged++;
-                    continue;
+                    target.ReplacedByCodes = null;
+                    target.UpdateTime = now;
+                    updated++;
                 }
 
-                MergeNonEmptyHsCodeValues(imported, target);
-                target.Status = "Active";
-                target.SourceName = Coalesce(imported.SourceName, preview.SourceName, target.SourceName);
-                target.EffectiveYear = preview.EffectiveYear ?? target.EffectiveYear;
-                target.LastVerifiedAt = now;
-                target.ReplacedByCodes = null;
-                target.UpdateTime = now;
-                updated++;
+                await context.SaveChangesAsync(cancellationToken);
+                context.ChangeTracker.Clear();
             }
 
-            await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return new HsCodeImportCommitResult(
                 added,
@@ -188,6 +206,53 @@ namespace ExportDocManager.Services.MasterData
                 obsolete,
                 skipped,
                 $"HS编码智能导入完成：新增 {added}，更新 {updated}，不变 {unchanged}，疑似作废 {obsolete}，跳过 {skipped}。");
+        }
+
+        private static async Task<Dictionary<string, HsCode>> LoadExistingMapAsync(
+            AppDbContext context,
+            IEnumerable<string> codes,
+            bool includeAll,
+            CancellationToken cancellationToken,
+            bool tracking = false)
+        {
+            var result = new Dictionary<string, HsCode>(StringComparer.OrdinalIgnoreCase);
+            if (includeAll)
+            {
+                IQueryable<HsCode> all = tracking
+                    ? context.HsCodes.OrderBy(item => item.Id)
+                    : context.HsCodes.AsNoTracking().OrderBy(item => item.Id);
+                await foreach (var item in all.AsAsyncEnumerable().WithCancellation(cancellationToken))
+                {
+                    if (!string.IsNullOrWhiteSpace(item.NormalizedCode))
+                    {
+                        result.TryAdd(item.NormalizedCode, item);
+                    }
+                }
+                return result;
+            }
+
+            foreach (var batch in (codes ?? Enumerable.Empty<string>())
+                         .Where(code => !string.IsNullOrWhiteSpace(code))
+                         .Distinct(StringComparer.OrdinalIgnoreCase)
+                         .Chunk(ImportInClauseBatchSize))
+            {
+                string[] values = batch.ToArray();
+                IQueryable<HsCode> query = context.HsCodes;
+                if (!tracking)
+                {
+                    query = query.AsNoTracking();
+                }
+
+                var rows = await query
+                    .Where(item => values.Contains(item.NormalizedCode))
+                    .ToListAsync(cancellationToken);
+                foreach (var row in rows)
+                {
+                    result.TryAdd(row.NormalizedCode, row);
+                }
+            }
+
+            return result;
         }
 
         private static DetectedImportLayout DetectBestImportLayout(XLWorkbook workbook)

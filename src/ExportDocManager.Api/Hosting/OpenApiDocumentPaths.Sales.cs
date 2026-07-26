@@ -518,9 +518,10 @@ namespace ExportDocManager.Api.Hosting
                         get = new
                         {
                             summary = "List suppliers", operationId = "listSuppliers", security = BearerSecurity(),
+                            deprecated = true,
                             responses = new Dictionary<string, object>
                             {
-                                ["200"] = new { description = "Suppliers.", content = JsonArrayContent("ApiSupplierDto") },
+                                ["200"] = new { description = "Legacy supplier list capped at 200 rows. Use /api/suppliers/page for normal screens.", content = JsonArrayContent("ApiSupplierDto") },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "Sales workspace is not available." }
                             }

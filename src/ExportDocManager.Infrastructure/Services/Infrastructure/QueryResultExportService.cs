@@ -59,10 +59,6 @@ namespace ExportDocManager.Services.Infrastructure
             var firstPage = await _queryReadRepository.QueryPageAsync(
                 BuildExportPageQuery(query, 1),
                 cancellationToken);
-            if (firstPage.TotalCount <= 0 || firstPage.Items.Count == 0)
-            {
-                return new QueryResultExportResult(0, destinationPath);
-            }
 
             int exportedCount = 0;
             await AtomicFileHelper.WriteFileAtomicAsync(
@@ -83,26 +79,6 @@ namespace ExportDocManager.Services.Infrastructure
             });
 
             return new QueryResultExportResult(exportedCount, destinationPath);
-        }
-
-        public async Task<QueryResultExportBytesResult> ExportToExcelBytesAsync(
-            QueryPageQuery query,
-            CancellationToken cancellationToken = default)
-        {
-            var firstPage = await _queryReadRepository.QueryPageAsync(
-                BuildExportPageQuery(query, 1),
-                cancellationToken);
-
-            using var workbook = new XLWorkbook();
-            int exportedCount = await PopulateWorkbookAsync(
-                workbook,
-                query,
-                firstPage,
-                progress: null,
-                cancellationToken);
-            using var output = new MemoryStream();
-            workbook.SaveAs(output);
-            return new QueryResultExportBytesResult(output.ToArray(), exportedCount);
         }
 
         private async Task<int> WriteWorkbook(

@@ -44,14 +44,18 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapGet("/api/tools/container-packing/projects", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
-                IContainerLoadingService containerLoadingService) =>
+                IContainerLoadingService containerLoadingService,
+                int? limit,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
                     return Results.Unauthorized();
                 }
 
-                var projects = await containerLoadingService.GetAllProjectsAsync();
+                var projects = await containerLoadingService.GetRecentProjectsAsync(
+                    limit ?? 100,
+                    cancellationToken);
                 return Results.Ok(new ApiContainerPackingProjectListResponse(
                     projects.Select(ApiContainerPackingProjectDtoFactory.FromProjectSummary).ToList(),
                     ApiContainerPackingProjectDtoFactory.StoragePolicy));

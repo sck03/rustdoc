@@ -55,15 +55,15 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("ListQueriedInvoices");
 
-            endpoints.MapPost("/api/query/invoices/save-to-path", async (
+            endpoints.MapPost("/api/query/invoices/save-to-path", (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiDesktopAccessOptions desktopAccessOptions,
-                IQueryResultExportService queryResultExportService,
-                ApiQueryInvoiceExportRequest request,
-                CancellationToken cancellationToken) =>
+                ApiBackgroundJobRunner jobRunner,
+                ApiQueryInvoiceExportRequest request) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                if (user == null)
                 {
                     return Results.Unauthorized();
                 }
@@ -84,28 +84,23 @@ namespace ExportDocManager.Api.Hosting
                     return validation;
                 }
 
-                var result = await queryResultExportService.ExportToExcelAsync(
-                    ToQueryPageQuery(request),
-                    destinationPath,
-                    cancellationToken: cancellationToken);
-
-                return Results.Ok(new ApiQueryInvoiceExportResponse(
-                    true,
-                    result.ExportedCount > 0 ? "查询结果已导出。" : "当前条件下没有可导出的查询结果。",
-                    result.ExportedCount,
-                    result.DestinationPath,
-                    QueryInvoiceStoragePolicy));
+                return AcceptedBackgroundJob(EnqueueQueryInvoiceExportJob(
+                    jobRunner,
+                    user.Username,
+                    request,
+                    destinationPath));
             })
             .WithName("SaveQueriedInvoicesToPath");
 
-            endpoints.MapPost("/api/query/invoices/download", async (
+            endpoints.MapPost("/api/query/invoices/download", (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
-                IQueryResultExportService queryResultExportService,
-                ApiQueryInvoiceFilterRequest request,
-                CancellationToken cancellationToken) =>
+                IAppPathProvider pathProvider,
+                ApiBackgroundJobRunner jobRunner,
+                ApiQueryInvoiceFilterRequest request) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                if (user == null)
                 {
                     return Results.Unauthorized();
                 }
@@ -115,15 +110,75 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("查询结果下载请求体不能为空。"));
                 }
 
-                var result = await queryResultExportService.ExportToExcelBytesAsync(
-                    ToQueryPageQuery(request),
-                    cancellationToken);
-                return Results.File(
-                    result.Content,
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                string destinationPath = CreateBrowserDownloadPath(
+                    pathProvider,
+                    "QueryExport",
                     $"QueryResults_{DateTime.Now:yyyyMMdd-HHmmss}.xlsx");
+                return AcceptedBackgroundJob(EnqueueQueryInvoiceExportJob(
+                    jobRunner,
+                    user.Username,
+                    request,
+                    destinationPath));
             })
             .WithName("DownloadQueriedInvoices");
+        }
+
+        internal static BackgroundJobSnapshot EnqueueQueryInvoiceExportJob(
+            ApiBackgroundJobRunner jobRunner,
+            string requestedBy,
+            ApiQueryInvoiceFilterRequest request,
+            string destinationPath)
+        {
+            var retryRequest = new ApiQueryInvoiceExportRequest
+            {
+                StartDate = request?.StartDate,
+                EndDate = request?.EndDate,
+                CustomerId = request?.CustomerId,
+                ExporterId = request?.ExporterId,
+                Keyword = request?.Keyword ?? string.Empty,
+                ContractNo = request?.ContractNo ?? string.Empty,
+                InvoiceType = request?.InvoiceType ?? string.Empty,
+                TransportMode = request?.TransportMode ?? string.Empty,
+                StyleName = request?.StyleName ?? string.Empty,
+                StyleNo = request?.StyleNo ?? string.Empty,
+                DestinationPath = destinationPath
+            };
+
+            return jobRunner.Enqueue(
+                "QueryInvoiceExcelExport",
+                "导出查询结果 Excel",
+                requestedBy,
+                async (provider, jobContext) =>
+                {
+                    jobContext.Report(5, "正在准备查询结果", QueryInvoiceStoragePolicy, destinationPath);
+                    var progress = new InlineProgress<OperationProgressUpdate>(update =>
+                    {
+                        jobContext.Report(
+                            Math.Clamp(update.ProgressPercent ?? 5, 5, 98),
+                            update.StatusText,
+                            update.DetailText,
+                            destinationPath);
+                    });
+                    var exportService = provider.GetRequiredService<IQueryResultExportService>();
+                    var result = await exportService.ExportToExcelAsync(
+                            ToQueryPageQuery(retryRequest),
+                            destinationPath,
+                            progress,
+                            jobContext.CancellationToken)
+                        .ConfigureAwait(false);
+
+                    jobContext.Report(
+                        99,
+                        "正在保存查询结果",
+                        result.ExportedCount > 0
+                            ? $"已导出 {result.ExportedCount} 条记录。"
+                            : "当前条件下没有记录，已生成仅含表头的 Excel。",
+                        result.DestinationPath);
+                    return result.DestinationPath;
+                },
+                retryOperation: "StartQueryInvoiceExportJob",
+                retryRequestJson: SerializeBackgroundJobRetryRequest(retryRequest),
+                initialOutputPath: destinationPath);
         }
 
         private static QueryPageQuery ToQueryPageQuery(ApiQueryInvoiceFilterRequest request)

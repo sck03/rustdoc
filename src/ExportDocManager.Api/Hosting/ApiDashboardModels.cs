@@ -14,6 +14,22 @@ namespace ExportDocManager.Api.Hosting
 
         public int TotalActiveCount { get; init; }
 
+        public string PeriodLabel { get; init; } = string.Empty;
+
+        public decimal PreviousMonthlyExportAmount { get; init; }
+
+        public decimal PreviousMonthlyProfit { get; init; }
+
+        public decimal PreviousMonthlyTaxRefund { get; init; }
+
+        public int MonthlyInvoiceCount { get; init; }
+
+        public int DraftCount { get; init; }
+
+        public int VerifiedCount { get; init; }
+
+        public int CompletedCount { get; init; }
+
         public string SingleWindowStatusSummary { get; init; } = string.Empty;
 
         public IReadOnlyList<ApiDashboardRecentInvoiceDto> RecentInvoices { get; init; } = Array.Empty<ApiDashboardRecentInvoiceDto>();

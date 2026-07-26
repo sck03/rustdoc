@@ -4,6 +4,7 @@ import type { ApiProductDto } from "../../api/index.ts";
 import { formatPlainNumber, normalizeText, numberValue } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { useModalDialog } from "../../ui/useModalDialog.ts";
 
 export function ProductLibraryPickerDialog({
   focusedRowIndex,
@@ -41,6 +42,10 @@ export function ProductLibraryPickerDialog({
   onPageSizeChange: (pageSize: number) => void;
 }) {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const dialogRef = useModalDialog<HTMLDivElement>(onClose, {
+    canClose: !isBusy,
+    initialFocusRef: searchInputRef,
+  });
   const [keyword, setKeyword] = useState(initialKeyword);
   const [selectedProductId, setSelectedProductId] = useState(() => products[0]?.id ?? 0);
   const displayedProducts = products;
@@ -81,13 +86,12 @@ export function ProductLibraryPickerDialog({
   }
 
   return (
-    <div className="single-window-lock-backdrop" onKeyDown={(event) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
+    <div className="single-window-lock-backdrop" onMouseDown={(event) => {
+      if (event.target === event.currentTarget && !isBusy) {
         onClose();
       }
     }}>
-      <div className="single-window-lock-dialog product-library-dialog" role="dialog" aria-modal="true" aria-labelledby="product-library-picker-title">
+      <div ref={dialogRef} className="single-window-lock-dialog product-library-dialog" role="dialog" aria-modal="true" aria-labelledby="product-library-picker-title">
         <div className="single-window-lock-header">
           <div className="single-window-lock-title">
             <PackageSearch size={18} aria-hidden="true" />

@@ -211,7 +211,7 @@ namespace ExportDocManager.Api.Hosting
                             Path.GetFileName(destinationPath),
                             destinationPath);
 
-                        var zipProgress = new Progress<OperationProgressUpdate>(update =>
+                        var zipProgress = new InlineProgress<OperationProgressUpdate>(update =>
                         {
                             jobContext.Report(
                                 update.ProgressPercent,

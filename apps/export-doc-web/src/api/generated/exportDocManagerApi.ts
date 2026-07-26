@@ -793,16 +793,24 @@ export interface ApiDashboardRecentInvoiceDto {
 }
 
 export interface ApiDashboardResponse {
+  completedCount: number;
+  draftCount: number;
   monthlyExportAmount: number;
+  monthlyInvoiceCount: number;
   monthlyProfit: number;
   monthlyTaxRefund: number;
   pendingCount: number;
+  periodLabel: string;
+  previousMonthlyExportAmount: number;
+  previousMonthlyProfit: number;
+  previousMonthlyTaxRefund: number;
   recentInvoices: ApiDashboardRecentInvoiceDto[];
   shippedCount: number;
   singleWindowStatusSummary: string;
   storagePolicy: string;
   todoItems: ApiDashboardTodoItemDto[];
   totalActiveCount: number;
+  verifiedCount: number;
 }
 
 export interface ApiDashboardTodoItemDto {
@@ -2019,14 +2027,6 @@ export interface ApiQueryInvoiceExportRequest {
   styleName?: string;
   styleNo?: string;
   transportMode?: string;
-}
-
-export interface ApiQueryInvoiceExportResponse {
-  destinationPath: string;
-  exportedCount: number;
-  message: string;
-  storagePolicy: string;
-  success: boolean;
 }
 
 export interface ApiQueryInvoiceFilterRequest {
@@ -3811,6 +3811,10 @@ export interface ListAuditLogsRequest {
   keyword?: string;
 }
 
+export interface ListContainerPackingProjectsRequest {
+  limit?: number;
+}
+
 export interface ListCrmContactsRequest {
   customerId: number;
 }
@@ -5109,9 +5113,9 @@ export class ExportDocManagerApiClient {
     return this.request<Blob>("GET", path, { init });
   }
 
-  public downloadQueriedInvoices(request: DownloadQueriedInvoicesRequest, init?: RequestInit): Promise<Blob> {
+  public downloadQueriedInvoices(request: DownloadQueriedInvoicesRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/query/invoices/download";
-    return this.request<Blob>("POST", path, {
+    return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
       init,
     });
@@ -5511,9 +5515,14 @@ export class ExportDocManagerApiClient {
     return this.request<ApiContainerTypeListResponse>("GET", path, { init });
   }
 
-  public listContainerPackingProjects(init?: RequestInit): Promise<ApiContainerPackingProjectListResponse> {
+  public listContainerPackingProjects(request: ListContainerPackingProjectsRequest = {}, init?: RequestInit): Promise<ApiContainerPackingProjectListResponse> {
     const path = "/api/tools/container-packing/projects";
-    return this.request<ApiContainerPackingProjectListResponse>("GET", path, { init });
+    return this.request<ApiContainerPackingProjectListResponse>("GET", path, {
+      query: {
+        "limit": request.limit,
+      },
+      init,
+    });
   }
 
   public listCrmContacts(request: ListCrmContactsRequest, init?: RequestInit): Promise<ApiCrmContactDto[]> {
@@ -6287,9 +6296,9 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveQueriedInvoicesToPath(request: SaveQueriedInvoicesToPathRequest, init?: RequestInit): Promise<ApiQueryInvoiceExportResponse> {
+  public saveQueriedInvoicesToPath(request: SaveQueriedInvoicesToPathRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/query/invoices/save-to-path";
-    return this.request<ApiQueryInvoiceExportResponse>("POST", path, {
+    return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
       init,
     });

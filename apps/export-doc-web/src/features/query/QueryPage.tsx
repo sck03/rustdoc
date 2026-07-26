@@ -12,8 +12,9 @@ import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { downloadBlob } from "../../ui/downloadBlob.ts";
+import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { formatAmount, formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
+import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 
 const defaultPageSize = 50;
@@ -44,6 +45,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
   const [pageSize, setPageSize] = useState(() => initialViewState.pageSize);
   const [exportPath, setExportPath] = useState("");
   const [actionMessage, setActionMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const [lastCreatedJobId, setLastCreatedJobId] = useState<string | null>(null);
 
   const partiesQuery = useQuery({
     queryKey: queryKeys.invoiceParties(),
@@ -107,33 +109,32 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
   const exportMutation = useMutation({
     mutationFn: async () => {
       if (isDesktop) {
-        const response = await client.saveQueriedInvoicesToPath({
+        const job = await client.saveQueriedInvoicesToPath({
           body: {
             ...toApiFilters(committedFilters),
             destinationPath: exportPath.trim(),
           },
         });
-        return { mode: "desktop" as const, response };
+        setLastCreatedJobId(job.jobId);
+        return { mode: "desktop" as const, job };
       }
 
-      const blob = await client.downloadQueriedInvoices({
+      const job = await client.downloadQueriedInvoices({
         body: toApiFilters(committedFilters),
       });
-      downloadBlob(blob, buildQueryExportFileName());
-      return { mode: "browser" as const };
+      setLastCreatedJobId(job.jobId);
+      await downloadJobResultWhenReady(client, job, buildQueryExportFileName());
+      return { mode: "browser" as const, job };
     },
     onSuccess: (result) => {
       if (result.mode === "browser") {
-        setActionMessage({ kind: "success", text: "查询结果 Excel 已交给浏览器下载。" });
+        setActionMessage({ kind: "success", text: "查询结果 Excel 已生成并交给浏览器下载。" });
         return;
       }
 
-      const response = result.response;
       setActionMessage({
         kind: "success",
-        text: response.destinationPath
-          ? `${response.message} ${response.exportedCount} 条，${response.destinationPath}`
-          : `${response.message} ${response.exportedCount} 条`,
+        text: "查询结果 Excel 已加入任务中心，完成后将保存到所选路径。",
       });
     },
     onError: (error) => setActionMessage({ kind: "error", text: readApiError(error) }),
@@ -166,6 +167,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
   function runSearch() {
     setCommittedFilters(normalizeFilters(filters));
     setActionMessage(null);
+    setLastCreatedJobId(null);
     setPageNumber(1);
   }
 
@@ -208,6 +210,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
       if (selected) {
         setExportPath(selected);
         setActionMessage(null);
+        setLastCreatedJobId(null);
       }
     } catch (error) {
       setActionMessage({ kind: "error", text: readDesktopError(error) });
@@ -220,6 +223,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
     }
 
     setActionMessage(null);
+    setLastCreatedJobId(null);
     exportMutation.mutate();
   }
 
@@ -359,7 +363,14 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
 
       {message ? <InlineNotice tone="error" title="查询未完成">{message}</InlineNotice> : null}
       {partiesQuery.isError ? <InlineNotice tone="warning" title="客户与出口商资料未加载">{readApiError(partiesQuery.error)}</InlineNotice> : null}
-      {actionMessage ? <InlineNotice tone={actionMessage.kind === "success" ? "success" : "error"}>{actionMessage.text}</InlineNotice> : null}
+      {actionMessage ? (
+        <InlineNotice
+          tone={actionMessage.kind === "success" ? "success" : "error"}
+          action={<ViewJobButton jobId={lastCreatedJobId} disabled={isActionBusy} />}
+        >
+          {actionMessage.text}
+        </InlineNotice>
+      ) : null}
 
       <QueryResultTable data={rows} isBusy={isBusy} onOpen={(invoiceId) => navigate(`/invoices/${invoiceId}`)} />
 

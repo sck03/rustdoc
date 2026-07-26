@@ -54,6 +54,7 @@ namespace ExportDocManager.Api.Hosting
         }
 
         private static async Task<IResult> DownloadSingleWindowSubmitPackageAsync(
+            HttpContext context,
             ISingleWindowHandoffPackageService handoffPackageService,
             ISettingsService settingsService,
             IAppPathProvider pathProvider,
@@ -71,6 +72,8 @@ namespace ExportDocManager.Api.Hosting
                 pathProvider,
                 "SingleWindowSubmitPackage",
                 $"{prefix}-{invoiceId}-{DateTime.Now:yyyyMMdd-HHmmss}.swpkg");
+            string packageDirectory = Path.GetDirectoryName(packagePath) ?? string.Empty;
+            bool cleanupRegistered = false;
             try
             {
                 await settingsService.LoadAsync();
@@ -79,8 +82,14 @@ namespace ExportDocManager.Api.Hosting
                     invoiceId,
                     packagePath,
                     cancellationToken);
-                byte[] content = await File.ReadAllBytesAsync(result.PackagePath, cancellationToken);
-                return Results.File(content, "application/octet-stream", Path.GetFileName(result.PackagePath));
+                var response = StreamTemporaryFile(
+                    context,
+                    result.PackagePath,
+                    "application/octet-stream",
+                    Path.GetFileName(result.PackagePath),
+                    packageDirectory);
+                cleanupRegistered = true;
+                return response;
             }
             catch (ArgumentException ex)
             {
@@ -96,8 +105,10 @@ namespace ExportDocManager.Api.Hosting
             }
             finally
             {
-                string directory = Path.GetDirectoryName(packagePath) ?? string.Empty;
-                AtomicFileHelper.TryDeleteDirectory(directory);
+                if (!cleanupRegistered)
+                {
+                    AtomicFileHelper.TryDeleteDirectory(packageDirectory);
+                }
             }
         }
 
@@ -165,6 +176,7 @@ namespace ExportDocManager.Api.Hosting
         }
 
         private static async Task<IResult> DownloadSingleWindowReceiptPackageAsync(
+            HttpContext context,
             ISingleWindowHandoffPackageService handoffPackageService,
             IAppPathProvider pathProvider,
             ApiSingleWindowReceiptPackageExportRequest request,
@@ -195,6 +207,8 @@ namespace ExportDocManager.Api.Hosting
                 pathProvider,
                 "SingleWindowReceiptPackage",
                 $"Receipt-{prefix}-{DateTime.Now:yyyyMMdd-HHmmss}.swpkg");
+            string packageDirectory = Path.GetDirectoryName(packagePath) ?? string.Empty;
+            bool cleanupRegistered = false;
             try
             {
                 var result = await handoffPackageService.ExportReceiptPackageAsync(
@@ -204,8 +218,14 @@ namespace ExportDocManager.Api.Hosting
                     receiptFiles,
                     packagePath,
                     cancellationToken);
-                byte[] content = await File.ReadAllBytesAsync(result.PackagePath, cancellationToken);
-                return Results.File(content, "application/octet-stream", Path.GetFileName(result.PackagePath));
+                var response = StreamTemporaryFile(
+                    context,
+                    result.PackagePath,
+                    "application/octet-stream",
+                    Path.GetFileName(result.PackagePath),
+                    packageDirectory);
+                cleanupRegistered = true;
+                return response;
             }
             catch (ArgumentException ex)
             {
@@ -217,8 +237,10 @@ namespace ExportDocManager.Api.Hosting
             }
             finally
             {
-                string directory = Path.GetDirectoryName(packagePath) ?? string.Empty;
-                AtomicFileHelper.TryDeleteDirectory(directory);
+                if (!cleanupRegistered)
+                {
+                    AtomicFileHelper.TryDeleteDirectory(packageDirectory);
+                }
             }
         }
 

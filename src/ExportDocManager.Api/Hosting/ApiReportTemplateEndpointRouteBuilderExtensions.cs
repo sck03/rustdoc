@@ -441,15 +441,19 @@ namespace ExportDocManager.Api.Hosting
                     "TemplatePackages",
                     "edtpl-download");
                 string packagePath = Path.Combine(tempRoot, BuildReportTemplatePackageFileName());
+                bool cleanupRegistered = false;
 
                 try
                 {
                     var result = await packageService.ExportAsync(packagePath, cancellationToken: cancellationToken);
-                    byte[] bytes = await File.ReadAllBytesAsync(result.PackagePath, cancellationToken);
-                    return Results.File(
-                        bytes,
+                    var response = StreamTemporaryFile(
+                        context,
+                        result.PackagePath,
                         "application/octet-stream",
-                        Path.GetFileName(result.PackagePath));
+                        Path.GetFileName(result.PackagePath),
+                        tempRoot);
+                    cleanupRegistered = true;
+                    return response;
                 }
                 catch (ArgumentException ex)
                 {
@@ -465,7 +469,10 @@ namespace ExportDocManager.Api.Hosting
                 }
                 finally
                 {
-                    AtomicFileHelper.TryDeleteDirectory(tempRoot);
+                    if (!cleanupRegistered)
+                    {
+                        AtomicFileHelper.TryDeleteDirectory(tempRoot);
+                    }
                 }
             })
             .WithName("DownloadReportTemplatePackage");

@@ -9,14 +9,15 @@ Var ExportDocManagerDataRoot
 Var ExportDocManagerDataRootJson
 Var ExportDocManagerRuntimePathsConfig
 
-!macro EXPORTDOCMANAGER_ABORT_IF_SYSTEM_DRIVE_INSTALL
+!macro EXPORTDOCMANAGER_WARN_IF_SYSTEM_DRIVE_INSTALL
   ${GetRoot} "$WINDIR" $ExportDocManagerSystemDrive
   ${GetRoot} "$INSTDIR" $ExportDocManagerInstallDrive
 
   ${If} "$ExportDocManagerSystemDrive" != ""
   ${AndIf} "$ExportDocManagerInstallDrive" == "$ExportDocManagerSystemDrive"
-    MessageBox MB_ICONEXCLAMATION|MB_OK "外贸业务综合管理系统默认将程序依赖和业务数据放在非系统盘。请返回选择非系统盘安装目录，例如 D:\ExportDocManager。"
-    Abort "外贸业务综合管理系统安装目录必须位于 Windows 系统盘之外。"
+    IfSilent system_drive_install_notice_done
+    MessageBox MB_ICONINFORMATION|MB_OK "当前安装目录位于 Windows 系统盘。程序会将可写数据放在安装目录下的 App_Data；如果设备有独立数据盘，可在首次运行时再设置数据目录。"
+    system_drive_install_notice_done:
   ${EndIf}
 !macroend
 
@@ -59,7 +60,7 @@ Var ExportDocManagerRuntimePathsConfig
 !macroend
 
 !macro NSIS_HOOK_PREINSTALL
-  !insertmacro EXPORTDOCMANAGER_ABORT_IF_SYSTEM_DRIVE_INSTALL
+  !insertmacro EXPORTDOCMANAGER_WARN_IF_SYSTEM_DRIVE_INSTALL
   !insertmacro EXPORTDOCMANAGER_CREATE_RUNTIME_DATA_ROOT
 !macroend
 

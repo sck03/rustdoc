@@ -14,7 +14,15 @@ namespace ExportDocManager.Services.Dashboard
         int TotalActiveCount,
         string SingleWindowStatusSummary,
         IReadOnlyList<DashboardRecentInvoice> RecentInvoices,
-        IReadOnlyList<DashboardTodoItem> TodoItems);
+        IReadOnlyList<DashboardTodoItem> TodoItems,
+        string PeriodLabel,
+        decimal PreviousMonthlyExportAmount,
+        decimal PreviousMonthlyProfit,
+        decimal PreviousMonthlyTaxRefund,
+        int MonthlyInvoiceCount,
+        int DraftCount,
+        int VerifiedCount,
+        int CompletedCount);
 
     public sealed record DashboardRecentInvoice(
         int Id,

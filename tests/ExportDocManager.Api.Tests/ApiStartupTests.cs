@@ -683,6 +683,31 @@ namespace ExportDocManager.Api.Tests
                 ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
                     "/api/reports/templates/example.html",
                     HttpMethods.Delete));
+            Assert.Equal(
+                PermissionAccessLevel.Manage,
+                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
+                    "/api/master-data/hs-knowledge/examples",
+                    HttpMethods.Post));
+            Assert.Equal(
+                PermissionAccessLevel.Manage,
+                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
+                    "/api/master-data/hs-knowledge/remote-candidates/review-batch",
+                    HttpMethods.Post));
+            Assert.Equal(
+                PermissionAccessLevel.Manage,
+                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
+                    "/api/master-data/hs-codes/import-upload",
+                    HttpMethods.Post));
+            Assert.Equal(
+                PermissionAccessLevel.Manage,
+                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
+                    "/api/tools/container-packing/container-types",
+                    HttpMethods.Post));
+            Assert.Equal(
+                PermissionAccessLevel.View,
+                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
+                    "/api/tools/container-packing/container-types",
+                    HttpMethods.Get));
         }
 
         [Theory]
@@ -1597,6 +1622,43 @@ namespace ExportDocManager.Api.Tests
             Assert.NotNull(await service.GetAsync("running"));
             Assert.Null(await service.GetAsync("failed"));
             Assert.Null(await service.GetAsync("succeeded"));
+        }
+
+        [Fact]
+        public async Task ApiBackgroundJobExecutionContext_ShouldIgnoreLateProgressAfterTerminalState()
+        {
+            var service = new ApiBackgroundJobService();
+            var completedAt = DateTimeOffset.UtcNow;
+            var terminal = service.Upsert(new BackgroundJobSnapshot
+            {
+                JobId = "late-progress",
+                Kind = "QueryInvoiceExcelExport",
+                Title = "导出查询结果 Excel",
+                Status = BackgroundJobStatusCatalog.Succeeded,
+                ProgressPercent = 100,
+                StatusText = "已完成",
+                DetailText = "已导出 1 条记录。",
+                RequestedBy = "admin",
+                RequestedByUserId = 1,
+                CreatedAt = completedAt.AddSeconds(-1),
+                StartedAt = completedAt.AddMilliseconds(-500),
+                CompletedAt = completedAt,
+                OutputPath = "query.xlsx",
+                CanCancel = false,
+                CanRetry = false
+            });
+            var context = new ApiBackgroundJobExecutionContext(service, terminal, CancellationToken.None);
+
+            context.Report(75, "导出完成", "已写入 1 行。", "late.xlsx");
+
+            var current = await service.GetAsync(terminal.JobId);
+            Assert.NotNull(current);
+            Assert.Equal(BackgroundJobStatusCatalog.Succeeded, current.Status);
+            Assert.Equal(100, current.ProgressPercent);
+            Assert.Equal("已完成", current.StatusText);
+            Assert.Equal(completedAt, current.CompletedAt);
+            Assert.Equal("query.xlsx", current.OutputPath);
+            Assert.Equal(1, current.RequestedByUserId);
         }
 
         [Fact]

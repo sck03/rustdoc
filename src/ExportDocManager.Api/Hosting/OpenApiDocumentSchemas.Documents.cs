@@ -662,19 +662,6 @@ namespace ExportDocManager.Api.Hosting
                                     ["destinationPath"] = StringProperty("User-selected .xlsx output path. The sidecar does not choose a default export directory.")
                                 })
                         },
-                        ["ApiQueryInvoiceExportResponse"] = new
-                        {
-                            type = "object",
-                            required = new[] { "success", "message", "exportedCount", "destinationPath", "storagePolicy" },
-                            properties = new Dictionary<string, object>
-                            {
-                                ["success"] = new { type = "boolean" },
-                                ["message"] = StringProperty("User-facing export result message."),
-                                ["exportedCount"] = new { type = "integer", format = "int32" },
-                                ["destinationPath"] = StringProperty("Normalized user-selected export path."),
-                                ["storagePolicy"] = StringProperty("Runtime path and invoice/payment data-domain policy for query export.")
-                            }
-                        },
                         ["ApiInvoiceDetailDto"] = new
                         {
                             type = "object",

@@ -93,11 +93,19 @@ namespace ExportDocManager.Api.Hosting
                     pathProvider,
                     "InvoiceTransfer",
                     $"Invoice-{id}-{DateTime.Now:yyyyMMdd-HHmmss}.edpkg");
+                string packageDirectory = Path.GetDirectoryName(packagePath) ?? string.Empty;
+                bool cleanupRegistered = false;
                 try
                 {
                     string exportedPath = await transferService.ExportAsync(id, packagePath, cancellationToken);
-                    byte[] content = await File.ReadAllBytesAsync(exportedPath, cancellationToken);
-                    return Results.File(content, "application/octet-stream", Path.GetFileName(exportedPath));
+                    var response = StreamTemporaryFile(
+                        context,
+                        exportedPath,
+                        "application/octet-stream",
+                        Path.GetFileName(exportedPath),
+                        packageDirectory);
+                    cleanupRegistered = true;
+                    return response;
                 }
                 catch (FileNotFoundException)
                 {
@@ -111,10 +119,12 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return WriteConflict(ex.Message);
                 }
-            finally
-            {
-                string directory = Path.GetDirectoryName(packagePath) ?? string.Empty;
-                AtomicFileHelper.TryDeleteDirectory(directory);
+                finally
+                {
+                    if (!cleanupRegistered)
+                    {
+                        AtomicFileHelper.TryDeleteDirectory(packageDirectory);
+                    }
                 }
             })
             .WithName("DownloadInvoiceTransferPackage");

@@ -323,6 +323,24 @@ namespace ExportDocManager.Api.Hosting
                 return PermissionAccessLevel.Manage;
             }
 
+            // HS knowledge, annual tax schedules, and container type
+            // definitions are company-shared reference data.  Everyone may
+            // query them, but only a data administrator should change the
+            // shared catalogue or approve remote candidates.
+            if (path.Equals("/api/master-data/hs-knowledge/import", StringComparison.OrdinalIgnoreCase) ||
+                (path.StartsWithSegments("/api/master-data/hs-knowledge/examples", StringComparison.OrdinalIgnoreCase) &&
+                 IsMutationMethod(method)) ||
+                (path.StartsWithSegments("/api/master-data/hs-knowledge/remote-candidates", StringComparison.OrdinalIgnoreCase) &&
+                 IsMutationMethod(method)) ||
+                path.Equals("/api/master-data/hs-codes/import-commit", StringComparison.OrdinalIgnoreCase) ||
+                path.Equals("/api/master-data/hs-codes/import-path", StringComparison.OrdinalIgnoreCase) ||
+                path.Equals("/api/master-data/hs-codes/import-upload", StringComparison.OrdinalIgnoreCase) ||
+                (path.StartsWithSegments("/api/tools/container-packing/container-types", StringComparison.OrdinalIgnoreCase) &&
+                 IsMutationMethod(method)))
+            {
+                return PermissionAccessLevel.Manage;
+            }
+
             // User report templates are ownership-scoped by UserReportTemplateService.
             // Operators may delete their own templates, while administrator-owned file
             // templates and every other destructive endpoint still require manage.
@@ -334,6 +352,12 @@ namespace ExportDocManager.Api.Hosting
 
             return GetRequiredAccessLevel(method);
         }
+
+        private static bool IsMutationMethod(string method) =>
+            HttpMethods.IsPost(method) ||
+            HttpMethods.IsPut(method) ||
+            HttpMethods.IsPatch(method) ||
+            HttpMethods.IsDelete(method);
     }
 
     public static class ApiAuthenticationApplicationBuilderExtensions

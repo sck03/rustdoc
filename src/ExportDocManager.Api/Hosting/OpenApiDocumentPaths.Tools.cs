@@ -280,6 +280,10 @@ namespace ExportDocManager.Api.Hosting
                         {
                             summary = "List saved container packing projects",
                             operationId = "listContainerPackingProjects",
+                            parameters = new[]
+                            {
+                                QueryParameter("limit", "integer", "int32", "Maximum recent projects to return. Defaults to 100 and is capped at 200.")
+                            },
                             responses = new Dictionary<string, object>
                             {
                                 ["200"] = new

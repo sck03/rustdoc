@@ -26,57 +26,35 @@ namespace ExportDocManager.Services.Infrastructure
             var startOfMonth = new DateTime(now.Year, now.Month, 1);
             var endOfMonth = startOfMonth.AddMonths(1);
             var scopedInvoices = _businessDataAccessScope.ApplyInvoiceScope(context.Invoices.AsNoTracking());
+            var activeInvoices = BuildPreferredInvoiceQuery(
+                scopedInvoices.Where(invoice => invoice.Status != InvoiceStatusCatalog.Cancelled));
 
-            var monthlyInvoicesRaw = await scopedInvoices
-                .Where(invoice =>
-                    invoice.InvoiceDate >= startOfMonth &&
-                    invoice.InvoiceDate < endOfMonth &&
-                    invoice.Status != InvoiceStatusCatalog.Cancelled)
-                .Select(invoice => new DashboardInvoiceSnapshot
-                {
-                    Id = invoice.Id,
-                    InvoiceNo = invoice.InvoiceNo,
-                    Status = invoice.Status,
-                    Type = invoice.Type,
-                    InvoiceDate = invoice.InvoiceDate,
-                    TotalAmount = invoice.TotalAmount,
-                    TotalProfit = invoice.TotalProfit,
-                    TotalTaxRefundAmount = invoice.TotalTaxRefundAmount,
-                    CustomerNameEN = invoice.CustomerNameEN
-                })
+            // Only the current and previous period rows are materialized.  The
+            // former implementation loaded every active invoice into the API
+            // process in order to deduplicate and count statuses, which made
+            // the dashboard increasingly expensive as history grew.
+            var monthlyInvoices = await SelectDashboardInvoiceSnapshots(activeInvoices
+                    .Where(invoice => invoice.InvoiceDate >= startOfMonth && invoice.InvoiceDate < endOfMonth),
+                includeCustomer: true,
+                cancellationToken);
+            var previousMonthlyInvoices = await SelectDashboardInvoiceSnapshots(activeInvoices
+                    .Where(invoice => invoice.InvoiceDate >= startOfMonth.AddMonths(-1) && invoice.InvoiceDate < startOfMonth),
+                includeCustomer: false,
+                cancellationToken);
+
+            var statusCounts = await activeInvoices
+                .GroupBy(invoice => invoice.Status ?? string.Empty)
+                .Select(group => new { Status = group.Key, Count = group.Count() })
                 .ToListAsync(cancellationToken);
 
-            var uniqueMonthlyInvoices = DeduplicateByInvoiceNo(monthlyInvoicesRaw);
+            int CountStatus(string status) => statusCounts.FirstOrDefault(item => item.Status == status)?.Count ?? 0;
+            int draftCount = CountStatus(InvoiceStatusCatalog.Draft);
+            int verifiedCount = CountStatus(InvoiceStatusCatalog.Verified);
+            int shippedCount = CountStatus(InvoiceStatusCatalog.Shipped);
+            int completedCount = CountStatus(InvoiceStatusCatalog.Completed);
+            int totalActiveCount = await activeInvoices.CountAsync(cancellationToken);
 
-            var allActiveInvoices = await scopedInvoices
-                .Where(invoice => invoice.Status != InvoiceStatusCatalog.Cancelled)
-                .Select(invoice => new DashboardInvoiceSnapshot
-                {
-                    Id = invoice.Id,
-                    InvoiceNo = invoice.InvoiceNo,
-                    Status = invoice.Status,
-                    Type = invoice.Type
-                })
-                .ToListAsync(cancellationToken);
-
-            var uniqueActiveInvoices = DeduplicateByInvoiceNo(allActiveInvoices);
-
-            var recentRaw = await scopedInvoices
-                .OrderByDescending(invoice => invoice.Id)
-                .Take(80)
-                .Select(invoice => new DashboardInvoiceSnapshot
-                {
-                    Id = invoice.Id,
-                    InvoiceNo = invoice.InvoiceNo,
-                    Status = invoice.Status,
-                    Type = invoice.Type,
-                    InvoiceDate = invoice.InvoiceDate,
-                    TotalAmount = invoice.TotalAmount,
-                    CustomerNameEN = invoice.CustomerNameEN
-                })
-                .ToListAsync(cancellationToken);
-
-            var recentInvoices = DeduplicateByInvoiceNo(recentRaw)
+            var recentInvoices = await activeInvoices
                 .OrderByDescending(invoice => invoice.Id)
                 .Take(10)
                 .Select(invoice => new DashboardRecentInvoice(
@@ -87,53 +65,73 @@ namespace ExportDocManager.Services.Infrastructure
                     invoice.InvoiceDate,
                     invoice.TotalAmount,
                     invoice.CustomerNameEN ?? string.Empty))
-                .ToList();
+                .ToListAsync(cancellationToken);
 
-            var todoItems = BuildTodoItems(uniqueActiveInvoices);
+            var todoItems = await BuildTodoItemsAsync(activeInvoices, cancellationToken);
             string singleWindowStatusSummary = await BuildSingleWindowStatusSummaryAsync(context, cancellationToken);
 
             return new DashboardSnapshot(
-                uniqueMonthlyInvoices.Sum(invoice => invoice.TotalAmount),
-                uniqueMonthlyInvoices.Sum(invoice => invoice.TotalProfit),
-                uniqueMonthlyInvoices.Sum(invoice => invoice.TotalTaxRefundAmount),
-                uniqueActiveInvoices.Count(invoice =>
-                    invoice.Status == InvoiceStatusCatalog.Draft ||
-                    invoice.Status == InvoiceStatusCatalog.Verified),
-                uniqueActiveInvoices.Count(invoice => invoice.Status == InvoiceStatusCatalog.Shipped),
-                uniqueActiveInvoices.Count,
+                monthlyInvoices.Sum(invoice => invoice.TotalAmount),
+                monthlyInvoices.Sum(invoice => invoice.TotalProfit),
+                monthlyInvoices.Sum(invoice => invoice.TotalTaxRefundAmount),
+                draftCount + verifiedCount,
+                shippedCount,
+                totalActiveCount,
                 singleWindowStatusSummary,
                 recentInvoices,
-                todoItems);
+                todoItems,
+                $"{now:yyyy年M月}",
+                previousMonthlyInvoices.Sum(invoice => invoice.TotalAmount),
+                previousMonthlyInvoices.Sum(invoice => invoice.TotalProfit),
+                previousMonthlyInvoices.Sum(invoice => invoice.TotalTaxRefundAmount),
+                monthlyInvoices.Count,
+                draftCount,
+                verifiedCount,
+                completedCount);
+        }
+
+        private static async Task<List<DashboardInvoiceSnapshot>> SelectDashboardInvoiceSnapshots(
+            IQueryable<Invoice> query,
+            bool includeCustomer,
+            CancellationToken cancellationToken)
+        {
+            return await query
+                .Select(invoice => new DashboardInvoiceSnapshot
+                {
+                    Id = invoice.Id,
+                    InvoiceNo = invoice.InvoiceNo,
+                    Status = invoice.Status,
+                    Type = invoice.Type,
+                    InvoiceDate = invoice.InvoiceDate,
+                    TotalAmount = invoice.TotalAmount,
+                    TotalProfit = invoice.TotalProfit,
+                    TotalTaxRefundAmount = invoice.TotalTaxRefundAmount,
+                    CustomerNameEN = includeCustomer ? invoice.CustomerNameEN : string.Empty
+                })
+                .ToListAsync(cancellationToken);
         }
 
         private async Task<string> BuildSingleWindowStatusSummaryAsync(
             AppDbContext context,
             CancellationToken cancellationToken)
         {
-            var batchSummaries = await _businessDataAccessScope
-                .ApplySubmissionBatchScope(context.SwSubmissionBatches.AsNoTracking(), context)
-                .Select(batch => new
-                {
-                    batch.InvoiceNo,
-                    batch.Status,
-                    batch.LastReceiptAt
-                })
-                .ToListAsync(cancellationToken);
-
-            int pendingBatchCount = batchSummaries.Count(batch =>
+            var batches = _businessDataAccessScope
+                .ApplySubmissionBatchScope(context.SwSubmissionBatches.AsNoTracking(), context);
+            int pendingBatchCount = await batches.CountAsync(batch =>
                 batch.Status == SingleWindowBatchStatusCatalog.SubmitPackageExported ||
                 batch.Status == SingleWindowBatchStatusCatalog.SubmitPackageImported ||
                 batch.Status == SingleWindowBatchStatusCatalog.QueuedToClient ||
                 batch.Status == SingleWindowBatchStatusCatalog.Received ||
                 batch.Status == SingleWindowBatchStatusCatalog.Accepted ||
-                batch.Status == SingleWindowBatchStatusCatalog.PendingReview);
-            int failedBatchCount = batchSummaries.Count(batch =>
+                batch.Status == SingleWindowBatchStatusCatalog.PendingReview, cancellationToken);
+            int failedBatchCount = await batches.CountAsync(batch =>
                 batch.Status == SingleWindowBatchStatusCatalog.Rejected ||
-                batch.Status == SingleWindowBatchStatusCatalog.Failed);
-            var latestReceiptBatch = batchSummaries
+                batch.Status == SingleWindowBatchStatusCatalog.Failed, cancellationToken);
+            var latestReceiptBatch = await batches
                 .Where(batch => batch.LastReceiptAt.HasValue)
                 .OrderByDescending(batch => batch.LastReceiptAt)
-                .FirstOrDefault();
+                .Select(batch => new { batch.InvoiceNo, batch.Status, batch.LastReceiptAt })
+                .FirstOrDefaultAsync(cancellationToken);
 
             var singleWindowParts = new List<string>();
             if (pendingBatchCount > 0)
@@ -156,87 +154,63 @@ namespace ExportDocManager.Services.Infrastructure
                 : "单一窗口近况：" + string.Join("；", singleWindowParts) + "。";
         }
 
-        private static IReadOnlyList<DashboardTodoItem> BuildTodoItems(
-            IReadOnlyList<DashboardInvoiceSnapshot> uniqueActiveInvoices)
+        private static async Task<IReadOnlyList<DashboardTodoItem>> BuildTodoItemsAsync(
+            IQueryable<Invoice> activeInvoices,
+            CancellationToken cancellationToken)
         {
             var todoItems = new List<DashboardTodoItem>();
 
-            todoItems.AddRange(uniqueActiveInvoices
+            todoItems.AddRange(await activeInvoices
                 .Where(invoice => invoice.Status == InvoiceStatusCatalog.Shipped)
+                .OrderByDescending(invoice => invoice.Id)
                 .Take(5)
                 .Select(invoice => new DashboardTodoItem(
                     "待收款 (Unpaid)",
                     $"发票 {invoice.InvoiceNo} 已出运，等待结汇。",
                     "ViewInvoice",
-                    invoice.Id.ToString())));
+                    invoice.Id.ToString()))
+                .ToListAsync(cancellationToken));
 
-            todoItems.AddRange(uniqueActiveInvoices
+            todoItems.AddRange(await activeInvoices
                 .Where(invoice => invoice.Status == InvoiceStatusCatalog.Verified)
+                .OrderByDescending(invoice => invoice.Id)
                 .Take(5)
                 .Select(invoice => new DashboardTodoItem(
                     "待出运 (Pending Shipment)",
                     $"发票 {invoice.InvoiceNo} 已核对，等待安排出运。",
                     "ViewInvoice",
-                    invoice.Id.ToString())));
+                    invoice.Id.ToString()))
+                .ToListAsync(cancellationToken));
 
-            todoItems.AddRange(uniqueActiveInvoices
+            todoItems.AddRange(await activeInvoices
                 .Where(invoice => invoice.Status == InvoiceStatusCatalog.Draft)
+                .OrderByDescending(invoice => invoice.Id)
                 .Take(3)
                 .Select(invoice => new DashboardTodoItem(
                     "待核对 (Pending Verification)",
                     $"发票 {invoice.InvoiceNo} 仍在草稿状态。",
                     "ViewInvoice",
-                    invoice.Id.ToString())));
+                    invoice.Id.ToString()))
+                .ToListAsync(cancellationToken));
 
             return todoItems;
         }
 
-        private static IReadOnlyList<DashboardInvoiceSnapshot> DeduplicateByInvoiceNo(
-            IEnumerable<DashboardInvoiceSnapshot> source)
+        private static IQueryable<Invoice> BuildPreferredInvoiceQuery(IQueryable<Invoice> source)
         {
-            if (source == null)
-            {
-                return [];
-            }
+            // Keep the existing business rule (actual data wins over customs
+            // data, then newest row wins) while letting EF translate the
+            // deduplication to SQL instead of materializing all rows.
+            var preferredIds = source
+                .GroupBy(invoice => (invoice.InvoiceNo ?? string.Empty).Trim())
+                .Select(group => group
+                    .OrderByDescending(invoice => invoice.Type != null && invoice.Type.Contains("实际"))
+                    .ThenByDescending(invoice => invoice.Type != null && invoice.Type.Contains("报关"))
+                    .ThenByDescending(invoice => invoice.Id)
+                    .Select(invoice => invoice.Id)
+                    .First());
 
-            return source
-                .GroupBy(invoice => NormalizeInvoiceKey(invoice.InvoiceNo))
-                .Select(SelectPreferredInvoice)
-                .Where(invoice => invoice != null)
-                .ToList();
-        }
-
-        private static DashboardInvoiceSnapshot SelectPreferredInvoice(
-            IEnumerable<DashboardInvoiceSnapshot> group)
-        {
-            var candidates = group?.Where(item => item != null).ToList() ?? [];
-            if (candidates.Count == 0)
-            {
-                return null;
-            }
-
-            var actual = candidates.FirstOrDefault(invoice =>
-                !string.IsNullOrEmpty(invoice.Type) &&
-                invoice.Type.Contains("实际", StringComparison.Ordinal));
-            if (actual != null)
-            {
-                return actual;
-            }
-
-            var customs = candidates.FirstOrDefault(invoice =>
-                !string.IsNullOrEmpty(invoice.Type) &&
-                invoice.Type.Contains("报关", StringComparison.Ordinal));
-            if (customs != null)
-            {
-                return customs;
-            }
-
-            return candidates.OrderByDescending(invoice => invoice.Id).First();
-        }
-
-        private static string NormalizeInvoiceKey(string invoiceNo)
-        {
-            return string.IsNullOrWhiteSpace(invoiceNo) ? string.Empty : invoiceNo.Trim();
+            return source.Where(invoice => preferredIds.Contains(invoice.Id));
         }
 
         private sealed class DashboardInvoiceSnapshot

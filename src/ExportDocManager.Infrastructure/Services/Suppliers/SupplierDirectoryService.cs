@@ -8,6 +8,7 @@ namespace ExportDocManager.Services.Suppliers
 {
     public sealed class SupplierDirectoryService : ISupplierDirectoryService
     {
+        private const int LegacyListLimit = 200;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
 
@@ -21,7 +22,10 @@ namespace ExportDocManager.Services.Suppliers
         {
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             return await _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking())
-                .OrderBy(item => item.Name).Select(ToRecordExpression()).ToListAsync(cancellationToken);
+                .OrderBy(item => item.Name)
+                .Take(LegacyListLimit)
+                .Select(ToRecordExpression())
+                .ToListAsync(cancellationToken);
         }
 
         public async Task<PagedResult<SupplierRecord>> QueryAsync(

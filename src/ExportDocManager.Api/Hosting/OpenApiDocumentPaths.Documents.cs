@@ -1241,10 +1241,10 @@ namespace ExportDocManager.Api.Hosting
                             },
                             responses = new Dictionary<string, object>
                             {
-                                ["200"] = new
+                                ["202"] = new
                                 {
-                                    description = "Queried invoice/customs rows exported to the user-selected .xlsx path.",
-                                    content = JsonContent("ApiQueryInvoiceExportResponse")
+                                    description = "Queried invoice/customs Excel export job accepted for the user-selected path.",
+                                    content = JsonContent("BackgroundJobSnapshot")
                                 },
                                 ["400"] = new { description = "Invalid export request or destination path." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
@@ -1288,7 +1288,7 @@ namespace ExportDocManager.Api.Hosting
                             },
                             responses = new Dictionary<string, object>
                             {
-                                ["200"] = new { description = "Queried invoice Excel attachment.", content = BinaryContent() },
+                                ["202"] = new { description = "Controlled queried-invoice Excel download job accepted.", content = JsonContent("BackgroundJobSnapshot") },
                                 ["400"] = new { description = "Invalid download request." },
                                 ["401"] = new { description = "Missing or invalid bearer token." }
                             }

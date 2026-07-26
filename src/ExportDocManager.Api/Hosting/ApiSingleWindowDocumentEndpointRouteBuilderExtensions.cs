@@ -207,6 +207,7 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 return await DownloadSingleWindowSubmitPackageAsync(
+                    context,
                     handoffPackageService,
                     settingsService,
                     pathProvider,
@@ -413,6 +414,7 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 return await DownloadSingleWindowSubmitPackageAsync(
+                    context,
                     handoffPackageService,
                     settingsService,
                     pathProvider,

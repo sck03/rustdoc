@@ -23,12 +23,16 @@ namespace ExportDocManager.Services.Tools
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
         }
 
-        public async Task<List<ContainerProject>> GetAllProjectsAsync()
+        public async Task<List<ContainerProject>> GetRecentProjectsAsync(
+            int limit,
+            CancellationToken cancellationToken = default)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
+            limit = Math.Clamp(limit, 1, 200);
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             return await _accessScope.ApplyContainerProjectScope(context.ContainerProjects.AsNoTracking())
                 .OrderByDescending(p => p.UpdatedAt)
-                .ToListAsync();
+                .Take(limit)
+                .ToListAsync(cancellationToken);
         }
 
         public async Task<ContainerProject> GetProjectAsync(int projectId)

@@ -38,10 +38,4 @@ namespace ExportDocManager.Api.Hosting
         public string DestinationPath { get; init; } = string.Empty;
     }
 
-    public sealed record ApiQueryInvoiceExportResponse(
-        bool Success,
-        string Message,
-        int ExportedCount,
-        string DestinationPath,
-        string StoragePolicy);
 }

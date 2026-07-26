@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { Circle, Diamond, Eraser, Minus, MousePointer2, Save, Square, Trash2, Triangle, Type, X } from "lucide-react";
 import { buildPortableCanvasFont } from "../../app/typographyPolicy.ts";
+import { useModalDialog } from "../../ui/useModalDialog.ts";
 
 type ShippingMarkTool = "select" | "text" | "line" | "rectangle" | "diamond" | "triangle" | "circle";
 type DrawableShippingMarkTool = Exclude<ShippingMarkTool, "select">;
@@ -73,6 +74,7 @@ export function ShippingMarkEditorDialog({
   const [shapes, setShapes] = useState<ShippingMarkShape[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
+  const dialogRef = useModalDialog<HTMLDivElement>(onClose, { canClose: !isSaving });
 
   const selectedShape = useMemo(
     () => shapes.find((shape) => shape.id === selectedId) ?? null,
@@ -299,8 +301,12 @@ export function ShippingMarkEditorDialog({
   }
 
   return (
-    <div className="single-window-lock-backdrop shipping-mark-backdrop">
-      <div className="single-window-lock-dialog shipping-mark-dialog" role="dialog" aria-modal="true" aria-labelledby="shipping-mark-editor-title">
+    <div className="single-window-lock-backdrop shipping-mark-backdrop" onMouseDown={(event) => {
+      if (event.target === event.currentTarget && !isSaving) {
+        onClose();
+      }
+    }}>
+      <div ref={dialogRef} className="single-window-lock-dialog shipping-mark-dialog" role="dialog" aria-modal="true" aria-labelledby="shipping-mark-editor-title">
         <div className="single-window-lock-header">
           <div className="single-window-lock-title">
             <Square size={18} aria-hidden="true" />

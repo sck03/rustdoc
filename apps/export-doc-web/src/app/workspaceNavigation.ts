@@ -59,24 +59,27 @@ export type WorkspaceContext = {
   icon: LucideIcon;
 };
 
-export const defaultExpandedWorkspaceNavGroups = ["workspace", "documents"];
+export const defaultExpandedWorkspaceNavGroups = ["workspace", "documents", "declaration"];
 
 export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
   {
     key: "workspace",
     label: "工作台",
     icon: LayoutDashboard,
-    items: [{ label: "仪表盘", to: "/dashboard", icon: LayoutDashboard, isActive: isDashboardRoute, workspace: "document", moduleKey: "document.dashboard" }],
+    items: [
+      { label: "单证概览", to: "/dashboard", icon: LayoutDashboard, isActive: isDashboardRoute, workspace: "document", moduleKey: "document.dashboard" },
+      { label: "销售概览", to: "/crm/dashboard", icon: LayoutDashboard, isActive: isCrmDashboardRoute, workspace: "sales", moduleKey: "sales.dashboard" },
+    ],
   },
   {
-    key: "sales",
-    label: "客户业务",
+    key: "customers",
+    label: "客户与供应链",
     icon: ContactRound,
     items: [
-      { label: "销售概览", to: "/crm/dashboard", icon: LayoutDashboard, isActive: isCrmDashboardRoute, workspace: "sales", moduleKey: "sales.dashboard" },
       { label: "客户跟进", to: "/crm/follow-ups", icon: ContactRound, isActive: isCustomerFollowUpRoute, workspace: "sales", moduleKey: "sales.crm" },
       { label: "商机跟踪", to: "/crm/opportunities", icon: CircleDollarSign, isActive: isSalesOpportunityRoute, workspace: "sales", moduleKey: "sales.opportunities" },
       { label: "邮件模板", to: "/crm/email-templates", icon: Mail, isActive: isEmailTemplateRoute, workspace: "sales", moduleKey: "sales.email-templates" },
+      { label: "供应商管理", to: "/suppliers", icon: Factory, isActive: isSupplierRoute, workspace: "sales", moduleKey: "sales.suppliers" },
     ],
   },
   {
@@ -91,38 +94,22 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     ],
   },
   {
-    key: "suppliers",
-    label: "供应链资料",
-    icon: Factory,
-    items: [{ label: "供应商管理", to: "/suppliers", icon: Factory, isActive: isSupplierRoute, workspace: "sales", moduleKey: "sales.suppliers" }],
-  },
-  {
-    key: "single-window",
-    label: "单一窗口",
+    key: "declaration",
+    label: "申报与归类",
     icon: Network,
     items: [
-      { label: "操作中心", to: "/single-window/operation-center", icon: Network, isActive: isSingleWindowOperationRoute, workspace: "document", moduleKey: "document.single-window" },
-      { label: "协同看板", to: "/single-window/collaboration", icon: ClipboardList, isActive: isSingleWindowCollaborationRoute, workspace: "document", moduleKey: "document.single-window" },
-      { label: "参考词典", to: "/single-window/reference-catalog", icon: Database, isActive: isSingleWindowReferenceCatalogRoute, workspace: "document", moduleKey: "document.single-window" },
+      { label: "单一窗口", to: "/single-window/operation-center", icon: Network, isActive: isSingleWindowOperationRoute, workspace: "document", moduleKey: "document.single-window" },
+      { label: "申报协同", to: "/single-window/collaboration", icon: ClipboardList, isActive: isSingleWindowCollaborationRoute, workspace: "document", moduleKey: "document.single-window" },
+      { label: "申报词典", to: "/single-window/reference-catalog", icon: Database, isActive: isSingleWindowReferenceCatalogRoute, workspace: "document", moduleKey: "document.single-window" },
+      { label: "HS 编码知识", to: "/master-data/hs-knowledge/search", icon: BookOpen, isActive: isHsKnowledgeRoute, workspace: "document", moduleKey: "document.master-data" },
     ],
   },
   {
-    key: "hs-knowledge",
-    label: "HS 归类与税则",
-    icon: BookOpen,
-    items: [{ label: "HS 编码知识", to: "/master-data/hs-knowledge/search", icon: BookOpen, isActive: isHsKnowledgeRoute, workspace: "document", moduleKey: "document.master-data" }],
-  },
-  {
-    key: "master-data",
-    label: "基础资料",
+    key: "resources",
+    label: "资料与工具",
     icon: Database,
-    items: [{ label: "主数据维护", to: "/master-data", icon: Database, isActive: isMasterDataRoute, workspace: "document", moduleKey: "document.master-data" }],
-  },
-  {
-    key: "tools",
-    label: "模板与工具",
-    icon: PackageCheck,
     items: [
+      { label: "主数据维护", to: "/master-data", icon: Database, isActive: isMasterDataRoute, workspace: "document", moduleKey: "document.master-data" },
       { label: "报表设计", to: "/reports/templates", icon: ScrollText, isActive: isReportRoute, workspace: "document", moduleKey: "document.reports" },
       { label: "Excel 模板", to: "/tools/excel", icon: FileSpreadsheet, isActive: isExcelToolsRoute, workspace: "document", moduleKey: "document.excel" },
       { label: "智能 OCR", to: "/tools/ocr", icon: ScanText, isActive: isSmartOcrRoute, workspace: "document", moduleKey: "document.ocr" },
@@ -181,19 +168,19 @@ export function getWorkspaceContext(pathname: string): WorkspaceContext {
     return createWorkspaceContext("工作台", "仪表盘", "查看业务概览、近期单据与待办进度", LayoutDashboard);
   }
   if (pathname.startsWith("/crm/follow-ups")) {
-    return createWorkspaceContext("客户业务", "客户跟进", "记录客户沟通、下次动作和待办提醒", ContactRound);
+    return createWorkspaceContext("客户与供应链", "客户跟进", "记录客户沟通、下次动作和待办提醒", ContactRound);
   }
   if (pathname.startsWith("/crm/dashboard")) {
-    return createWorkspaceContext("客户业务", "销售概览", "查看客户、联系人和近期跟进待办", LayoutDashboard);
+    return createWorkspaceContext("工作台", "销售概览", "查看客户、联系人和近期跟进待办", LayoutDashboard);
   }
   if (pathname.startsWith("/crm/email-templates")) {
-    return createWorkspaceContext("客户业务", "邮件模板", "维护业务邮件模板、变量和单封邮件预览", Mail);
+    return createWorkspaceContext("客户与供应链", "邮件模板", "维护业务邮件模板、变量和单封邮件预览", Mail);
   }
   if (pathname.startsWith("/crm/opportunities")) {
-    return createWorkspaceContext("客户业务", "商机与报价跟踪", "记录销售阶段、预计金额、概率和下一步动作", CircleDollarSign);
+    return createWorkspaceContext("客户与供应链", "商机与报价跟踪", "记录销售阶段、预计金额、概率和下一步动作", CircleDollarSign);
   }
   if (pathname.startsWith("/suppliers")) {
-    return createWorkspaceContext("供应链资料", "供应商管理", "维护供应商、主要产品和联系人", Factory);
+    return createWorkspaceContext("客户与供应链", "供应商管理", "维护供应商、主要产品和联系人", Factory);
   }
   if (pathname.startsWith("/settings")) {
     return createWorkspaceContext("系统维护", "系统设置", "集中管理运行目录、数据库、模板、邮件与维护工具", Settings);
@@ -205,16 +192,16 @@ export function getWorkspaceContext(pathname: string): WorkspaceContext {
     return createWorkspaceContext("系统维护", "账号与权限", "维护登录账号、岗位、启停状态与模块权限模板", UsersRound);
   }
   if (pathname.startsWith("/tools/ocr")) {
-    return createWorkspaceContext("模板与工具", "智能 OCR", "识别扫描件和图片文字，并保留本地离线处理", ScanText);
+    return createWorkspaceContext("资料与工具", "智能 OCR", "识别扫描件和图片文字，并保留本地离线处理", ScanText);
   }
   if (pathname.startsWith("/tools/container-packing")) {
-    return createWorkspaceContext("模板与工具", "装柜模拟器", "维护货物与柜型，分析空间利用和装载重心", PackageCheck);
+    return createWorkspaceContext("资料与工具", "装柜模拟器", "维护货物与柜型，分析空间利用和装载重心", PackageCheck);
   }
   if (pathname.startsWith("/tools/exchange-rates")) {
-    return createWorkspaceContext("模板与工具", "今日汇率", "查看常用币种汇率并维护业务换算口径", CircleDollarSign);
+    return createWorkspaceContext("资料与工具", "今日汇率", "查看常用币种汇率并维护业务换算口径", CircleDollarSign);
   }
   if (pathname.startsWith("/tools/email")) {
-    return createWorkspaceContext("模板与工具", "邮件发送", "配置收件信息并发送单据、报表与附件", Mail);
+    return createWorkspaceContext("资料与工具", "邮件发送", "配置收件信息并发送单据、报表与附件", Mail);
   }
   if (pathname.startsWith("/system/update")) {
     return createWorkspaceContext("系统维护", "软件更新", "检查版本、查看更新说明并交由桌面更新器安装", RefreshCw);
@@ -232,19 +219,19 @@ export function getWorkspaceContext(pathname: string): WorkspaceContext {
     return createWorkspaceContext("单证业务", "任务中心", "跟踪导入、导出、报表和文件处理任务", ClipboardList);
   }
   if (pathname.startsWith("/tools/excel")) {
-    return createWorkspaceContext("模板与工具", "Excel 模板与托单", "导入业务数据、导出模板并生成订舱托单副本", FileSpreadsheet);
+    return createWorkspaceContext("资料与工具", "Excel 模板与托单", "导入业务数据、导出模板并生成订舱托单副本", FileSpreadsheet);
   }
   if (pathname.startsWith("/reports")) {
-    return createWorkspaceContext("模板与工具", "报表设计", "维护单据模板、可视化版式和打印预览", ScrollText);
+    return createWorkspaceContext("资料与工具", "报表设计", "维护单据模板、可视化版式和打印预览", ScrollText);
   }
   if (pathname.startsWith("/single-window")) {
     return getSingleWindowWorkspaceContext(pathname);
   }
   if (pathname.startsWith("/master-data/hs-knowledge")) {
-    return createWorkspaceContext("HS 归类与税则", "HS 编码知识中心", "查询、维护和迁移本公司的税则与申报经验", BookOpen);
+    return createWorkspaceContext("申报与归类", "HS 编码知识中心", "查询、维护和迁移本公司的税则与申报经验", BookOpen);
   }
   if (pathname.startsWith("/master-data")) {
-    return createWorkspaceContext("基础资料", "主数据维护", "统一维护客户、出口商、商品、港口、单位与 HS 编码", Database);
+    return createWorkspaceContext("资料与工具", "主数据维护", "统一维护客户、出口商、商品、港口、单位与 HS 编码", Database);
   }
   if (pathname.includes("/payments/new")) {
     return createWorkspaceContext("单证业务", "新建付款报销", "录入付款、费用和报销信息并生成凭证", CreditCard);
@@ -342,18 +329,18 @@ function createWorkspaceContext(section: string, title: string, description: str
 
 function getSingleWindowWorkspaceContext(pathname: string): WorkspaceContext {
   if (pathname.startsWith("/single-window/reference-catalog")) {
-    return createWorkspaceContext("单一窗口", "参考词典", "维护申报代码、字段选项与 Excel 导入数据", Database);
+    return createWorkspaceContext("申报与归类", "参考词典", "维护申报代码、字段选项与 Excel 导入数据", Database);
   }
   if (pathname.startsWith("/single-window/collaboration")) {
-    return createWorkspaceContext("单一窗口", "协同看板", "跟踪工作站、协同工单和提交处理进度", ClipboardList);
+    return createWorkspaceContext("申报与归类", "协同看板", "跟踪工作站、协同工单和提交处理进度", ClipboardList);
   }
   if (pathname.startsWith("/single-window/coo")) {
-    return createWorkspaceContext("单一窗口", "海关原产地证", "编辑 COO 草稿、审查字段并生成提交交接包", FileText);
+    return createWorkspaceContext("申报与归类", "海关原产地证", "编辑 COO 草稿、审查字段并生成提交交接包", FileText);
   }
   if (pathname.startsWith("/single-window/acd")) {
-    return createWorkspaceContext("单一窗口", "报关代理委托", "编辑 ACD 草稿、审查权限项并处理回执", FileText);
+    return createWorkspaceContext("申报与归类", "报关代理委托", "编辑 ACD 草稿、审查权限项并处理回执", FileText);
   }
-  return createWorkspaceContext("单一窗口", "操作中心", "管理提交批次、客户端目录、交接包和回执", Network);
+  return createWorkspaceContext("申报与归类", "单一窗口操作中心", "管理提交批次、客户端目录、交接包和回执", Network);
 }
 
 export function isDashboardRoute(pathname: string) { return pathname === "/" || pathname.startsWith("/dashboard"); }

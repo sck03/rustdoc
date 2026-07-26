@@ -286,14 +286,23 @@ namespace ExportDocManager.Api.Hosting
                         IncludeSampleFiles = request?.IncludeSampleFiles == true
                     },
                     cancellationToken).ConfigureAwait(false);
+                bool cleanupRegistered = false;
                 try
                 {
-                    byte[] content = await File.ReadAllBytesAsync(result.FullPath, cancellationToken);
-                    return Results.File(content, "application/zip", result.FileName);
+                    var response = StreamTemporaryFile(
+                        context,
+                        result.FullPath,
+                        "application/zip",
+                        result.FileName);
+                    cleanupRegistered = true;
+                    return response;
                 }
                 finally
                 {
-                    AtomicFileHelper.TryDeleteFile(result.FullPath);
+                    if (!cleanupRegistered)
+                    {
+                        AtomicFileHelper.TryDeleteFile(result.FullPath);
+                    }
                 }
             })
             .WithName("DownloadSupportPackage");

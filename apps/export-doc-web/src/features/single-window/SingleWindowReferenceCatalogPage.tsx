@@ -19,6 +19,7 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import { useModalDialog } from "../../ui/useModalDialog.ts";
 import {
   CatalogCellPosition,
   CatalogColumn,
@@ -71,6 +72,11 @@ export function SingleWindowReferenceCatalogPage({
   const [focusedCell, setFocusedCell] = useState<CatalogCellPosition | null>(null);
   const [contextMenu, setContextMenu] = useState<CatalogContextMenuState | null>(null);
   const [aliasEditor, setAliasEditor] = useState<AliasEditorState | null>(null);
+  const aliasEditorInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const aliasDialogRef = useModalDialog<HTMLDivElement>(() => setAliasEditor(null), {
+    active: Boolean(aliasEditor),
+    initialFocusRef: aliasEditorInputRef,
+  });
 
   const catalogQuery = useQuery({
     queryKey: queryKeys.singleWindowReferenceCatalog(),
@@ -792,8 +798,12 @@ export function SingleWindowReferenceCatalogPage({
       ) : null}
 
       {aliasEditor ? (
-        <div className="single-window-lock-backdrop">
-          <div className="single-window-lock-dialog reference-catalog-alias-dialog" role="dialog" aria-modal="true" aria-labelledby="reference-catalog-alias-title">
+        <div className="single-window-lock-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) {
+            setAliasEditor(null);
+          }
+        }}>
+          <div ref={aliasDialogRef} className="single-window-lock-dialog reference-catalog-alias-dialog" role="dialog" aria-modal="true" aria-labelledby="reference-catalog-alias-title">
             <div className="single-window-lock-header">
               <div className="single-window-lock-title">
                 <h2 id="reference-catalog-alias-title">编辑别名</h2>
@@ -804,7 +814,7 @@ export function SingleWindowReferenceCatalogPage({
               <span>第 {aliasEditor.rowIndex + 1} 行</span>
             </div>
             <textarea
-              autoFocus
+              ref={aliasEditorInputRef}
               value={aliasEditor.value}
               onChange={(event) => setAliasEditor((current) => (current ? { ...current, value: event.target.value } : current))}
               onKeyDown={(event) => {

@@ -23,14 +23,14 @@ namespace ExportDocManager.Infrastructure.Tests
 
             Assert.Equal(7, project.OwnerUserId);
             Assert.Equal(1, project.VersionNumber);
-            Assert.Single(await aliceService.GetAllProjectsAsync());
-            Assert.Empty(await bobService.GetAllProjectsAsync());
+            Assert.Single(await aliceService.GetRecentProjectsAsync(100));
+            Assert.Empty(await bobService.GetRecentProjectsAsync(100));
             Assert.Null(await bobService.GetProjectAsync(project.Id));
             Assert.Empty(await bobService.GetProjectItemsAsync(project.Id));
 
             await bobService.DeleteProjectAsync(project.Id);
             Assert.NotNull(await aliceService.GetProjectAsync(project.Id));
-            Assert.Single(await adminService.GetAllProjectsAsync());
+            Assert.Single(await adminService.GetRecentProjectsAsync(100));
         }
 
         [Fact]

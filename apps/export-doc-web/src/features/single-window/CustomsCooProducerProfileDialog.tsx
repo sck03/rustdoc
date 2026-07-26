@@ -13,6 +13,7 @@ import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import { useModalDialog } from "../../ui/useModalDialog.ts";
 
 type ProducerProfileDraft = ApiCustomsCooProducerProfileInputDto & {
   id: number;
@@ -90,6 +91,7 @@ export function CustomsCooProducerProfileDialog({
 
   const profiles = profilesQuery.data?.items ?? [];
   const isBusy = profilesQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
+  const dialogRef = useModalDialog<HTMLDivElement>(handleClose, { canClose: !isBusy });
   const selectedCount = selectedId ? 1 : 0;
   const isDraftDirty = !producerProfileDraftEquals(draft, cleanDraft);
 
@@ -200,8 +202,13 @@ export function CustomsCooProducerProfileDialog({
   }
 
   return (
-    <div className="single-window-lock-backdrop" role="presentation">
+    <div className="single-window-lock-backdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget && !isBusy) {
+        void handleClose();
+      }
+    }}>
       <div
+        ref={dialogRef}
         className="single-window-lock-dialog producer-profile-dialog"
         role="dialog"
         aria-modal="true"

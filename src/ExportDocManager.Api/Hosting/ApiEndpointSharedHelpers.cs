@@ -125,12 +125,64 @@ namespace ExportDocManager.Api.Hosting
             return candidate.StartsWith(root, StringComparison.OrdinalIgnoreCase);
         }
 
+        internal static IResult StreamTemporaryFile(
+            HttpContext context,
+            string filePath,
+            string contentType,
+            string downloadFileName,
+            string cleanupDirectory = "")
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+            context.Response.RegisterForDispose(new TemporaryDownloadCleanup(filePath, cleanupDirectory));
+            return Results.File(
+                filePath,
+                contentType,
+                downloadFileName,
+                enableRangeProcessing: true);
+        }
+
         private static string SanitizeFileNamePart(string value)
         {
             var chars = value.Trim()
                 .Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character)
                 .ToArray();
             return new string(chars).Trim('.', ' ');
+        }
+
+        private sealed class TemporaryDownloadCleanup : IDisposable
+        {
+            private readonly string filePath;
+            private readonly string cleanupDirectory;
+
+            public TemporaryDownloadCleanup(string filePath, string cleanupDirectory)
+            {
+                this.filePath = filePath;
+                this.cleanupDirectory = cleanupDirectory ?? string.Empty;
+            }
+
+            public void Dispose()
+            {
+                if (!string.IsNullOrWhiteSpace(cleanupDirectory))
+                {
+                    AtomicFileHelper.TryDeleteDirectory(cleanupDirectory);
+                    return;
+                }
+
+                AtomicFileHelper.TryDeleteFile(filePath);
+            }
+        }
+
+        private sealed class InlineProgress<T> : IProgress<T>
+        {
+            private readonly Action<T> report;
+
+            public InlineProgress(Action<T> report)
+            {
+                this.report = report ?? throw new ArgumentNullException(nameof(report));
+            }
+
+            public void Report(T value) => report(value);
         }
     }
 }

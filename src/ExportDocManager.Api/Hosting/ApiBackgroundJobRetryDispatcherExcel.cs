@@ -133,5 +133,31 @@ namespace ExportDocManager.Api.Hosting
                     invoiceBookingRequest.InvoiceId,
                     invoiceBookingDestinationPath));
         }
+
+        private IResult RetryQueryInvoiceExportJob(
+            BackgroundJobSnapshot sourceJob,
+            string requestedBy)
+        {
+            if (!TryDeserializeRetryRequest<ApiQueryInvoiceExportRequest>(sourceJob, out var request, out var error))
+            {
+                return error;
+            }
+
+            var validation = ApiEndpointRouteBuilderExtensions.ValidateExcelDestinationPath(
+                request?.DestinationPath,
+                "查询结果导出路径",
+                out string destinationPath);
+            if (validation != null)
+            {
+                return validation;
+            }
+
+            return ApiEndpointRouteBuilderExtensions.AcceptedBackgroundJob(
+                ApiEndpointRouteBuilderExtensions.EnqueueQueryInvoiceExportJob(
+                    jobRunner,
+                    requestedBy,
+                    request,
+                    destinationPath));
+        }
     }
 }

@@ -14,10 +14,5 @@ namespace ExportDocManager.Services.Infrastructure
             IProgress<OperationProgressUpdate> progress = null,
             CancellationToken cancellationToken = default);
 
-        Task<QueryResultExportBytesResult> ExportToExcelBytesAsync(
-            QueryPageQuery query,
-            CancellationToken cancellationToken = default);
     }
-
-    public sealed record QueryResultExportBytesResult(byte[] Content, int ExportedCount);
 }

@@ -177,6 +177,44 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task HsCodeImport_ShouldCommitMoreThanOneDatabaseBatch()
+        {
+            using var factory = new SqliteTestDbContextFactory();
+            var service = new HsCodeService(factory, new LocalMasterDataReadRepository(factory));
+            string path = CreateHsCodeWorkbook(workbook =>
+            {
+                var sheet = workbook.AddWorksheet("大批量税则");
+                sheet.Cell(1, 1).Value = "HS编码";
+                sheet.Cell(1, 2).Value = "商品名称";
+                for (int index = 0; index < 450; index++)
+                {
+                    sheet.Cell(index + 2, 1).Value = $"6109{index:D6}";
+                    sheet.Cell(index + 2, 2).Value = $"测试商品 {index + 1}";
+                }
+            });
+
+            try
+            {
+                var preview = await service.PreviewImportAsync(
+                    path,
+                    HsCodeImportMode.Incremental,
+                    "批量测试资料",
+                    2026);
+                Assert.Equal(450, preview.AddCount);
+
+                var result = await service.CommitImportAsync(preview);
+                Assert.Equal(450, result.AddedCount);
+                await using var context = factory.CreateDbContext();
+                Assert.Equal(450, await context.HsCodes.CountAsync());
+                Assert.Equal("批量测试资料", (await service.GetByCodeAsync("6109000449"))?.SourceName);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
         public async Task HsCodeImport_ShouldRecognizeSpecificationElementsAndChineseTariffColumns()
         {
             using var factory = new SqliteTestDbContextFactory();

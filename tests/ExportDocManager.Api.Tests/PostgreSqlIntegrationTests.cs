@@ -80,6 +80,66 @@ namespace ExportDocManager.Api.Tests
                     new CrmCustomerSaveRequest(created.Id, created.Name, created.CountryRegion, created.Website,
                         "暂停", created.Source, created.Notes, created.LinkedDocumentCustomerId,
                         created.VersionNumber)));
+
+                var now = DateTime.Now;
+                var startOfMonth = new DateTime(now.Year, now.Month, 1);
+                await using (var context = factory.CreateDbContext())
+                {
+                    context.Invoices.AddRange(
+                        new Invoice
+                        {
+                            InvoiceNo = "PG-DASH-DUP",
+                            Type = "报关数据",
+                            Status = InvoiceStatusCatalog.Verified,
+                            InvoiceDate = startOfMonth.AddDays(1),
+                            TotalAmount = 40m,
+                            TotalProfit = 4m,
+                            TotalTaxRefundAmount = 2m
+                        },
+                        new Invoice
+                        {
+                            InvoiceNo = "PG-DASH-DUP",
+                            Type = "实际数据",
+                            Status = InvoiceStatusCatalog.Shipped,
+                            InvoiceDate = startOfMonth.AddDays(2),
+                            TotalAmount = 100m,
+                            TotalProfit = 10m,
+                            TotalTaxRefundAmount = 5m
+                        },
+                        new Invoice
+                        {
+                            InvoiceNo = "PG-DASH-DRAFT",
+                            Type = "实际数据",
+                            Status = InvoiceStatusCatalog.Draft,
+                            InvoiceDate = startOfMonth.AddDays(3),
+                            TotalAmount = 20m,
+                            TotalProfit = 2m,
+                            TotalTaxRefundAmount = 1m
+                        },
+                        new Invoice
+                        {
+                            InvoiceNo = "PG-DASH-PREVIOUS",
+                            Type = "实际数据",
+                            Status = InvoiceStatusCatalog.Completed,
+                            InvoiceDate = startOfMonth.AddDays(-1),
+                            TotalAmount = 50m,
+                            TotalProfit = 5m,
+                            TotalTaxRefundAmount = 2.5m
+                        });
+                    await context.SaveChangesAsync();
+                }
+
+                var dashboard = new DashboardService(
+                    factory,
+                    new BusinessDataAccessScope(settings, new FixedCurrentUserContext(admin)));
+                var snapshot = await dashboard.GetDashboardAsync();
+                Assert.Equal(120m, snapshot.MonthlyExportAmount);
+                Assert.Equal(50m, snapshot.PreviousMonthlyExportAmount);
+                Assert.Equal(2, snapshot.MonthlyInvoiceCount);
+                Assert.Equal(1, snapshot.DraftCount);
+                Assert.Equal(1, snapshot.ShippedCount);
+                Assert.Equal(1, snapshot.CompletedCount);
+                Assert.Equal(3, snapshot.TotalActiveCount);
             }
             finally
             {

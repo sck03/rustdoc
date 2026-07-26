@@ -4,7 +4,9 @@ namespace ExportDocManager.Services.Tools
 {
     public interface IContainerLoadingService
     {
-        Task<List<ContainerProject>> GetAllProjectsAsync();
+        Task<List<ContainerProject>> GetRecentProjectsAsync(
+            int limit,
+            CancellationToken cancellationToken = default);
 
         Task<ContainerProject> GetProjectAsync(int projectId);
 

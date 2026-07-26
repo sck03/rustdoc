@@ -46,6 +46,9 @@ namespace ExportDocManager.Api.Hosting
                 case "StartInvoiceBookingSheetExportJob":
                     return await RetryInvoiceBookingSheetExportJobAsync(sourceJob, requestedBy, invoiceService);
 
+                case "StartQueryInvoiceExportJob":
+                    return RetryQueryInvoiceExportJob(sourceJob, requestedBy);
+
                 case "StartInvoiceReportPdfJob":
                     return RetryInvoiceReportPdfJob(sourceJob, requestedBy);
 

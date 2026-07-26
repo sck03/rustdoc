@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Check, Search, ShieldCheck, X } from "lucide-react";
 import type {
   ApiInvoiceItemDto,
@@ -7,6 +7,7 @@ import type {
   HsCodeKnowledgeSearchItem,
 } from "../../api/index.ts";
 import { normalizeText, readApiError } from "../../ui/formUtils.ts";
+import { useModalDialog } from "../../ui/useModalDialog.ts";
 import { buildInvoiceHsFeedbackContext, buildInvoiceHsQuery } from "./invoiceHsKnowledgeModel.ts";
 
 export function InvoiceHsKnowledgePanel({
@@ -27,6 +28,12 @@ export function InvoiceHsKnowledgePanel({
   const [results, setResults] = useState<HsCodeKnowledgeSearchItem[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const queryRef = useRef<HTMLTextAreaElement | null>(null);
+  const panelRef = useModalDialog<HTMLElement>(onClose, {
+    active: open,
+    canClose: !busy,
+    initialFocusRef: queryRef,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -90,8 +97,8 @@ export function InvoiceHsKnowledgePanel({
 
   if (!open) return null;
   return (
-    <div className="invoice-hs-panel-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <aside className="invoice-hs-panel" role="dialog" aria-modal="true" aria-labelledby="invoice-hs-panel-title">
+    <div className="invoice-hs-panel-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && !busy && onClose()}>
+      <aside ref={panelRef} className="invoice-hs-panel" role="dialog" aria-modal="true" aria-labelledby="invoice-hs-panel-title">
         <header>
           <div>
             <span className="eyebrow">本地已审核知识</span>
@@ -102,6 +109,7 @@ export function InvoiceHsKnowledgePanel({
         </header>
         <div className="invoice-hs-search" role="search" aria-label="智能匹配 HS 编码">
           <textarea
+            ref={queryRef}
             aria-label="HS 编码匹配条件"
             value={draft}
             maxLength={500}

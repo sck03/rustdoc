@@ -35,6 +35,14 @@ namespace ExportDocManager.Api.Hosting
                 PendingCount = dashboard.PendingCount,
                 ShippedCount = dashboard.ShippedCount,
                 TotalActiveCount = dashboard.TotalActiveCount,
+                PeriodLabel = dashboard.PeriodLabel,
+                PreviousMonthlyExportAmount = dashboard.PreviousMonthlyExportAmount,
+                PreviousMonthlyProfit = dashboard.PreviousMonthlyProfit,
+                PreviousMonthlyTaxRefund = dashboard.PreviousMonthlyTaxRefund,
+                MonthlyInvoiceCount = dashboard.MonthlyInvoiceCount,
+                DraftCount = dashboard.DraftCount,
+                VerifiedCount = dashboard.VerifiedCount,
+                CompletedCount = dashboard.CompletedCount,
                 SingleWindowStatusSummary = dashboard.SingleWindowStatusSummary,
                 RecentInvoices = dashboard.RecentInvoices
                     .Select(invoice => new ApiDashboardRecentInvoiceDto

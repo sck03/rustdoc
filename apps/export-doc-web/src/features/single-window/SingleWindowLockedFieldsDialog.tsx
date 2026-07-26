@@ -2,6 +2,7 @@ import { LockKeyholeOpen, X } from "lucide-react";
 import { ApiSingleWindowLockedFieldDto } from "../../api/index.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import { useModalDialog } from "../../ui/useModalDialog.ts";
 
 export function SingleWindowLockedFieldsDialog({
   title,
@@ -24,10 +25,15 @@ export function SingleWindowLockedFieldsDialog({
 }) {
   const selectedCount = selectedKeys.size;
   const allSelected = fields.length > 0 && selectedCount === fields.length;
+  const dialogRef = useModalDialog<HTMLDivElement>(onClose, { canClose: !isBusy });
 
   return (
-    <div className="single-window-lock-backdrop" role="presentation">
-      <div className="single-window-lock-dialog" role="dialog" aria-modal="true" aria-labelledby="single-window-lock-title">
+    <div className="single-window-lock-backdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget && !isBusy) {
+        onClose();
+      }
+    }}>
+      <div ref={dialogRef} className="single-window-lock-dialog" role="dialog" aria-modal="true" aria-labelledby="single-window-lock-title">
         <header className="single-window-lock-header">
           <div className="single-window-lock-title">
             <LockKeyholeOpen size={18} aria-hidden="true" />

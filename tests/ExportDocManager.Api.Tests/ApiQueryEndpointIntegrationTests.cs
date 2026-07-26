@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using ClosedXML.Excel;
 using ExportDocManager.Api.Hosting;
+using ExportDocManager.Services.Infrastructure;
 
 namespace ExportDocManager.Api.Tests
 {
@@ -89,10 +90,15 @@ namespace ExportDocManager.Api.Tests
                 endDate = new DateTime(2026, 6, 30, 23, 59, 59),
                 keyword = "Q-STYLE-001"
             });
-            Assert.Equal(HttpStatusCode.OK, exportResponse.StatusCode);
-            Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportResponse.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(HttpStatusCode.Accepted, exportResponse.StatusCode);
+            var acceptedJob = await ApiIntegrationTestHarness.ReadJsonAsync<BackgroundJobSnapshot>(exportResponse);
+            var completedJob = await WaitForTerminalJobAsync(adminClient, acceptedJob.JobId);
+            Assert.Equal(BackgroundJobStatusCatalog.Succeeded, completedJob.Status);
 
-            await using var exportStream = await exportResponse.Content.ReadAsStreamAsync();
+            var downloadResponse = await adminClient.GetAsync($"/api/jobs/{acceptedJob.JobId}/download");
+            Assert.Equal(HttpStatusCode.OK, downloadResponse.StatusCode);
+            Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", downloadResponse.Content.Headers.ContentType?.MediaType);
+            await using var exportStream = await downloadResponse.Content.ReadAsStreamAsync();
             using var workbook = new XLWorkbook(exportStream);
             var worksheet = workbook.Worksheet("查询结果");
             Assert.Equal("发票号", worksheet.Cell(1, 1).GetString());
@@ -101,6 +107,44 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("Query Buyer", worksheet.Cell(2, 4).GetString());
             Assert.Equal("Query Exporter", worksheet.Cell(2, 5).GetString());
             Assert.Equal("USA", worksheet.Cell(2, 6).GetString());
+
+            var emptyExportResponse = await adminClient.PostAsJsonAsync("/api/query/invoices/download", new
+            {
+                keyword = "NO-SUCH-QUERY-RESULT"
+            });
+            Assert.Equal(HttpStatusCode.Accepted, emptyExportResponse.StatusCode);
+            var emptyAcceptedJob = await ApiIntegrationTestHarness.ReadJsonAsync<BackgroundJobSnapshot>(emptyExportResponse);
+            var emptyCompletedJob = await WaitForTerminalJobAsync(adminClient, emptyAcceptedJob.JobId);
+            Assert.Equal(BackgroundJobStatusCatalog.Succeeded, emptyCompletedJob.Status);
+            Assert.Contains("仅含表头", emptyCompletedJob.DetailText, StringComparison.Ordinal);
+
+            var emptyDownloadResponse = await adminClient.GetAsync($"/api/jobs/{emptyAcceptedJob.JobId}/download");
+            Assert.Equal(HttpStatusCode.OK, emptyDownloadResponse.StatusCode);
+            await using var emptyExportStream = await emptyDownloadResponse.Content.ReadAsStreamAsync();
+            using var emptyWorkbook = new XLWorkbook(emptyExportStream);
+            var emptyWorksheet = emptyWorkbook.Worksheet("查询结果");
+            Assert.Equal("发票号", emptyWorksheet.Cell(1, 1).GetString());
+            Assert.True(emptyWorksheet.Cell(2, 1).IsEmpty());
+        }
+
+        private static async Task<BackgroundJobSnapshot> WaitForTerminalJobAsync(HttpClient client, string jobId)
+        {
+            BackgroundJobSnapshot lastJob = null;
+            for (int attempt = 0; attempt < 100; attempt++)
+            {
+                var response = await client.GetAsync($"/api/jobs/{jobId}");
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                var job = await ApiIntegrationTestHarness.ReadJsonAsync<BackgroundJobSnapshot>(response);
+                lastJob = job;
+                if (BackgroundJobStatusCatalog.IsTerminal(job.Status))
+                {
+                    return job;
+                }
+
+                await Task.Delay(50);
+            }
+
+            throw new TimeoutException($"Background job {jobId} did not finish in time. Last status={lastJob?.Status}, text={lastJob?.StatusText}, detail={lastJob?.DetailText}, error={lastJob?.ErrorMessage}.");
         }
 
         [Fact]

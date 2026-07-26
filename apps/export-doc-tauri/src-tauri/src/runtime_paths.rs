@@ -134,21 +134,16 @@ fn resolve_data_root(
     }
 
     let default_data_root = app_root.join("App_Data");
-    if is_system_drive_path(&default_data_root) {
-        let selected = prompt_for_runtime_data_root(
-            "默认数据目录位于系统盘。请选择一个非系统盘业务数据目录，例如 D:\\ExportDocManagerData。",
-            &default_data_root,
-        )?;
-        try_persist_runtime_data_root(app_root, &selected);
-        return Ok(selected);
-    }
-
+    // A single-disk Windows machine is a valid deployment.  The program must
+    // not reject a writable C:\\App_Data merely because it is on the system
+    // drive; enterprise deployments can still provide --data-root when a
+    // separate data volume is required.
     match ensure_runtime_data_directories(&default_data_root) {
         Ok(()) => Ok(default_data_root),
         Err(error) => {
             let selected = prompt_for_runtime_data_root(
                 &format!(
-                    "默认数据目录不可写或无法创建：{error}\n请选择一个可写的业务数据目录，推荐放在非系统盘。"
+                    "默认数据目录不可写或无法创建：{error}\n请选择一个可写的业务数据目录；如果有独立数据盘，建议优先使用。"
                 ),
                 &default_data_root,
             )?;
@@ -377,14 +372,6 @@ fn prompt_for_runtime_data_root(
             )
         })?;
 
-    if is_system_drive_path(&selected) {
-        return Err(format!(
-            "选择的数据目录位于系统盘：'{}'。请重新启动并选择非系统盘目录，或通过 --data-root 明确指定企业策略允许的目录。",
-            selected.display()
-        )
-        .into());
-    }
-
     ensure_runtime_data_directories(&selected)?;
     Ok(selected)
 }
@@ -402,48 +389,6 @@ fn ensure_runtime_data_directories(data_root: &Path) -> Result<(), Box<dyn Error
     ensure_directory(&data_root.join("WebView"))?;
     ensure_directory(&data_root.join("Logs"))?;
     Ok(())
-}
-
-#[cfg(windows)]
-fn is_system_drive_path(path: &Path) -> bool {
-    let Some(system_drive) = env::var_os("SystemDrive") else {
-        return false;
-    };
-
-    let system_drive = system_drive
-        .to_string_lossy()
-        .replace('/', "\\")
-        .to_ascii_lowercase();
-    if system_drive.trim().is_empty() {
-        return false;
-    }
-
-    let mut normalized_drive = system_drive.trim_end_matches('\\').to_owned();
-    if !normalized_drive.ends_with(':') {
-        normalized_drive.push(':');
-    }
-
-    let full_path = normalize_path_for_prefix(path)
-        .to_string_lossy()
-        .replace('/', "\\")
-        .to_ascii_lowercase();
-    full_path == normalized_drive || full_path.starts_with(&format!("{normalized_drive}\\"))
-}
-
-#[cfg(not(windows))]
-fn is_system_drive_path(_path: &Path) -> bool {
-    false
-}
-
-fn normalize_path_for_prefix(path: &Path) -> PathBuf {
-    if path.is_absolute() {
-        return path.to_path_buf();
-    }
-
-    env::current_dir()
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join(path)
 }
 
 fn resolve_sidecar_path(app_root: &Path) -> Result<PathBuf, Box<dyn Error>> {

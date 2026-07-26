@@ -160,6 +160,7 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 return await DownloadSingleWindowReceiptPackageAsync(
+                    context,
                     handoffPackageService,
                     pathProvider,
                     request,

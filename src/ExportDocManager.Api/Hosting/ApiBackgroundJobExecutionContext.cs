@@ -27,26 +27,35 @@ namespace ExportDocManager.Api.Hosting
             string detailText = "",
             string outputPath = "")
         {
-            _jobs.Update(JobId, current => new BackgroundJobSnapshot
+            _jobs.Update(JobId, current =>
             {
-                JobId = current.JobId,
-                Kind = current.Kind,
-                Title = current.Title,
-                Status = string.Equals(current.Status, BackgroundJobStatusCatalog.Canceling, StringComparison.OrdinalIgnoreCase)
-                    ? BackgroundJobStatusCatalog.Canceling
-                    : BackgroundJobStatusCatalog.Running,
-                ProgressPercent = progressPercent ?? current.ProgressPercent,
-                StatusText = statusText ?? current.StatusText,
-                DetailText = detailText ?? current.DetailText,
-                RequestedBy = current.RequestedBy,
-                CreatedAt = current.CreatedAt,
-                StartedAt = current.StartedAt,
-                OutputPath = string.IsNullOrWhiteSpace(outputPath) ? current.OutputPath : outputPath,
-                ErrorMessage = current.ErrorMessage,
-                CanCancel = current.CanCancel,
-                CanRetry = false,
-                RetryOperation = current.RetryOperation,
-                RetryRequestJson = current.RetryRequestJson
+                if (BackgroundJobStatusCatalog.IsTerminal(current.Status) ||
+                    string.Equals(current.Status, BackgroundJobStatusCatalog.Canceling, StringComparison.OrdinalIgnoreCase))
+                {
+                    return current;
+                }
+
+                return new BackgroundJobSnapshot
+                {
+                    JobId = current.JobId,
+                    Kind = current.Kind,
+                    Title = current.Title,
+                    Status = BackgroundJobStatusCatalog.Running,
+                    ProgressPercent = progressPercent ?? current.ProgressPercent,
+                    StatusText = statusText ?? current.StatusText,
+                    DetailText = detailText ?? current.DetailText,
+                    RequestedBy = current.RequestedBy,
+                    RequestedByUserId = current.RequestedByUserId,
+                    CreatedAt = current.CreatedAt,
+                    StartedAt = current.StartedAt,
+                    CompletedAt = current.CompletedAt,
+                    OutputPath = string.IsNullOrWhiteSpace(outputPath) ? current.OutputPath : outputPath,
+                    ErrorMessage = current.ErrorMessage,
+                    CanCancel = current.CanCancel,
+                    CanRetry = false,
+                    RetryOperation = current.RetryOperation,
+                    RetryRequestJson = current.RetryRequestJson
+                };
             });
         }
     }
