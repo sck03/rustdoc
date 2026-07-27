@@ -817,7 +817,7 @@
 
   .dashboard-metric strong {
     margin-top: 4px;
-    font-size: 20px;
+    font-size: clamp(17px, 5.4vw, 20px);
   }
 
   .dashboard-table-frame,

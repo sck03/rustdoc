@@ -32,7 +32,7 @@ permissions:
 jobs:
   lifecycle:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 30
     env:
       COMPOSE_DIRECTORY: deploy/container
       EXPORTDOCMANAGER_WEB_PORT: "18080"
@@ -78,22 +78,64 @@ jobs:
       - name: Build and start HTTP stack
         working-directory: deploy/container
         shell: bash
-        run: docker compose up -d --build
+        run: |
+          if ! docker compose up -d --build; then
+            echo "Container stack failed to reach its declared startup dependencies." >&2
+            docker compose ps --all || true
+            docker compose logs --no-color --tail=200 postgres api web || true
+            exit 1
+          fi
 
       - name: Wait for readiness and health endpoints
+        working-directory: deploy/container
         shell: bash
         run: |
-          for attempt in $(seq 1 180); do
-            if curl --fail --silent --show-error "http://127.0.0.1:${EXPORTDOCMANAGER_WEB_PORT}/readyz" > artifacts/container-runtime/evidence/readyz.json; then
+          show_diagnostics() {
+            docker compose ps --all || true
+            docker compose logs --no-color --tail=200 postgres api web || true
+          }
+
+          ready=0
+          for attempt in $(seq 1 30); do
+            if curl --connect-timeout 2 --max-time 3 --fail --silent \
+              "http://127.0.0.1:${EXPORTDOCMANAGER_WEB_PORT}/readyz" \
+              > ../../artifacts/container-runtime/evidence/readyz.json; then
+              ready=1
               break
             fi
-            if [ "$attempt" -eq 180 ]; then
-              echo "Container readiness timed out." >&2
+
+            api_container_id="$(docker compose ps -q api)"
+            if [ -z "$api_container_id" ]; then
+              echo "API container was not created." >&2
+              show_diagnostics
               exit 1
+            fi
+
+            api_status="$(docker inspect --format '{{.State.Status}}' "$api_container_id" 2>/dev/null || true)"
+            api_restarts="$(docker inspect --format '{{.RestartCount}}' "$api_container_id" 2>/dev/null || echo 0)"
+            api_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$api_container_id" 2>/dev/null || true)"
+            if [ "$api_status" != "running" ] || [ "${api_restarts:-0}" -gt 0 ] || [ "$api_health" = "unhealthy" ]; then
+              echo "API container is not stable: status=${api_status:-unknown}, health=${api_health:-unknown}, restarts=${api_restarts:-unknown}." >&2
+              show_diagnostics
+              exit 1
+            fi
+
+            if [ $((attempt % 5)) -eq 0 ]; then
+              echo "Readiness attempt ${attempt}/30: API status=${api_status}, health=${api_health}, restarts=${api_restarts}."
+              docker compose ps --all
             fi
             sleep 2
           done
-          curl --fail --silent --show-error "http://127.0.0.1:${EXPORTDOCMANAGER_WEB_PORT}/healthz" > artifacts/container-runtime/evidence/healthz.json
+
+          if [ "$ready" -ne 1 ]; then
+            echo "Container readiness timed out after bounded retries." >&2
+            show_diagnostics
+            exit 1
+          fi
+
+          curl --connect-timeout 2 --max-time 10 --fail --silent --show-error \
+            "http://127.0.0.1:${EXPORTDOCMANAGER_WEB_PORT}/healthz" \
+            > ../../artifacts/container-runtime/evidence/healthz.json
 
       - name: Validate reverse-proxy and security-header boundary
         working-directory: deploy/container

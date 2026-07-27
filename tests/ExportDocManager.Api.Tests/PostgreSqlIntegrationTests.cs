@@ -98,8 +98,8 @@ namespace ExportDocManager.Api.Tests
                         "暂停", created.Source, created.Notes, created.LinkedDocumentCustomerId,
                         created.VersionNumber)));
 
-                var now = DateTime.Now;
-                var startOfMonth = new DateTime(now.Year, now.Month, 1);
+                var now = DateTime.UtcNow;
+                var startOfMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
                 await using (var context = factory.CreateDbContext())
                 {
                     context.Invoices.AddRange(

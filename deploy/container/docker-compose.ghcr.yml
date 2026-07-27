@@ -42,6 +42,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error --max-time 3 http://127.0.0.1:5188/readyz >/dev/null"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+      start_period: 10s
     expose:
       - "5188"
 
@@ -51,7 +57,8 @@ services:
     ports:
       - "${EXPORTDOCMANAGER_WEB_PORT:-8080}:8080"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     networks:
       default:
         ipv4_address: ${EXPORTDOCMANAGER_REVERSE_PROXY_IP:-172.30.238.10}
