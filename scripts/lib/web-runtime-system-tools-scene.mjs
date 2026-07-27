@@ -54,7 +54,9 @@ export function createSystemToolsSmokeScene(runtime) {
     const expectedText = [
       "软件更新",
       "检查并安装新版本",
-      "更新源配置",
+      "更新配置",
+      "管理员统一控制更新来源",
+      "签名公钥固定在安装包内",
       "当前版本",
       "最新版本",
       "目标平台",
@@ -192,7 +194,9 @@ export function createSystemToolsSmokeScene(runtime) {
     const installedState = options.mockTauriRuntimeContext
       ? await waitFor(async () => {
         const state = await readUpdateCenterState(page);
-        const invoked = state.invocations.some((item) => item.command === "install_tauri_update");
+        const invoked = state.invocations.some((item) =>
+          item.command === "install_tauri_update" &&
+          Object.prototype.hasOwnProperty.call(item.args ?? {}, "endpoint"));
         return invoked && state.statusDetails["安装版本"] === `v${updateSource.version}` ? state : null;
       }, timeoutMs, "Timed out waiting for Tauri updater install invocation.")
       : checkedState;

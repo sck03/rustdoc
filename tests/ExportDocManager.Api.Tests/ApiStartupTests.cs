@@ -224,6 +224,26 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains(ApiDesktopAccessOptions.HeaderName, string.Join(",", headers), StringComparison.OrdinalIgnoreCase);
         }
 
+        [Theory]
+        [InlineData("/readyz")]
+        [InlineData("/healthz")]
+        public async Task CorsPolicy_ShouldExposePublicProbesToTauriLocalhost(string path)
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-probe-cors",
+                "probe-cors-test.db",
+                desktopAccessToken: "desktop-secret");
+            using var client = harness.CreateClient();
+            using var request = new HttpRequestMessage(HttpMethod.Get, path);
+            request.Headers.TryAddWithoutValidation("Origin", "http://tauri.localhost");
+
+            using var response = await client.SendAsync(request);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.True(response.Headers.TryGetValues("Access-Control-Allow-Origin", out var origins));
+            Assert.Contains("http://tauri.localhost", origins);
+        }
+
         [Fact]
         public void OpenApiDocument_ShouldExposeHealthEndpoint()
         {

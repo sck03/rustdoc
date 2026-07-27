@@ -8,6 +8,7 @@ type LoginPageProps = {
   username: string;
   password: string;
   bootstrapToken: string;
+  isDesktopRuntime: boolean;
   isBusy: boolean;
   message: string | null;
   product: ProductEditionPresentation;
@@ -23,6 +24,7 @@ export function LoginPage({
   username,
   password,
   bootstrapToken,
+  isDesktopRuntime,
   isBusy,
   message,
   product,
@@ -98,39 +100,41 @@ export function LoginPage({
             <ArrowRight size={18} aria-hidden="true" />
           </button>
 
-          <details className="login-connection-settings">
-            <summary>服务器连接设置</summary>
-            <label className="login-field">
-              <span>API 地址</span>
-              <span className="login-input-shell">
-                <Server size={17} aria-hidden="true" />
-                <input
-                  aria-label="服务器 API 地址"
-                  value={apiBaseUrl}
-                  onChange={(event) => onApiBaseUrlChange(event.target.value)}
-                  spellCheck={false}
-                />
-              </span>
-            </label>
-            <small>仅在无法连接服务器或管理员要求切换服务地址时修改。</small>
-            <label className="login-field">
-              <span>首次部署令牌</span>
-              <span className="login-input-shell">
-                <ShieldCheck size={17} aria-hidden="true" />
-                <input
-                  aria-label="首次部署令牌"
-                  value={bootstrapToken}
-                  onChange={(event) => onBootstrapTokenChange(event.target.value)}
-                  type="password"
-                  autoComplete="off"
-                  maxLength={512}
-                  placeholder="仅空库首次建立管理员时填写"
-                  spellCheck={false}
-                />
-              </span>
-            </label>
-            <small>由部署管理员提供，至少 24 个字符；仅随本次登录发送，登录成功后立即从页面内存清除，不会写入浏览器存储。</small>
-          </details>
+          {!isDesktopRuntime ? (
+            <details className="login-connection-settings">
+              <summary>服务器连接设置</summary>
+              <label className="login-field">
+                <span>API 地址</span>
+                <span className="login-input-shell">
+                  <Server size={17} aria-hidden="true" />
+                  <input
+                    aria-label="服务器 API 地址"
+                    value={apiBaseUrl}
+                    onChange={(event) => onApiBaseUrlChange(event.target.value)}
+                    spellCheck={false}
+                  />
+                </span>
+              </label>
+              <small>仅在无法连接服务器或管理员要求切换服务地址时修改。</small>
+              <label className="login-field">
+                <span>首次部署令牌</span>
+                <span className="login-input-shell">
+                  <ShieldCheck size={17} aria-hidden="true" />
+                  <input
+                    aria-label="首次部署令牌"
+                    value={bootstrapToken}
+                    onChange={(event) => onBootstrapTokenChange(event.target.value)}
+                    type="password"
+                    autoComplete="off"
+                    maxLength={512}
+                    placeholder="仅网络版空库首次建立管理员时填写"
+                    spellCheck={false}
+                  />
+                </span>
+              </label>
+              <small>由部署管理员提供，至少 24 个字符；仅随本次登录发送，登录成功后立即从页面内存清除，不会写入浏览器存储。</small>
+            </details>
+          ) : null}
         </form>
       </div>
     </main>

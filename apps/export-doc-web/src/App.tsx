@@ -460,6 +460,7 @@ function App() {
         username={username}
         password={password}
         bootstrapToken={bootstrapToken}
+        isDesktopRuntime={isDesktopRuntime}
         isBusy={isBusy}
         message={message}
         product={loginProduct}
@@ -565,7 +566,7 @@ function App() {
               <Route path="/tools/container-packing" element={<ContainerPackingPage client={client} />} />
               <Route path="/tools/exchange-rates" element={<ExchangeRatePage client={client} />} />
               <Route path="/tools/email" element={<EmailPage client={client} />} />
-              <Route path="/system/update" element={<UpdateCenterPage />} />
+              <Route path="/system/update" element={<UpdateCenterPage client={client} />} />
               <Route path="/system/license" element={<LicensePage client={client} />} />
               <Route path="/system/about" element={<AboutPage client={client} product={activeProduct} />} />
               <Route path="/access-denied" element={<NoModuleAccessPage />} />

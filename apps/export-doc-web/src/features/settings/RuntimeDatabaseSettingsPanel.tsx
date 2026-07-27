@@ -1,5 +1,7 @@
 import type { ApiSettingsSecretsDto } from "../../api/index.ts";
+import { InlineNotice } from "../../ui/PageState.tsx";
 import { CheckboxSetting, DirectorySetting, NumberSetting, SelectSetting, TextSetting } from "./SettingsFieldControls.tsx";
+import { systemUpdaterEndpointPath } from "./settingsConfigurationPaths.ts";
 import type { SettingsRecord } from "./settingsTypes.ts";
 
 export function RuntimeDatabaseSettingsPanel({ settings, secrets, canManageSettings, updateSecrets, isBusy, canSelectDesktopDirectory, onChange, onSelectDefaultExportDirectory }: {
@@ -47,6 +49,30 @@ export function RuntimeDatabaseSettingsPanel({ settings, secrets, canManageSetti
             <TextSetting settings={settings} path={["system", "postgreSqlAutoBackupTime"]} label="自动备份时间" placeholder="02:00" onChange={onChange} />
             <SelectSetting settings={settings} path={["system", "postgreSqlAutoBackupDayOfWeek"]} label="每周备份星期" options={[{ value: "1", label: "星期一" }, { value: "2", label: "星期二" }, { value: "3", label: "星期三" }, { value: "4", label: "星期四" }, { value: "5", label: "星期五" }, { value: "6", label: "星期六" }, { value: "0", label: "星期日" }]} onChange={(path, value) => onChange(path, Number(value))} />
             <NumberSetting settings={settings} path={["system", "postgreSqlAutoBackupRetentionCount"]} label="PostgreSQL 保留份数" onChange={onChange} />
+          </div>
+        </fieldset>
+      </section>
+      <section className="form-section" aria-label="软件更新">
+        <div className="section-header">
+          <div>
+            <h2>软件更新</h2>
+            <span>管理员受控配置</span>
+          </div>
+        </div>
+        <InlineNotice tone="info" title="更新地址可切换，签名信任不可替换">
+          留空时使用安装包内置默认地址；可填写 GitHub、自建 HTTPS 地址，或受控公司内网的 HTTP 地址。HTTP 仅适用于可信内网或 VPN，公网仍应使用 HTTPS。更新签名公钥固定在安装包内，本页不会提供公钥输入框。
+        </InlineNotice>
+        <fieldset className="settings-fieldset" disabled={!canManageSettings}>
+          <div className="field-grid">
+            <TextSetting
+              settings={settings}
+              path={systemUpdaterEndpointPath}
+              label="软件更新地址"
+              placeholder="例如 https://.../latest.json 或 http://内网服务器/.../latest.json"
+              maxLength={2048}
+              className="form-field-wide"
+              onChange={onChange}
+            />
           </div>
         </fieldset>
       </section>

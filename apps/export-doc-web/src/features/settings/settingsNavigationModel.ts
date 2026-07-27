@@ -41,6 +41,9 @@ export function readSettingsCategoryFromSearch(
     case "validation":
       category = "maintenance";
       break;
+    case "updater":
+      category = "runtime";
+      break;
     default:
       category = "runtime";
       break;
@@ -83,6 +86,8 @@ export function readSettingsPanelLabelFromSearch(search: string) {
     case "database":
     case "system":
       return "系统与数据库";
+    case "updater":
+      return "软件更新";
     default:
       return null;
   }

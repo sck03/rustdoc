@@ -52,6 +52,7 @@ namespace ExportDocManager.Api.Hosting
 
             if (!canManageSettings)
             {
+                clone.System.UpdaterEndpoint = string.Empty;
                 clone.System.SqliteDatabaseFileName = DatabaseConnectionSettings.DefaultSqliteDatabaseFileName;
                 clone.System.PostgreSqlHost = string.Empty;
                 clone.System.PostgreSqlPort = 5432;

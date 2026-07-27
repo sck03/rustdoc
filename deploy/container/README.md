@@ -42,6 +42,8 @@ Windows/Linux 浏览器服务器包由单个 ASP.NET Core 进程同时托管 Rea
 
 因此，内网 HTTP 只是不启用 TLS 配置，不是把 Web 服务器和同源代理一并省略。若现场确实要移除 Nginx，必须同时提供等价的静态文件服务、SPA fallback、`/api` 反向代理、健康探针转发和安全响应头，并重新审查 `KnownProxies`/CORS/CSP；不能只删掉 Web 容器后把 API 端口直接暴露给所有客户端。单进程浏览器服务器包已经提供了不使用 Nginx 的正式替代路径。
 
+桌面版软件更新地址是另一条独立配置：桌面管理员可在系统设置中把 `latest.json` 指向 GitHub、自建 HTTPS 或受控内网 HTTP 更新服务器。它不要求把 updater 私钥放进容器；更新公钥固定在桌面安装包内，HTTP 更新也仍必须通过客户端签名校验。Web/容器本身不会执行 Tauri 桌面安装事务。
+
 ## 初始化
 
 在本目录执行：

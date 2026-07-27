@@ -88,13 +88,30 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     await settingsService.LoadAsync();
-                    bool requiresRestart = ApiSettingsDtoFactory.RequiresRestartForSystemSettingsChange(
-                        settingsService.Settings.System,
-                        request.Settings.System);
+                    var validation = ApiSettingsDtoFactory.ValidateDraft(
+                        request.Settings,
+                        settingsService.Settings,
+                        request.UpdateSecrets);
+                    if (!validation.IsValid)
+                    {
+                        string errors = string.Join(
+                            "；",
+                            validation.Messages
+                                .Where(message => string.Equals(message.Level, "error", StringComparison.OrdinalIgnoreCase))
+                                .Select(message => message.Message));
+                        return Results.BadRequest(new ApiErrorResponse(
+                            string.IsNullOrWhiteSpace(errors)
+                                ? "设置包含无效内容，请先运行设置校验。"
+                                : errors));
+                    }
+
                     var prepared = ApiSettingsDtoFactory.PrepareForSave(
                         request.Settings,
                         settingsService.Settings,
                         request.UpdateSecrets);
+                    bool requiresRestart = ApiSettingsDtoFactory.RequiresRestartForSystemSettingsChange(
+                        settingsService.Settings.System,
+                        prepared.System);
 
                     await settingsService.UpdateAsync(current =>
                     {

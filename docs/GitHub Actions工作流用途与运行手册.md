@@ -123,8 +123,8 @@
 - **平台：** 由调用方传入 runner、平台、架构、产品版和 bundle 类型。
 - **做什么：** 安装 .NET 8/Node 24/Rust，准备开源字体和 Chrome Headless Shell（Linux ARM64 使用明确的 Chromium ARM64 路径），构建 API/Web/Tauri、OCR 资源并验证精简 payload。`publish_release=false` 生成未签名验收包；`true` 才启用 updater 签名、上传安装包并合并 `latest.json`。
 - **输出：** `export-doc-manager-<platform>-<arch>-<edition>-<version>` Artifact，通常保留 14 天；发布模式另上传 GitHub Release 资产。
-- **Secrets/Variables：** 测试模式不需要签名材料；发布模式必须配置仓库 Variables `EXPORTDOCMANAGER_UPDATER_ENDPOINT`、`EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY`，以及带密码的 Secrets `TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。调用方使用 `secrets: inherit`，不应把私钥写入仓库或日志。
-- **常见失败：** 版本格式、浏览器资源缺失/执行权限、OCR 运行时缺库、签名变量或私钥缺失、Release tag 已被其它版本占用。
+- **Secrets/Variables：** 测试模式不需要签名材料；发布模式必须配置仓库 Variable `EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY`，以及带密码的 Secrets `TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。`EXPORTDOCMANAGER_UPDATER_ENDPOINT` 改为可选：留空时安装包只内置公钥，由管理员安装后在系统设置中配置 GitHub、自建服务器或公司内网地址。若构建时就要内置 HTTP 默认地址，还必须显式配置 `EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT=true`；公网默认地址仍应使用 HTTPS。调用方使用 `secrets: inherit`，不应把私钥写入仓库或日志。
+- **常见失败：** 版本格式、浏览器资源缺失/执行权限、OCR 运行时缺库、公钥或私钥缺失、未显式放行却尝试内置 HTTP endpoint、Release tag 已被其它版本占用。
 - **耗时：** 15—40 分钟，首次下载浏览器和 Rust 依赖时更久。
 
 ### 2.9 Reusable browser server package

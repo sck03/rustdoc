@@ -3,7 +3,7 @@ import { NumberField, SelectField } from "../../ui/FormFields.tsx";
 import { readBoolean, readNestedValue, readNumberValue } from "./settingsValueUtils.ts";
 import type { SettingsRecord } from "./settingsTypes.ts";
 
-export function TextSetting({ settings, path, label, disabled, placeholder, list, className, onChange }: {
+export function TextSetting({ settings, path, label, disabled, placeholder, list, className, maxLength, onChange }: {
   settings: SettingsRecord;
   path: string[];
   label: string;
@@ -11,12 +11,13 @@ export function TextSetting({ settings, path, label, disabled, placeholder, list
   placeholder?: string;
   list?: string;
   className?: string;
+  maxLength?: number;
   onChange: (path: string[], value: string) => void;
 }) {
   return (
     <label className={className}>
       <span>{label}</span>
-      <input value={readSettingString(settings, path)} disabled={disabled} placeholder={placeholder} list={list} onChange={(event) => onChange(path, event.target.value)} />
+      <input value={readSettingString(settings, path)} disabled={disabled} placeholder={placeholder} list={list} maxLength={maxLength} onChange={(event) => onChange(path, event.target.value)} />
     </label>
   );
 }

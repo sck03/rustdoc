@@ -15,7 +15,8 @@ const navigationPath = path.join(repoRoot, "apps", "export-doc-web", "src", "fea
 const categoryCatalogPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "settings", "settingsCategoryCatalog.ts").replaceAll("\\", "/");
 const runtimeDiagnosticsPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "settings", "runtimeDiagnosticsModel.ts").replaceAll("\\", "/");
 const runtimeDependencyDiagnosticsPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "settings", "runtimeDependencyDiagnosticsModel.ts").replaceAll("\\", "/");
-fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as navigation from ${JSON.stringify(navigationPath)}; import * as categoryCatalog from ${JSON.stringify(categoryCatalogPath)}; import * as runtimeDiagnostics from ${JSON.stringify(runtimeDiagnosticsPath)}; import * as runtimeDependencyDiagnostics from ${JSON.stringify(runtimeDependencyDiagnosticsPath)}; globalThis.__model = model; globalThis.__navigation = navigation; globalThis.__categoryCatalog = categoryCatalog; globalThis.__runtimeDiagnostics = runtimeDiagnostics; globalThis.__runtimeDependencyDiagnostics = runtimeDependencyDiagnostics;`, "utf8");
+const updaterEndpointModelPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "system", "updaterEndpointModel.ts").replaceAll("\\", "/");
+fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as navigation from ${JSON.stringify(navigationPath)}; import * as categoryCatalog from ${JSON.stringify(categoryCatalogPath)}; import * as runtimeDiagnostics from ${JSON.stringify(runtimeDiagnosticsPath)}; import * as runtimeDependencyDiagnostics from ${JSON.stringify(runtimeDependencyDiagnosticsPath)}; import * as updaterEndpointModel from ${JSON.stringify(updaterEndpointModelPath)}; globalThis.__model = model; globalThis.__navigation = navigation; globalThis.__categoryCatalog = categoryCatalog; globalThis.__runtimeDiagnostics = runtimeDiagnostics; globalThis.__runtimeDependencyDiagnostics = runtimeDependencyDiagnostics; globalThis.__updaterEndpointModel = updaterEndpointModel;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -24,6 +25,7 @@ const navigation = globalThis.__navigation;
 const categoryCatalog = globalThis.__categoryCatalog;
 const runtimeDiagnostics = globalThis.__runtimeDiagnostics;
 const runtimeDependencyDiagnostics = globalThis.__runtimeDependencyDiagnostics;
+const updaterEndpointModel = globalThis.__updaterEndpointModel;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 
 const normalized = m.normalizeExcelImportSettings({ SchemeName: "Legacy", ItemsStartRow: "25", invoiceNoCell: null });
@@ -50,6 +52,8 @@ assert(navigation.readSettingsCategoryFromSearch("?section=%20diagnostics%20") =
 assert(navigation.readSettingsPanelLabelFromSearch("?section=backup") === "数据备份与还原", "backup panel");
 assert(navigation.readSettingsPanelLabelFromSearch("?section=diagnostics") === "运行诊断", "diagnostics panel");
 assert(navigation.readSettingsCategoryFromSearch("?section=ownership") === "maintenance", "ownership maintenance category");
+assert(navigation.readSettingsCategoryFromSearch("?section=updater") === "runtime", "updater belongs to runtime settings");
+assert(navigation.readSettingsPanelLabelFromSearch("?section=updater") === "软件更新", "updater panel deep link");
 assert(navigation.readSettingsPanelLabelFromSearch("?section=unknown") === null, "unknown panel");
 const salesEditionCategories = categoryCatalog.filterSettingsCategories({ canUseDocumentWorkspace: false });
 assert(JSON.stringify(salesEditionCategories.map((item) => item.key)) === JSON.stringify(["runtime", "exchange-rate", "communication", "maintenance"]), "sales edition settings are focused on common runtime tasks");
@@ -57,6 +61,10 @@ const documentEditionCategories = categoryCatalog.filterSettingsCategories({ can
 assert(documentEditionCategories.some((item) => item.key === "document-templates"), "document edition keeps document settings");
 assert(!documentEditionCategories.some((item) => item.key === "users"), "single-role edition hides user management");
 assert(navigation.readSettingsCategoryFromSearch("?section=singleWindow", salesEditionCategories.map((item) => item.key)) === "runtime", "sales edition deep link falls back from document settings");
+assert(updaterEndpointModel.readUpdaterEndpoint({ system: { updaterEndpoint: " http://updates.internal/latest.json " } }) === "http://updates.internal/latest.json", "updater endpoint normalization");
+assert(updaterEndpointModel.isInsecureHttpUpdaterEndpoint("HTTP://updates.internal/latest.json"), "intranet HTTP detection");
+assert(!updaterEndpointModel.isInsecureHttpUpdaterEndpoint("https://updates.example.test/latest.json"), "HTTPS is not marked insecure");
+assert(updaterEndpointModel.describeUpdaterEndpoint("") === "使用安装包默认地址", "empty endpoint uses packaged default");
 
 const runtimeGroups = runtimeDiagnostics.buildRuntimePathGroups({
   appRoot: "E:/App",

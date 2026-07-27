@@ -70,6 +70,7 @@ namespace ExportDocManager.Api.Hosting
             settings.System.PostgreSqlUsername = DbHelper.NormalizePostgreSqlText(settings.System.PostgreSqlUsername);
             settings.System.PostgreSqlAdditionalOptions =
                 DbHelper.NormalizePostgreSqlAdditionalOptions(settings.System.PostgreSqlAdditionalOptions);
+            settings.System.UpdaterEndpoint = UpdaterEndpointPolicy.Normalize(settings.System.UpdaterEndpoint);
         }
 
         private static string NormalizeTemplateText(string value, string fallback)

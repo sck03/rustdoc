@@ -25,7 +25,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { SecretToggle, readSettingString } from "./SettingsFieldControls.tsx";
-import { exchangeRateAllSupportedCurrenciesPath, exchangeRateLastCurrencyListUpdateTimePath, singleWindowCustomsCooAplAddPath, singleWindowCustomsCooFetchPlacePath, singleWindowCustomsCooOrgCodePath } from "./settingsConfigurationPaths.ts";
+import { exchangeRateAllSupportedCurrenciesPath, exchangeRateLastCurrencyListUpdateTimePath, singleWindowCustomsCooAplAddPath, singleWindowCustomsCooFetchPlacePath, singleWindowCustomsCooOrgCodePath, systemUpdaterEndpointPath } from "./settingsConfigurationPaths.ts";
 import { cloneSettings, normalizeCurrencyList, normalizeSettingText, setNestedValue } from "./settingsValueUtils.ts";
 import type { SettingPatch, SettingsRecord } from "./settingsTypes.ts";
 import { isDesktopBridgeAvailable, selectDirectory } from "../../desktop/desktopBridge.ts";
@@ -59,6 +59,7 @@ type SingleWindowAuthorityAutoState = {
 };
 
 const systemDefaultPatches: SettingPatch[] = [
+  { path: systemUpdaterEndpointPath, value: "" },
   { path: ["system", "defaultTemplateExporterNameCn"], value: "" },
   { path: ["system", "backupRetentionDays"], value: 0 },
   { path: ["system", "itemEntryBlankRowCount"], value: 20 },

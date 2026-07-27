@@ -264,22 +264,26 @@ export async function logFrontendError(payload: {
   return true;
 }
 
-export async function checkTauriUpdate() {
+export async function checkTauriUpdate(endpoint?: string) {
   const invoke = getInvoke();
   if (!invoke) {
     return null;
   }
 
-  return invoke<TauriUpdaterCheckResult>("check_tauri_update");
+  return invoke<TauriUpdaterCheckResult>("check_tauri_update", {
+    endpoint: normalizeOptionalText(endpoint),
+  });
 }
 
-export async function installTauriUpdate() {
+export async function installTauriUpdate(endpoint?: string) {
   const invoke = getInvoke();
   if (!invoke) {
     return null;
   }
 
-  return invoke<TauriUpdaterInstallResult>("install_tauri_update");
+  return invoke<TauriUpdaterInstallResult>("install_tauri_update", {
+    endpoint: normalizeOptionalText(endpoint),
+  });
 }
 
 export async function requestAppExit() {
@@ -302,6 +306,10 @@ async function invokeOptionalPath(command: string) {
 }
 
 function normalizeOptionalPath(value?: string) {
+  return normalizeOptionalText(value);
+}
+
+function normalizeOptionalText(value?: string) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
 }

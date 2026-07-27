@@ -235,6 +235,7 @@ namespace ExportDocManager.Services.Infrastructure
             Settings.System.PostgreSqlDatabase = DbHelper.NormalizePostgreSqlText(Settings.System.PostgreSqlDatabase);
             Settings.System.PostgreSqlUsername = DbHelper.NormalizePostgreSqlText(Settings.System.PostgreSqlUsername);
             Settings.System.PostgreSqlAdditionalOptions = DbHelper.NormalizePostgreSqlAdditionalOptions(Settings.System.PostgreSqlAdditionalOptions);
+            Settings.System.UpdaterEndpoint = UpdaterEndpointPolicy.Normalize(Settings.System.UpdaterEndpoint);
         }
 
         private static string ResolveSettingsPath(IAppPathProvider pathProvider, string filePath)

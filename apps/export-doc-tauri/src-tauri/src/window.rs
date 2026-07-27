@@ -26,11 +26,11 @@ pub(crate) fn open_main_window(
 }
 
 fn debug_startup_url() -> &'static str {
-    "http://127.0.0.1:5173/#/dashboard"
+    "http://127.0.0.1:5173/#/"
 }
 
 fn release_startup_path() -> &'static str {
-    "index.html#/dashboard"
+    "index.html#/"
 }
 
 fn product_window_title() -> &'static str {
@@ -51,14 +51,14 @@ mod tests {
 
     #[test]
     fn debug_startup_url_has_no_runtime_query() {
-        assert_eq!(debug_startup_url(), "http://127.0.0.1:5173/#/dashboard");
+        assert_eq!(debug_startup_url(), "http://127.0.0.1:5173/#/");
         assert!(!debug_startup_url().contains("apiBaseUrl"));
         assert!(!debug_startup_url().contains("desktopAccessToken"));
     }
 
     #[test]
     fn release_startup_path_has_no_runtime_query() {
-        assert_eq!(release_startup_path(), "index.html#/dashboard");
+        assert_eq!(release_startup_path(), "index.html#/");
         assert!(!release_startup_path().contains("apiBaseUrl"));
         assert!(!release_startup_path().contains("desktopAccessToken"));
     }

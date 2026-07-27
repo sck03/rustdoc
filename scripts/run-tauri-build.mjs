@@ -14,23 +14,38 @@ const privateKeyPassword = String(process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD
 const requireSignedUpdater = /^(?:1|true|yes)$/iu.test(
   String(process.env.EXPORTDOCMANAGER_REQUIRE_SIGNED_UPDATER || "").trim(),
 );
+const allowInsecureUpdaterEndpoint = /^(?:1|true|yes)$/iu.test(
+  String(process.env.EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT || "").trim(),
+);
 
-if (Boolean(endpoint) !== Boolean(publicKey)) {
-  throw new Error("Updater endpoint and public key must be configured together.");
+if (endpoint && !publicKey) {
+  throw new Error("A packaged updater endpoint requires EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY.");
 }
 
 if (endpoint) {
+  if (endpoint.length > 2048 || /[\u0000-\u001f\u007f\\]/u.test(endpoint)) {
+    throw new Error("Release updater endpoint contains an invalid character or exceeds 2048 characters.");
+  }
   const parsedEndpoint = new URL(endpoint);
-  if (parsedEndpoint.protocol !== "https:") {
-    throw new Error(`Release updater endpoint must use HTTPS: ${endpoint}`);
+  if (!['http:', 'https:'].includes(parsedEndpoint.protocol)) {
+    throw new Error(`Release updater endpoint must use HTTP or HTTPS: ${endpoint}`);
+  }
+  if (parsedEndpoint.username || parsedEndpoint.password || parsedEndpoint.hash) {
+    throw new Error("Release updater endpoint must not contain credentials or a URL fragment.");
+  }
+  if (parsedEndpoint.protocol === "http:" && !allowInsecureUpdaterEndpoint) {
+    throw new Error(
+      "An HTTP updater endpoint is only allowed for a controlled intranet build. " +
+      "Set EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT=true explicitly, or use HTTPS.",
+    );
   }
 }
 
 if (requireSignedUpdater) {
-  if (!endpoint || !publicKey || !privateKey || !privateKeyPassword) {
+  if (!publicKey || !privateKey || !privateKeyPassword) {
     throw new Error(
-      "A release build requires EXPORTDOCMANAGER_UPDATER_ENDPOINT, " +
-      "EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY, TAURI_SIGNING_PRIVATE_KEY and " +
+      "A release build requires EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY, " +
+      "TAURI_SIGNING_PRIVATE_KEY and " +
       "TAURI_SIGNING_PRIVATE_KEY_PASSWORD.",
     );
   }
@@ -50,13 +65,14 @@ if (configIndex >= 0) {
   buildArguments.splice(configIndex, 2);
 }
 
-if (endpoint && publicKey) {
+if (publicKey) {
   const releaseConfig = deepMerge(baseConfig, {
     bundle: { createUpdaterArtifacts: true },
     plugins: {
       updater: {
-        endpoints: [endpoint],
+        endpoints: endpoint ? [endpoint] : [],
         pubkey: publicKey,
+        dangerousInsecureTransportProtocol: true,
       },
     },
   });

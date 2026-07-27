@@ -110,6 +110,7 @@ assert(model.getRequiredRouteAccessLevel("/single-window/coo/8") === "operate", 
 assert(model.getRequiredRouteAccessLevel("/single-window/acd/8") === "operate", "ACD editor route requires operate");
 assert(model.getRequiredRouteAccessLevel("/invoices/8") === "view", "invoice detail route permits view");
 assert(product.getDefaultWorkspaceRoute({ enabledModules: financeModules }) === "/payments", "finance default route");
+assert(product.getDefaultWorkspaceRoute({ enabledModules: ["sales.dashboard"] }) === "/crm/dashboard", "sales edition default route");
 assert(product.getDefaultWorkspaceRoute({ enabledModules: [] }) === "/access-denied", "empty permission template uses access denied route");
 assert(product.getProductEditionPresentation("Document").displayName === "外贸业务综合管理系统（单证员版）", "document edition brand name");
 assert(product.getProductEditionPresentation("Sales").displayName === "外贸业务综合管理系统（业务员版）", "sales edition brand name");

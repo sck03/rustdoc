@@ -111,6 +111,8 @@ namespace ExportDocManager.Api.Hosting
                 messages.Add(Warning("system.appName", "软件名称为空，保存后主界面标题会缺少名称。", false));
             }
 
+            AddUpdaterEndpointValidationMessages(raw, normalized, messages);
+
             AddRangeFixMessage(messages, "system.backupRetentionDays", raw.BackupRetentionDays, normalized.BackupRetentionDays, "备份保留天数");
             AddRangeFixMessage(messages, "system.postgreSqlAutoBackupDayOfWeek", raw.PostgreSqlAutoBackupDayOfWeek, normalized.PostgreSqlAutoBackupDayOfWeek, "PostgreSQL 每周备份星期");
             AddRangeFixMessage(messages, "system.postgreSqlAutoBackupRetentionCount", raw.PostgreSqlAutoBackupRetentionCount, normalized.PostgreSqlAutoBackupRetentionCount, "PostgreSQL 备份保留份数");
@@ -173,6 +175,42 @@ namespace ExportDocManager.Api.Hosting
                     false));
             }
 
+        }
+
+        private static void AddUpdaterEndpointValidationMessages(
+            SystemSettings raw,
+            SystemSettings normalized,
+            ICollection<ApiSettingsValidationMessageDto> messages)
+        {
+            string rawValue = raw?.UpdaterEndpoint ?? string.Empty;
+            string normalizedValue = UpdaterEndpointPolicy.Normalize(normalized?.UpdaterEndpoint);
+
+            if (!string.Equals(rawValue, normalizedValue, StringComparison.Ordinal))
+            {
+                messages.Add(Warning(
+                    "system.updaterEndpoint",
+                    "软件更新地址首尾空白将自动移除。",
+                    true));
+            }
+
+            if (normalizedValue.Length == 0)
+            {
+                return;
+            }
+
+            if (!UpdaterEndpointPolicy.TryValidate(normalizedValue, out _, out string validationError))
+            {
+                messages.Add(Error("system.updaterEndpoint", validationError, false));
+                return;
+            }
+
+            if (UpdaterEndpointPolicy.UsesInsecureHttp(normalizedValue))
+            {
+                messages.Add(Warning(
+                    "system.updaterEndpoint",
+                    "当前更新地址使用 HTTP。仅应在受控公司内网、专用 VLAN 或可信 VPN 中使用；公网和跨不可信网络仍应使用 HTTPS。安装包签名仍会由客户端内置公钥强制校验。",
+                    false));
+            }
         }
 
         private static void AddEmailValidationMessages(

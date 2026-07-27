@@ -41,6 +41,10 @@ namespace ExportDocManager.Api.Tests
             var operatorLogin = await harness.LoginAsync(anonymousClient, "settings-operator", "operator-pass");
             Assert.False(operatorLogin.User.Capabilities.CanManageSettings);
             using var operatorClient = harness.CreateClient(operatorLogin.AccessToken);
+            var operatorSettingsResponse = await operatorClient.GetAsync("/api/settings");
+            Assert.Equal(HttpStatusCode.OK, operatorSettingsResponse.StatusCode);
+            var operatorSettings = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSettingsResponse>(operatorSettingsResponse);
+            Assert.Empty(operatorSettings.Settings.System.UpdaterEndpoint);
 
             string settingsPath = Path.Combine(harness.AppRoot, "appsettings.json");
             var forbiddenSettings = CloneSettings(settingsResponse.Settings);
@@ -55,6 +59,7 @@ namespace ExportDocManager.Api.Tests
 
             var requestedSettings = CloneSettings(settingsResponse.Settings);
             requestedSettings.System.AppName = "Settings Endpoint Smoke";
+            requestedSettings.System.UpdaterEndpoint = "http://updates.internal:8080/desktop/latest.json";
             requestedSettings.BatchExport.Items =
             [
                 new BatchExportItem
@@ -104,6 +109,7 @@ namespace ExportDocManager.Api.Tests
             Assert.True(saved.Success);
             Assert.False(saved.RequiresRestart);
             Assert.Equal("Settings Endpoint Smoke", saved.Settings.System.AppName);
+            Assert.Equal("http://updates.internal:8080/desktop/latest.json", saved.Settings.System.UpdaterEndpoint);
             Assert.True(File.Exists(settingsPath));
             Assert.StartsWith(
                 harness.AppRoot,
@@ -112,6 +118,7 @@ namespace ExportDocManager.Api.Tests
             Assert.False(File.Exists(Path.Combine(harness.DataRoot, "appsettings.json")));
             string settingsJson = await File.ReadAllTextAsync(settingsPath);
             Assert.Contains("Settings Endpoint Smoke", settingsJson);
+            Assert.Contains("http://updates.internal:8080/desktop/latest.json", settingsJson);
             Assert.True(
                 settingsJson.IndexOf("Smoke Commercial Invoice", StringComparison.Ordinal) <
                 settingsJson.IndexOf("Smoke Packing List", StringComparison.Ordinal));
@@ -123,6 +130,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, getAfterSaveResponse.StatusCode);
             var settingsAfterSave = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSettingsResponse>(getAfterSaveResponse);
             Assert.Equal("Settings Endpoint Smoke", settingsAfterSave.Settings.System.AppName);
+            Assert.Equal("http://updates.internal:8080/desktop/latest.json", settingsAfterSave.Settings.System.UpdaterEndpoint);
             Assert.Collection(
                 settingsAfterSave.Settings.BatchExport.Items,
                 item =>
@@ -151,6 +159,21 @@ namespace ExportDocManager.Api.Tests
                     Assert.True(item.IsEnabled);
                     Assert.True(item.ShowSeal);
                 });
+
+            var invalidSettings = CloneSettings(settingsAfterSave.Settings);
+            invalidSettings.System.UpdaterEndpoint = "ftp://updates.example.test/latest.json";
+            var invalidSaveResponse = await adminClient.PutAsJsonAsync("/api/settings", new
+            {
+                settings = invalidSettings,
+                updateSecrets = false
+            });
+            Assert.Equal(HttpStatusCode.BadRequest, invalidSaveResponse.StatusCode);
+
+            var getAfterInvalidSaveResponse = await adminClient.GetAsync("/api/settings");
+            var settingsAfterInvalidSave = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSettingsResponse>(getAfterInvalidSaveResponse);
+            Assert.Equal(
+                "http://updates.internal:8080/desktop/latest.json",
+                settingsAfterInvalidSave.Settings.System.UpdaterEndpoint);
         }
 
         private static AppSettings CloneSettings(AppSettings settings)

@@ -39,12 +39,28 @@ assert.doesNotMatch(
   /(?:writeStoredJson|localStorage|sessionStorage)[^\n;]*bootstrapToken/i,
   "bootstrap token must not be written to browser storage",
 );
+assert.match(
+  appSource,
+  /isDesktopRuntime=\{isDesktopRuntime\}/,
+  "the login page must receive the actual desktop runtime state",
+);
+assert.match(
+  loginPageSource,
+  /isDesktopRuntime: boolean;/,
+  "the login page must model desktop and browser deployment modes explicitly",
+);
+assert.match(
+  loginPageSource,
+  /\{!isDesktopRuntime \? \(\s*<details className="login-connection-settings">/s,
+  "desktop SQLite login must hide server connection and bootstrap-token settings",
+);
 
 for (const contract of [
   "首次部署令牌",
   'type="password"',
   'autoComplete="off"',
   "登录成功后立即从页面内存清除",
+  "仅网络版空库首次建立管理员时填写",
 ]) {
   assert(loginPageSource.includes(contract), `login page is missing bootstrap-token contract: ${contract}`);
 }

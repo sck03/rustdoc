@@ -39,6 +39,7 @@ namespace ExportDocManager.Api.Tests
             {
                 System = new SystemSettings
                 {
+                    UpdaterEndpoint = "http://updates.internal/latest.json",
                     DefaultExportDirectory = @"E:\\Exports",
                     SqliteDatabaseFileName = "team.db",
                     PostgreSqlHost = "postgres.internal",
@@ -77,6 +78,7 @@ namespace ExportDocManager.Api.Tests
                 canManageSettings: false,
                 networkMode: false);
             Assert.Equal(@"E:\\Exports", localResponse.Settings.System.DefaultExportDirectory);
+            Assert.Empty(localResponse.Settings.System.UpdaterEndpoint);
             Assert.Equal("data.db", localResponse.Settings.System.SqliteDatabaseFileName);
             Assert.Empty(localResponse.Settings.System.PostgreSqlHost);
             Assert.Equal(5432, localResponse.Settings.System.PostgreSqlPort);
@@ -335,6 +337,107 @@ namespace ExportDocManager.Api.Tests
 
             Assert.True(ApiSettingsDtoFactory.RequiresRestartForSystemSettingsChange(current, requested));
             Assert.False(ApiSettingsDtoFactory.RequiresRestartForSystemSettingsChange(current, current));
+        }
+
+        [Fact]
+        public void RequiresRestartForSystemSettingsChange_UpdaterEndpointOnly_ShouldNotRequireRestart()
+        {
+            var current = new SystemSettings
+            {
+                UpdaterEndpoint = "https://github.com/sck03/rustdoc/releases/latest/download/latest.json"
+            };
+            var requested = new SystemSettings
+            {
+                UpdaterEndpoint = "http://updates.internal/latest.json"
+            };
+
+            Assert.False(ApiSettingsDtoFactory.RequiresRestartForSystemSettingsChange(current, requested));
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("https://github.com/sck03/rustdoc/releases/latest/download/latest.json")]
+        [InlineData("https://updates.example.test/{{target}}/{{arch}}/{{current_version}}")]
+        [InlineData("http://updates.internal:8080/desktop/latest.json")]
+        public void ValidateDraft_UpdaterEndpointSupportedAddress_ShouldRemainValid(string endpoint)
+        {
+            var request = new AppSettings
+            {
+                System = new SystemSettings { UpdaterEndpoint = endpoint }
+            };
+
+            var response = ApiSettingsDtoFactory.ValidateDraft(
+                request,
+                new AppSettings(),
+                updateSecrets: false);
+
+            Assert.True(response.IsValid);
+            Assert.Equal(endpoint, response.NormalizedSettings.System.UpdaterEndpoint);
+            if (endpoint.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            {
+                Assert.Contains(response.Messages, message =>
+                    message.Level == "warning" &&
+                    message.PropertyName == "system.updaterEndpoint" &&
+                    message.Message.Contains("受控公司内网", StringComparison.Ordinal));
+            }
+        }
+
+        [Theory]
+        [InlineData("ftp://updates.example.test/latest.json")]
+        [InlineData("https://user:password@updates.example.test/latest.json")]
+        [InlineData("https://updates.example.test/latest.json#fragment")]
+        [InlineData("latest.json")]
+        public void ValidateDraft_UpdaterEndpointUnsafeAddress_ShouldBeRejected(string endpoint)
+        {
+            var request = new AppSettings
+            {
+                System = new SystemSettings { UpdaterEndpoint = endpoint }
+            };
+
+            var response = ApiSettingsDtoFactory.ValidateDraft(
+                request,
+                new AppSettings(),
+                updateSecrets: false);
+
+            Assert.False(response.IsValid);
+            Assert.Contains(response.Messages, message =>
+                message.Level == "error" &&
+                message.PropertyName == "system.updaterEndpoint");
+        }
+
+        [Fact]
+        public void ValidateDraft_UpdaterEndpointTooLong_ShouldBeRejected()
+        {
+            string endpoint = "https://updates.example.test/" + new string('a', UpdaterEndpointPolicy.MaxLength);
+            var response = ApiSettingsDtoFactory.ValidateDraft(
+                new AppSettings
+                {
+                    System = new SystemSettings { UpdaterEndpoint = endpoint }
+                },
+                new AppSettings(),
+                updateSecrets: false);
+
+            Assert.False(response.IsValid);
+            Assert.Contains(response.Messages, message =>
+                message.PropertyName == "system.updaterEndpoint" &&
+                message.Message.Contains(UpdaterEndpointPolicy.MaxLength.ToString(), StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void PrepareForSave_UpdaterEndpoint_ShouldTrimWithoutChangingTrustRoot()
+        {
+            var prepared = ApiSettingsDtoFactory.PrepareForSave(
+                new AppSettings
+                {
+                    System = new SystemSettings
+                    {
+                        UpdaterEndpoint = "  http://updates.internal/latest.json  "
+                    }
+                },
+                new AppSettings(),
+                updateSecrets: false);
+
+            Assert.Equal("http://updates.internal/latest.json", prepared.System.UpdaterEndpoint);
         }
 
         [Fact]

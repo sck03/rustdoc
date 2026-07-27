@@ -131,8 +131,8 @@ namespace ExportDocManager.Api.Tests
 
                 var app = builder.Build();
                 app.UseExportDocManagerApiSafety();
-                app.UseExportDocManagerReadiness(databaseSettings, runtimeOptions);
                 app.UseCors(ApiCorsPolicy.LocalFrontendPolicyName);
+                app.UseExportDocManagerReadiness(databaseSettings, runtimeOptions);
                 app.UseExportDocManagerDesktopAccess();
                 app.UseExportDocManagerApiAuthentication();
                 app.UseExportDocManagerWorkspaceAccess();

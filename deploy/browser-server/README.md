@@ -46,4 +46,6 @@ pwsh -File .\initialize-windows.ps1 `
 
 公网、跨网段或有合规要求时，在该程序前配置可信 HTTPS 反向代理，并把代理直接连接本程序的固定 IP 写入 `EXPORTDOCMANAGER_TRUSTED_PROXIES`（初始化脚本的 `-TrustedProxies/--trusted-proxies`）。反向代理负责证书、HSTS、外部访问控制和可选静态缓存；API 仍负责登录、权限、数据归属和审计。非 Docker 包不使用 Compose 容器网段，也不需要 `EXPORTDOCMANAGER_CONTAINER_SUBNET` 或 Nginx 固定地址。
 
+桌面端 updater 的 `latest.json` 地址由桌面管理员在系统设置中单独维护，可指向 GitHub、自建 HTTPS 或受控内网 HTTP。浏览器服务器包只托管 Web/API，不执行 Tauri 更新，也不应保存 updater 私钥；公钥由桌面正式安装包固定携带。
+
 数据库、日志、缓存、备份、业务文件和默认生成的 `Security/local-master-key.bin` 均写入配置的数据根，不写系统用户目录。若设置 `EXPORTDOCMANAGER_MASTER_KEY`，该 32 字节 Base64/64 位十六进制密钥必须长期安全备份，不能随意更换。正式运行建议再由企业服务管理器（Windows 服务、systemd 或容器平台）负责进程拉起和日志轮换，但不要把服务注册动作隐藏在初始化脚本中。

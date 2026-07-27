@@ -69,6 +69,7 @@ jobs:
       EXPORTDOCMANAGER_REQUIRE_SIGNED_UPDATER: ${{ inputs.publish_release && 'true' || 'false' }}
       EXPORTDOCMANAGER_UPDATER_ENDPOINT: ${{ vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT }}
       EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY: ${{ vars.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY }}
+      EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT: ${{ vars.EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
@@ -195,10 +196,12 @@ jobs:
         if: inputs.publish_release
         shell: pwsh
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_UPDATER_ENDPOINT)) { throw "请配置仓库变量 EXPORTDOCMANAGER_UPDATER_ENDPOINT。" }
           if ([string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY)) { throw "请配置仓库变量 EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY。" }
           if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) { throw "请配置仓库 Secret TAURI_SIGNING_PRIVATE_KEY。" }
           if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)) { throw "请配置仓库 Secret TAURI_SIGNING_PRIVATE_KEY_PASSWORD，并使用带密码的私钥。" }
+          if ([string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_UPDATER_ENDPOINT)) {
+            Write-Host "未内置默认更新地址；客户端将使用管理员在系统设置中保存的更新地址。"
+          }
           npm --prefix apps/export-doc-tauri run build -- --target ${{ inputs.rust_target }} --bundles ${{ inputs.bundle_targets }}
           exit $LASTEXITCODE
 
@@ -311,4 +314,5 @@ jobs:
           - 内置报表浏览器：`${{ inputs.include_browser }}`
           - 发布到 GitHub Release：`${{ inputs.publish_release }}`
           - 更新签名：`${{ inputs.publish_release && '已启用，缺少构建密钥会直接失败' || '未启用，仅用于测试和人工验收' }}`
+          - 默认更新地址：`${{ inputs.publish_release && (vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT || '未内置，由管理员运行时配置') || '不适用' }}`
           "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
