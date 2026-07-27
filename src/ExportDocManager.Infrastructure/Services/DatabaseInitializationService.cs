@@ -4,6 +4,7 @@ using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Serilog;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -93,7 +94,7 @@ namespace ExportDocManager.Services.Infrastructure
                 await EnsureSharedMasterDataConcurrencySchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 await EnsureHsCodeMetadataSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
                 await EnsureHsCodeKnowledgeSchemaAsync(context, usesPostgreSql).ConfigureAwait(false);
-                await EnsureQueryPerformanceIndexesAsync(context).ConfigureAwait(false);
+                await EnsureQueryPerformanceIndexesAsync(context, usesPostgreSql).ConfigureAwait(false);
                 DbSeeder.SeedAuxiliaryData(
                     context,
                     _databaseSettings,
@@ -470,7 +471,7 @@ namespace ExportDocManager.Services.Infrastructure
                 """).ConfigureAwait(false);
         }
 
-        private static async Task EnsureQueryPerformanceIndexesAsync(AppDbContext context)
+        private static async Task EnsureQueryPerformanceIndexesAsync(AppDbContext context, bool usesPostgreSql)
         {
             if (!context.Database.IsRelational()) return;
 
@@ -501,6 +502,93 @@ namespace ExportDocManager.Services.Infrastructure
                 CREATE INDEX IF NOT EXISTS "IX_HsCodeDeclarationExamples_IsManuallyVerified_UpdatedAt"
                     ON "HsCodeDeclarationExamples" ("IsManuallyVerified", "UpdatedAt");
                 """).ConfigureAwait(false);
+
+            if (!usesPostgreSql)
+            {
+                return;
+            }
+
+            // Pattern operator classes keep numeric HS-prefix searches indexable even when
+            // the database uses a Unicode collation. They do not require optional extensions.
+            await context.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_HsCodes_Status_NormalizedCode_Prefix"
+                    ON "HsCodes" ("Status", "NormalizedCode" varchar_pattern_ops);
+                CREATE INDEX IF NOT EXISTS "IX_HsCodeDeclarationExamples_RawCode_Prefix"
+                    ON "HsCodeDeclarationExamples" ("RawReportedHsCode" varchar_pattern_ops);
+                CREATE INDEX IF NOT EXISTS "IX_HsCodeDeclarationExamples_CurrentCode_Prefix"
+                    ON "HsCodeDeclarationExamples" ("ResolvedCurrentHsCode" varchar_pattern_ops);
+                CREATE INDEX IF NOT EXISTS "IX_HsCodeRemoteCandidates_Status_RawCode_Prefix"
+                    ON "HsCodeRemoteCandidates" ("ReviewStatus", "RawReportedHsCode" varchar_pattern_ops);
+                CREATE INDEX IF NOT EXISTS "IX_HsCodeRemoteCandidates_Status_CurrentCode_Prefix"
+                    ON "HsCodeRemoteCandidates" ("ReviewStatus", "SuggestedCurrentHsCode" varchar_pattern_ops);
+                CREATE INDEX IF NOT EXISTS "IX_Products_HSCode_Prefix"
+                    ON "Products" ("HSCode" text_pattern_ops);
+                CREATE INDEX IF NOT EXISTS "IX_Items_HSCode_Prefix"
+                    ON "Items" ("HSCode" text_pattern_ops);
+                CREATE INDEX IF NOT EXISTS "IX_CustomsCooItems_HSCode_Prefix"
+                    ON "CustomsCooItems" ("HSCode" text_pattern_ops);
+                """).ConfigureAwait(false);
+
+            await EnsurePostgreSqlTrigramIndexesAsync(context).ConfigureAwait(false);
+        }
+
+        private static async Task EnsurePostgreSqlTrigramIndexesAsync(AppDbContext context)
+        {
+            try
+            {
+                // pg_trgm is a trusted PostgreSQL extension. A restricted managed database
+                // may still deny CREATE EXTENSION; in that case prefix/exact searches remain
+                // indexed and contains-searches continue correctly with a documented fallback.
+                await context.Database.ExecuteSqlRawAsync("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+                    .ConfigureAwait(false);
+                await context.Database.ExecuteSqlRawAsync(
+                    """
+                    CREATE INDEX IF NOT EXISTS "IX_HsCodes_TextSearch_Trgm"
+                        ON "HsCodes" USING gin (
+                            "Name" gin_trgm_ops,
+                            "Elements" gin_trgm_ops,
+                            "Description" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_HsCodeDeclarationExamples_TextSearch_Trgm"
+                        ON "HsCodeDeclarationExamples" USING gin (
+                            "ProductName" gin_trgm_ops,
+                            "Specification" gin_trgm_ops,
+                            "SearchText" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_HsCodeRemoteCandidates_TextSearch_Trgm"
+                        ON "HsCodeRemoteCandidates" USING gin (
+                            "ProductName" gin_trgm_ops,
+                            "Specification" gin_trgm_ops,
+                            "QueryText" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_Products_HistorySearch_Trgm"
+                        ON "Products" USING gin (
+                            "ProductCode" gin_trgm_ops,
+                            "NameCN" gin_trgm_ops,
+                            "NameEN" gin_trgm_ops,
+                            "Material" gin_trgm_ops,
+                            "Brand" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_Items_HistorySearch_Trgm"
+                        ON "Items" USING gin (
+                            "StyleNo" gin_trgm_ops,
+                            "StyleNameCN" gin_trgm_ops,
+                            "StyleName" gin_trgm_ops,
+                            "FabricComposition" gin_trgm_ops,
+                            "Brand" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_CustomsCooItems_HistorySearch_Trgm"
+                        ON "CustomsCooItems" USING gin (
+                            "SourceStyleNo" gin_trgm_ops,
+                            "GoodsName" gin_trgm_ops,
+                            "GoodsNameE" gin_trgm_ops,
+                            "GoodsDesc" gin_trgm_ops);
+                    """).ConfigureAwait(false);
+            }
+            catch (PostgresException ex) when (ex.SqlState is "42501" or "0A000" or "58P01")
+            {
+                Log.Warning(
+                    ex,
+                    "PostgreSQL pg_trgm text-search indexes were not installed. " +
+                    "HS exact and prefix indexes remain active; contains searches use the stable scan fallback. " +
+                    "Ask the database administrator to install pg_trgm for large shared datasets.");
+            }
         }
 
         private static async Task AddSqliteColumnIfMissingAsync(AppDbContext context, string tableName, string columnName, string definition)

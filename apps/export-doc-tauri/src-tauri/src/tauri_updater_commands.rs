@@ -1,6 +1,5 @@
 use serde::Serialize;
 use tauri_plugin_updater::{Updater, UpdaterExt};
-use url::Url;
 
 use crate::sidecar;
 
@@ -37,10 +36,8 @@ const TAURI_UPDATER_STORAGE_POLICY: &str =
 #[tauri::command]
 pub(crate) async fn check_tauri_update(
     app: tauri::AppHandle,
-    endpoint: Option<String>,
-    public_key: Option<String>,
 ) -> Result<TauriUpdaterCheckResult, String> {
-    let updater = build_tauri_updater(&app, endpoint, public_key)?;
+    let updater = build_tauri_updater(&app)?;
     match updater.check().await.map_err(describe_updater_error)? {
         Some(update) => Ok(TauriUpdaterCheckResult {
             supported: true,
@@ -82,10 +79,8 @@ pub(crate) async fn check_tauri_update(
 #[tauri::command]
 pub(crate) async fn install_tauri_update(
     app: tauri::AppHandle,
-    endpoint: Option<String>,
-    public_key: Option<String>,
 ) -> Result<TauriUpdaterInstallResult, String> {
-    let updater = build_tauri_updater(&app, endpoint, public_key)?;
+    let updater = build_tauri_updater(&app)?;
     let update = updater
         .check()
         .await
@@ -111,31 +106,8 @@ pub(crate) async fn install_tauri_update(
     })
 }
 
-fn build_tauri_updater(
-    app: &tauri::AppHandle,
-    endpoint: Option<String>,
-    public_key: Option<String>,
-) -> Result<Updater, String> {
+fn build_tauri_updater(app: &tauri::AppHandle) -> Result<Updater, String> {
     let mut builder = app.updater_builder();
-
-    if let Some(endpoint) = normalize_optional_text(endpoint) {
-        let url = Url::parse(&endpoint).map_err(|error| format!("更新地址无效: {error}"))?;
-        match url.scheme() {
-            "https" | "http" => {}
-            scheme => {
-                return Err(format!(
-                    "更新地址只允许 http/https，当前 scheme 为 {scheme}。"
-                ));
-            }
-        }
-        builder = builder
-            .endpoints(vec![url])
-            .map_err(describe_updater_error)?;
-    }
-
-    if let Some(public_key) = normalize_optional_text(public_key) {
-        builder = builder.pubkey(public_key);
-    }
 
     let app_for_exit = app.clone();
     builder = builder.on_before_exit(move || {
@@ -146,21 +118,15 @@ fn build_tauri_updater(
     builder.build().map_err(describe_updater_error)
 }
 
-fn normalize_optional_text(value: Option<String>) -> Option<String> {
-    value
-        .map(|item| item.trim().to_owned())
-        .filter(|item| !item.is_empty())
-}
-
 fn describe_updater_error(error: tauri_plugin_updater::Error) -> String {
     let message = error.to_string();
     if message.contains("empty endpoints") || message.contains("Updater endpoints are empty") {
-        return "尚未配置更新地址。请填写软件更新源地址，或在打包配置中内置更新地址。".to_owned();
+        return "当前安装包尚未配置正式更新源。请使用发布流程生成的签名安装包，或联系软件维护人员。".to_owned();
     }
 
     if message.contains("signature") || message.contains("pubkey") || message.contains("public key")
     {
-        return format!("更新签名校验失败或尚未配置签名公钥: {message}");
+        return format!("更新签名校验失败或安装包未内置签名公钥: {message}");
     }
 
     format!("软件更新执行失败: {message}")

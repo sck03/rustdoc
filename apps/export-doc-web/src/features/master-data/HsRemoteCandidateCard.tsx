@@ -3,6 +3,7 @@ import { ExternalLink } from "lucide-react";
 import type { ExportDocManagerApiClient, HsCodeRemoteCandidate } from "../../api/index.ts";
 import { Button } from "../../ui/Button.tsx";
 import { useDebouncedValue } from "../../ui/useDebouncedValue.ts";
+import { formatHsKnowledgeStatus, formatHsKnowledgeVerifiedAt } from "./hsKnowledgeDisplay.ts";
 
 export function HsRemoteCandidateCard({
   client,
@@ -18,8 +19,6 @@ export function HsRemoteCandidateCard({
   onConfirm,
   onIgnore,
   onReset,
-  statusLabel,
-  formatVerifiedAt,
 }: {
   client: ExportDocManagerApiClient;
   candidate: HsCodeRemoteCandidate;
@@ -34,20 +33,18 @@ export function HsRemoteCandidateCard({
   onConfirm: (code: string) => void;
   onIgnore: () => void;
   onReset: () => void;
-  statusLabel: (status?: string) => string;
-  formatVerifiedAt: (value?: string) => string;
 }) {
   return <article className={canOperate && allowSelection ? "remote-candidate-card remote-candidate-card-selectable" : "remote-candidate-card"}>
     {canOperate && allowSelection ? <input type="checkbox" aria-label={`选择 ${candidate.productName}`} checked={selected} onChange={onToggle} /> : null}
     <div className="remote-candidate-evidence">
-      <div className="remote-candidate-title"><strong>{candidate.productName}</strong><span className="status-pill">{statusLabel(candidate.resolutionStatus)}</span></div>
+      <div className="remote-candidate-title"><strong>{candidate.productName}</strong><span className="status-pill">{formatHsKnowledgeStatus(candidate.resolutionStatus)}</span></div>
       <div className="remote-code-comparison">
         <span><small>网页实例编码</small><b>{candidate.rawReportedHsCode || "未提供"}</b></span>
         <i aria-hidden="true">→</i>
         <span className={candidate.suggestedCurrentHsCode ? "current-code" : "current-code unresolved"}><small>待确认当前编码</small><b>{candidate.suggestedCurrentHsCode || "需要人工选择"}</b></span>
       </div>
       <p>{candidate.specification || "暂无规格与申报要素"}</p>
-      <div className="remote-candidate-meta"><small>查询词：{candidate.queryText}</small><small>网页出现 {candidate.seenCount} 次</small><small>来源：{candidate.source}</small>{candidate.reviewedAt ? <small>审核：{formatVerifiedAt(candidate.reviewedAt).replace("验证于 ", "")}</small> : null}</div>
+      <div className="remote-candidate-meta"><small>查询词：{candidate.queryText}</small><small>网页出现 {candidate.seenCount} 次</small><small>来源：{candidate.source}</small>{candidate.reviewedAt ? <small>审核：{formatHsKnowledgeVerifiedAt(candidate.reviewedAt).replace("验证于 ", "")}</small> : null}</div>
       {candidate.sourceUrl ? <a className="knowledge-source-link" href={candidate.sourceUrl} target="_blank" rel="noreferrer">查看网页证据<ExternalLink size={13} aria-hidden="true" /></a> : null}
     </div>
     <div className="remote-candidate-actions">

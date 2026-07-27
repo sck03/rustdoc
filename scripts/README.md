@@ -6,6 +6,14 @@
 
 - `github/verify-public-source.ps1`：上传前检查注册机、私钥、内部 `KEY/` 产物和 GitHub 大文件边界。
 - `github/initialize-github-repository.ps1`：初始化 `main` 分支、暂存公开文件，可选配置 origin、创建提交和推送；默认不会提交或联网推送。
+- `verify-github-workflow-actions.mjs`：检查官方 Action 主版本、Node 24、`upload-artifact@v7` 和 `download-artifact@v8`，防止工作流运行时回退。
+- `audit-npm-production.mjs`、`audit-dotnet-packages.mjs`：执行结构化 npm/NuGet 漏洞审计；Web 只允许已记录且由声明式路由契约约束的 React Router RSC 公告例外。
+- `generate-dependency-governance.mjs`：从 npm/Cargo 锁文件和还原后的 NuGet 图生成 SPDX、CycloneDX 和第三方依赖清单到显式 `artifacts/` 目录。
+- `check_frontend_style_governance.mjs`：阻止硬编码颜色、阴影、渐变、px 字号和 `!important` 债务继续增长。
+
+RustSec 工作流直接调用安装后的 `cargo-audit` 时必须保留 `audit` 子命令，并拒绝漏洞、新增 unsound 公告和 yanked crate。Tauri 当前 Linux WebKit/GTK3 传递栈只精确豁免 `RUSTSEC-2024-0429`；该例外不能扩展为通配忽略，也不代表其它停止维护告警已经消失。
+
+Tauri 正式 updater 密钥不由仓库脚本或 CI 自动生成。项目所有者确认 endpoint 后，按 `docs/Tauri正式更新签名与发布配置.md` 在仓库外手工执行一次 signer 命令，并把公钥/地址放 Variables、私钥/密码放 Secrets。
 
 普通用户只需要使用 `scripts/` 根目录下的以下批处理入口，不要直接运行 `lib/`、`prepare-*`、`verify-*` 或 `assert-*`：
 

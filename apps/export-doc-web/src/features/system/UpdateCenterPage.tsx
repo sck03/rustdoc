@@ -7,13 +7,10 @@ import {
   type TauriUpdaterCheckResult,
   type TauriUpdaterInstallResult,
 } from "../../desktop/desktopBridge.ts";
-import { TextAreaField, TextField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 
 export function UpdateCenterPage() {
-  const [endpoint, setEndpoint] = useState("");
-  const [publicKey, setPublicKey] = useState("");
   const [checkResult, setCheckResult] = useState<TauriUpdaterCheckResult | null>(null);
   const [installResult, setInstallResult] = useState<TauriUpdaterInstallResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -27,7 +24,7 @@ export function UpdateCenterPage() {
     setMessage(null);
     setInstallResult(null);
     try {
-      const result = await checkTauriUpdate(endpoint, publicKey);
+      const result = await checkTauriUpdate();
       if (!result) {
         throw new Error("当前不是桌面运行环境，无法检查软件更新。");
       }
@@ -47,7 +44,7 @@ export function UpdateCenterPage() {
     setIsBusy(true);
     setMessage(null);
     try {
-      const result = await installTauriUpdate(endpoint, publicKey);
+      const result = await installTauriUpdate();
       if (!result) {
         throw new Error("当前不是桌面运行环境，无法安装软件更新。");
       }
@@ -84,32 +81,16 @@ export function UpdateCenterPage() {
 
       {message ? <InlineNotice tone={messageType === "error" ? "error" : "success"}>{message}</InlineNotice> : null}
 
-      <section className="form-section update-config-section" aria-label="更新配置">
+      <section className="form-section update-config-section" aria-label="更新安全说明">
         <div className="section-header">
           <div>
-            <h2>更新源配置</h2>
-            <span>{isDesktop ? "可选，留空使用内置配置" : "仅桌面端生效"}</span>
+            <h2>可信更新</h2>
+            <span>{isDesktop ? "更新配置由正式安装包内置" : "仅桌面端生效"}</span>
           </div>
         </div>
-        <div className="field-grid update-config-grid">
-          <TextField
-            label="更新地址"
-            className="update-endpoint-field"
-            value={endpoint}
-            disabled={isBusy}
-            description="留空使用内置更新地址"
-            placeholder="https://example.com/exportdoc/latest.json"
-            onChange={setEndpoint}
-          />
-          <TextAreaField
-            label="签名公钥"
-            className="update-public-key-field"
-            value={publicKey}
-            disabled={isBusy}
-            description="留空使用内置签名公钥"
-            onChange={setPublicKey}
-          />
-        </div>
+        <InlineNotice tone="info" title="更新地址和签名公钥不可在页面修改">
+          正式发布包只接受构建时内置的 HTTPS 更新源，并使用内置公钥验证更新签名。这样可以避免临时修改地址或公钥后安装未经信任的软件包。
+        </InlineNotice>
       </section>
 
       <section className="form-section" aria-label="更新状态">
@@ -121,6 +102,7 @@ export function UpdateCenterPage() {
           <DetailItem label="下载地址" value={checkResult?.downloadUrl || "-"} wide />
           <DetailItem label="发布时间" value={formatDateTime(checkResult?.date)} />
           <DetailItem label="安装版本" value={formatVersion(installResult?.installedVersion)} />
+          <DetailItem label="验证方式" value="安装包内置签名公钥" />
           <DetailItem label="重启策略" value={installResult?.restartPolicy || "-"} wide />
         </div>
       </section>

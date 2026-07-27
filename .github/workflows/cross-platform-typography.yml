@@ -17,6 +17,8 @@ on:
       - "scripts/provision-chrome-for-testing.ps1"
       - "scripts/report-layout-requirements.txt"
       - "scripts/test_frontend_scale_contracts.mjs"
+      - "scripts/check_frontend_style_governance.mjs"
+      - "scripts/baselines/frontend-style-governance.json"
       - "scripts/test_web_runtime_browser_session.mjs"
       - "scripts/test_login_security_contracts.mjs"
       - "scripts/test_react_router_declarative_contract.mjs"
@@ -40,6 +42,8 @@ on:
       - "scripts/provision-chrome-for-testing.ps1"
       - "scripts/report-layout-requirements.txt"
       - "scripts/test_frontend_scale_contracts.mjs"
+      - "scripts/check_frontend_style_governance.mjs"
+      - "scripts/baselines/frontend-style-governance.json"
       - "scripts/test_web_runtime_browser_session.mjs"
       - "scripts/test_login_security_contracts.mjs"
       - "scripts/test_react_router_declarative_contract.mjs"
@@ -67,7 +71,7 @@ jobs:
           - name: Windows 125% / 150% font contract
             os: windows-latest
             slug: windows-x64
-            scale_profiles: windows-125,windows-150,windows-4k,mobile-safari-contract
+            scale_profiles: windows-125,windows-150,windows-4k,desktop-zoom-200,mobile-safari-contract
           - name: macOS Retina font contract
             os: macos-latest
             slug: macos-native
@@ -75,7 +79,7 @@ jobs:
           - name: Linux font contract
             os: ubuntu-latest
             slug: linux-x64
-            scale_profiles: linux-100,mobile-safari-contract
+            scale_profiles: linux-100,mobile-320,mobile-375,mobile-keyboard-390,mobile-safari-contract
 
     runs-on: ${{ matrix.os }}
     env:
@@ -127,6 +131,9 @@ jobs:
 
       - name: Validate browser session contracts
         run: npm --prefix apps/export-doc-web run test:browser-session-contracts
+
+      - name: Prevent new hard-coded CSS debt
+        run: npm --prefix apps/export-doc-web run test:style-governance
 
       - name: Validate density, scaling and native font rendering
         timeout-minutes: 5

@@ -264,28 +264,22 @@ export async function logFrontendError(payload: {
   return true;
 }
 
-export async function checkTauriUpdate(endpoint?: string, publicKey?: string) {
+export async function checkTauriUpdate() {
   const invoke = getInvoke();
   if (!invoke) {
     return null;
   }
 
-  return invoke<TauriUpdaterCheckResult>("check_tauri_update", {
-    endpoint: normalizeOptionalPath(endpoint),
-    publicKey: normalizeOptionalPath(publicKey),
-  });
+  return invoke<TauriUpdaterCheckResult>("check_tauri_update");
 }
 
-export async function installTauriUpdate(endpoint?: string, publicKey?: string) {
+export async function installTauriUpdate() {
   const invoke = getInvoke();
   if (!invoke) {
     return null;
   }
 
-  return invoke<TauriUpdaterInstallResult>("install_tauri_update", {
-    endpoint: normalizeOptionalPath(endpoint),
-    publicKey: normalizeOptionalPath(publicKey),
-  });
+  return invoke<TauriUpdaterInstallResult>("install_tauri_update");
 }
 
 export async function requestAppExit() {

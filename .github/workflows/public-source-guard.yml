@@ -17,6 +17,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
       - name: Verify public repository boundary
         shell: pwsh
         run: ./scripts/github/verify-public-source.ps1
+
+      - name: Verify GitHub Action runtime policy
+        run: node scripts/verify-github-workflow-actions.mjs
+
+      - name: Verify updater release trust contract
+        run: node scripts/test_tauri_updater_release_contract.mjs

@@ -1,0 +1,192 @@
+name: Container runtime lifecycle validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "Directory.Packages.props"
+      - "deploy/container/**"
+      - "src/**"
+      - "apps/export-doc-web/**"
+      - "apps/exportdoc-ocr-rs/**"
+      - "tools/excel-analyzer-rs/**"
+      - ".github/workflows/container-runtime-validation.yml"
+  pull_request:
+    paths:
+      - "Directory.Packages.props"
+      - "deploy/container/**"
+      - "src/**"
+      - "apps/export-doc-web/**"
+      - "apps/exportdoc-ocr-rs/**"
+      - "tools/excel-analyzer-rs/**"
+      - ".github/workflows/container-runtime-validation.yml"
+
+concurrency:
+  group: container-runtime-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      COMPOSE_DIRECTORY: deploy/container
+      EXPORTDOCMANAGER_WEB_PORT: "18080"
+      EXPORTDOCMANAGER_HTTPS_PORT: "18443"
+      POSTGRES_DB: exportdoc
+      POSTGRES_USER: exportdoc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Verify public repository boundary
+        shell: pwsh
+        run: ./scripts/github/verify-public-source.ps1
+
+      - name: Initialize isolated runtime directory
+        shell: pwsh
+        run: |
+          ./deploy/container/initialize-container-runtime.ps1 `
+            -RuntimeRoot "${{ github.workspace }}/artifacts/container-runtime/live" `
+            -PostgreSqlPassword "container-validation-db-2026" `
+            -BootstrapToken "container-validation-bootstrap-token-2026" `
+            -WebPort $env:EXPORTDOCMANAGER_WEB_PORT `
+            -HttpsPort $env:EXPORTDOCMANAGER_HTTPS_PORT
+
+      - name: Create CI-only TLS certificate
+        shell: bash
+        run: |
+          mkdir -p deploy/container/secrets/tls artifacts/container-runtime/evidence
+          openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
+            -subj "/CN=127.0.0.1" \
+            -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" \
+            -keyout deploy/container/secrets/tls/server.key \
+            -out deploy/container/secrets/tls/server.crt
+
+      - name: Validate HTTP and HTTPS Compose models
+        working-directory: deploy/container
+        shell: bash
+        run: |
+          docker compose config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.https.yml config --quiet
+
+      - name: Build and start HTTP stack
+        working-directory: deploy/container
+        shell: bash
+        run: docker compose up -d --build
+
+      - name: Wait for readiness and health endpoints
+        shell: bash
+        run: |
+          for attempt in $(seq 1 180); do
+            if curl --fail --silent --show-error "http://127.0.0.1:${EXPORTDOCMANAGER_WEB_PORT}/readyz" > artifacts/container-runtime/evidence/readyz.json; then
+              break
+            fi
+            if [ "$attempt" -eq 180 ]; then
+              echo "Container readiness timed out." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --fail --silent --show-error "http://127.0.0.1:${EXPORTDOCMANAGER_WEB_PORT}/healthz" > artifacts/container-runtime/evidence/healthz.json
+
+      - name: Validate reverse-proxy and security-header boundary
+        working-directory: deploy/container
+        shell: bash
+        run: |
+          if docker compose port api 5188 2>/dev/null | grep -q .; then
+            echo "API port 5188 must not be published to the host." >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error --dump-header ../../artifacts/container-runtime/evidence/http-headers.txt --output /dev/null "http://127.0.0.1:${EXPORTDOCMANAGER_WEB_PORT}/"
+          grep -Eiq '^X-Content-Type-Options:[[:space:]]*nosniff' ../../artifacts/container-runtime/evidence/http-headers.txt
+          grep -Eiq '^X-Frame-Options:[[:space:]]*DENY' ../../artifacts/container-runtime/evidence/http-headers.txt
+          grep -Eiq '^Content-Security-Policy:' ../../artifacts/container-runtime/evidence/http-headers.txt
+          grep -Eiq '^Permissions-Policy:' ../../artifacts/container-runtime/evidence/http-headers.txt
+
+      - name: Validate bind-volume persistence across container recreation
+        working-directory: deploy/container
+        shell: bash
+        run: |
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<'SQL'
+          CREATE TABLE IF NOT EXISTS container_lifecycle_probe (
+            id integer PRIMARY KEY,
+            marker text NOT NULL
+          );
+          INSERT INTO container_lifecycle_probe (id, marker)
+          VALUES (1, 'persisted-across-container-recreation')
+          ON CONFLICT (id) DO UPDATE SET marker = EXCLUDED.marker;
+          SQL
+          docker compose stop api
+          docker compose rm -sf postgres
+          docker compose up -d postgres
+          for attempt in $(seq 1 90); do
+            if docker compose exec -T postgres pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 90 ]; then
+              echo "PostgreSQL did not recover after container recreation." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          test "$(docker compose exec -T postgres psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT marker FROM container_lifecycle_probe WHERE id = 1")" = "persisted-across-container-recreation"
+
+      - name: Validate pg_dump and pg_restore recovery
+        working-directory: deploy/container
+        shell: bash
+        run: |
+          docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > ../../artifacts/container-runtime/exportdoc-validation.dump
+          test -s ../../artifacts/container-runtime/exportdoc-validation.dump
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DROP TABLE container_lifecycle_probe"
+          cat ../../artifacts/container-runtime/exportdoc-validation.dump | docker compose exec -T postgres pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --exit-on-error
+          test "$(docker compose exec -T postgres psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT marker FROM container_lifecycle_probe WHERE id = 1")" = "persisted-across-container-recreation"
+          docker compose start api
+
+      - name: Start HTTPS overlay and validate TLS boundary
+        working-directory: deploy/container
+        shell: bash
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.https.yml up -d web
+          for attempt in $(seq 1 90); do
+            if curl --insecure --fail --silent --show-error "https://127.0.0.1:${EXPORTDOCMANAGER_HTTPS_PORT}/readyz" > ../../artifacts/container-runtime/evidence/https-readyz.json; then
+              break
+            fi
+            if [ "$attempt" -eq 90 ]; then
+              echo "HTTPS readiness timed out." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --insecure --fail --silent --show-error --dump-header ../../artifacts/container-runtime/evidence/https-headers.txt --output /dev/null "https://127.0.0.1:${EXPORTDOCMANAGER_HTTPS_PORT}/"
+          grep -Eiq '^Strict-Transport-Security:[[:space:]]*max-age=31536000' ../../artifacts/container-runtime/evidence/https-headers.txt
+          grep -Eiq '^Content-Security-Policy:' ../../artifacts/container-runtime/evidence/https-headers.txt
+
+      - name: Capture lifecycle evidence
+        if: ${{ always() }}
+        working-directory: deploy/container
+        shell: bash
+        run: |
+          mkdir -p ../../artifacts/container-runtime/evidence
+          docker compose -f docker-compose.yml -f docker-compose.https.yml ps --all > ../../artifacts/container-runtime/evidence/compose-ps.txt 2>&1 || true
+          docker compose -f docker-compose.yml -f docker-compose.https.yml logs --no-color > ../../artifacts/container-runtime/evidence/compose.log 2>&1 || true
+
+      - name: Upload lifecycle evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: container-runtime-lifecycle
+          path: artifacts/container-runtime
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Stop validation stack
+        if: ${{ always() }}
+        working-directory: deploy/container
+        shell: bash
+        run: docker compose -f docker-compose.yml -f docker-compose.https.yml down --remove-orphans

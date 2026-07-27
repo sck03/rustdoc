@@ -36,6 +36,7 @@ permissions:
 jobs:
   package:
     uses: ./.github/workflows/desktop-package-reusable.yml
+    secrets: inherit
     with:
       platform: linux
       runner: ${{ inputs.architecture == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}

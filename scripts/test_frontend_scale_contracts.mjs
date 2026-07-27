@@ -19,6 +19,10 @@ const allProfiles = [
   { name: "windows-4k", width: 3840, height: 2160, deviceScaleFactor: 1.5, mobile: false },
   { name: "macos-retina", width: 1440, height: 900, deviceScaleFactor: 2, mobile: false },
   { name: "linux-100", width: 1366, height: 768, deviceScaleFactor: 1, mobile: false },
+  { name: "desktop-zoom-200", width: 683, height: 384, deviceScaleFactor: 2, mobile: false },
+  { name: "mobile-320", width: 320, height: 568, deviceScaleFactor: 2, mobile: true },
+  { name: "mobile-375", width: 375, height: 667, deviceScaleFactor: 3, mobile: true },
+  { name: "mobile-keyboard-390", width: 390, height: 430, deviceScaleFactor: 3, mobile: true },
   { name: "mobile-safari-contract", width: 390, height: 844, deviceScaleFactor: 3, mobile: true },
 ];
 const requestedProfileNames = new Set(

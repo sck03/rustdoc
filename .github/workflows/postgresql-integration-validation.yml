@@ -2,6 +2,40 @@ name: PostgreSQL integration validation
 
 on:
   workflow_dispatch:
+    inputs:
+      hs_records:
+        description: "HS税则与申报实例容量（10k / 100k / 1m）"
+        required: true
+        default: "10000"
+        type: choice
+        options:
+          - "10000"
+          - "100000"
+          - "1000000"
+      invoice_records:
+        description: "发票与明细容量（10k / 100k / 1m）"
+        required: true
+        default: "10000"
+        type: choice
+        options:
+          - "10000"
+          - "100000"
+          - "1000000"
+  push:
+    branches: [main]
+    paths:
+      - "Directory.Packages.props"
+      - "src/ExportDocManager.Infrastructure/**"
+      - "tests/ExportDocManager.Api.Tests/PostgreSqlIntegrationTests.cs"
+      - "tests/ExportDocManager.Infrastructure.Tests/**"
+      - ".github/workflows/postgresql-integration-validation.yml"
+  pull_request:
+    paths:
+      - "Directory.Packages.props"
+      - "src/ExportDocManager.Infrastructure/**"
+      - "tests/ExportDocManager.Api.Tests/PostgreSqlIntegrationTests.cs"
+      - "tests/ExportDocManager.Infrastructure.Tests/**"
+      - ".github/workflows/postgresql-integration-validation.yml"
 
 concurrency:
   group: postgresql-integration-validation
@@ -15,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-bookworm
         env:
           POSTGRES_DB: exportdoc_test
           POSTGRES_USER: exportdoc
@@ -31,6 +65,8 @@ jobs:
     env:
       NUGET_PACKAGES: ${{ github.workspace }}/artifacts/nuget-packages
       EXPORTDOC_TEST_POSTGRES_CONNECTION_STRING: Host=127.0.0.1;Port=5432;Database=exportdoc_test;Username=exportdoc;Password=exportdoc-test-password
+      EXPORTDOC_TEST_HS_RECORDS: ${{ inputs.hs_records || '10000' }}
+      EXPORTDOC_TEST_INVOICE_RECORDS: ${{ inputs.invoice_records || '10000' }}
 
     steps:
       - name: Checkout
@@ -42,12 +78,29 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Restore
-        run: dotnet restore tests/ExportDocManager.Api.Tests/ExportDocManager.Api.Tests.csproj
+        run: dotnet restore ExportDocManager.sln
 
-      - name: Run real PostgreSQL integration test
+      - name: Run real PostgreSQL initialization, concurrency and capacity validation
+        timeout-minutes: 45
         run: >-
           dotnet test tests/ExportDocManager.Api.Tests/ExportDocManager.Api.Tests.csproj
           -c Release
           --no-restore
           --filter FullyQualifiedName~PostgreSqlIntegrationTests
           --logger "console;verbosity=normal"
+
+      - name: Validate four-role permissions and SQL security boundaries
+        run: |
+          dotnet test tests/ExportDocManager.Application.Tests/ExportDocManager.Application.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~PermissionModuleCatalogTests" --logger "console;verbosity=normal"
+          dotnet test tests/ExportDocManager.Api.Tests/ExportDocManager.Api.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~ApiMultiUserInfrastructureTests|FullyQualifiedName~ApiSecurityBoundaryTests|FullyQualifiedName~ApiStartupTests" --logger "console;verbosity=normal"
+          dotnet test tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~BusinessDataAccessScopeTests|FullyQualifiedName~InfrastructureSqlSafetyPolicyTests|FullyQualifiedName~SecurityAndResourceBoundaryTests" --logger "console;verbosity=normal"
+
+      - name: Write capacity summary
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          echo "## PostgreSQL shared-database validation" >> "$GITHUB_STEP_SUMMARY"
+          echo "- PostgreSQL baseline: \`18-bookworm\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- HS / declaration examples: \`${EXPORTDOC_TEST_HS_RECORDS}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Invoices / invoice items: \`${EXPORTDOC_TEST_INVOICE_RECORDS}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Coverage: initialization, pg_trgm/prefix indexes, paging, HS search, invoice history, optimistic concurrency, role and SQL safety boundaries" >> "$GITHUB_STEP_SUMMARY"

@@ -6,7 +6,8 @@ param(
     [string]$PostgreSqlPassword,
     [Parameter(Mandatory = $true)]
     [string]$BootstrapToken,
-    [int]$WebPort = 8080
+    [int]$WebPort = 8080,
+    [int]$HttpsPort = 8443
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,6 +16,11 @@ if ($PostgreSqlPassword.Length -lt 12 -or $PostgreSqlPassword -notmatch '^[A-Za-
 }
 if ($BootstrapToken.Length -lt 24 -or $BootstrapToken.Length -gt 512 -or $BootstrapToken -notmatch '^[A-Za-z0-9._~!@%+=:-]+$') {
     throw "首次部署令牌必须为 24-512 位，且只能使用字母、数字和 . _ ~ ! @ % + = : -，避免 .env 转义歧义。"
+}
+if ($WebPort -lt 1 -or $WebPort -gt 65535 -or
+    $HttpsPort -lt 1 -or $HttpsPort -gt 65535 -or
+    $WebPort -eq $HttpsPort) {
+    throw "HTTP/HTTPS 端口必须在 1-65535 之间且不能相同。"
 }
 $resolvedRuntimeRoot = [System.IO.Path]::GetFullPath($RuntimeRoot)
 $configRoot = Join-Path $resolvedRuntimeRoot "config"
@@ -43,6 +49,9 @@ $envLines = @(
     "POSTGRES_PASSWORD=$PostgreSqlPassword",
     "EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=$BootstrapToken",
     "EXPORTDOCMANAGER_WEB_PORT=$WebPort",
+    "EXPORTDOCMANAGER_HTTPS_PORT=$HttpsPort",
+    "EXPORTDOCMANAGER_TLS_CERTIFICATE=./secrets/tls/server.crt",
+    "EXPORTDOCMANAGER_TLS_PRIVATE_KEY=./secrets/tls/server.key",
     "EXPORTDOCMANAGER_RUNTIME_ROOT=$relativeRuntimeRoot",
     "EXPORTDOCMANAGER_ALLOWED_ORIGINS=",
     "EXPORTDOCMANAGER_CONTAINER_SUBNET=172.30.238.0/24",

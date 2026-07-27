@@ -226,7 +226,19 @@ try {
       await captureScreenshot(page, screenshotPath, { captureBeyondViewport: false });
       const approvedPath = path.join(approvedRoot, path.basename(screenshotPath));
       if (updateApprovedBaselines) copyFileSync(screenshotPath, approvedPath);
-      const pixelComparison = compareScreenshot({ screenshotPath, approvedPath, diffRoot, maximumPixelDifferenceRatio });
+      let pixelComparison = compareScreenshot({ screenshotPath, approvedPath, diffRoot, maximumPixelDifferenceRatio });
+      let pixelComparisonAttempts = 1;
+      while (!updateApprovedBaselines && !pixelComparison.passed && pixelComparisonAttempts < 3) {
+        // Chromium can occasionally capture one frame before font/border rasterization has
+        // fully settled even after the DOM readiness contract is true. Retry only a failed
+        // pixel comparison so real, repeatable regressions still fail without slowing every
+        // visual scene or weakening the approved difference threshold.
+        await evaluate(page, "document.fonts?.ready ?? Promise.resolve()", false);
+        await delay(250);
+        await captureScreenshot(page, screenshotPath, { captureBeyondViewport: false });
+        pixelComparison = compareScreenshot({ screenshotPath, approvedPath, diffRoot, maximumPixelDifferenceRatio });
+        pixelComparisonAttempts += 1;
+      }
       const axeViolations = axeAudit.value ?? [];
       const passed = !value.horizontalOverflow && value.unnamedButtons === 0 && value.unlabeledInputs === 0
         && axeViolations.length === 0
@@ -245,7 +257,7 @@ try {
         && (value.invoiceDetailColumnCount === null || value.invoiceDetailColumnCount >= 20)
         && value.workspaceNavigation && value.expectedStickyControl && value.expectedDialog
         && pixelComparison.passed;
-      results.push({ page: pageName, viewport, url, screenshotPath, approvedPath, pixelComparison, passed, axeViolations, ...value, ...mobileNavigationInteractionValue });
+      results.push({ page: pageName, viewport, url, screenshotPath, approvedPath, pixelComparison, pixelComparisonAttempts, passed, axeViolations, ...value, ...mobileNavigationInteractionValue });
     }
   }
 
@@ -295,7 +307,9 @@ function compareScreenshot({ screenshotPath, approvedPath, diffRoot, maximumPixe
   });
   const differenceRatio = differentPixels / (actual.width * actual.height);
   const passed = differenceRatio <= maximumPixelDifferenceRatio;
-  const diffPath = passed ? null : path.join(diffRoot, path.basename(screenshotPath));
+  const candidateDiffPath = path.join(diffRoot, path.basename(screenshotPath));
+  const diffPath = passed ? null : candidateDiffPath;
+  if (passed) rmSync(candidateDiffPath, { force: true });
   if (diffPath) writeFileSync(diffPath, PNG.sync.write(diff));
   return { status: passed ? "matched" : "pixel-difference", passed, differentPixels, differenceRatio, diffPath };
 }

@@ -39,6 +39,7 @@ TestResults/
 deploy/container/.env
 deploy/container/runtime/
 deploy/container/config/
+deploy/container/secrets/
 
 # Internal license issuing tool and signing material must never enter GitHub.
 apps/license-keygen-tauri/

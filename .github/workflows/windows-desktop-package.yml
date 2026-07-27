@@ -28,6 +28,7 @@ permissions:
 jobs:
   package:
     uses: ./.github/workflows/desktop-package-reusable.yml
+    secrets: inherit
     with:
       platform: windows
       runner: windows-latest

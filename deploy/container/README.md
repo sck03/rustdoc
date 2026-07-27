@@ -13,6 +13,18 @@ pwsh -File .\initialize-container-runtime.ps1 `
 docker compose up -d --build
 ```
 
+初始化脚本同时写入默认 HTTPS 端口和证书挂载路径，但普通 `docker-compose.yml` 不会读取证书，也不会因为证书尚未准备而阻止局域网 HTTP 部署。正式启用内置 TLS overlay 前，把可信证书和私钥放到 `.env` 指定的宿主路径，再执行：
+
+```powershell
+docker compose `
+  -f .\docker-compose.yml `
+  -f .\docker-compose.https.yml `
+  --env-file .\.env `
+  up -d --build
+```
+
+默认同时保留 HTTP `8080` 和 HTTPS `8443` 映射，便于受控内网迁移；公网部署应由防火墙只开放 HTTPS，或在外层负载均衡/CDN 完成证书终止。`nginx.https.conf` 只允许 TLS 1.2/1.3，启用 HSTS、CSP、禁止 iframe 和 MIME sniffing。首次使用 HSTS 前必须确认域名、证书续期和全部子域均已具备 HTTPS，不能用临时自签证书直接面向正式用户。
+
 如果镜像已由 GitHub Actions 发布到 GHCR，则在 `.env` 设置 `EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/你的账号`，改用：
 
 ```powershell
@@ -47,6 +59,19 @@ PostgreSQL 18 官方镜像把默认 `PGDATA` 改为版本化目录 `/var/lib/pos
 - 容器内报表 Chromium：Debian 官方 `chromium` 包，固定通过 `/usr/bin/chromium` 使用；不从宿主 C 盘或程序运行数据根复制浏览器二进制
 - 镜像层与 Docker 自身缓存由 Docker Engine 管理；Windows 上如要求系统 C 盘零占用，还必须把 Docker Desktop/Engine 的 data-root 或磁盘镜像迁到非系统盘。
 
-不要把 `runtime/`、`.env` 或数据库密码提交到版本库。公网部署必须在 Web 容器前增加 HTTPS 反向代理、防火墙和可信证书；不要直接公开 API 容器端口。
+不要把 `runtime/`、`.env`、TLS 私钥或数据库密码提交到版本库。公网部署必须使用可信 HTTPS 和防火墙，可启用本目录 TLS overlay，也可在 Web 容器前使用成熟反向代理/CDN；不要直接公开 API 容器端口。
 
-GitHub 只负责免费构建和保存 GHCR 镜像，不提供 PostgreSQL/API 的长期运行主机。真实部署仍需 Docker Engine；当前开发机没有 Docker CLI 时，只能完成 Dockerfile、Compose 和工作流静态验证，不能把静态检查写成真实容器验收通过。
+## 生命周期、备份与恢复验收
+
+仓库工作流 `Container runtime lifecycle validation` 会在 GitHub Ubuntu runner 上真实执行：
+
+- HTTP/HTTPS Compose 解析和完整 API/Web 镜像构建；
+- `/readyz`、`/healthz`、CSP/HSTS 等响应头；
+- API `5188` 不对宿主机发布；
+- PostgreSQL 容器删除重建后的 bind volume 数据持久化；
+- `pg_dump -Fc` 备份、删除测试表后使用 `pg_restore --clean --if-exists --exit-on-error` 恢复；
+- 失败日志、探针响应和恢复包 Artifact 上传及最终容器清理。
+
+该工作流使用固定的临时测试密码和自签证书，只服务一次性 runner，不应复制到生产环境。生产恢复演练必须使用独立的备份账号/介质、实际数据规模、加密备份和经过批准的停机窗口；恢复前停止 API 写入，恢复后检查应用登录、权限、发票、HS 查询、任务和审计记录。单纯看到备份文件存在不等于恢复可用。
+
+GitHub 只负责构建、生命周期验证和保存 GHCR/Artifact，不提供 PostgreSQL/API 的长期运行主机。真实部署仍需 Docker Engine；当前开发机没有 Docker CLI，因此本地只能完成 Dockerfile、Compose 和工作流静态验证。只有 GitHub 生命周期工作流或目标服务器演练实际成功后，才能把对应平台记录为容器验收通过。

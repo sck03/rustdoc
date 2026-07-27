@@ -71,6 +71,9 @@ jobs:
           npm ci --prefix apps/export-doc-web
           npm ci --prefix apps/export-doc-tauri
 
+      - name: Validate signed updater release trust contract
+        run: npm --prefix apps/export-doc-tauri run test:updater-release-contract
+
       - name: Restore .NET projects
         run: dotnet restore ExportDocManager.sln
 

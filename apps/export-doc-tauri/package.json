@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build",
+    "build": "node ../../scripts/run-tauri-build.mjs",
     "build:web": "npm --prefix ../export-doc-web run build",
     "prepare:bundle": "node ../../scripts/prepare-tauri-bundle.mjs && npm --prefix ../export-doc-web run build",
     "tauri": "tauri",
+    "audit:production": "node ../../scripts/audit-npm-production.mjs .",
+    "test:updater-release-contract": "node ../../scripts/test_tauri_updater_release_contract.mjs",
     "tauri:info:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/run-tauri-local.ps1 info",
     "tauri:check:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/run-tauri-local.ps1 cargo-check",
     "tauri:check:editions:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/check-tauri-editions.ps1",

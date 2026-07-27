@@ -36,6 +36,7 @@ permissions:
 jobs:
   package:
     uses: ./.github/workflows/desktop-package-reusable.yml
+    secrets: inherit
     with:
       platform: macos
       runner: ${{ inputs.architecture == 'arm64' && 'macos-15' || 'macos-15-intel' }}

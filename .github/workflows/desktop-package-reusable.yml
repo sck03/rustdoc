@@ -36,10 +36,15 @@ on:
       publish_release:
         required: true
         type: boolean
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
 
 concurrency:
-  group: desktop-${{ inputs.platform }}-${{ inputs.architecture }}-${{ inputs.version }}
-  cancel-in-progress: true
+  group: ${{ inputs.publish_release && format('desktop-release-{0}', inputs.version) || format('desktop-{0}-{1}-{2}', inputs.platform, inputs.architecture, inputs.version) }}
+  cancel-in-progress: ${{ !inputs.publish_release }}
 
 permissions:
   contents: write
@@ -61,6 +66,11 @@ jobs:
       EXPORTDOCMANAGER_RUST_TARGET: ${{ inputs.rust_target }}
       EXPORTDOCMANAGER_PRODUCT_EDITION: ${{ inputs.edition }}
       EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER: ${{ inputs.include_browser && 'false' || 'true' }}
+      EXPORTDOCMANAGER_REQUIRE_SIGNED_UPDATER: ${{ inputs.publish_release && 'true' || 'false' }}
+      EXPORTDOCMANAGER_UPDATER_ENDPOINT: ${{ vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT }}
+      EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY: ${{ vars.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -177,9 +187,19 @@ jobs:
         run: ./scripts/verify-bundled-browser-pdf.ps1 -BrowserRoot ./Browsers
 
       - name: Build unsigned desktop package
+        if: ${{ !inputs.publish_release }}
+        shell: pwsh
+        run: npm --prefix apps/export-doc-tauri run build -- --target ${{ inputs.rust_target }} --bundles ${{ inputs.bundle_targets }} --no-sign
+
+      - name: Build signed updater package
+        if: inputs.publish_release
         shell: pwsh
         run: |
-          npm --prefix apps/export-doc-tauri run build -- --target ${{ inputs.rust_target }} --bundles ${{ inputs.bundle_targets }} --no-sign
+          if ([string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_UPDATER_ENDPOINT)) { throw "请配置仓库变量 EXPORTDOCMANAGER_UPDATER_ENDPOINT。" }
+          if ([string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY)) { throw "请配置仓库变量 EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY。" }
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) { throw "请配置仓库 Secret TAURI_SIGNING_PRIVATE_KEY。" }
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)) { throw "请配置仓库 Secret TAURI_SIGNING_PRIVATE_KEY_PASSWORD，并使用带密码的私钥。" }
+          npm --prefix apps/export-doc-tauri run build -- --target ${{ inputs.rust_target }} --bundles ${{ inputs.bundle_targets }}
           exit $LASTEXITCODE
 
       - name: Verify bundled Chrome Headless Shell resource
@@ -243,7 +263,7 @@ jobs:
           $tag = "v$($env:RELEASE_VERSION)"
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {
-            $createArgs = @("release", "create", $tag, "--title", "ExportDocManager $($env:RELEASE_VERSION)", "--notes", "ExportDocManager 手工构建的未签名桌面安装包与容器版本。")
+            $createArgs = @("release", "create", $tag, "--title", "ExportDocManager $($env:RELEASE_VERSION)", "--notes", "ExportDocManager 经过签名校验的桌面安装包与容器版本。")
             if ($env:RELEASE_VERSION.Contains("-")) {
               $createArgs += "--prerelease"
             }
@@ -252,9 +272,9 @@ jobs:
           }
 
           $extensions = switch ("${{ inputs.platform }}") {
-            "windows" { @(".exe", ".msi") }
-            "linux" { @(".deb", ".rpm", ".appimage") }
-            "macos" { @(".dmg", ".pkg", ".zip") }
+            "windows" { @(".exe", ".msi", ".sig") }
+            "linux" { @(".deb", ".rpm", ".appimage", ".sig") }
+            "macos" { @(".dmg", ".pkg", ".zip", ".gz", ".sig") }
             default { @() }
           }
           $assets = @(
@@ -267,6 +287,18 @@ jobs:
           & gh release upload $tag @($assets.FullName) --clobber
           exit $LASTEXITCODE
 
+      - name: Merge signed updater manifest into GitHub Release
+        if: inputs.publish_release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          ./scripts/publish-tauri-updater-manifest.ps1
+          -Platform ${{ inputs.platform }}
+          -Architecture ${{ inputs.architecture }}
+          -Version ${{ steps.version.outputs.value }}
+          -BundleRoot ${{ env.CARGO_TARGET_DIR }}
+
       - name: Write package summary
         shell: pwsh
         run: |
@@ -278,5 +310,5 @@ jobs:
           - 产品版：`${{ inputs.edition }}`
           - 内置报表浏览器：`${{ inputs.include_browser }}`
           - 发布到 GitHub Release：`${{ inputs.publish_release }}`
-          - 签名状态：未签名，仅用于测试和人工验收
+          - 更新签名：`${{ inputs.publish_release && '已启用，缺少构建密钥会直接失败' || '未启用，仅用于测试和人工验收' }}`
           "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append

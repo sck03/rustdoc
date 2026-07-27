@@ -54,6 +54,17 @@ for (const file of walk(root)) {
     }
   }
 
+  if (["ui/ConfirmationDialog.tsx", "features/invoices/InvoiceStatusReasonDialog.tsx"].includes(sourceRelativePath)) {
+    if (!sourceText.includes("useModalDialog")) {
+      failures.push(`${sourceRelativePath}: 模态框必须复用公共焦点循环、Escape 关闭和焦点恢复 Hook`);
+    }
+    for (const duplicatedModalImplementation of ["window.addEventListener(\"keydown\"", "previouslyFocusedElement", "querySelectorAll<HTMLElement>"]) {
+      if (sourceText.includes(duplicatedModalImplementation)) {
+        failures.push(`${sourceRelativePath}: 不得重新复制公共模态框键盘与焦点实现：${duplicatedModalImplementation}`);
+      }
+    }
+  }
+
   if (sourceRelativePath === "features/invoices/useInvoiceItemsWorkspace.ts") {
     for (const workspaceContract of ["maxInvoiceItemHistoryDepth = 50", "recalculateInvoiceItem", "masterDataRoot(\"products\")", "productLibraryEnabled", "productLibraryPageSize", "placeholderData: keepPreviousData"]) {
       if (!sourceText.includes(workspaceContract)) {

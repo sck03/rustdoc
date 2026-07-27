@@ -42,6 +42,34 @@ public sealed class InfrastructureSqlSafetyPolicyTests
         Assert.Contains("ExecuteSqlInterpolatedAsync", initialization, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PostgreSqlHsSearchIndexes_ShouldKeepPrefixAndOptionalTrigramFallbackContracts()
+    {
+        string sourceRoot = ResolveSourceRoot("src", "ExportDocManager.Infrastructure");
+        string initialization = File.ReadAllText(
+            Path.Combine(sourceRoot, "Services", "DatabaseInitializationService.cs"));
+
+        foreach (string requiredContract in new[]
+        {
+            "IX_HsCodes_Status_NormalizedCode_Prefix",
+            "IX_HsCodeDeclarationExamples_RawCode_Prefix",
+            "IX_HsCodeRemoteCandidates_Status_RawCode_Prefix",
+            "IX_Products_HSCode_Prefix",
+            "IX_Items_HSCode_Prefix",
+            "CREATE EXTENSION IF NOT EXISTS pg_trgm",
+            "IX_HsCodes_TextSearch_Trgm",
+            "IX_HsCodeDeclarationExamples_TextSearch_Trgm",
+            "IX_HsCodeRemoteCandidates_TextSearch_Trgm",
+            "IX_Items_HistorySearch_Trgm",
+            "PostgreSQL pg_trgm text-search indexes were not installed"
+        })
+        {
+            Assert.Contains(requiredContract, initialization, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("ex.SqlState is \"42501\" or \"0A000\" or \"58P01\"", initialization, StringComparison.Ordinal);
+    }
+
     private static bool IsBuildOutput(string path)
     {
         string normalizedPath = path.Replace('\\', '/');
