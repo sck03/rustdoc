@@ -62,6 +62,14 @@ assert(draft.items[0].styleNameCN === "棉制男式T恤衫" && draft.items[0].un
 
 const imported = model.readRouteInvoiceDraft({ invoiceDraft: { ...draft, customerNameEN: "mixed Case buyer" } });
 assert(imported?.customerNameEN === "MIXED CASE BUYER", "routed Excel draft uppercased automatically");
+assert(model.canDeleteInvoiceStatus("Draft") === true, "draft invoice can be physically deleted");
+assert(model.canDeleteInvoiceStatus("Verified") === false, "verified invoice cannot be physically deleted");
+assert(model.canDeleteInvoiceStatus("Shipped") === false, "shipped invoice cannot be physically deleted");
+assert(model.canDeleteInvoiceStatus("Completed") === false, "completed invoice cannot be physically deleted");
+assert(model.canDeleteInvoiceStatus("Cancelled") === false, "cancelled invoice remains for audit");
+assert(model.canUnverifyInvoiceStatus("Verified") === true, "verified invoice can return to draft through managed unverify");
+assert(model.canUnverifyInvoiceStatus("Cancelled") === false, "cancelled invoice cannot return to draft and bypass audit retention");
+assert(model.isInvoiceEditableStatus("Cancelled") === false, "cancelled invoice remains locked");
 assert(hsModel.buildInvoiceHsQuery({ hsCode: "6110", styleNameCN: "化纤制套头衫" }) === "6110", "HS code prefix takes priority");
 assert(hsModel.buildInvoiceHsQuery({ hsCode: "61", styleNameCN: "化纤制套头衫", styleName: "PULLOVER" }) === "化纤制套头衫 PULLOVER", "short HS code falls back to product names");
 const feedbackContext = hsModel.buildInvoiceHsFeedbackContext({

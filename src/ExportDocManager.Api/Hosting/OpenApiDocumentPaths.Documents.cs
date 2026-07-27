@@ -855,7 +855,7 @@ namespace ExportDocManager.Api.Hosting
                         },
                         delete = new
                         {
-                            summary = "Delete invoice",
+                            summary = "Delete a draft invoice",
                             operationId = "deleteInvoice",
                             parameters = new object[]
                             {
@@ -865,12 +865,13 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["200"] = new
                                 {
-                                    description = "Deleted invoice.",
+                                    description = "Deleted draft invoice.",
                                     content = JsonContent("ApiCommandResponse")
                                 },
                                 ["400"] = new { description = "Invalid invoice id." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["404"] = new { description = "Invoice not found or outside the current user's business scope." }
+                                ["404"] = new { description = "Invoice not found or outside the current user's business scope." },
+                                ["409"] = new { description = "Only Draft invoices may be physically deleted; formal and cancelled records must be retained." }
                             }
                         }
                     },
@@ -902,11 +903,65 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
+                    ["/api/system/data-maintenance/invoices/{id}"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Preview an invoice before administrator data cleanup",
+                            operationId = "getInvoiceDataMaintenancePreview",
+                            parameters = new object[]
+                            {
+                                PathParameter("id", "integer", "int32", "Invoice id.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "Invoice cleanup eligibility and retention guidance.",
+                                    content = JsonContent("ApiInvoiceDataMaintenancePreviewResponse")
+                                },
+                                ["400"] = new { description = "Invalid invoice id." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Administrator permission required." },
+                                ["404"] = new { description = "Invoice not found." }
+                            }
+                        }
+                    },
+                    ["/api/system/data-maintenance/invoices/{id}/purge"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Purge a cancelled invoice through audited administrator maintenance",
+                            operationId = "purgeCancelledInvoice",
+                            parameters = new object[]
+                            {
+                                PathParameter("id", "integer", "int32", "Invoice id.")
+                            },
+                            requestBody = new
+                            {
+                                required = true,
+                                content = JsonContent("ApiInvoicePurgeRequest")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "Cancelled invoice purged and MaintenancePurge audit record retained.",
+                                    content = JsonContent("ApiInvoicePurgeResponse")
+                                },
+                                ["400"] = new { description = "Invalid confirmation or maintenance reason." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Administrator permission required." },
+                                ["404"] = new { description = "Invoice not found." },
+                                ["409"] = new { description = "Only cancelled invoices may be purged through this endpoint." }
+                            }
+                        }
+                    },
                     ["/api/invoices/{id}/unverify"] = new
                     {
                         post = new
                         {
-                            summary = "Move a locked invoice back to draft",
+                            summary = "Move a reversible formal invoice back to draft",
                             operationId = "unverifyInvoice",
                             parameters = new object[]
                             {
@@ -927,7 +982,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Invalid invoice id." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "Invoice not found or outside the current user's business scope." },
-                                ["409"] = new { description = "Invoice is not in a locked status or could not be updated." }
+                                ["409"] = new { description = "Invoice is not in a reversible formal status, is cancelled, or could not be updated." }
                             }
                         }
                     },

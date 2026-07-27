@@ -21,12 +21,11 @@ namespace ExportDocManager.Models.Entities
                 [Cancelled] = "已作废"
             };
 
-        private static readonly HashSet<string> LockedStatuses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        private static readonly HashSet<string> ReversibleLockedStatuses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             Verified,
             Shipped,
-            Completed,
-            Cancelled
+            Completed
         };
 
         public static readonly IReadOnlyList<string> Statuses =
@@ -69,7 +68,7 @@ namespace ExportDocManager.Models.Entities
                 return false;
             }
 
-            return LockedStatuses.Contains(status.Trim());
+            return ReversibleLockedStatuses.Contains(status.Trim());
         }
 
         public static bool IsCancelled(string status)

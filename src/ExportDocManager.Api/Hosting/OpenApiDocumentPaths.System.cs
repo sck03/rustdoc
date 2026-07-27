@@ -24,13 +24,13 @@ namespace ExportDocManager.Api.Hosting
                     {
                         get = new
                         {
-                            summary = "Health check",
+                            summary = "Public health check or authorized runtime diagnostics",
                             operationId = "getHealth",
                             responses = new Dictionary<string, object>
                             {
                                 ["200"] = new
                                 {
-                                    description = "The API sidecar is running and runtime paths are available.",
+                                    description = "Anonymous requests receive a lightweight status/version response. Administrators and trusted desktop clients also receive runtime path and dependency diagnostics.",
                                     content = JsonContent("ApiHealthResponse")
                                 }
                             }

@@ -901,15 +901,15 @@ namespace ExportDocManager.Api.Hosting
                                 ["checkedAt"] = new { type = "string", format = "date-time" },
                                 ["productVersion"] = StringProperty("Product semantic version."),
                                 ["informationalVersion"] = StringProperty("Assembly informational version."),
-                                ["appRoot"] = StringProperty("Program runtime directory."),
-                                ["dataRoot"] = StringProperty("Business writable data root."),
-                                ["databaseRoot"] = StringProperty("Database directory under the writable data root."),
-                                ["singleWindowRoot"] = StringProperty("Single Window writable data directory."),
-                                ["templateRoot"] = StringProperty("Bundled template directory under the program root."),
-                                ["ocrModelRoot"] = StringProperty("Bundled OCR model directory under the program root."),
-                                ["logRoot"] = StringProperty("Log directory under the writable data root."),
+                                ["appRoot"] = StringProperty("Program runtime directory; empty in the public lightweight response."),
+                                ["dataRoot"] = StringProperty("Business writable data root; empty in the public lightweight response."),
+                                ["databaseRoot"] = StringProperty("Database directory under the writable data root; empty in the public lightweight response."),
+                                ["singleWindowRoot"] = StringProperty("Single Window writable data directory; empty in the public lightweight response."),
+                                ["templateRoot"] = StringProperty("Bundled template directory under the program root; empty in the public lightweight response."),
+                                ["ocrModelRoot"] = StringProperty("Bundled OCR model directory under the program root; empty in the public lightweight response."),
+                                ["logRoot"] = StringProperty("Log directory under the writable data root; empty in the public lightweight response."),
                                 ["databaseProvider"] = StringProperty("Current database mode."),
-                                ["sqliteDatabasePath"] = StringProperty("Resolved SQLite database path when SQLite is used."),
+                                ["sqliteDatabasePath"] = StringProperty("Resolved SQLite database path for authorized diagnostics; empty in the public lightweight response."),
                                 ["runtimePaths"] = new
                                 {
                                     type = "array",
@@ -920,7 +920,7 @@ namespace ExportDocManager.Api.Hosting
                                     type = "array",
                                     items = RefSchema("ApiRuntimeDependencyInfo")
                                 },
-                                ["storagePolicy"] = StringProperty("Runtime storage policy summary.")
+                                ["storagePolicy"] = StringProperty("Public probe boundary or authorized runtime storage policy summary.")
                             }
                         },
                         ["ApiRuntimePathInfo"] = new

@@ -823,6 +823,55 @@ namespace ExportDocManager.Api.Hosting
                                 ["invoice"] = RefSchema("ApiInvoiceDetailDto")
                              }
                          },
+                        ["ApiInvoicePurgeRequest"] = new
+                        {
+                            type = "object",
+                            required = new[] { "invoiceNoConfirmation", "reason" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["invoiceNoConfirmation"] = StringProperty("Exact invoice number entered again by the administrator."),
+                                ["reason"] = StringProperty("Audited maintenance reason, up to 500 characters.")
+                            }
+                        },
+                        ["ApiInvoiceDataMaintenancePreviewResponse"] = new
+                        {
+                            type = "object",
+                            required = new[]
+                            {
+                                "id", "invoiceNo", "type", "status", "statusDisplayName", "invoiceDate",
+                                "customerName", "canPurge", "guidance", "storagePolicy"
+                            },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["id"] = new { type = "integer", format = "int32" },
+                                ["invoiceNo"] = StringProperty("Invoice number."),
+                                ["type"] = StringProperty("Actual/customs invoice data type."),
+                                ["status"] = StringProperty("Normalized invoice status."),
+                                ["statusDisplayName"] = StringProperty("Localized invoice status label."),
+                                ["invoiceDate"] = new { type = "string", format = "date-time" },
+                                ["customerName"] = StringProperty("Customer snapshot name used to identify the record."),
+                                ["canPurge"] = new { type = "boolean" },
+                                ["guidance"] = StringProperty("Commercial retention and cleanup guidance for the current status."),
+                                ["storagePolicy"] = StringProperty("Data and audit boundary for the maintenance operation.")
+                            }
+                        },
+                        ["ApiInvoicePurgeResponse"] = new
+                        {
+                            type = "object",
+                            required = new[]
+                            {
+                                "success", "invoiceId", "invoiceNo", "previousStatus", "message", "storagePolicy"
+                            },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["success"] = new { type = "boolean" },
+                                ["invoiceId"] = new { type = "integer", format = "int32" },
+                                ["invoiceNo"] = StringProperty("Purged invoice number."),
+                                ["previousStatus"] = StringProperty("Status immediately before purge; always Cancelled on success."),
+                                ["message"] = StringProperty("Maintenance result message."),
+                                ["storagePolicy"] = StringProperty("Data and audit boundary for the maintenance operation.")
+                            }
+                        },
                         ["ApiInvoiceStatusTransitionRequest"] = new
                         {
                             type = "object",

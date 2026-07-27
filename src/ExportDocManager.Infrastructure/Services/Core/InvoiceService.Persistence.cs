@@ -32,7 +32,13 @@ namespace ExportDocManager.Services.Core
                             return false;
                         }
 
-                        await TrackSingleWindowWorkspaceDeletionAsync(context, id);
+                        if (!InvoiceStatusCatalog.IsEditable(invoice.Status))
+                        {
+                            throw new InvoiceConflictException(
+                                "只有草稿发票可以直接删除。已核对、已出运或已结汇发票只能作废；已作废发票必须保留审计记录，如确需清理请使用管理员数据维护功能。");
+                        }
+
+                        await InvoiceDeletionSupport.TrackSingleWindowWorkspaceDeletionAsync(context, id);
 
                         context.Invoices.Remove(invoice);
                         await context.SaveChangesAsync();
@@ -41,7 +47,11 @@ namespace ExportDocManager.Services.Core
             }
             catch (DbUpdateConcurrencyException)
             {
-                throw new Exception("删除失败: 该发票数据已被其他用户修改或删除，请刷新后重试。");
+                throw new InvoiceConflictException("删除失败：该发票数据已被其他用户修改或删除，请刷新后重试。");
+            }
+            catch (InvoiceConflictException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -138,6 +148,12 @@ namespace ExportDocManager.Services.Core
                         if (!invoice.RowVersion.SequenceEqual(expectedRowVersion))
                         {
                             throw new DbUpdateConcurrencyException();
+                        }
+
+                        if (InvoiceStatusCatalog.IsCancelled(invoice.Status))
+                        {
+                            throw new InvoiceValidationException(
+                                "已作废发票不能反审核回到草稿；记录应继续保留，如确需物理清理请使用管理员数据维护功能。");
                         }
 
                         if (!InvoiceStatusCatalog.CanUnverify(invoice.Status))
@@ -403,47 +419,5 @@ namespace ExportDocManager.Services.Core
             invoice.ShipmentDate = DateTimeValueHelper.NormalizeBusinessDate(invoice.ShipmentDate, invoice.InvoiceDate);
         }
 
-        private static async Task TrackSingleWindowWorkspaceDeletionAsync(AppDbContext context, int invoiceId)
-        {
-            ArgumentNullException.ThrowIfNull(context);
-
-            var customsCooDocument = await context.CustomsCooDocuments
-                .FirstOrDefaultAsync(document => document.SourceInvoiceId == invoiceId);
-            if (customsCooDocument != null)
-            {
-                context.CustomsCooDocuments.Remove(customsCooDocument);
-            }
-
-            var agentConsignmentDocument = await context.AgentConsignmentDocuments
-                .FirstOrDefaultAsync(document => document.SourceInvoiceId == invoiceId);
-            if (agentConsignmentDocument != null)
-            {
-                context.AgentConsignmentDocuments.Remove(agentConsignmentDocument);
-            }
-
-            var operationTickets = await context.SwOperationTickets
-                .Where(ticket => ticket.SourceInvoiceId == invoiceId)
-                .ToListAsync();
-            if (operationTickets.Count > 0)
-            {
-                context.SwOperationTickets.RemoveRange(operationTickets);
-            }
-
-            var handoffPackageRecords = await context.SwHandoffPackageRecords
-                .Where(record => record.SourceInvoiceId == invoiceId)
-                .ToListAsync();
-            if (handoffPackageRecords.Count > 0)
-            {
-                context.SwHandoffPackageRecords.RemoveRange(handoffPackageRecords);
-            }
-
-            var submissionBatches = await context.SwSubmissionBatches
-                .Where(batch => batch.SourceInvoiceId == invoiceId)
-                .ToListAsync();
-            if (submissionBatches.Count > 0)
-            {
-                context.SwSubmissionBatches.RemoveRange(submissionBatches);
-            }
-        }
     }
 }

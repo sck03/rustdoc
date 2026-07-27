@@ -347,6 +347,10 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("createInvoice", json, StringComparison.Ordinal);
             Assert.Contains("updateInvoice", json, StringComparison.Ordinal);
             Assert.Contains("deleteInvoice", json, StringComparison.Ordinal);
+            Assert.Contains("/api/system/data-maintenance/invoices/{id}", json, StringComparison.Ordinal);
+            Assert.Contains("/api/system/data-maintenance/invoices/{id}/purge", json, StringComparison.Ordinal);
+            Assert.Contains("getInvoiceDataMaintenancePreview", json, StringComparison.Ordinal);
+            Assert.Contains("purgeCancelledInvoice", json, StringComparison.Ordinal);
             Assert.Contains("/api/invoices/{id}/clone", json, StringComparison.Ordinal);
             Assert.Contains("cloneInvoice", json, StringComparison.Ordinal);
             Assert.Contains("/api/invoices/{id}/unverify", json, StringComparison.Ordinal);
@@ -364,6 +368,9 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("ApiInvoiceDetailDto", json, StringComparison.Ordinal);
             Assert.Contains("ApiInvoiceItemDto", json, StringComparison.Ordinal);
             Assert.Contains("ApiInvoiceSaveResponse", json, StringComparison.Ordinal);
+            Assert.Contains("ApiInvoiceDataMaintenancePreviewResponse", json, StringComparison.Ordinal);
+            Assert.Contains("ApiInvoicePurgeRequest", json, StringComparison.Ordinal);
+            Assert.Contains("ApiInvoicePurgeResponse", json, StringComparison.Ordinal);
             Assert.Contains("ApiInvoiceCloneRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiInvoiceCloneResponse", json, StringComparison.Ordinal);
             Assert.Contains("ApiInvoiceCloneTypeRequest", json, StringComparison.Ordinal);
@@ -376,6 +383,19 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("ApiInvoiceProfitAnalysisResponse", json, StringComparison.Ordinal);
             Assert.Contains("does not read payment/reimbursement data", json, StringComparison.Ordinal);
             Assert.Contains("ApiCommandResponse", json, StringComparison.Ordinal);
+
+            using var jsonDocument = JsonDocument.Parse(json);
+            var paths = jsonDocument.RootElement.GetProperty("paths");
+            var deleteResponses = paths
+                .GetProperty("/api/invoices/{id}")
+                .GetProperty("delete")
+                .GetProperty("responses");
+            Assert.True(deleteResponses.TryGetProperty("409", out _));
+            var historyResponses = paths
+                .GetProperty("/api/invoices/{id}/status-history")
+                .GetProperty("get")
+                .GetProperty("responses");
+            Assert.False(historyResponses.TryGetProperty("409", out _));
         }
 
         [Fact]
@@ -1773,6 +1793,47 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public async Task ApiBackgroundJobService_CancelShouldRemainAcceptedWhenWorkerCompletesSynchronously()
+        {
+            var service = new ApiBackgroundJobService();
+            const string jobId = "cancel-race";
+            service.Upsert(new BackgroundJobSnapshot
+            {
+                JobId = jobId,
+                Kind = "Test",
+                Title = "取消竞态",
+                Status = BackgroundJobStatusCatalog.Running,
+                StatusText = "运行中",
+                CreatedAt = DateTimeOffset.UtcNow,
+                CanCancel = true
+            });
+
+            using var source = new CancellationTokenSource();
+            service.RegisterCancellationSource(jobId, source);
+            using var registration = source.Token.Register(() =>
+                service.Update(jobId, current => new BackgroundJobSnapshot
+                {
+                    JobId = current.JobId,
+                    Kind = current.Kind,
+                    Title = current.Title,
+                    Status = BackgroundJobStatusCatalog.Canceled,
+                    StatusText = "已取消",
+                    RequestedBy = current.RequestedBy,
+                    CreatedAt = current.CreatedAt,
+                    CompletedAt = DateTimeOffset.UtcNow,
+                    CanCancel = false
+                }));
+
+            bool accepted = await service.RequestCancelAsync(jobId);
+            var final = await service.GetAsync(jobId);
+
+            Assert.True(accepted);
+            Assert.NotNull(final);
+            Assert.Equal(BackgroundJobStatusCatalog.Canceled, final.Status);
+            Assert.False(final.CanCancel);
+        }
+
+        [Fact]
         public async Task ApiBackgroundJobRunner_ShouldDeleteControlledPartialOutputWhenJobFails()
         {
             string appRoot = CreateTempDirectory("edm-job-cleanup-app");
@@ -2710,7 +2771,7 @@ namespace ExportDocManager.Api.Tests
                     new DatabaseConnectionSettings(),
                     Path.Combine(pathProvider.DatabaseRoot, "exportdoc.db"),
                     new RuntimeDependencyDiagnosticsService(pathProvider).Inspect());
-                var publicResponse = ApiHealthResponseFactory.CreatePublic(response);
+                var publicResponse = ApiHealthResponseFactory.CreatePublic(new DatabaseConnectionSettings());
 
                 Assert.Equal("ok", response.Status);
                 Assert.False(string.IsNullOrWhiteSpace(response.ProductVersion));

@@ -4,6 +4,8 @@ using System.Text.Json;
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Security;
+using Microsoft.Data.Sqlite;
 
 namespace ExportDocManager.Api.Tests
 {
@@ -538,6 +540,187 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.BadRequest, repeatResponse.StatusCode);
             var repeatError = await ApiIntegrationTestHarness.ReadJsonAsync<ApiErrorResponse>(repeatResponse);
             Assert.Contains("无需反审核", repeatError.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task InvoiceDeletion_ShouldAllowDraftAndRequireAuditedMaintenanceForCancelledInvoice()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-invoice-delete-policy",
+                "api-invoice-delete-policy.db");
+            using var anonymousClient = harness.CreateClient();
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+
+            Assert.Equal(
+                HttpStatusCode.Unauthorized,
+                (await anonymousClient.GetAsync("/api/system/data-maintenance/invoices/1")).StatusCode);
+            var createOperatorResponse = await adminClient.PostAsJsonAsync("/api/users", new
+            {
+                username = "invoice-maintenance-operator",
+                fullName = "Invoice Maintenance Operator",
+                role = UserRoleCatalog.User,
+                departmentId = string.Empty,
+                companyScope = string.Empty,
+                isActive = true,
+                resetPassword = "operator-pass"
+            });
+            Assert.Equal(HttpStatusCode.OK, createOperatorResponse.StatusCode);
+            var operatorLogin = await harness.LoginAsync(anonymousClient, "invoice-maintenance-operator", "operator-pass");
+            using var operatorClient = harness.CreateClient(operatorLogin.AccessToken);
+            Assert.Equal(
+                HttpStatusCode.Forbidden,
+                (await operatorClient.GetAsync("/api/system/data-maintenance/invoices/1")).StatusCode);
+
+            var draftCreateResponse = await adminClient.PostAsJsonAsync(
+                "/api/invoices",
+                CreateInvoiceRequest("INV-DELETE-DRAFT"));
+            Assert.Equal(HttpStatusCode.Created, draftCreateResponse.StatusCode);
+            var draft = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(draftCreateResponse);
+
+            var draftDeleteResponse = await adminClient.DeleteAsync($"/api/invoices/{draft.Id}");
+            Assert.Equal(HttpStatusCode.OK, draftDeleteResponse.StatusCode);
+            Assert.Equal(
+                HttpStatusCode.NotFound,
+                (await adminClient.GetAsync($"/api/invoices/{draft.Id}")).StatusCode);
+
+            var formalCreateResponse = await adminClient.PostAsJsonAsync(
+                "/api/invoices",
+                CreateInvoiceRequest("INV-DELETE-FORMAL"));
+            Assert.Equal(HttpStatusCode.Created, formalCreateResponse.StatusCode);
+            var formal = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(formalCreateResponse);
+
+            var verifyResponse = await adminClient.PostAsJsonAsync(
+                $"/api/invoices/{formal.Id}/status",
+                new ApiInvoiceStatusTransitionRequest
+                {
+                    TargetStatus = InvoiceStatusCatalog.Verified,
+                    RowVersion = formal.Invoice.RowVersion,
+                    Note = "进入正式业务状态"
+                });
+            Assert.Equal(HttpStatusCode.OK, verifyResponse.StatusCode);
+            formal = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(verifyResponse);
+
+            var verifiedDeleteResponse = await adminClient.DeleteAsync($"/api/invoices/{formal.Id}");
+            Assert.Equal(HttpStatusCode.Conflict, verifiedDeleteResponse.StatusCode);
+            var verifiedDeleteError = await ApiIntegrationTestHarness.ReadJsonAsync<ApiErrorResponse>(verifiedDeleteResponse);
+            Assert.Contains("只能作废", verifiedDeleteError.Message, StringComparison.Ordinal);
+
+            var verifiedPreviewResponse = await adminClient.GetAsync(
+                $"/api/system/data-maintenance/invoices/{formal.Id}");
+            Assert.Equal(HttpStatusCode.OK, verifiedPreviewResponse.StatusCode);
+            var verifiedPreview = await ApiIntegrationTestHarness
+                .ReadJsonAsync<ApiInvoiceDataMaintenancePreviewResponse>(verifiedPreviewResponse);
+            Assert.False(verifiedPreview.CanPurge);
+            Assert.Equal(InvoiceStatusCatalog.Verified, verifiedPreview.Status);
+
+            var verifiedPurgeResponse = await adminClient.PostAsJsonAsync(
+                $"/api/system/data-maintenance/invoices/{formal.Id}/purge",
+                new ApiInvoicePurgeRequest
+                {
+                    InvoiceNoConfirmation = formal.Invoice.InvoiceNo,
+                    Reason = "不应允许直接清理正式状态"
+                });
+            Assert.Equal(HttpStatusCode.Conflict, verifiedPurgeResponse.StatusCode);
+
+            var cancelResponse = await adminClient.PostAsJsonAsync(
+                $"/api/invoices/{formal.Id}/status",
+                new ApiInvoiceStatusTransitionRequest
+                {
+                    TargetStatus = InvoiceStatusCatalog.Cancelled,
+                    RowVersion = formal.Invoice.RowVersion,
+                    Note = "测试错误数据作废"
+                });
+            Assert.Equal(HttpStatusCode.OK, cancelResponse.StatusCode);
+            formal = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(cancelResponse);
+
+            var cancelledUnverifyResponse = await adminClient.PostAsJsonAsync(
+                $"/api/invoices/{formal.Id}/unverify",
+                new ApiInvoiceUnverifyRequest
+                {
+                    RowVersion = formal.Invoice.RowVersion,
+                    Note = "不允许通过反审核绕过作废留存规则"
+                });
+            Assert.Equal(HttpStatusCode.BadRequest, cancelledUnverifyResponse.StatusCode);
+            var cancelledUnverifyError = await ApiIntegrationTestHarness.ReadJsonAsync<ApiErrorResponse>(cancelledUnverifyResponse);
+            Assert.Contains("不能反审核", cancelledUnverifyError.Message, StringComparison.Ordinal);
+
+            var cancelledDeleteResponse = await adminClient.DeleteAsync($"/api/invoices/{formal.Id}");
+            Assert.Equal(HttpStatusCode.Conflict, cancelledDeleteResponse.StatusCode);
+            var cancelledDeleteError = await ApiIntegrationTestHarness.ReadJsonAsync<ApiErrorResponse>(cancelledDeleteResponse);
+            Assert.Contains("数据维护", cancelledDeleteError.Message, StringComparison.Ordinal);
+
+            var cancelledPreviewResponse = await adminClient.GetAsync(
+                $"/api/system/data-maintenance/invoices/{formal.Id}");
+            Assert.Equal(HttpStatusCode.OK, cancelledPreviewResponse.StatusCode);
+            var cancelledPreview = await ApiIntegrationTestHarness
+                .ReadJsonAsync<ApiInvoiceDataMaintenancePreviewResponse>(cancelledPreviewResponse);
+            Assert.True(cancelledPreview.CanPurge);
+            Assert.Equal("已作废", cancelledPreview.StatusDisplayName);
+            Assert.Contains("审计", cancelledPreview.StoragePolicy, StringComparison.Ordinal);
+
+            var wrongConfirmationResponse = await adminClient.PostAsJsonAsync(
+                $"/api/system/data-maintenance/invoices/{formal.Id}/purge",
+                new ApiInvoicePurgeRequest
+                {
+                    InvoiceNoConfirmation = "WRONG-INVOICE-NO",
+                    Reason = "测试数据清理"
+                });
+            Assert.Equal(HttpStatusCode.BadRequest, wrongConfirmationResponse.StatusCode);
+
+            const string purgeReason = "集成测试产生的错误发票，确认无业务留存价值";
+            var purgeResponse = await adminClient.PostAsJsonAsync(
+                $"/api/system/data-maintenance/invoices/{formal.Id}/purge",
+                new ApiInvoicePurgeRequest
+                {
+                    InvoiceNoConfirmation = formal.Invoice.InvoiceNo,
+                    Reason = purgeReason
+                });
+            Assert.Equal(HttpStatusCode.OK, purgeResponse.StatusCode);
+            var purged = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoicePurgeResponse>(purgeResponse);
+            Assert.True(purged.Success);
+            Assert.Equal(formal.Id, purged.InvoiceId);
+            Assert.Equal(InvoiceStatusCatalog.Cancelled, purged.PreviousStatus);
+            Assert.Equal(
+                HttpStatusCode.NotFound,
+                (await adminClient.GetAsync($"/api/invoices/{formal.Id}")).StatusCode);
+
+            await using var connection = new SqliteConnection($"Data Source={harness.DatabasePath}");
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT OldValues, NewValues
+                FROM AuditLogs
+                WHERE EntityName = 'Invoice'
+                  AND Action = 'MaintenancePurge'
+                  AND EntityId = $entityId
+                ORDER BY Id DESC
+                LIMIT 1;
+            """;
+            command.Parameters.AddWithValue("$entityId", formal.Id.ToString());
+            await using (var auditReader = await command.ExecuteReaderAsync())
+            {
+                Assert.True(await auditReader.ReadAsync());
+                using var auditOldDocument = JsonDocument.Parse(auditReader.GetString(0));
+                using var auditNewDocument = JsonDocument.Parse(auditReader.GetString(1));
+                Assert.Equal(formal.Invoice.InvoiceNo, auditOldDocument.RootElement.GetProperty("InvoiceNo").GetString());
+                Assert.Equal(InvoiceStatusCatalog.Cancelled, auditOldDocument.RootElement.GetProperty("Status").GetString());
+                Assert.Equal(
+                    purgeReason,
+                    auditNewDocument.RootElement.GetProperty("Reason").GetString());
+            }
+
+            command.Parameters.Clear();
+            command.CommandText = """
+                SELECT
+                    (SELECT COUNT(*) FROM Items WHERE InvoiceId = $invoiceId),
+                    (SELECT COUNT(*) FROM InvoiceStatusHistories WHERE InvoiceId = $invoiceId);
+                """;
+            command.Parameters.AddWithValue("$invoiceId", formal.Id);
+            await using var retainedDataReader = await command.ExecuteReaderAsync();
+            Assert.True(await retainedDataReader.ReadAsync());
+            Assert.Equal(0L, retainedDataReader.GetInt64(0));
+            Assert.Equal(0L, retainedDataReader.GetInt64(1));
         }
 
         private static ApiInvoiceDetailDto CreateInvoiceRequest(

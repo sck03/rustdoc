@@ -1038,12 +1038,13 @@
 
 .maintenance-section-nav {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(250px, 1.2fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   min-width: 0;
 }
 
 .maintenance-technical-nav {
+  grid-column: 1 / -1;
   min-width: 0;
   padding: 8px;
   border: 1px solid #d9e2e7;
@@ -1130,6 +1131,61 @@
 
 .maintenance-section-tab-active small {
   color: #d9f2ef;
+}
+
+.invoice-data-maintenance-section {
+  display: grid;
+  gap: 14px;
+}
+
+.invoice-maintenance-query-grid {
+  grid-template-columns: minmax(220px, 1fr) minmax(150px, auto);
+}
+
+.invoice-maintenance-preview {
+  margin-top: 2px;
+}
+
+.invoice-maintenance-danger-zone {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  background: var(--edm-surface-muted);
+  border: 1px solid var(--edm-line);
+  border-left: 4px solid var(--edm-danger);
+  border-radius: 10px;
+}
+
+.invoice-maintenance-danger-zone > label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.invoice-maintenance-danger-zone > label > span {
+  color: var(--edm-ink-800);
+  font-size: var(--edm-font-size-sm);
+  font-weight: 800;
+}
+
+.invoice-maintenance-danger-zone > label > small,
+.settings-helper-text {
+  color: var(--edm-ink-600);
+  font-size: var(--edm-font-size-xs);
+  line-height: 1.55;
+}
+
+.invoice-maintenance-danger-zone > .command-button {
+  justify-self: start;
+}
+
+.settings-helper-text {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--edm-surface-muted);
+  border: 1px solid var(--edm-line);
+  border-radius: 8px;
 }
 
 .maintenance-advanced-details {

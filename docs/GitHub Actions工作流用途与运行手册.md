@@ -82,7 +82,7 @@
 
 - **触发：** `workflow_dispatch`；`main` push/PR 在 Compose、Dockerfile、API/Web、OCR 或该工作流变化时触发。
 - **平台：** `ubuntu-latest`，真实执行 Docker Compose。
-- **做什么：** 校验 HTTP 基础 Compose 和 HTTPS overlay；构建 API/Web 镜像并分步启动；检查 `/readyz`、`/healthz`、CSP/HSTS、API `5188` 不对宿主发布；删除并重建 PostgreSQL 容器验证 bind volume 数据持久化；在 runner 内执行 `pg_dump/pg_restore` 恢复验收，最后清理容器。
+- **做什么：** 校验 HTTP 基础 Compose 和 HTTPS overlay；构建 API/Web 镜像并分步启动；检查 `/readyz`、匿名轻量 `/healthz`、CSP/HSTS、API `5188` 不对宿主发布；删除并重建 PostgreSQL 容器验证 bind volume 数据持久化；在 runner 内执行 `pg_dump/pg_restore` 恢复验收，最后清理容器。匿名 `/healthz` 不扫描浏览器、OCR、PostgreSQL 工具或服务器路径，完整诊断只向管理员/可信桌面连接开放。
 - **输出：** 只上传 `artifacts/container-runtime/evidence` 下的探针、Compose 状态和日志证据，不递归扫描 PostgreSQL 数据目录，也不上传数据库 dump；通常保留 14 天。
 - **Secrets/Variables：** 不需要自定义 Secret。测试密码、自签证书和端口由工作流临时生成，不能用于生产。
 - **常见失败：** Docker 构建超过 15 分钟、API 启动/健康检查超过 5 分钟、镜像内 Chromium/OCR 缺库、端口或 Docker 网段冲突、volume 权限不足、备份恢复失败。
@@ -219,12 +219,19 @@ Action runtime 的升级只影响 GitHub 托管 runner；它不会把 Node、Pyt
 | --- | --- |
 | Action 被提示 Node 旧版或 Artifact 弃用 | `scripts/verify-github-workflow-actions.mjs`、所有 `uses:` 主版本和 `setup-node` 的 `node-version` |
 | Linux 字体/PDF 失败或长时间无输出 | Linux 系统库、Chrome 启动日志、具体 scale profile；确认单步 5 分钟上限是否触发 |
-| `/readyz` unhealthy 或容器启动很慢 | API health JSON、`compose.log`、镜像构建与启动是否分开超时；不要先扫描 PostgreSQL 数据目录 |
+| `/readyz` unhealthy 或容器启动很慢 | API health JSON、`compose.log`、镜像构建与启动是否分开超时；匿名 `/healthz` 应保持轻量，不应扫描浏览器/OCR/PostgreSQL 工具或 PostgreSQL 数据目录 |
 | PostgreSQL 测试很慢 | 输入容量、索引计划、runner 资源和测试 45 分钟上限；不要把未连接真实 PG 的本机测试当成容量结论 |
 | GHCR push denied | 仓库 Actions 权限、`packages: write`、镜像命名空间和组织包策略 |
 | 正式桌面包签名失败 | endpoint/public key Variables、带密码私钥两个 Secrets、版本 tag 和签名文件；不要把私钥贴到日志 |
 | 浏览器服务器包缺文件 | `verify-package-payload.ps1`、Chrome/Chromium 架构、Linux 执行权限、OCR 模型和 `wwwroot/index.html` |
 | 工作流没有自动启动 | 检查该工作流的 `paths` 过滤器；手工入口用 `workflow_dispatch`，可复用工作流必须由平台入口调用 |
+
+### 2026-07-27 三类失败的已修复口径
+
+- PostgreSQL 日志出现 `Cannot write DateTime with Kind=Unspecified to PostgreSQL type 'timestamp with time zone'` 时，先检查查询边界和 `AppDbContext` 保存规范化是否仍统一转为 UTC；不要通过 Npgsql 旧兼容开关掩盖 DateTime 契约。当前仪表盘月份边界、单一窗口心跳和 PostgreSQL 保存路径已按该口径收口。
+- Linux/API 测试出现“取消请求返回 false，但任务已经 Canceled”时，检查取消实现是否先原子更新为 `Canceling`、再触发 `CancellationTokenSource.Cancel()`，并在 CAS 失败时重新读取最新状态；不能先发取消信号再用旧快照覆盖状态。
+- 容器在镜像构建成功后长期卡在健康检查时，先分别看 `/readyz` 与匿名 `/healthz`。前者只表示进程就绪，后者公开响应也应为轻量探针；只有带管理员 Bearer 或可信桌面 token 的请求才执行完整运行路径/依赖扫描。该边界用于避免可选浏览器、OCR、PostgreSQL 工具发现拖慢容器存活检查。
+- 上述修复应只运行相关 API/领域集成测试、Web 类型/构建与工作流静态门禁；除非改动扩展到公共基础设施，不要求为了同一故障重复执行全仓库测试。推送后的 GitHub runner 结果仍是跨平台/真实 PostgreSQL/Docker 的最终证据。
 
 ## 5. 运行边界与审查记录
 

@@ -27,6 +27,24 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions) =>
             {
+                // Container/load-balancer probes are anonymous by design.  Do
+                // not perform filesystem, browser, OCR, or PostgreSQL tool
+                // discovery for those requests: optional dependency discovery
+                // can be slow or unavailable while the API itself is healthy.
+                bool hasDesktopAccess = ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions);
+                string bearerToken = ApiCurrentUserResolver.GetBearerToken(context);
+                bool canViewDetails = hasDesktopAccess;
+                if (!canViewDetails && !string.IsNullOrWhiteSpace(bearerToken))
+                {
+                    var user = await currentUserResolver.ResolveAsync(context, context.RequestAborted);
+                    canViewDetails = authorizationService.CanManageSettings(user);
+                }
+
+                if (!canViewDetails)
+                {
+                    return Results.Ok(ApiHealthResponseFactory.CreatePublic(databaseSettings));
+                }
+
                 string sqliteDatabasePath = DatabaseModeHelper.UsesPostgreSql(databaseSettings)
                     ? string.Empty
                     : DbHelper.GetDatabasePath(databaseSettings.SqliteDatabaseFileName);
@@ -36,10 +54,7 @@ namespace ExportDocManager.Api.Hosting
                     databaseSettings,
                     sqliteDatabasePath,
                     dependencyDiagnostics.Inspect());
-                var user = await currentUserResolver.ResolveAsync(context, context.RequestAborted);
-                bool canViewDetails = ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions) ||
-                    authorizationService.CanManageSettings(user);
-                return Results.Ok(canViewDetails ? response : ApiHealthResponseFactory.CreatePublic(response));
+                return Results.Ok(response);
             })
             .WithName("Healthz");
 

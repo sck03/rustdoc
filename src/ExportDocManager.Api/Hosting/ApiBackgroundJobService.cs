@@ -70,45 +70,57 @@ namespace ExportDocManager.Api.Hosting
             }
 
             string key = jobId.Trim();
-            if (!_jobs.TryGetValue(key, out var job) || !job.CanCancel || BackgroundJobStatusCatalog.IsTerminal(job.Status))
+            while (_jobs.TryGetValue(key, out var job))
             {
-                return Task.FromResult(false);
-            }
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!job.CanCancel || BackgroundJobStatusCatalog.IsTerminal(job.Status))
+                {
+                    return Task.FromResult(false);
+                }
 
-            if (_cancellationSources.TryGetValue(key, out var source))
-            {
-                source.Cancel();
-            }
+                // Move the job to Canceling before signaling the worker.  The
+                // worker may complete immediately after observing cancellation;
+                // changing the state first prevents a stale Running snapshot
+                // from making an otherwise accepted request look unsuccessful.
+                var next = new BackgroundJobSnapshot
+                {
+                    JobId = job.JobId,
+                    Kind = job.Kind,
+                    Title = job.Title,
+                    Status = BackgroundJobStatusCatalog.Canceling,
+                    ProgressPercent = job.ProgressPercent,
+                    StatusText = "正在取消",
+                    DetailText = job.DetailText,
+                    RequestedBy = job.RequestedBy,
+                    RequestedByUserId = job.RequestedByUserId,
+                    CreatedAt = job.CreatedAt,
+                    StartedAt = job.StartedAt,
+                    CompletedAt = job.CompletedAt,
+                    OutputPath = job.OutputPath,
+                    ErrorMessage = job.ErrorMessage,
+                    CanCancel = false,
+                    CanRetry = job.CanRetry,
+                    RetryOperation = job.RetryOperation,
+                    RetryRequestJson = job.RetryRequestJson
+                };
 
-            var next = new BackgroundJobSnapshot
-            {
-                JobId = job.JobId,
-                Kind = job.Kind,
-                Title = job.Title,
-                Status = BackgroundJobStatusCatalog.Canceling,
-                ProgressPercent = job.ProgressPercent,
-                StatusText = "正在取消",
-                DetailText = job.DetailText,
-                RequestedBy = job.RequestedBy,
-                RequestedByUserId = job.RequestedByUserId,
-                CreatedAt = job.CreatedAt,
-                StartedAt = job.StartedAt,
-                CompletedAt = job.CompletedAt,
-                OutputPath = job.OutputPath,
-                ErrorMessage = job.ErrorMessage,
-                CanCancel = false,
-                CanRetry = job.CanRetry,
-                RetryOperation = job.RetryOperation,
-                RetryRequestJson = job.RetryRequestJson
-            };
+                if (!_jobs.TryUpdate(key, next, job))
+                {
+                    // Another status update won the race.  Re-read the latest
+                    // snapshot and decide whether this request is still valid.
+                    continue;
+                }
 
-            bool updated = _jobs.TryUpdate(key, next, job);
-            if (updated)
-            {
                 PersistJob(next);
+                if (_cancellationSources.TryGetValue(key, out var source))
+                {
+                    source.Cancel();
+                }
+
+                return Task.FromResult(true);
             }
 
-            return Task.FromResult(updated);
+            return Task.FromResult(false);
         }
 
         public Task<bool> DeleteAsync(

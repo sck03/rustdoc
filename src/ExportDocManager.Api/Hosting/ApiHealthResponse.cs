@@ -49,6 +49,29 @@ namespace ExportDocManager.Api.Hosting
 
     public static class ApiHealthResponseFactory
     {
+        public static ApiHealthResponse CreatePublic(DatabaseConnectionSettings databaseSettings)
+        {
+            ArgumentNullException.ThrowIfNull(databaseSettings);
+
+            return new ApiHealthResponse(
+                "ok",
+                DateTimeOffset.UtcNow,
+                ProductVersionProvider.ProductVersion,
+                ProductVersionProvider.InformationalVersion,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                DatabaseModeHelper.GetCurrentModeText(databaseSettings),
+                string.Empty,
+                Array.Empty<ApiRuntimePathInfo>(),
+                Array.Empty<ApiRuntimeDependencyInfo>(),
+                "公开健康检查只返回服务版本、状态和数据库模式；服务器绝对路径与依赖明细仅向桌面可信连接或管理员账号返回。");
+        }
+
         public static ApiHealthResponse Create(
             IAppPathProvider paths,
             DatabaseConnectionSettings databaseSettings,
@@ -80,26 +103,6 @@ namespace ExportDocManager.Api.Hosting
                     .Select(ToApiRuntimeDependency)
                     .ToArray(),
                 "程序根保存 appsettings.json 与 Templates/Resources/Browsers/Tools/OcrModels 等随程序资源；稳定资源路径只解析、不因健康检查自动创建，其中报表模板仅在用户显式新建、保存或导入时维护。数据库、日志、缓存、备份、WebView 和其它业务可写数据统一使用 data root（默认 App_Data，可由 --data-root 指向运行目录下其它目录）；授权镜像保存到运行数据根 Security，试用锚点和已注册许可证保存到平台机器级授权锚点。");
-        }
-
-        public static ApiHealthResponse CreatePublic(ApiHealthResponse response)
-        {
-            ArgumentNullException.ThrowIfNull(response);
-
-            return response with
-            {
-                AppRoot = string.Empty,
-                DataRoot = string.Empty,
-                DatabaseRoot = string.Empty,
-                SingleWindowRoot = string.Empty,
-                TemplateRoot = string.Empty,
-                OcrModelRoot = string.Empty,
-                LogRoot = string.Empty,
-                SqliteDatabasePath = string.Empty,
-                RuntimePaths = Array.Empty<ApiRuntimePathInfo>(),
-                RuntimeDependencies = Array.Empty<ApiRuntimeDependencyInfo>(),
-                StoragePolicy = "公开健康检查只返回服务版本、状态和数据库模式；服务器绝对路径与依赖明细仅向桌面可信连接或管理员账号返回。"
-            };
         }
 
         private static ApiRuntimeDependencyInfo ToApiRuntimeDependency(RuntimeDependencyDiagnostic diagnostic)

@@ -29,6 +29,7 @@ import { InvoiceProfitAnalysisPanel } from "./InvoiceProfitAnalysisPanel.tsx";
 import { InvoiceReportPreviewPanel } from "./InvoiceReportPreviewPanel.tsx";
 import { InvoiceStatusReasonDialog } from "./InvoiceStatusReasonDialog.tsx";
 import {
+  canDeleteInvoiceStatus,
   canUnverifyInvoiceStatus,
   canTransitionInvoiceStatus,
   createEmptyInvoice,
@@ -655,15 +656,22 @@ export function InvoiceEditorPage({
   }
 
   async function handleDeleteInvoice() {
-    if (!invoicePermission.canManage || isNew || !isInvoiceIdValid || !invoice || deleteInvoiceMutation.isPending) {
+    if (
+      !invoicePermission.canManage
+      || isNew
+      || !isInvoiceIdValid
+      || !invoice
+      || !canDeleteInvoiceStatus(persistedInvoiceStatus || invoice.status)
+      || deleteInvoiceMutation.isPending
+    ) {
       return;
     }
 
     const title = invoice.invoiceNo?.trim() || invoice.customerNameEN?.trim() || `#${parsedInvoiceId}`;
     if (!await requestConfirmation({
       title: "删除发票",
-      description: `确定删除当前发票“${title}”吗？`,
-      details: ["删除后无法在发票列表中继续查看。", "如有关联业务数据，服务端会拒绝删除并说明原因。"],
+      description: `确定删除当前草稿发票“${title}”吗？`,
+      details: ["仅草稿允许直接删除，删除后无法恢复。", "已核对及后续状态只能作废；已作废记录默认保留审计。"],
       confirmLabel: "确认删除",
       tone: "danger",
     })) {
@@ -802,7 +810,10 @@ export function InvoiceEditorPage({
             </span>
           ) : null}
         </div>
-        {!isNew && isInvoiceIdValid && invoicePermission.canManage ? (
+        {!isNew
+          && isInvoiceIdValid
+          && invoicePermission.canManage
+          && canDeleteInvoiceStatus(persistedInvoiceStatus || invoice?.status) ? (
           <button
             className="command-button secondary danger"
             type="button"

@@ -100,6 +100,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IItemService, ItemService>();
             services.AddScoped<IInvoicePartyResolver, InvoicePartyResolver>();
             services.AddScoped<IInvoiceService, InvoiceService>();
+            services.AddScoped<IInvoiceDataMaintenanceService, InvoiceDataMaintenanceService>();
             services.AddScoped<IInvoiceTransferService, InvoiceTransferService>();
             services.AddScoped<IShippingMarkImageService, ShippingMarkImageService>();
             services.AddScoped<IDashboardService, DashboardService>();

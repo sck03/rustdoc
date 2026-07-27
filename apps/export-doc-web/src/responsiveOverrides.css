@@ -358,6 +358,14 @@
     grid-template-columns: 1fr;
   }
 
+  .invoice-maintenance-query-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-maintenance-danger-zone > .command-button {
+    justify-self: stretch;
+  }
+
   .maintenance-section-nav {
     grid-template-columns: 1fr;
   }

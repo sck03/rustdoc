@@ -21,6 +21,7 @@ export const invoiceStatusOptions = [
 ];
 
 const lockedInvoiceStatuses = new Set(["Verified", "Shipped", "Completed", "Cancelled"]);
+const reversibleInvoiceStatuses = new Set(["Verified", "Shipped", "Completed"]);
 
 export function normalizeInvoiceType(value?: string) {
   const normalized = value?.trim() ?? "";
@@ -42,11 +43,15 @@ export function normalizeInvoiceStatus(value?: string) {
 
 export function canUnverifyInvoiceStatus(value?: string) {
   const normalized = normalizeInvoiceStatus(value);
-  return lockedInvoiceStatuses.has(normalized);
+  return reversibleInvoiceStatuses.has(normalized);
 }
 
 export function isInvoiceEditableStatus(value?: string) {
-  return !canUnverifyInvoiceStatus(value);
+  return !lockedInvoiceStatuses.has(normalizeInvoiceStatus(value));
+}
+
+export function canDeleteInvoiceStatus(value?: string) {
+  return normalizeInvoiceStatus(value) === "Draft";
 }
 
 export function getInvoiceStatusLabel(value?: string) {

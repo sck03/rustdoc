@@ -1303,6 +1303,19 @@ export interface ApiInvoiceCloneTypeResponse {
   success: boolean;
 }
 
+export interface ApiInvoiceDataMaintenancePreviewResponse {
+  canPurge: boolean;
+  customerName: string;
+  guidance: string;
+  id: number;
+  invoiceDate: string;
+  invoiceNo: string;
+  status: string;
+  statusDisplayName: string;
+  storagePolicy: string;
+  type: string;
+}
+
 export interface ApiInvoiceDetailDto {
   bankAccount?: string;
   bankName?: string;
@@ -1489,6 +1502,20 @@ export interface ApiInvoiceProfitAnalysisResponse {
   storagePolicy: string;
   taxRefund: number;
   taxRefundText: string;
+}
+
+export interface ApiInvoicePurgeRequest {
+  invoiceNoConfirmation: string;
+  reason: string;
+}
+
+export interface ApiInvoicePurgeResponse {
+  invoiceId: number;
+  invoiceNo: string;
+  message: string;
+  previousStatus: string;
+  storagePolicy: string;
+  success: boolean;
 }
 
 export interface ApiInvoiceReportZipRequest {
@@ -3705,6 +3732,10 @@ export interface GetInvoiceRequest {
   id: number;
 }
 
+export interface GetInvoiceDataMaintenancePreviewRequest {
+  id: number;
+}
+
 export interface GetInvoiceHsCodeRequest {
   code: string;
 }
@@ -4068,6 +4099,11 @@ export interface PreviewSupplierImportRequest {
 export interface PreviewUploadedInvoiceTransferPackageRequest {
   fileName?: string;
   body: Blob;
+}
+
+export interface PurgeCancelledInvoiceRequest {
+  id: number;
+  body: ApiInvoicePurgeRequest;
 }
 
 export interface QueryCrmCustomersRequest {
@@ -5282,6 +5318,11 @@ export class ExportDocManagerApiClient {
     return this.request<ApiInvoiceDetailDto>("GET", path, { init });
   }
 
+  public getInvoiceDataMaintenancePreview(request: GetInvoiceDataMaintenancePreviewRequest, init?: RequestInit): Promise<ApiInvoiceDataMaintenancePreviewResponse> {
+    const path = `/api/system/data-maintenance/invoices/${encodePath(request.id)}`;
+    return this.request<ApiInvoiceDataMaintenancePreviewResponse>("GET", path, { init });
+  }
+
   public getInvoiceHsCode(request: GetInvoiceHsCodeRequest, init?: RequestInit): Promise<ApiHsCodeDto> {
     const path = `/api/invoices/hs-codes/${encodePath(request.code)}`;
     return this.request<ApiHsCodeDto>("GET", path, { init });
@@ -6030,6 +6071,14 @@ export class ExportDocManagerApiClient {
       query: {
         "fileName": request.fileName,
       },
+      body: request.body,
+      init,
+    });
+  }
+
+  public purgeCancelledInvoice(request: PurgeCancelledInvoiceRequest, init?: RequestInit): Promise<ApiInvoicePurgeResponse> {
+    const path = `/api/system/data-maintenance/invoices/${encodePath(request.id)}/purge`;
+    return this.request<ApiInvoicePurgeResponse>("POST", path, {
       body: request.body,
       init,
     });
