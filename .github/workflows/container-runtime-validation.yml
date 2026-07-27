@@ -148,9 +148,27 @@ jobs:
             exit 1
           fi
 
-          curl --connect-timeout 2 --max-time 10 --fail --silent --show-error \
-            "http://127.0.0.1:${EXPORTDOCMANAGER_WEB_PORT}/healthz" \
-            > ../../artifacts/container-runtime/evidence/healthz.json
+          health_ready=0
+          for attempt in $(seq 1 3); do
+            if curl --connect-timeout 2 --max-time 3 --fail --silent --show-error \
+              "http://127.0.0.1:${EXPORTDOCMANAGER_WEB_PORT}/healthz" \
+              > ../../artifacts/container-runtime/evidence/healthz.json; then
+              health_ready=1
+              break
+            fi
+            echo "Public health attempt ${attempt}/3 did not complete within the bounded timeout." >&2
+            sleep 2
+          done
+
+          if [ "$health_ready" -ne 1 ]; then
+            echo "Public health endpoint did not respond through the Web reverse proxy." >&2
+            echo "Direct API probe (diagnostic only):" >&2
+            docker compose exec -T api \
+              curl --connect-timeout 2 --max-time 3 --fail --silent --show-error \
+              http://127.0.0.1:5188/healthz >&2 || true
+            show_diagnostics
+            exit 1
+          fi
 
       - name: Validate reverse-proxy and security-header boundary
         working-directory: deploy/container
