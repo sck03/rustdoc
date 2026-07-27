@@ -174,8 +174,17 @@ jobs:
         working-directory: deploy/container
         shell: bash
         run: |
-          if docker compose port api 5188 2>/dev/null | grep -q .; then
+          api_container_id="$(docker compose ps -q api)"
+          if [ -z "$api_container_id" ]; then
+            echo "API container is missing while checking the reverse-proxy boundary." >&2
+            docker compose ps --all >&2 || true
+            exit 1
+          fi
+          api_published_ports="$(docker inspect --format '{{json .NetworkSettings.Ports}}' "$api_container_id" | \
+            jq -r '(.["5188/tcp"] // []) | length')"
+          if [ "${api_published_ports:-0}" -gt 0 ]; then
             echo "API port 5188 must not be published to the host." >&2
+            docker inspect --format '{{json .NetworkSettings.Ports}}' "$api_container_id" >&2 || true
             exit 1
           fi
           curl --fail --silent --show-error --dump-header ../../artifacts/container-runtime/evidence/http-headers.txt --output /dev/null "http://127.0.0.1:${EXPORTDOCMANAGER_WEB_PORT}/"

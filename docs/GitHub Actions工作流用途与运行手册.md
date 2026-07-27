@@ -85,7 +85,7 @@
 - **做什么：** 校验 HTTP 基础 Compose 和 HTTPS overlay；构建 API/Web 镜像并分步启动；检查 `/readyz`、匿名轻量 `/healthz`、CSP/HSTS、API `5188` 不对宿主发布；删除并重建 PostgreSQL 容器验证 bind volume 数据持久化；在 runner 内执行 `pg_dump/pg_restore` 恢复验收，最后清理容器。匿名 `/healthz` 在 API 路由表和鉴权/许可证/数据库服务解析之前由早期探针直接返回，不扫描浏览器、OCR、PostgreSQL 工具或服务器路径；管理员 Bearer/可信桌面连接仍可进入完整诊断。
 - **输出：** 只上传 `artifacts/container-runtime/evidence` 下的探针、Compose 状态和日志证据，不递归扫描 PostgreSQL 数据目录，也不上传数据库 dump；通常保留 14 天。
 - **Secrets/Variables：** 不需要自定义 Secret。测试密码、自签证书和端口由工作流临时生成，不能用于生产。
-- **常见失败：** Docker 构建超过 15 分钟、API 启动/健康检查超过 5 分钟、镜像内 Chromium/OCR 缺库、端口或 Docker 网段冲突、volume 权限不足、备份恢复失败。
+- **常见失败：** Docker 构建超过 15 分钟、API 启动/健康检查超过 5 分钟、镜像内 Chromium/OCR 缺库、端口或 Docker 网段冲突、volume 权限不足、备份恢复失败。API 的 `expose: 5188` 只表示 Compose 内部可达，不等于宿主端口发布；边界检查读取容器实际 `NetworkSettings.Ports` 的 host binding，不使用会把 `expose` 也打印出来的 `docker compose port` 作为判据。
 - **耗时：** 通常 10—30 分钟；构建和启动均有明确上限，失败时先看上传的 evidence 与 API health JSON。公开 `/healthz` 采用 3 次、每次最多 3 秒的有界重试；仍失败时步骤会额外尝试 API 容器内直连并输出 Web/API/Compose 诊断，避免只看到一个无上下文的 curl 超时。
 
 ### 2.6 Dependency security and SBOM governance
@@ -220,6 +220,7 @@ Action runtime 的升级只影响 GitHub 托管 runner；它不会把 Node、Pyt
 | Action 被提示 Node 旧版或 Artifact 弃用 | `scripts/verify-github-workflow-actions.mjs`、所有 `uses:` 主版本和 `setup-node` 的 `node-version` |
 | Linux 字体/PDF 失败或长时间无输出 | Linux 系统库、Chrome 启动日志、具体 scale profile；确认单步 5 分钟上限是否触发 |
 | `/readyz` unhealthy 或容器启动很慢 | API health JSON、`compose.log`、镜像构建与启动是否分开超时；匿名 `/healthz` 应保持轻量，不应扫描浏览器/OCR/PostgreSQL 工具或 PostgreSQL 数据目录 |
+| API 端口边界检查误报 | 先看 `compose-ps.txt` 的 `PORTS` 列；只有出现 `0.0.0.0:5188->5188` 或实际 host binding 才算发布，单独的 `5188/tcp` 是 Compose `expose`，不是宿主映射 |
 | PostgreSQL 测试很慢 | 输入容量、索引计划、runner 资源和测试 45 分钟上限；不要把未连接真实 PG 的本机测试当成容量结论 |
 | GHCR push denied | 仓库 Actions 权限、`packages: write`、镜像命名空间和组织包策略 |
 | 正式桌面包签名失败 | endpoint/public key Variables、带密码私钥两个 Secrets、版本 tag 和签名文件；不要把私钥贴到日志 |
