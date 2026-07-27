@@ -15,6 +15,8 @@ public sealed class PackagePayloadContractTests
 
         Assert.Contains("ExportDocPackageProfile=Desktop", desktopScript, StringComparison.Ordinal);
         Assert.Contains("ExportDocPackageProfile=Server", serverWorkflow, StringComparison.Ordinal);
+        Assert.Contains("initialize-windows.ps1", serverWorkflow, StringComparison.Ordinal);
+        Assert.Contains("initialize-linux.sh", serverWorkflow, StringComparison.Ordinal);
         Assert.Contains("ExportDocPackageProfile=Container", dockerfile, StringComparison.Ordinal);
         Assert.DoesNotContain("COPY Browsers/", dockerfile, StringComparison.Ordinal);
         Assert.Contains("AS report-fonts", dockerfile, StringComparison.Ordinal);
@@ -32,6 +34,9 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("dashboard|recorder|traceViewer", verifier, StringComparison.Ordinal);
         Assert.Contains("forbiddenPrivateToolPayload", verifier, StringComparison.Ordinal);
         Assert.Contains("private license key generator", verifier, StringComparison.Ordinal);
+        Assert.Contains("requiredServerEntries", verifier, StringComparison.Ordinal);
+        Assert.Contains("initialize-windows.ps1", verifier, StringComparison.Ordinal);
+        Assert.Contains("initialize-linux.sh", verifier, StringComparison.Ordinal);
     }
 
     [Fact]

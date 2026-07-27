@@ -75,14 +75,25 @@ jobs:
           docker compose config --quiet
           docker compose -f docker-compose.yml -f docker-compose.https.yml config --quiet
 
-      - name: Build and start HTTP stack
+      - name: Build HTTP images
         working-directory: deploy/container
         shell: bash
+        timeout-minutes: 15
+        run: docker compose build
+
+      - name: Start HTTP stack
+        working-directory: deploy/container
+        shell: bash
+        timeout-minutes: 5
         run: |
-          if ! docker compose up -d --build; then
+          if ! docker compose up -d --no-build; then
             echo "Container stack failed to reach its declared startup dependencies." >&2
             docker compose ps --all || true
             docker compose logs --no-color --tail=200 postgres api web || true
+            api_container_id="$(docker compose ps -q api)"
+            if [ -n "$api_container_id" ]; then
+              docker inspect --format '{{json .State.Health}}' "$api_container_id" || true
+            fi
             exit 1
           fi
 
@@ -93,6 +104,10 @@ jobs:
           show_diagnostics() {
             docker compose ps --all || true
             docker compose logs --no-color --tail=200 postgres api web || true
+            api_container_id="$(docker compose ps -q api)"
+            if [ -n "$api_container_id" ]; then
+              docker inspect --format '{{json .State.Health}}' "$api_container_id" || true
+            fi
           }
 
           ready=0
@@ -223,7 +238,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: container-runtime-lifecycle
-          path: artifacts/container-runtime
+          path: artifacts/container-runtime/evidence
           if-no-files-found: error
           retention-days: 14
 

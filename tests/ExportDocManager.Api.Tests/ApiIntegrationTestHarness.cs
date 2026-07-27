@@ -130,6 +130,8 @@ namespace ExportDocManager.Api.Tests
                 builder.Services.AddExportDocManagerApiServices(pathProvider, databaseSettings, runtimeOptions);
 
                 var app = builder.Build();
+                app.UseExportDocManagerApiSafety();
+                app.UseExportDocManagerReadiness();
                 app.UseCors(ApiCorsPolicy.LocalFrontendPolicyName);
                 app.UseExportDocManagerDesktopAccess();
                 app.UseExportDocManagerApiAuthentication();

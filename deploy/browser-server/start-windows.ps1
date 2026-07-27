@@ -1,10 +1,39 @@
 [CmdletBinding()]
 param(
-    [string]$Urls = "http://0.0.0.0:5188"
+    [string]$Urls
 )
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
+$runtimeEnvPath = Join-Path $root "App_Data\Security\browser-server.env"
+$runtimeEnvPointer = Join-Path $root "browser-server.env.path"
+if (Test-Path -LiteralPath $runtimeEnvPointer -PathType Leaf) {
+    $configuredPath = (Get-Content -LiteralPath $runtimeEnvPointer -Raw).Trim()
+    if (-not [string]::IsNullOrWhiteSpace($configuredPath)) {
+        $runtimeEnvPath = if ([System.IO.Path]::IsPathRooted($configuredPath)) {
+            [System.IO.Path]::GetFullPath($configuredPath)
+        } else {
+            [System.IO.Path]::GetFullPath((Join-Path $root $configuredPath))
+        }
+    }
+}
+if (Test-Path -LiteralPath $runtimeEnvPath -PathType Leaf) {
+    foreach ($line in Get-Content -LiteralPath $runtimeEnvPath) {
+        if ([string]::IsNullOrWhiteSpace($line) -or $line.TrimStart().StartsWith('#')) {
+            continue
+        }
+        $separator = $line.IndexOf('=')
+        if ($separator -le 0) {
+            continue
+        }
+        $name = $line.Substring(0, $separator).Trim()
+        $value = $line.Substring($separator + 1)
+        if ($name -match '^(?:EXPORTDOCMANAGER_|POSTGRES_)[A-Za-z0-9_]*$') {
+            [Environment]::SetEnvironmentVariable($name, $value, [EnvironmentVariableTarget]::Process)
+        }
+    }
+}
+
 $configPath = Join-Path $root "appsettings.json"
 if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
     throw "appsettings.json was not found: $configPath"
@@ -23,13 +52,30 @@ if ($null -eq $browser) {
     throw "内置 Chrome Headless Shell 不存在。"
 }
 
+$effectiveUrls = if ($PSBoundParameters.ContainsKey('Urls')) {
+    $Urls
+} elseif (-not [string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_URLS)) {
+    $env:EXPORTDOCMANAGER_URLS
+} else {
+    "http://0.0.0.0:5188"
+}
+
 $env:EXPORTDOCMANAGER_NETWORK_MODE = "true"
 $env:EXPORTDOCMANAGER_PRODUCT_EDITION = "Full"
 $env:EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE = $browser.FullName
-$dataRoot = Join-Path $root "App_Data"
+$dataRoot = if (-not [string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_DATA_ROOT)) {
+    if ([System.IO.Path]::IsPathRooted($env:EXPORTDOCMANAGER_DATA_ROOT)) {
+        [System.IO.Path]::GetFullPath($env:EXPORTDOCMANAGER_DATA_ROOT)
+    } else {
+        [System.IO.Path]::GetFullPath((Join-Path $root $env:EXPORTDOCMANAGER_DATA_ROOT))
+    }
+} else {
+    Join-Path $root "App_Data"
+}
+New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
 & (Join-Path $root "ExportDocManager.Api.exe") `
     --app-root $root `
     --data-root $dataRoot `
-    --urls $Urls `
+    --urls $effectiveUrls `
     --network-mode true
 exit $LASTEXITCODE

@@ -67,6 +67,20 @@ if ($Profile -ne "Container") {
     }
 }
 
+if ($Profile -eq "Server") {
+    $requiredServerEntries = if ($RuntimeIdentifier.StartsWith("win-", [StringComparison]::OrdinalIgnoreCase)) {
+        @("appsettings.json", "initialize-windows.ps1", "start-windows.ps1", "wwwroot/index.html")
+    } else {
+        @("appsettings.json", "initialize-linux.sh", "start-linux.sh", "wwwroot/index.html")
+    }
+    foreach ($relativeEntry in $requiredServerEntries) {
+        $entryPath = Join-Path $root $relativeEntry
+        if (-not (Test-Path -LiteralPath $entryPath -PathType Leaf)) {
+            throw "Server payload is missing deployment entry '$relativeEntry': $entryPath"
+        }
+    }
+}
+
 $runtimeName = if ($RuntimeIdentifier.StartsWith("win-")) { "onnxruntime.dll" } elseif ($RuntimeIdentifier.StartsWith("osx-")) { "libonnxruntime.dylib" } else { "libonnxruntime.so" }
 $runtimeFiles = @(Get-ChildItem -LiteralPath $root -File -Recurse | Where-Object Name -eq $runtimeName)
 if ($runtimeFiles.Count -ne 1) { throw "Expected exactly one shared $runtimeName, found $($runtimeFiles.Count)." }

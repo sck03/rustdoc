@@ -1,6 +1,6 @@
 # GitHub 开源发布与 Docker 镜像说明
 
-> 更新日期：2026-07-17
+> 更新日期：2026-07-27
 
 ## 1. 公开仓库边界
 
@@ -36,7 +36,7 @@ pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
 
 ## 3. GitHub Actions 与 GHCR
 
-- `public-source-guard.yml`：`main/master` 推送或手工运行时检查公开边界。
+- `public-source-guard.yml`：当前只允许手工运行，检查公开边界、Action Node 24/Artifact 版本政策和 updater 信任契约。
 - `cross-platform-validation.yml`：只手工运行，检查 Windows、Linux、macOS 的 .NET/Web/Tauri 契约。
 - `container-images.yml`：只手工运行；启动时填写版本号并选择是否更新 `latest`，随后构建 `linux/amd64`、`linux/arm64` 的 API/Web 镜像并发布到 GHCR。
 - `windows-desktop-package.yml`：只手工运行；选择版本和 Document/Sales/Full，构建 Windows x64 NSIS 安装包。
@@ -45,15 +45,15 @@ pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
 - `desktop-package-reusable.yml`：上述三个桌面入口共用的内部编排，不会单独出现在手工运行列表中。
 - `windows-browser-server-package.yml`：只手工运行；生成无需 Docker 的 Windows x64 浏览器服务器 ZIP。
 - `linux-browser-server-package.yml`：只手工运行；生成无需 Docker 的 Linux x64 浏览器服务器 tar.gz。
-- `browser-server-package-reusable.yml`：两个浏览器服务器入口共用的内部编排，将 React、ASP.NET Core API、Chrome Headless Shell、PostgreSQL 配置模板和启动脚本合并到同一发布包。
+- `browser-server-package-reusable.yml`：两个浏览器服务器入口共用的内部编排，将 React、ASP.NET Core API、Chrome Headless Shell、PostgreSQL 配置模板、`initialize-windows.ps1`/`initialize-linux.sh` 和启动脚本合并到同一发布包。
 
-公开源码守卫仍在主分支推送时自动运行；跨平台验证、容器发布和三个桌面打包入口都只在仓库 Actions 页面点击 “Run workflow” 后执行。项目当前不启用 Dependabot 自动版本 PR，避免多个依赖生态同时创建分支并放大 Actions 数量；依赖升级由维护者集中检查 package/lock 文件后人工提交。
+公开源码守卫、跨平台验证、容器发布和三个桌面打包入口当前都在仓库 Actions 页面点击 “Run workflow” 后执行；字体、PostgreSQL、容器生命周期和依赖治理另按各自路径/定时规则运行。项目当前不启用 Dependabot 自动版本 PR，避免多个依赖生态同时创建分支并放大 Actions 数量；依赖升级由维护者集中检查 package/lock 文件后人工提交。
 
 手工发布 Docker 镜像时：进入 Actions → Build and publish container images → Run workflow，填写 `version`，例如 `0.1.2` 或 `0.1.2-beta.1`；`publish_latest=true` 时同时覆盖 `latest`。工作流会在临时 runner 中同步 `.NET/Web/Tauri/Rust` 内部版本，不会反向修改或提交仓库源码。最终镜像同时带版本标签和 `sha-*` 标签。
 
 手工生成桌面包时，进入对应的 `Build Windows/Linux/macOS desktop package` → `Run workflow`，填写版本并选择产品版；macOS 还可选择 ARM64 或 x64。默认结果位于该次运行的 Artifacts，保留 14 天；只有把 `publish_release` 改为 `true` 才会上传到 `v<版本>` GitHub Release。三个入口都会自动下载当前平台的 Chrome Headless Shell，并在打包前后验证浏览器可执行文件已经进入 Tauri 资源目录，因此最终安装包不要求普通用户另行下载浏览器。源码仓库仍不保存这些大体积二进制。Chrome for Testing 当前官方 Headless Shell 平台为 `linux64 / mac-arm64 / mac-x64 / win32 / win64`，所以 macOS ARM64 已开放正式手工打包；Linux ARM64 和 Windows ARM64 没有对应官方包，仍只保留应用编译契约，不能把 x64 浏览器伪装成 ARM64 交付。桌面包当前未签名，正式分发前仍需完成代码签名、公证、安装启动、更新和卸载验收。
 
-非 Docker 浏览器服务器版在 Actions 中选择 `Build Windows browser server package` 或 `Build Linux browser server package`。生成包由单个 ASP.NET Core 进程同时提供 React 页面与 `/api`，使用同源访问，不需要 Nginx 容器；包内自带 Chrome Headless Shell 和启动脚本。部署机器仍需原生 PostgreSQL，首次启动前必须编辑 `appsettings.json`。GitHub 只负责编译和保存下载包，不提供长期运行服务器。
+非 Docker 浏览器服务器版在 Actions 中选择 `Build Windows browser server package` 或 `Build Linux browser server package`。生成包由单个 ASP.NET Core 进程同时提供 React 页面与 `/api`，使用同源访问，不需要 Nginx 容器；包内自带 Chrome Headless Shell、启动脚本和“初始化配置并可立即启动”脚本。部署机器仍需原生 PostgreSQL，建议运行 `initialize-windows.ps1` 或 `initialize-linux.sh`，不要把数据库密码和首次部署令牌写进启动命令历史；脚本不会自动安装数据库、改防火墙或注册系统服务。GitHub 只负责编译和保存下载包，不提供长期运行服务器。
 
 镜像名称为：
 
@@ -73,7 +73,7 @@ EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/你的github账号
 EXPORTDOCMANAGER_IMAGE_TAG=latest
 ```
 
-初始化运行目录并启动：
+初始化运行目录并启动（初始化脚本会自动选择不与宿主机接口、路由表和 Docker 网络重叠的紧凑 `/28`；企业 VPN 有大范围路由时可用 `-ContainerSubnet/-ReverseProxyIp` 显式指定 `/24` 至 `/28`）：
 
 ```powershell
 pwsh -NoProfile -File deploy/container/initialize-container-runtime.ps1

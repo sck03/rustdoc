@@ -110,13 +110,13 @@ namespace ExportDocManager.Services.SingleWindow
                 }
             }
 
-            if (!changed &&
-                workstation.UpdatedAt >= DateTime.Now.Subtract(HeartbeatInterval))
+            var heartbeatCutoff = DateTime.UtcNow.Subtract(HeartbeatInterval);
+            if (!changed && workstation.UpdatedAt >= heartbeatCutoff)
             {
                 return;
             }
 
-            workstation.UpdatedAt = DateTime.Now;
+            workstation.UpdatedAt = DateTime.UtcNow;
             await context.SaveChangesAsync(cancellationToken);
         }
 

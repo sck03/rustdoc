@@ -30,6 +30,7 @@ builder.Services.AddExportDocManagerApiServices(pathProvider, databaseSettings, 
 var app = builder.Build();
 app.UseExportDocManagerForwardedHeaders(runtimeOptions);
 app.UseExportDocManagerApiSafety();
+app.UseExportDocManagerReadiness();
 app.UseCors(ApiCorsPolicy.LocalFrontendPolicyName);
 app.UseExportDocManagerDesktopAccess();
 app.UseExportDocManagerApiAuthentication();

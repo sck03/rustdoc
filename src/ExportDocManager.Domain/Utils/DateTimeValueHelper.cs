@@ -8,11 +8,29 @@ namespace ExportDocManager.Utils
         {
             if (value != default && value >= WinFormsMinDate)
             {
-                return value;
+                return DateTime.SpecifyKind(value, DateTimeKind.Utc);
             }
 
             var fallbackValue = fallback ?? DateTime.Today;
-            return fallbackValue >= WinFormsMinDate ? fallbackValue : WinFormsMinDate;
+            return DateTime.SpecifyKind(
+                fallbackValue >= WinFormsMinDate ? fallbackValue : WinFormsMinDate,
+                DateTimeKind.Utc);
+        }
+
+        /// <summary>
+        /// Normalizes a timestamp before it is persisted to PostgreSQL's
+        /// <c>timestamp with time zone</c> columns.  Values coming from a
+        /// date-only form are intentionally treated as UTC without changing
+        /// their calendar fields; local timestamps preserve their instant.
+        /// </summary>
+        public static DateTime NormalizeUtcTimestamp(DateTime value)
+        {
+            return value.Kind switch
+            {
+                DateTimeKind.Utc => value,
+                DateTimeKind.Local => value.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+            };
         }
     }
 }

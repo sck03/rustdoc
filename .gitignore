@@ -37,6 +37,7 @@ TestResults/
 *.cache
 *.log
 deploy/container/.env
+deploy/browser-server/browser-server.env.path
 deploy/container/runtime/
 deploy/container/config/
 deploy/container/secrets/

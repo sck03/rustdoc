@@ -1,19 +1,22 @@
 # Full 局域网 / 容器版
 
-该部署只发布 `Full` 产品，并通过 PostgreSQL 中的账号岗位、权限模板和数据归属控制实际能力。Web 与 API 使用同一域名反向代理，API 不直接映射到宿主机端口。Compose 为 Nginx 分配固定容器地址，API 只信任该明确地址提供的 `X-Forwarded-For` / `X-Forwarded-Proto`，因此多用户登录限流按真实客户端地址区分，同时不会无条件信任外部可伪造的转发头。
+该部署只发布 `Full` 产品，并通过 PostgreSQL 中的账号岗位、权限模板和数据归属控制实际能力。当前 Compose 方案使用一个 Web 容器承载 Nginx、一个 API 容器和一个 PostgreSQL 容器；它适合公司局域网，也支持在需要时叠加 TLS。HTTP、HTTPS 和 Nginx 的选择属于部署边界，不改变业务权限、数据库隔离或登录流程。
 
-## 初始化
+## 先选择部署模式
 
-在本目录执行：
+### 公司内网 HTTP（正式支持）
+
+如果服务器和浏览器都位于受控的公司内网、VLAN 或 VPN 内，通常不需要为了“形式上的严格”强制启用 HTTPS。基础 `docker-compose.yml` 就是 HTTP-only 模式：不读取证书，不挂载私钥，也不依赖 `docker-compose.https.yml`。
 
 ```powershell
-pwsh -File .\initialize-container-runtime.ps1 `
-  -PostgreSqlPassword "请替换为长随机数据库密码" `
-  -BootstrapToken "请替换为另一段至少24位的随机首次部署令牌"
-docker compose up -d --build
+docker compose -f .\docker-compose.yml --env-file .\.env up -d --build
 ```
 
-初始化脚本同时写入默认 HTTPS 端口和证书挂载路径，但普通 `docker-compose.yml` 不会读取证书，也不会因为证书尚未准备而阻止局域网 HTTP 部署。正式启用内置 TLS overlay 前，把可信证书和私钥放到 `.env` 指定的宿主路径，再执行：
+默认从 `http://服务器地址:8080` 访问。应由网络管理员使用防火墙/交换机 ACL 只允许办公网段访问该端口，并避免把它转发到公网。HTTP 会明文传输登录凭据和业务数据，因此跨越不可信网络、公共 Wi-Fi、互联网或存在合规要求时，必须改用 HTTPS 或由可信 VPN/外部负载均衡终止 TLS；内网 HTTP 是有明确边界的部署模式，不是程序故障降级。
+
+### 公网或合规 HTTPS
+
+在公网、跨网段访问、零信任网络或企业合规要求下，准备可信证书和私钥后叠加 HTTPS overlay：
 
 ```powershell
 docker compose `
@@ -23,7 +26,46 @@ docker compose `
   up -d --build
 ```
 
-默认同时保留 HTTP `8080` 和 HTTPS `8443` 映射，便于受控内网迁移；公网部署应由防火墙只开放 HTTPS，或在外层负载均衡/CDN 完成证书终止。`nginx.https.conf` 只允许 TLS 1.2/1.3，启用 HSTS、CSP、禁止 iframe 和 MIME sniffing。首次使用 HSTS 前必须确认域名、证书续期和全部子域均已具备 HTTPS，不能用临时自签证书直接面向正式用户。
+overlay 额外发布 HTTPS 端口 `8443`，启用 TLS 1.2/1.3、HSTS 和更严格的安全响应头。若要“只允许 HTTPS”，应在防火墙关闭或限制 `8080`，不要仅依赖浏览器重定向。也可以让企业负载均衡、网关或 CDN 在 Nginx 前终止 TLS；此时必须把其实际连接 Nginx 的固定 IP 配置为可信代理。
+
+### 非 Docker 浏览器服务器包
+
+Windows/Linux 浏览器服务器包由单个 ASP.NET Core 进程同时托管 React 静态文件和 API，部署机连接原生 PostgreSQL，不需要 Nginx。该模式适合已有 IIS、Apache、企业网关，或不希望维护 Docker Web 容器的环境；是否增加外部反向代理由现场网络决定。
+
+## Nginx 在当前 Compose 中做什么
+
+“内网不强制 HTTPS”不等于“当前 Nginx 必须删除”。Nginx 在 Compose 里仍承担三个实际职责：
+
+- 提供 React 的静态文件和 SPA fallback，让浏览器可以直接打开 Web 页面；
+- 代理 `/api`、`/readyz`、`/healthz` 和 `/openapi`，让 Web/API 同源，并且 API `5188` 只在 Compose 内部可见；
+- 统一 CSP、禁止 iframe、MIME sniffing 防护等 HTTP 响应头，并向 API 传递经过配置的可信代理地址。
+
+因此，内网 HTTP 只是不启用 TLS 配置，不是把 Web 服务器和同源代理一并省略。若现场确实要移除 Nginx，必须同时提供等价的静态文件服务、SPA fallback、`/api` 反向代理、健康探针转发和安全响应头，并重新审查 `KnownProxies`/CORS/CSP；不能只删掉 Web 容器后把 API 端口直接暴露给所有客户端。单进程浏览器服务器包已经提供了不使用 Nginx 的正式替代路径。
+
+## 初始化
+
+在本目录执行：
+
+```powershell
+pwsh -File .\initialize-container-runtime.ps1 `
+  -PostgreSqlPassword "请替换为长随机数据库密码" `
+  -BootstrapToken "请替换为另一段至少24位的随机首次部署令牌"
+docker compose -f .\docker-compose.yml --env-file .\.env up -d --build
+```
+
+初始化脚本会检查当前宿主机接口、路由表和已存在的 Docker 网络，从候选私有地址中自动选择不重叠的紧凑 `/28`，并把 Nginx 的可信代理地址一起写入 `.env`。仓库不再提供 `172.30.238.0/24` 这类固定默认值；新部署会按现场网络自动生成，已存在的 `.env` 默认保持稳定。需要重新探测时增加 `-RegenerateNetwork`。企业 VPN 使用大范围路由、或现场有特殊网络规划时，可以显式指定 `/24` 至 `/28` 网段和代理地址：
+
+```powershell
+pwsh -File .\initialize-container-runtime.ps1 `
+  -PostgreSqlPassword "请替换为长随机数据库密码" `
+  -BootstrapToken "请替换为另一段至少24位的随机首次部署令牌" `
+  -ContainerSubnet "10.238.42.0/28" `
+  -ReverseProxyIp "10.238.42.10"
+```
+
+显式网段与已发现的本机/Docker 网络重叠时，脚本默认拒绝继续；只有网络管理员确认隔离且明确传入 `-AllowNetworkOverlap` 才会放行。Compose 不再在缺少这两个变量时静默回退到某个固定网段。`/28` 足够容纳当前 Web、API、PostgreSQL 以及后续少量副本；如果现场要扩展更多容器，可以显式改用 `/27` 或 `/24`（脚本会拒绝宽于 `/24` 的网络）。
+
+初始化脚本会把 HTTPS 端口和证书挂载路径写入 `.env`，方便以后启用 overlay；这不会把内网 HTTP 部署变成必需 TLS。首次使用 HSTS 前必须确认域名、证书续期和全部子域均已具备 HTTPS，不能用临时自签证书直接面向正式用户。
 
 如果镜像已由 GitHub Actions 发布到 GHCR，则在 `.env` 设置 `EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/你的账号`，改用：
 
@@ -35,7 +77,7 @@ docker compose -f .\docker-compose.ghcr.yml --env-file .\.env up -d
 
 API 启动时仍要求 `.env` 中保留至少 24 位的 `EXPORTDOCMANAGER_BOOTSTRAP_TOKEN`；数据库已有用户后，普通登录无需再次填写该令牌，可以按企业密钥轮换制度更换 `.env` 中的值并重启 API。不要把令牌复用为数据库密码或管理员密码。
 
-默认容器网段为 `172.30.238.0/24`，Nginx 地址为 `172.30.238.10`。如果该网段与现有 Docker、VPN 或局域网路由冲突，应在 `.env` 同时修改 `EXPORTDOCMANAGER_CONTAINER_SUBNET` 和 `EXPORTDOCMANAGER_REVERSE_PROXY_IP`，并确保代理地址属于所选网段。公网 HTTPS/CDN 代理位于内置 Nginx 前方时，还应把它实际连接 Nginx 的明确来源 IP 写入 `EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES`；多个地址用分号分隔。API 会按已配置代理数量限制转发链，并逐跳核对可信地址，不接受任意长度的客户端伪造链。不要填写整个不受控网段。非 Compose 反向代理部署可通过 `EXPORTDOCMANAGER_TRUSTED_PROXIES` 配置一个或多个明确代理 IP（逗号或分号分隔，不接受主机名和 CIDR）。
+容器网段和 Nginx 地址由初始化脚本写入 `.env`，必须是专用、彼此匹配的 IPv4 `/24` 至 `/28` 与地址；它们只存在于 Docker 内部，不是公司局域网对外的服务器地址。公网 HTTPS/CDN 代理位于内置 Nginx 前方时，还应把它实际连接 Nginx 的明确来源 IP 写入 `EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES`；多个地址用分号分隔。API 会按已配置代理数量限制转发链，并逐跳核对可信地址，不接受任意长度的客户端伪造链。不要填写整个不受控网段。非 Compose 反向代理部署可通过 `EXPORTDOCMANAGER_TRUSTED_PROXIES` 配置一个或多个明确代理 IP（逗号或分号分隔，不接受主机名和 CIDR）。
 
 敏感配置默认由运行目录 `runtime/api-data/Security/local-master-key.bin` 中自动生成的本地主密钥保护，不写系统盘固定目录。也可以在 `.env` 设置 `EXPORTDOCMANAGER_MASTER_KEY`（32 字节 Base64 或 64 位十六进制）；一旦使用环境主密钥，必须长期安全备份并在迁移时一并提供，随意更换会导致既有密文无法解密。
 

@@ -22,8 +22,12 @@ namespace ExportDocManager.Services.Infrastructure
         public async Task<DashboardSnapshot> GetDashboardAsync(CancellationToken cancellationToken = default)
         {
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            var now = DateTime.Now;
-            var startOfMonth = new DateTime(now.Year, now.Month, 1);
+            // PostgreSQL maps these columns to timestamp with time zone.  Keep
+            // query boundaries explicitly UTC so Npgsql never receives an
+            // Unspecified value, while the displayed month remains the
+            // server's current calendar month.
+            var now = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Utc);
+            var startOfMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
             var endOfMonth = startOfMonth.AddMonths(1);
             var scopedInvoices = _businessDataAccessScope.ApplyInvoiceScope(context.Invoices.AsNoTracking());
             var activeInvoices = BuildPreferredInvoiceQuery(

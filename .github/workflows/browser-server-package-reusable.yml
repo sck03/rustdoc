@@ -150,8 +150,10 @@ jobs:
           Copy-Item -Path "apps/export-doc-web/dist/*" -Destination $webRoot -Recurse -Force
           Copy-Item -LiteralPath "deploy/browser-server/appsettings.json" -Destination $packageRoot -Force
           if ('${{ inputs.platform }}' -eq 'windows') {
+            Copy-Item -LiteralPath "deploy/browser-server/initialize-windows.ps1" -Destination $packageRoot -Force
             Copy-Item -LiteralPath "deploy/browser-server/start-windows.ps1" -Destination $packageRoot -Force
           } else {
+            Copy-Item -LiteralPath "deploy/browser-server/initialize-linux.sh" -Destination $packageRoot -Force
             Copy-Item -LiteralPath "deploy/browser-server/start-linux.sh" -Destination $packageRoot -Force
           }
           $ocrRoot = Join-Path $packageRoot "sidecar/ocr"
@@ -181,7 +183,30 @@ jobs:
                 throw "Linux PP-OCRv6 package file was not included: $_"
               }
             }
-            & chmod +x -- (Join-Path $packageRoot "ExportDocManager.Api") (Join-Path $packageRoot "start-linux.sh") $browser.FullName (Join-Path $ocrRoot "exportdoc-ocr") (Join-Path $toolsRoot "exportdoc-excel-analyzer")
+            & chmod +x -- (Join-Path $packageRoot "ExportDocManager.Api") (Join-Path $packageRoot "initialize-linux.sh") (Join-Path $packageRoot "start-linux.sh") $browser.FullName (Join-Path $ocrRoot "exportdoc-ocr") (Join-Path $toolsRoot "exportdoc-excel-analyzer")
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Validate browser server deployment scripts
+        shell: pwsh
+        run: |
+          $packageRoot = Join-Path $env:GITHUB_WORKSPACE "artifacts/browser-server/package"
+          if ('${{ inputs.platform }}' -eq 'windows') {
+            foreach ($scriptName in @('initialize-windows.ps1', 'start-windows.ps1')) {
+              $tokens = $null
+              $parseErrors = $null
+              [void][System.Management.Automation.Language.Parser]::ParseFile(
+                (Join-Path $packageRoot $scriptName),
+                [ref]$tokens,
+                [ref]$parseErrors)
+              if ($parseErrors.Count -gt 0) {
+                throw "$scriptName PowerShell syntax validation failed: $($parseErrors.Message -join '; ')"
+              }
+            }
+          } else {
+            & sh -n (Join-Path $packageRoot 'initialize-linux.sh')
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            & sh -n (Join-Path $packageRoot 'start-linux.sh')
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 

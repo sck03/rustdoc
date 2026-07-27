@@ -23,6 +23,18 @@ namespace ExportDocManager.Api.Tests
                 Assert.Equal("ok", readinessDocument.RootElement.GetProperty("status").GetString());
             }
 
+            using (var readinessHeadRequest = new HttpRequestMessage(HttpMethod.Head, "/readyz"))
+            using (var readinessHeadResponse = await anonymousClient.SendAsync(readinessHeadRequest))
+            {
+                Assert.Equal(HttpStatusCode.OK, readinessHeadResponse.StatusCode);
+            }
+
+            using (var readinessPostRequest = new HttpRequestMessage(HttpMethod.Post, "/readyz"))
+            using (var readinessPostResponse = await anonymousClient.SendAsync(readinessPostRequest))
+            {
+                Assert.Equal(HttpStatusCode.MethodNotAllowed, readinessPostResponse.StatusCode);
+            }
+
             var healthResponse = await anonymousClient.GetAsync("/healthz");
             Assert.Equal(HttpStatusCode.OK, healthResponse.StatusCode);
             using (var healthDocument = JsonDocument.Parse(await healthResponse.Content.ReadAsStringAsync()))

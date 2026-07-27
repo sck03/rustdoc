@@ -2,6 +2,7 @@ using System;
 using ExportDocManager.Models;
 using Microsoft.EntityFrameworkCore;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.DataAccess
 {
@@ -65,6 +66,50 @@ namespace ExportDocManager.DataAccess
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
         {
+        }
+
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            NormalizePostgreSqlDateTimes();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override Task<int> SaveChangesAsync(
+            bool acceptAllChangesOnSuccess,
+            CancellationToken cancellationToken = default)
+        {
+            NormalizePostgreSqlDateTimes();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        private void NormalizePostgreSqlDateTimes()
+        {
+            if (!Database.IsNpgsql())
+            {
+                return;
+            }
+
+            foreach (var entry in ChangeTracker.Entries())
+            {
+                if (entry.State is not (EntityState.Added or EntityState.Modified))
+                {
+                    continue;
+                }
+
+                foreach (var property in entry.Properties)
+                {
+                    if (property.Metadata.ClrType == typeof(DateTime) &&
+                        property.CurrentValue is DateTime timestamp)
+                    {
+                        property.CurrentValue = DateTimeValueHelper.NormalizeUtcTimestamp(timestamp);
+                    }
+                    else if (property.Metadata.ClrType == typeof(DateTime?) &&
+                             property.CurrentValue is DateTime nullableTimestamp)
+                    {
+                        property.CurrentValue = DateTimeValueHelper.NormalizeUtcTimestamp(nullableTimestamp);
+                    }
+                }
+            }
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

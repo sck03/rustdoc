@@ -19,7 +19,6 @@ services:
       retries: 20
 
   api:
-    init: true
     image: ${EXPORTDOCMANAGER_IMAGE_NAMESPACE:?请设置 EXPORTDOCMANAGER_IMAGE_NAMESPACE}/export-doc-manager-api:${EXPORTDOCMANAGER_IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
@@ -30,7 +29,7 @@ services:
       EXPORTDOCMANAGER_PRODUCT_EDITION: Full
       EXPORTDOCMANAGER_DATA_ROOT: /runtime-data
       EXPORTDOCMANAGER_ALLOWED_ORIGINS: ${EXPORTDOCMANAGER_ALLOWED_ORIGINS:-}
-      EXPORTDOCMANAGER_TRUSTED_PROXIES: "${EXPORTDOCMANAGER_REVERSE_PROXY_IP:-172.30.238.10};${EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES:-}"
+      EXPORTDOCMANAGER_TRUSTED_PROXIES: "${EXPORTDOCMANAGER_REVERSE_PROXY_IP:?请先运行 initialize-container-runtime.ps1 或在 .env 中设置 EXPORTDOCMANAGER_REVERSE_PROXY_IP};${EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES:-}"
       TZ: ${TZ:-Asia/Shanghai}
       EXPORTDOCMANAGER_BROWSER_GLOBAL_CONCURRENCY: ${EXPORTDOCMANAGER_BROWSER_GLOBAL_CONCURRENCY:-2}
       EXPORTDOCMANAGER_BROWSER_PDF_CONCURRENCY: ${EXPORTDOCMANAGER_BROWSER_PDF_CONCURRENCY:-2}
@@ -44,9 +43,9 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent --show-error --max-time 3 http://127.0.0.1:5188/readyz >/dev/null"]
-      interval: 5s
-      timeout: 4s
-      retries: 12
+      interval: 3s
+      timeout: 2s
+      retries: 10
       start_period: 10s
     expose:
       - "5188"
@@ -61,10 +60,10 @@ services:
         condition: service_healthy
     networks:
       default:
-        ipv4_address: ${EXPORTDOCMANAGER_REVERSE_PROXY_IP:-172.30.238.10}
+        ipv4_address: ${EXPORTDOCMANAGER_REVERSE_PROXY_IP:?请先运行 initialize-container-runtime.ps1 或在 .env 中设置 EXPORTDOCMANAGER_REVERSE_PROXY_IP}
 
 networks:
   default:
     ipam:
       config:
-        - subnet: ${EXPORTDOCMANAGER_CONTAINER_SUBNET:-172.30.238.0/24}
+        - subnet: ${EXPORTDOCMANAGER_CONTAINER_SUBNET:?请先运行 initialize-container-runtime.ps1 或在 .env 中设置 EXPORTDOCMANAGER_CONTAINER_SUBNET}
