@@ -1,8 +1,8 @@
 import { Eye, Printer, RefreshCw } from "lucide-react";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
-type Props={canPreview:boolean;canPrint:boolean;canRefreshTemplates:boolean;errorMessage:string|null;hasSavedInvoice:boolean;hasUnsavedDraftChanges:boolean;isBusy:boolean;jobId:string|null;previewStoragePolicy:string|null;statusMessage:string|null;templateMessage:string|null;onPreview():void;onPrint():void;onRefresh():void};
-export function InvoiceReportPreviewHeader(p:Props){const {canPreview,errorMessage,hasSavedInvoice,hasUnsavedDraftChanges,isBusy,jobId:lastCreatedJobId,previewStoragePolicy,statusMessage,templateMessage}=p;const canPrintPreview=p.canPrint;return (<>
+type Props={canPreview:boolean;canPrint:boolean;canRefreshTemplates:boolean;errorMessage:string|null;hasSavedInvoice:boolean;hasUnsavedDraftChanges:boolean;isBusy:boolean;jobId:string|null;statusMessage:string|null;templateMessage:string|null;onPreview():void;onPrint():void;onRefresh():void};
+export function InvoiceReportPreviewHeader(p:Props){const {canPreview,errorMessage,hasSavedInvoice,hasUnsavedDraftChanges,isBusy,jobId:lastCreatedJobId,statusMessage,templateMessage}=p;const canPrintPreview=p.canPrint;return (<>
       <div className="section-header">
         <h2>报表预览</h2>
         <div className="toolbar-actions">
@@ -47,6 +47,4 @@ export function InvoiceReportPreviewHeader(p:Props){const {canPreview,errorMessa
       {hasSavedInvoice && hasUnsavedDraftChanges ? (
         <InlineNotice tone="info">当前发票有未保存修改。HTML 预览使用当前草稿；PDF、托单、单据包和邮件请先保存后再生成。</InlineNotice>
       ) : null}
-      {previewStoragePolicy ? <InlineNotice tone="info">{previewStoragePolicy}</InlineNotice> : null}
-
 </>);}

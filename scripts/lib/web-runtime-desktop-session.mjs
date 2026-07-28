@@ -77,7 +77,7 @@ function buildMockTauriBootstrap(options) {
           return result;
         }
 
-        if (command === "request_app_exit" || command === "select_report_template_file") {
+        if (command === "request_app_exit") {
           return null;
         }
 

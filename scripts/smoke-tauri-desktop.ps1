@@ -952,13 +952,15 @@ $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 $vite = $null
 $tauri = $null
 $desktopAccessToken = [Convert]::ToHexString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLowerInvariant()
-$runtimePathsConfigPath = Join-Path $resolvedAppRoot "runtime-paths.json"
+$runtimeConfigRoot = Join-Path $resolvedDataRoot "RuntimeConfig"
+$runtimePathsConfigPath = Join-Path $runtimeConfigRoot "runtime-paths.json"
 $runtimePathsConfigBackupPath = Join-Path $logRoot ("runtime-paths.json.smoke-backup-{0}" -f $PID)
 $runtimePathsConfigExisted = $false
 $usesRuntimePathsConfig = $UseRuntimePathsConfig -or $UseExistingRuntimePathsConfig
 
 try {
     if ($UseRuntimePathsConfig) {
+        New-Item -ItemType Directory -Path $runtimeConfigRoot -Force | Out-Null
         if (Test-Path -LiteralPath $runtimePathsConfigBackupPath -PathType Leaf) {
             Remove-Item -LiteralPath $runtimePathsConfigBackupPath -Force
         }
@@ -1004,6 +1006,9 @@ try {
     if (-not $usesRuntimePathsConfig) {
         $tauriArgumentList += @("--data-root", $resolvedDataRoot)
         $tauriEnvironment["EXPORTDOCMANAGER_DATA_ROOT"] = $resolvedDataRoot
+    }
+    if ($usesRuntimePathsConfig) {
+        $tauriEnvironment["EXPORTDOCMANAGER_RUNTIME_CONFIG_ROOT"] = $runtimeConfigRoot
     }
 
     $tauri = Start-LoggedProcess `

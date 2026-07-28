@@ -2801,10 +2801,17 @@ namespace ExportDocManager.Api.Tests
                 Assert.Contains(response.RuntimePaths, item =>
                     item.Key == "template-root" &&
                     item.StorageClass == "program-resource" &&
-                    item.AccessMode == "managed" &&
+                    item.AccessMode == "read-only" &&
                     item.Requirement == ApiRuntimePathRequirement.Feature &&
                     item.Path == Path.Combine(appRoot, "Templates") &&
                     !item.Exists);
+                Assert.Contains(response.RuntimePaths, item =>
+                    item.Key == "user-template-root" &&
+                    item.StorageClass == "runtime-data" &&
+                    item.AccessMode == "read-write" &&
+                    item.Requirement == ApiRuntimePathRequirement.Feature &&
+                    item.Path == Path.Combine(dataRoot, "Templates") &&
+                    item.Exists);
                 Assert.Contains(response.RuntimePaths, item =>
                     item.Key == "tool-root" &&
                     item.Requirement == ApiRuntimePathRequirement.Optional &&
@@ -2835,10 +2842,8 @@ namespace ExportDocManager.Api.Tests
                     item.Key == "postgresql-tools" &&
                     item.Requirement == ApiRuntimePathRequirement.Optional &&
                     !item.Ready);
-                Assert.Contains("appsettings.json", response.StoragePolicy, StringComparison.Ordinal);
                 Assert.Contains("Templates/Resources/Browsers/Tools/OcrModels", response.StoragePolicy, StringComparison.Ordinal);
-                Assert.Contains("路径只解析、不因健康检查自动创建", response.StoragePolicy, StringComparison.Ordinal);
-                Assert.Contains("数据库、日志", response.StoragePolicy, StringComparison.Ordinal);
+                Assert.Contains("设置、用户模板、数据库、日志", response.StoragePolicy, StringComparison.Ordinal);
                 Assert.Contains("App_Data", response.StoragePolicy, StringComparison.Ordinal);
                 Assert.Contains("--data-root", response.StoragePolicy, StringComparison.Ordinal);
             }

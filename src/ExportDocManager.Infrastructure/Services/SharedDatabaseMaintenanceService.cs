@@ -969,7 +969,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO {QuoteId
 
         private JsonNode ReadRedactedSettings()
         {
-            string settingsPath = Path.Combine(_pathProvider.AppRoot, "appsettings.json");
+            string settingsPath = Path.Combine(_pathProvider.ConfigRoot, "appsettings.json");
             if (!File.Exists(settingsPath))
             {
                 return new JsonObject

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { ClipboardPaste, Copy, FileImage, Play, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import { type ApiOcrRecognizeImageResponse, ExportDocManagerApiClient } from "../../api/index.ts";
+import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { isDesktopBridgeAvailable, readOcrImageFileAsDataUrl, selectOcrImageFile } from "../../desktop/desktopBridge.ts";
 import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
@@ -40,6 +41,13 @@ const MaxZoom = 10;
 export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) {
   const ocrPermission = useModulePermission("document.ocr");
   const desktopAvailable = isDesktopBridgeAvailable();
+  const healthQuery = useQuery({
+    queryKey: queryKeys.health(),
+    queryFn: () => client.getHealth(),
+  });
+  const ocrRuntime = healthQuery.data?.runtimeDependencies.find((item) => item.key === "ocr-runtime") ?? null;
+  const ocrRuntimeUnavailable = Boolean(ocrRuntime && !ocrRuntime.ready);
+  const canUseOcr = ocrPermission.canOperate && !ocrRuntimeUnavailable;
   const previewViewportRef = useRef<HTMLDivElement | null>(null);
   const previewDragRef = useRef<PreviewDragState | null>(null);
   const [imagePath, setImagePath] = useState("");
@@ -101,7 +109,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
 
   useEffect(() => {
     function handlePaste(event: ClipboardEvent) {
-      if (!ocrPermission.canOperate) return;
+      if (!canUseOcr) return;
       const items = Array.from(event.clipboardData?.items ?? []);
       const imageItem = items.find((item) => item.type.startsWith("image/"));
       const file = imageItem?.getAsFile();
@@ -115,10 +123,10 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [ocrPermission.canOperate]);
+  }, [canUseOcr]);
 
   const isBusy = recognizeMutation.isPending;
-  const canRecognize = ocrPermission.canOperate && Boolean(imageSource?.kind === "content" || imagePath.trim()) && !isBusy;
+  const canRecognize = canUseOcr && Boolean(imageSource?.kind === "content" || imagePath.trim()) && !isBusy;
   const canCopy = Boolean(recognizedText.trim());
   const lines = result?.lines ?? [];
   const pathSource = imageSource?.kind === "path" ? imageSource.filePath : "";
@@ -330,14 +338,14 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
         <PathField
           label="图片路径"
           value={imagePath}
-          disabled={isBusy || !ocrPermission.canOperate}
+          disabled={isBusy || !canUseOcr}
           onChange={(value) => {
             void usePathImage(value, false);
           }}
           actions={
             <>
               {desktopAvailable ? (
-                <DesktopIconButton title="选择 OCR 图片" disabled={isBusy || !ocrPermission.canOperate} onClick={pickImage}>
+                <DesktopIconButton title="选择 OCR 图片" disabled={isBusy || !canUseOcr} onClick={pickImage}>
                   <FileImage size={15} aria-hidden="true" />
                 </DesktopIconButton>
               ) : null}
@@ -346,7 +354,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
           }
         />
         <div className="toolbar-actions smart-ocr-action-bar">
-          <button className="icon-button" type="button" title="粘贴图片" aria-label="粘贴图片" disabled={isBusy || !ocrPermission.canOperate} onClick={() => void pasteImageFromClipboard()}>
+          <button className="icon-button" type="button" title="粘贴图片" aria-label="粘贴图片" disabled={isBusy || !canUseOcr} onClick={() => void pasteImageFromClipboard()}>
             <ClipboardPaste size={18} aria-hidden="true" />
           </button>
           <button className="icon-button" type="button" title="复制文本" aria-label="复制文本" disabled={!canCopy} onClick={() => void copyText()}>
@@ -359,6 +367,11 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
       </div>
 
       {!ocrPermission.canOperate ? <PermissionNotice>当前模板仅允许进入 OCR 模块，图片载入和识别操作已禁用。</PermissionNotice> : null}
+      {ocrPermission.canOperate && ocrRuntimeUnavailable ? (
+        <InlineNotice tone="warning" title="智能识别暂不可用">
+          {readOcrRuntimeUnavailableMessage(ocrRuntime?.status)}
+        </InlineNotice>
+      ) : null}
       {message ? <InlineNotice tone={messageType === "error" ? "error" : "success"}>{message}</InlineNotice> : null}
 
       <div className="smart-ocr-layout">
@@ -474,4 +487,17 @@ function extractBase64Payload(dataUrl: string) {
   }
 
   return dataUrl.slice(separatorIndex + 1);
+}
+
+function readOcrRuntimeUnavailableMessage(status?: string) {
+  switch (status) {
+    case "disabled":
+      return "智能识别功能已在当前安装中关闭。如需使用，请联系系统管理员启用。";
+    case "incomplete":
+      return "智能识别组件安装不完整，请联系系统管理员修复后再试。";
+    case "unsupported":
+      return "当前系统平台暂不支持智能识别，其它业务功能不受影响。";
+    default:
+      return "当前安装未包含智能识别组件，其它业务功能不受影响。";
+  }
 }

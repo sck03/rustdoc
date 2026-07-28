@@ -102,37 +102,37 @@ export function LoginPage({
 
           {!isDesktopRuntime ? (
             <details className="login-connection-settings">
-              <summary>服务器连接设置</summary>
+              <summary>高级连接选项</summary>
               <label className="login-field">
-                <span>API 地址</span>
+                <span>服务器地址</span>
                 <span className="login-input-shell">
                   <Server size={17} aria-hidden="true" />
                   <input
-                    aria-label="服务器 API 地址"
+                    aria-label="业务服务器地址"
                     value={apiBaseUrl}
                     onChange={(event) => onApiBaseUrlChange(event.target.value)}
                     spellCheck={false}
                   />
                 </span>
               </label>
-              <small>仅在无法连接服务器或管理员要求切换服务地址时修改。</small>
+              <small>通常无需修改；仅在管理员要求切换业务服务器时填写。</small>
               <label className="login-field">
-                <span>首次部署令牌</span>
+                <span>首次启用口令</span>
                 <span className="login-input-shell">
                   <ShieldCheck size={17} aria-hidden="true" />
                   <input
-                    aria-label="首次部署令牌"
+                    aria-label="首次启用口令"
                     value={bootstrapToken}
                     onChange={(event) => onBootstrapTokenChange(event.target.value)}
                     type="password"
                     autoComplete="off"
                     maxLength={512}
-                    placeholder="仅网络版空库首次建立管理员时填写"
+                    placeholder="仅首次启用系统时填写"
                     spellCheck={false}
                   />
                 </span>
               </label>
-              <small>由部署管理员提供，至少 24 个字符；仅随本次登录发送，登录成功后立即从页面内存清除，不会写入浏览器存储。</small>
+              <small>由系统部署人员提供，仅首次建立管理员账号时使用；登录成功后会立即清除。</small>
             </details>
           ) : null}
         </form>

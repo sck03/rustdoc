@@ -9,7 +9,7 @@ namespace ExportDocManager.Api.Hosting
         private const string BackupStoragePolicy =
             "数据库备份默认写入运行数据根 Backups/，只枚举和还原当前数据库对应的备份包；不读取发票/付款业务表，不生成导出目录，不写系统用户配置目录、全局程序数据目录或系统 C 盘默认落点。";
         private const string CloudBackupStoragePolicy =
-            "WebDAV 云备份只读取程序根 appsettings.json 中已保存的 WebDAV 配置，并只上传运行数据根 Backups/ 中当前数据库对应的最新 ZIP 备份；不接受任意本地路径，不读取发票/报关业务表，也不读取付款/报销业务表。";
+            "WebDAV 云备份只读取运行数据根 Config/appsettings.json 中已保存的 WebDAV 配置，并只上传运行数据根 Backups/ 中当前数据库对应的最新 ZIP 备份；不接受任意本地路径，不读取发票/报关业务表，也不读取付款/报销业务表。";
 
         private static void MapBackupEndpoints(this IEndpointRouteBuilder endpoints)
         {

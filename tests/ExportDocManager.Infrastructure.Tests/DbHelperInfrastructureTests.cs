@@ -45,7 +45,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 var provider = new RuntimeAppPathProvider(appRoot);
                 DbHelper.ConfigurePathProvider(provider);
 
-                var settingsPath = Path.Combine(appRoot, "appsettings.json");
+                var settingsPath = Path.Combine(provider.ConfigRoot, "appsettings.json");
                 var json = JsonSerializer.Serialize(new
                 {
                     System = new

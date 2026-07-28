@@ -98,8 +98,9 @@ case "$DATA_ROOT" in
 esac
 mkdir -p "$DATA_ROOT"
 DATA_ROOT=$(CDPATH= cd -- "$DATA_ROOT" && pwd)
-mkdir -p "$DATA_ROOT/Security"
-if [ "$FORCE" -ne 1 ] && [ -f "$ROOT/appsettings.json" ] && ! grep -q 'CHANGE_ME_BEFORE_START' "$ROOT/appsettings.json"; then
+mkdir -p "$DATA_ROOT/Security" "$DATA_ROOT/Config"
+CONFIG_FILE="$DATA_ROOT/Config/appsettings.json"
+if [ "$FORCE" -ne 1 ] && [ -f "$CONFIG_FILE" ] && ! grep -q 'CHANGE_ME_BEFORE_START' "$CONFIG_FILE"; then
   echo "已存在有效 appsettings.json；如确认覆盖配置，请增加 --force。" >&2
   exit 1
 fi
@@ -108,7 +109,7 @@ if [ "$FORCE" -ne 1 ] && [ -f "$DATA_ROOT/Security/browser-server.env" ]; then
   exit 1
 fi
 
-cat > "$ROOT/appsettings.json" <<EOF
+cat > "$CONFIG_FILE" <<EOF
 {
   "System": {
     "DatabaseProvider": "PostgreSQL",
@@ -122,7 +123,7 @@ cat > "$ROOT/appsettings.json" <<EOF
   }
 }
 EOF
-chmod 600 "$ROOT/appsettings.json"
+chmod 600 "$CONFIG_FILE"
 
 ENV_FILE="$DATA_ROOT/Security/browser-server.env"
 {
@@ -139,7 +140,7 @@ chmod 600 "$ENV_FILE"
 printf '%s\n' "$ENV_FILE" > "$ROOT/browser-server.env.path"
 
 echo "浏览器服务器配置已完成。"
-echo "数据库配置: $ROOT/appsettings.json"
+echo "数据库配置: $CONFIG_FILE"
 echo "运行环境（含首次部署令牌）: $ENV_FILE"
 echo "数据根: $DATA_ROOT"
 echo "监听: $URLS"

@@ -210,7 +210,7 @@ export function getWorkspaceContext(pathname: string): WorkspaceContext {
     return createWorkspaceContext("系统维护", "授权注册", "查看设备机器码、试用状态与离线授权信息", KeyRound);
   }
   if (pathname.startsWith("/system/about")) {
-    return createWorkspaceContext("系统维护", "关于系统", "查看产品版本、运行环境与存储策略", Info);
+    return createWorkspaceContext("系统维护", "关于系统", "查看产品版本、许可与技术支持信息", Info);
   }
   if (pathname.startsWith("/query")) {
     return createWorkspaceContext("单证业务", "单据查询", "按日期、客户和关键字检索并导出业务数据", Search);

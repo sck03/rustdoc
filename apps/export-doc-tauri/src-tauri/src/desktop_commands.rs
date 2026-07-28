@@ -206,17 +206,6 @@ pub(crate) fn select_report_template_package_file() -> Result<Option<String>, St
 }
 
 #[tauri::command]
-pub(crate) fn select_report_template_file() -> Result<Option<String>, String> {
-    Ok(pick_file(
-        "选择报表模板文件",
-        &[
-            ("报表模板", &["html", "htm", "scriban", "txt"]),
-            ("全部文件", &["*"]),
-        ],
-    ))
-}
-
-#[tauri::command]
 pub(crate) fn select_save_package_path(
     default_file_name: Option<String>,
     default_directory: Option<String>,

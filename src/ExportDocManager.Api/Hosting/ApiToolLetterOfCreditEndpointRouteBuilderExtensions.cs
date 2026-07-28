@@ -8,7 +8,7 @@ namespace ExportDocManager.Api.Hosting
     public static partial class ApiEndpointRouteBuilderExtensions
     {
         private const string LetterOfCreditReviewStoragePolicy =
-            "信用证 AI 合规审查只使用当前请求中的发票/信用证草稿字段和程序根 appsettings.json 中的 AI 配置；结果只在响应和页面状态中返回，不写数据库、不生成文件、不创建默认输出目录、不读取同号另一口径发票，也不读取付款/报销单据或系统 C 盘落点。";
+            "信用证 AI 合规审查只使用当前请求中的发票/信用证草稿字段和运行数据根 Config/appsettings.json 中的 AI 配置；结果只在响应和页面状态中返回，不写数据库、不生成文件、不创建默认输出目录、不读取同号另一口径发票，也不读取付款/报销单据或系统 C 盘落点。";
 
         private static void MapLetterOfCreditToolEndpoints(this IEndpointRouteBuilder endpoints)
         {

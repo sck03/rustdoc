@@ -423,16 +423,9 @@ export function InvoiceExtendedFieldsPanel({
           disabled={!isEditable}
           onChange={(value) => onChange({ customsBrokerCode: value })}
         />
-        <TextField label="备用1" value={invoice.spare1 ?? ""} disabled={!isEditable} onChange={(value) => onChange({ spare1: value })} />
-        <TextField label="备用2" value={invoice.spare2 ?? ""} disabled={!isEditable} onChange={(value) => onChange({ spare2: value })} />
-        <TextField label="备用3" value={invoice.spare3 ?? ""} disabled={!isEditable} onChange={(value) => onChange({ spare3: value })} />
-        <TextAreaField
-          className="field-grid-span-all invoice-custom-fields-json"
-          label="扩展字段 JSON"
-          value={invoice.customFieldsJson ?? ""}
-          disabled={!isEditable}
-          onChange={(value) => onChange({ customFieldsJson: value })}
-        />
+        <TextField label="自定义备注 1" value={invoice.spare1 ?? ""} disabled={!isEditable} onChange={(value) => onChange({ spare1: value })} />
+        <TextField label="自定义备注 2" value={invoice.spare2 ?? ""} disabled={!isEditable} onChange={(value) => onChange({ spare2: value })} />
+        <TextField label="自定义备注 3" value={invoice.spare3 ?? ""} disabled={!isEditable} onChange={(value) => onChange({ spare3: value })} />
       </div>
     </section>
   );

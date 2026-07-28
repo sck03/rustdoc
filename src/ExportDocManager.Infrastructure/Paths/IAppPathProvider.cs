@@ -5,7 +5,10 @@ namespace ExportDocManager.Services.Infrastructure
         string AppRoot { get; }
         string DataRoot { get; }
         string DatabaseRoot { get; }
+        /// <summary>Bundled report templates shipped with the application. This location is read-only at runtime.</summary>
         string TemplateRoot { get; }
+        /// <summary>User-created and imported report templates stored with runtime data.</summary>
+        string UserTemplateRoot { get; }
         string ResourceRoot { get; }
         string BrowserRoot { get; }
         string ToolRoot { get; }

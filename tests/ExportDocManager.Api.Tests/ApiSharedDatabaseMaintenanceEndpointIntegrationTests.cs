@@ -137,7 +137,7 @@ namespace ExportDocManager.Api.Tests
             Directory.CreateDirectory(Path.Combine(harness.DataRoot, "Logs"));
             await File.WriteAllTextAsync(Path.Combine(harness.DataRoot, "Logs", "crash-test.log"), "sample crash diagnostic");
             await File.WriteAllTextAsync(
-                Path.Combine(harness.AppRoot, "appsettings.json"),
+                Path.Combine(harness.DataRoot, "Config", "appsettings.json"),
                 """
                 {
                   "System": {

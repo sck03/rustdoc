@@ -8,7 +8,7 @@ namespace ExportDocManager.Api.Hosting
     public static partial class ApiEndpointRouteBuilderExtensions
     {
         private const string EmailToolStoragePolicy =
-            "邮件工具只读取程序根 appsettings.json 中的 SMTP 配置；任意本地附件路径只允许带桌面可信令牌的 Tauri 请求使用，局域网/容器浏览器不得读取服务器文件路径。发送过程不创建默认附件目录、不写数据库，也不把发票/报关数据域与付款/报销数据域按编号合并。";
+            "邮件工具只读取运行数据根 Config/appsettings.json 中的 SMTP 配置；任意本地附件路径只允许带桌面可信令牌的 Tauri 请求使用，局域网/容器浏览器不得读取服务器文件路径。发送过程不创建默认附件目录、不写数据库，也不把发票/报关数据域与付款/报销数据域按编号合并。";
 
         private const string EmailServerSuggestionStoragePolicy =
             "邮件服务器配置推断只在内存中返回建议，不保存 appsettings.json、不写数据库、不创建目录。";

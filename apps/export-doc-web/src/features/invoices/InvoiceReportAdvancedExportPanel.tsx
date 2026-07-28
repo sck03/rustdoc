@@ -117,11 +117,9 @@ export function InvoiceReportAdvancedExportPanel({
 
         <InvoiceDocumentPackageConfig
           canEdit={canEditPackageConfig}
-          desktopAvailable={desktopAvailable}
           draft={documentPackage.configDraft}
           templateOptions={documentPackage.templateOptions}
           onAdd={documentPackage.addConfigItem}
-          onChooseTemplate={documentPackage.chooseConfigTemplateFile}
           onMove={documentPackage.moveConfigItem}
           onRemove={documentPackage.removeConfigItem}
           onUpdate={documentPackage.updateConfig}

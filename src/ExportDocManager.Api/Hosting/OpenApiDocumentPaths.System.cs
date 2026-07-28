@@ -401,7 +401,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["200"] = new
                                 {
-                                    description = "Settings were saved to the program root appsettings.json.",
+                                    description = "Settings were saved to the runtime data Config/appsettings.json.",
                                     content = JsonContent("ApiSettingsSaveResponse")
                                 },
                                 ["400"] = new { description = "Invalid settings payload." },

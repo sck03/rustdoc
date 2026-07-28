@@ -114,7 +114,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["reportType"] = StringProperty("Report type: ExportDocument or PaymentVoucher."),
                                 ["displayName"] = StringProperty("Template display name."),
-                                ["templatePath"] = StringProperty("Resolved template path under program root Templates or an explicit configured path."),
+                                ["templatePath"] = StringProperty("Resolved path from the managed built-in or user template catalog."),
                                 ["withSealDefault"] = new { type = "boolean" }
                             }
                         },
@@ -181,7 +181,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["reportType"] = StringProperty("Report type: ExportDocument or PaymentVoucher."),
                                 ["displayName"] = StringProperty("Template display name."),
-                                ["templatePath"] = StringProperty("Resolved template path under program root Templates or an explicit configured path."),
+                                ["templatePath"] = StringProperty("Resolved path from the managed built-in or user template catalog."),
                                 ["withSealDefault"] = new { type = "boolean" },
                                 ["content"] = StringProperty("Editable HTML/Scriban template content."),
                                 ["storagePolicy"] = StringProperty("Runtime storage policy for report templates.")
@@ -230,7 +230,7 @@ namespace ExportDocManager.Api.Hosting
                             properties = new Dictionary<string, object>
                             {
                                 ["reportType"] = StringProperty("Report type: ExportDocument or PaymentVoucher."),
-                                ["templatePath"] = StringProperty("Target template path under program root Templates or an explicit configured path."),
+                                ["templatePath"] = StringProperty("Target path under the runtime-data user template directory for the selected report type."),
                                 ["content"] = StringProperty("HTML/Scriban template content to save atomically.")
                             }
                         },
@@ -252,7 +252,7 @@ namespace ExportDocManager.Api.Hosting
                             properties = new Dictionary<string, object>
                             {
                                 ["reportType"] = StringProperty("Report type: ExportDocument or PaymentVoucher."),
-                                ["templatePath"] = StringProperty("Current template path under program root Templates."),
+                                ["templatePath"] = StringProperty("Current path from the managed built-in or user template catalog."),
                                 ["newTemplatePath"] = StringProperty("New template file name or path under the same report type directory.")
                             }
                         },
@@ -326,7 +326,7 @@ namespace ExportDocManager.Api.Hosting
                             properties = new Dictionary<string, object>
                             {
                                 ["reportType"] = StringProperty("Report type. Invoice preview supports ExportDocument; payment/reimbursement preview supports PaymentVoucher."),
-                                ["templatePath"] = StringProperty("Optional explicit template path. When omitted, the sidecar uses Templates under the program root."),
+                                ["templatePath"] = StringProperty("Optional managed export-document template path. When omitted, the default Export template is used."),
                                 ["withSeal"] = new { type = "boolean" }
                             }
                         },
@@ -337,7 +337,7 @@ namespace ExportDocManager.Api.Hosting
                             properties = new Dictionary<string, object>
                             {
                                 ["reportType"] = StringProperty("Report type. Payment/reimbursement draft preview supports PaymentVoucher."),
-                                ["templatePath"] = StringProperty("Optional explicit template path. When omitted, the sidecar uses Templates/Internal under the program root."),
+                                ["templatePath"] = StringProperty("Optional managed payment/reimbursement template path. Export-document templates are rejected."),
                                 ["withSeal"] = new { type = "boolean" },
                                 ["payment"] = RefSchema("ApiPaymentDto")
                             }
@@ -349,7 +349,7 @@ namespace ExportDocManager.Api.Hosting
                             properties = new Dictionary<string, object>
                             {
                                 ["reportType"] = StringProperty("Report type. Invoice draft preview supports ExportDocument."),
-                                ["templatePath"] = StringProperty("Optional explicit template path. When omitted, the sidecar uses Templates/Export under the program root."),
+                                ["templatePath"] = StringProperty("Optional managed export-document template path. Payment/reimbursement templates are rejected."),
                                 ["withSeal"] = new { type = "boolean" },
                                 ["invoice"] = RefSchema("ApiInvoiceDetailDto")
                             }
@@ -389,7 +389,7 @@ namespace ExportDocManager.Api.Hosting
                             properties = new Dictionary<string, object>
                             {
                                 ["reportType"] = StringProperty("Report type. Invoice PDF supports ExportDocument; payment/reimbursement PDF supports PaymentVoucher."),
-                                ["templatePath"] = StringProperty("Optional explicit template path. When omitted, the sidecar uses Templates under the program root."),
+                                ["templatePath"] = StringProperty("Optional managed export-document template path. When omitted, the default Export template is used."),
                                 ["withSeal"] = new { type = "boolean" },
                                 ["destinationPath"] = StringProperty("User-selected PDF output path. The sidecar does not assign a default system-drive path.")
                             }
@@ -407,7 +407,7 @@ namespace ExportDocManager.Api.Hosting
                                     description = "Invoice ids to render into PDFs before zipping. A single request supports up to 200 ids."
                                 },
                                 ["reportType"] = StringProperty("Report type. Batch invoice ZIP currently supports ExportDocument."),
-                                ["templatePath"] = StringProperty("Optional explicit template path. When omitted, the sidecar uses Templates under the program root."),
+                                ["templatePath"] = StringProperty("Optional managed export-document template path. When omitted, the default Export template is used."),
                                 ["withSeal"] = new { type = "boolean" },
                                 ["destinationPath"] = StringProperty("User-selected ZIP output path. The sidecar does not assign a default system-drive path.")
                             }

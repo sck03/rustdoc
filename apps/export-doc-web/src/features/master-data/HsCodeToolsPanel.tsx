@@ -413,7 +413,7 @@ export function HsCodeToolsPanel({
         <form className="hs-code-clear-confirmation" aria-label="HS编码清空确认" onSubmit={submitClearAllLocalHsCodes}>
           <div>
             <strong>清空本地HS编码库</strong>
-            <span>将删除当前运行数据根数据库中的全部 HS 编码记录。</span>
+            <span>将删除当前数据库中的全部 HS 编码记录。</span>
           </div>
           <label>
             <span>确认文本</span>

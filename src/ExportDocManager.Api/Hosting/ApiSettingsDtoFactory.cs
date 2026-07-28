@@ -7,7 +7,7 @@ namespace ExportDocManager.Api.Hosting
     public static partial class ApiSettingsDtoFactory
     {
         public const string StoragePolicy =
-            "设置文件默认读取和保存到程序根目录 appsettings.json；不会迁入 App_Data，授权状态保存到运行数据根 Security。";
+            "设置文件读取和保存到运行数据根 Config/appsettings.json；数据库、日志、模板副本和授权镜像均归入运行数据根，程序安装目录保持只读。";
 
         private static AppSettings CloneSettings(AppSettings settings)
         {

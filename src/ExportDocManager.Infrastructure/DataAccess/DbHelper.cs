@@ -37,7 +37,7 @@ namespace ExportDocManager.DataAccess
 
         public static DatabaseConnectionSettings LoadDatabaseSettings()
         {
-            return LoadDatabaseSettingsFromPath(Path.Combine(_pathProvider.AppRoot, "appsettings.json"));
+            return LoadDatabaseSettingsFromPath(Path.Combine(_pathProvider.ConfigRoot, "appsettings.json"));
         }
 
         public static DatabaseConnectionSettings LoadDatabaseSettings(string settingsPath)
@@ -47,7 +47,7 @@ namespace ExportDocManager.DataAccess
                 throw new ArgumentException("数据库设置文件路径不能为空。", nameof(settingsPath));
             }
 
-            return LoadDatabaseSettingsFromPath(ResolveFromAppRoot(settingsPath));
+            return LoadDatabaseSettingsFromPath(ResolveFromConfigRoot(settingsPath));
         }
 
         private static DatabaseConnectionSettings LoadDatabaseSettingsFromPath(string resolvedSettingsPath)
@@ -232,12 +232,12 @@ namespace ExportDocManager.DataAccess
             return decrypted ?? value;
         }
 
-        private static string ResolveFromAppRoot(string path)
+        private static string ResolveFromConfigRoot(string path)
         {
             var trimmed = path.Trim();
             return Path.IsPathRooted(trimmed)
                 ? trimmed
-                : Path.GetFullPath(Path.Combine(_pathProvider.AppRoot, trimmed));
+                : Path.GetFullPath(Path.Combine(_pathProvider.ConfigRoot, trimmed));
         }
 
         private static bool TryEnsureDirectory(string directoryPath)

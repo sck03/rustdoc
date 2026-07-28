@@ -312,7 +312,7 @@ export function WorkspaceShell({
               <SlidersHorizontal size={16} aria-hidden="true" />
               <span>{interfaceDensity === "compact" ? "紧凑" : "舒适"}</span>
             </button>
-            <span className="service-status" data-state={serviceConnectionState} title={apiBaseUrl}>
+            <span className="service-status" data-state={serviceConnectionState} title={serviceStatusLabel}>
               <span className="service-status-dot" aria-hidden="true" />
               <Server size={15} aria-hidden="true" />
               <span className="api-base">{serviceStatusLabel}</span>

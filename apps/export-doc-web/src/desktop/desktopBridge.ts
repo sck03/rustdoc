@@ -148,10 +148,6 @@ export async function selectReportTemplatePackageFile() {
   return invokeOptionalPath("select_report_template_package_file");
 }
 
-export async function selectReportTemplateFile() {
-  return invokeOptionalPath("select_report_template_file");
-}
-
 export async function selectSavePackagePath(defaultFileName?: string, defaultDirectory?: string) {
   const invoke = getInvoke();
   if (!invoke) {

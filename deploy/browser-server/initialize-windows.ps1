@@ -74,8 +74,10 @@ if (-not [string]::IsNullOrWhiteSpace($MasterKey)) {
 
 $resolvedDataRoot = [System.IO.Path]::GetFullPath($DataRoot)
 $securityRoot = Join-Path $resolvedDataRoot "Security"
+$configRoot = Join-Path $resolvedDataRoot "Config"
 New-Item -ItemType Directory -Force -Path $securityRoot | Out-Null
-$configPath = Join-Path $root "appsettings.json"
+New-Item -ItemType Directory -Force -Path $configRoot | Out-Null
+$configPath = Join-Path $configRoot "appsettings.json"
 $environmentPath = Join-Path $securityRoot "browser-server.env"
 if (-not $Force -and (Test-Path -LiteralPath $configPath -PathType Leaf) -and
     -not (Get-Content -LiteralPath $configPath -Raw).Contains("CHANGE_ME_BEFORE_START")) {
@@ -138,7 +140,7 @@ foreach ($configurationFile in @($configPath, $environmentPath)) {
 }
 
 Write-Host "浏览器服务器配置已完成。"
-Write-Host "数据库配置: $(Join-Path $root 'appsettings.json')"
+Write-Host "数据库配置: $configPath"
 Write-Host "运行环境（含首次部署令牌）: $environmentPath"
 Write-Host "数据根: $resolvedDataRoot"
 Write-Host "监听: $Urls"

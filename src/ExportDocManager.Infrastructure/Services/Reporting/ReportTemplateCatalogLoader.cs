@@ -25,8 +25,7 @@ namespace ExportDocManager.Services.Reporting
         public async Task<IReadOnlyList<ReportTemplateConfig>> LoadResolvedConfigsAsync(
             CancellationToken cancellationToken = default)
         {
-            string basePath = _pathResolver.GetTemplatesBaseDirectory();
-            string configPath = Path.Combine(basePath, "report_templates.json");
+            string configPath = _pathResolver.GetUserConfigPath();
             var configuredRows = new List<ReportTemplateConfig>();
 
             if (File.Exists(configPath))
@@ -44,15 +43,11 @@ namespace ExportDocManager.Services.Reporting
                                 continue;
                             }
 
-                            string path = cfg.FileName;
-                            if (!Path.IsPathRooted(path))
-                            {
-                                path = Path.Combine(basePath, path);
-                            }
+                            string path = _pathResolver.ToAbsolutePath(cfg.FileName);
 
                             configuredRows.Add(new ReportTemplateConfig
                             {
-                                Type = NormalizeTemplateCatalogType(cfg.Type, path),
+                                Type = DetermineTemplateCatalogType(path),
                                 FileName = Path.GetFullPath(path),
                                 Name = cfg.Name,
                                 WithSeal = cfg.WithSeal
@@ -66,19 +61,17 @@ namespace ExportDocManager.Services.Reporting
                 }
             }
 
-            return BuildResolvedTemplateConfigs(basePath, configuredRows, cancellationToken);
+            return BuildResolvedTemplateConfigs(configuredRows, cancellationToken);
         }
 
         public List<ReportTemplateConfig> BuildResolvedTemplateConfigs(
-            string basePath,
             IEnumerable<ReportTemplateConfig> configuredRows,
             CancellationToken cancellationToken = default)
         {
-            Directory.CreateDirectory(basePath);
-            var baseFullPath = Path.GetFullPath(basePath);
-            var resolved = new List<ReportTemplateConfig>();
+            string builtInRoot = _pathResolver.GetBuiltInTemplatesBaseDirectory();
+            string userRoot = _pathResolver.GetUserTemplatesBaseDirectory();
             var configuredByPath = new Dictionary<string, ReportTemplateConfig>(StringComparer.OrdinalIgnoreCase);
-            var addedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var resolvedByIdentity = new Dictionary<string, ReportTemplateConfig>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var row in configuredRows ?? Enumerable.Empty<ReportTemplateConfig>())
             {
@@ -88,56 +81,58 @@ namespace ExportDocManager.Services.Reporting
                 }
 
                 var fullPath = Path.GetFullPath(row.FileName);
-                if (!File.Exists(fullPath))
+                if (!File.Exists(fullPath) ||
+                    (!_pathResolver.IsBuiltInTemplatePath(fullPath) && !_pathResolver.IsUserTemplatePath(fullPath)))
                 {
                     continue;
                 }
 
                 configuredByPath[fullPath] = new ReportTemplateConfig
                 {
-                    Type = NormalizeTemplateCatalogType(row.Type, fullPath),
+                    Type = DetermineTemplateCatalogType(fullPath),
                     FileName = fullPath,
                     Name = NormalizeTemplateDisplayName(row.Name, fullPath),
                     WithSeal = row.WithSeal ?? true
                 };
             }
 
-            foreach (var templatePath in Directory.GetFiles(baseFullPath, "*.html", SearchOption.AllDirectories)
+            AddTemplatesFromRoot(builtInRoot, configuredByPath, resolvedByIdentity, cancellationToken);
+            AddTemplatesFromRoot(userRoot, configuredByPath, resolvedByIdentity, cancellationToken);
+
+            return resolvedByIdentity.Values
+                .OrderBy(config => NormalizeTemplateCatalogType(config.Type, config.FileName), StringComparer.OrdinalIgnoreCase)
+                .ThenBy(config => NormalizeTemplateDisplayName(config.Name, config.FileName), StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+        }
+
+        private void AddTemplatesFromRoot(
+            string root,
+            IReadOnlyDictionary<string, ReportTemplateConfig> configuredByPath,
+            IDictionary<string, ReportTemplateConfig> resolvedByIdentity,
+            CancellationToken cancellationToken)
+        {
+            if (!Directory.Exists(root))
+            {
+                return;
+            }
+
+            foreach (string templatePath in Directory.GetFiles(root, "*.html", SearchOption.AllDirectories)
                          .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                string fullPath = Path.GetFullPath(templatePath);
+                string identity = _pathResolver.GetCatalogIdentity(fullPath);
 
-                if (!addedPaths.Add(templatePath))
-                {
-                    continue;
-                }
-
-                if (configuredByPath.TryGetValue(templatePath, out var configured))
-                {
-                    resolved.Add(CloneTemplateConfig(configured));
-                    continue;
-                }
-
-                resolved.Add(new ReportTemplateConfig
-                {
-                    Type = NormalizeTemplateCatalogType(null, templatePath),
-                    FileName = templatePath,
-                    Name = NormalizeTemplateDisplayName(null, templatePath),
-                    WithSeal = true
-                });
+                resolvedByIdentity[identity] = configuredByPath.TryGetValue(fullPath, out var configured)
+                    ? CloneTemplateConfig(configured)
+                    : new ReportTemplateConfig
+                    {
+                        Type = NormalizeTemplateCatalogType(null, fullPath),
+                        FileName = fullPath,
+                        Name = NormalizeTemplateDisplayName(null, fullPath),
+                        WithSeal = true
+                    };
             }
-
-            foreach (var configured in configuredByPath
-                         .Where(entry => !ReportTemplatePathResolver.IsPathWithinDirectory(entry.Key, baseFullPath))
-                         .OrderBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase))
-            {
-                if (addedPaths.Add(configured.Key))
-                {
-                    resolved.Add(CloneTemplateConfig(configured.Value));
-                }
-            }
-
-            return resolved;
         }
 
         public Dictionary<ReportDocumentType, string> BuildTemplatePathCache(IEnumerable<ReportTemplateConfig> configs)
@@ -154,14 +149,19 @@ namespace ExportDocManager.Services.Reporting
                 var reportType = ResolveCatalogReportType(config.Type, config.FileName);
                 var fullPath = Path.GetFullPath(config.FileName);
                 if (!cache.TryGetValue(reportType, out var existingPath) ||
-                    IsPreferredDefaultTemplate(fullPath, reportType) ||
-                    !IsPreferredDefaultTemplate(existingPath, reportType))
+                    GetTemplatePriority(fullPath, reportType) > GetTemplatePriority(existingPath, reportType))
                 {
                     cache[reportType] = fullPath;
                 }
             }
 
             return cache;
+        }
+
+        private int GetTemplatePriority(string templatePath, ReportDocumentType reportType)
+        {
+            int priority = _pathResolver.IsUserTemplatePath(templatePath) ? 100 : 0;
+            return IsPreferredDefaultTemplate(templatePath, reportType) ? priority + 10 : priority;
         }
 
         public string NormalizeStoredTemplatePath(string templatePath)

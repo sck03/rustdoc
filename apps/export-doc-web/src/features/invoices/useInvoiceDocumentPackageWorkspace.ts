@@ -7,7 +7,7 @@ import type {
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { selectDirectory, selectReportTemplateFile, selectSaveZipPath } from "../../desktop/desktopBridge.ts";
+import { selectDirectory, selectSaveZipPath } from "../../desktop/desktopBridge.ts";
 import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -84,8 +84,8 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     [configDraft.items, templates],
   );
   const templateOptions = useMemo(
-    () => buildTemplateSelectOptions(templates, configDraft.items),
-    [configDraft.items, templates],
+    () => buildTemplateSelectOptions(templates),
+    [templates],
   );
   const documentEmailDate = useMemo(() => formatDateForBatchExport(new Date()), [invoiceId]);
   const defaultEmailSubject = useMemo(
@@ -295,14 +295,6 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     setConfigDirty(true);
     clearGeneratedOutput();
   }
-  async function chooseConfigTemplateFile(index: number) {
-    try {
-      const selected = await selectReportTemplateFile();
-      if (selected) updateConfigItem(index, { templatePath: selected });
-    } catch (error) {
-      feedback.showError(readDesktopError(error));
-    }
-  }
   async function pickDestination() {
     try {
       const selected = createZip
@@ -354,7 +346,6 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     addConfigItem,
     removeConfigItem,
     moveConfigItem,
-    chooseConfigTemplateFile,
     saveConfig: () => saveConfigMutation.mutate(configDraft),
     previewPackage: () => previewMutation.mutate(),
     generatePackage: () => packageMutation.mutate(),

@@ -657,10 +657,6 @@ export function SettingsPage({
                   paymentTemplatesLoading={paymentTemplatesQuery.isFetching}
                   paymentTemplateError={paymentTemplatesQuery.isError ? paymentTemplatesQuery.error : null}
                   onChange={patchSetting}
-                  onActionError={(error) => {
-                    setMessage(readApiError(error));
-                    setSuccessMessage(null);
-                  }}
                 />
               ) : null}
 

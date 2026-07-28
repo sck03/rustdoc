@@ -76,7 +76,8 @@ export function createSettingsBackupSmokeScene(runtime) {
           text.includes('文件夹命名规则') &&
           text.includes('默认合并 PDF') &&
           text.includes('默认生成 ZIP') &&
-          (rows.length === 0 || buttons.some((button) => (button.title || '').includes('选择模板文件'))) &&
+          (rows.length === 0 || rows.every((row) => row.querySelector('select.batch-export-cell-input'))) &&
+          !panel.querySelector('.batch-export-path-input') &&
           buttons.some((button) => (button.innerText || '').includes('新增单证')));
       })()`,
       timeoutMs,
@@ -96,7 +97,8 @@ export function createSettingsBackupSmokeScene(runtime) {
           panel.querySelector('.batch-export-items-toolbar') &&
           panel.querySelector('[aria-label="付款/报销模板"]') &&
           text.includes('付款/报销模板') &&
-          (rows.length === 0 || buttons.some((button) => (button.title || '').includes('选择模板文件'))) &&
+          (rows.length === 0 || rows.every((row) => row.querySelector('select.batch-export-cell-input'))) &&
+          !panel.querySelector('.batch-export-path-input') &&
           buttons.some((button) => (button.innerText || '').includes('新增模板')));
       })()`,
       timeoutMs,

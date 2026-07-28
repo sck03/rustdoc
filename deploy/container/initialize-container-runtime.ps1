@@ -350,9 +350,9 @@ if ($containerSubnetWasProvided -and -not $AllowNetworkOverlap) {
 }
 
 $resolvedRuntimeRoot = [System.IO.Path]::GetFullPath($RuntimeRoot)
-$configRoot = Join-Path $resolvedRuntimeRoot "config"
+$apiDataRoot = Join-Path $resolvedRuntimeRoot "api-data"
+$configRoot = Join-Path $apiDataRoot "Config"
 New-Item -ItemType Directory -Force -Path $configRoot | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $resolvedRuntimeRoot "api-data") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $resolvedRuntimeRoot "postgres") | Out-Null
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $resolvedEnvironmentFile) | Out-Null
 

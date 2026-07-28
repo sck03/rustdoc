@@ -2,7 +2,6 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-CONFIG="$ROOT/appsettings.json"
 RUNTIME_ENV="$ROOT/App_Data/Security/browser-server.env"
 RUNTIME_ENV_POINTER="$ROOT/browser-server.env.path"
 if [ -f "$RUNTIME_ENV_POINTER" ]; then
@@ -27,6 +26,15 @@ if [ -f "$RUNTIME_ENV" ]; then
   done < "$RUNTIME_ENV"
 fi
 
+DATA_ROOT=${EXPORTDOCMANAGER_DATA_ROOT:-$ROOT/App_Data}
+case "$DATA_ROOT" in
+  /*) ;;
+  *) DATA_ROOT="$ROOT/$DATA_ROOT" ;;
+esac
+mkdir -p "$DATA_ROOT"
+DATA_ROOT=$(CDPATH= cd -- "$DATA_ROOT" && pwd)
+CONFIG="$DATA_ROOT/Config/appsettings.json"
+
 if [ ! -f "$CONFIG" ]; then
   echo "appsettings.json was not found: $CONFIG" >&2
   exit 1
@@ -50,13 +58,6 @@ chmod +x "$BROWSER" "$ROOT/ExportDocManager.Api"
 export EXPORTDOCMANAGER_NETWORK_MODE=true
 export EXPORTDOCMANAGER_PRODUCT_EDITION=Full
 export EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE="$BROWSER"
-DATA_ROOT=${EXPORTDOCMANAGER_DATA_ROOT:-$ROOT/App_Data}
-case "$DATA_ROOT" in
-  /*) ;;
-  *) DATA_ROOT="$ROOT/$DATA_ROOT" ;;
-esac
-mkdir -p "$DATA_ROOT"
-DATA_ROOT=$(CDPATH= cd -- "$DATA_ROOT" && pwd)
 case "$(uname -m)" in
   aarch64|arm64) DEFAULT_OCR_RUNTIME=disabled ;;
   *) DEFAULT_OCR_RUNTIME=enabled ;;

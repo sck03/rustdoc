@@ -29,7 +29,8 @@ namespace ExportDocManager.Api.Tests
             Assert.True(response.Secrets.PostgreSqlPasswordSet);
             Assert.Equal("email-secret", settings.Email.Password);
             Assert.Contains("appsettings.json", response.StoragePolicy, StringComparison.Ordinal);
-            Assert.Contains("不会迁入 App_Data", response.StoragePolicy, StringComparison.Ordinal);
+            Assert.Contains("运行数据根 Config", response.StoragePolicy, StringComparison.Ordinal);
+            Assert.Contains("程序安装目录保持只读", response.StoragePolicy, StringComparison.Ordinal);
         }
 
         [Fact]

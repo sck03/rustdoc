@@ -1,9 +1,9 @@
-import { ArrowDown, ArrowUp, FolderOpen, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import type { BatchExportConfigDraft, BatchExportItemSetting } from "./invoiceReportPreviewModel.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 type Option={value:string;label:string};
-type Props={canEdit:boolean;desktopAvailable:boolean;draft:BatchExportConfigDraft;templateOptions:Option[];onAdd():void;onChooseTemplate(index:number):void|Promise<void>;onMove(index:number,direction:-1|1):void;onRemove(index:number):void;onUpdate(changes:Partial<BatchExportConfigDraft>):void;onUpdateItem(index:number,changes:Partial<BatchExportItemSetting>):void};
-export function InvoiceDocumentPackageConfig(props:Props){const {canEdit:canEditPackageConfig,desktopAvailable,draft:packageConfigDraft,templateOptions:packageConfigTemplateOptions,onAdd:addPackageConfigItem,onChooseTemplate:choosePackageConfigTemplateFile,onMove:movePackageConfigItem,onRemove:removePackageConfigItem,onUpdate:updatePackageConfig,onUpdateItem:updatePackageConfigItem}=props;return (
+type Props={canEdit:boolean;draft:BatchExportConfigDraft;templateOptions:Option[];onAdd():void;onMove(index:number,direction:-1|1):void;onRemove(index:number):void;onUpdate(changes:Partial<BatchExportConfigDraft>):void;onUpdateItem(index:number,changes:Partial<BatchExportItemSetting>):void};
+export function InvoiceDocumentPackageConfig(props:Props){const {canEdit:canEditPackageConfig,draft:packageConfigDraft,templateOptions:packageConfigTemplateOptions,onAdd:addPackageConfigItem,onMove:movePackageConfigItem,onRemove:removePackageConfigItem,onUpdate:updatePackageConfig,onUpdateItem:updatePackageConfigItem}=props;return (
         <details className="document-package-config">
           <summary>单据包配置</summary>
           <div className="document-package-config-body">
@@ -58,7 +58,6 @@ export function InvoiceDocumentPackageConfig(props:Props){const {canEdit:canEdit
                     <th>启用</th>
                     <th>名称</th>
                     <th>模板</th>
-                    <th>模板路径</th>
                     <th>带章</th>
                     <th>操作</th>
                   </tr>
@@ -99,27 +98,6 @@ export function InvoiceDocumentPackageConfig(props:Props){const {canEdit:canEdit
                               </option>
                             ))}
                           </select>
-                        </td>
-                        <td>
-                          <div className="batch-export-path-control">
-                            <input
-                              className="batch-export-cell-input batch-export-path-input"
-                              value={item.templatePath}
-                              disabled={!canEditPackageConfig}
-                              onChange={(event) => updatePackageConfigItem(index, { templatePath: event.target.value })}
-                            />
-                            {desktopAvailable ? (
-                              <button
-                                className="icon-button compact-icon-button batch-export-path-button"
-                                type="button"
-                                title="选择模板文件" aria-label="选择模板文件"
-                                disabled={!canEditPackageConfig}
-                                onClick={() => void choosePackageConfigTemplateFile(index)}
-                              >
-                                <FolderOpen size={15} aria-hidden="true" />
-                              </button>
-                            ) : null}
-                          </div>
                         </td>
                         <td>
                           <input
@@ -166,7 +144,7 @@ export function InvoiceDocumentPackageConfig(props:Props){const {canEdit:canEdit
                     ))
                   ) : (
                     <tr>
-                      <td className="empty-cell" colSpan={7}>
+                      <td className="empty-cell" colSpan={6}>
                         暂无导出项
                       </td>
                     </tr>

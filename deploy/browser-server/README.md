@@ -21,7 +21,7 @@ pwsh -File .\initialize-windows.ps1 `
   -Start
 ```
 
-不传 `-Start` 时只写配置，之后可运行 `pwsh -File .\start-windows.ps1`。需要把数据放在其它磁盘时增加 `-DataRoot "D:\ExportDocManagerData"`；通过 IIS/Caddy/Nginx 反向代理时，可用 `-TrustedProxies "192.168.1.20"` 指定直接代理 IP。配置完成后，数据库密码写入 `appsettings.json`，首次部署令牌和运行参数写入指定数据根的 `Security\browser-server.env`，包根的 `browser-server.env.path` 只保存该文件位置；脚本会尽力把数据库配置和环境文件 ACL 收紧为当前管理员、Administrators 与 LocalSystem 可访问。已有有效配置时脚本默认拒绝覆盖，管理员确认后才使用 `-Force`；以后如改用其它 Windows 服务账号，应由管理员显式授予该账号读取权限。
+不传 `-Start` 时只写配置，之后可运行 `pwsh -File .\start-windows.ps1`。需要把数据放在其它磁盘时增加 `-DataRoot "D:\ExportDocManagerData"`；通过 IIS/Caddy/Nginx 反向代理时，可用 `-TrustedProxies "192.168.1.20"` 指定直接代理 IP。配置完成后，数据库密码写入数据根的 `Config\appsettings.json`，首次部署令牌和运行参数写入 `Security\browser-server.env`；发布包根只保留只读示例 `appsettings.example.json` 和一个用于定位外部数据根的小型 `browser-server.env.path`。脚本会尽力把数据库配置和环境文件 ACL 收紧为当前管理员、Administrators 与 LocalSystem 可访问。已有有效配置时脚本默认拒绝覆盖，管理员确认后才使用 `-Force`；以后如改用其它 Windows 服务账号，应由管理员显式授予该账号读取权限。
 
 ### Linux
 
@@ -38,7 +38,7 @@ pwsh -File .\initialize-windows.ps1 `
   --start
 ```
 
-不传 `--start` 时只写配置，之后可运行 `./start-linux.sh`。数据目录可通过 `--data-root /srv/exportdoc-manager-data` 指定；脚本使用 `umask 077`，并把包含数据库密码的 `appsettings.json` 与含令牌的环境文件权限设为 `600`，包根的 `browser-server.env.path` 只保存环境文件位置。已有有效配置时默认拒绝覆盖，只有管理员确认后才使用 `--force`。Linux ARM64 会按当前运行时能力默认关闭不支持的 Paddle OCR 验证，但仍保留 HS、发票和报表等其它服务能力；如现场有兼容 OCR 运行库，可显式设置 `EXPORTDOCMANAGER_OCR_RUNTIME` 后再启动。
+不传 `--start` 时只写配置，之后可运行 `./start-linux.sh`。数据目录可通过 `--data-root /srv/exportdoc-manager-data` 指定；脚本使用 `umask 077`，并把数据根 `Config/appsettings.json` 与 `Security/browser-server.env` 权限设为 `600`，包根只保留只读示例和数据根定位指针。已有有效配置时默认拒绝覆盖，只有管理员确认后才使用 `--force`。Linux ARM64 会按当前运行时能力默认关闭不支持的 Paddle OCR 验证，但仍保留 HS、发票和报表等其它服务能力；如现场有兼容 OCR 运行库，可显式设置 `EXPORTDOCMANAGER_OCR_RUNTIME` 后再启动。
 
 ## 访问和 HTTPS 边界
 

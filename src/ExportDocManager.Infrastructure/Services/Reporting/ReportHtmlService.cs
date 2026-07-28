@@ -309,9 +309,24 @@ namespace ExportDocManager.Services.Reporting
                 resolvedTemplatePath = await GetTemplatePathAsync(reportType, cancellationToken).ConfigureAwait(false);
             }
 
+            if (!string.IsNullOrWhiteSpace(resolvedTemplatePath) &&
+                !_pathResolver.IsBuiltInTemplatePath(resolvedTemplatePath) &&
+                !_pathResolver.IsUserTemplatePath(resolvedTemplatePath))
+            {
+                throw new UnauthorizedAccessException("报表模板必须位于内置模板目录或运行数据根用户模板目录。");
+            }
+
             if (string.IsNullOrWhiteSpace(resolvedTemplatePath) || !File.Exists(resolvedTemplatePath))
             {
                 throw new FileNotFoundException($"Template not found: {resolvedTemplatePath}");
+            }
+
+            var resolvedReportType = ReportTemplateCatalogLoader.ResolveCatalogReportType(null, resolvedTemplatePath);
+            if (resolvedReportType != reportType)
+            {
+                throw new ArgumentException(
+                    "模板类型与当前业务单据不匹配。出口单证模板和付款报销模板不能交叉使用。",
+                    nameof(templatePath));
             }
 
             return resolvedTemplatePath;
@@ -420,7 +435,7 @@ namespace ExportDocManager.Services.Reporting
             string subFolder = reportType == ReportDocumentType.PaymentVoucher
                 ? ReportTemplateCatalogLoader.InternalTemplateCatalogType
                 : ReportTemplateCatalogLoader.ExportTemplateCatalogType;
-            string basePath = _pathResolver.EnsureTemplateDirectory(subFolder);
+            string basePath = _pathResolver.GetBuiltInTemplateDirectory(subFolder);
 
             string htmlPath = reportType == ReportDocumentType.PaymentVoucher
                 ? "payment_voucher_template.html"

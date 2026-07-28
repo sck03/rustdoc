@@ -207,12 +207,11 @@ export function buildPackageTemplateViewsFromItems(
   configuredItems: BatchExportItemSetting[],
 ): PackageTemplateView[] {
   const effectiveConfiguredItems = configuredItems.filter((item) => item.templatePath.length > 0);
-  const hasConfiguredItems = effectiveConfiguredItems.length > 0;
   const usedTemplatePaths = new Set<string>();
   const views: PackageTemplateView[] = [];
 
   for (const item of effectiveConfiguredItems) {
-    const template = findTemplateForBatchExportItem(item, templates, usedTemplatePaths) ?? createConfiguredTemplate(item);
+    const template = findTemplateForBatchExportItem(item, templates, usedTemplatePaths);
     if (!template) {
       continue;
     }
@@ -226,6 +225,7 @@ export function buildPackageTemplateViewsFromItems(
     });
   }
 
+  const hasConfiguredItems = views.length > 0;
   for (const template of templates) {
     if (usedTemplatePaths.has(template.templatePath)) {
       continue;
@@ -242,21 +242,7 @@ export function buildPackageTemplateViewsFromItems(
   return views;
 }
 
-export function createConfiguredTemplate(item: BatchExportItemSetting): ApiReportTemplateDto | null {
-  const templatePath = item.templatePath.trim();
-  if (!templatePath) {
-    return null;
-  }
-
-  return {
-    reportType: item.reportType || "ExportDocument",
-    displayName: item.name || fileNameFromPath(templatePath),
-    templatePath,
-    withSealDefault: item.showSeal,
-  };
-}
-
-export function buildTemplateSelectOptions(templates: ApiReportTemplateDto[], items: BatchExportItemSetting[]) {
+export function buildTemplateSelectOptions(templates: ApiReportTemplateDto[]) {
   const options: Array<{ value: string; label: string }> = [];
   const usedPaths = new Set<string>();
 
@@ -277,12 +263,8 @@ export function buildTemplateSelectOptions(templates: ApiReportTemplateDto[], it
     addOption(template.templatePath, template.displayName || fileNameFromPath(template.templatePath));
   }
 
-  for (const item of items) {
-    addOption(item.templatePath, item.name || fileNameFromPath(item.templatePath));
-  }
-
   if (options.length === 0) {
-    options.push({ value: "", label: "手工填写模板路径" });
+    options.push({ value: "", label: "暂无可用模板" });
   }
 
   return options;
@@ -481,4 +463,3 @@ export function readBoolean(record: Record<string, unknown>, fallback: boolean, 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
-

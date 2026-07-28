@@ -174,7 +174,6 @@ export function PaymentReportPreviewPanel({
   const canPrintPreview = Boolean(preview?.html) && !isBusy;
   const canGeneratePdf = reportOutputPermission.canOperate && canUseSavedPaymentOutput && canPreview && (!desktopAvailable || Boolean(pdfDestinationPath.trim())) && !isBusy;
   const canOpenTemplateDesigner = reportDesignPermission.canView && Boolean(selectedTemplatePath) && !isBusy;
-  const previewStoragePolicy = preview?.storagePolicy || "";
   const templateMessage = templatesQuery.isError
     ? readApiError(templatesQuery.error)
     : settingsQuery.isError
@@ -339,8 +338,6 @@ export function PaymentReportPreviewPanel({
       {hasSavedPayment && hasUnsavedDraftChanges ? (
         <InlineNotice tone="info">当前付款/报销单有未保存修改。HTML 预览使用当前草稿；PDF 请先保存后再生成。</InlineNotice>
       ) : null}
-      {previewStoragePolicy ? <InlineNotice tone="info">{previewStoragePolicy}</InlineNotice> : null}
-
       <div className="report-preview-controls">
         <SelectField
           label="模板"
@@ -445,12 +442,11 @@ function buildPaymentTemplateViews(
 
   for (const item of configuredItems) {
     const template = findTemplateForPaymentItem(item, templates, usedTemplatePaths);
-    const templatePath = template?.templatePath ?? item.templatePath;
-    if (!templatePath) {
+    if (!template) {
       continue;
     }
 
-    const normalizedPath = normalizePathForMatch(templatePath);
+    const normalizedPath = normalizePathForMatch(template.templatePath);
     if (usedTemplatePaths.has(normalizedPath)) {
       continue;
     }
@@ -461,8 +457,8 @@ function buildPaymentTemplateViews(
     }
 
     views.push({
-      templatePath,
-      displayName: item.name || template?.displayName || fileNameFromPath(templatePath),
+      templatePath: template.templatePath,
+      displayName: item.name || template.displayName || fileNameFromPath(template.templatePath),
       withSealDefault: item.showSeal,
     });
   }

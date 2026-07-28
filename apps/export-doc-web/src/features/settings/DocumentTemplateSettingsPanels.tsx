@@ -1,6 +1,5 @@
 import { useMemo } from "react";
-import { ArrowDown, ArrowUp, FolderOpen, Plus, Trash2 } from "lucide-react";
-import { isDesktopBridgeAvailable, selectReportTemplateFile } from "../../desktop/desktopBridge.ts";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 
@@ -27,7 +26,6 @@ type TemplateSettingsPanelProps = {
   templatesLoading: boolean;
   templateErrorMessage: string | null;
   onChange: (path: string[], value: unknown) => void;
-  onActionError: (error: unknown) => void;
 };
 
 export function BatchExportSettingsPanel({
@@ -38,12 +36,10 @@ export function BatchExportSettingsPanel({
   templatesLoading,
   templateErrorMessage,
   onChange,
-  onActionError,
 }: TemplateSettingsPanelProps) {
   const items = readBatchExportItemsForSettings(settings);
-  const templateOptions = useMemo(() => buildTemplateOptions(templates, items), [items, templates]);
+  const templateOptions = useMemo(() => buildTemplateOptions(templates), [templates]);
   const disabled = !canManageSettings || isBusy;
-  const canSelectTemplateFile = isDesktopBridgeAvailable();
 
   function updateItems(nextItems: BatchExportItemDraft[]) {
     onChange(["batchExport", "items"], nextItems.map(toBatchExportItemRecord));
@@ -97,21 +93,6 @@ export function BatchExportSettingsPanel({
     updateItems(nextItems);
   }
 
-  async function chooseTemplateFile(index: number) {
-    if (disabled) {
-      return;
-    }
-
-    try {
-      const selected = await selectReportTemplateFile();
-      if (selected) {
-        updateItem(index, { templatePath: selected });
-      }
-    } catch (error) {
-      onActionError(error);
-    }
-  }
-
   return (
     <section className="form-section batch-export-settings-section" aria-label="单证模板设置">
       <div className="section-header">
@@ -143,7 +124,6 @@ export function BatchExportSettingsPanel({
                 <th>启用</th>
                 <th>名称</th>
                 <th>模板</th>
-                <th>模板路径</th>
                 <th>带章</th>
                 <th>操作</th>
               </tr>
@@ -184,27 +164,6 @@ export function BatchExportSettingsPanel({
                           </option>
                         ))}
                       </select>
-                    </td>
-                    <td>
-                      <div className="batch-export-path-control">
-                        <input
-                          className="batch-export-cell-input batch-export-path-input"
-                          value={item.templatePath}
-                          disabled={disabled}
-                          onChange={(event) => updateItem(index, { templatePath: event.target.value })}
-                        />
-                        {canSelectTemplateFile ? (
-                          <button
-                            className="icon-button compact-icon-button batch-export-path-button"
-                            type="button"
-                            title="选择模板文件" aria-label="选择模板文件"
-                            disabled={disabled}
-                            onClick={() => chooseTemplateFile(index)}
-                          >
-                            <FolderOpen size={15} aria-hidden="true" />
-                          </button>
-                        ) : null}
-                      </div>
                     </td>
                     <td>
                       <input
@@ -251,7 +210,7 @@ export function BatchExportSettingsPanel({
                 ))
               ) : (
                 <tr>
-                  <td className="empty-cell" colSpan={7}>
+                  <td className="empty-cell" colSpan={6}>
                     暂无导出项
                   </td>
                 </tr>
@@ -272,12 +231,10 @@ export function PaymentTemplateSettingsPanel({
   templatesLoading,
   templateErrorMessage,
   onChange,
-  onActionError,
 }: TemplateSettingsPanelProps) {
   const items = readPaymentTemplateItemsForSettings(settings);
-  const templateOptions = useMemo(() => buildTemplateOptions(templates, items), [items, templates]);
+  const templateOptions = useMemo(() => buildTemplateOptions(templates), [templates]);
   const disabled = !canManageSettings || isBusy;
-  const canSelectTemplateFile = isDesktopBridgeAvailable();
 
   function updateItems(nextItems: BatchExportItemDraft[]) {
     onChange(["paymentTemplates"], nextItems.map(toPaymentTemplateRecord));
@@ -331,21 +288,6 @@ export function PaymentTemplateSettingsPanel({
     updateItems(nextItems);
   }
 
-  async function chooseTemplateFile(index: number) {
-    if (disabled) {
-      return;
-    }
-
-    try {
-      const selected = await selectReportTemplateFile();
-      if (selected) {
-        updateItem(index, { templatePath: selected });
-      }
-    } catch (error) {
-      onActionError(error);
-    }
-  }
-
   return (
     <section className="form-section batch-export-settings-section" aria-label="付款/报销模板设置">
       <div className="section-header">
@@ -371,7 +313,6 @@ export function PaymentTemplateSettingsPanel({
                 <th>启用</th>
                 <th>名称</th>
                 <th>模板</th>
-                <th>模板路径</th>
                 <th>带章</th>
                 <th>操作</th>
               </tr>
@@ -412,27 +353,6 @@ export function PaymentTemplateSettingsPanel({
                           </option>
                         ))}
                       </select>
-                    </td>
-                    <td>
-                      <div className="batch-export-path-control">
-                        <input
-                          className="batch-export-cell-input batch-export-path-input"
-                          value={item.templatePath}
-                          disabled={disabled}
-                          onChange={(event) => updateItem(index, { templatePath: event.target.value })}
-                        />
-                        {canSelectTemplateFile ? (
-                          <button
-                            className="icon-button compact-icon-button batch-export-path-button"
-                            type="button"
-                            title="选择模板文件" aria-label="选择模板文件"
-                            disabled={disabled}
-                            onClick={() => chooseTemplateFile(index)}
-                          >
-                            <FolderOpen size={15} aria-hidden="true" />
-                          </button>
-                        ) : null}
-                      </div>
                     </td>
                     <td>
                       <input
@@ -479,7 +399,7 @@ export function PaymentTemplateSettingsPanel({
                 ))
               ) : (
                 <tr>
-                  <td className="empty-cell" colSpan={7}>
+                  <td className="empty-cell" colSpan={6}>
                     暂无付款/报销模板
                   </td>
                 </tr>
@@ -613,7 +533,7 @@ function toPaymentTemplateRecord(item: BatchExportItemDraft) {
   };
 }
 
-function buildTemplateOptions(templates: ReportTemplateOption[], items: BatchExportItemDraft[]) {
+function buildTemplateOptions(templates: ReportTemplateOption[]) {
   const options: Array<{ value: string; label: string }> = [{ value: "", label: "未选择" }];
   const seen = new Set<string>([""]);
 
@@ -626,19 +546,6 @@ function buildTemplateOptions(templates: ReportTemplateOption[], items: BatchExp
     options.push({
       value: templatePath,
       label: template.displayName || fileNameFromPath(templatePath),
-    });
-    seen.add(templatePath.toLowerCase());
-  }
-
-  for (const item of items) {
-    const templatePath = item.templatePath.trim();
-    if (!templatePath || seen.has(templatePath.toLowerCase())) {
-      continue;
-    }
-
-    options.push({
-      value: templatePath,
-      label: fileNameFromPath(templatePath),
     });
     seen.add(templatePath.toLowerCase());
   }

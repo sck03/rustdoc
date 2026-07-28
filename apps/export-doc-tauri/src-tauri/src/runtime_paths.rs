@@ -14,6 +14,7 @@ use tauri::Manager;
 const RUNTIME_PATHS_CONFIG_FILE_NAME: &str = "runtime-paths.json";
 const RUNTIME_PATHS_CONFIG_BACKUP_FILE_NAME: &str = "runtime-paths.json.bak";
 const RUNTIME_PATHS_CONFIG_SCHEMA_VERSION: u32 = 1;
+const RUNTIME_CONFIG_ROOT_ENVIRONMENT_VARIABLE: &str = "EXPORTDOCMANAGER_RUNTIME_CONFIG_ROOT";
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -74,7 +75,10 @@ pub(crate) fn prepare_runtime_paths(app: &tauri::App) -> Result<RuntimePaths, Bo
         .unwrap_or(default_app_root);
     let explicit_data_root =
         data_root_argument.or_else(|| env::var_os("EXPORTDOCMANAGER_DATA_ROOT").map(PathBuf::from));
-    let data_root = resolve_data_root(&app_root, explicit_data_root)?;
+    let runtime_config_root = env::var_os(RUNTIME_CONFIG_ROOT_ENVIRONMENT_VARIABLE)
+        .map(PathBuf::from)
+        .unwrap_or(app.path().app_config_dir()?);
+    let data_root = resolve_data_root(&app_root, &runtime_config_root, explicit_data_root)?;
 
     ensure_directory(&app_root)?;
     ensure_runtime_data_directories(&data_root)?;
@@ -123,13 +127,14 @@ where
 
 fn resolve_data_root(
     app_root: &Path,
+    runtime_config_root: &Path,
     explicit_data_root: Option<PathBuf>,
 ) -> Result<PathBuf, Box<dyn Error>> {
     if let Some(data_root) = explicit_data_root {
         return Ok(data_root);
     }
 
-    if let Some(data_root) = read_persisted_data_root(app_root)? {
+    if let Some(data_root) = read_persisted_data_root(runtime_config_root, app_root)? {
         return Ok(data_root);
     }
 
@@ -147,15 +152,18 @@ fn resolve_data_root(
                 ),
                 &default_data_root,
             )?;
-            try_persist_runtime_data_root(app_root, &selected);
+            try_persist_runtime_data_root(runtime_config_root, &selected);
             Ok(selected)
         }
     }
 }
 
-fn read_persisted_data_root(app_root: &Path) -> Result<Option<PathBuf>, Box<dyn Error>> {
-    let config_path = runtime_paths_config_path(app_root);
-    let backup_path = runtime_paths_config_backup_path(app_root);
+fn read_persisted_data_root(
+    runtime_config_root: &Path,
+    app_root: &Path,
+) -> Result<Option<PathBuf>, Box<dyn Error>> {
+    let config_path = runtime_paths_config_path(runtime_config_root);
+    let backup_path = runtime_paths_config_backup_path(runtime_config_root);
     if !config_path.exists() {
         if !backup_path.exists() {
             return Ok(None);
@@ -236,42 +244,48 @@ fn read_data_root_from_config(
     }
 }
 
-fn try_persist_runtime_data_root(app_root: &Path, data_root: &Path) {
-    if let Err(error) = persist_runtime_data_root(app_root, data_root) {
+fn try_persist_runtime_data_root(runtime_config_root: &Path, data_root: &Path) {
+    if let Err(error) = persist_runtime_data_root(runtime_config_root, data_root) {
         eprintln!(
             "Failed to persist runtime data root to '{}': {error}",
-            runtime_paths_config_path(app_root).display()
+            runtime_paths_config_path(runtime_config_root).display()
         );
     }
 }
 
-fn persist_runtime_data_root(app_root: &Path, data_root: &Path) -> Result<(), Box<dyn Error>> {
+fn persist_runtime_data_root(
+    runtime_config_root: &Path,
+    data_root: &Path,
+) -> Result<(), Box<dyn Error>> {
     let config = RuntimePathsConfig {
         schema_version: RUNTIME_PATHS_CONFIG_SCHEMA_VERSION,
         data_root: data_root.to_string_lossy().into_owned(),
         source: Some("tauri-runtime-selection".to_owned()),
     };
     let config_text = serde_json::to_string_pretty(&config)?;
-    write_runtime_paths_config_atomically(app_root, format!("{config_text}\n").as_bytes())
+    write_runtime_paths_config_atomically(
+        runtime_config_root,
+        format!("{config_text}\n").as_bytes(),
+    )
 }
 
-fn runtime_paths_config_path(app_root: &Path) -> PathBuf {
-    app_root.join(RUNTIME_PATHS_CONFIG_FILE_NAME)
+fn runtime_paths_config_path(runtime_config_root: &Path) -> PathBuf {
+    runtime_config_root.join(RUNTIME_PATHS_CONFIG_FILE_NAME)
 }
 
-fn runtime_paths_config_backup_path(app_root: &Path) -> PathBuf {
-    app_root.join(RUNTIME_PATHS_CONFIG_BACKUP_FILE_NAME)
+fn runtime_paths_config_backup_path(runtime_config_root: &Path) -> PathBuf {
+    runtime_config_root.join(RUNTIME_PATHS_CONFIG_BACKUP_FILE_NAME)
 }
 
 fn write_runtime_paths_config_atomically(
-    app_root: &Path,
+    runtime_config_root: &Path,
     content: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    ensure_directory(app_root)?;
+    ensure_directory(runtime_config_root)?;
 
-    let config_path = runtime_paths_config_path(app_root);
-    let backup_path = runtime_paths_config_backup_path(app_root);
-    let temporary_path = runtime_paths_config_temporary_path(app_root);
+    let config_path = runtime_paths_config_path(runtime_config_root);
+    let backup_path = runtime_paths_config_backup_path(runtime_config_root);
+    let temporary_path = runtime_paths_config_temporary_path(runtime_config_root);
     let write_result = (|| -> Result<(), Box<dyn Error>> {
         let mut temporary_file = OpenOptions::new()
             .create_new(true)
@@ -338,12 +352,12 @@ fn write_runtime_paths_config_atomically(
     write_result
 }
 
-fn runtime_paths_config_temporary_path(app_root: &Path) -> PathBuf {
+fn runtime_paths_config_temporary_path(runtime_config_root: &Path) -> PathBuf {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|value| value.as_nanos())
         .unwrap_or_default();
-    app_root.join(format!(
+    runtime_config_root.join(format!(
         ".{RUNTIME_PATHS_CONFIG_FILE_NAME}.{}.{timestamp}.tmp",
         std::process::id()
     ))
@@ -379,6 +393,7 @@ fn prompt_for_runtime_data_root(
 fn ensure_runtime_data_directories(data_root: &Path) -> Result<(), Box<dyn Error>> {
     ensure_directory(data_root)?;
     ensure_directory(&data_root.join("Database"))?;
+    ensure_directory(&data_root.join("Templates"))?;
     ensure_directory(&data_root.join("Files"))?;
     ensure_directory(&data_root.join("Exports"))?;
     ensure_directory(&data_root.join("SingleWindow"))?;
@@ -507,7 +522,8 @@ mod tests {
     #[test]
     fn reads_persisted_absolute_runtime_data_root() {
         let app_root = fresh_test_dir("absolute-runtime-data-root");
-        fs::create_dir_all(&app_root).unwrap();
+        let config_root = app_root.join("platform-config");
+        fs::create_dir_all(&config_root).unwrap();
         let data_root = absolute_test_data_root("configured-business-data");
         let config = RuntimePathsConfig {
             schema_version: RUNTIME_PATHS_CONFIG_SCHEMA_VERSION,
@@ -515,28 +531,32 @@ mod tests {
             source: Some("test".to_owned()),
         };
         fs::write(
-            runtime_paths_config_path(&app_root),
+            runtime_paths_config_path(&config_root),
             serde_json::to_string(&config).unwrap(),
         )
         .unwrap();
 
         assert_eq!(
-            read_persisted_data_root(&app_root).unwrap(),
+            read_persisted_data_root(&config_root, &app_root).unwrap(),
             Some(data_root)
         );
+        assert!(!runtime_paths_config_path(&app_root).exists());
     }
 
     #[test]
     fn rejects_unsupported_runtime_paths_config_schema() {
         let app_root = fresh_test_dir("unsupported-runtime-paths-schema");
-        fs::create_dir_all(&app_root).unwrap();
+        let config_root = app_root.join("platform-config");
+        fs::create_dir_all(&config_root).unwrap();
         fs::write(
-            runtime_paths_config_path(&app_root),
+            runtime_paths_config_path(&config_root),
             r#"{"schemaVersion":2,"dataRoot":"BusinessData"}"#,
         )
         .unwrap();
 
-        let error = read_persisted_data_root(&app_root).unwrap_err().to_string();
+        let error = read_persisted_data_root(&config_root, &app_root)
+            .unwrap_err()
+            .to_string();
 
         assert!(error.contains("Unsupported runtime paths config schema version 2"));
     }
@@ -544,19 +564,22 @@ mod tests {
     #[test]
     fn unsupported_schema_does_not_fall_back_to_older_backup() {
         let app_root = fresh_test_dir("unsupported-runtime-paths-schema-with-backup");
-        fs::create_dir_all(&app_root).unwrap();
+        let config_root = app_root.join("platform-config");
+        fs::create_dir_all(&config_root).unwrap();
         fs::write(
-            runtime_paths_config_path(&app_root),
+            runtime_paths_config_path(&config_root),
             r#"{"schemaVersion":2,"dataRoot":"NewBusinessData"}"#,
         )
         .unwrap();
         fs::write(
-            runtime_paths_config_backup_path(&app_root),
+            runtime_paths_config_backup_path(&config_root),
             r#"{"schemaVersion":1,"dataRoot":"OldBusinessData"}"#,
         )
         .unwrap();
 
-        let error = read_persisted_data_root(&app_root).unwrap_err().to_string();
+        let error = read_persisted_data_root(&config_root, &app_root)
+            .unwrap_err()
+            .to_string();
 
         assert!(error.contains("Unsupported runtime paths config schema version 2"));
     }
@@ -564,15 +587,16 @@ mod tests {
     #[test]
     fn resolves_persisted_relative_runtime_data_root_against_app_root() {
         let app_root = fresh_test_dir("relative-runtime-data-root");
-        fs::create_dir_all(&app_root).unwrap();
+        let config_root = app_root.join("platform-config");
+        fs::create_dir_all(&config_root).unwrap();
         fs::write(
-            runtime_paths_config_path(&app_root),
+            runtime_paths_config_path(&config_root),
             r#"{"schemaVersion":1,"dataRoot":"BusinessData"}"#,
         )
         .unwrap();
 
         assert_eq!(
-            read_persisted_data_root(&app_root).unwrap(),
+            read_persisted_data_root(&config_root, &app_root).unwrap(),
             Some(app_root.join("BusinessData"))
         );
     }
@@ -580,33 +604,35 @@ mod tests {
     #[test]
     fn persists_runtime_data_root_as_valid_config() {
         let app_root = fresh_test_dir("persist-runtime-data-root");
-        fs::create_dir_all(&app_root).unwrap();
+        let config_root = app_root.join("platform-config");
         let data_root = app_root.join("BusinessData");
 
-        persist_runtime_data_root(&app_root, &data_root).unwrap();
+        persist_runtime_data_root(&config_root, &data_root).unwrap();
 
         assert_eq!(
-            read_persisted_data_root(&app_root).unwrap(),
+            read_persisted_data_root(&config_root, &app_root).unwrap(),
             Some(data_root)
         );
+        assert!(runtime_paths_config_path(&config_root).exists());
+        assert!(!runtime_paths_config_path(&app_root).exists());
     }
 
     #[test]
     fn persist_keeps_previous_runtime_paths_config_as_backup() {
         let app_root = fresh_test_dir("backup-runtime-data-root");
-        fs::create_dir_all(&app_root).unwrap();
+        let config_root = app_root.join("platform-config");
         let first_data_root = app_root.join("FirstBusinessData");
         let second_data_root = app_root.join("SecondBusinessData");
 
-        persist_runtime_data_root(&app_root, &first_data_root).unwrap();
-        persist_runtime_data_root(&app_root, &second_data_root).unwrap();
+        persist_runtime_data_root(&config_root, &first_data_root).unwrap();
+        persist_runtime_data_root(&config_root, &second_data_root).unwrap();
 
         assert_eq!(
-            read_persisted_data_root(&app_root).unwrap(),
+            read_persisted_data_root(&config_root, &app_root).unwrap(),
             Some(second_data_root)
         );
         assert_eq!(
-            read_data_root_from_config(&runtime_paths_config_backup_path(&app_root), &app_root)
+            read_data_root_from_config(&runtime_paths_config_backup_path(&config_root), &app_root)
                 .unwrap(),
             first_data_root
         );
@@ -615,16 +641,16 @@ mod tests {
     #[test]
     fn falls_back_to_backup_when_runtime_paths_config_is_corrupted() {
         let app_root = fresh_test_dir("recover-runtime-data-root");
-        fs::create_dir_all(&app_root).unwrap();
+        let config_root = app_root.join("platform-config");
         let first_data_root = app_root.join("FirstBusinessData");
         let second_data_root = app_root.join("SecondBusinessData");
 
-        persist_runtime_data_root(&app_root, &first_data_root).unwrap();
-        persist_runtime_data_root(&app_root, &second_data_root).unwrap();
-        fs::write(runtime_paths_config_path(&app_root), "{broken-json").unwrap();
+        persist_runtime_data_root(&config_root, &first_data_root).unwrap();
+        persist_runtime_data_root(&config_root, &second_data_root).unwrap();
+        fs::write(runtime_paths_config_path(&config_root), "{broken-json").unwrap();
 
         assert_eq!(
-            read_persisted_data_root(&app_root).unwrap(),
+            read_persisted_data_root(&config_root, &app_root).unwrap(),
             Some(first_data_root)
         );
     }

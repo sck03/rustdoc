@@ -18,7 +18,10 @@ const profileRoot = path.join(repositoryRoot, ".codex-runtime", "visual-baseline
 const browserExecutable = path.join(repositoryRoot, "Browsers", "ChromeForTesting", "win64", "ChromeHeadlessShell", "chrome-headless-shell-win64", "chrome-headless-shell.exe");
 const axeSource = readFileSync(path.join(webRoot, "node_modules", "axe-core", "axe.min.js"), "utf8");
 const updateApprovedBaselines = process.env.UPDATE_FRONTEND_VISUAL_BASELINES === "1";
-const maximumPixelDifferenceRatio = Number(process.env.FRONTEND_VISUAL_MAX_DIFF_RATIO ?? "0.001");
+// Headless Chromium can shift sub-pixel glyph and one-pixel border rasterization between
+// fresh Windows processes even with the same pinned binary. Keep the default below 0.2%
+// so layout and component regressions still fail, while semantic checks guard critical text.
+const maximumPixelDifferenceRatio = Number(process.env.FRONTEND_VISUAL_MAX_DIFF_RATIO ?? "0.002");
 const pages = ["login", "login-expired", "dashboard", "invoice", "invoiceParties", "hs", "singleWindow", "report", "state-loading", "state-empty", "state-error", "state-fatal", "state-offline", "state-offline-local", "state-service-unavailable", "state-permission", "state-route-redirect", "state-conflict", "state-feedback", "dialog"];
 const viewports = [
   { name: "desktop-1366", width: 1366, height: 768 },

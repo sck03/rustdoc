@@ -199,7 +199,6 @@ export function InvoiceReportPreviewPanel({
     && Boolean(selectedTemplatePath)
     && !isBusy;
   const templateMessage = templatesQuery.isError ? readApiError(templatesQuery.error) : null;
-  const previewStoragePolicy = preview?.storagePolicy || documentPackage.preview?.storagePolicy || "";
 
   function handleTemplateChange(value: string) {
     setSelectedTemplatePath(value);
@@ -250,7 +249,6 @@ export function InvoiceReportPreviewPanel({
         hasUnsavedDraftChanges={hasUnsavedDraftChanges}
         isBusy={isBusy}
         jobId={lastCreatedJobId}
-        previewStoragePolicy={previewStoragePolicy}
         statusMessage={statusMessage}
         templateMessage={templateMessage}
         onPreview={() => previewMutation.mutate()}

@@ -69,9 +69,9 @@ if ($Profile -ne "Container") {
 
 if ($Profile -eq "Server") {
     $requiredServerEntries = if ($RuntimeIdentifier.StartsWith("win-", [StringComparison]::OrdinalIgnoreCase)) {
-        @("appsettings.json", "initialize-windows.ps1", "start-windows.ps1", "wwwroot/index.html")
+        @("appsettings.example.json", "initialize-windows.ps1", "start-windows.ps1", "wwwroot/index.html")
     } else {
-        @("appsettings.json", "initialize-linux.sh", "start-linux.sh", "wwwroot/index.html")
+        @("appsettings.example.json", "initialize-linux.sh", "start-linux.sh", "wwwroot/index.html")
     }
     foreach ($relativeEntry in $requiredServerEntries) {
         $entryPath = Join-Path $root $relativeEntry

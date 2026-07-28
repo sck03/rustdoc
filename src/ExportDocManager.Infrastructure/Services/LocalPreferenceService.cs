@@ -163,12 +163,12 @@ namespace ExportDocManager.Services.Infrastructure
         private static string ResolvePreferencePath(IAppPathProvider pathProvider, string filePath)
         {
             var preferencePath = string.IsNullOrWhiteSpace(filePath)
-                ? Path.Combine(pathProvider.AppRoot, PreferencesFileName)
+                ? Path.Combine(pathProvider.ConfigRoot, PreferencesFileName)
                 : filePath.Trim();
 
             return Path.GetFullPath(Path.IsPathRooted(preferencePath)
                 ? preferencePath
-                : Path.Combine(pathProvider.AppRoot, preferencePath));
+                : Path.Combine(pathProvider.ConfigRoot, preferencePath));
         }
 
         private static Dictionary<string, string> CreateEmptyState()

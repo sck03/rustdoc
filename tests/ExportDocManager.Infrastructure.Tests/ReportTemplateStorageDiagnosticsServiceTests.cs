@@ -22,7 +22,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 Assert.True(result.Exists);
                 Assert.True(result.Writable);
-                Assert.Equal(Path.Combine(appRoot, "Templates"), result.TemplateRoot);
+                Assert.Equal(Path.Combine(dataRoot, "Templates"), result.TemplateRoot);
                 Assert.Contains("Templates", result.StoragePolicy, StringComparison.Ordinal);
                 Assert.Empty(Directory.GetFiles(result.TemplateRoot, ".edm-template-write-check-*.tmp"));
             }
@@ -39,7 +39,8 @@ namespace ExportDocManager.Infrastructure.Tests
             string appRoot = Path.Combine(root, "app");
             string dataRoot = Path.Combine(root, "data");
             Directory.CreateDirectory(appRoot);
-            File.WriteAllText(Path.Combine(appRoot, "Templates"), "blocked");
+            Directory.CreateDirectory(dataRoot);
+            File.WriteAllText(Path.Combine(dataRoot, "Templates"), "blocked");
 
             try
             {
@@ -50,8 +51,8 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 Assert.False(result.Exists);
                 Assert.False(result.Writable);
-                Assert.Contains("模板目录不可写", result.Message, StringComparison.Ordinal);
-                Assert.Contains("非系统盘运行目录", result.Message, StringComparison.Ordinal);
+                Assert.Contains("用户模板目录不可写", result.Message, StringComparison.Ordinal);
+                Assert.Contains("运行数据根", result.Message, StringComparison.Ordinal);
             }
             finally
             {

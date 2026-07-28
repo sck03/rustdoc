@@ -378,7 +378,7 @@ namespace ExportDocManager.Api.Tests
                 "edm-api-lc-review",
                 "api-lc-review.db");
             File.WriteAllText(
-                Path.Combine(harness.AppRoot, "appsettings.json"),
+                Path.Combine(harness.DataRoot, "Config", "appsettings.json"),
                 $$"""
                 {
                   "AI": {

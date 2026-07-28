@@ -56,11 +56,12 @@ assert.match(
 );
 
 for (const contract of [
-  "首次部署令牌",
+  "首次启用口令",
+  "value={bootstrapToken}",
   'type="password"',
   'autoComplete="off"',
-  "登录成功后立即从页面内存清除",
-  "仅网络版空库首次建立管理员时填写",
+  "登录成功后会立即清除",
+  "仅首次启用系统时填写",
 ]) {
   assert(loginPageSource.includes(contract), `login page is missing bootstrap-token contract: ${contract}`);
 }

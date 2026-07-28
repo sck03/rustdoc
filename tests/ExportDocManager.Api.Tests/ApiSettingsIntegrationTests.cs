@@ -9,7 +9,7 @@ namespace ExportDocManager.Api.Tests
     public class ApiSettingsIntegrationTests
     {
         [Fact]
-        public async Task SettingsEndpoints_ShouldReadForAuthenticatedUsersAndSaveOnlyForAdminsToProgramRoot()
+        public async Task SettingsEndpoints_ShouldReadForAuthenticatedUsersAndSaveOnlyForAdminsToRuntimeConfigRoot()
         {
             await using var harness = await ApiIntegrationTestHarness.StartAsync(
                 "edm-api-settings",
@@ -24,7 +24,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
             var settingsResponse = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSettingsResponse>(getResponse);
             Assert.Contains("appsettings.json", settingsResponse.StoragePolicy, StringComparison.Ordinal);
-            Assert.Contains("不会迁入 App_Data", settingsResponse.StoragePolicy, StringComparison.Ordinal);
+            Assert.Contains("Config/appsettings.json", settingsResponse.StoragePolicy, StringComparison.Ordinal);
 
             var createOperatorResponse = await adminClient.PostAsJsonAsync("/api/users", new
             {
@@ -46,7 +46,7 @@ namespace ExportDocManager.Api.Tests
             var operatorSettings = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSettingsResponse>(operatorSettingsResponse);
             Assert.Empty(operatorSettings.Settings.System.UpdaterEndpoint);
 
-            string settingsPath = Path.Combine(harness.AppRoot, "appsettings.json");
+            string settingsPath = Path.Combine(harness.DataRoot, "Config", "appsettings.json");
             var forbiddenSettings = CloneSettings(settingsResponse.Settings);
             forbiddenSettings.System.AppName = "Blocked Settings Save";
             var forbiddenResponse = await operatorClient.PutAsJsonAsync("/api/settings", new
@@ -112,10 +112,10 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("http://updates.internal:8080/desktop/latest.json", saved.Settings.System.UpdaterEndpoint);
             Assert.True(File.Exists(settingsPath));
             Assert.StartsWith(
-                harness.AppRoot,
+                Path.Combine(harness.DataRoot, "Config"),
                 Path.GetFullPath(settingsPath),
                 StringComparison.OrdinalIgnoreCase);
-            Assert.False(File.Exists(Path.Combine(harness.DataRoot, "appsettings.json")));
+            Assert.False(File.Exists(Path.Combine(harness.AppRoot, "appsettings.json")));
             string settingsJson = await File.ReadAllTextAsync(settingsPath);
             Assert.Contains("Settings Endpoint Smoke", settingsJson);
             Assert.Contains("http://updates.internal:8080/desktop/latest.json", settingsJson);

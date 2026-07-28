@@ -34,7 +34,18 @@ if (Test-Path -LiteralPath $runtimeEnvPath -PathType Leaf) {
     }
 }
 
-$configPath = Join-Path $root "appsettings.json"
+$dataRoot = if (-not [string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_DATA_ROOT)) {
+    if ([System.IO.Path]::IsPathRooted($env:EXPORTDOCMANAGER_DATA_ROOT)) {
+        [System.IO.Path]::GetFullPath($env:EXPORTDOCMANAGER_DATA_ROOT)
+    } else {
+        [System.IO.Path]::GetFullPath((Join-Path $root $env:EXPORTDOCMANAGER_DATA_ROOT))
+    }
+} else {
+    Join-Path $root "App_Data"
+}
+New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
+
+$configPath = Join-Path $dataRoot "Config\appsettings.json"
 if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
     throw "appsettings.json was not found: $configPath"
 }
@@ -63,16 +74,6 @@ $effectiveUrls = if ($PSBoundParameters.ContainsKey('Urls')) {
 $env:EXPORTDOCMANAGER_NETWORK_MODE = "true"
 $env:EXPORTDOCMANAGER_PRODUCT_EDITION = "Full"
 $env:EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE = $browser.FullName
-$dataRoot = if (-not [string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_DATA_ROOT)) {
-    if ([System.IO.Path]::IsPathRooted($env:EXPORTDOCMANAGER_DATA_ROOT)) {
-        [System.IO.Path]::GetFullPath($env:EXPORTDOCMANAGER_DATA_ROOT)
-    } else {
-        [System.IO.Path]::GetFullPath((Join-Path $root $env:EXPORTDOCMANAGER_DATA_ROOT))
-    }
-} else {
-    Join-Path $root "App_Data"
-}
-New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
 & (Join-Path $root "ExportDocManager.Api.exe") `
     --app-root $root `
     --data-root $dataRoot `

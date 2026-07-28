@@ -75,7 +75,7 @@ pwsh -File .\initialize-container-runtime.ps1 `
 docker compose -f .\docker-compose.ghcr.yml --env-file .\.env up -d
 ```
 
-随后由部署管理员访问 `http://服务器地址:8080`，展开登录页“服务器连接设置”，在“首次部署令牌”中填写初始化命令使用的 `BootstrapToken`，再以用户名 `admin` 登录；这次输入的密码会成为首个应用管理员密码，至少需要 8 个字符。令牌只随本次登录请求发送，登录成功后从页面内存清除，不写入浏览器存储。空数据库首次初始化只接受 `admin` 用户名，其他用户名不能先行创建或认领管理员。数据库连接密码来自运行目录 `runtime/config/appsettings.json`，与应用管理员密码及首次部署令牌相互独立。
+随后由部署管理员访问 `http://服务器地址:8080`，展开登录页“高级连接选项”，在“首次启用口令”中填写初始化命令使用的 `BootstrapToken`，再以用户名 `admin` 登录；这次输入的密码会成为首个应用管理员密码，至少需要 8 个字符。口令只随本次登录请求发送，登录成功后从页面内存清除，不写入浏览器存储。空数据库首次初始化只接受 `admin` 用户名，其他用户名不能先行创建或认领管理员。数据库连接密码来自运行目录 `runtime/api-data/Config/appsettings.json`，与应用管理员密码及首次启用口令相互独立。
 
 API 启动时仍要求 `.env` 中保留至少 24 位的 `EXPORTDOCMANAGER_BOOTSTRAP_TOKEN`；数据库已有用户后，普通登录无需再次填写该令牌，可以按企业密钥轮换制度更换 `.env` 中的值并重启 API。不要把令牌复用为数据库密码或管理员密码。
 
@@ -98,10 +98,12 @@ PostgreSQL 18 官方镜像把默认 `PGDATA` 改为版本化目录 `/var/lib/pos
 ## 存储边界
 
 - PostgreSQL 数据：`runtime/postgres/`
-- API 数据、日志、授权镜像、缓存和备份：`runtime/api-data/`
-- 可编辑程序配置：`runtime/config/appsettings.json`
+- API 数据、日志、授权镜像、缓存、备份和用户模板：`runtime/api-data/`
+- 可编辑程序配置：`runtime/api-data/Config/appsettings.json`
 - 容器内报表 Chromium：Debian 官方 `chromium` 包，固定通过 `/usr/bin/chromium` 使用；不从宿主 C 盘或程序运行数据根复制浏览器二进制
 - 镜像层与 Docker 自身缓存由 Docker Engine 管理；Windows 上如要求系统 C 盘零占用，还必须把 Docker Desktop/Engine 的 data-root 或磁盘镜像迁到非系统盘。
+
+API 容器只挂载整个 `runtime/api-data/` 到 `/runtime-data`，不再对配置文件增加嵌套只读挂载。管理员保存设置时需要在 `Config/` 同目录创建临时文件并原子替换正式文件，因此 `api-data/Config/` 必须保持可写；安装镜像内的 `/app` 仍保持只读使用。
 
 不要把 `runtime/`、`.env`、TLS 私钥或数据库密码提交到版本库。公网部署必须使用可信 HTTPS 和防火墙，可启用本目录 TLS overlay，也可在 Web 容器前使用成熟反向代理/CDN；不要直接公开 API 容器端口。
 

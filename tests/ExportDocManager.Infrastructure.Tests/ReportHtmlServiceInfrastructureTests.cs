@@ -135,6 +135,73 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task RenderInvoiceReportAsync_ShouldRejectPaymentTemplateCategory()
+        {
+            string appRoot = CreateTempDirectory("invoice-template-domain-app");
+            string dataRoot = CreateTempDirectory("invoice-template-domain-data");
+
+            try
+            {
+                string templatePath = Path.Combine(appRoot, "Templates", "Internal", "payment_voucher_template.html");
+                Directory.CreateDirectory(Path.GetDirectoryName(templatePath)!);
+                await File.WriteAllTextAsync(templatePath, "<html><body>{{ Payment.InvoiceNo }}</body></html>");
+
+                await using var factory = new TestDbContextFactory();
+                int invoiceId = await SeedInvoiceAsync(factory);
+                var service = new ReportHtmlService(
+                    factory,
+                    new StubSettingsService(),
+                    new RuntimeAppPathProvider(appRoot, dataRoot));
+
+                var error = await Assert.ThrowsAsync<ArgumentException>(() => service.RenderInvoiceReportAsync(
+                    invoiceId,
+                    ReportDocumentType.ExportDocument,
+                    templatePath,
+                    withSeal: false));
+
+                Assert.Contains("不能交叉使用", error.Message, StringComparison.Ordinal);
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        [Fact]
+        public async Task RenderPaymentVoucherAsync_ShouldRejectExportTemplateCategory()
+        {
+            string appRoot = CreateTempDirectory("payment-template-domain-app");
+            string dataRoot = CreateTempDirectory("payment-template-domain-data");
+
+            try
+            {
+                string templatePath = Path.Combine(appRoot, "Templates", "Export", "invoice_template.html");
+                Directory.CreateDirectory(Path.GetDirectoryName(templatePath)!);
+                await File.WriteAllTextAsync(templatePath, "<html><body>{{ Invoice.InvoiceNo }}</body></html>");
+
+                await using var factory = new TestDbContextFactory();
+                int paymentId = await SeedPaymentWithMatchingInvoiceAsync(factory);
+                var service = new ReportHtmlService(
+                    factory,
+                    new StubSettingsService(),
+                    new RuntimeAppPathProvider(appRoot, dataRoot));
+
+                var error = await Assert.ThrowsAsync<ArgumentException>(() => service.RenderPaymentVoucherAsync(
+                    paymentId,
+                    templatePath,
+                    withSeal: false));
+
+                Assert.Contains("不能交叉使用", error.Message, StringComparison.Ordinal);
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        [Fact]
         public async Task RenderBuiltInProgramTemplates_ShouldRenderFromProgramRootWithoutCrossDomainLeakage()
         {
             string repositoryRoot = FindRepositoryRoot();

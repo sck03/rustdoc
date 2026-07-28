@@ -9,7 +9,7 @@ namespace ExportDocManager.Api.Hosting
     public static partial class ApiEndpointRouteBuilderExtensions
     {
         private const string InvoiceDocumentEmailStoragePolicy =
-            "单据邮件发送只读取当前发票/报关数据域、客户邮箱和程序根 appsettings.json SMTP 配置；临时 PDF 写运行数据根 Cache/ReportDocumentEmails 后自动清理，不读取付款/报销表，不创建默认附件或导出目录。";
+            "单据邮件发送只读取当前发票/报关数据域、客户邮箱和运行数据根 Config/appsettings.json SMTP 配置；临时 PDF 写运行数据根 Cache/ReportDocumentEmails 后自动清理，不读取付款/报销表，不创建默认附件或导出目录。";
 
         private static void MapInvoiceDocumentEmailEndpoint(this IEndpointRouteBuilder endpoints)
         {

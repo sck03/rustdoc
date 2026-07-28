@@ -10,7 +10,7 @@ namespace ExportDocManager.Services.Reporting
         private const string PackageExtension = ".edtpl";
 
         private const string StoragePolicy =
-            "模板包导出路径来自用户显式输入；相对路径解析到运行数据根 TemplatePackages/。模板文件只从程序根 Templates/ 打包，导入临时目录使用运行数据根 Cache/TemplatePackages，不写入系统盘用户目录。";
+            "模板包导出路径来自用户显式输入；相对路径解析到运行数据根 TemplatePackages/。只打包和导入运行数据根 Templates/ 下的用户模板，内置模板保持只读；临时文件使用运行数据根 Cache/TemplatePackages。";
 
         private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
@@ -35,7 +35,7 @@ namespace ExportDocManager.Services.Reporting
             CancellationToken cancellationToken = default)
         {
             string targetPath = NormalizeExportPackagePath(packagePath);
-            string templatesRoot = _pathResolver.GetTemplatesBaseDirectory();
+            string templatesRoot = _pathResolver.GetUserTemplatesBaseDirectory();
             string tempRoot = RuntimeCachePathHelper.CreateUniqueDirectory(
                 _pathProvider,
                 "TemplatePackages",
@@ -80,12 +80,12 @@ namespace ExportDocManager.Services.Reporting
                         FileName = row.FileName,
                         WithSeal = row.WithSeal ?? true
                     }).ToList(),
-                    ExportTemplates = (_settingsService.Settings.BatchExport?.Items ?? new List<BatchExportItem>())
-                        .Select(ToManifestItem)
-                        .ToList(),
-                    InternalTemplates = (_settingsService.Settings.PaymentTemplates ?? new List<BatchExportItem>())
-                        .Select(ToManifestItem)
-                        .ToList()
+                    ExportTemplates = BuildManifestItems(
+                        _settingsService.Settings.BatchExport?.Items,
+                        ReportDocumentType.ExportDocument),
+                    InternalTemplates = BuildManifestItems(
+                        _settingsService.Settings.PaymentTemplates,
+                        ReportDocumentType.PaymentVoucher)
                 };
 
                 string manifestPath = Path.Combine(tempRoot, "config.json");
@@ -132,7 +132,7 @@ namespace ExportDocManager.Services.Reporting
                 _pathProvider,
                 "TemplatePackages",
                 "edtpl-import");
-            string templatesRoot = _pathResolver.GetTemplatesBaseDirectory();
+            string templatesRoot = _pathResolver.GetUserTemplatesBaseDirectory();
 
             await _settingsService.LoadAsync().ConfigureAwait(false);
 
@@ -191,12 +191,12 @@ namespace ExportDocManager.Services.Reporting
                     await SaveTemplateRowsAsync(mergedRows, cancellationToken).ConfigureAwait(false);
                 }
 
-                var exportTemplates = (manifest.ExportTemplates ?? new List<BatchExportItemManifest>())
-                    .Select(ToBatchExportItem)
-                    .ToList();
-                var internalTemplates = (manifest.InternalTemplates ?? new List<BatchExportItemManifest>())
-                    .Select(ToBatchExportItem)
-                    .ToList();
+                var exportTemplates = BuildImportedItems(
+                    manifest.ExportTemplates,
+                    ReportDocumentType.ExportDocument);
+                var internalTemplates = BuildImportedItems(
+                    manifest.InternalTemplates,
+                    ReportDocumentType.PaymentVoucher);
 
                 if (exportTemplates.Count > 0 || internalTemplates.Count > 0)
                 {
@@ -233,7 +233,7 @@ namespace ExportDocManager.Services.Reporting
 
         private async Task<List<ReportTemplateConfig>> LoadTemplateRowsAsync(CancellationToken cancellationToken)
         {
-            string templatesRoot = _pathResolver.GetTemplatesBaseDirectory();
+            string templatesRoot = _pathResolver.GetUserTemplatesBaseDirectory();
             var configs = await _catalogLoader.LoadResolvedConfigsAsync(cancellationToken).ConfigureAwait(false);
             return configs
                 .Where(config =>
@@ -242,7 +242,7 @@ namespace ExportDocManager.Services.Reporting
                     ReportTemplatePathResolver.IsPathWithinDirectory(config.FileName, templatesRoot))
                 .Select(config => new ReportTemplateConfig
                 {
-                    Type = ReportTemplateCatalogLoader.NormalizeTemplateCatalogType(config.Type, config.FileName),
+                    Type = ReportTemplateCatalogLoader.NormalizeTemplateCatalogType(null, config.FileName),
                     Name = ReportTemplateCatalogLoader.NormalizeTemplateDisplayName(config.Name, config.FileName),
                     FileName = _pathResolver.ToStoredPath(config.FileName),
                     WithSeal = config.WithSeal ?? true
@@ -254,7 +254,7 @@ namespace ExportDocManager.Services.Reporting
             IEnumerable<ReportTemplateConfig> rows,
             CancellationToken cancellationToken)
         {
-            string configPath = Path.Combine(_pathResolver.GetTemplatesBaseDirectory(), "report_templates.json");
+            string configPath = _pathResolver.GetUserConfigPath();
             var normalizedRows = (rows ?? Enumerable.Empty<ReportTemplateConfig>())
                 .Where(row => row != null && !string.IsNullOrWhiteSpace(row.FileName))
                 .Select(NormalizeTemplateRowForStorage)
@@ -273,7 +273,7 @@ namespace ExportDocManager.Services.Reporting
         private ReportTemplateConfig NormalizeTemplateRowForStorage(ReportTemplateConfig row)
         {
             string absolutePath = _pathResolver.ToAbsolutePath(row.FileName);
-            string templatesRoot = _pathResolver.GetTemplatesBaseDirectory();
+            string templatesRoot = _pathResolver.GetUserTemplatesBaseDirectory();
             if (!ReportTemplatePathResolver.IsPathWithinDirectory(absolutePath, templatesRoot))
             {
                 absolutePath = Path.Combine(
@@ -283,7 +283,7 @@ namespace ExportDocManager.Services.Reporting
 
             return new ReportTemplateConfig
             {
-                Type = ReportTemplateCatalogLoader.NormalizeTemplateCatalogType(row.Type, absolutePath),
+                Type = ReportTemplateCatalogLoader.NormalizeTemplateCatalogType(null, absolutePath),
                 Name = ReportTemplateCatalogLoader.NormalizeTemplateDisplayName(row.Name, absolutePath),
                 FileName = _pathResolver.ToStoredPath(absolutePath),
                 WithSeal = row.WithSeal ?? true
@@ -518,28 +518,73 @@ namespace ExportDocManager.Services.Reporting
             };
         }
 
-        private static BatchExportItemManifest ToManifestItem(BatchExportItem item)
+        private List<BatchExportItemManifest> BuildManifestItems(
+            IEnumerable<BatchExportItem> items,
+            ReportDocumentType reportType)
         {
-            return new BatchExportItemManifest
-            {
-                Name = item?.Name ?? string.Empty,
-                TemplatePath = item?.TemplatePath ?? string.Empty,
-                ReportType = item?.ReportType ?? string.Empty,
-                IsEnabled = item?.IsEnabled ?? true,
-                ShowSeal = item?.ShowSeal ?? true
-            };
+            return (items ?? Enumerable.Empty<BatchExportItem>())
+                .Select(item => TryNormalizeTemplateReference(item?.TemplatePath, reportType, out string templatePath)
+                    ? new BatchExportItemManifest
+                    {
+                        Name = item?.Name ?? string.Empty,
+                        TemplatePath = templatePath,
+                        ReportType = reportType.ToString(),
+                        IsEnabled = item?.IsEnabled ?? true,
+                        ShowSeal = item?.ShowSeal ?? true
+                    }
+                    : null)
+                .OfType<BatchExportItemManifest>()
+                .ToList();
         }
 
-        private static BatchExportItem ToBatchExportItem(BatchExportItemManifest item)
+        private List<BatchExportItem> BuildImportedItems(
+            IEnumerable<BatchExportItemManifest> items,
+            ReportDocumentType reportType)
         {
-            return new BatchExportItem
+            return (items ?? Enumerable.Empty<BatchExportItemManifest>())
+                .Select(item => TryNormalizeTemplateReference(item?.TemplatePath, reportType, out string templatePath)
+                    ? new BatchExportItem
+                    {
+                        Name = item?.Name ?? string.Empty,
+                        TemplatePath = templatePath,
+                        ReportType = reportType.ToString(),
+                        IsEnabled = item?.IsEnabled ?? true,
+                        ShowSeal = item?.ShowSeal ?? true
+                    }
+                    : null)
+                .OfType<BatchExportItem>()
+                .ToList();
+        }
+
+        private bool TryNormalizeTemplateReference(
+            string templatePath,
+            ReportDocumentType reportType,
+            out string normalizedPath)
+        {
+            normalizedPath = string.Empty;
+            if (string.IsNullOrWhiteSpace(templatePath))
             {
-                Name = item?.Name ?? string.Empty,
-                TemplatePath = item?.TemplatePath ?? string.Empty,
-                ReportType = item?.ReportType ?? string.Empty,
-                IsEnabled = item?.IsEnabled ?? true,
-                ShowSeal = item?.ShowSeal ?? true
-            };
+                return false;
+            }
+
+            try
+            {
+                string absolutePath = Path.GetFullPath(_pathResolver.ToAbsolutePath(templatePath));
+                bool managed = _pathResolver.IsBuiltInTemplatePath(absolutePath) ||
+                               _pathResolver.IsUserTemplatePath(absolutePath);
+                if (!managed || !File.Exists(absolutePath) ||
+                    ReportTemplateCatalogLoader.ResolveCatalogReportType(null, absolutePath) != reportType)
+                {
+                    return false;
+                }
+
+                normalizedPath = _pathResolver.ToStoredPath(absolutePath);
+                return true;
+            }
+            catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
         }
 
         private static void ReportProgress(

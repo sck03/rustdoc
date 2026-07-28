@@ -39,7 +39,6 @@ services:
     shm_size: "512mb"
     volumes:
       - ${EXPORTDOCMANAGER_RUNTIME_ROOT:-./runtime}/api-data:/runtime-data
-      - ${EXPORTDOCMANAGER_RUNTIME_ROOT:-./runtime}/config/appsettings.json:/app/appsettings.json:ro
     depends_on:
       postgres:
         condition: service_healthy

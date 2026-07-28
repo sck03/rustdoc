@@ -102,7 +102,7 @@ namespace ExportDocManager.Api.Hosting
                 runtimeDependencies
                     .Select(ToApiRuntimeDependency)
                     .ToArray(),
-                "程序根保存 appsettings.json 与 Templates/Resources/Browsers/Tools/OcrModels 等随程序资源；稳定资源路径只解析、不因健康检查自动创建，其中报表模板仅在用户显式新建、保存或导入时维护。数据库、日志、缓存、备份、WebView 和其它业务可写数据统一使用 data root（默认 App_Data，可由 --data-root 指向运行目录下其它目录）；授权镜像保存到运行数据根 Security，试用锚点和已注册许可证保存到平台机器级授权锚点。");
+                "程序根只保存可执行文件以及 Templates/Resources/Browsers/Tools/OcrModels 等只读随程序资源。设置、用户模板、数据库、日志、缓存、备份、WebView 和其它业务可写数据统一使用 data root（默认 App_Data，可由 --data-root 指向其它磁盘）；授权镜像保存到运行数据根 Security，试用锚点和已注册许可证保存到平台机器级授权锚点。");
         }
 
         private static ApiRuntimeDependencyInfo ToApiRuntimeDependency(RuntimeDependencyDiagnostic diagnostic)
@@ -123,13 +123,14 @@ namespace ExportDocManager.Api.Hosting
         {
             var result = new List<ApiRuntimePathInfo>
             {
-                DirectoryPath("app-root", "程序根", paths.AppRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Core, "程序可执行文件、配置入口和随程序资源的根目录。"),
-                DirectoryPath("template-root", "报表模板", paths.TemplateRoot, "program-resource", "managed", ApiRuntimePathRequirement.Feature, "内置模板随程序发布；只有用户显式执行模板维护时才写入。"),
+                DirectoryPath("app-root", "程序根", paths.AppRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Core, "程序可执行文件和随程序资源的只读根目录。"),
+                DirectoryPath("template-root", "内置报表模板", paths.TemplateRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Feature, "随程序发布，只读加载且不在运行时改写。"),
                 DirectoryPath("resource-root", "公共资源", paths.ResourceRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Feature, "Excel 模板、单一窗口词典等随程序资源。"),
                 DirectoryPath("browser-root", "浏览器运行包", paths.BrowserRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Feature, "报表渲染使用的跨平台浏览器资源。"),
                 DirectoryPath("tool-root", "工具运行包", paths.ToolRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Optional, "PostgreSQL、Excel helper 等可选工具。"),
                 DirectoryPath("ocr-model-root", "OCR 模型", paths.OcrModelRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Optional, "可选 OCR 模型与原生运行资源。"),
                 DirectoryPath("data-root", "运行数据根", paths.DataRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "全部默认业务可写目录的统一根。"),
+                DirectoryPath("user-template-root", "用户报表模板", paths.UserTemplateRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Feature, "用户新建、编辑副本和导入的报表模板。"),
                 DirectoryPath("database-root", "数据库目录", paths.DatabaseRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "SQLite 数据库及数据库相关运行文件。"),
                 DirectoryPath("file-root", "业务文件", paths.FileRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "业务附件和受管文件。"),
                 DirectoryPath("export-root", "导出目录", paths.ExportRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "未显式选择外部目录时的受管导出位置。"),

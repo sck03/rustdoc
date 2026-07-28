@@ -18,6 +18,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.Equal(Path.Combine(provider.DataRoot, "Database"), provider.DatabaseRoot);
                 Assert.Equal(Path.Combine(provider.DataRoot, "Backups"), provider.BackupRoot);
                 Assert.Equal(Path.Combine(provider.AppRoot, "Templates"), provider.TemplateRoot);
+                Assert.Equal(Path.Combine(provider.DataRoot, "Templates"), provider.UserTemplateRoot);
                 Assert.Equal(Path.Combine(provider.AppRoot, "Resources"), provider.ResourceRoot);
                 Assert.Equal(Path.Combine(provider.AppRoot, "Browsers"), provider.BrowserRoot);
                 Assert.Equal(Path.Combine(provider.AppRoot, "Tools"), provider.ToolRoot);
@@ -47,6 +48,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.Equal(NormalizeRoot(appRoot), provider.AppRoot);
                 Assert.Equal(NormalizeRoot(dataRoot), provider.DataRoot);
                 Assert.Equal(Path.Combine(NormalizeRoot(appRoot), "Templates"), provider.TemplateRoot);
+                Assert.Equal(Path.Combine(NormalizeRoot(dataRoot), "Templates"), provider.UserTemplateRoot);
                 Assert.Equal(Path.Combine(NormalizeRoot(appRoot), "Resources"), provider.ResourceRoot);
                 Assert.Equal(Path.Combine(NormalizeRoot(appRoot), "Browsers"), provider.BrowserRoot);
                 Assert.Equal(Path.Combine(NormalizeRoot(appRoot), "Tools"), provider.ToolRoot);
@@ -59,6 +61,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.True(Directory.Exists(provider.SingleWindowRoot));
                 Assert.True(Directory.Exists(provider.SecurityRoot));
                 Assert.True(Directory.Exists(provider.WebViewRoot));
+                Assert.True(Directory.Exists(provider.UserTemplateRoot));
             }
             finally
             {

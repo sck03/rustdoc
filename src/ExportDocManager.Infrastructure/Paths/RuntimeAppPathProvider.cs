@@ -40,6 +40,8 @@ namespace ExportDocManager.Services.Infrastructure
 
         public string TemplateRoot => GetAppPath("Templates");
 
+        public string UserTemplateRoot => GetDataDirectory("Templates");
+
         public string ResourceRoot => GetAppPath("Resources");
 
         public string BrowserRoot => GetAppPath("Browsers");

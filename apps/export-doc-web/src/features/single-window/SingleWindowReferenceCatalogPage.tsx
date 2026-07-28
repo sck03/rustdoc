@@ -153,7 +153,7 @@ export function SingleWindowReferenceCatalogPage({
       setDraft(nextCatalog);
       setHasUnsavedChanges(false);
       setMessage(null);
-      setSuccessMessage(response.message || "单一窗口参考词典 JSON 已导入。");
+      setSuccessMessage(response.message || "单一窗口参考词典已导入。");
       queryClient.setQueryData(queryKeys.singleWindowReferenceCatalog(), {
         catalog: nextCatalog,
         storagePolicy: response.storagePolicy,
@@ -500,7 +500,7 @@ export function SingleWindowReferenceCatalogPage({
 
     downloadJson(normalizeCatalog(draft), "singlewindow_reference_catalogs.json");
     setMessage(null);
-    setSuccessMessage("参考词典 JSON 已导出。");
+    setSuccessMessage("参考词典已导出。");
   }
 
   function chooseJsonImportFile() {
@@ -516,7 +516,7 @@ export function SingleWindowReferenceCatalogPage({
       return;
     }
 
-    if (!await confirmDiscardChanges("导入 JSON 参考词典")) {
+    if (!await confirmDiscardChanges("导入参考词典配置")) {
       return;
     }
 
@@ -577,11 +577,11 @@ export function SingleWindowReferenceCatalogPage({
           </button>
           <button className="command-button secondary" type="button" disabled={!draft || isBusy} onClick={handleExportJson}>
             <Download size={17} aria-hidden="true" />
-            <span>导出JSON</span>
+            <span>导出配置</span>
           </button>
           <button className="command-button secondary" type="button" disabled={!canManageReferenceCatalog || isBusy} onClick={chooseJsonImportFile}>
             <Upload size={17} aria-hidden="true" />
-            <span>导入JSON</span>
+            <span>导入配置</span>
           </button>
           <button className="command-button secondary" type="button" disabled={!canManageReferenceCatalog || isBusy} onClick={excelWorkspace.chooseFile}>
             <FileSpreadsheet size={17} aria-hidden="true" />

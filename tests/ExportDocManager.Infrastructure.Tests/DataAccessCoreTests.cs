@@ -265,27 +265,12 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public async Task DatabaseInitializationService_ShouldUpgradeLegacyInvoiceNoUniqueIndexToTypeAwareIndex()
+        public async Task DatabaseInitializationService_ShouldCreateVersionedV1SchemaForEmptyDatabase()
         {
             var databasePath = Path.Combine(
                 Path.GetTempPath(),
-                "edm-invoice-type-schema-" + Guid.NewGuid().ToString("N") + ".db");
+                "edm-v1-schema-" + Guid.NewGuid().ToString("N") + ".db");
             using var factory = new SqliteFileDbContextFactory(databasePath);
-
-            await using (var context = await factory.CreateDbContextAsync())
-            {
-                await context.Database.EnsureCreatedAsync();
-                await context.Database.ExecuteSqlRawAsync("DROP INDEX IF EXISTS \"IX_Invoices_InvoiceNo_Type\"");
-                await context.Database.ExecuteSqlRawAsync("CREATE UNIQUE INDEX \"IX_Invoices_InvoiceNo\" ON \"Invoices\" (\"InvoiceNo\")");
-
-                context.Invoices.Add(new Invoice
-                {
-                    InvoiceNo = "INV-TYPE-UPGRADE",
-                    InvoiceDate = new DateTime(2026, 6, 25),
-                    ShipmentDate = new DateTime(2026, 6, 25)
-                });
-                await context.SaveChangesAsync();
-            }
 
             var service = new DatabaseInitializationService(
                 factory,
@@ -297,12 +282,14 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.True(result.IsSuccess, result.ErrorMessage);
 
             await using var verifyContext = await factory.CreateDbContextAsync();
-            var existing = await verifyContext.Invoices.SingleAsync();
-            Assert.Equal("实际数据", existing.Type);
+            int schemaVersion = await verifyContext.Database
+                .SqlQueryRaw<int>("SELECT \"Version\" AS \"Value\" FROM \"__ExportDocManagerSchema\" WHERE \"Id\" = 1")
+                .SingleAsync();
+            Assert.Equal(1, schemaVersion);
 
             verifyContext.Invoices.Add(new Invoice
             {
-                InvoiceNo = "INV-TYPE-UPGRADE",
+                InvoiceNo = "INV-V1-TYPE",
                 Type = "报关数据",
                 InvoiceDate = new DateTime(2026, 6, 25),
                 ShipmentDate = new DateTime(2026, 6, 25)
@@ -311,12 +298,36 @@ namespace ExportDocManager.Infrastructure.Tests
 
             verifyContext.Invoices.Add(new Invoice
             {
-                InvoiceNo = "INV-TYPE-UPGRADE",
+                InvoiceNo = "INV-V1-TYPE",
                 Type = "报关数据",
                 InvoiceDate = new DateTime(2026, 6, 26),
                 ShipmentDate = new DateTime(2026, 6, 26)
             });
             await Assert.ThrowsAsync<DbUpdateException>(() => verifyContext.SaveChangesAsync());
+        }
+
+        [Fact]
+        public async Task DatabaseInitializationService_ShouldRejectUnversionedPreReleaseDatabase()
+        {
+            var databasePath = Path.Combine(
+                Path.GetTempPath(),
+                "edm-unversioned-schema-" + Guid.NewGuid().ToString("N") + ".db");
+            using var factory = new SqliteFileDbContextFactory(databasePath);
+            await using (var context = await factory.CreateDbContextAsync())
+            {
+                await context.Database.EnsureCreatedAsync();
+            }
+
+            var service = new DatabaseInitializationService(
+                factory,
+                new DatabaseConnectionSettings(),
+                new DatabaseInitializationCoordinator());
+
+            var result = await service.InitializeAsync("admin", string.Empty);
+
+            Assert.False(result.IsSuccess);
+            Assert.Contains("无版本标记", result.ErrorMessage, StringComparison.Ordinal);
+            Assert.Contains("空数据库重新初始化", result.ErrorMessage, StringComparison.Ordinal);
         }
 
         private sealed class FixedAuditUserProvider : IAuditUserProvider

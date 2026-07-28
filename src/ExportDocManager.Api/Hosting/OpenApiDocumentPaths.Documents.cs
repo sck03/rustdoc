@@ -121,7 +121,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["200"] = new
                                 {
-                                    description = "Report templates resolved from the program root Templates directory.",
+                                    description = "Report templates resolved from the read-only built-in catalog and runtime-data user catalog, filtered by report type.",
                                     content = JsonContent("ApiReportTemplateDtoArray")
                                 },
                                 ["400"] = new { description = "Invalid report type." },
@@ -141,7 +141,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["200"] = new
                                 {
-                                    description = "Report template was created under the program root Templates directory.",
+                                    description = "Report template was created under the runtime-data user directory for the selected report type.",
                                     content = JsonContent("ApiReportTemplateContentDto")
                                 },
                                 ["400"] = new { description = "Invalid report type, template path, or request body." },
@@ -200,13 +200,13 @@ namespace ExportDocManager.Api.Hosting
                             parameters = new object[]
                             {
                                 QueryParameter("reportType", "string", null, "Report type: ExportDocument or PaymentVoucher."),
-                                QueryParameter("templatePath", "string", null, "Resolved template path under program root Templates or an explicit configured path.")
+                                QueryParameter("templatePath", "string", null, "Resolved path from the managed built-in or user template catalog.")
                             },
                             responses = new Dictionary<string, object>
                             {
                                 ["200"] = new
                                 {
-                                    description = "Report template HTML content. Editable templates are constrained to program root Templates or explicit catalog entries.",
+                                    description = "Report template HTML content. The path must belong to the managed catalog and match the requested report type.",
                                     content = JsonContent("ApiReportTemplateContentDto")
                                 },
                                 ["400"] = new { description = "Invalid report type or template path." },
@@ -229,7 +229,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["200"] = new
                                 {
-                                    description = "Report template was saved atomically under the program root Templates directory or an explicit catalog entry.",
+                                    description = "Report template was saved atomically under the runtime-data user template directory; editing a built-in template creates a user copy.",
                                     content = JsonContent("ApiReportTemplateContentDto")
                                 },
                                 ["400"] = new { description = "Invalid report type, template path, or request body." },
@@ -246,13 +246,13 @@ namespace ExportDocManager.Api.Hosting
                             parameters = new object[]
                             {
                                 QueryParameter("reportType", "string", null, "Report type: ExportDocument or PaymentVoucher."),
-                                QueryParameter("templatePath", "string", null, "Template path under program root Templates.")
+                                QueryParameter("templatePath", "string", null, "User template path from the managed catalog.")
                             },
                             responses = new Dictionary<string, object>
                             {
                                 ["200"] = new
                                 {
-                                    description = "Report template was deleted from the program root Templates directory.",
+                                    description = "User template was deleted from the runtime-data template directory.",
                                     content = JsonContent("ApiCommandResponse")
                                 },
                                 ["400"] = new { description = "Invalid report type or template path." },
@@ -278,7 +278,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["200"] = new
                                 {
-                                    description = "Report template was renamed under the program root Templates directory.",
+                                    description = "User template was renamed within its report-type directory.",
                                     content = JsonContent("ApiReportTemplateContentDto")
                                 },
                                 ["400"] = new { description = "Invalid report type, template path, or request body." },
@@ -349,7 +349,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["200"] = new
                                 {
-                                    description = "Report template package was imported through runtime Cache/TemplatePackages and written to program root Templates.",
+                                    description = "Report template package was imported through runtime Cache/TemplatePackages and written to runtime-data user Templates.",
                                     content = JsonContent("ApiReportTemplatePackageImportResponse")
                                 },
                                 ["400"] = new { description = "Invalid package path, strategy, or package content." },
@@ -380,7 +380,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["200"] = new
                                 {
-                                    description = "Uploaded package was staged under runtime Cache/TemplatePackages and imported into program root Templates.",
+                                    description = "Uploaded package was staged under runtime Cache/TemplatePackages and imported into runtime-data user Templates.",
                                     content = JsonContent("ApiReportTemplatePackageImportResponse")
                                 },
                                 ["400"] = new { description = "Invalid strategy, file name, empty body, or package content." },
@@ -433,7 +433,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["200"] = new
                                 {
-                                    description = "Rendered report HTML using Templates under the program root or an explicit template path.",
+                                    description = "Rendered export-document HTML using a managed Export template. Payment/reimbursement templates are rejected.",
                                     content = JsonContent("ApiReportHtmlPreviewResponse")
                                 },
                                 ["400"] = new { description = "Invalid invoice id, report type, or preview request." },
@@ -516,7 +516,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["200"] = new
                                 {
-                                    description = "Rendered payment/reimbursement HTML using Templates/Internal under the program root or an explicit template path. Payment data is rendered from the payment domain and does not load invoice/customs documents.",
+                                    description = "Rendered payment/reimbursement HTML using a managed Internal template. Export-document templates are rejected, and invoice/customs data is not loaded.",
                                     content = JsonContent("ApiPaymentReportHtmlPreviewResponse")
                                 },
                                 ["400"] = new { description = "Invalid payment id, report type, or preview request." },
@@ -570,7 +570,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["202"] = new
                                 {
-                                    description = "Report PDF background job was accepted. The sidecar reads Templates under the program root and writes only to the explicit destination path.",
+                                    description = "Export-document PDF background job was accepted. A managed Export template is read and output is written only to the explicit destination path.",
                                     content = JsonContent("BackgroundJobSnapshot")
                                 },
                                 ["400"] = new { description = "Invalid invoice id, report type, or destination path." },
@@ -617,7 +617,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["202"] = new
                                 {
-                                    description = "Payment/reimbursement PDF background job was accepted. The sidecar reads Templates/Internal and the browser renderer from the program root, renders payment data only, and writes only to the explicit destination path.",
+                                    description = "Payment/reimbursement PDF background job was accepted. A managed Internal template is read, payment data only is rendered, and output is written only to the explicit destination path.",
                                     content = JsonContent("BackgroundJobSnapshot")
                                 },
                                 ["400"] = new { description = "Invalid payment id, report type, or destination path." },

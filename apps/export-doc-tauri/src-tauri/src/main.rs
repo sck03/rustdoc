@@ -63,7 +63,6 @@ fn run_tauri_app() -> tauri::Result<()> {
             desktop_commands::select_excel_file,
             desktop_commands::select_directory,
             desktop_commands::select_report_template_package_file,
-            desktop_commands::select_report_template_file,
             desktop_commands::select_save_package_path,
             desktop_commands::select_save_invoice_transfer_package_path,
             desktop_commands::select_save_report_template_package_path,

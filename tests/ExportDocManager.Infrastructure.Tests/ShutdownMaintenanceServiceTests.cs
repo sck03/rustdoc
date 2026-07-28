@@ -355,6 +355,7 @@ namespace ExportDocManager.Infrastructure.Tests
             public string DataRoot { get; }
             public string DatabaseRoot => Path.Combine(DataRoot, "Database");
             public string TemplateRoot => Path.Combine(AppRoot, "Templates");
+            public string UserTemplateRoot => Path.Combine(DataRoot, "Templates");
             public string ResourceRoot => Path.Combine(AppRoot, "Resources");
             public string BrowserRoot => Path.Combine(AppRoot, "Browsers");
             public string ToolRoot => Path.Combine(AppRoot, "Tools");

@@ -26,7 +26,7 @@ namespace ExportDocManager.Api.Tests
                 null);
             Assert.Equal(HttpStatusCode.Unauthorized, anonymousTemplateStorageResponse.StatusCode);
 
-            var templatePath = Path.Combine(harness.AppRoot, "Templates", "Export", "designer_test.html");
+            var templatePath = Path.Combine(harness.DataRoot, "Templates", "Export", "designer_test.html");
             var anonymousContentResponse = await anonymousClient.GetAsync(
                 $"/api/reports/templates/content?reportType=ExportDocument&templatePath={Uri.EscapeDataString(templatePath)}");
             Assert.Equal(HttpStatusCode.Unauthorized, anonymousContentResponse.StatusCode);
@@ -142,7 +142,7 @@ namespace ExportDocManager.Api.Tests
             var templateStorage = await ApiIntegrationTestHarness.ReadJsonAsync<ApiReportTemplateStorageStatusResponse>(templateStorageResponse);
             Assert.True(templateStorage.Exists);
             Assert.True(templateStorage.Writable);
-            Assert.Equal(Path.Combine(harness.AppRoot, "Templates"), templateStorage.TemplateRoot);
+            Assert.Equal(Path.Combine(harness.DataRoot, "Templates"), templateStorage.TemplateRoot);
             Assert.Empty(Directory.GetFiles(templateStorage.TemplateRoot, ".edm-template-write-check-*.tmp"));
 
             var exportFieldsResponse = await adminClient.GetAsync("/api/reports/templates/fields?reportType=ExportDocument");
@@ -262,11 +262,11 @@ namespace ExportDocManager.Api.Tests
             Assert.EndsWith(".html", createdTemplate.TemplatePath, StringComparison.OrdinalIgnoreCase);
             Assert.True(File.Exists(createdTemplate.TemplatePath));
             Assert.StartsWith(
-                Path.Combine(harness.AppRoot, "Templates", "Export"),
+                Path.Combine(harness.DataRoot, "Templates", "Export"),
                 Path.GetFullPath(createdTemplate.TemplatePath),
                 StringComparison.OrdinalIgnoreCase);
 
-            var renamedTemplatePath = Path.Combine(harness.AppRoot, "Templates", "Export", "api_renamed_template.html");
+            var renamedTemplatePath = Path.Combine(harness.DataRoot, "Templates", "Export", "api_renamed_template.html");
             var renameTemplateResponse = await adminClient.PostAsJsonAsync(
                 "/api/reports/templates/rename",
                 new
@@ -288,7 +288,7 @@ namespace ExportDocManager.Api.Tests
             Assert.True(deleteTemplateResult.Success);
             Assert.False(File.Exists(renamedTemplatePath));
 
-            var templateCatalogPath = Path.Combine(harness.AppRoot, "Templates", "report_templates.json");
+            var templateCatalogPath = Path.Combine(harness.DataRoot, "Templates", "report_templates.json");
             Assert.True(File.Exists(templateCatalogPath));
             Assert.DoesNotContain("api_renamed_template.html", await File.ReadAllTextAsync(templateCatalogPath), StringComparison.OrdinalIgnoreCase);
 
@@ -309,7 +309,7 @@ namespace ExportDocManager.Api.Tests
             Assert.DoesNotContain(@"C:\", savedTemplate.StoragePolicy, StringComparison.OrdinalIgnoreCase);
             Assert.True(File.Exists(templatePath));
             Assert.StartsWith(
-                Path.Combine(harness.AppRoot, "Templates"),
+                Path.Combine(harness.DataRoot, "Templates"),
                 Path.GetFullPath(templatePath),
                 StringComparison.OrdinalIgnoreCase);
 
@@ -408,7 +408,7 @@ namespace ExportDocManager.Api.Tests
                     displayName = "Blocked"
                 });
             Assert.Equal(HttpStatusCode.Forbidden, forbiddenCreateResponse.StatusCode);
-            Assert.False(File.Exists(Path.Combine(harness.AppRoot, "Templates", "Export", "operator_blocked_template.html")));
+            Assert.False(File.Exists(Path.Combine(harness.DataRoot, "Templates", "Export", "operator_blocked_template.html")));
 
             var forbiddenDeleteResponse = await operatorClient.DeleteAsync(
                 $"/api/reports/templates/content?reportType=ExportDocument&templatePath={Uri.EscapeDataString(templatePath)}");

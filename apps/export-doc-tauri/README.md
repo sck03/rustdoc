@@ -13,7 +13,8 @@ Runtime layout follows the project storage policy:
 
 - stable resources stay beside the program root: `Templates/`, `OcrModels/`, `Browsers/`, `Resources/`;
 - writable business data and operational logs default to `App_Data/`, with logs under `App_Data/Logs/`;
-- `appsettings.json` stays in the program root;
+- `Config/appsettings.json`, `Config/local-preferences.json`, and user report templates stay under the writable data root;
+- the optional `runtime-paths.json` locator is stored in the platform application-config directory, while the program root remains read-only;
 - sidecar stdout/stderr are appended to `App_Data/Logs/api-sidecar.stdout.log` and `App_Data/Logs/api-sidecar.stderr.log`, or the equivalent explicit data root;
 - the Windows authorization module keeps its existing dual-write behavior.
 
@@ -22,6 +23,7 @@ Useful environment overrides for development:
 - `EXPORTDOCMANAGER_API_SIDECAR`: absolute path to `ExportDocManager.Api.exe`;
 - `EXPORTDOCMANAGER_APP_ROOT`: app root passed to `--app-root`;
 - `EXPORTDOCMANAGER_DATA_ROOT`: data root passed to `--data-root`.
+- `EXPORTDOCMANAGER_RUNTIME_CONFIG_ROOT`: test or managed-deployment override for the small runtime data-root locator directory.
 
 Rust/Cargo is required to run `npm run dev` or `npm run build`.
 

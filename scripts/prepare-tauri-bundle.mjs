@@ -18,8 +18,8 @@ const productEditionManifestFileName = "product-edition.json";
 
 const stableResourceDirs = new Set(["Templates", "OcrModels", "Resources", "Browsers"]);
 const sidecarExcludedExtensions = new Set([".pdb", ".xml"]);
-const rootConfigFiles = ["appsettings.json", "local-preferences.json"];
-const runtimeDataDirectories = ["Database", "Files", "Exports", "SingleWindow", "Backups", "Cache", "Config", "Security", "WebView", "Logs"];
+const rootConfigFiles = [];
+const runtimeDataDirectories = ["Database", "Templates", "Files", "Exports", "SingleWindow", "Backups", "Cache", "Config", "Security", "WebView", "Logs"];
 
 const rid = process.env.EXPORTDOCMANAGER_TAURI_RID || detectRuntimeIdentifier();
 const rustTarget = resolveRustTargetTriple(rid);
@@ -331,7 +331,7 @@ async function createRuntimeLayoutManifest() {
     selfContained,
     storagePolicy: {
       programRoot: "Program root carries the Tauri executable, API sidecar, stable templates, OCR models, browser renderer assets and built-in resources.",
-      dataRoot: "Runtime business data and operational logs default to App_Data beside the program root, or an explicit --data-root / environment / runtime-paths.json value.",
+      dataRoot: "Runtime business data and operational logs default to App_Data beside the program root, or an explicit --data-root / environment / platform-config runtime-paths.json value.",
       userSelectedOutput: "User-selected import and export paths remain outside the managed data root by explicit request.",
     },
     programRootResources,

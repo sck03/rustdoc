@@ -170,6 +170,22 @@ jobs:
             exit 1
           fi
 
+      - name: Validate writable runtime configuration boundary
+        working-directory: deploy/container
+        shell: bash
+        run: |
+          docker compose exec -T api sh -eu -c '
+            test -d /runtime-data/Config
+            test -f /runtime-data/Config/appsettings.json
+            test -w /runtime-data/Config
+            test -w /runtime-data/Config/appsettings.json
+            probe="/runtime-data/Config/.settings-write-probe-$$"
+            printf "%s\n" "runtime-config-write-ok" > "$probe"
+            mv "$probe" "${probe}.committed"
+            test "$(cat "${probe}.committed")" = "runtime-config-write-ok"
+            rm -f "${probe}.committed"
+          '
+
       - name: Validate reverse-proxy and security-header boundary
         working-directory: deploy/container
         shell: bash

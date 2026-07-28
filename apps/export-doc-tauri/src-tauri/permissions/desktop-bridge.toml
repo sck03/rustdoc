@@ -16,7 +16,6 @@ commands.allow = [
   "select_excel_file",
   "select_directory",
   "select_report_template_package_file",
-  "select_report_template_file",
   "select_save_package_path",
   "select_save_invoice_transfer_package_path",
   "select_save_report_template_package_path",

@@ -242,13 +242,13 @@ namespace ExportDocManager.Services.Infrastructure
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {
-                return Path.Combine(pathProvider.AppRoot, SettingsFileName);
+                return Path.Combine(pathProvider.ConfigRoot, SettingsFileName);
             }
 
             var trimmed = filePath.Trim();
             return Path.IsPathRooted(trimmed)
                 ? Path.GetFullPath(trimmed)
-                : Path.GetFullPath(Path.Combine(pathProvider.AppRoot, trimmed));
+                : Path.GetFullPath(Path.Combine(pathProvider.ConfigRoot, trimmed));
         }
     }
 }

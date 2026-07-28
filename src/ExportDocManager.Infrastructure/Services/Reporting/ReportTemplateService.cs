@@ -10,7 +10,7 @@ namespace ExportDocManager.Services.Reporting
     public sealed class ReportTemplateService : IReportTemplateService
     {
         private const string StoragePolicy =
-            "报表模板默认保存在程序根 Templates/ 下；读取/保存仅允许 Templates/ 内模板，或 report_templates.json 已显式配置的模板路径。不会写入系统盘用户配置目录或全局程序数据目录。";
+            "内置模板从程序根 Templates/ 只读加载；新建、编辑副本、重命名、删除和模板包导入统一写入运行数据根 Templates/。不会改写已安装程序资源，也不会使用系统用户配置目录或系统级共享数据目录。";
 
         private readonly ReportTemplatePathResolver _pathResolver;
         private readonly ReportTemplateCatalogLoader _catalogLoader;
@@ -55,7 +55,7 @@ namespace ExportDocManager.Services.Reporting
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            await SyncTemplateReferencesAsync(string.Empty, resolvedPath, cancellationToken).ConfigureAwait(false);
+            await SyncTemplateReferencesAsync(reportType, string.Empty, resolvedPath, cancellationToken).ConfigureAwait(false);
             return ToContentResult(CreateResolvedTemplate(reportType, resolvedPath, title), content);
         }
 
@@ -80,6 +80,14 @@ namespace ExportDocManager.Services.Reporting
         {
             var resolved = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: false, cancellationToken)
                 .ConfigureAwait(false);
+            string previousPath = resolved.TemplatePath;
+            if (_pathResolver.IsBuiltInTemplatePath(previousPath))
+            {
+                string userCopyPath = _pathResolver.GetUserCopyPath(previousPath);
+                Directory.CreateDirectory(Path.GetDirectoryName(userCopyPath)!);
+                resolved = CreateResolvedTemplate(reportType, userCopyPath, resolved.DisplayName);
+            }
+
             await AtomicFileHelper.WriteAllTextAtomicAsync(
                     resolved.TemplatePath,
                     content ?? string.Empty,
@@ -88,7 +96,8 @@ namespace ExportDocManager.Services.Reporting
                 .ConfigureAwait(false);
 
             await SyncTemplateReferencesAsync(
-                    resolved.TemplatePath,
+                    reportType,
+                    previousPath,
                     resolved.TemplatePath,
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -124,7 +133,7 @@ namespace ExportDocManager.Services.Reporting
 
             Directory.CreateDirectory(Path.GetDirectoryName(resolvedNewPath)!);
             File.Move(current.TemplatePath, resolvedNewPath, overwrite: false);
-            await SyncTemplateReferencesAsync(current.TemplatePath, resolvedNewPath, cancellationToken).ConfigureAwait(false);
+            await SyncTemplateReferencesAsync(reportType, current.TemplatePath, resolvedNewPath, cancellationToken).ConfigureAwait(false);
 
             string content = await File.ReadAllTextAsync(resolvedNewPath, Encoding.UTF8, cancellationToken)
                 .ConfigureAwait(false);
@@ -141,7 +150,7 @@ namespace ExportDocManager.Services.Reporting
             EnsureTemplateLifecyclePath(current.TemplatePath);
 
             File.Delete(current.TemplatePath);
-            await SyncTemplateReferencesAsync(current.TemplatePath, string.Empty, cancellationToken).ConfigureAwait(false);
+            await SyncTemplateReferencesAsync(reportType, current.TemplatePath, string.Empty, cancellationToken).ConfigureAwait(false);
 
             return new ReportTemplateCommandResult
             {
@@ -189,9 +198,7 @@ namespace ExportDocManager.Services.Reporting
             {
                 string selected = selectedTemplatePath.Trim()
                     .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
-                candidatePath = Path.IsPathRooted(selected)
-                    ? Path.GetFullPath(selected)
-                    : Path.GetFullPath(Path.Combine(_pathResolver.GetTemplatesBaseDirectory(), selected));
+                candidatePath = _pathResolver.ToAbsolutePath(selected);
 
                 if (!ReportTemplatePathResolver.IsPathWithinDirectory(candidatePath, categoryDirectory))
                 {
@@ -235,12 +242,11 @@ namespace ExportDocManager.Services.Reporting
             var matched = configs.FirstOrDefault(config =>
                 string.Equals(Path.GetFullPath(config.FileName), resolvedPath, StringComparison.OrdinalIgnoreCase));
 
-            bool withinTemplateRoot = ReportTemplatePathResolver.IsPathWithinDirectory(
-                resolvedPath,
-                _pathResolver.GetTemplatesBaseDirectory());
-            if (!withinTemplateRoot && matched == null)
+            bool withinManagedTemplateRoots = _pathResolver.IsBuiltInTemplatePath(resolvedPath) ||
+                                              _pathResolver.IsUserTemplatePath(resolvedPath);
+            if (!withinManagedTemplateRoots || matched == null && !_pathResolver.IsUserTemplatePath(resolvedPath) && !File.Exists(resolvedPath))
             {
-                throw new UnauthorizedAccessException("只能编辑程序根 Templates/ 下或模板配置文件显式登记的报表模板。");
+                throw new UnauthorizedAccessException("只能读取内置模板，或维护运行数据根 Templates/ 下的用户模板。");
             }
 
             var effectiveReportType = matched != null
@@ -262,7 +268,10 @@ namespace ExportDocManager.Services.Reporting
                 throw new ArgumentException("无法解析模板所在目录。", nameof(templatePath));
             }
 
-            Directory.CreateDirectory(directory);
+            if (_pathResolver.IsUserTemplatePath(resolvedPath))
+            {
+                Directory.CreateDirectory(directory);
+            }
             return new ResolvedReportTemplate
             {
                 ReportType = reportType,
@@ -273,6 +282,7 @@ namespace ExportDocManager.Services.Reporting
         }
 
         private async Task SyncTemplateReferencesAsync(
+            ReportDocumentType reportType,
             string previousTemplatePath,
             string currentTemplatePath,
             CancellationToken cancellationToken)
@@ -284,19 +294,21 @@ namespace ExportDocManager.Services.Reporting
             string normalizedCurrentPath = _catalogLoader.NormalizeStoredTemplatePath(currentTemplatePath);
             bool settingsChanged = false;
 
-            if (_settingsService.Settings.BatchExport?.Items != null)
+            if (reportType == ReportDocumentType.PaymentVoucher)
+            {
+                if (_settingsService.Settings.PaymentTemplates != null)
+                {
+                    settingsChanged |= UpdateTemplateReferences(
+                        _settingsService.Settings.PaymentTemplates,
+                        normalizedPreviousPath,
+                        normalizedPreviousAbsolutePath,
+                        normalizedCurrentPath);
+                }
+            }
+            else if (_settingsService.Settings.BatchExport?.Items != null)
             {
                 settingsChanged |= UpdateTemplateReferences(
                     _settingsService.Settings.BatchExport.Items,
-                    normalizedPreviousPath,
-                    normalizedPreviousAbsolutePath,
-                    normalizedCurrentPath);
-            }
-
-            if (_settingsService.Settings.PaymentTemplates != null)
-            {
-                settingsChanged |= UpdateTemplateReferences(
-                    _settingsService.Settings.PaymentTemplates,
                     normalizedPreviousPath,
                     normalizedPreviousAbsolutePath,
                     normalizedCurrentPath);
@@ -313,11 +325,13 @@ namespace ExportDocManager.Services.Reporting
 
         private async Task RefreshTemplateCatalogAsync(CancellationToken cancellationToken)
         {
-            string basePath = _pathResolver.GetTemplatesBaseDirectory();
-            string configPath = Path.Combine(basePath, "report_templates.json");
+            string configPath = _pathResolver.GetUserConfigPath();
             var configs = await _catalogLoader.LoadResolvedConfigsAsync(cancellationToken).ConfigureAwait(false);
             var rows = configs
-                .Where(config => config != null && !string.IsNullOrWhiteSpace(config.FileName))
+                .Where(config =>
+                    config != null &&
+                    !string.IsNullOrWhiteSpace(config.FileName) &&
+                    _pathResolver.IsUserTemplatePath(config.FileName))
                 .Select(config => new ReportTemplateConfig
                 {
                     Type = ReportTemplateCatalogLoader.NormalizeTemplateCatalogType(config.Type, config.FileName),
@@ -408,11 +422,9 @@ namespace ExportDocManager.Services.Reporting
 
         private void EnsureTemplateLifecyclePath(string templatePath)
         {
-            if (!ReportTemplatePathResolver.IsPathWithinDirectory(
-                    templatePath,
-                    _pathResolver.GetTemplatesBaseDirectory()))
+            if (!_pathResolver.IsUserTemplatePath(templatePath))
             {
-                throw new UnauthorizedAccessException("只能新建、重命名或删除程序根 Templates/ 下的报表模板。");
+                throw new UnauthorizedAccessException("内置模板为只读资源；请先保存为用户模板副本，再执行重命名或删除。");
             }
         }
 

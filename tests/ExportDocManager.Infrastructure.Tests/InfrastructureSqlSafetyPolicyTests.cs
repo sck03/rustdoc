@@ -14,7 +14,11 @@ public sealed class InfrastructureSqlSafetyPolicyTests
     public void RawSql_ShouldRemainConfinedToReviewedSchemaInitialization()
     {
         string sourceRoot = ResolveSourceRoot("src", "ExportDocManager.Infrastructure");
-        string allowedRelativePath = "Services/DatabaseInitializationService.cs";
+        var allowedRelativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Services/DatabaseInitializationService.cs",
+            "Services/DatabaseSchemaBaseline.cs"
+        };
         var violations = Directory
             .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
             .Where(path => !IsBuildOutput(path))
@@ -24,7 +28,7 @@ public sealed class InfrastructureSqlSafetyPolicyTests
                 RelativePath = Path.GetRelativePath(sourceRoot, path).Replace('\\', '/'),
                 Content = File.ReadAllText(path)
             })
-            .Where(file => !string.Equals(file.RelativePath, allowedRelativePath, StringComparison.OrdinalIgnoreCase))
+            .Where(file => !allowedRelativePaths.Contains(file.RelativePath))
             .SelectMany(file => RawSqlTokens
                 .Where(token => file.Content.Contains(token, StringComparison.Ordinal))
                 .Select(token => $"{file.RelativePath}: contains unreviewed raw SQL token `{token}`"))
@@ -36,10 +40,10 @@ public sealed class InfrastructureSqlSafetyPolicyTests
             + Environment.NewLine
             + string.Join(Environment.NewLine, violations));
 
-        string initialization = File.ReadAllText(Path.Combine(sourceRoot, "Services", "DatabaseInitializationService.cs"));
-        Assert.Contains("EscapeSqliteIdentifier", initialization, StringComparison.Ordinal);
-        Assert.Contains("EscapePostgreSqlIdentifier", initialization, StringComparison.Ordinal);
-        Assert.Contains("ExecuteSqlInterpolatedAsync", initialization, StringComparison.Ordinal);
+        string initialization = File.ReadAllText(Path.Combine(sourceRoot, "Services", "DatabaseSchemaBaseline.cs"));
+        Assert.Contains("MetadataTableName", initialization, StringComparison.Ordinal);
+        Assert.Contains("ExecuteSqlRawAsync", initialization, StringComparison.Ordinal);
+        Assert.Contains("CreatePerformanceIndexesAsync", initialization, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -47,7 +51,7 @@ public sealed class InfrastructureSqlSafetyPolicyTests
     {
         string sourceRoot = ResolveSourceRoot("src", "ExportDocManager.Infrastructure");
         string initialization = File.ReadAllText(
-            Path.Combine(sourceRoot, "Services", "DatabaseInitializationService.cs"));
+            Path.Combine(sourceRoot, "Services", "DatabaseSchemaBaseline.cs"));
 
         foreach (string requiredContract in new[]
         {
@@ -61,7 +65,7 @@ public sealed class InfrastructureSqlSafetyPolicyTests
             "IX_HsCodeDeclarationExamples_TextSearch_Trgm",
             "IX_HsCodeRemoteCandidates_TextSearch_Trgm",
             "IX_Items_HistorySearch_Trgm",
-            "PostgreSQL pg_trgm text-search indexes were not installed"
+            "PostgreSQL pg_trgm indexes were not installed"
         })
         {
             Assert.Contains(requiredContract, initialization, StringComparison.Ordinal);

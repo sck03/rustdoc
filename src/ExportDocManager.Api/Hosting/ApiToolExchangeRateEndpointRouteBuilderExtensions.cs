@@ -8,7 +8,7 @@ namespace ExportDocManager.Api.Hosting
     public static partial class ApiEndpointRouteBuilderExtensions
     {
         private const string ExchangeRateStoragePolicy =
-            "汇率工具只读取程序根 appsettings.json 中的汇率配置，并通过用户配置的汇率源远程获取数据；查询结果只保存在服务内存缓存和页面状态中，不写入默认导出目录、数据库表或系统 C 盘。";
+            "汇率工具只读取运行数据根 Config/appsettings.json 中的汇率配置，并通过用户配置的汇率源远程获取数据；查询结果只保存在服务内存缓存和页面状态中，不写入默认导出目录、数据库表或系统 C 盘。";
 
         private static void MapExchangeRateToolEndpoints(this IEndpointRouteBuilder endpoints)
         {

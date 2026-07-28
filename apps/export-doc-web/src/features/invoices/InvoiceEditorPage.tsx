@@ -930,7 +930,7 @@ export function InvoiceEditorPage({
                 <details className="invoice-new-optional-section information-tier-advanced">
                   <summary>
                     <span>报关与扩展字段（低频）</span>
-                    <small>报关行、备用字段和高级 JSON，按需展开</small>
+                    <small>报关行和低频自定义备注，按需展开</small>
                   </summary>
                   <InvoiceExtendedFieldsPanel
                     invoice={invoice}

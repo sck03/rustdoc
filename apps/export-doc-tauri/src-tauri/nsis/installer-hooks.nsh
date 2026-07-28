@@ -1,13 +1,8 @@
 !include FileFunc.nsh
 !include LogicLib.nsh
-!include StrFunc.nsh
-${Using:StrFunc} StrRep
-
 Var ExportDocManagerInstallDrive
 Var ExportDocManagerSystemDrive
 Var ExportDocManagerDataRoot
-Var ExportDocManagerDataRootJson
-Var ExportDocManagerRuntimePathsConfig
 
 !macro EXPORTDOCMANAGER_WARN_IF_SYSTEM_DRIVE_INSTALL
   ${GetRoot} "$WINDIR" $ExportDocManagerSystemDrive
@@ -27,36 +22,20 @@ Var ExportDocManagerRuntimePathsConfig
   ClearErrors
   CreateDirectory "$ExportDocManagerDataRoot"
   CreateDirectory "$ExportDocManagerDataRoot\Database"
+  CreateDirectory "$ExportDocManagerDataRoot\Templates"
+  CreateDirectory "$ExportDocManagerDataRoot\Files"
+  CreateDirectory "$ExportDocManagerDataRoot\Exports"
   CreateDirectory "$ExportDocManagerDataRoot\SingleWindow"
   CreateDirectory "$ExportDocManagerDataRoot\Backups"
   CreateDirectory "$ExportDocManagerDataRoot\Cache"
+  CreateDirectory "$ExportDocManagerDataRoot\Config"
+  CreateDirectory "$ExportDocManagerDataRoot\Security"
+  CreateDirectory "$ExportDocManagerDataRoot\WebView"
+  CreateDirectory "$ExportDocManagerDataRoot\Logs"
   IfErrors 0 runtime_data_root_created
     Abort "无法在 $ExportDocManagerDataRoot 创建外贸业务综合管理系统运行数据目录。"
 
   runtime_data_root_created:
-!macroend
-
-!macro EXPORTDOCMANAGER_WRITE_RUNTIME_PATHS_CONFIG
-  StrCpy $ExportDocManagerRuntimePathsConfig "$INSTDIR\runtime-paths.json"
-  IfFileExists "$ExportDocManagerRuntimePathsConfig" runtime_paths_config_done
-
-  StrCpy $ExportDocManagerDataRoot "$INSTDIR\App_Data"
-  ${StrRep} $ExportDocManagerDataRootJson "$ExportDocManagerDataRoot" "\" "/"
-
-  ClearErrors
-  FileOpen $0 "$ExportDocManagerRuntimePathsConfig" w
-  IfErrors 0 runtime_paths_config_opened
-    Abort "无法创建 $ExportDocManagerRuntimePathsConfig。"
-
-  runtime_paths_config_opened:
-  FileWrite $0 '{$\r$\n'
-  FileWrite $0 '  "schemaVersion": 1,$\r$\n'
-  FileWrite $0 '  "dataRoot": "$ExportDocManagerDataRootJson",$\r$\n'
-  FileWrite $0 '  "source": "nsis-installer"$\r$\n'
-  FileWrite $0 '}$\r$\n'
-  FileClose $0
-
-  runtime_paths_config_done:
 !macroend
 
 !macro NSIS_HOOK_PREINSTALL
@@ -65,11 +44,7 @@ Var ExportDocManagerRuntimePathsConfig
 !macroend
 
 !macro NSIS_HOOK_POSTINSTALL
-  !insertmacro EXPORTDOCMANAGER_WRITE_RUNTIME_PATHS_CONFIG
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
-  ${If} "$UpdateMode" != "1"
-    Delete "$INSTDIR\runtime-paths.json"
-  ${EndIf}
 !macroend
