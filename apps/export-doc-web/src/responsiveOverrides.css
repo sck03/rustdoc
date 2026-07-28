@@ -323,11 +323,6 @@
     grid-column: auto;
   }
 
-  .update-endpoint-field,
-  .update-public-key-field {
-    grid-column: auto;
-  }
-
   .hs-code-tool-grid {
     grid-template-columns: 1fr;
   }

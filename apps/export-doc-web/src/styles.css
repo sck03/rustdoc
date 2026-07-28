@@ -2308,49 +2308,12 @@ tbody tr:hover {
   line-height: 1.2;
 }
 
-.update-center-surface {
-  grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
-}
-
 .update-center-toolbar {
   align-items: center;
 }
 
 .update-center-detail-grid {
   grid-template-columns: repeat(4, minmax(160px, 1fr));
-}
-
-.update-config-section {
-  gap: 12px;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfdfc 100%);
-  border-color: #d7e7e3;
-}
-
-.update-config-grid {
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  align-items: start;
-  column-gap: 16px;
-}
-
-.update-endpoint-field {
-  grid-column: span 8;
-}
-
-.update-public-key-field {
-  grid-column: span 4;
-}
-
-.update-endpoint-field input {
-  height: 42px;
-  font-family: var(--edm-font-mono);
-  font-size: 13px;
-}
-
-.update-public-key-field textarea {
-  min-height: 112px;
-  font-family: var(--edm-font-mono);
-  font-size: 12px;
-  line-height: 1.45;
 }
 
 .update-center-layout {

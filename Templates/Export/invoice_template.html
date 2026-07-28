@@ -144,16 +144,6 @@
             padding-left: 80px; /* 整体向右偏移 */
             line-height: 1.1; /* 减小行间距 */
         }
-
-        .special-terms strong {
-            margin-right: 50px; /* 减小REMARKS标签与内容之间的间距 */
-        }
-
-
-        .special-terms strong ~ * {
-            padding-left: 30px; /* 内容部分额外向右偏移 */
-            display: inline-block;
-        }
        
     </style>
 </head>
@@ -293,7 +283,6 @@
         
         {{ if $is_last && Invoice.SpecialTerms && Invoice.SpecialTerms != "" }}
         <div class="special-terms">
-            <strong>REMARKS:</strong><br>
             <span class="remarks-content">{{ Invoice.SpecialTerms }}</span>
         </div>
         {{ end }}

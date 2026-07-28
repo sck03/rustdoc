@@ -54,14 +54,10 @@ export function createSystemToolsSmokeScene(runtime) {
     const expectedText = [
       "软件更新",
       "检查并安装新版本",
-      "更新配置",
-      "管理员统一控制更新来源",
-      "签名公钥固定在安装包内",
       "当前版本",
       "最新版本",
-      "目标平台",
+      "检查结果",
       "更新日志",
-      "下载地址",
       "检查更新",
       "下载并安装",
     ];
@@ -179,10 +175,13 @@ export function createSystemToolsSmokeScene(runtime) {
       const state = await readUpdateCenterState(page);
       const canInstall = state.buttons.some((button) =>
         includesText(button.text, "下载并安装") && !button.disabled);
+      const checkInvocation = state.invocations.some((item) =>
+        item.command === "check_tauri_update" &&
+        includesText(item.result?.downloadUrl, updateSource.packagePath));
       return state.statusDetails["最新版本"] === `v${updateSource.version}` &&
-        state.statusDetails["更新可用"] === "是" &&
-        includesText(state.statusDetails["下载地址"], updateSource.packagePath) &&
+        state.statusDetails["检查结果"] === "发现新版本" &&
         includesText(state.releaseNotes, updateSource.marker) &&
+        checkInvocation &&
         canInstall
         ? state
         : null;

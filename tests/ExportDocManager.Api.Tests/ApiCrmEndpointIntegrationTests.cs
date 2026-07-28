@@ -76,6 +76,10 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, updateFollowUpResponse.StatusCode);
             var updatedFollowUp = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCrmFollowUpDto>(updateFollowUpResponse);
             Assert.Equal("电话", updatedFollowUp.Type);
+            var followUpPage = await client.GetFromJsonAsync<ApiPagedResponse<ApiCrmFollowUpDto>>(
+                "/api/crm/follow-ups/page?includeCompleted=false&pageNumber=1&pageSize=20");
+            Assert.Equal(1, followUpPage?.TotalCount);
+            Assert.Equal(updatedFollowUp.Id, Assert.Single(followUpPage!.Items).Id);
             var staleFollowUpResponse = await client.PutAsJsonAsync($"/api/crm/follow-ups/{followUp.Id}",
                 new ApiCrmFollowUpSaveRequest(followUp.Id, customer.Id, secondContact.Id, "邮件",
                     "过期修改", followUp.NextAction, followUp.FollowedUpAt, followUp.NextFollowUpAt,

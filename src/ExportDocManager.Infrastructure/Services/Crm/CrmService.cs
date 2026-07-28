@@ -284,8 +284,10 @@ namespace ExportDocManager.Services.Crm
             var totalCount = await query.CountAsync(cancellationToken);
             var rows = await query
                 .OrderBy(item => item.IsCompleted)
-                .ThenBy(item => item.NextFollowUpAt ?? DateTimeOffset.MaxValue)
+                .ThenBy(item => item.NextFollowUpAt == null)
+                .ThenBy(item => item.NextFollowUpAt)
                 .ThenByDescending(item => item.FollowedUpAt)
+                .ThenByDescending(item => item.Id)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .Select(item => new CrmFollowUpRecord(

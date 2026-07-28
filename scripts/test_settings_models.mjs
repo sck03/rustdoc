@@ -62,9 +62,6 @@ assert(documentEditionCategories.some((item) => item.key === "document-templates
 assert(!documentEditionCategories.some((item) => item.key === "users"), "single-role edition hides user management");
 assert(navigation.readSettingsCategoryFromSearch("?section=singleWindow", salesEditionCategories.map((item) => item.key)) === "runtime", "sales edition deep link falls back from document settings");
 assert(updaterEndpointModel.readUpdaterEndpoint({ system: { updaterEndpoint: " http://updates.internal/latest.json " } }) === "http://updates.internal/latest.json", "updater endpoint normalization");
-assert(updaterEndpointModel.isInsecureHttpUpdaterEndpoint("HTTP://updates.internal/latest.json"), "intranet HTTP detection");
-assert(!updaterEndpointModel.isInsecureHttpUpdaterEndpoint("https://updates.example.test/latest.json"), "HTTPS is not marked insecure");
-assert(updaterEndpointModel.describeUpdaterEndpoint("") === "使用安装包默认地址", "empty endpoint uses packaged default");
 
 const runtimeGroups = runtimeDiagnostics.buildRuntimePathGroups({
   appRoot: "E:/App",

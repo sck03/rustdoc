@@ -13,7 +13,7 @@
 
 RustSec 工作流直接调用安装后的 `cargo-audit` 时必须保留 `audit` 子命令，并拒绝漏洞、新增 unsound 公告和 yanked crate。Tauri 当前 Linux WebKit/GTK3 传递栈只精确豁免 `RUSTSEC-2024-0429`；该例外不能扩展为通配忽略，也不代表其它停止维护告警已经消失。
 
-Tauri 正式 updater 密钥不由仓库脚本或 CI 自动生成。项目所有者确认 endpoint 后，按 `docs/Tauri正式更新签名与发布配置.md` 在仓库外手工执行一次 signer 命令，并把公钥/地址放 Variables、私钥/密码放 Secrets。
+Tauri 正式 updater 密钥不由仓库脚本或 CI 自动生成，也不需要先确认 endpoint。项目所有者可先按 `docs/Tauri正式更新签名与发布配置.md` 在仓库外手工执行一次 signer 命令并妥善备份私钥；公钥固定进入正式安装包，更新地址由管理员配置，可在 GitHub、自建服务器和可信企业内网之间切换。
 
 普通用户只需要使用 `scripts/` 根目录下的以下批处理入口，不要直接运行 `lib/`、`prepare-*`、`verify-*` 或 `assert-*`：
 

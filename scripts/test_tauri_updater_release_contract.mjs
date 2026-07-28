@@ -51,10 +51,25 @@ for (const manifestContract of ["latest.json", "platforms", "signature", "releas
   assert.ok(manifestPublisher.includes(manifestContract), `updater manifest publisher is missing ${manifestContract}`);
 }
 
-assert.ok(updatePage.includes("更新地址由管理员配置，签名公钥固定在安装包内"));
-assert.ok(updatePage.includes("当前使用公司内网 HTTP 更新地址"));
+for (const hiddenUpdateDetail of [
+  "更新配置",
+  "管理员统一控制更新来源",
+  "当前更新地址",
+  "地址来源",
+  "传输方式",
+  "目标平台",
+  "签名信任",
+  "签名公钥固定在安装包内",
+  "下载地址",
+  "验证方式",
+  "重启策略",
+  "打开系统设置",
+]) {
+  assert.ok(!updatePage.includes(hiddenUpdateDetail), `update center must hide administrator detail: ${hiddenUpdateDetail}`);
+}
 assert.doesNotMatch(updatePage, /<input[^>]+(?:endpoint|publicKey)/iu, "update center must not expose a duplicate updater editor");
 assert.ok(settingsPanel.includes('path={systemUpdaterEndpointPath}'), "administrator settings must expose the updater endpoint");
+assert.ok(settingsPanel.includes("受控公司内网的 HTTP 地址"), "administrator settings must explain trusted intranet HTTP use");
 assert.doesNotMatch(settingsPanel, /publicKey|public_key/iu, "administrator settings must not expose the updater public key");
 assert.ok(settingsModel.includes("UpdaterEndpoint"), "system settings must persist the administrator endpoint");
 assert.match(desktopBridge, /checkTauriUpdate\(endpoint\?: string\)/u, "desktop bridge must accept an optional endpoint override");

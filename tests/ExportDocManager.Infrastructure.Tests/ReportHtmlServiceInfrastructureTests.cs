@@ -167,6 +167,8 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.DoesNotContain("Style:", invoiceResult.Html, StringComparison.Ordinal);
                 Assert.Contains("PO-I1", invoiceResult.Html, StringComparison.Ordinal);
                 Assert.Matches(@">\s*I1\s*<", invoiceResult.Html);
+                Assert.Contains("SPECIAL TERMS WITHOUT FIXED PREFIX", invoiceResult.Html, StringComparison.Ordinal);
+                Assert.DoesNotContain("REMARKS:", invoiceResult.Html, StringComparison.OrdinalIgnoreCase);
 
                 var packingListResult = await invoiceService.RenderInvoiceReportAsync(
                     invoiceId,
@@ -759,6 +761,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 TradeTerms = "FOB",
                 TransportMode = "BY SEA",
                 SupervisionMode = "一般贸易",
+                SpecialTerms = "SPECIAL TERMS WITHOUT FIXED PREFIX",
                 ExporterNameCN = exporter.ExporterNameCN,
                 ExporterCreditCode = exporter.CreditCode,
                 TotalAmount = 9m,
