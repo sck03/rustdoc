@@ -8,12 +8,12 @@ using Serilog;
 namespace ExportDocManager.Services.Infrastructure
 {
     /// <summary>
-    /// Owns the production v1 database baseline. Pre-release databases without an explicit
+    /// Owns the current production database baseline. Pre-release databases without an explicit
     /// schema marker are intentionally rejected instead of being upgraded through compatibility SQL.
     /// </summary>
     internal static class DatabaseSchemaBaseline
     {
-        internal const int CurrentVersion = 1;
+        internal const int CurrentVersion = 3;
         internal const string MetadataTableName = "__ExportDocManagerSchema";
 
         public static async Task EnsureCurrentAsync(AppDbContext context, bool usesPostgreSql)
@@ -32,7 +32,7 @@ namespace ExportDocManager.Services.Infrastructure
                 bool created = await context.Database.EnsureCreatedAsync().ConfigureAwait(false);
                 if (!created)
                 {
-                    throw new InvalidOperationException("数据库不是空库，无法建立 ExportDocManager v1 基线。请使用新数据库重新初始化。");
+                    throw new InvalidOperationException($"数据库不是空库，无法建立 ExportDocManager v{CurrentVersion} 基线。请使用新数据库重新初始化。");
                 }
 
                 await CreatePerformanceIndexesAsync(context, usesPostgreSql).ConfigureAwait(false);

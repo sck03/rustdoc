@@ -33,8 +33,6 @@ export function createInvoiceReportSmokeScene(runtime) {
       const editorExpectedText = [
         "基础信息",
         "利润分析",
-        "预估毛利",
-        "毛利率",
         invoice.invoiceNo,
       ];
       const editorPageText = await waitForRuntimeDiagnostics(page, editorExpectedText, timeoutMs);
@@ -251,14 +249,30 @@ export function createInvoiceReportSmokeScene(runtime) {
         undoRedoCheck: invoiceItemUndoRedoCheck,
         workbenchModeCheck: invoiceItemWorkbenchModeCheck,
       } = await invoiceItemTableSmokeScene.run(page, product, timeoutMs);
+
+      await evaluate(
+        page,
+        `(() => {
+          const panel = document.querySelector('[aria-label="利润分析"]');
+          const expandButton = panel
+            ? Array.from(panel.querySelectorAll('button')).find((element) =>
+                element.getAttribute('aria-expanded') === 'false' &&
+                (element.innerText || '').includes('展开利润分析'))
+            : null;
+          expandButton?.click();
+          return Boolean(panel);
+        })()`,
+        true,
+      );
   
       const profitButtonCheck = await waitForPageExpression(
         page,
         `(() => {
           const panel = document.querySelector('[aria-label="利润分析"]');
           const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
-          const button = buttons.find((element) => (element.innerText || '').includes('计算'));
-          return Boolean(button && !button.disabled);
+          const button = buttons.find((element) => (element.title || '') === '计算利润分析');
+          const text = panel ? panel.innerText || '' : '';
+          return Boolean(button && !button.disabled && text.includes('预估毛利') && text.includes('毛利率'));
         })()`,
         timeoutMs,
         "Timed out waiting for the invoice profit-analysis button to become available.",
@@ -269,7 +283,7 @@ export function createInvoiceReportSmokeScene(runtime) {
         `(() => {
           const panel = document.querySelector('[aria-label="利润分析"]');
           const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
-          const button = buttons.find((element) => (element.innerText || '').includes('计算'));
+          const button = buttons.find((element) => (element.title || '') === '计算利润分析');
           if (!button || button.disabled) {
             throw new Error('Invoice profit-analysis button is not available.');
           }

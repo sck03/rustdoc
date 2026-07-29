@@ -2424,40 +2424,39 @@ export interface ApiShutdownMaintenanceResponse {
 
 export interface ApiSingleWindowClientDispatchRequest {
   batchId: number;
-  importRootPath?: string;
-  profileName?: string;
 }
 
 export interface ApiSingleWindowClientProfileDto {
-  businessDirectoryOverridesJson: string;
+  agentConsignmentClientRootPath: string;
   canSubmitAgentConsignment: boolean;
   canSubmitCustomsCoo: boolean;
+  cardIdentifier: string;
+  companyScope: string;
+  customsCooClientRootPath: string;
   id: number;
-  importRootPath: string;
+  isActive: boolean;
   isEnabled: boolean;
-  machineName: string;
+  profileKey: string;
   profileName: string;
-  receiptRootPath: string;
   updatedAt: string;
 }
 
-export interface ApiSingleWindowClientProfileResponse {
-  profile: ApiSingleWindowClientProfileDto;
-  storagePolicy: string;
-}
-
 export interface ApiSingleWindowClientProfileSaveRequest {
-  businessType?: string;
-  importRootPath?: string;
-  receiptRootPath?: string;
+  agentConsignmentClientRootPath: string;
+  canSubmitAgentConsignment: boolean;
+  canSubmitCustomsCoo: boolean;
+  cardIdentifier: string;
+  companyScope: string;
+  customsCooClientRootPath: string;
+  profileKey: string;
+  profileName: string;
 }
 
-export interface ApiSingleWindowClientProfileSaveResponse {
-  id: number;
+export interface ApiSingleWindowClientProfilesResponse {
+  activeProfileKey: string;
   message: string;
-  profile: ApiSingleWindowClientProfileDto;
+  profiles: ApiSingleWindowClientProfileDto[];
   storagePolicy: string;
-  success: boolean;
 }
 
 export interface ApiSingleWindowHandoffPackageResponse {
@@ -2514,7 +2513,6 @@ export interface ApiSingleWindowLockedFieldsResponse {
 
 export interface ApiSingleWindowReceiptCollectionRequest {
   batchId: number;
-  receiptRootPath?: string;
 }
 
 export interface ApiSingleWindowReceiptPackageExportRequest {
@@ -3088,14 +3086,6 @@ export interface SingleWindowClientDispatchResult {
   targetDirectory: string;
 }
 
-export interface SingleWindowCollaborationPageResult {
-  pageNumber: number;
-  pageSize: number;
-  tickets: SingleWindowOperationTicketRow[];
-  totalTicketCount: number;
-  workstations: SingleWindowWorkstationRow[];
-}
-
 export interface SingleWindowEditorNavigationTarget {
   goodsLineNo: number;
   groupKey: string;
@@ -3137,38 +3127,33 @@ export interface SingleWindowExportReview {
 }
 
 export interface SingleWindowOperationCenterDetail {
+  assignedCardIdentifier?: string;
   attachmentFileCount?: number;
   batchId: number;
   batchReference: string;
   businessType: string;
-  clientDispatchPath?: string;
   clientProfileName?: string;
+  companyScope: string;
   contractNo: string;
   createdAt: string;
-  createdOnMachine?: string;
   draftRevision: number;
   invoiceNo: string;
   lastClientDispatchAt?: string;
   lastReceiptAt?: string;
-  lastReceiptPackagePath?: string;
   packageRecords: SingleWindowOperationCenterPackageRecord[];
   payloadFileCount?: number;
   receiptRecords: SingleWindowOperationCenterReceiptRecord[];
   referenceNo?: string;
   status: string;
   submissionVersion: number;
-  submitPackagePath?: string;
   updatedAt: string;
   warningCount?: number;
-  workingDirectoryPath?: string;
 }
 
 export interface SingleWindowOperationCenterPackageRecord {
   attachmentFileCount?: number;
   createdAt: string;
-  createdOnMachine?: string;
   direction: string;
-  filePath: string;
   packageType: string;
   payloadFileCount?: number;
   warningCount?: number;
@@ -3194,14 +3179,14 @@ export interface SingleWindowOperationCenterReceiptRecord {
 }
 
 export interface SingleWindowOperationCenterRow {
+  assignedCardIdentifier?: string;
   batchId: number;
   batchReference: string;
   businessType: string;
-  clientDispatchPath?: string;
   clientProfileName?: string;
+  companyScope: string;
   contractNo: string;
   createdAt: string;
-  createdOnMachine?: string;
   draftRevision: number;
   invoiceNo: string;
   lastReceiptCode?: string;
@@ -3210,50 +3195,42 @@ export interface SingleWindowOperationCenterRow {
   referenceNo?: string;
   status: string;
   submissionVersion: number;
-  submitPackagePath?: string;
   updatedAt: string;
-}
-
-export interface SingleWindowOperationTicketRow {
-  assignedAt?: string;
-  assignedOperator?: string;
-  assignedWorkstationId?: number;
-  batchId?: number;
-  businessType: string;
-  completedAt?: string;
-  documentId: number;
-  lastError?: string;
-  priority: number;
-  requestedAt: string;
-  requestedBy?: string;
-  sourceInvoiceId: number;
-  status: string;
-  submittedAt?: string;
-  ticketId: number;
 }
 
 export interface SingleWindowPackageFile {
   description: string;
   mediaType: string;
   relativePath: string;
+  sha256: string;
+  sizeBytes: number;
 }
 
 export interface SingleWindowPackageManifest {
   attachmentFiles: SingleWindowPackageFile[];
   batchReference: string;
   businessType: number;
+  cardIdentifier: string;
+  clientProfileKey: string;
+  clientProfileName: string;
+  companyScope: string;
+  contentDigest: string;
   contractNo: string;
   createdAt: string;
   createdOnMachine: string;
   draftRevision: number;
   invoiceNo: string;
+  packageId: string;
   packageType: number;
   payloadFiles: SingleWindowPackageFile[];
   schemaVersion: string;
+  snapshotSha256: string;
   sourceBaselineHash: string;
   sourceDocumentId: number;
   sourceDocumentType: string;
   sourceInvoiceId: number;
+  sourcePackageDigest: string;
+  stationKey: string;
   submissionVersion: number;
   warnings: string[];
 }
@@ -3323,19 +3300,11 @@ export interface SingleWindowReferenceTransportModeEntry {
   value: string;
 }
 
-export interface SingleWindowWorkstationRow {
-  canSubmitAgentConsignment: boolean;
-  canSubmitCustomsCoo: boolean;
-  isEnabled: boolean;
-  machineName: string;
-  operatorName: string;
-  profileId?: number;
-  remarks?: string;
-  updatedAt: string;
-  workstationId: number;
-}
-
 export type OpenApiDocument = Record<string, unknown>;
+
+export interface ActivateSingleWindowClientProfileRequest {
+  profileKey: string;
+}
 
 export interface AnalyzeContainerPackingRequest {
   body: ApiContainerPackingAnalyzeRequest;
@@ -3967,15 +3936,6 @@ export interface ListSalesOpportunityHistoryRequest {
   id: number;
 }
 
-export interface ListSingleWindowCollaborationRequest {
-  businessType?: string;
-  status?: string;
-  keyword?: string;
-  pageNumber?: number;
-  pageSize?: number;
-  includeDisabledWorkstations?: boolean;
-}
-
 export interface ListSingleWindowOperationCenterRequest {
   businessType?: string;
   status?: string;
@@ -4264,7 +4224,7 @@ export interface SaveShippingMarkImageRequest {
   body: ApiShippingMarkImageSaveRequest;
 }
 
-export interface SaveSingleWindowDefaultClientProfileRequest {
+export interface SaveSingleWindowClientProfileRequest {
   body: ApiSingleWindowClientProfileSaveRequest;
 }
 
@@ -4604,6 +4564,11 @@ export class ExportDocManagerApiClient {
     } else {
       throw new Error("A fetch implementation is required to use ExportDocManagerApiClient.");
     }
+  }
+
+  public activateSingleWindowClientProfile(request: ActivateSingleWindowClientProfileRequest, init?: RequestInit): Promise<ApiSingleWindowClientProfilesResponse> {
+    const path = `/api/single-window/client-profiles/${encodePath(request.profileKey)}/activate`;
+    return this.request<ApiSingleWindowClientProfilesResponse>("POST", path, { init });
   }
 
   public analyzeContainerPacking(request: AnalyzeContainerPackingRequest, init?: RequestInit): Promise<ApiContainerPackingAnalyzeResponse> {
@@ -5399,9 +5364,9 @@ export class ExportDocManagerApiClient {
     return this.request<ApiSharedDatabaseOwnershipSummaryResponse>("GET", path, { init });
   }
 
-  public getSingleWindowDefaultClientProfile(init?: RequestInit): Promise<ApiSingleWindowClientProfileResponse> {
-    const path = "/api/single-window/client-profile/default";
-    return this.request<ApiSingleWindowClientProfileResponse>("GET", path, { init });
+  public getSingleWindowClientProfiles(init?: RequestInit): Promise<ApiSingleWindowClientProfilesResponse> {
+    const path = "/api/single-window/client-profiles";
+    return this.request<ApiSingleWindowClientProfilesResponse>("GET", path, { init });
   }
 
   public getSingleWindowExportReview(request: GetSingleWindowExportReviewRequest, init?: RequestInit): Promise<SingleWindowExportReview> {
@@ -5819,21 +5784,6 @@ export class ExportDocManagerApiClient {
     return this.request<ApiSalesOpportunityHistoryDto[]>("GET", path, { init });
   }
 
-  public listSingleWindowCollaboration(request: ListSingleWindowCollaborationRequest = {}, init?: RequestInit): Promise<SingleWindowCollaborationPageResult> {
-    const path = "/api/single-window/collaboration";
-    return this.request<SingleWindowCollaborationPageResult>("GET", path, {
-      query: {
-        "businessType": request.businessType,
-        "status": request.status,
-        "keyword": request.keyword,
-        "pageNumber": request.pageNumber,
-        "pageSize": request.pageSize,
-        "includeDisabledWorkstations": request.includeDisabledWorkstations,
-      },
-      init,
-    });
-  }
-
   public listSingleWindowOperationCenter(request: ListSingleWindowOperationCenterRequest = {}, init?: RequestInit): Promise<SingleWindowOperationCenterPageResult> {
     const path = "/api/single-window/operation-center";
     return this.request<SingleWindowOperationCenterPageResult>("GET", path, {
@@ -5846,11 +5796,6 @@ export class ExportDocManagerApiClient {
       },
       init,
     });
-  }
-
-  public listSingleWindowWorkstations(init?: RequestInit): Promise<SingleWindowWorkstationRow[]> {
-    const path = "/api/single-window/collaboration/workstations";
-    return this.request<SingleWindowWorkstationRow[]>("GET", path, { init });
   }
 
   public listSupplierAssessments(request: ListSupplierAssessmentsRequest, init?: RequestInit): Promise<ApiSupplierAssessmentDto[]> {
@@ -6377,9 +6322,9 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveSingleWindowDefaultClientProfile(request: SaveSingleWindowDefaultClientProfileRequest, init?: RequestInit): Promise<ApiSingleWindowClientProfileSaveResponse> {
-    const path = "/api/single-window/client-profile/default";
-    return this.request<ApiSingleWindowClientProfileSaveResponse>("PUT", path, {
+  public saveSingleWindowClientProfile(request: SaveSingleWindowClientProfileRequest, init?: RequestInit): Promise<ApiSingleWindowClientProfilesResponse> {
+    const path = "/api/single-window/client-profiles";
+    return this.request<ApiSingleWindowClientProfilesResponse>("PUT", path, {
       body: request.body,
       init,
     });

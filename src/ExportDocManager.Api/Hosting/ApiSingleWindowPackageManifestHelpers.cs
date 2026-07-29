@@ -16,6 +16,19 @@ namespace ExportDocManager.Api.Hosting
                 using var archive = System.IO.Compression.ZipFile.OpenRead(packagePath);
                 var entry = archive.GetEntry("manifest.json")
                     ?? throw new InvalidDataException("交接包缺少 manifest.json。");
+                const long maximumManifestBytes = 1024L * 1024L;
+                if (entry.Length <= 0 || entry.Length > maximumManifestBytes)
+                {
+                    throw new InvalidDataException("交接包 manifest.json 大小无效或超过 1 MB 限制。");
+                }
+
+                if (entry.Length > 64 * 1024 &&
+                    (entry.CompressedLength <= 0 ||
+                     (double)entry.Length / entry.CompressedLength > 100d))
+                {
+                    throw new InvalidDataException("交接包 manifest.json 压缩比异常。");
+                }
+
                 using var stream = entry.Open();
                 return System.Text.Json.JsonSerializer.Deserialize<SingleWindowPackageManifest>(
                     stream,

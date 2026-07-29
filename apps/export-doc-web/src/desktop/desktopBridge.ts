@@ -1,4 +1,4 @@
-type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
+import { invoke, isTauri } from "@tauri-apps/api/core";
 
 export type DesktopRuntimeContext = {
   apiBaseUrl: string;
@@ -29,22 +29,8 @@ export type TauriUpdaterInstallResult = {
   storagePolicy: string;
 };
 
-declare global {
-  interface Window {
-    __TAURI__?: {
-      core?: {
-        invoke?: TauriInvoke;
-      };
-    };
-  }
-}
-
 function getInvoke() {
-  if (typeof window === "undefined") {
-    return undefined;
-  }
-
-  return window.__TAURI__?.core?.invoke;
+  return typeof window !== "undefined" && isTauri() ? invoke : undefined;
 }
 
 export function isDesktopBridgeAvailable() {

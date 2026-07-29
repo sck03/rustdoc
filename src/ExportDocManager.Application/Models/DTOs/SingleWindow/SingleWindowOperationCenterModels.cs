@@ -64,6 +64,8 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public string ContractNo { get; init; } = string.Empty;
 
+        public string CompanyScope { get; init; } = string.Empty;
+
         public string Status { get; init; } = string.Empty;
 
         public string ReferenceNo { get; init; } = string.Empty;
@@ -72,13 +74,9 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public string LastReceiptMessage { get; init; } = string.Empty;
 
-        public string CreatedOnMachine { get; init; } = string.Empty;
-
-        public string SubmitPackagePath { get; init; } = string.Empty;
-
         public string ClientProfileName { get; init; } = string.Empty;
 
-        public string ClientDispatchPath { get; init; } = string.Empty;
+        public string AssignedCardIdentifier { get; init; } = string.Empty;
 
         public DateTime CreatedAt { get; init; }
 
@@ -92,10 +90,6 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
         public string PackageType { get; init; } = string.Empty;
 
         public string Direction { get; init; } = string.Empty;
-
-        public string FilePath { get; init; } = string.Empty;
-
-        public string CreatedOnMachine { get; init; } = string.Empty;
 
         public int PayloadFileCount { get; init; }
 
@@ -141,21 +135,15 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public string ContractNo { get; init; } = string.Empty;
 
+        public string CompanyScope { get; init; } = string.Empty;
+
         public string Status { get; init; } = string.Empty;
 
         public string ReferenceNo { get; init; } = string.Empty;
 
-        public string SubmitPackagePath { get; init; } = string.Empty;
-
-        public string LastReceiptPackagePath { get; init; } = string.Empty;
-
-        public string WorkingDirectoryPath { get; init; } = string.Empty;
-
         public string ClientProfileName { get; init; } = string.Empty;
 
-        public string ClientDispatchPath { get; init; } = string.Empty;
-
-        public string CreatedOnMachine { get; init; } = string.Empty;
+        public string AssignedCardIdentifier { get; init; } = string.Empty;
 
         public int PayloadFileCount { get; init; }
 

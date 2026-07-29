@@ -268,6 +268,7 @@ const singleWindowOperationCenterSmokeScene = createSingleWindowOperationCenterS
   buildSmokeCustomsCooReceiptXml,
   createSmokeInvoice,
   deleteSmokeInvoice,
+  desktopAccessHeaders,
   ensureTrailingSlash,
   evaluate,
   getSingleWindowBatchDetail,

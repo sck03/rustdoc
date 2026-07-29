@@ -296,9 +296,7 @@ namespace ExportDocManager.Api.Hosting
                 var imported = expectedPackageType == SingleWindowPackageType.SubmitPackage
                     ? await handoffPackageService.ImportSubmitPackageAsync(packagePath, workingRoot, cancellationToken)
                     : await handoffPackageService.ImportReceiptPackageAsync(packagePath, workingRoot, cancellationToken);
-                bool keepWorkingDirectory =
-                    expectedPackageType == SingleWindowPackageType.SubmitPackage ||
-                    request.KeepWorkingDirectory;
+                bool keepWorkingDirectory = request.KeepWorkingDirectory;
 
                 ApiSingleWindowImportedPackageResponse response;
                 using (imported)

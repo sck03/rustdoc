@@ -22,6 +22,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/tools/ocr/recognize-image", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 IOcrService ocrService,
                 ApiOcrRecognizeImageRequest request,
                 CancellationToken cancellationToken) =>
@@ -29,6 +30,11 @@ namespace ExportDocManager.Api.Hosting
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
                     return Results.Unauthorized();
+                }
+
+                if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
+                {
+                    return WriteForbidden("服务器图片路径识别仅允许可信 Tauri 桌面端；浏览器请上传图片内容。");
                 }
 
                 string filePath = request?.FilePath?.Trim() ?? string.Empty;

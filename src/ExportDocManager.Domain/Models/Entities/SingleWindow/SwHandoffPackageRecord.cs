@@ -24,6 +24,12 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(80)]
         public string InvoiceNo { get; set; } = string.Empty;
 
+        [MaxLength(120)]
+        public string CompanyScope { get; set; } = string.Empty;
+
+        [MaxLength(64)]
+        public string StationKey { get; set; } = string.Empty;
+
         [MaxLength(40)]
         public string PackageType { get; set; } = string.Empty;
 
@@ -41,6 +47,9 @@ namespace ExportDocManager.Models.Entities
         public int AttachmentFileCount { get; set; }
 
         public int WarningCount { get; set; }
+
+        [MaxLength(64)]
+        public string ContentDigest { get; set; } = string.Empty;
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 

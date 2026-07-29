@@ -9,6 +9,7 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
     buildSmokeCustomsCooReceiptXml,
     createSmokeInvoice,
     deleteSmokeInvoice,
+    desktopAccessHeaders,
     ensureTrailingSlash,
     evaluate,
     getSingleWindowBatchDetail,
@@ -21,12 +22,26 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
   } = runtime;
 
   async function waitForSingleWindowOperationCenterCheck(page, options, accessToken, tokenType, timeoutMs) {
-    if (!options.singleWindowOperationCenterCheck) {
-      return null;
-    }
+    if (!options.singleWindowOperationCenterCheck) return null;
 
-    const customsCoo = await waitForSingleWindowOperationCenterCustomsCooCheck(page, options, accessToken, tokenType, timeoutMs);
-    const agentConsignment = await waitForSingleWindowOperationCenterAgentConsignmentCheck(page, options, accessToken, tokenType, timeoutMs);
+    const customsCoo = await runBusinessCheck(page, options, accessToken, tokenType, timeoutMs, {
+      key: "coo",
+      displayName: "海关原产地证",
+      minimumProfileCount: 1,
+      expectedStatus: "Approved",
+      expectedReceiptMessage: "Smoke approved",
+      buildReceiptXml: buildSmokeCustomsCooReceiptXml,
+      exportSubmitPackage: exportSmokeCustomsCooSubmitPackage,
+    });
+    const agentConsignment = await runBusinessCheck(page, options, accessToken, tokenType, timeoutMs, {
+      key: "acd",
+      displayName: "报关代理委托",
+      minimumProfileCount: 2,
+      expectedStatus: "Accepted",
+      expectedReceiptMessage: "Smoke ACD accepted",
+      buildReceiptXml: buildSmokeAgentConsignmentReceiptXml,
+      exportSubmitPackage: exportSmokeAgentConsignmentSubmitPackage,
+    });
 
     return {
       ...customsCoo,
@@ -36,190 +51,190 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
         customsCoo?.detailStatus === "Approved" &&
         agentConsignment?.detailStatus === "Accepted" &&
         customsCoo?.detailReceiptRecordCount > 0 &&
-        agentConsignment?.detailReceiptRecordCount > 0,
+        agentConsignment?.detailReceiptRecordCount > 0 &&
+        customsCoo?.activeStationProfileCount === 1 &&
+        agentConsignment?.activeStationProfileCount === 1 &&
+        agentConsignment?.stationProfileCount >= 2 &&
+        customsCoo?.companyScope !== agentConsignment?.companyScope &&
+        customsCoo?.activeCardIdentifier !== agentConsignment?.activeCardIdentifier,
       ),
     };
   }
 
-  async function waitForSingleWindowOperationCenterCustomsCooCheck(page, options, accessToken, tokenType, timeoutMs) {
-    if (!options.singleWindowOperationCenterCheck) {
-      return null;
-    }
-
+  async function runBusinessCheck(page, options, accessToken, tokenType, timeoutMs, definition) {
     const timestamp = Date.now();
-    const smokeRoot = path.join(options.userDataDir, `single-window-operation-center-${timestamp}`);
-    const clientRoot = path.join(smokeRoot, "ClientRoot");
+    const smokeRoot = path.join(options.userDataDir, `single-window-operation-center-${definition.key}-${timestamp}`);
+    const clientRoot = path.join(smokeRoot, "OfficialClient");
     const outBoxPath = path.join(clientRoot, "OutBox");
     const inBoxPath = path.join(clientRoot, "InBox");
-    const submitPackagePath = path.join(smokeRoot, `submit-package-${timestamp}.swpkg`);
-    const receiptPackagePath = path.join(smokeRoot, `receipt-package-${timestamp}.swpkg`);
+    const submitPackagePath = path.join(smokeRoot, `${definition.key}-submit-${timestamp}.swpkg`);
+    const receiptPackagePath = path.join(smokeRoot, `${definition.key}-receipt-${timestamp}.swpkg`);
     let invoice = null;
-    let submitPackage = null;
-    let receiptFilePath = "";
+    let operatorUserId = 0;
+    let operatorDeleted = false;
     let cleanupDeleted = false;
     let cleanedClientRoot = false;
     let result = null;
 
     try {
       mkdirSync(inBoxPath, { recursive: true });
-      invoice = await createSmokeInvoice(options, accessToken, tokenType);
-      submitPackage = await exportSmokeCustomsCooSubmitPackage(
+      const companyScope = `Smoke Company ${definition.key.toUpperCase()} ${timestamp}`;
+      const operator = await createScopedSmokeUser(
         options,
         accessToken,
         tokenType,
+        definition,
+        companyScope,
+        timestamp,
+      );
+      operatorUserId = operator.userId;
+      const operatorLogin = await loginScopedSmokeUser(options, operator.username, operator.password);
+      invoice = await createSmokeInvoice(options, operatorLogin.accessToken, operatorLogin.tokenType);
+      const submitPackage = await definition.exportSubmitPackage(
+        options,
+        operatorLogin.accessToken,
+        operatorLogin.tokenType,
         invoice.id,
         submitPackagePath,
       );
-
       const batchId = submitPackage.trackingBatchId;
       const batchReference = submitPackage.manifest?.batchReference ?? "";
       if (!batchId || !batchReference) {
         throw new Error(`Single Window submit package response did not include trackingBatchId/batchReference: ${JSON.stringify(submitPackage)}`);
       }
 
-      const checkUrl = buildSingleWindowOperationCenterCheckUrl(options.webUrl);
-      await page.send("Page.navigate", { url: checkUrl });
-      await waitForRuntimeDiagnostics(page, ["操作中心", "提交包导入", "批次快捷操作"], timeoutMs);
+      const profileResponse = await saveStationProfile(
+        options,
+        accessToken,
+        tokenType,
+        definition,
+        submitPackage.manifest?.companyScope ?? "",
+        clientRoot,
+        timestamp,
+      );
+      const stationProfiles = Array.isArray(profileResponse.profiles) ? profileResponse.profiles : [];
+      const activeProfiles = stationProfiles.filter((profile) => profile.isActive);
+      const activeProfile = activeProfiles[0] ?? null;
+      if (stationProfiles.length < definition.minimumProfileCount ||
+          activeProfiles.length !== 1 ||
+          !activeProfile ||
+          !singleWindowProfileContainsPath(activeProfile, clientRoot)) {
+        throw new Error(`Single Window station profile was not saved for ${clientRoot}: ${JSON.stringify(profileResponse)}`);
+      }
 
-      await evaluate(
+      const checkUrl = buildSingleWindowOperationCenterCheckUrl(options.webUrl, timestamp);
+      await page.send("Page.navigate", { url: checkUrl });
+      await waitForRuntimeDiagnostics(page, ["操作中心", "公司与操作卡档案", "导入待办提交包"], timeoutMs);
+
+      const profileReady = await waitForPageExpression(
         page,
         `(() => {
-          const input = document.querySelector('input[aria-label="搜索单一窗口批次"]');
-          if (!input) {
-            throw new Error('Operation center search input was not found.');
-          }
-
-          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-          setter.call(input, ${JSON.stringify(invoice.invoiceNo)});
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          return true;
+          const section = document.querySelector('[aria-label="本机持卡机操作档案"]');
+          const selector = section?.querySelector('select[aria-label="选择操作档案"]');
+          const inputs = section ? Array.from(section.querySelectorAll('input')) : [];
+          const inputValues = inputs.map((input) => input.value);
+          return Boolean(section &&
+            selector?.value === ${JSON.stringify(activeProfile.profileKey)} &&
+            inputValues.includes(${JSON.stringify(activeProfile.profileName)}) &&
+            inputValues.includes(${JSON.stringify(activeProfile.companyScope)}) &&
+            inputValues.includes(${JSON.stringify(activeProfile.cardIdentifier)}));
         })()`,
-        true,
+        timeoutMs,
+        "Timed out waiting for the active Single Window station profile.",
       );
 
       await waitForPageExpression(
         page,
         `(() => {
-          const input = document.querySelector('input[aria-label="搜索单一窗口批次"]');
-          return Boolean(input && input.value === ${JSON.stringify(invoice.invoiceNo)});
+          window.__exportDocManagerSmokeSingleWindowPackagePath = ${JSON.stringify(submitPackagePath)};
+          window.__exportDocManagerSmokeTauriInvocations = [];
+          const section = document.querySelector('[aria-label="持卡机提交包导入"]');
+          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.title || '').includes('选择提交包')) : null;
+          if (!button || button.disabled) return false;
+          button.click();
+          return true;
         })()`,
         timeoutMs,
-        "Timed out waiting for operation center search input to receive the smoke invoice number.",
+        "Timed out waiting for the submit-package picker.",
+      );
+
+      const packagePicked = await waitForPageExpression(
+        page,
+        `(() => {
+          const section = document.querySelector('[aria-label="持卡机提交包导入"]');
+          const input = section?.querySelector('.path-field input');
+          return Boolean(input && input.value === ${JSON.stringify(submitPackagePath)});
+        })()`,
+        timeoutMs,
+        "Timed out waiting for the submit package path to be selected.",
       );
 
       await evaluate(
         page,
         `(() => {
-          const input = document.querySelector('input[aria-label="搜索单一窗口批次"]');
-          if (!input) {
-            throw new Error('Operation center search input was not found before submit.');
-          }
-
-          const form = input.closest('form');
-          if (form) {
-            form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-          }
+          const section = document.querySelector('[aria-label="持卡机提交包导入"]');
+          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('导入并绑定当前档案')) : null;
+          if (!button || button.disabled) throw new Error('Submit-package import button is unavailable.');
+          button.click();
           return true;
         })()`,
         true,
       );
 
+      const submitImportUi = await waitForPageExpression(
+        page,
+        `(() => {
+          const section = document.querySelector('[aria-label="持卡机提交包导入"]');
+          const text = section?.innerText || '';
+          return Boolean(text.includes(${JSON.stringify(invoice.invoiceNo)}) && text.includes(${JSON.stringify(activeProfile.companyScope)}));
+        })()`,
+        timeoutMs,
+        "Timed out waiting for the imported submit-package summary.",
+      );
+
+      await setOperationCenterSearch(page, invoice.invoiceNo);
       const rowReady = await waitForPageExpression(
         page,
         `(() => {
           const rows = Array.from(document.querySelectorAll('.single-window-operation-table tbody tr'));
           const row = rows.find((candidate) =>
             (candidate.innerText || '').includes(${JSON.stringify(invoice.invoiceNo)}) &&
-            (candidate.innerText || '').includes(${JSON.stringify(batchReference)}));
-          if (!row) {
-            return false;
-          }
-
+            (candidate.innerText || '').includes(${JSON.stringify(batchReference)}) &&
+            (candidate.innerText || '').includes(${JSON.stringify(definition.displayName)}));
+          if (!row) return false;
           row.click();
           return true;
         })()`,
         timeoutMs,
-        `Timed out waiting for operation center smoke batch row: ${invoice.invoiceNo} / ${batchReference}`,
+        `Timed out waiting for operation center batch row: ${invoice.invoiceNo} / ${batchReference}`,
       );
 
       const actionPanelReady = await waitForPageExpression(
         page,
         `(() => {
           const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const text = section ? section.innerText || '' : '';
+          const text = section?.innerText || '';
+          const dispatchButton = section
+            ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('发送官方客户端'))
+            : null;
           return Boolean(section &&
             text.includes(${JSON.stringify(batchReference)}) &&
-            text.includes(${JSON.stringify(invoice.invoiceNo)}) &&
-            text.includes('保存目录根') &&
-            text.includes('发送到 OutBox') &&
-            text.includes('自动收件打包') &&
-            text.includes('打包并导入'));
+            text.includes('发送官方客户端') &&
+            text.includes('收集并导出回执') &&
+            text.includes(${JSON.stringify(activeProfile.cardIdentifier)}) &&
+            dispatchButton &&
+            !dispatchButton.disabled);
         })()`,
         timeoutMs,
-        "Timed out waiting for operation center list action panel.",
-      );
-
-      await waitForPageExpression(
-        page,
-        `(() => {
-          window.__exportDocManagerSmokeDirectoryPath = ${JSON.stringify(clientRoot)};
-          window.__exportDocManagerSmokeTauriInvocations = [];
-          const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.title || '').includes('选择业务目录根')) : null;
-          if (!button || button.disabled) {
-            return false;
-          }
-
-          button.click();
-          return true;
-        })()`,
-        timeoutMs,
-        "Timed out waiting for operation center directory picker button to become available.",
-      );
-
-      const directoryPicked = await waitForPageExpression(
-        page,
-        `(() => {
-          const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const input = section ? section.querySelector('.path-field input') : null;
-          const invocations = window.__exportDocManagerSmokeTauriInvocations || [];
-          return Boolean(input &&
-            input.value === ${JSON.stringify(clientRoot)} &&
-            invocations.some((entry) => entry.command === 'select_directory'));
-        })()`,
-        timeoutMs,
-        "Timed out waiting for operation center directory picker to apply the smoke client root.",
+        "Timed out waiting for the operation center action panel and enabled dispatch action.",
       );
 
       await evaluate(
         page,
         `(() => {
           const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('保存目录根')) : null;
-          if (!button || button.disabled) {
-            throw new Error('Operation center save directory root button is not available.');
-          }
-
-          button.click();
-          return true;
-        })()`,
-        true,
-      );
-
-      const savedProfile = await waitFor(async () => {
-        const candidate = await getSingleWindowClientProfile(options, accessToken, tokenType);
-        return singleWindowProfileContainsPath(candidate.profile, clientRoot) ? candidate : null;
-      }, timeoutMs, "Timed out waiting for operation center client root to persist in the API profile.");
-
-      await evaluate(
-        page,
-        `(() => {
-          const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('发送到 OutBox')) : null;
-          if (!button || button.disabled) {
-            throw new Error('Operation center dispatch button is not available.');
-          }
-
+          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('发送官方客户端')) : null;
+          if (!button || button.disabled) throw new Error('Dispatch button is unavailable.');
           button.click();
           return true;
         })()`,
@@ -230,76 +245,51 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
         page,
         `(() => {
           const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const text = section ? section.innerText || '' : '';
-          return Boolean(text.includes('当前批次已发送到默认导入目录') &&
-            text.includes('目标目录') &&
-            text.includes('报文数'));
+          const text = section?.innerText || '';
+          return Boolean(text.includes('XML 已发送到本机官方客户端 OutBox') && text.includes('已发送文件'));
         })()`,
         timeoutMs,
-        "Timed out waiting for operation center dispatch UI result.",
+        "Timed out waiting for the dispatch result.",
       );
 
       const outBoxFiles = await waitFor(async () => {
-        if (!existsSync(outBoxPath)) {
-          return null;
-        }
-
+        if (!existsSync(outBoxPath)) return null;
         const files = readdirSync(outBoxPath)
           .filter((fileName) => fileName.toLowerCase().endsWith(".xml"))
           .map((fileName) => path.join(outBoxPath, fileName));
         return files.length > 0 ? files : null;
-      }, timeoutMs, `Timed out waiting for dispatched Single Window XML files in ${outBoxPath}.`);
+      }, timeoutMs, `Timed out waiting for dispatched XML files in ${outBoxPath}.`);
 
-      receiptFilePath = path.join(inBoxPath, `Successed_${batchReference}_${invoice.invoiceNo}.xml`);
-      writeFileSync(receiptFilePath, buildSmokeCustomsCooReceiptXml(batchReference), "utf8");
+      const receiptFilePath = path.join(inBoxPath, `Successed_${batchReference}_${invoice.invoiceNo}.xml`);
+      writeFileSync(receiptFilePath, definition.buildReceiptXml(batchReference), "utf8");
 
       await evaluate(
         page,
         `(() => {
           window.__exportDocManagerSmokeSavePackagePath = ${JSON.stringify(receiptPackagePath)};
           window.__exportDocManagerSmokeTauriInvocations = [];
-          return true;
-        })()`,
-        true,
-      );
-
-      await evaluate(
-        page,
-        `(() => {
           const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('打包并导入')) : null;
-          if (!button || button.disabled) {
-            throw new Error('Operation center receipt package import button is not available.');
-          }
-
+          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('收集并导出回执')) : null;
+          if (!button || button.disabled) throw new Error('Receipt export button is unavailable.');
           button.click();
           return true;
         })()`,
         true,
       );
 
-      const autoReceiptUi = await waitForPageExpression(
+      const receiptExportUi = await waitForPageExpression(
         page,
         `(() => {
           const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const text = section ? section.innerText || '' : '';
-          return Boolean(
-            text.includes('回执包已导出并导入') &&
-            text.includes('回执文件') &&
-            text.includes('回执包') &&
-            text.includes('解析回执') &&
-            text.includes('写入回执') &&
-            text.includes('Smoke approved'));
+          const text = section?.innerText || '';
+          return Boolean(text.includes('回执包已导出') && text.includes('已收集回执'));
         })()`,
         timeoutMs,
-        "Timed out waiting for operation center receipt package import result.",
+        "Timed out waiting for the receipt-package export result.",
       );
 
       const packageFile = await waitFor(async () => {
-        if (!existsSync(receiptPackagePath)) {
-          return null;
-        }
-
+        if (!existsSync(receiptPackagePath)) return null;
         const size = statSync(receiptPackagePath).size;
         const header = size > 0 ? readFileSync(receiptPackagePath).subarray(0, 2).toString("ascii") : "";
         return header === "PK" ? { size, header } : null;
@@ -311,23 +301,21 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
           const expected = ${JSON.stringify(normalizePathForCompare(receiptPackagePath))};
           const normalize = (value) => String(value || '').replace(/\\\\/g, '/').replace(/\\/+$/, '').toLowerCase();
           const invocations = window.__exportDocManagerSmokeTauriInvocations || [];
-          return invocations.some((entry) => entry &&
-            entry.command === 'select_save_package_path' &&
-            normalize(window.__exportDocManagerSmokeSavePackagePath) === expected);
+          return invocations.some((entry) => entry?.command === 'select_save_package_path' && normalize(window.__exportDocManagerSmokeSavePackagePath) === expected);
         })()`,
         timeoutMs,
         "Timed out waiting for select_save_package_path invocation.",
       );
 
+      await importReceiptPackage(options, accessToken, tokenType, receiptPackagePath);
       const detail = await waitFor(async () => {
         const candidate = await getSingleWindowBatchDetail(options, accessToken, tokenType, batchId);
         const receiptRecords = Array.isArray(candidate.receiptRecords) ? candidate.receiptRecords : [];
-        return normalizePathForCompare(candidate.lastReceiptPackagePath) === normalizePathForCompare(receiptPackagePath) &&
-          candidate.status === "Approved" &&
-          receiptRecords.some((record) => String(record.receiptMessage || "").includes("Smoke approved"))
+        return candidate.status === definition.expectedStatus &&
+          receiptRecords.some((record) => String(record.receiptMessage || "").includes(definition.expectedReceiptMessage))
           ? candidate
           : null;
-      }, timeoutMs, "Timed out waiting for operation center detail to record imported receipt package and receipt log.");
+      }, timeoutMs, "Timed out waiting for the imported receipt to update the operation center detail.");
 
       const submitPackageHeader = existsSync(submitPackagePath)
         ? readFileSync(submitPackagePath).subarray(0, 2).toString("ascii")
@@ -348,420 +336,196 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
         receiptPackagePath,
         receiptPackageHeader: packageFile.header,
         receiptPackageSize: packageFile.size,
+        profileReady: Boolean(profileReady?.found),
+        packagePicked: Boolean(packagePicked?.found),
+        submitImportUi: Boolean(submitImportUi?.found),
         rowReady: Boolean(rowReady?.found),
         actionPanelReady: Boolean(actionPanelReady?.found),
-        directoryPicked: Boolean(directoryPicked?.found),
-        savedProfile: singleWindowProfileContainsPath(savedProfile?.profile, clientRoot),
+        savedProfile: true,
+        stationProfileCount: stationProfiles.length,
+        activeStationProfileCount: activeProfiles.length,
+        activeStationProfileKey: activeProfile.profileKey,
+        activeCardIdentifier: activeProfile.cardIdentifier,
         dispatchUi: Boolean(dispatchUi?.found),
-        autoReceiptUi: Boolean(autoReceiptUi?.found),
+        receiptExportUi: Boolean(receiptExportUi?.found),
         savePackageInvocation: Boolean(savePackageInvocation?.found),
         detailStatus: detail.status,
-        detailLastReceiptPackagePath: detail.lastReceiptPackagePath,
-        detailClientDispatchPath: detail.clientDispatchPath,
         detailPackageRecordCount: Array.isArray(detail.packageRecords) ? detail.packageRecords.length : 0,
         detailReceiptRecordCount: Array.isArray(detail.receiptRecords) ? detail.receiptRecords.length : 0,
         detailReceiptMessages: Array.isArray(detail.receiptRecords)
           ? detail.receiptRecords.map((record) => record.receiptMessage).filter(Boolean)
           : [],
+        companyScope,
+        operatorUsername: operator.username,
+        deletedOperator: false,
         deletedInvoice: false,
         cleanedClientRoot: false,
       };
 
       cleanupDeleted = await deleteSmokeInvoice(options, accessToken, tokenType, invoice.id).catch(() => false);
       result.deletedInvoice = cleanupDeleted;
+      operatorDeleted = await deleteScopedSmokeUser(options, accessToken, tokenType, operatorUserId).catch(() => false);
+      result.deletedOperator = operatorDeleted;
       cleanedClientRoot = tryRemoveDirectory(smokeRoot);
       result.cleanedClientRoot = cleanedClientRoot;
     } finally {
       if (!cleanedClientRoot) {
         cleanedClientRoot = tryRemoveDirectory(smokeRoot);
-        if (result) {
-          result.cleanedClientRoot = cleanedClientRoot;
-        }
+        if (result) result.cleanedClientRoot = cleanedClientRoot;
       }
-
       if (invoice?.id && !cleanupDeleted) {
         cleanupDeleted = await deleteSmokeInvoice(options, accessToken, tokenType, invoice.id).catch(() => false);
-        if (result) {
-          result.deletedInvoice = cleanupDeleted;
-        }
+        if (result) result.deletedInvoice = cleanupDeleted;
+      }
+      if (operatorUserId && !operatorDeleted) {
+        operatorDeleted = await deleteScopedSmokeUser(options, accessToken, tokenType, operatorUserId).catch(() => false);
+        if (result) result.deletedOperator = operatorDeleted;
       }
     }
 
     return result;
   }
 
-  async function waitForSingleWindowOperationCenterAgentConsignmentCheck(page, options, accessToken, tokenType, timeoutMs) {
-    const timestamp = Date.now();
-    const smokeRoot = path.join(options.userDataDir, `single-window-operation-center-acd-${timestamp}`);
-    const clientRoot = path.join(smokeRoot, "ClientRoot");
-    const outBoxPath = path.join(clientRoot, "OutBox");
-    const inBoxPath = path.join(clientRoot, "InBox");
-    const submitPackagePath = path.join(smokeRoot, `acd-submit-package-${timestamp}.swpkg`);
-    const receiptPackagePath = path.join(smokeRoot, `acd-receipt-package-${timestamp}.swpkg`);
-    let invoice = null;
-    let cleanupDeleted = false;
-    let cleanedClientRoot = false;
-    let result = null;
+  async function setOperationCenterSearch(page, invoiceNo) {
+    await evaluate(
+      page,
+      `(() => {
+        const input = document.querySelector('input[aria-label="搜索单一窗口批次"]');
+        if (!input) throw new Error('Operation center search input was not found.');
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        setter.call(input, ${JSON.stringify(invoiceNo)});
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.closest('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        return true;
+      })()`,
+      true,
+    );
+  }
 
-    try {
-      mkdirSync(inBoxPath, { recursive: true });
-      invoice = await createSmokeInvoice(options, accessToken, tokenType);
-      const submitPackage = await exportSmokeAgentConsignmentSubmitPackage(
-        options,
-        accessToken,
-        tokenType,
-        invoice.id,
-        submitPackagePath,
-      );
+  async function saveStationProfile(options, accessToken, tokenType, definition, companyScope, clientRoot, timestamp) {
+    const response = await fetch(new URL("/api/single-window/client-profiles", ensureTrailingSlash(options.apiBaseUrl)), {
+      method: "PUT",
+      headers: authorizedJsonHeaders(options, accessToken, tokenType),
+      body: JSON.stringify({
+        profileKey: "",
+        profileName: `Smoke ${definition.displayName} ${timestamp}`,
+        companyScope,
+        cardIdentifier: `SMOKE-${definition.key.toUpperCase()}-${timestamp}`,
+        customsCooClientRootPath: definition.key === "coo" ? clientRoot : "",
+        agentConsignmentClientRootPath: definition.key === "acd" ? clientRoot : "",
+        canSubmitCustomsCoo: definition.key === "coo",
+        canSubmitAgentConsignment: definition.key === "acd",
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Single Window station profile save failed with HTTP ${response.status}: ${await response.text()}`);
+    }
+    return response.json();
+  }
 
-      const batchId = submitPackage.trackingBatchId;
-      const batchReference = submitPackage.manifest?.batchReference ?? "";
-      if (!batchId || !batchReference) {
-        throw new Error(`Single Window ACD submit package response did not include trackingBatchId/batchReference: ${JSON.stringify(submitPackage)}`);
-      }
-
-      const checkUrl = buildSingleWindowOperationCenterCheckUrl(options.webUrl);
-      await page.send("Page.navigate", { url: checkUrl });
-      await waitForRuntimeDiagnostics(page, ["操作中心", "提交包导入", "批次快捷操作"], timeoutMs);
-
-      await evaluate(
-        page,
-        `(() => {
-          const input = document.querySelector('input[aria-label="搜索单一窗口批次"]');
-          if (!input) {
-            throw new Error('Operation center search input was not found for ACD smoke.');
-          }
-
-          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-          setter.call(input, ${JSON.stringify(invoice.invoiceNo)});
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          const form = input.closest('form');
-          if (form) {
-            form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-          }
-          return true;
-        })()`,
-        true,
-      );
-
-      const rowReady = await waitForPageExpression(
-        page,
-        `(() => {
-          const rows = Array.from(document.querySelectorAll('.single-window-operation-table tbody tr'));
-          const row = rows.find((candidate) =>
-            (candidate.innerText || '').includes(${JSON.stringify(invoice.invoiceNo)}) &&
-            (candidate.innerText || '').includes(${JSON.stringify(batchReference)}) &&
-            ((candidate.innerText || '').includes('报关代理委托') || (candidate.innerText || '').includes('AgentConsignment')));
-          if (!row) {
-            return false;
-          }
-
-          row.click();
-          return true;
-        })()`,
-        timeoutMs,
-        `Timed out waiting for operation center ACD smoke batch row: ${invoice.invoiceNo} / ${batchReference}`,
-      );
-
-      const actionPanelReady = await waitForPageExpression(
-        page,
-        `(() => {
-          const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const text = section ? section.innerText || '' : '';
-          return Boolean(section &&
-            text.includes(${JSON.stringify(batchReference)}) &&
-            text.includes(${JSON.stringify(invoice.invoiceNo)}) &&
-            text.includes('保存目录根') &&
-            text.includes('发送到 OutBox') &&
-            text.includes('打包并导入'));
-        })()`,
-        timeoutMs,
-        "Timed out waiting for operation center ACD list action panel.",
-      );
-
-      await waitForPageExpression(
-        page,
-        `(() => {
-          window.__exportDocManagerSmokeDirectoryPath = ${JSON.stringify(clientRoot)};
-          window.__exportDocManagerSmokeTauriInvocations = [];
-          const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.title || '').includes('选择业务目录根')) : null;
-          if (!button || button.disabled) {
-            return false;
-          }
-
-          button.click();
-          return true;
-        })()`,
-        timeoutMs,
-        "Timed out waiting for operation center ACD directory picker button to become available.",
-      );
-
-      const directoryPicked = await waitForPageExpression(
-        page,
-        `(() => {
-          const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const input = section ? section.querySelector('.path-field input') : null;
-          const invocations = window.__exportDocManagerSmokeTauriInvocations || [];
-          return Boolean(input &&
-            input.value === ${JSON.stringify(clientRoot)} &&
-            invocations.some((entry) => entry.command === 'select_directory'));
-        })()`,
-        timeoutMs,
-        "Timed out waiting for operation center ACD directory picker.",
-      );
-
-      await evaluate(
-        page,
-        `(() => {
-          const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('保存目录根')) : null;
-          if (!button || button.disabled) {
-            throw new Error('Operation center ACD save directory root button is not available.');
-          }
-
-          button.click();
-          return true;
-        })()`,
-        true,
-      );
-
-      const savedProfile = await waitFor(async () => {
-        const candidate = await getSingleWindowClientProfile(options, accessToken, tokenType);
-        return singleWindowProfileContainsPath(candidate.profile, clientRoot) ? candidate : null;
-      }, timeoutMs, "Timed out waiting for operation center ACD client root to persist in the API profile.");
-
-      await evaluate(
-        page,
-        `(() => {
-          const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('发送到 OutBox')) : null;
-          if (!button || button.disabled) {
-            throw new Error('Operation center ACD dispatch button is not available.');
-          }
-
-          button.click();
-          return true;
-        })()`,
-        true,
-      );
-
-      const dispatchUi = await waitForPageExpression(
-        page,
-        `(() => {
-          const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const text = section ? section.innerText || '' : '';
-          return Boolean(text.includes('当前批次已发送到默认导入目录') &&
-            text.includes('目标目录') &&
-            text.includes('报文数'));
-        })()`,
-        timeoutMs,
-        "Timed out waiting for operation center ACD dispatch UI result.",
-      );
-
-      const outBoxFiles = await waitFor(async () => {
-        if (!existsSync(outBoxPath)) {
-          return null;
-        }
-
-        const files = readdirSync(outBoxPath)
-          .filter((fileName) => fileName.toLowerCase().endsWith(".xml"))
-          .map((fileName) => path.join(outBoxPath, fileName));
-        return files.length > 0 ? files : null;
-      }, timeoutMs, `Timed out waiting for dispatched ACD Single Window XML files in ${outBoxPath}.`);
-
-      const receiptFilePath = path.join(inBoxPath, `Successed_${batchReference}_${invoice.invoiceNo}.xml`);
-      writeFileSync(receiptFilePath, buildSmokeAgentConsignmentReceiptXml(batchReference), "utf8");
-
-      await evaluate(
-        page,
-        `(() => {
-          window.__exportDocManagerSmokeSavePackagePath = ${JSON.stringify(receiptPackagePath)};
-          window.__exportDocManagerSmokeTauriInvocations = [];
-          const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('打包并导入')) : null;
-          if (!button || button.disabled) {
-            throw new Error('Operation center ACD receipt package import button is not available.');
-          }
-
-          button.click();
-          return true;
-        })()`,
-        true,
-      );
-
-      const autoReceiptUi = await waitForPageExpression(
-        page,
-        `(() => {
-          const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const text = section ? section.innerText || '' : '';
-          return Boolean(
-            text.includes('回执包已导出并导入') &&
-            text.includes('代理委托导入响应') &&
-            text.includes('Smoke ACD accepted') &&
-            text.includes('写入回执'));
-        })()`,
-        timeoutMs,
-        "Timed out waiting for operation center ACD receipt package import result.",
-      );
-
-      const packageFile = await waitFor(async () => {
-        if (!existsSync(receiptPackagePath)) {
-          return null;
-        }
-
-        const size = statSync(receiptPackagePath).size;
-        const header = size > 0 ? readFileSync(receiptPackagePath).subarray(0, 2).toString("ascii") : "";
-        return header === "PK" ? { size, header } : null;
-      }, timeoutMs, `Timed out waiting for ACD receipt package file: ${receiptPackagePath}`);
-
-      const detail = await waitFor(async () => {
-        const candidate = await getSingleWindowBatchDetail(options, accessToken, tokenType, batchId);
-        const receiptRecords = Array.isArray(candidate.receiptRecords) ? candidate.receiptRecords : [];
-        return normalizePathForCompare(candidate.lastReceiptPackagePath) === normalizePathForCompare(receiptPackagePath) &&
-          candidate.status === "Accepted" &&
-          receiptRecords.some((record) => String(record.receiptMessage || "").includes("Smoke ACD accepted"))
-          ? candidate
-          : null;
-      }, timeoutMs, "Timed out waiting for operation center ACD detail to record imported receipt package and receipt log.");
-
-      const submitPackageHeader = existsSync(submitPackagePath)
-        ? readFileSync(submitPackagePath).subarray(0, 2).toString("ascii")
-        : "";
-      result = {
-        invoiceId: invoice.id,
-        invoiceNo: invoice.invoiceNo,
-        batchId,
-        batchReference,
-        businessType: "AgentConsignment",
-        url: redactDesktopAccessToken(checkUrl),
-        submitPackagePath,
-        submitPackageHeader,
-        clientRoot,
-        outBoxPath,
-        outBoxXmlCount: outBoxFiles.length,
-        dispatchedXmlFiles: outBoxFiles.map((filePath) => path.basename(filePath)),
-        receiptFilePath,
-        receiptPackagePath,
-        receiptPackageHeader: packageFile.header,
-        receiptPackageSize: packageFile.size,
-        rowReady: Boolean(rowReady?.found),
-        actionPanelReady: Boolean(actionPanelReady?.found),
-        directoryPicked: Boolean(directoryPicked?.found),
-        savedProfile: singleWindowProfileContainsPath(savedProfile?.profile, clientRoot),
-        dispatchUi: Boolean(dispatchUi?.found),
-        autoReceiptUi: Boolean(autoReceiptUi?.found),
-        detailStatus: detail.status,
-        detailLastReceiptPackagePath: detail.lastReceiptPackagePath,
-        detailClientDispatchPath: detail.clientDispatchPath,
-        detailPackageRecordCount: Array.isArray(detail.packageRecords) ? detail.packageRecords.length : 0,
-        detailReceiptRecordCount: Array.isArray(detail.receiptRecords) ? detail.receiptRecords.length : 0,
-        detailReceiptMessages: Array.isArray(detail.receiptRecords)
-          ? detail.receiptRecords.map((record) => record.receiptMessage).filter(Boolean)
-          : [],
-        deletedInvoice: false,
-        cleanedClientRoot: false,
-      };
-
-      cleanupDeleted = await deleteSmokeInvoice(options, accessToken, tokenType, invoice.id).catch(() => false);
-      result.deletedInvoice = cleanupDeleted;
-      cleanedClientRoot = tryRemoveDirectory(smokeRoot);
-      result.cleanedClientRoot = cleanedClientRoot;
-    } finally {
-      if (!cleanedClientRoot) {
-        cleanedClientRoot = tryRemoveDirectory(smokeRoot);
-        if (result) {
-          result.cleanedClientRoot = cleanedClientRoot;
-        }
-      }
-
-      if (invoice?.id && !cleanupDeleted) {
-        cleanupDeleted = await deleteSmokeInvoice(options, accessToken, tokenType, invoice.id).catch(() => false);
-        if (result) {
-          result.deletedInvoice = cleanupDeleted;
-        }
-      }
+  async function createScopedSmokeUser(options, accessToken, tokenType, definition, companyScope, timestamp) {
+    const username = `sw-${definition.key}-${timestamp}`;
+    const password = `Sw-${definition.key}-${timestamp}!`;
+    const response = await fetch(new URL("/api/users", ensureTrailingSlash(options.apiBaseUrl)), {
+      method: "POST",
+      headers: authorizedJsonHeaders(options, accessToken, tokenType),
+      body: JSON.stringify({
+        username,
+        fullName: `Single Window ${definition.displayName} Smoke`,
+        role: "Admin",
+        departmentId: "SW-SMOKE",
+        companyScope,
+        isActive: true,
+        resetPassword: password,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Single Window scoped smoke user create failed with HTTP ${response.status}: ${await response.text()}`);
     }
 
-    return result;
+    const payload = await response.json();
+    const userId = Number(payload?.user?.id || 0);
+    if (!userId) {
+      throw new Error(`Single Window scoped smoke user response is incomplete: ${JSON.stringify(payload)}`);
+    }
+
+    return { userId, username, password };
+  }
+
+  async function loginScopedSmokeUser(options, username, password) {
+    const response = await fetch(new URL("/api/auth/login", ensureTrailingSlash(options.apiBaseUrl)), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...desktopAccessHeaders(options) },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!response.ok) {
+      throw new Error(`Single Window scoped smoke user login failed with HTTP ${response.status}: ${await response.text()}`);
+    }
+
+    const payload = await response.json();
+    if (!payload?.accessToken) {
+      throw new Error(`Single Window scoped smoke login response is incomplete: ${JSON.stringify(payload)}`);
+    }
+
+    return { accessToken: payload.accessToken, tokenType: payload.tokenType || "Bearer" };
+  }
+
+  async function deleteScopedSmokeUser(options, accessToken, tokenType, userId) {
+    const response = await fetch(new URL(`/api/users/${encodeURIComponent(String(userId))}`, ensureTrailingSlash(options.apiBaseUrl)), {
+      method: "DELETE",
+      headers: authorizedHeaders(options, accessToken, tokenType),
+    });
+    return response.ok || response.status === 404;
+  }
+
+  async function importReceiptPackage(options, accessToken, tokenType, packagePath) {
+    const response = await fetch(new URL("/api/single-window/receipts/import", ensureTrailingSlash(options.apiBaseUrl)), {
+      method: "POST",
+      headers: authorizedJsonHeaders(options, accessToken, tokenType),
+      body: JSON.stringify({ packagePath, workingDirectory: "", keepWorkingDirectory: false }),
+    });
+    if (!response.ok) {
+      throw new Error(`Single Window receipt package import failed with HTTP ${response.status}: ${await response.text()}`);
+    }
+    return response.json();
   }
 
   async function exportSmokeCustomsCooSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath) {
-    const response = await fetch(new URL(`/api/single-window/coo/${encodeURIComponent(String(invoiceId))}/submit-package`, ensureTrailingSlash(options.apiBaseUrl)), {
-      method: "POST",
-      headers: authorizedJsonHeaders(options, accessToken, tokenType),
-      body: JSON.stringify({ packagePath }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Single Window submit package smoke export failed with HTTP ${response.status}: ${await response.text()}`);
-    }
-
-    const payload = await response.json();
-    if (!payload?.success || !payload?.trackingBatchId || !payload?.manifest?.batchReference) {
-      throw new Error(`Single Window submit package response did not include success/trackingBatchId/manifest: ${JSON.stringify(payload)}`);
-    }
-
-    return payload;
+    return exportSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath, "coo");
   }
 
   async function exportSmokeAgentConsignmentSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath) {
-    const response = await fetch(new URL(`/api/single-window/acd/${encodeURIComponent(String(invoiceId))}/submit-package`, ensureTrailingSlash(options.apiBaseUrl)), {
+    return exportSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath, "acd");
+  }
+
+  async function exportSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath, route) {
+    const response = await fetch(new URL(`/api/single-window/${route}/${encodeURIComponent(String(invoiceId))}/submit-package/save-to-path`, ensureTrailingSlash(options.apiBaseUrl)), {
       method: "POST",
       headers: authorizedJsonHeaders(options, accessToken, tokenType),
       body: JSON.stringify({ packagePath }),
     });
-
     if (!response.ok) {
-      throw new Error(`Single Window ACD submit package smoke export failed with HTTP ${response.status}: ${await response.text()}`);
+      throw new Error(`Single Window ${route.toUpperCase()} submit package export failed with HTTP ${response.status}: ${await response.text()}`);
     }
-
     const payload = await response.json();
     if (!payload?.success || !payload?.trackingBatchId || !payload?.manifest?.batchReference) {
-      throw new Error(`Single Window ACD submit package response did not include success/trackingBatchId/manifest: ${JSON.stringify(payload)}`);
+      throw new Error(`Single Window submit package response is incomplete: ${JSON.stringify(payload)}`);
     }
-
     return payload;
-  }
-
-  async function getSingleWindowClientProfile(options, accessToken, tokenType) {
-    const response = await fetch(new URL("/api/single-window/client-profile/default", ensureTrailingSlash(options.apiBaseUrl)), {
-      headers: authorizedHeaders(options, accessToken, tokenType),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Single Window client profile failed with HTTP ${response.status}: ${await response.text()}`);
-    }
-
-    return response.json();
   }
 
   function singleWindowProfileContainsPath(profile, expectedPath) {
     const expected = normalizePathForCompare(expectedPath).toLowerCase();
-    if (!profile || !expected) {
-      return false;
-    }
-
-    const candidates = [
-      profile.importRootPath,
-      profile.receiptRootPath,
-    ];
-    try {
-      const overrides = JSON.parse(profile.businessDirectoryOverridesJson || "{}");
-      for (const item of overrides.businesses ?? overrides.Businesses ?? []) {
-        candidates.push(item.importRootPath ?? item.ImportRootPath ?? "");
-        candidates.push(item.receiptRootPath ?? item.ReceiptRootPath ?? "");
-      }
-    } catch {
-      candidates.push(profile.businessDirectoryOverridesJson);
-    }
-
-    return candidates.some((candidate) => normalizePathForCompare(candidate).toLowerCase().includes(expected));
+    return Boolean(profile && expected && [
+      profile.customsCooClientRootPath,
+      profile.agentConsignmentClientRootPath,
+    ].some((candidate) => normalizePathForCompare(candidate).toLowerCase() === expected));
   }
 
-  function buildSingleWindowOperationCenterCheckUrl(webUrl) {
+  function buildSingleWindowOperationCenterCheckUrl(webUrl, smokeRunId) {
     const url = new URL(webUrl);
     url.searchParams.set("smokeSingleWindowOperationCenter", "1");
+    url.searchParams.set("smokeSingleWindowRun", String(smokeRunId));
     url.hash = "/single-window/operation-center";
     return url.toString();
   }

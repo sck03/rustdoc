@@ -265,11 +265,11 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public async Task DatabaseInitializationService_ShouldCreateVersionedV1SchemaForEmptyDatabase()
+        public async Task DatabaseInitializationService_ShouldCreateCurrentVersionedSchemaForEmptyDatabase()
         {
             var databasePath = Path.Combine(
                 Path.GetTempPath(),
-                "edm-v1-schema-" + Guid.NewGuid().ToString("N") + ".db");
+                "edm-v3-schema-" + Guid.NewGuid().ToString("N") + ".db");
             using var factory = new SqliteFileDbContextFactory(databasePath);
 
             var service = new DatabaseInitializationService(
@@ -285,7 +285,7 @@ namespace ExportDocManager.Infrastructure.Tests
             int schemaVersion = await verifyContext.Database
                 .SqlQueryRaw<int>("SELECT \"Version\" AS \"Value\" FROM \"__ExportDocManagerSchema\" WHERE \"Id\" = 1")
                 .SingleAsync();
-            Assert.Equal(1, schemaVersion);
+            Assert.Equal(3, schemaVersion);
 
             verifyContext.Invoices.Add(new Invoice
             {

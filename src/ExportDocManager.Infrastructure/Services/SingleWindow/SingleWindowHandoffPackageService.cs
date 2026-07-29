@@ -58,10 +58,12 @@ namespace ExportDocManager.Services.SingleWindow
             CancellationToken cancellationToken = default)
         {
             string targetPath = PackagePathHelper.NormalizePackagePath(savePath, ".swpkg", nameof(savePath));
+            bool targetExisted = File.Exists(targetPath);
             string tempDirectory = RuntimeCachePathHelper.CreateUniqueDirectory(
                 _pathProvider,
                 "SingleWindowPackages",
                 "sw-submit");
+            int reservationBatchId = 0;
 
             try
             {
@@ -73,6 +75,7 @@ namespace ExportDocManager.Services.SingleWindow
                 List<string> warnings = [];
                 string invoiceNo;
                 string contractNo;
+                string companyScope;
                 int sourceDocumentId = 0;
                 string sourceDocumentType = string.Empty;
                 int draftRevision = 0;
@@ -95,6 +98,7 @@ namespace ExportDocManager.Services.SingleWindow
                         attachments = mapped.Attachments;
                         invoiceNo = source.Invoice?.InvoiceNo ?? string.Empty;
                         contractNo = source.Invoice?.ContractNo ?? string.Empty;
+                        companyScope = source.Invoice?.CompanyScope ?? string.Empty;
                         draftRevision = source.ExistingDocument?.DraftRevision ?? 0;
                         sourceBaselineHash = source.ExistingDocument?.SourceBaselineHash ?? string.Empty;
                         sourceDocumentId = await TryPersistCustomsCooDocumentAsync(source, mapped, cancellationToken);
@@ -112,6 +116,7 @@ namespace ExportDocManager.Services.SingleWindow
                         attachments = source.Attachments;
                         invoiceNo = source.Invoice?.InvoiceNo ?? string.Empty;
                         contractNo = source.Invoice?.ContractNo ?? string.Empty;
+                        companyScope = source.Invoice?.CompanyScope ?? string.Empty;
                         draftRevision = source.ExistingDocument?.DraftRevision ?? 0;
                         sourceBaselineHash = source.ExistingDocument?.SourceBaselineHash ?? string.Empty;
                         sourceDocumentId = await TryPersistAgentConsignmentDocumentAsync(source, mapped, cancellationToken);
@@ -122,16 +127,26 @@ namespace ExportDocManager.Services.SingleWindow
                         throw new InvalidOperationException("不支持的单一窗口业务类型。");
                 }
 
-                int submissionVersion = await ResolveNextSubmissionVersionAsync(
+                var reservation = await _singleWindowTrackingService.ReserveSubmissionAsync(
                     businessType,
                     invoiceId,
                     sourceDocumentId,
+                    sourceDocumentType,
+                    Math.Max(1, draftRevision),
+                    sourceBaselineHash,
+                    invoiceNo,
+                    contractNo,
+                    companyScope,
                     cancellationToken);
+                reservationBatchId = reservation.BatchId;
+                int submissionVersion = reservation.SubmissionVersion;
 
+                string snapshotPath = Path.Combine(tempDirectory, "snapshot.json");
                 await File.WriteAllTextAsync(
-                    Path.Combine(tempDirectory, "snapshot.json"),
+                    snapshotPath,
                     JsonSerializer.Serialize(snapshot, snapshot.GetType(), JsonOptions),
                     cancellationToken);
+                string snapshotSha256 = await SingleWindowPackageIntegrity.ComputeFileSha256Async(snapshotPath, cancellationToken);
 
                 string payloadDirectory = Path.Combine(tempDirectory, "payloads");
                 Directory.CreateDirectory(payloadDirectory);
@@ -141,12 +156,12 @@ namespace ExportDocManager.Services.SingleWindow
                 {
                     string payloadPath = Path.Combine(payloadDirectory, payload.FileName);
                     await File.WriteAllTextAsync(payloadPath, payload.Content, cancellationToken);
-                    payloadFiles.Add(new SingleWindowPackageFile
-                    {
-                        RelativePath = Path.Combine("payloads", payload.FileName),
-                        MediaType = payload.MediaType,
-                        Description = payload.FileName
-                    });
+                    payloadFiles.Add(await SingleWindowPackageIntegrity.DescribeFileAsync(
+                        payloadPath,
+                        PathBoundaryHelper.ToProtocolRelativePath("payloads", payload.FileName),
+                        payload.MediaType,
+                        payload.FileName,
+                        cancellationToken));
                     warnings.AddRange(payload.Warnings);
                 }
 
@@ -155,7 +170,7 @@ namespace ExportDocManager.Services.SingleWindow
                 {
                     PackageType = SingleWindowPackageType.SubmitPackage,
                     BusinessType = businessType,
-                    BatchReference = BuildBatchReference(businessType, submissionVersion),
+                    BatchReference = reservation.BatchReference,
                     SourceInvoiceId = invoiceId,
                     SourceDocumentId = sourceDocumentId,
                     SourceDocumentType = sourceDocumentType,
@@ -164,10 +179,13 @@ namespace ExportDocManager.Services.SingleWindow
                     SourceBaselineHash = sourceBaselineHash ?? string.Empty,
                     InvoiceNo = invoiceNo,
                     ContractNo = contractNo,
+                    CompanyScope = companyScope,
+                    SnapshotSha256 = snapshotSha256,
                     PayloadFiles = payloadFiles,
                     AttachmentFiles = attachmentFiles,
                     Warnings = warnings.Distinct(StringComparer.Ordinal).ToList()
                 };
+                manifest.ContentDigest = SingleWindowPackageIntegrity.ComputeContentDigest(manifest);
 
                 await File.WriteAllTextAsync(
                     Path.Combine(tempDirectory, "manifest.json"),
@@ -176,10 +194,14 @@ namespace ExportDocManager.Services.SingleWindow
 
                 await ZipArchiveHelper.CreateFromDirectoryAsync(tempDirectory, targetPath, cancellationToken);
 
-                int? trackingBatchId = await TryRecordSubmitPackageExportAsync(
+                int trackingBatchId = await _singleWindowTrackingService.RecordSubmitPackageExportAsync(
                     targetPath,
                     manifest,
                     cancellationToken);
+                if (trackingBatchId != reservation.BatchId)
+                {
+                    throw new InvalidOperationException("单一窗口提交包跟踪批次与版本预留不一致。");
+                }
 
                 return new SingleWindowHandoffPackageResult
                 {
@@ -187,6 +209,33 @@ namespace ExportDocManager.Services.SingleWindow
                     Manifest = manifest,
                     TrackingBatchId = trackingBatchId
                 };
+            }
+            catch (Exception ex)
+            {
+                if (reservationBatchId > 0)
+                {
+                    try
+                    {
+                        await _singleWindowTrackingService.MarkSubmissionReservationFailedAsync(
+                            reservationBatchId,
+                            ex.Message,
+                            CancellationToken.None);
+                    }
+                    catch (Exception trackingException)
+                    {
+                        Serilog.Log.Error(
+                            trackingException,
+                            "Marking failed single-window reservation {BatchId} failed",
+                            reservationBatchId);
+                    }
+                }
+
+                if (!targetExisted)
+                {
+                    AtomicFileHelper.TryDeleteFile(targetPath);
+                }
+
+                throw;
             }
             finally
             {
@@ -199,7 +248,11 @@ namespace ExportDocManager.Services.SingleWindow
             string workingDirectory = "",
             CancellationToken cancellationToken = default)
         {
-            return ImportPackageAsync(packagePath, workingDirectory, cancellationToken);
+            return ImportPackageAsync(
+                packagePath,
+                workingDirectory,
+                SingleWindowPackageType.SubmitPackage,
+                cancellationToken);
         }
 
         public async Task<SingleWindowHandoffPackageResult> ExportReceiptPackageAsync(
@@ -218,18 +271,41 @@ namespace ExportDocManager.Services.SingleWindow
 
             try
             {
+                var binding = await _singleWindowTrackingService.ResolveReceiptPackageBindingAsync(
+                    businessType,
+                    batchReference,
+                    invoiceNo,
+                    cancellationToken);
                 Directory.CreateDirectory(tempDirectory);
                 string receiptsDirectory = Path.Combine(tempDirectory, "receipts");
                 var copiedFiles = await CopyReceiptFilesAsync(receiptsDirectory, receiptFiles ?? [], cancellationToken);
+                if (copiedFiles.Count == 0)
+                {
+                    throw new InvalidDataException("没有可打包的有效单一窗口回执文件。");
+                }
 
                 var manifest = new SingleWindowPackageManifest
                 {
                     PackageType = SingleWindowPackageType.ReceiptPackage,
-                    BusinessType = businessType,
-                    BatchReference = batchReference ?? string.Empty,
-                    InvoiceNo = invoiceNo ?? string.Empty,
+                    BusinessType = binding.BusinessType,
+                    BatchReference = binding.BatchReference,
+                    SourceInvoiceId = binding.SourceInvoiceId,
+                    SourceDocumentId = binding.SourceDocumentId,
+                    SourceDocumentType = binding.SourceDocumentType,
+                    SubmissionVersion = binding.SubmissionVersion,
+                    DraftRevision = binding.DraftRevision,
+                    SourceBaselineHash = binding.SourceBaselineHash,
+                    InvoiceNo = binding.InvoiceNo,
+                    ContractNo = binding.ContractNo,
+                    CompanyScope = binding.CompanyScope,
+                    SourcePackageDigest = binding.SubmitPackageDigest,
+                    StationKey = binding.AssignedStationKey,
+                    CardIdentifier = binding.AssignedCardIdentifier,
+                    ClientProfileKey = binding.AssignedProfileKey,
+                    ClientProfileName = binding.ClientProfileName,
                     PayloadFiles = copiedFiles
                 };
+                manifest.ContentDigest = SingleWindowPackageIntegrity.ComputeContentDigest(manifest);
 
                 await File.WriteAllTextAsync(
                     Path.Combine(tempDirectory, "manifest.json"),
@@ -238,7 +314,7 @@ namespace ExportDocManager.Services.SingleWindow
 
                 await ZipArchiveHelper.CreateFromDirectoryAsync(tempDirectory, targetPath, cancellationToken);
 
-                int? trackingBatchId = await TryRecordReceiptPackageExportAsync(
+                int trackingBatchId = await _singleWindowTrackingService.RecordReceiptPackageExportAsync(
                     targetPath,
                     manifest,
                     cancellationToken);
@@ -261,7 +337,11 @@ namespace ExportDocManager.Services.SingleWindow
             string workingDirectory = "",
             CancellationToken cancellationToken = default)
         {
-            return ImportPackageAsync(packagePath, workingDirectory, cancellationToken);
+            return ImportPackageAsync(
+                packagePath,
+                workingDirectory,
+                SingleWindowPackageType.ReceiptPackage,
+                cancellationToken);
         }
     }
 }

@@ -54,10 +54,6 @@ const SingleWindowOperationCenterDetailPage = lazyNamed(
   () => import("./features/single-window/SingleWindowPages.tsx"),
   "SingleWindowOperationCenterDetailPage",
 );
-const SingleWindowCollaborationPage = lazyNamed(
-  () => import("./features/single-window/SingleWindowPages.tsx"),
-  "SingleWindowCollaborationPage",
-);
 const SingleWindowReferenceCatalogPage = lazyNamed(
   () => import("./features/single-window/SingleWindowReferenceCatalogPage.tsx"),
   "SingleWindowReferenceCatalogPage",
@@ -529,7 +525,6 @@ function App() {
                 path="/single-window/operation-center/:batchId"
                 element={<SingleWindowOperationCenterDetailPage client={client} />}
               />
-              <Route path="/single-window/collaboration" element={<SingleWindowCollaborationPage client={client} />} />
               <Route
                 path="/single-window/reference-catalog"
                 element={
@@ -686,16 +681,11 @@ function clearStoredSession() {
 }
 
 function readDefaultApiBaseUrl() {
-  const queryApiBaseUrl = new URLSearchParams(window.location.search).get("apiBaseUrl")?.trim();
-  if (queryApiBaseUrl) {
-    return queryApiBaseUrl;
-  }
-
   return import.meta.env.VITE_EXPORTDOC_API_BASE_URL ?? window.location.origin;
 }
 
 function readDefaultDesktopAccessToken() {
-  return new URLSearchParams(window.location.search).get("desktopAccessToken")?.trim() || undefined;
+  return undefined;
 }
 
 function isDesktopRuntimeContextUnavailable(error: unknown) {

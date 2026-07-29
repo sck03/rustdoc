@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.DataAccess
@@ -26,6 +27,34 @@ namespace ExportDocManager.DataAccess
             Func<AppDbContext, CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default)
         {
+            return await ExecuteInTransactionCoreAsync(
+                    contextFactory,
+                    operation,
+                    isolationLevel: null,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public static async Task<T> ExecuteInTransactionAsync<T>(
+            IDbContextFactory<AppDbContext> contextFactory,
+            Func<AppDbContext, CancellationToken, Task<T>> operation,
+            IsolationLevel isolationLevel,
+            CancellationToken cancellationToken = default)
+        {
+            return await ExecuteInTransactionCoreAsync(
+                    contextFactory,
+                    operation,
+                    isolationLevel,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        private static async Task<T> ExecuteInTransactionCoreAsync<T>(
+            IDbContextFactory<AppDbContext> contextFactory,
+            Func<AppDbContext, CancellationToken, Task<T>> operation,
+            IsolationLevel? isolationLevel,
+            CancellationToken cancellationToken)
+        {
             ArgumentNullException.ThrowIfNull(contextFactory);
             ArgumentNullException.ThrowIfNull(operation);
 
@@ -39,9 +68,13 @@ namespace ExportDocManager.DataAccess
                 await using var context = await contextFactory
                     .CreateDbContextAsync(cancellationToken)
                     .ConfigureAwait(false);
-                await using var transaction = await context.Database
-                    .BeginTransactionAsync(cancellationToken)
-                    .ConfigureAwait(false);
+                await using var transaction = isolationLevel.HasValue
+                    ? await context.Database
+                        .BeginTransactionAsync(isolationLevel.Value, cancellationToken)
+                        .ConfigureAwait(false)
+                    : await context.Database
+                        .BeginTransactionAsync(cancellationToken)
+                        .ConfigureAwait(false);
 
                 try
                 {

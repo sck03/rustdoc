@@ -17,10 +17,12 @@ namespace ExportDocManager.Api.Tests
         [Fact]
         public async Task ToolEndpoints_ShouldRequireAuthenticationAndPreservePathValidationBehavior()
         {
+            const string desktopToken = "tools-desktop-token";
             await using var harness = await ApiIntegrationTestHarness.StartAsync(
                 "edm-api-tools",
-                "api-tools.db");
-            using var anonymousClient = harness.CreateClient();
+                "api-tools.db",
+                desktopAccessToken: desktopToken);
+            using var anonymousClient = harness.CreateClient(desktopAccessToken: desktopToken);
 
             var anonymousPdfMergeResponse = await anonymousClient.PostAsJsonAsync(
                 "/api/tools/pdf/merge/save-to-path",
@@ -84,7 +86,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.Unauthorized, anonymousLetterOfCreditReviewResponse.StatusCode);
 
             var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
-            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken, desktopToken);
 
             var emailStatusResponse = await adminClient.GetAsync("/api/tools/email/status");
             Assert.Equal(HttpStatusCode.OK, emailStatusResponse.StatusCode);
@@ -149,7 +151,7 @@ namespace ExportDocManager.Api.Tests
                     body = "Body",
                     attachmentPaths = new[] { Path.Combine(harness.DataRoot, "missing.pdf") }
                 });
-            Assert.Equal(HttpStatusCode.Forbidden, missingEmailAttachmentResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, missingEmailAttachmentResponse.StatusCode);
 
             var unconfiguredEmailResponse = await adminClient.PostAsJsonAsync(
                 "/api/tools/email/send",
@@ -181,7 +183,7 @@ namespace ExportDocManager.Api.Tests
                 });
             Assert.Equal(HttpStatusCode.OK, createOperatorResponse.StatusCode);
             var operatorLogin = await harness.LoginAsync(anonymousClient, "email-operator", "email-pass");
-            using var operatorClient = harness.CreateClient(operatorLogin.AccessToken);
+            using var operatorClient = harness.CreateClient(operatorLogin.AccessToken, desktopToken);
             var forbiddenEmailTestResponse = await operatorClient.PostAsync(
                 "/api/tools/email/test-connection",
                 content: null);
@@ -194,7 +196,7 @@ namespace ExportDocManager.Api.Tests
                     sourceFiles = Array.Empty<string>(),
                     destinationPath = Path.Combine(harness.DataRoot, "merged.pdf")
                 });
-            Assert.Equal(HttpStatusCode.Forbidden, invalidPdfMergeResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, invalidPdfMergeResponse.StatusCode);
 
             var invalidLetterOfCreditResponse = await adminClient.PostAsJsonAsync(
                 "/api/tools/letter-of-credit/import",
@@ -285,7 +287,7 @@ namespace ExportDocManager.Api.Tests
                 {
                     destinationPath = Path.Combine(harness.DataRoot, "template.txt")
                 });
-            Assert.Equal(HttpStatusCode.Forbidden, invalidExcelExportResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, invalidExcelExportResponse.StatusCode);
 
             var invalidBookingSheetResponse = await adminClient.PostAsync(
                 "/api/tools/excel/booking-sheet/from-invoice/0/download",

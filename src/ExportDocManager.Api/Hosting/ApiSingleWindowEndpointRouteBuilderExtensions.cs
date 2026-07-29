@@ -6,7 +6,6 @@ namespace ExportDocManager.Api.Hosting
         {
             MapSingleWindowReferenceCatalogEndpoints(endpoints);
             MapSingleWindowIssuingAuthorityEndpoints(endpoints);
-            MapSingleWindowCollaborationEndpoints(endpoints);
             MapSingleWindowProducerProfileEndpoints(endpoints);
             MapSingleWindowDocumentEndpoints(endpoints);
             MapSingleWindowPackageEndpoints(endpoints);

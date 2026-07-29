@@ -9,6 +9,7 @@ namespace ExportDocManager.Services.SingleWindow
         private async Task<SingleWindowImportedPackage> ImportPackageAsync(
             string packagePath,
             string workingDirectory,
+            SingleWindowPackageType expectedPackageType,
             CancellationToken cancellationToken)
         {
             if (!File.Exists(packagePath))
@@ -37,6 +38,12 @@ namespace ExportDocManager.Services.SingleWindow
                 var manifest = JsonSerializer.Deserialize<SingleWindowPackageManifest>(
                     await File.ReadAllTextAsync(manifestPath, cancellationToken),
                     JsonOptions) ?? throw new InvalidDataException("交接包 manifest.json 无效。");
+
+                await SingleWindowPackageIntegrity.ValidateAsync(
+                    targetDirectory,
+                    manifest,
+                    expectedPackageType,
+                    cancellationToken);
 
                 IReadOnlyList<SingleWindowReceiptImportEntry> receiptEntries =
                     manifest.PackageType == SingleWindowPackageType.ReceiptPackage
@@ -84,7 +91,10 @@ namespace ExportDocManager.Services.SingleWindow
                     continue;
                 }
 
-                string path = Path.Combine(workingDirectory, file.RelativePath);
+                string path = PathBoundaryHelper.ResolveProtocolRelativePath(
+                    workingDirectory,
+                    file.RelativePath,
+                    "交接包 manifest 包含越界文件路径。");
                 if (!File.Exists(path))
                 {
                     continue;

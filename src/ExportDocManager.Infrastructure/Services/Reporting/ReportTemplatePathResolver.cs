@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Reporting
 {
@@ -139,14 +140,7 @@ namespace ExportDocManager.Services.Reporting
                 return false;
             }
 
-            string normalizedPath = Path.GetFullPath(path)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            string normalizedDirectory = Path.GetFullPath(directory)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-
-            return string.Equals(normalizedPath, normalizedDirectory, StringComparison.OrdinalIgnoreCase) ||
-                   normalizedPath.StartsWith(normalizedDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
-                   normalizedPath.StartsWith(normalizedDirectory + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            return PathBoundaryHelper.IsWithinRoot(path, directory);
         }
 
         private static bool TryResolvePrefixedPath(

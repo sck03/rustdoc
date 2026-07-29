@@ -5,27 +5,22 @@ namespace ExportDocManager.Api.Hosting
     public static partial class ApiSingleWindowDtoFactory
     {
         public const string ClientBridgeStoragePolicy =
-            "客户端目录档案保存在运行目录数据库；导入目录和回执目录来自用户配置或请求显式路径，提交包恢复目录使用运行数据根 SingleWindow/Inbox。Templates/OcrModels 等稳定资源仍在程序根目录，日志保存到运行数据根 Logs，授权状态保存到运行数据根 Security。";
+            "同一持卡机可在本机运行数据根 SQLite 中维护多个公司抬头与操作卡档案，但同一时刻只启用一个档案。稳定持卡机标识保存在运行数据根 Security/SingleWindow/station.id；各档案及 COO/代理委托目录彼此隔离。浏览器/PostgreSQL 网络版不读取或修改本机官方客户端目录。";
 
-        public static ApiSingleWindowClientProfileResponse FromClientProfile(
-            SwClientProfile profile)
+        public static ApiSingleWindowClientProfilesResponse FromClientProfiles(
+            IReadOnlyList<SwClientProfile> profiles,
+            string message = "")
         {
-            return new ApiSingleWindowClientProfileResponse(
-                FromClientProfileDto(profile),
-                ClientBridgeStoragePolicy);
-        }
-
-        public static ApiSingleWindowClientProfileSaveResponse FromSavedClientProfile(
-            int id,
-            SwClientProfile profile,
-            string message)
-        {
-            return new ApiSingleWindowClientProfileSaveResponse(
-                true,
-                id,
-                FromClientProfileDto(profile),
+            var items = (profiles ?? [])
+                .Select(FromClientProfileDto)
+                .ToList();
+            string activeProfileKey = items.FirstOrDefault(item => item.IsActive)?.ProfileKey
+                ?? string.Empty;
+            return new ApiSingleWindowClientProfilesResponse(
+                items,
+                activeProfileKey,
                 ClientBridgeStoragePolicy,
-                string.IsNullOrWhiteSpace(message) ? "单一窗口客户端目录档案已保存。" : message);
+                message ?? string.Empty);
         }
 
         private static ApiSingleWindowClientProfileDto FromClientProfileDto(SwClientProfile profile)
@@ -33,14 +28,16 @@ namespace ExportDocManager.Api.Hosting
             profile ??= new SwClientProfile();
             return new ApiSingleWindowClientProfileDto(
                 profile.Id,
+                profile.ProfileKey ?? string.Empty,
                 profile.ProfileName ?? string.Empty,
-                profile.MachineName ?? string.Empty,
-                profile.ImportRootPath ?? string.Empty,
-                profile.ReceiptRootPath ?? string.Empty,
-                profile.BusinessDirectoryOverridesJson ?? string.Empty,
+                profile.CompanyScope ?? string.Empty,
+                profile.CardIdentifier ?? string.Empty,
+                profile.CustomsCooClientRootPath ?? string.Empty,
+                profile.AgentConsignmentClientRootPath ?? string.Empty,
                 profile.CanSubmitCustomsCoo,
                 profile.CanSubmitAgentConsignment,
                 profile.IsEnabled,
+                profile.IsActive,
                 profile.UpdatedAt);
         }
     }

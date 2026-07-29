@@ -1,4 +1,5 @@
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 using Scriban.Runtime;
 using Serilog;
@@ -11,7 +12,8 @@ namespace ExportDocManager.Services.Reporting
             Invoice invoice,
             Customer customer,
             Exporter exporter,
-            bool withSeal)
+            bool withSeal,
+            IAppPathProvider pathProvider = null)
         {
             invoice.Items ??= new List<Item>();
 
@@ -19,8 +21,6 @@ namespace ExportDocManager.Services.Reporting
             scriptObject.Add("Invoice", invoice);
             scriptObject.Add("Customer", customer);
             scriptObject.Add("Exporter", exporter);
-            // Invoice/customs reports do not read payment/reimbursement records by invoice number.
-            scriptObject.Add("Payment", new Payment());
 
             scriptObject.Import(new
             {
@@ -36,13 +36,13 @@ namespace ExportDocManager.Services.Reporting
 
             if (withSeal)
             {
-                scriptObject.Add("doc_seal_path", ReportImageDataUriHelper.GetDataUri(exporter?.DocSealPath));
-                scriptObject.Add("customs_seal_path", ReportImageDataUriHelper.GetDataUri(exporter?.CustomsSealPath));
+                scriptObject.Add("doc_seal_path", ReportImageDataUriHelper.GetSealDataUri(exporter?.DocSealPath, pathProvider));
+                scriptObject.Add("customs_seal_path", ReportImageDataUriHelper.GetSealDataUri(exporter?.CustomsSealPath, pathProvider));
             }
 
             if (invoice.ShippingMarksType == "Image" && !string.IsNullOrWhiteSpace(invoice.ShippingMarksImage))
             {
-                scriptObject.Add("shipping_marks_image_data", ReportImageDataUriHelper.GetDataUri(invoice.ShippingMarksImage));
+                scriptObject.Add("shipping_marks_image_data", ReportImageDataUriHelper.GetShippingMarkDataUri(invoice.ShippingMarksImage, pathProvider));
             }
 
             return scriptObject;
@@ -52,22 +52,19 @@ namespace ExportDocManager.Services.Reporting
             Exporter exporter,
             Payment payment,
             Payee payee,
-            bool withSeal)
+            bool withSeal,
+            IAppPathProvider pathProvider = null)
         {
             payment ??= new Payment();
             var scriptObject = new ScriptObject();
             scriptObject.Add("Exporter", exporter ?? new Exporter());
             scriptObject.Add("Payment", payment);
             scriptObject.Add("Payee", payee ?? new Payee());
-            // Payment vouchers are independent from invoice/customs documents; these aliases are detached legacy template compatibility objects.
-            scriptObject.Add("Invoice", new Invoice { InvoiceNo = payment.InvoiceNo ?? string.Empty });
-            scriptObject.Add("Customer", new Customer());
-
             scriptObject.Import(new
             {
                 cny_amount_upper = ConvertNumberToChineseUpper(payment.CNYAmount),
-                doc_seal_path = withSeal ? ReportImageDataUriHelper.GetDataUri(exporter?.DocSealPath) : string.Empty,
-                customs_seal_path = withSeal ? ReportImageDataUriHelper.GetDataUri(exporter?.CustomsSealPath) : string.Empty
+                doc_seal_path = withSeal ? ReportImageDataUriHelper.GetSealDataUri(exporter?.DocSealPath, pathProvider) : string.Empty,
+                customs_seal_path = withSeal ? ReportImageDataUriHelper.GetSealDataUri(exporter?.CustomsSealPath, pathProvider) : string.Empty
             });
 
             AddSharedHelpers(scriptObject);
@@ -93,7 +90,29 @@ namespace ExportDocManager.Services.Reporting
 
     internal static class ReportImageDataUriHelper
     {
-        public static string GetDataUri(string path)
+        private const long MaximumImageBytes = 5L * 1024L * 1024L;
+
+        public static string GetShippingMarkDataUri(string path, IAppPathProvider pathProvider)
+        {
+            string marksRoot = pathProvider == null
+                ? string.Empty
+                : Path.Combine(pathProvider.DataRoot, "Marks");
+            return GetDataUri(path, string.IsNullOrWhiteSpace(marksRoot) ? [] : [marksRoot]);
+        }
+
+        public static string GetSealDataUri(string path, IAppPathProvider pathProvider)
+        {
+            if (pathProvider == null)
+            {
+                return string.Empty;
+            }
+
+            return GetDataUri(
+                path,
+                [Path.Combine(pathProvider.FileRoot, "Seals"), pathProvider.ResourceRoot]);
+        }
+
+        private static string GetDataUri(string path, IReadOnlyList<string> allowedRoots)
         {
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             {
@@ -102,17 +121,24 @@ namespace ExportDocManager.Services.Reporting
 
             try
             {
-                byte[] imageBytes = File.ReadAllBytes(path);
-                string extension = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
-                string mimeType = extension switch
+                string fullPath = Path.GetFullPath(path);
+                if (allowedRoots == null ||
+                    allowedRoots.Count == 0 ||
+                    !allowedRoots.Any(root => PathBoundaryHelper.IsWithinRoot(fullPath, root)))
                 {
-                    "jpg" or "jpeg" => "image/jpeg",
-                    "png" => "image/png",
-                    "gif" => "image/gif",
-                    "webp" => "image/webp",
-                    "svg" => "image/svg+xml",
-                    _ => $"image/{extension}"
-                };
+                    Log.Warning("Blocked report image outside managed roots: {Path}", fullPath);
+                    return string.Empty;
+                }
+
+                var fileInfo = new FileInfo(fullPath);
+                if (fileInfo.Length <= 0 || fileInfo.Length > MaximumImageBytes)
+                {
+                    return string.Empty;
+                }
+
+                byte[] imageBytes = File.ReadAllBytes(fullPath);
+                string mimeType = DetectImageMimeType(imageBytes);
+                if (string.IsNullOrWhiteSpace(mimeType)) return string.Empty;
 
                 return $"data:{mimeType};base64,{Convert.ToBase64String(imageBytes)}";
             }
@@ -121,6 +147,36 @@ namespace ExportDocManager.Services.Reporting
                 Log.Error(ex, "Failed to load report image: {Path}", path);
                 return string.Empty;
             }
+        }
+
+        private static string DetectImageMimeType(byte[] bytes)
+        {
+            if (bytes.Length >= 8 &&
+                bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 &&
+                bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A)
+            {
+                return "image/png";
+            }
+
+            if (bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
+            {
+                return "image/jpeg";
+            }
+
+            if (bytes.Length >= 6 &&
+                (bytes.AsSpan(0, 6).SequenceEqual("GIF87a"u8) || bytes.AsSpan(0, 6).SequenceEqual("GIF89a"u8)))
+            {
+                return "image/gif";
+            }
+
+            if (bytes.Length >= 12 &&
+                bytes.AsSpan(0, 4).SequenceEqual("RIFF"u8) &&
+                bytes.AsSpan(8, 4).SequenceEqual("WEBP"u8))
+            {
+                return "image/webp";
+            }
+
+            return string.Empty;
         }
     }
 }

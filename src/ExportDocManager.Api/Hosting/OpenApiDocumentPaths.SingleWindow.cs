@@ -250,26 +250,27 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
-                    ["/api/single-window/client-profile/default"] = new
+                    ["/api/single-window/client-profiles"] = new
                     {
                         get = new
                         {
-                            summary = "Get default Single Window client profile",
-                            operationId = "getSingleWindowDefaultClientProfile",
+                            summary = "List this SQLite station's Single Window operation profiles",
+                            operationId = "getSingleWindowClientProfiles",
                             responses = new Dictionary<string, object>
                             {
                                 ["200"] = new
                                 {
-                                    description = "Default Single Window client directory profile.",
-                                    content = JsonContent("ApiSingleWindowClientProfileResponse")
+                                    description = "Operation profiles and the currently active card profile.",
+                                    content = JsonContent("ApiSingleWindowClientProfilesResponse")
                                 },
-                                ["401"] = new { description = "Missing or invalid bearer token." }
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Trusted desktop token required." }
                             }
                         },
                         put = new
                         {
-                            summary = "Save default Single Window client profile",
-                            operationId = "saveSingleWindowDefaultClientProfile",
+                            summary = "Create or update and activate a Single Window operation profile",
+                            operationId = "saveSingleWindowClientProfile",
                             requestBody = new
                             {
                                 required = true,
@@ -279,12 +280,36 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["200"] = new
                                 {
-                                    description = "Default client directory profile saved.",
-                                    content = JsonContent("ApiSingleWindowClientProfileSaveResponse")
+                                    description = "Operation profile saved and activated.",
+                                    content = JsonContent("ApiSingleWindowClientProfilesResponse")
                                 },
                                 ["400"] = new { description = "Invalid directory profile payload." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Trusted desktop token required." },
                                 ["409"] = new { description = "Client profile could not be saved." }
+                            }
+                        }
+                    },
+                    ["/api/single-window/client-profiles/{profileKey}/activate"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Activate one company and operation-card profile on this SQLite station",
+                            operationId = "activateSingleWindowClientProfile",
+                            parameters = new[]
+                            {
+                                PathParameter("profileKey", "string", null, "Stable local operation profile key.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "The selected operation profile is now active.",
+                                    content = JsonContent("ApiSingleWindowClientProfilesResponse")
+                                },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Trusted desktop token required." },
+                                ["409"] = new { description = "Operation profile could not be activated." }
                             }
                         }
                     },
@@ -306,7 +331,7 @@ namespace ExportDocManager.Api.Hosting
                                     description = "Batch payload files copied to the client OutBox.",
                                     content = JsonContent("SingleWindowClientDispatchResult")
                                 },
-                                ["400"] = new { description = "Invalid batch id or missing import root path." },
+                                ["400"] = new { description = "Invalid batch id." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot dispatch the batch." },
                                 ["404"] = new { description = "Single Window batch not found." },
@@ -332,7 +357,7 @@ namespace ExportDocManager.Api.Hosting
                                     description = "Receipt files matched for the batch.",
                                     content = JsonContent("SingleWindowReceiptCollectionResult")
                                 },
-                                ["400"] = new { description = "Invalid batch id or missing receipt root path." },
+                                ["400"] = new { description = "Invalid batch id." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot collect receipts for the batch." },
                                 ["404"] = new { description = "Single Window batch not found." },
@@ -600,49 +625,6 @@ namespace ExportDocManager.Api.Hosting
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot manage Single Window reference catalogs." },
                                 ["409"] = new { description = "Workbook could not be parsed." }
-                            }
-                        }
-                    },
-                    ["/api/single-window/collaboration"] = new
-                    {
-                        get = new
-                        {
-                            summary = "List Single Window collaboration tickets",
-                            operationId = "listSingleWindowCollaboration",
-                            parameters = new object[]
-                            {
-                                QueryParameter("businessType", "string", null, "Optional Single Window business type filter."),
-                                QueryParameter("status", "string", null, "Optional collaboration ticket status filter."),
-                                QueryParameter("keyword", "string", null, "Keyword for ticket fields."),
-                                QueryParameter("pageNumber", "integer", "int32", "Page number starting from 1."),
-                                QueryParameter("pageSize", "integer", "int32", "Page size capped by the service."),
-                                QueryParameter("includeDisabledWorkstations", "boolean", null, "Whether disabled workstations should be returned.")
-                            },
-                            responses = new Dictionary<string, object>
-                            {
-                                ["200"] = new
-                                {
-                                    description = "Paged Single Window collaboration tickets and workstation list.",
-                                    content = JsonContent("SingleWindowCollaborationPageResult")
-                                },
-                                ["401"] = new { description = "Missing or invalid bearer token." }
-                            }
-                        }
-                    },
-                    ["/api/single-window/collaboration/workstations"] = new
-                    {
-                        get = new
-                        {
-                            summary = "List Single Window workstations",
-                            operationId = "listSingleWindowWorkstations",
-                            responses = new Dictionary<string, object>
-                            {
-                                ["200"] = new
-                                {
-                                    description = "Single Window workstation rows.",
-                                    content = JsonArrayContent("SingleWindowWorkstationRow")
-                                },
-                                ["401"] = new { description = "Missing or invalid bearer token." }
                             }
                         }
                     },

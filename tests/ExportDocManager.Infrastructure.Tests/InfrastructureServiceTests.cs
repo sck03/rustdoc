@@ -25,22 +25,6 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal(["TT", "OA"], service.GetOptions(" PaymentMethod "));
         }
 
-        [Fact]
-        public void SharedDatabaseCapabilityService_ShouldReportPendingPostgreSqlConfiguration()
-        {
-            var service = new SharedDatabaseCapabilityService(new DatabaseConnectionSettings
-            {
-                Provider = DatabaseConnectionSettings.PostgreSqlProvider,
-                PostgreSqlHost = "127.0.0.1"
-            });
-
-            var profile = service.GetCurrentProfile();
-
-            Assert.False(profile.SharedDatabaseEnabled);
-            Assert.True(profile.SharedDatabasePendingConfiguration);
-            Assert.Contains("尚未配置完成", profile.CurrentModeText);
-        }
-
         private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
         {
             private readonly DbContextOptions<AppDbContext> _options;

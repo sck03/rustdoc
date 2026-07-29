@@ -21,7 +21,7 @@ namespace ExportDocManager.Api.Hosting
 
             return new ApiSingleWindowHandoffPackageResponse(
                 true,
-                result.PackagePath ?? string.Empty,
+                Path.GetFileName(result.PackagePath ?? string.Empty),
                 result.Manifest ?? new SingleWindowPackageManifest(),
                 result.TrackingBatchId,
                 SubmitPackageStoragePolicy,
@@ -36,7 +36,7 @@ namespace ExportDocManager.Api.Hosting
 
             return new ApiSingleWindowHandoffPackageResponse(
                 true,
-                result.PackagePath ?? string.Empty,
+                Path.GetFileName(result.PackagePath ?? string.Empty),
                 result.Manifest ?? new SingleWindowPackageManifest(),
                 result.TrackingBatchId,
                 ReceiptPackageStoragePolicy,
@@ -53,8 +53,8 @@ namespace ExportDocManager.Api.Hosting
 
             return new ApiSingleWindowImportedPackageResponse(
                 true,
-                packagePath ?? string.Empty,
-                imported.WorkingDirectory ?? string.Empty,
+                Path.GetFileName(packagePath ?? string.Empty),
+                string.Empty,
                 workingDirectoryKept,
                 imported.Manifest ?? new SingleWindowPackageManifest(),
                 imported.ParsedReceipts ?? [],

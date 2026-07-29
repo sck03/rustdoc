@@ -1,5 +1,24 @@
 namespace ExportDocManager.Models.DTOs.SingleWindow
 {
+    public sealed class SingleWindowClientProfileUpdate
+    {
+        public string ProfileKey { get; init; } = string.Empty;
+
+        public string ProfileName { get; init; } = string.Empty;
+
+        public string CompanyScope { get; init; } = string.Empty;
+
+        public string CardIdentifier { get; init; } = string.Empty;
+
+        public string CustomsCooClientRootPath { get; init; } = string.Empty;
+
+        public string AgentConsignmentClientRootPath { get; init; } = string.Empty;
+
+        public bool CanSubmitCustomsCoo { get; init; } = true;
+
+        public bool CanSubmitAgentConsignment { get; init; } = true;
+    }
+
     public sealed class SingleWindowClientDispatchResult
     {
         public int BatchId { get; init; }

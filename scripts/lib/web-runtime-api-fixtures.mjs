@@ -22,6 +22,7 @@ export async function createSmokeInvoice(options, accessToken, tokenType) {
     exporterNameEN: "Smoke Exporter Ltd.",
     exporterNameCN: "Smoke Exporter",
     exporterAddressEN: "Smoke Exporter Address",
+    companyScope: `Smoke Company ${timestamp}`,
     currency: "USD",
     status: "Draft",
     paymentTerms: "T/T",

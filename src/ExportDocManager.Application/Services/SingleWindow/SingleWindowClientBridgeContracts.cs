@@ -3,14 +3,23 @@ using ExportDocManager.Models.Entities;
 
 namespace ExportDocManager.Services.SingleWindow
 {
+    public interface ISingleWindowStationIdentityService
+    {
+        Task<string> GetCurrentStationKeyAsync(CancellationToken cancellationToken = default);
+    }
+
     public interface ISingleWindowClientProfileService
     {
-        Task<SwClientProfile> GetDefaultAsync(CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<SwClientProfile>> ListAsync(CancellationToken cancellationToken = default);
 
-        Task<int> SaveDefaultAsync(
-            string importRootPath,
-            string receiptRootPath = "",
-            SingleWindowBusinessType? businessType = null,
+        Task<SwClientProfile> GetActiveAsync(CancellationToken cancellationToken = default);
+
+        Task<int> SaveAsync(
+            SingleWindowClientProfileUpdate update,
+            CancellationToken cancellationToken = default);
+
+        Task ActivateAsync(
+            string profileKey,
             CancellationToken cancellationToken = default);
     }
 
@@ -18,13 +27,10 @@ namespace ExportDocManager.Services.SingleWindow
     {
         Task<SingleWindowClientDispatchResult> DispatchBatchToImportRootAsync(
             int batchId,
-            string importRootPath,
-            string profileName = "",
             CancellationToken cancellationToken = default);
 
         Task<SingleWindowReceiptCollectionResult> CollectReceiptFilesAsync(
             int batchId,
-            string receiptRootPath,
             CancellationToken cancellationToken = default);
     }
 }

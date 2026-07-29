@@ -315,11 +315,7 @@ namespace ExportDocManager.Utils
 
         private static void EnsurePathWithinRoot(string candidatePath, string rootPath)
         {
-            var normalizedRoot = rootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var normalizedCandidate = candidatePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            if (!string.Equals(normalizedCandidate, normalizedRoot, StringComparison.OrdinalIgnoreCase) &&
-                !normalizedCandidate.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
-                !normalizedCandidate.StartsWith(normalizedRoot + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            if (!PathBoundaryHelper.IsWithinRoot(candidatePath, rootPath))
             {
                 throw new InvalidDataException("压缩包内含有无效路径。");
             }

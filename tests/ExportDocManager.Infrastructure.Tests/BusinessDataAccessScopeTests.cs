@@ -144,19 +144,6 @@ namespace ExportDocManager.Infrastructure.Tests
                         SourceInvoiceId = foreignInvoice.Id,
                         InvoiceNo = foreignInvoice.InvoiceNo
                     });
-                seedContext.SwOperationTickets.AddRange(
-                    new SwOperationTicket
-                    {
-                        BusinessType = "海关原产地证",
-                        SourceInvoiceId = ownInvoice.Id,
-                        Status = SingleWindowCollaborationStatusCatalog.Pending
-                    },
-                    new SwOperationTicket
-                    {
-                        BusinessType = "海关原产地证",
-                        SourceInvoiceId = foreignInvoice.Id,
-                        Status = SingleWindowCollaborationStatusCatalog.Pending
-                    });
                 await seedContext.SaveChangesAsync();
             }
 
@@ -169,15 +156,9 @@ namespace ExportDocManager.Infrastructure.Tests
             var batches = await scope.ApplySubmissionBatchScope(context.SwSubmissionBatches.AsNoTracking(), context)
                 .OrderBy(batch => batch.BatchReference)
                 .ToListAsync();
-            var tickets = await scope.ApplyOperationTicketScope(context.SwOperationTickets.AsNoTracking(), context)
-                .OrderBy(ticket => ticket.SourceInvoiceId)
-                .ToListAsync();
-
             var batch = Assert.Single(batches);
-            var ticket = Assert.Single(tickets);
             Assert.Equal("OWN-BATCH", batch.BatchReference);
             Assert.Equal("OWN-SW", batch.InvoiceNo);
-            Assert.Equal(context.Invoices.Single(invoice => invoice.InvoiceNo == "OWN-SW").Id, ticket.SourceInvoiceId);
         }
 
         private static DatabaseConnectionSettings CreatePostgreSqlModeSettings()

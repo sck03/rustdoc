@@ -48,8 +48,6 @@ namespace ExportDocManager.DataAccess
         public DbSet<ContainerProjectItem> ContainerProjectItems { get; set; }
         public DbSet<ContainerTypeDefinition> ContainerTypeDefinitions { get; set; }
         public DbSet<SwClientProfile> SwClientProfiles { get; set; }
-        public DbSet<SwOperatorWorkstation> SwOperatorWorkstations { get; set; }
-        public DbSet<SwOperationTicket> SwOperationTickets { get; set; }
         public DbSet<CustomsCooDocument> CustomsCooDocuments { get; set; }
         public DbSet<CustomsCooItem> CustomsCooItems { get; set; }
         public DbSet<CustomsCooNonpartyCorp> CustomsCooNonpartyCorps { get; set; }
@@ -59,6 +57,7 @@ namespace ExportDocManager.DataAccess
         public DbSet<SwSubmissionBatch> SwSubmissionBatches { get; set; }
         public DbSet<SwReceiptLog> SwReceiptLogs { get; set; }
         public DbSet<SwHandoffPackageRecord> SwHandoffPackageRecords { get; set; }
+        public DbSet<SwSubmitPackageArchive> SwSubmitPackageArchives { get; set; }
 
         public AppDbContext()
         {
@@ -420,21 +419,19 @@ namespace ExportDocManager.DataAccess
                 .HasIndex(document => new { document.SourceInvoiceId, document.DraftRevision });
 
             modelBuilder.Entity<SwClientProfile>()
-                .HasIndex(profile => profile.ProfileName)
+                .HasIndex(profile => profile.ProfileKey)
                 .IsUnique();
             modelBuilder.Entity<SwClientProfile>()
-                .HasIndex(profile => new { profile.IsEnabled, profile.MachineName });
-
-            modelBuilder.Entity<SwOperatorWorkstation>()
-                .HasIndex(workstation => workstation.MachineName)
+                .HasIndex(profile => profile.StationKey)
+                .IsUnique(false);
+            modelBuilder.Entity<SwClientProfile>()
+                .HasIndex(profile => new { profile.StationKey, profile.ProfileName })
                 .IsUnique();
-            modelBuilder.Entity<SwOperatorWorkstation>()
-                .HasIndex(workstation => new { workstation.IsEnabled, workstation.ProfileId });
-
-            modelBuilder.Entity<SwOperationTicket>()
-                .HasIndex(ticket => new { ticket.BusinessType, ticket.Status, ticket.Priority, ticket.RequestedAt });
-            modelBuilder.Entity<SwOperationTicket>()
-                .HasIndex(ticket => new { ticket.SourceInvoiceId, ticket.DocumentId, ticket.BusinessType });
+            modelBuilder.Entity<SwClientProfile>()
+                .HasIndex(profile => new { profile.StationKey, profile.CompanyScope, profile.CardIdentifier })
+                .IsUnique();
+            modelBuilder.Entity<SwClientProfile>()
+                .HasIndex(profile => new { profile.StationKey, profile.IsActive, profile.IsEnabled });
 
             modelBuilder.Entity<SwSubmissionBatch>()
                 .HasIndex(batch => batch.BatchReference)
@@ -444,7 +441,8 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<SwSubmissionBatch>()
                 .HasIndex(batch => new { batch.SourceInvoiceId, batch.BusinessType, batch.CreatedAt });
             modelBuilder.Entity<SwSubmissionBatch>()
-                .HasIndex(batch => new { batch.SourceInvoiceId, batch.BusinessType, batch.SubmissionVersion });
+                .HasIndex(batch => new { batch.SourceInvoiceId, batch.BusinessType, batch.SubmissionVersion })
+                .IsUnique();
             modelBuilder.Entity<SwSubmissionBatch>()
                 .HasMany(batch => batch.ReceiptLogs)
                 .WithOne(log => log.Batch)
@@ -455,11 +453,25 @@ namespace ExportDocManager.DataAccess
                 .WithOne(record => record.Batch)
                 .HasForeignKey(record => record.BatchId)
                 .OnDelete(DeleteBehavior.SetNull);
+            modelBuilder.Entity<SwSubmissionBatch>()
+                .HasOne(batch => batch.SubmitPackageArchive)
+                .WithOne(archive => archive.Batch)
+                .HasForeignKey<SwSubmitPackageArchive>(archive => archive.BatchId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<SwSubmitPackageArchive>()
+                .HasIndex(archive => archive.BatchId)
+                .IsUnique();
+            modelBuilder.Entity<SwSubmitPackageArchive>()
+                .HasIndex(archive => archive.Sha256);
 
             modelBuilder.Entity<SwReceiptLog>()
                 .HasIndex(log => new { log.BatchId, log.ImportedAt });
             modelBuilder.Entity<SwReceiptLog>()
                 .HasIndex(log => new { log.ReferenceNo, log.ReceiptCode, log.SourceFileName });
+            modelBuilder.Entity<SwReceiptLog>()
+                .HasIndex(log => new { log.BatchId, log.ContentSha256 })
+                .IsUnique();
 
             modelBuilder.Entity<SwHandoffPackageRecord>()
                 .HasIndex(record => new { record.BatchReference, record.PackageType, record.Direction, record.CreatedAt });

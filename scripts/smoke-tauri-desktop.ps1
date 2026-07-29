@@ -18,6 +18,8 @@ param(
 
     [switch]$VerifyWebReports,
 
+    [switch]$VerifySingleWindowOperationCenter,
+
     [switch]$VerifyInvoiceItems,
 
     [switch]$VerifyContainerPacking,
@@ -789,6 +791,57 @@ function Invoke-WebReportsSmoke {
     return $nodeOutputText | ConvertFrom-Json
 }
 
+function Invoke-WebSingleWindowOperationCenterSmoke {
+    param(
+        [Parameter(Mandatory = $true)][string]$ApiBaseUrl,
+        [Parameter(Mandatory = $true)][string]$DesktopAccessToken,
+        [Parameter(Mandatory = $true)][string]$LogRoot,
+        [Parameter(Mandatory = $true)][string]$DataRoot
+    )
+
+    $browserExecutable = Resolve-BrowserExecutablePath -Path $BrowserExecutablePath
+    Assert-NonSystemDrivePath -Path $browserExecutable -Purpose "Chrome for Testing executable"
+
+    $scriptPath = Join-Path $scriptRoot "smoke-web-runtime-diagnostics.mjs"
+    if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
+        throw "Web smoke script was not found: $scriptPath"
+    }
+
+    $browserProfileRoot = Join-Path $DataRoot ("BrowserSingleWindowSmokeProfile-{0:yyyyMMddHHmmss}-{1}" -f (Get-Date), $PID)
+    Assert-PathUnderRoot -Path $browserProfileRoot -Root $DataRoot -Purpose "Single Window smoke browser profile"
+    Assert-NonSystemDrivePath -Path $browserProfileRoot -Purpose "Single Window smoke browser profile"
+    New-Item -ItemType Directory -Path $browserProfileRoot -Force | Out-Null
+
+    $jsonPath = Join-Path $LogRoot "web-single-window-operation-center-smoke.json"
+    $screenshotPath = Join-Path $LogRoot "web-single-window-operation-center-smoke.png"
+    $webUrl = "http://127.0.0.1:5173/#/single-window/operation-center"
+    $nodeArguments = @(
+        $scriptPath,
+        "--browser-executable", $browserExecutable,
+        "--web-url", $webUrl,
+        "--api-base-url", $ApiBaseUrl,
+        "--desktop-access-token", $DesktopAccessToken,
+        "--mock-tauri-runtime-context",
+        "--username", $Username,
+        "--password", $Password,
+        "--user-data-dir", $browserProfileRoot,
+        "--timeout-ms", ([string]($WebSmokeTimeoutSeconds * 1000)),
+        "--screenshot-path", $screenshotPath,
+        "--expected-text", "持卡机本地模式",
+        "--single-window-operation-center-check"
+    )
+
+    $nodeOutput = & node @nodeArguments
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        throw "Single Window operation-center smoke failed with exit code $exitCode."
+    }
+
+    $nodeOutputText = $nodeOutput -join [Environment]::NewLine
+    Set-Content -LiteralPath $jsonPath -Value $nodeOutputText -Encoding UTF8
+    return $nodeOutputText | ConvertFrom-Json
+}
+
 function Invoke-WebInvoiceItemsSmoke {
     param(
         [Parameter(Mandatory = $true)][string]$ApiBaseUrl,
@@ -903,7 +956,7 @@ if ($UseRuntimePathsConfig -and $UseExistingRuntimePathsConfig) {
     throw "Use either -UseRuntimePathsConfig or -UseExistingRuntimePathsConfig, not both."
 }
 
-if (($VerifyWebDiagnostics -or $VerifyWebReports -or $VerifyInvoiceItems -or $VerifyBackupRestore -or $VerifyContainerPacking -or $VerifySalesWorkspace) -and $SkipVite) {
+if (($VerifyWebDiagnostics -or $VerifyWebReports -or $VerifySingleWindowOperationCenter -or $VerifyInvoiceItems -or $VerifyBackupRestore -or $VerifyContainerPacking -or $VerifySalesWorkspace) -and $SkipVite) {
     throw "Web smoke verification requires Vite; do not combine web verification switches with -SkipVite."
 }
 
@@ -924,6 +977,8 @@ $resolvedAppRoot = Get-FullPath -Path $AppRoot
 if ([string]::IsNullOrWhiteSpace($DataRoot)) {
     $DataRoot = if ($VerifySalesWorkspace) {
         Join-Path $resolvedAppRoot ("App_Data\SalesWorkspaceSmoke-{0:yyyyMMdd-HHmmss}-{1}" -f (Get-Date), $PID)
+    } elseif ($VerifySingleWindowOperationCenter) {
+        Join-Path $resolvedAppRoot ("App_Data\SingleWindowSmoke-{0:yyyyMMdd-HHmmss}-{1}" -f (Get-Date), $PID)
     } else {
         Join-Path $resolvedAppRoot "App_Data\Smoke"
     }
@@ -1103,6 +1158,14 @@ try {
     $webReports = $null
     if ($VerifyWebReports) {
         $webReports = Invoke-WebReportsSmoke `
+            -ApiBaseUrl $apiBaseUrl `
+            -DesktopAccessToken $desktopAccessToken `
+            -LogRoot $logRoot `
+            -DataRoot $resolvedDataRoot
+    }
+    $webSingleWindowOperationCenter = $null
+    if ($VerifySingleWindowOperationCenter) {
+        $webSingleWindowOperationCenter = Invoke-WebSingleWindowOperationCenterSmoke `
             -ApiBaseUrl $apiBaseUrl `
             -DesktopAccessToken $desktopAccessToken `
             -LogRoot $logRoot `
@@ -1300,6 +1363,7 @@ try {
         DesktopAccessTokenEnabled = $true
         WebDiagnostics = $webDiagnostics
         WebReports = $webReports
+        WebSingleWindowOperationCenter = $webSingleWindowOperationCenter
         WebInvoiceItems = $webInvoiceItems
         WebContainerPacking = $webContainerPacking
         WebSalesWorkspace = $webSalesWorkspace

@@ -160,8 +160,7 @@ namespace ExportDocManager.Api.Hosting
                 provider.GetRequiredService<SingleWindowTrackingService>());
             services.AddScoped<ISingleWindowOperationCenterService>(provider =>
                 provider.GetRequiredService<SingleWindowTrackingService>());
-            services.AddScoped<ISingleWindowWorkstationRegistryService, SingleWindowWorkstationRegistryService>();
-            services.AddScoped<ISingleWindowCollaborationDataSource, LocalSingleWindowCollaborationDataSource>();
+            services.AddSingleton<ISingleWindowStationIdentityService, SingleWindowStationIdentityService>();
             services.AddScoped<ICustomsCooSourceAssembler, CustomsCooSourceAssembler>();
             services.AddScoped<IAgentConsignmentSourceAssembler, AgentConsignmentSourceAssembler>();
             services.AddScoped<ICustomsCooFieldMapper, CustomsCooFieldMapper>();
@@ -170,11 +169,8 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<ICustomsCooPayloadGenerator, CustomsCooXmlPayloadGenerator>();
             services.AddScoped<IAgentConsignmentPayloadGenerator, AgentConsignmentXmlPayloadGenerator>();
             services.AddScoped<ISingleWindowReceiptParser, SingleWindowReceiptParser>();
-            services.AddScoped<ManualImportClientBridge>();
-            services.AddScoped<ISingleWindowClientProfileService>(provider =>
-                provider.GetRequiredService<ManualImportClientBridge>());
-            services.AddScoped<ISingleWindowClientBridge>(provider =>
-                provider.GetRequiredService<ManualImportClientBridge>());
+            services.AddScoped<ISingleWindowClientProfileService, SingleWindowClientProfileService>();
+            services.AddScoped<ISingleWindowClientBridge, ManualImportClientBridge>();
             services.AddScoped<ICustomsCooProducerProfileService, CustomsCooProducerProfileService>();
             services.AddScoped<SingleWindowDocumentPersistenceService>();
             services.AddScoped<ISingleWindowDocumentPersistenceService>(provider =>

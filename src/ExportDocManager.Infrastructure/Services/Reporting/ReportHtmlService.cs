@@ -14,6 +14,7 @@ namespace ExportDocManager.Services.Reporting
         private readonly ReportTemplateCatalogLoader _catalogLoader;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
+        private readonly IAppPathProvider _pathProvider;
 
         private readonly SemaphoreSlim _templateConfigSemaphore = new(1, 1);
         private readonly object _configLock = new();
@@ -37,9 +38,10 @@ namespace ExportDocManager.Services.Reporting
         {
             ArgumentNullException.ThrowIfNull(contextFactory);
             ArgumentNullException.ThrowIfNull(settingsService);
-            _entityLoader = new ReportEntityLoader(contextFactory);
             _contextFactory = contextFactory;
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
+            _entityLoader = new ReportEntityLoader(contextFactory, _accessScope);
+            _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _pathResolver = new ReportTemplatePathResolver(pathProvider);
             _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver);
         }
@@ -258,7 +260,7 @@ namespace ExportDocManager.Services.Reporting
                     .LoadInvoiceEntitiesAsync(invoice, isPreview, cancellationToken)
                     .ConfigureAwait(false);
 
-                var globals = ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(invoice, customer, exporter, withSeal);
+                var globals = ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(invoice, customer, exporter, withSeal, _pathProvider);
                 return ScribanReportTemplateRenderer.Render(templateContent, globals);
             }
             catch (Exception ex)
@@ -285,7 +287,7 @@ namespace ExportDocManager.Services.Reporting
                     .LoadPaymentVoucherEntitiesAsync(payment, cancellationToken)
                     .ConfigureAwait(false);
 
-                var globals = ReportTemplateGlobalsBuilder.BuildPaymentVoucherGlobals(exporter, payment, payee, withSeal);
+                var globals = ReportTemplateGlobalsBuilder.BuildPaymentVoucherGlobals(exporter, payment, payee, withSeal, _pathProvider);
                 return ScribanReportTemplateRenderer.Render(templateContent, globals);
             }
             catch (Exception ex)

@@ -728,6 +728,35 @@
     grid-column: auto;
   }
 
+  .single-window-station-fields,
+  .single-window-capability-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .single-window-mode-banner {
+    align-items: flex-start;
+  }
+
+  .single-window-station-profile .section-header,
+  .single-window-intake-card .section-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .single-window-station-profile .section-header .toolbar-actions,
+  .single-window-intake-card .section-header .toolbar-actions,
+  .single-window-profile-switch-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .single-window-station-profile .section-header .command-button,
+  .single-window-intake-card .section-header .command-button,
+  .single-window-profile-switch-actions .command-button {
+    flex: 1 1 150px;
+    justify-content: center;
+  }
+
   .runtime-detail-grid .detail-item-wide {
     grid-column: auto;
   }
