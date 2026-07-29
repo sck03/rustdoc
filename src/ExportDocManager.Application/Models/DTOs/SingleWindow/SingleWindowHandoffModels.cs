@@ -52,6 +52,12 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public string SourcePackageDigest { get; init; } = string.Empty;
 
+        /// <summary>
+        /// Official reference carried by receipt packages.  It is empty only
+        /// when the official client has not assigned a reference yet.
+        /// </summary>
+        public string ReceiptReferenceNo { get; init; } = string.Empty;
+
         public string ContentDigest { get; set; } = string.Empty;
 
         public string StationKey { get; init; } = string.Empty;

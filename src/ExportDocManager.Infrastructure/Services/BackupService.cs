@@ -3,15 +3,25 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Utils;
+using Microsoft.Data.Sqlite;
 using Serilog;
 
 namespace ExportDocManager.Services.Infrastructure
 {
     public class BackupService : IBackupService
     {
+        private static readonly SemaphoreSlim SqliteMaintenanceGate = new(1, 1);
+        private static readonly JsonSerializerOptions RestoreMarkerJsonOptions = new(JsonSerializerDefaults.Web)
+        {
+            WriteIndented = true
+        };
+
         private readonly string _backupDirectory;
         private readonly string _databasePath;
         private readonly string _databaseFileName;
@@ -37,12 +47,9 @@ namespace ExportDocManager.Services.Infrastructure
 
             if (_usesSqlite)
             {
-                var sqliteFileName = string.IsNullOrWhiteSpace(databaseSettings.SqliteDatabaseFileName)
-                    ? "data.db"
-                    : databaseSettings.SqliteDatabaseFileName.Trim();
                 _databasePath = string.IsNullOrWhiteSpace(databasePath)
-                    ? DbHelper.GetDatabasePath(sqliteFileName)
-                    : databasePath;
+                    ? DbHelper.ResolveRuntimeSqliteDatabasePath(pathProvider, databaseSettings.SqliteDatabaseFileName)
+                    : Path.GetFullPath(databasePath);
                 _databaseFileName = Path.GetFileName(_databasePath);
             }
             else
@@ -58,49 +65,58 @@ namespace ExportDocManager.Services.Infrastructure
             Directory.CreateDirectory(_backupDirectory);
         }
 
-        public async Task BackupDatabaseAsync()
+        public async Task<DatabaseBackupResult> BackupDatabaseAsync(CancellationToken cancellationToken = default)
         {
+            await SqliteMaintenanceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
                 if (!_usesSqlite)
                 {
                     Log.Information("Skipping local database backup because the current provider is PostgreSQL.");
-                    return;
+                    return new DatabaseBackupResult(
+                        Success: false,
+                        Skipped: true,
+                        Message: "当前使用 PostgreSQL，共享数据库请使用 PostgreSQL 维护中心备份。",
+                        FilePath: string.Empty);
                 }
 
                 if (!File.Exists(_databasePath))
                 {
                     Log.Warning("Database file not found at {Path}, skipping backup.", _databasePath);
-                    return;
+                    return new DatabaseBackupResult(
+                        Success: false,
+                        Skipped: true,
+                        Message: "当前 SQLite 数据库文件不存在，未创建备份。",
+                        FilePath: string.Empty);
                 }
 
-                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                string backupFileName = $"{timestamp}_{BuildBackupNameToken(_databaseFileName)}.zip";
-                string backupPath = Path.Combine(_backupDirectory, backupFileName);
-                string databaseFileName = Path.GetFileName(_databasePath);
-
-                string tempDbCopy = AtomicFileHelper.GetSiblingTempFilePath(_databasePath);
-                try
-                {
-                    await FileCopyHelper.CopyAsync(
-                        _databasePath,
-                        tempDbCopy,
-                        overwrite: true,
-                        sourceFileShare: FileShare.ReadWrite | FileShare.Delete);
-                    await ZipArchiveHelper.CreateFromFilesAsync(
-                        new[] { (SourcePath: tempDbCopy, EntryName: databaseFileName) },
-                        backupPath);
-                }
-                finally
-                {
-                    AtomicFileHelper.TryDeleteFile(tempDbCopy);
-                }
+                string backupPath = await CreateConsistentBackupCoreAsync(
+                    namePrefix: string.Empty,
+                    cancellationToken).ConfigureAwait(false);
 
                 Log.Information("Database backed up successfully to {Path}", backupPath);
+                return new DatabaseBackupResult(
+                    Success: true,
+                    Skipped: false,
+                    Message: $"数据库一致性备份已创建：{Path.GetFileName(backupPath)}",
+                    FilePath: backupPath);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "Failed to backup database.");
+                return new DatabaseBackupResult(
+                    Success: false,
+                    Skipped: false,
+                    Message: $"数据库备份失败：{ex.Message}",
+                    FilePath: string.Empty);
+            }
+            finally
+            {
+                SqliteMaintenanceGate.Release();
             }
         }
 
@@ -152,7 +168,9 @@ namespace ExportDocManager.Services.Infrastructure
             }
         }
 
-        public void RestoreDatabase(string backupFilePath)
+        public async Task<DatabaseRestoreScheduleResult> ScheduleRestoreAsync(
+            string backupFilePath,
+            CancellationToken cancellationToken = default)
         {
             if (!_usesSqlite)
             {
@@ -164,87 +182,212 @@ namespace ExportDocManager.Services.Infrastructure
                 throw new FileNotFoundException("Backup file not found.", backupFilePath);
             }
 
-            string tempBackup = null;
+            await SqliteMaintenanceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            string stagedRestorePath = SqlitePendingRestoreManager.GetStagedRestorePath(_databasePath);
+            string markerPath = SqlitePendingRestoreManager.GetMarkerPath(_databasePath);
             try
             {
-                // 1. 确保目标目录存在
-                string dbDir = Path.GetDirectoryName(_databasePath);
-                if (!Directory.Exists(dbDir))
+                if (File.Exists(markerPath))
                 {
-                    Directory.CreateDirectory(dbDir);
+                    throw new InvalidOperationException(
+                        "已有 SQLite 数据库还原任务等待下次启动执行。请先重启程序完成该任务，再安排新的还原。");
                 }
 
-                // 2. 备份当前的（以防万一还原失败）
-                tempBackup = AtomicFileHelper.GetSiblingTempFilePath(_databasePath);
-                if (File.Exists(_databasePath))
+                string safetyBackupPath = File.Exists(_databasePath)
+                    ? await CreateConsistentBackupCoreAsync("pre-restore", cancellationToken).ConfigureAwait(false)
+                    : string.Empty;
+
+                await ExtractDatabaseSnapshotAsync(
+                    backupFilePath,
+                    stagedRestorePath,
+                    cancellationToken).ConfigureAwait(false);
+                await ValidateSqliteSnapshotAsync(stagedRestorePath, cancellationToken).ConfigureAwait(false);
+
+                var marker = new SqlitePendingRestoreMarker
                 {
-                    FileCopyHelper.Copy(
-                        _databasePath,
-                        tempBackup,
-                        overwrite: true,
-                        sourceFileShare: FileShare.ReadWrite | FileShare.Delete);
-                }
+                    TargetDatabasePath = Path.GetFullPath(_databasePath),
+                    StagedDatabasePath = Path.GetFullPath(stagedRestorePath),
+                    SourceBackupFileName = Path.GetFileName(backupFilePath),
+                    SafetyBackupFilePath = safetyBackupPath,
+                    StagedSha256 = await ComputeSha256Async(stagedRestorePath, cancellationToken).ConfigureAwait(false),
+                    CreatedAt = DateTimeOffset.UtcNow
+                };
+                await AtomicFileHelper.WriteAllTextAtomicAsync(
+                    markerPath,
+                    JsonSerializer.Serialize(marker, RestoreMarkerJsonOptions),
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
 
-                // 3. 尝试清除连接池
-                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-                string tempRestore = AtomicFileHelper.GetSiblingTempFilePath(_databasePath);
-
-                // 4. 解压覆盖
-                try
-                {
-                    if (backupFilePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-                    {
-                        using (var archive = ZipFile.OpenRead(backupFilePath))
-                        {
-                            var entry = archive.Entries.FirstOrDefault(e =>
-                                e.Name.Equals(_databaseFileName, StringComparison.OrdinalIgnoreCase));
-                            if (entry == null)
-                            {
-                                throw new InvalidDataException(
-                                    $"备份压缩包中未找到当前数据库文件 '{_databaseFileName}'。");
-                            }
-
-                            using var entryStream = entry.Open();
-                            using var outputStream = File.Create(tempRestore);
-                            entryStream.CopyTo(outputStream);
-                        }
-                    }
-                    else
-                    {
-                        FileCopyHelper.Copy(backupFilePath, tempRestore, overwrite: true);
-                    }
-
-                    AtomicFileHelper.ReplaceFile(tempRestore, _databasePath);
-                }
-                finally
-                {
-                    AtomicFileHelper.TryDeleteFile(tempRestore);
-                }
-                
-                Log.Information("Database restored successfully from {Path}", backupFilePath);
-                
-                // 恢复成功后删除临时备份
-                AtomicFileHelper.TryDeleteFile(tempBackup);
-            }
-            catch (IOException ioEx)
-            {
-                Log.Error(ioEx, "File access error during restore. The database might be in use.");
-                throw new Exception("数据库文件正被使用，无法还原。请确保关闭所有相关窗口后再试，或重启程序。", ioEx);
+                Log.Information(
+                    "Database restore scheduled from {Path}; it will be applied before the next database connection is opened.",
+                    backupFilePath);
+                return new DatabaseRestoreScheduleResult(
+                    Success: true,
+                    Message: "数据库还原任务已安全排队。请立即重启桌面程序；程序会在建立数据库连接前离线还原，并清理旧 WAL/SHM 文件。",
+                    BackupFilePath: backupFilePath,
+                    SafetyBackupFilePath: safetyBackupPath);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to restore database.");
-                // 尝试恢复之前的版本
-                if (!string.IsNullOrWhiteSpace(tempBackup) && File.Exists(tempBackup))
+                if (!File.Exists(markerPath))
                 {
-                    try
-                    {
-                        AtomicFileHelper.ReplaceFile(tempBackup, _databasePath);
-                    }
-                    catch { /* 尽力而为 */ }
+                    AtomicFileHelper.TryDeleteFile(stagedRestorePath);
                 }
+                Log.Error(ex, "Failed to schedule database restore.");
                 throw;
             }
+            finally
+            {
+                SqliteMaintenanceGate.Release();
+            }
+        }
+
+        private async Task<string> CreateConsistentBackupCoreAsync(
+            string namePrefix,
+            CancellationToken cancellationToken)
+        {
+            string timestamp = DateTimeOffset.Now.ToString("yyyyMMdd_HHmmss_fff");
+            string prefix = string.IsNullOrWhiteSpace(namePrefix) ? string.Empty : $"{namePrefix.Trim()}_";
+            string backupFileName = $"{timestamp}_{prefix}{BuildBackupNameToken(_databaseFileName)}_{Guid.NewGuid():N}.zip";
+            string backupPath = Path.Combine(_backupDirectory, backupFileName);
+            string snapshotPath = Path.Combine(
+                _backupDirectory,
+                $".{BuildBackupNameToken(_databaseFileName)}.{Guid.NewGuid():N}.snapshot.db");
+
+            try
+            {
+                await CreateSqliteOnlineSnapshotAsync(snapshotPath, cancellationToken).ConfigureAwait(false);
+                await ZipArchiveHelper.CreateFromFilesAsync(
+                    new[] { (SourcePath: snapshotPath, EntryName: _databaseFileName) },
+                    backupPath,
+                    cancellationToken).ConfigureAwait(false);
+                if (!File.Exists(backupPath) || new FileInfo(backupPath).Length == 0)
+                {
+                    throw new IOException("备份压缩包未成功写入。" );
+                }
+
+                return backupPath;
+            }
+            finally
+            {
+                AtomicFileHelper.TryDeleteFile(snapshotPath);
+            }
+        }
+
+        private async Task CreateSqliteOnlineSnapshotAsync(
+            string snapshotPath,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var sourceBuilder = new SqliteConnectionStringBuilder(DbHelper.BuildConnectionString(_databasePath))
+            {
+                Mode = SqliteOpenMode.ReadOnly,
+                Pooling = false
+            };
+            var destinationBuilder = new SqliteConnectionStringBuilder(DbHelper.BuildConnectionString(snapshotPath))
+            {
+                Mode = SqliteOpenMode.ReadWriteCreate,
+                Pooling = false
+            };
+
+            await using var source = new SqliteConnection(sourceBuilder.ToString());
+            await using var destination = new SqliteConnection(destinationBuilder.ToString());
+            await source.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await destination.OpenAsync(cancellationToken).ConfigureAwait(false);
+            source.BackupDatabase(destination);
+            await ValidateOpenSqliteConnectionAsync(destination, cancellationToken).ConfigureAwait(false);
+        }
+
+        private async Task ExtractDatabaseSnapshotAsync(
+            string backupFilePath,
+            string stagedRestorePath,
+            CancellationToken cancellationToken)
+        {
+            await AtomicFileHelper.WriteFileAtomicAsync(
+                stagedRestorePath,
+                async (tempPath, ct) =>
+                {
+                    if (backupFilePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                    {
+                        using var archive = ZipFile.OpenRead(backupFilePath);
+                        var entries = archive.Entries
+                            .Where(entry => entry.Name.Equals(_databaseFileName, StringComparison.OrdinalIgnoreCase))
+                            .ToArray();
+                        if (entries.Length != 1)
+                        {
+                            throw new InvalidDataException(
+                                $"备份压缩包必须且只能包含一个当前数据库文件 '{_databaseFileName}'。");
+                        }
+
+                        var entry = entries[0];
+                        if (entry.Length <= 0 || entry.Length > 4L * 1024L * 1024L * 1024L)
+                        {
+                            throw new InvalidDataException("备份数据库文件大小无效。" );
+                        }
+
+                        await using var entryStream = entry.Open();
+                        await using var outputStream = new FileStream(
+                            tempPath,
+                            FileMode.Create,
+                            FileAccess.Write,
+                            FileShare.None,
+                            81920,
+                            FileOptions.Asynchronous | FileOptions.SequentialScan);
+                        await entryStream.CopyToAsync(outputStream, ct).ConfigureAwait(false);
+                        await outputStream.FlushAsync(ct).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await FileCopyHelper.CopyAsync(
+                            backupFilePath,
+                            tempPath,
+                            overwrite: true,
+                            sourceFileShare: FileShare.Read,
+                            cancellationToken: ct).ConfigureAwait(false);
+                    }
+                },
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        private static async Task ValidateSqliteSnapshotAsync(
+            string databasePath,
+            CancellationToken cancellationToken)
+        {
+            var builder = new SqliteConnectionStringBuilder(DbHelper.BuildConnectionString(databasePath))
+            {
+                Mode = SqliteOpenMode.ReadOnly,
+                Pooling = false
+            };
+            await using var connection = new SqliteConnection(builder.ToString());
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await ValidateOpenSqliteConnectionAsync(connection, cancellationToken).ConfigureAwait(false);
+        }
+
+        private static async Task ValidateOpenSqliteConnectionAsync(
+            SqliteConnection connection,
+            CancellationToken cancellationToken)
+        {
+            string result = await SqliteMaintenanceGateway
+                .RunQuickCheckAsync(connection, cancellationToken)
+                .ConfigureAwait(false);
+            if (!string.Equals(result, "ok", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException($"SQLite 一致性检查失败：{result}" );
+            }
+        }
+
+        private static async Task<string> ComputeSha256Async(
+            string path,
+            CancellationToken cancellationToken)
+        {
+            await using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                81920,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            byte[] hash = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
+            return Convert.ToHexString(hash).ToLowerInvariant();
         }
 
         private IEnumerable<FileInfo> GetCandidateBackupFiles()

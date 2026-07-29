@@ -464,11 +464,37 @@ fn otsu(g: &GrayImage) -> u8 {
     threshold
 }
 fn decode_ctc(data: Vec<f32>, shape: &[usize], labels: &[String]) -> Result<(String, f32)> {
-    if shape.len() < 2 {
+    if shape.len() != 2 && shape.len() != 3 {
         bail!("invalid recognition output shape")
     }
+    if shape.len() == 3 && shape[0] != 1 {
+        bail!("recognition output batch size must be one")
+    }
     let seq = if shape.len() == 3 { shape[1] } else { shape[0] };
-    let classes = *shape.last().unwrap();
+    let classes = shape[shape.len() - 1];
+    if seq == 0 || classes == 0 {
+        bail!("recognition output dimensions must be non-zero")
+    }
+    let required_len = seq
+        .checked_mul(classes)
+        .context("recognition output dimensions overflow")?;
+    if data.len() != required_len {
+        bail!(
+            "recognition output data length mismatch: expected {required_len}, got {}",
+            data.len()
+        )
+    }
+    if classes != labels.len() && classes != labels.len() + 1 && classes != labels.len() + 2 {
+        bail!(
+            "unsupported recognition output class count: expected {}, {} or {}, got {classes}",
+            labels.len(),
+            labels.len() + 1,
+            labels.len() + 2
+        )
+    }
+    if data.iter().any(|value| !value.is_finite()) {
+        bail!("recognition output contains a non-finite score")
+    }
     let blank = classes == labels.len() + 1 || classes == labels.len() + 2;
     let (mut last, mut text, mut sum, mut n) = (usize::MAX, String::new(), 0f32, 0usize);
     for t in 0..seq {
@@ -478,7 +504,7 @@ fn decode_ctc(data: Vec<f32>, shape: &[usize], labels: &[String]) -> Result<(Str
             .copied()
             .enumerate()
             .max_by(|a, b| a.1.total_cmp(&b.1))
-            .unwrap();
+            .ok_or_else(|| anyhow!("recognition output row is empty"))?;
         if idx == last {
             continue;
         }
@@ -579,6 +605,32 @@ mod tests {
         let (text, confidence) = decode_ctc(data, &[1, 5, 4], &labels).unwrap();
         assert_eq!(text, "A B");
         assert!(confidence > 0.9);
+    }
+
+    #[test]
+    fn decode_ctc_rejects_invalid_shapes_and_batch_sizes() {
+        let labels = vec!["A".to_string()];
+
+        assert!(decode_ctc(vec![0.1], &[1], &labels).is_err());
+        assert!(decode_ctc(vec![0.1, 0.9, 0.2, 0.8], &[2, 1, 2], &labels).is_err());
+        assert!(decode_ctc(Vec::new(), &[1, 0, 2], &labels).is_err());
+    }
+
+    #[test]
+    fn decode_ctc_rejects_mismatched_or_overflowing_data_lengths() {
+        let labels = vec!["A".to_string()];
+
+        assert!(decode_ctc(vec![0.1], &[1, 2], &labels).is_err());
+        assert!(decode_ctc(Vec::new(), &[usize::MAX, 2], &labels).is_err());
+    }
+
+    #[test]
+    fn decode_ctc_rejects_unsupported_class_counts_and_non_finite_scores() {
+        let labels = vec!["A".to_string()];
+
+        assert!(decode_ctc(vec![0.1, 0.2, 0.3, 0.4], &[1, 4], &labels).is_err());
+        assert!(decode_ctc(vec![f32::NAN, 0.2], &[1, 2], &labels).is_err());
+        assert!(decode_ctc(vec![0.1, f32::INFINITY], &[1, 2], &labels).is_err());
     }
 
     #[test]

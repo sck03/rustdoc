@@ -7,6 +7,15 @@ namespace ExportDocManager.Infrastructure.Tests
     public sealed class SingleWindowTrackingPolicyTests
     {
         [Fact]
+        public void ReceiptTokenMatching_ShouldRequireBusinessTokenBoundaries()
+        {
+            Assert.True(ManualImportClientBridge.ContainsToken("Success_INV-1.xml", "INV-1"));
+            Assert.True(ManualImportClientBridge.ContainsToken("batch/INV-1/receipt.xml", "INV-1"));
+            Assert.False(ManualImportClientBridge.ContainsToken("Success_INV-10.xml", "INV-1"));
+            Assert.False(ManualImportClientBridge.ContainsToken("XINV-1.xml", "INV-1"));
+        }
+
+        [Fact]
         public void SelectPrimaryReceipt_ShouldPreferTerminalStatusOverNewerPreliminaryStatus()
         {
             DateTime now = DateTime.UtcNow;

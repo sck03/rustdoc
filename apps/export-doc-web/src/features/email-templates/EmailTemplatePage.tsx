@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ApiCrmCustomerDto, ApiEmailTemplateDto, ApiEmailTemplatePreviewDto, ApiEmailTemplateVariableDto, ApiEmailTemplateVersionDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
-import { TaskViewTabs } from "../../ui/TaskViewTabs.tsx";
+import { TaskViewTabs, getTaskViewPanelProps } from "../../ui/TaskViewTabs.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import {
@@ -24,9 +24,11 @@ import {
 } from "./emailTemplateModel.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { EmailHtmlPreview, EmailRichTextEditor } from "../../ui/EmailRichTextEditor.tsx";
 
 type EmailTemplateTaskView = "directory" | "editor" | "variables" | "preview" | "history";
 type EmailTemplateScope = "all" | "editable" | "shared";
+const emailTemplateTabsId = "email-template-workspace";
 
 export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClient }) {
   const templatePermission = useModulePermission("sales.email-templates");
@@ -239,12 +241,12 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
     <div className="section-heading-row"><div><h2>邮件模板</h2><p>维护单封业务邮件内容；不包含群发、活动、追踪或自动发送。</p></div></div>
     <OperationFeedback feedback={feedback} />
     {!templatePermission.canOperate ? <PermissionNotice>当前权限模板仅允许查看邮件模板；新建、复制、预览生成、恢复和修改已禁用。</PermissionNotice> : null}
-    <TaskViewTabs value={view} label="邮件模板工作区" onChange={changeView} items={[
+    <TaskViewTabs idPrefix={emailTemplateTabsId} value={view} label="邮件模板工作区" onChange={changeView} items={[
       { id: "directory", label: "模板目录" }, { id: "editor", label: selected ? canEdit ? "编辑模板" : "查看模板" : "新建模板", disabled: !selected && !templatePermission.canOperate },
       { id: "variables", label: "变量设置", disabled: !templatePermission.canOperate }, { id: "preview", label: "预览与套用", disabled: !templatePermission.canOperate },
       { id: "history", label: "版本历史" },
     ]} />
-    {view === "directory" ? <section className="form-section"><div className="section-header"><div><h3>模板目录</h3><p className="section-description">维护常用的单封业务邮件，不包含群发活动。</p></div><div className="section-header-actions"><span>{visibleTemplates.length} 个</span>{templatePermission.canOperate ? <button className="primary-button" type="button" onClick={startNewTemplate}>新建模板</button> : null}</div></div>
+    {view === "directory" ? <section className="form-section" {...getTaskViewPanelProps(emailTemplateTabsId, "directory")}><div className="section-header"><div><h3>模板目录</h3><p className="section-description">维护常用的单封业务邮件，不包含群发活动。</p></div><div className="section-header-actions"><span>{visibleTemplates.length} 个</span>{templatePermission.canOperate ? <button className="primary-button" type="button" onClick={startNewTemplate}>新建模板</button> : null}</div></div>
       <form className="toolbar" onSubmit={(event) => { event.preventDefault(); void loadTemplates(); }}>
         <input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索模板名称、主题或正文" />
         <button className="secondary-button" type="submit">搜索</button>
@@ -256,23 +258,32 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
         {!visibleTemplates.length ? <tr><td className="empty-cell" colSpan={5}><div className="empty-cell-content"><strong>{templates.length ? "当前范围没有模板" : "暂无邮件模板"}</strong><span>{templates.length ? "可切换模板范围，或调整搜索和停用状态条件。" : templatePermission.canOperate ? "先建立一封常用询价、报价或跟进邮件，之后可载入客户变量快速套用。" : "当前没有可查看的邮件模板。"}</span>{!templates.length && templatePermission.canOperate ? <button className="primary-button" type="button" onClick={startNewTemplate}>建立第一个模板</button> : null}</div></td></tr> : null}
       </tbody></table></ResponsiveTableFrame>
     </section> : null}
-    {view === "editor" ? <form className="form-grid" onSubmit={save}>
+    {view === "editor" ? <form className="form-grid" onSubmit={save} {...getTaskViewPanelProps(emailTemplateTabsId, "editor")}>
         <div className="section-header"><h3>{selected ? "编辑模板" : "新建模板"}</h3><span>{isDirty ? "有未保存修改" : "已同步"}</span></div>
         {!canEdit ? <FormGuidance className="form-field-wide" title={templatePermission.canOperate ? "这是其他账号共享的模板" : "当前模板为只读"} description={templatePermission.canOperate ? "可以预览、套用或复制为自己的模板，但不能直接修改原模板。" : "可以查看正文和版本历史，但当前权限不能生成预览或修改模板。"} /> : null}
         <label>模板名称<input required disabled={!canEdit} maxLength={150} value={name} onChange={(event) => setName(event.target.value)} /></label>
         <label>分类<input disabled={!canEdit} maxLength={50} value={category} onChange={(event) => setCategory(event.target.value)} /></label>
         <label className="form-field-wide">邮件主题<input disabled={!canEdit} maxLength={300} value={subject} onChange={(event) => setSubject(event.target.value)} /></label>
-        <label className="form-field-wide">邮件正文<textarea disabled={!canEdit} rows={12} maxLength={10000} value={bodyHtml} onChange={(event) => { setBodyHtml(event.target.value); setPreview(null); }} /><span className="field-hint">普通文字可直接输入；需要格式时可使用简单 HTML。</span></label>
+        <div className="form-field-wide email-rich-text-field">
+          <span className="email-rich-text-field-label">邮件正文</span>
+          <EmailRichTextEditor value={bodyHtml} disabled={!canEdit} onChange={(value) => { setBodyHtml(value); setPreview(null); }} />
+          <span className="field-hint">可直接排版文字、列表和链接；图片请作为邮件附件发送。</span>
+          <details className="email-html-advanced">
+            <summary>高级 HTML</summary>
+            <textarea aria-label="邮件正文高级 HTML" disabled={!canEdit} rows={8} maxLength={10000} value={bodyHtml} onChange={(event) => { setBodyHtml(event.target.value); setPreview(null); }} />
+            <span className="field-hint">仅建议熟悉 HTML 的用户使用。系统会移除脚本、事件属性、嵌入内容和危险链接。</span>
+          </details>
+        </div>
         <label className="checkbox-field"><input type="checkbox" disabled={!canEdit} checked={isActive} onChange={(event) => setIsActive(event.target.checked)} />启用模板</label>
         <label className="checkbox-field"><input type="checkbox" disabled={!canEdit} checked={isShared} onChange={(event) => setIsShared(event.target.checked)} />团队共享（局域网账号可见）</label>
         <div className="form-actions">{canEdit ? <button className="primary-button" type="submit">保存模板</button> : null}{templatePermission.canOperate ? <button className="secondary-button" type="button" onClick={() => setView("variables")}>设置变量</button> : null}{selected ? <button className="secondary-button" type="button" onClick={() => changeView("history")}>查看版本历史</button> : null}{selected && templatePermission.canOperate ? <button className="secondary-button" type="button" onClick={copyAsNewTemplate}>复制为新模板</button> : null}{canDelete ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除</button> : null}</div>
       </form> : null}
-      {view === "variables" ? <section className="form-section"><div className="section-header"><div><h3>变量设置</h3><p className="section-description">填写预览样例，或把变量插入当前邮件正文。</p></div><span>{variables.length} 项</span></div>
+      {view === "variables" ? <section className="form-section" {...getTaskViewPanelProps(emailTemplateTabsId, "variables")}><div className="section-header"><div><h3>变量设置</h3><p className="section-description">填写预览样例，或把变量插入当前邮件正文。</p></div><span>{variables.length} 项</span></div>
         <div className="context-strip"><strong>{name.trim() || "未命名模板"}</strong><span>{canEdit ? "变量只用于生成当前预览，不会自动发送邮件。" : "这是只读共享模板；可调整预览样例，复制为自己的模板后才能修改正文。"}</span></div>
-        <div className="form-grid variable-setting-grid">{variables.map((item) => <label key={item.key}>{item.label}<input value={sampleValues[item.key] ?? ""} onChange={(event) => { setSampleValues((current) => ({ ...current, [item.key]: event.target.value })); setPreview(null); }} /><span className="field-hint">{item.token}</span><button className="secondary-button" disabled={!canEdit} type="button" onClick={() => { setBodyHtml((current) => current + item.token); setPreview(null); }}>插入正文</button></label>)}</div>
+        <div className="form-grid variable-setting-grid">{variables.map((item) => <label key={item.key}>{item.label}<input value={sampleValues[item.key] ?? ""} onChange={(event) => { setSampleValues((current) => ({ ...current, [item.key]: event.target.value })); setPreview(null); }} /><span className="field-hint">{item.token}</span><button className="secondary-button" disabled={!canEdit} type="button" onClick={() => { setBodyHtml((current) => `${current}<p>${item.token}</p>`); setPreview(null); }}>插入正文</button></label>)}</div>
         <div className="form-actions"><button className="secondary-button" type="button" onClick={() => setView("editor")}>{canEdit ? "返回编辑正文" : "返回模板详情"}</button>{selected && !canEdit && templatePermission.canOperate ? <button className="secondary-button" type="button" onClick={copyAsNewTemplate}>复制后修改</button> : null}{templatePermission.canOperate ? <button className="primary-button" type="button" onClick={() => void previewAndOpen()}>生成预览</button> : null}</div>
       </section> : null}
-      {view === "preview" ? <section className="form-section"><div className="section-header"><div><h3>预览与套用</h3><p className="section-description">可选载入 CRM 客户资料，确认内容后再套用到单封邮件。</p></div></div>
+      {view === "preview" ? <section className="form-section" {...getTaskViewPanelProps(emailTemplateTabsId, "preview")}><div className="section-header"><div><h3>预览与套用</h3><p className="section-description">可选载入 CRM 客户资料，确认内容后再套用到单封邮件。</p></div></div>
         {!canEdit ? <div className="context-strip"><strong>团队共享模板 · 只读</strong><span>可以载入客户变量并套用邮件；需要修改模板内容时请先复制。</span></div> : null}
         {crmPermission.canView ? <form className="toolbar" onSubmit={(event) => { event.preventDefault(); void searchCrmCustomers(); }}>
           <input value={crmCustomerKeyword} onChange={(event) => setCrmCustomerKeyword(event.target.value)} placeholder="搜索 CRM 客户" />
@@ -281,15 +292,15 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
           <button className="secondary-button" type="button" disabled={!templatePermission.canOperate} onClick={() => void loadCrmDraft()}>载入客户变量</button>
         </form> : <div className="context-strip"><strong>未开放客户资料</strong><span>当前模板没有 CRM 客户读取权限，可继续使用手工样例变量。</span></div>}
         {recipientAddress ? <p>建议收件人：{recipientAddress}</p> : null}
-        {preview ? <div className="form-grid"><label className="form-field-wide">预览主题<input readOnly value={preview.subject} /></label><label className="form-field-wide">预览正文<textarea rows={10} readOnly value={preview.bodyHtml} /></label></div> : <p>填写变量样例后点击“预览”。变量值写入 HTML 正文前会进行编码。</p>}
+        {preview ? <div className="form-grid"><label className="form-field-wide">预览主题<input readOnly value={preview.subject} /></label><div className="form-field-wide email-rich-text-field"><span className="email-rich-text-field-label">预览正文</span><EmailHtmlPreview html={preview.bodyHtml} title="邮件模板正文预览" /></div></div> : <p>填写变量样例后点击“预览”。变量值写入邮件正文前会安全编码。</p>}
         <div className="form-actions"><button className="secondary-button" type="button" onClick={() => setView("variables")}>调整预览变量</button>{selected && !canEdit && templatePermission.canOperate ? <button className="secondary-button" type="button" onClick={copyAsNewTemplate}>复制后修改</button> : null}<button className="secondary-button" type="button" onClick={() => void renderPreview()}>刷新预览</button>{emailPermission.canOperate ? <button className="primary-button" type="button" onClick={() => void applyToEmail()}>套用到单封邮件</button> : null}</div>
       </section> : null}
-      {view === "history" ? <section className="form-section"><div className="section-header"><div><h3>版本历史</h3><p className="section-description">每次实际保存都会追加快照；恢复旧版本时仍保留当前历史。</p></div><span>{selected ? `当前 V${selected.versionNumber}` : "未选择模板"}</span></div>
+      {view === "history" ? <section className="form-section" {...getTaskViewPanelProps(emailTemplateTabsId, "history")}><div className="section-header"><div><h3>版本历史</h3><p className="section-description">每次实际保存都会追加快照；恢复旧版本时仍保留当前历史。</p></div><span>{selected ? `当前 V${selected.versionNumber}` : "未选择模板"}</span></div>
         <ResponsiveTableFrame label="邮件模板版本历史" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>版本</th><th>变更</th><th data-table-priority="secondary">操作账号</th><th data-table-priority="secondary">时间</th><th /></tr></thead><tbody>
           {versions.map((item) => <tr key={item.id}><td><strong>V{item.versionNumber}</strong>{item.versionNumber === selected?.versionNumber ? " · 当前" : ""}</td><td>{item.changeType}</td><td data-table-priority="secondary">{item.changedBy || "本地用户"}</td><td data-table-priority="secondary">{new Date(item.createdAt).toLocaleString("zh-CN")}</td><td><button className="secondary-button" type="button" onClick={() => setSelectedVersionNumber(item.versionNumber)}>查看</button></td></tr>)}
           {!versions.length ? <tr><td className="empty-cell" colSpan={5}>暂无可用版本历史。</td></tr> : null}
         </tbody></table></ResponsiveTableFrame>
-        {selectedVersion ? <div className="form-grid"><div className="context-strip form-field-wide"><strong>V{selectedVersion.versionNumber} · {selectedVersion.changeType}</strong><span>{selectedVersion.category} · {selectedVersion.isActive ? "启用" : "停用"} · {selectedVersion.isShared ? "团队共享" : "个人模板"}</span></div><label className="form-field-wide">历史主题<input readOnly value={selectedVersion.subject} /></label><label className="form-field-wide">历史正文<textarea rows={10} readOnly value={selectedVersion.bodyHtml} /></label><div className="form-actions form-field-wide"><button className="secondary-button" type="button" onClick={() => setView("editor")}>返回模板详情</button>{templatePermission.canOperate && selectedVersion.canRestore && selectedVersion.versionNumber !== selected?.versionNumber ? <button className="primary-button" type="button" onClick={() => void restoreVersion(selectedVersion)}>恢复此版本</button> : null}</div></div> : null}
+        {selectedVersion ? <div className="form-grid"><div className="context-strip form-field-wide"><strong>V{selectedVersion.versionNumber} · {selectedVersion.changeType}</strong><span>{selectedVersion.category} · {selectedVersion.isActive ? "启用" : "停用"} · {selectedVersion.isShared ? "团队共享" : "个人模板"}</span></div><label className="form-field-wide">历史主题<input readOnly value={selectedVersion.subject} /></label><div className="form-field-wide email-rich-text-field"><span className="email-rich-text-field-label">历史正文</span><EmailHtmlPreview html={selectedVersion.bodyHtml} title={`邮件模板 V${selectedVersion.versionNumber} 正文`} /><details className="email-html-advanced"><summary>查看高级 HTML</summary><textarea aria-label="历史邮件正文高级 HTML" rows={8} readOnly value={selectedVersion.bodyHtml} /></details></div><div className="form-actions form-field-wide"><button className="secondary-button" type="button" onClick={() => setView("editor")}>返回模板详情</button>{templatePermission.canOperate && selectedVersion.canRestore && selectedVersion.versionNumber !== selected?.versionNumber ? <button className="primary-button" type="button" onClick={() => void restoreVersion(selectedVersion)}>恢复此版本</button> : null}</div></div> : null}
       </section> : null}
   </section>;
 }

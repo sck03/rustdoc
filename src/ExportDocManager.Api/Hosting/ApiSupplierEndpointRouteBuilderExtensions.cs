@@ -41,7 +41,19 @@ namespace ExportDocManager.Api.Hosting
                 if (!HasSalesAccess(c, t, a, out var denied)) return denied;
                 try
                 {
-                    return await s.DeleteAsync(id, ct) ? Results.Ok(new ApiCommandResponse(true, "供应商已删除。")) : Results.NotFound();
+                    var result = await s.DeleteAsync(id, ct);
+                    if (!result.Found) return Results.NotFound();
+                    string message = result.Deactivated
+                        ? $"该供应商已有 {result.ProductLinkCount} 条供货关系和 {result.AssessmentCount} 条评价，系统已保留历史资料并将供应商停用。"
+                        : $"供应商已删除，同时删除 {result.ContactCount} 位联系人。";
+                    return Results.Ok(new ApiSupplierDeleteResponse(
+                        true,
+                        result.Deleted,
+                        result.Deactivated,
+                        message,
+                        result.ContactCount,
+                        result.ProductLinkCount,
+                        result.AssessmentCount));
                 }
                 catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
             }).WithName("DeleteSupplier");

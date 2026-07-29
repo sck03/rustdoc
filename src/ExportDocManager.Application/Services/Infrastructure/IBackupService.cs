@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -8,7 +9,7 @@ namespace ExportDocManager.Services.Infrastructure
         /// <summary>
         /// 执行数据库备份
         /// </summary>
-        Task BackupDatabaseAsync();
+        Task<DatabaseBackupResult> BackupDatabaseAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// 清理旧备份文件
@@ -22,9 +23,23 @@ namespace ExportDocManager.Services.Infrastructure
         List<string> GetAvailableBackups();
 
         /// <summary>
-        /// 还原数据库
+        /// 安排在下一次程序启动、数据库连接建立前离线还原数据库
         /// </summary>
         /// <param name="backupFilePath">备份文件路径</param>
-        void RestoreDatabase(string backupFilePath);
+        Task<DatabaseRestoreScheduleResult> ScheduleRestoreAsync(
+            string backupFilePath,
+            CancellationToken cancellationToken = default);
     }
+
+    public sealed record DatabaseBackupResult(
+        bool Success,
+        bool Skipped,
+        string Message,
+        string FilePath);
+
+    public sealed record DatabaseRestoreScheduleResult(
+        bool Success,
+        string Message,
+        string BackupFilePath,
+        string SafetyBackupFilePath);
 }

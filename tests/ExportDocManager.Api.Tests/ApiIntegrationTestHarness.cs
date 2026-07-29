@@ -47,7 +47,8 @@ namespace ExportDocManager.Api.Tests
             string databaseFileName,
             string desktopAccessToken = null,
             string productEdition = null,
-            ILicenseSignatureVerifier licenseSignatureVerifier = null)
+            ILicenseSignatureVerifier licenseSignatureVerifier = null,
+            Action<IServiceCollection> configureServices = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
             ArgumentException.ThrowIfNullOrWhiteSpace(databaseFileName);
@@ -61,6 +62,7 @@ namespace ExportDocManager.Api.Tests
                 desktopAccessToken,
                 productEdition,
                 licenseSignatureVerifier,
+                configureServices,
                 cleanupOnFailure: true);
         }
 
@@ -70,7 +72,8 @@ namespace ExportDocManager.Api.Tests
             string databaseFileName,
             string desktopAccessToken = null,
             string productEdition = null,
-            ILicenseSignatureVerifier licenseSignatureVerifier = null)
+            ILicenseSignatureVerifier licenseSignatureVerifier = null,
+            Action<IServiceCollection> configureServices = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(appRoot);
             ArgumentException.ThrowIfNullOrWhiteSpace(dataRoot);
@@ -83,6 +86,7 @@ namespace ExportDocManager.Api.Tests
                 desktopAccessToken,
                 productEdition,
                 licenseSignatureVerifier,
+                configureServices,
                 cleanupOnFailure: false);
         }
 
@@ -93,6 +97,7 @@ namespace ExportDocManager.Api.Tests
             string desktopAccessToken,
             string productEdition,
             ILicenseSignatureVerifier licenseSignatureVerifier,
+            Action<IServiceCollection> configureServices,
             bool cleanupOnFailure)
         {
             string databasePath = Path.Combine(dataRoot, "Database", databaseFileName);
@@ -128,6 +133,7 @@ namespace ExportDocManager.Api.Tests
                     builder.Services.AddSingleton(licenseSignatureVerifier);
                 }
                 builder.Services.AddExportDocManagerApiServices(pathProvider, databaseSettings, runtimeOptions);
+                configureServices?.Invoke(builder.Services);
 
                 var app = builder.Build();
                 app.UseExportDocManagerApiSafety();

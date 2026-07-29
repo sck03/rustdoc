@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import type { ApiSingleWindowImportedPackageResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
-import { isDesktopBridgeAvailable, selectSingleWindowPackageFile } from "../../desktop/desktopBridge.ts";
+import { getDesktopRuntimeContext, isDesktopBridgeAvailable, selectSingleWindowPackageFile } from "../../desktop/desktopBridge.ts";
 import { DesktopIconButton, readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
@@ -36,7 +36,34 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
   const [pageSize, setPageSize] = useState(initialListViewState.pageSize);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
   const navigate = useNavigate();
-  const isDesktopStation = isDesktopBridgeAvailable();
+  const desktopBridgeAvailable = isDesktopBridgeAvailable();
+  const desktopRuntimeQuery = useQuery({
+    queryKey: ["desktop", "runtime-context"],
+    queryFn: () => getDesktopRuntimeContext(),
+    enabled: desktopBridgeAvailable,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const healthQuery = useQuery({
+    queryKey: queryKeys.health(),
+    queryFn: () => client.getHealth(),
+    enabled: desktopBridgeAvailable,
+    staleTime: 60_000,
+  });
+  const isDesktopStation = Boolean(
+    desktopBridgeAvailable &&
+    desktopRuntimeQuery.data?.singleWindowStationCapable &&
+    desktopRuntimeQuery.data.platform === "windows" &&
+    healthQuery.data?.sqliteDatabasePath,
+  );
+  const isDesktopStationResolving = Boolean(
+    desktopBridgeAvailable && (desktopRuntimeQuery.isPending || healthQuery.isPending),
+  );
+  const isUnsupportedDesktopStation = Boolean(
+    desktopBridgeAvailable &&
+    !desktopRuntimeQuery.isPending &&
+    !healthQuery.isPending &&
+    !isDesktopStation,
+  );
 
   const operationCenterQuery = useQuery({
     queryKey: queryKeys.singleWindowOperationCenter(pageNumber, pageSize, committedKeyword.trim(), businessType, status),
@@ -84,19 +111,33 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
       <SingleWindowTabs activeKey="operation-center" />
 
       <div className={isDesktopStation ? "single-window-mode-banner station-mode" : "single-window-mode-banner office-mode"}>
-        {isDesktopStation ? <HardDrive size={20} aria-hidden="true" /> : <Server size={20} aria-hidden="true" />}
+        {isDesktopStationResolving
+          ? <RefreshCw size={20} aria-hidden="true" />
+          : isDesktopStation ? <HardDrive size={20} aria-hidden="true" /> : <Server size={20} aria-hidden="true" />}
         <div>
-          <strong>{isDesktopStation ? "持卡机本地模式" : "办公室归档模式"}</strong>
-          <span>{isDesktopStation
-            ? "选择当前公司与操作卡档案，导入对应提交包，将 XML 写入交接 OutBox，再由操作员在官方客户端确认导入和提交。"
-            : "生成业务提交包并导入持卡机返回的回执包；办公室端不显示持卡机本地目录。"}</span>
+          <strong>{isDesktopStationResolving ? "正在识别桌面运行模式" : isDesktopStation ? "持卡机本地模式" : "办公室归档模式"}</strong>
+          <span>{isDesktopStationResolving
+            ? "正在核对 Windows 桌面能力和 SQLite 单机数据库，确认前不会显示持卡机或办公室专属操作。"
+            : isDesktopStation
+              ? "选择当前公司与操作卡档案，导入对应待办包，把申报文件送入官方客户端交接目录，再由操作员确认导入和提交。"
+              : "生成业务提交包并导入持卡机返回的回执包；办公室端不显示持卡机本地目录。"}</span>
         </div>
       </div>
 
-      {isDesktopStation ? <SingleWindowStationProfilePanel client={client} canOperate={permission.canOperate} /> : null}
-      {isDesktopStation
-        ? <StationSubmitPackageImportPanel client={client} canOperate={permission.canOperate} />
-        : <OfficeReceiptPackageImportPanel client={client} canOperate={permission.canOperate} />}
+      {isUnsupportedDesktopStation ? (
+        <InlineNotice tone="warning" title="当前桌面环境不能作为持卡机">
+          持卡机操作要求 Windows 桌面版和 SQLite 单机数据库。当前环境仍可作为办公室端制作或归档交接包，但不会显示实体卡和官方客户端目录操作。
+        </InlineNotice>
+      ) : null}
+
+      {!isDesktopStationResolving && isDesktopStation
+        ? <SingleWindowStationProfilePanel client={client} canOperate={permission.canOperate} />
+        : null}
+      {!isDesktopStationResolving
+        ? isDesktopStation
+          ? <StationSubmitPackageImportPanel client={client} canOperate={permission.canOperate} />
+          : <OfficeReceiptPackageImportPanel client={client} canOperate={permission.canOperate} />
+        : null}
 
       <div className="toolbar single-window-toolbar">
         <form className="search-form" onSubmit={handleSearch}>
@@ -115,7 +156,7 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
       {operationCenterQuery.isError ? <InlineNotice tone="error" title="操作中心加载失败">{readApiError(operationCenterQuery.error)}</InlineNotice> : null}
       {!permission.canOperate ? <PermissionNotice>当前权限仅允许查看批次和回执，交接包处理已禁用。</PermissionNotice> : null}
 
-      {selectedRow ? (
+      {selectedRow && !isDesktopStationResolving ? (
         <OperationCenterListActionsPanel
           client={client}
           row={selectedRow}
@@ -175,7 +216,7 @@ function StationSubmitPackageImportPanel({ client, canOperate }: { client: Expor
   return (
     <section className="form-section single-window-intake-card" aria-label="持卡机提交包导入">
       <div className="section-header">
-        <div><h2>导入待办提交包</h2><span>导入时校验当前档案、公司抬头、业务能力、文件摘要和 XML 完整性</span></div>
+        <div><h2>导入待办提交包</h2><span>导入时核对当前档案、公司抬头、业务类型和申报文件完整性</span></div>
         <button className="command-button" type="button" disabled={!canOperate || mutation.isPending || !packagePath.trim() || !activeProfile} onClick={() => mutation.mutate()}><Upload size={17} aria-hidden="true" /><span>导入并绑定当前档案</span></button>
       </div>
       {activeProfile ? (

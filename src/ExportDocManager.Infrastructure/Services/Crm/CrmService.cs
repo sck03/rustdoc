@@ -213,10 +213,12 @@ namespace ExportDocManager.Services.Crm
             entity.Email = Clean(request.Email);
             entity.Phone = Clean(request.Phone);
             entity.InstantMessaging = Clean(request.InstantMessaging);
-            entity.IsPrimary = request.IsPrimary;
+            bool makePrimary = request.IsPrimary;
+            entity.IsPrimary = false;
             entity.UpdatedAt = DateTimeOffset.UtcNow;
-            if (entity.IsPrimary)
+            if (makePrimary)
             {
+                await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
                 var previousPrimaryContacts = await context.CrmContacts
                     .Where(item => item.CrmCustomerId == request.CrmCustomerId && item.Id != entity.Id && item.IsPrimary)
                     .ToListAsync(cancellationToken);
@@ -226,8 +228,16 @@ namespace ExportDocManager.Services.Crm
                     previousPrimary.VersionNumber++;
                     previousPrimary.UpdatedAt = DateTimeOffset.UtcNow;
                 }
+
+                await SaveWithConcurrencyAsync(context, "联系人", cancellationToken);
+                entity.IsPrimary = true;
+                await SaveWithConcurrencyAsync(context, "联系人", cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
             }
-            await SaveWithConcurrencyAsync(context, "联系人", cancellationToken);
+            else
+            {
+                await SaveWithConcurrencyAsync(context, "联系人", cancellationToken);
+            }
             return new(entity.Id, entity.CrmCustomerId, entity.Name, entity.Title, entity.Email,
                 entity.Phone, entity.InstantMessaging, entity.IsPrimary, entity.VersionNumber);
         }
@@ -418,6 +428,12 @@ namespace ExportDocManager.Services.Crm
             catch (DbUpdateConcurrencyException exception)
             {
                 throw new BusinessConcurrencyException($"该{entityName}已被其他用户修改，请刷新后重试。", exception);
+            }
+            catch (DbUpdateException exception) when (entityName.Contains("联系人", StringComparison.Ordinal))
+            {
+                throw new BusinessConcurrencyException(
+                    $"该{entityName}的主要联系人已被其他用户调整，请刷新后重试。",
+                    exception);
             }
         }
     }

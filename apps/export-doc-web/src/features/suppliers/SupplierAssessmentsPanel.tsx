@@ -3,11 +3,12 @@ import type { ApiSupplierAssessmentDto, ExportDocManagerApiClient } from "../../
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { OperationFeedback, errorFeedback, requestErrorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
-import { TaskViewTabs } from "../../ui/TaskViewTabs.tsx";
-import { readApiError } from "../../ui/formUtils.ts";
+import { TaskViewTabs, getTaskViewPanelProps } from "../../ui/TaskViewTabs.tsx";
+import { currentLocalDateInputValue, readApiError } from "../../ui/formUtils.ts";
 import { SupplierAssessmentAnalytics } from "./SupplierAssessmentAnalytics.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
 type AssessmentView = "directory" | "analytics" | "editor";
 
@@ -23,7 +24,13 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
   const [selectedId, setSelectedId] = useState(0);
   const [view, setView] = useState<AssessmentView>("directory");
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
+  const [draftDirty, setDraftDirty] = useState(false);
   const selected = rows.find((item) => item.id === selectedId);
+  const tabsId = `supplier-assessment-${supplierId}`;
+  const { confirmDiscardChanges } = useUnsavedChangesGuard({
+    isDirty: draftDirty,
+    message: "当前供应商评价有未保存的修改。",
+  });
 
   async function load(preferredId?: number, signal?: AbortSignal) {
     const result = await client.listSupplierAssessments({ supplierId }, { signal });
@@ -34,10 +41,26 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
 
   useEffect(() => {
     const controller = new AbortController();
+    setDraftDirty(false);
     setView("directory");
     void load(undefined, controller.signal).catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); });
     return () => controller.abort();
   }, [client, supplierId]);
+
+  async function changeView(nextView: AssessmentView) {
+    if (nextView === view) return true;
+    if (!await confirmDiscardChanges("切换评价工作区")) return false;
+    setDraftDirty(false);
+    setView(nextView);
+    return true;
+  }
+
+  async function openEditor(nextSelectedId: number) {
+    if (!await confirmDiscardChanges(nextSelectedId ? "切换评价" : "记录新评价")) return;
+    setDraftDirty(false);
+    setSelectedId(nextSelectedId);
+    setView("editor");
+  }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,6 +86,7 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
         ? await client.updateSupplierAssessment({ supplierId, id, body })
         : await client.createSupplierAssessment({ supplierId, body });
       await load(saved.id);
+      setDraftDirty(false);
       setView("editor");
       setFeedback(successFeedback(id ? "供应商评价已更新。" : "供应商评价已记录。"));
     } catch (error) {
@@ -71,10 +95,11 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
   }
 
   async function remove() {
-    if (!canManage || !selected || !await requestConfirmation({ title: "删除供应商评价", description: `确定删除 ${selected.assessedAt.slice(0, 10)} 的供应商评价吗？`, confirmLabel: "确认删除", tone: "danger" })) return;
+    if (!canManage || !selected || !await requestConfirmation({ title: "删除供应商评价", description: `确定删除 ${selected.assessedAt.slice(0, 10)} 的供应商评价吗？`, confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除供应商评价")) return;
     try {
       await client.deleteSupplierAssessment({ supplierId, id: selected.id });
       await load();
+      setDraftDirty(false);
       setView("directory");
       setFeedback(successFeedback("供应商评价已删除。"));
     } catch (error) {
@@ -82,7 +107,7 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
     }
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = currentLocalDateInputValue();
   return <section className="form-section supplier-assessment-workspace">
     <div className="section-header">
       <div><h3>{view === "directory" ? "供应商评价记录" : view === "analytics" ? "供应商评价分析" : selected ? "编辑供应商评价" : "新增供应商评价"}</h3>
@@ -90,14 +115,14 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
       <span>{rows.length} 次</span>
     </div>
     <OperationFeedback feedback={feedback} />
-    <TaskViewTabs value={view} label="供应商评价工作区" onChange={setView} items={[
+    <TaskViewTabs idPrefix={tabsId} value={view} label="供应商评价工作区" onChange={changeView} items={[
       { id: "directory", label: "评价记录" },
       { id: "analytics", label: "趋势分析" },
       { id: "editor", label: selected ? canOperate ? "编辑评价" : "查看评价" : "记录评价", disabled: !selected && !canOperate },
     ]} />
-    {view === "directory" ? <>
+    {view === "directory" ? <div {...getTaskViewPanelProps(tabsId, "directory")}>
       <div className="section-header-actions supplier-assessment-actions">
-        {canOperate ? <button className="primary-button" type="button" onClick={() => { setSelectedId(0); setView("editor"); }}>记录新评价</button> : null}
+        {canOperate ? <button className="primary-button" type="button" onClick={() => void openEditor(0)}>记录新评价</button> : null}
       </div>
       <ResponsiveTableFrame label="供应商评价记录" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr>
         <th>日期与类型</th><th>综合分</th><th data-table-priority="secondary">质量</th><th data-table-priority="secondary">交期</th>
@@ -109,18 +134,18 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
           <td data-table-priority="secondary">{item.qualityScore}</td><td data-table-priority="secondary">{item.deliveryScore}</td>
           <td data-table-priority="secondary">{item.serviceScore}</td><td data-table-priority="secondary">{item.priceScore}</td>
           <td><BusinessStatusBadge value={item.conclusion} /></td><td><TablePrimaryText value={item.notes || "-"} secondary={item.assessedBy || undefined} /></td>
-          <td><button className="secondary-button" type="button" onClick={() => { setSelectedId(item.id); setView("editor"); }}>{canOperate ? "编辑" : "查看"}</button></td>
+          <td><button className="secondary-button" type="button" onClick={() => void openEditor(item.id)}>{canOperate ? "编辑" : "查看"}</button></td>
         </tr>)}
         {!rows.length ? <tr><td className="empty-cell" colSpan={9}><div className="empty-cell-content"><strong>尚未记录供应商评价</strong>
           <span>完成样品、订单或阶段合作后，再用四项评分留下可复核依据。</span>
-          {canOperate ? <button className="primary-button" type="button" onClick={() => { setSelectedId(0); setView("editor"); }}>记录第一次评价</button> : null}
+          {canOperate ? <button className="primary-button" type="button" onClick={() => void openEditor(0)}>记录第一次评价</button> : null}
         </div></td></tr> : null}
       </tbody></table></ResponsiveTableFrame>
-    </> : view === "analytics" ? <SupplierAssessmentAnalytics rows={rows} supplierName={supplierName}
-      onCreate={canOperate ? () => { setSelectedId(0); setView("editor"); } : undefined} /> : <form className="form-grid" key={selected?.id ?? `new-${supplierId}`} onSubmit={save}>
-      <div className="section-heading-row"><h4>{selected ? canOperate ? "编辑评价" : "查看评价" : "记录新评价"}</h4><button className="secondary-button" type="button" onClick={() => setView("directory")}>返回评价记录</button></div>
+    </div> : view === "analytics" ? <div {...getTaskViewPanelProps(tabsId, "analytics")}><SupplierAssessmentAnalytics rows={rows} supplierName={supplierName}
+      onCreate={canOperate ? () => void openEditor(0) : undefined} /></div> : <form className="form-grid" key={`${selected?.id ?? "new"}-${selected?.versionNumber ?? 0}-${supplierId}`} onSubmit={save} {...getTaskViewPanelProps(tabsId, "editor")}>
+      <div className="section-heading-row"><h4>{selected ? canOperate ? "编辑评价" : "查看评价" : "记录新评价"}</h4><button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回评价记录</button></div>
       <div className="form-field-wide context-strip"><strong>{supplierName}</strong><span>1 分表示明显不足，5 分表示表现优秀。</span></div>
-      <fieldset className="permission-fieldset form-field-wide" disabled={!canOperate}>
+      <fieldset className="permission-fieldset form-field-wide" disabled={!canOperate} onChangeCapture={() => setDraftDirty(true)}>
       <label>评价日期<input name="assessedAt" type="date" required max={today} defaultValue={selected?.assessedAt.slice(0, 10) ?? today} /></label>
       <label>评价类型<select name="assessmentKind" defaultValue={selected?.assessmentKind ?? "定期评价"}><option>定期评价</option><option>订单复盘</option><option>样品评估</option><option>其它</option></select></label>
       <ScoreField name="qualityScore" label="质量评分" value={selected?.qualityScore ?? 4} />

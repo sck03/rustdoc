@@ -284,6 +284,26 @@ namespace ExportDocManager.Services.SingleWindow
                     throw new InvalidDataException("没有可打包的有效单一窗口回执文件。");
                 }
 
+                var parsedReceiptReferences = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (string receiptFile in receiptFiles ?? [])
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string content = await File.ReadAllTextAsync(receiptFile, cancellationToken).ConfigureAwait(false);
+                    var parsed = _singleWindowReceiptParser.Parse(
+                        binding.BusinessType,
+                        content,
+                        Path.GetFileName(receiptFile));
+                    string referenceNo = parsed?.ReferenceNo?.Trim() ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(referenceNo))
+                    {
+                        parsedReceiptReferences.Add(referenceNo);
+                    }
+                }
+                if (parsedReceiptReferences.Count > 1)
+                {
+                    throw new InvalidDataException("所选回执文件包含多个不同的官方业务编号，不能打入同一批次回执包。" );
+                }
+
                 var manifest = new SingleWindowPackageManifest
                 {
                     PackageType = SingleWindowPackageType.ReceiptPackage,
@@ -299,6 +319,7 @@ namespace ExportDocManager.Services.SingleWindow
                     ContractNo = binding.ContractNo,
                     CompanyScope = binding.CompanyScope,
                     SourcePackageDigest = binding.SubmitPackageDigest,
+                    ReceiptReferenceNo = parsedReceiptReferences.SingleOrDefault() ?? string.Empty,
                     StationKey = binding.AssignedStationKey,
                     CardIdentifier = binding.AssignedCardIdentifier,
                     ClientProfileKey = binding.AssignedProfileKey,

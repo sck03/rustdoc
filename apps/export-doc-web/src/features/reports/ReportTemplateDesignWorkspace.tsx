@@ -67,7 +67,7 @@ export function ReportTemplateDesignWorkspace({
         </button>
       </div>
       <textarea
-        aria-label="模板源码"
+        aria-label="模板高级 HTML"
         value={content}
         disabled={sourceDisabled}
         spellCheck={false}

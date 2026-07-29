@@ -16,6 +16,14 @@ namespace ExportDocManager.Api.Hosting
     public sealed record ApiSupplierImportResultDto(int CreatedSuppliers, int CreatedContacts, int SkippedRows);
     public sealed record ApiSupplierBatchStatusRequest(IReadOnlyList<int> Ids, string Status);
     public sealed record ApiSupplierBatchStatusResult(int AffectedCount, string Status);
+    public sealed record ApiSupplierDeleteResponse(
+        bool Success,
+        bool Deleted,
+        bool Deactivated,
+        string Message,
+        int ContactCount,
+        int ProductLinkCount,
+        int AssessmentCount);
     public sealed record ApiSupplierProductOptionDto(int Id, string ProductCode, string NameCN, string NameEN);
     public sealed record ApiSupplierProductLinkDto(int Id, int SupplierCompanyId, int ProductId, string ProductCode,
         string ProductNameCN, string ProductNameEN, string SupplierProductCode, decimal ReferencePrice,

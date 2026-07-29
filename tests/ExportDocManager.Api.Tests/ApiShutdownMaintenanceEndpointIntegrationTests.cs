@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.Models;
+using ExportDocManager.Models.DTOs;
+using ExportDocManager.Services.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ExportDocManager.Api.Tests
 {
@@ -53,6 +56,33 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("不读取付款/报销业务表", result.StoragePolicy, StringComparison.Ordinal);
             Assert.False(File.Exists(oldLog));
             Assert.NotEmpty(Directory.GetFiles(result.BackupRoot, "*.zip", SearchOption.TopDirectoryOnly));
+        }
+
+        [Fact]
+        public async Task ShutdownMaintenanceEndpoint_ShouldReportServiceMaintenanceFailure()
+        {
+            const string desktopToken = "desktop-secret";
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-shutdown-maintenance-failure",
+                "api-shutdown-maintenance-failure.db",
+                desktopToken,
+                configureServices: services => services.AddSingleton<IShutdownMaintenanceService>(
+                    new FixedShutdownMaintenanceService(new ShutdownMaintenanceResult
+                    {
+                        CloudSyncErrorMessage = "database backup failed"
+                    })));
+            using var desktopClient = harness.CreateClient(desktopAccessToken: desktopToken);
+
+            var response = await desktopClient.PostAsync(
+                "/api/system/shutdown-maintenance",
+                content: null);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await ApiIntegrationTestHarness.ReadJsonAsync<ApiShutdownMaintenanceResponse>(response);
+            Assert.False(result.Success);
+            Assert.True(result.CloudSyncFailed);
+            Assert.Contains("database backup failed", result.Message, StringComparison.Ordinal);
+            Assert.Contains("database backup failed", result.CloudSyncErrorMessage, StringComparison.Ordinal);
         }
 
         [Fact]
@@ -142,6 +172,21 @@ namespace ExportDocManager.Api.Tests
                 updateSecrets = false
             });
             Assert.Equal(HttpStatusCode.OK, saveResponse.StatusCode);
+        }
+
+        private sealed class FixedShutdownMaintenanceService : IShutdownMaintenanceService
+        {
+            private readonly ShutdownMaintenanceResult _result;
+
+            public FixedShutdownMaintenanceService(ShutdownMaintenanceResult result)
+            {
+                _result = result;
+            }
+
+            public Task<ShutdownMaintenanceResult> RunAsync(CancellationToken cancellationToken = default)
+            {
+                return Task.FromResult(_result);
+            }
         }
     }
 }

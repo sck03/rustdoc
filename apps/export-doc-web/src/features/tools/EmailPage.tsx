@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Paperclip, RefreshCw, Send, Settings, Trash2 } from "lucide-react";
@@ -15,6 +15,8 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { readEmailDraftNavigationState } from "./emailDraftNavigation.ts";
+import { EmailRichTextEditor } from "../../ui/EmailRichTextEditor.tsx";
+import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
 type MessageState = {
   kind: "success" | "error";
@@ -31,6 +33,8 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
   const [attachmentsText, setAttachmentsText] = useState("");
   const [message, setMessage] = useState<MessageState | null>(null);
   const [sendResult, setSendResult] = useState<ApiEmailSendResponse | null>(null);
+  const [lastSentDraftSnapshot, setLastSentDraftSnapshot] = useState("");
+  const submittedDraftSnapshotRef = useRef("");
   const isDesktopRuntime = isDesktopBridgeAvailable();
 
   useEffect(() => {
@@ -65,6 +69,9 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
       }),
     onSuccess: (response) => {
       setSendResult(response);
+      if (response.success) {
+        setLastSentDraftSnapshot(submittedDraftSnapshotRef.current);
+      }
       setMessage({
         kind: response.success ? "success" : "error",
         text: response.message || "邮件发送完成。",
@@ -81,6 +88,17 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
     () => isDesktopRuntime ? normalizeAttachmentPaths(attachmentsText) : [],
     [attachmentsText, isDesktopRuntime],
   );
+  const currentDraftSnapshot = JSON.stringify({
+    toAddress: toAddress.trim(),
+    subject: subject.trim(),
+    body,
+    attachmentPaths,
+  });
+  const hasDraftContent = Boolean(toAddress.trim() || subject.trim() || body.trim() || attachmentPaths.length);
+  const { confirmDiscardChanges } = useUnsavedChangesGuard({
+    isDirty: hasDraftContent && currentDraftSnapshot !== lastSentDraftSnapshot,
+    message: "当前邮件有尚未发送的内容。",
+  });
   const isBusy = statusQuery.isFetching || sendMutation.isPending;
   const canSend = emailPermission.canOperate && Boolean(status?.isConfigured && toAddress.trim()) && !isBusy;
   const statusLabel = status ? (status.isConfigured ? "SMTP 已配置" : "SMTP 未配置") : "读取中";
@@ -123,7 +141,12 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
 
     setMessage(null);
     setSendResult(null);
+    submittedDraftSnapshotRef.current = currentDraftSnapshot;
     sendMutation.mutate();
+  }
+
+  async function openEmailSettings() {
+    if (await confirmDiscardChanges("打开邮件设置")) navigate("/settings?section=email");
   }
 
   return (
@@ -135,7 +158,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
         </div>
         <div className="toolbar-actions">
           {!status?.isConfigured ? (
-            <button className="icon-button" type="button" title="配置邮件服务" aria-label="配置邮件服务" onClick={() => navigate("/settings?section=email")}>
+            <button className="icon-button" type="button" title="配置邮件服务" aria-label="配置邮件服务" onClick={() => void openEmailSettings()}>
               <Settings size={18} aria-hidden="true" />
             </button>
           ) : null}
@@ -191,10 +214,14 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
             <span>主题</span>
             <input value={subject} disabled={!emailPermission.canOperate} onChange={(event) => setSubject(event.target.value)} />
           </label>
-          <label className="textarea-field email-body-field">
-            <span>正文</span>
-            <textarea value={body} disabled={!emailPermission.canOperate} onChange={(event) => setBody(event.target.value)} />
-          </label>
+          <div className="email-body-field email-rich-text-field">
+            <span className="email-rich-text-field-label">正文</span>
+            <EmailRichTextEditor value={body} disabled={!emailPermission.canOperate} ariaLabel="待发送邮件正文" onChange={setBody} />
+            <details className="email-html-advanced">
+              <summary>高级 HTML</summary>
+              <textarea aria-label="待发送邮件高级 HTML" value={body} disabled={!emailPermission.canOperate} onChange={(event) => setBody(event.target.value)} />
+            </details>
+          </div>
         </section>
 
         {isDesktopRuntime ? <section className="form-section email-attachment-section" aria-label="邮件附件">

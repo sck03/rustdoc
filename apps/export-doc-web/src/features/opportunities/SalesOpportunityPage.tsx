@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { ApiCrmCustomerDto, ApiProductDto, ApiSalesOpportunityDto, ApiSalesOpportunityHistoryDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
-import { TaskViewTabs } from "../../ui/TaskViewTabs.tsx";
+import { TaskViewTabs, getTaskViewPanelProps } from "../../ui/TaskViewTabs.tsx";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { OperationFeedback, errorFeedback, requestErrorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
@@ -12,8 +12,10 @@ import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { FormGuidance, PermissionNotice } from "../../ui/PageState.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
+import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
 const stages = ["线索", "需求确认", "已报价", "谈判中", "已成交", "已失单"];
+const opportunityTabsId = "sales-opportunity-workspace";
 
 export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiClient }) {
   const opportunityPermission = useModulePermission("sales.opportunities");
@@ -34,23 +36,43 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
   const [revision, setRevision] = useState(0);
   const [history, setHistory] = useState<ApiSalesOpportunityHistoryDto[]>([]);
   const [view, setView] = useState<"directory" | "editor" | "history">(readOpportunityView(searchParams.get("view")));
+  const [draftDirty, setDraftDirty] = useState(false);
   const customerSearchController = useRef<AbortController | null>(null);
   const productSearchController = useRef<AbortController | null>(null);
+  const { confirmDiscardChanges } = useUnsavedChangesGuard({
+    isDirty: draftDirty,
+    message: "当前商机有未保存的修改。",
+  });
   const customerOptions = useMemo(() => selected && !customers.some((item) => item.id === selected.crmCustomerId)
     ? [{ id: selected.crmCustomerId, name: selected.customerName } as ApiCrmCustomerDto, ...customers] : customers, [customers, selected]);
   const productOptions = useMemo(() => selected?.productId && !products.some((item) => item.id === selected.productId)
     ? [{ id: selected.productId, productCode: selected.productCode ?? "", nameCN: selected.productName ?? "", nameEN: "" } as ApiProductDto, ...products] : products, [products, selected]);
 
-  function changeView(nextView: "directory" | "editor" | "history") {
+  function applyView(nextView: "directory" | "editor" | "history") {
     setView(nextView);
-    if (nextView === "history") return;
     setSearchParams(nextView === "directory" ? {} : { view: nextView }, { replace: true });
+  }
+
+  async function changeView(nextView: "directory" | "editor" | "history") {
+    if (nextView === view) return true;
+    if (!await confirmDiscardChanges("切换商机工作区")) return false;
+    setDraftDirty(false);
+    applyView(nextView);
+    return true;
   }
 
   useEffect(() => {
     const requestedView = readOpportunityView(searchParams.get("view"));
-    setView((current) => current === requestedView ? current : requestedView);
-  }, [searchParams]);
+    if (requestedView === view) return;
+    void (async () => {
+      if (!await confirmDiscardChanges("切换商机工作区")) {
+        setSearchParams(view === "directory" ? {} : { view }, { replace: true });
+        return;
+      }
+      setDraftDirty(false);
+      setView(requestedView);
+    })();
+  }, [confirmDiscardChanges, searchParams, setSearchParams, view]);
 
   const pageQuery = usePagedDirectoryQuery(
     ["sales-opportunities", keyword, stage, pageNumber, pageSize, revision],
@@ -118,6 +140,7 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
     try {
       const saved = id ? await client.updateSalesOpportunity({ id, body }) : await client.createSalesOpportunity({ body });
       setSelected(saved);
+      setDraftDirty(false);
       if (keyword || stage || pageNumber !== 1) {
         setKeywordInput(""); setKeyword(""); setStage(""); setPageNumber(1);
       }
@@ -127,20 +150,26 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
   }
 
   async function remove() {
-    if (!opportunityPermission.canManage || !selected || !await requestConfirmation({ title: "删除商机", description: `确定删除商机“${selected.title}”吗？`, details: ["客户和产品资料将保留。"], confirmLabel: "确认删除", tone: "danger" })) return;
-    try { await client.deleteSalesOpportunity({ id: selected.id }); setSelected(null); changeView("directory"); setRevision((value) => value + 1); setFeedback(successFeedback("商机已删除，客户和产品保持不变。")); }
+    if (!opportunityPermission.canManage || !selected || !await requestConfirmation({ title: "删除商机", description: `确定删除商机“${selected.title}”吗？`, details: ["客户和产品资料将保留。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除商机")) return;
+    try { await client.deleteSalesOpportunity({ id: selected.id }); setDraftDirty(false); setSelected(null); applyView("directory"); setRevision((value) => value + 1); setFeedback(successFeedback("商机已删除，客户和产品保持不变。")); }
     catch (error) { setFeedback(requestErrorFeedback(error)); }
+  }
+
+  async function openCustomerProfile() {
+    if (!await confirmDiscardChanges("打开客户资料")) return;
+    setDraftDirty(false);
+    navigate("/crm/follow-ups?view=profile");
   }
 
   return <section className="work-surface">
     <div className="section-heading-row"><div><h2>商机与报价跟踪</h2><p>记录销售阶段和最近报价信息，不替代正式报价文件、发票或单证。</p></div></div>
     <OperationFeedback feedback={feedback} />
     {!opportunityPermission.canOperate ? <PermissionNotice>当前权限模板仅允许查看商机；新建、修改和阶段更新已禁用。</PermissionNotice> : null}
-    <TaskViewTabs value={view} label="商机工作区" onChange={changeView} items={[
+    <TaskViewTabs idPrefix={opportunityTabsId} value={view} label="商机工作区" onChange={changeView} items={[
       { id: "directory", label: "商机目录" }, { id: "editor", label: selected ? opportunityPermission.canOperate ? "编辑商机" : "查看商机" : "新建商机", disabled: !selected && !opportunityPermission.canOperate },
       { id: "history", label: "版本历史", disabled: !selected },
     ]} />
-    {view === "directory" ? <section className="form-section"><div className="section-header"><div><h3>商机目录</h3><p className="section-description">按客户、阶段和报价编号查找销售机会。</p></div><div className="section-header-actions"><span>共 {page?.totalCount ?? 0} 项</span>{opportunityPermission.canOperate ? <button className="primary-button" type="button" onClick={() => { setSelected(null); changeView("editor"); }}>新建商机</button> : null}</div></div>
+    {view === "directory" ? <section className="form-section" {...getTaskViewPanelProps(opportunityTabsId, "directory")}><div className="section-header"><div><h3>商机目录</h3><p className="section-description">按客户、阶段和报价编号查找销售机会。</p></div><div className="section-header-actions"><span>共 {page?.totalCount ?? 0} 项</span>{opportunityPermission.canOperate ? <button className="primary-button" type="button" onClick={() => { setSelected(null); changeView("editor"); }}>新建商机</button> : null}</div></div>
       <form className="toolbar" onSubmit={(event) => { event.preventDefault(); setKeyword(keywordInput.trim()); setPageNumber(1); }}>
         <input value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} placeholder="搜索商机、客户、产品或报价编号" />
         <select value={stage} onChange={(event) => { setStage(event.target.value); setPageNumber(1); }}><option value="">全部阶段</option>{stages.map((item) => <option key={item}>{item}</option>)}</select>
@@ -153,13 +182,15 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
       </tbody></table></ResponsiveTableFrame>
       <ListPaginationControls pageNumber={pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={pageQuery.isFetching} onPageChange={setPageNumber} onPageSizeChange={(value) => { setPageSize(value); setPageNumber(1); }} />
     </section> : null}
-    {view === "editor" ? <form className="form-grid" key={selected?.id ?? "new"} onSubmit={save}>
+    {view === "editor" ? <form className="form-grid" key={`${selected?.id ?? "new"}-${selected?.versionNumber ?? 0}`} onSubmit={save} {...getTaskViewPanelProps(opportunityTabsId, "editor")}>
       <div className="section-header"><h3>{selected ? opportunityPermission.canOperate ? "编辑商机" : "查看商机" : "新建商机"}</h3><span>轻量销售跟踪</span></div>
-      {!customers.length ? <FormGuidance className="form-field-wide" title="先建立一位销售客户" description="商机必须归属 CRM 客户，不会写入原单证客户资料。" action={opportunityPermission.canOperate ? <button className="primary-button" type="button" onClick={() => navigate("/crm/follow-ups?view=profile")}>建立客户资料</button> : undefined} /> : null}
-      <fieldset className="permission-fieldset form-field-wide" disabled={!opportunityPermission.canOperate}>
+      {!customers.length ? <FormGuidance className="form-field-wide" title="先建立一位销售客户" description="商机必须归属 CRM 客户，不会写入原单证客户资料。" action={opportunityPermission.canOperate ? <button className="primary-button" type="button" onClick={() => void openCustomerProfile()}>建立客户资料</button> : undefined} /> : null}
+      <fieldset className="permission-fieldset form-field-wide" disabled={!opportunityPermission.canOperate} onChangeCapture={(event) => {
+        if (!(event.target instanceof Element) || !event.target.closest("[data-draft-ignore]")) setDraftDirty(true);
+      }}>
       <fieldset className="form-section-block">
         <legend>基本信息</legend>
-        <label className="form-field-wide">CRM 客户<div className="toolbar"><input value={customerKeyword} onChange={(event) => setCustomerKeyword(event.target.value)} placeholder="搜索客户" /><button className="secondary-button" type="button" onClick={() => void searchCustomers()}>查找</button></div><select name="crmCustomerId" required defaultValue={selected?.crmCustomerId ?? ""}><option value="">请选择客户</option>{customerOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="form-field-wide">CRM 客户<div className="toolbar" data-draft-ignore><input value={customerKeyword} onChange={(event) => setCustomerKeyword(event.target.value)} placeholder="搜索客户" /><button className="secondary-button" type="button" onClick={() => void searchCustomers()}>查找</button></div><select name="crmCustomerId" required defaultValue={selected?.crmCustomerId ?? ""}><option value="">请选择客户</option>{customerOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label className="form-field-wide">商机名称<input name="title" required maxLength={200} defaultValue={selected?.title} placeholder="例如：2026 秋季服装订单" /></label>
         <label>当前阶段<select name="stage" defaultValue={selected?.stage ?? "线索"}>{stages.map((item) => <option key={item}>{item}</option>)}</select></label>
       </fieldset>
@@ -170,7 +201,7 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
         <label>币种<input name="currency" maxLength={3} defaultValue={selected?.currency ?? "USD"} /></label>
         <label>成交概率（%）<input name="probabilityPercent" type="number" min="0" max="100" defaultValue={selected?.probabilityPercent ?? 0} /></label>
         <label>预计成交日<input name="expectedCloseDate" type="date" defaultValue={selected?.expectedCloseAt?.slice(0, 10)} /></label>
-        <label className="form-field-wide">关联产品（可选）<div className="toolbar"><input value={productKeyword} onChange={(event) => setProductKeyword(event.target.value)} placeholder="搜索产品货号或名称" /><button className="secondary-button" type="button" onClick={() => void searchProducts()}>查找</button></div><select name="productId" defaultValue={selected?.productId ?? 0}><option value={0}>不关联产品</option>{productOptions.map((item) => <option key={item.id} value={item.id}>{item.productCode || "无货号"} · {item.nameCN || item.nameEN || "未命名"}</option>)}</select></label>
+        <label className="form-field-wide">关联产品（可选）<div className="toolbar" data-draft-ignore><input value={productKeyword} onChange={(event) => setProductKeyword(event.target.value)} placeholder="搜索产品货号或名称" /><button className="secondary-button" type="button" onClick={() => void searchProducts()}>查找</button></div><select name="productId" defaultValue={selected?.productId ?? 0}><option value={0}>不关联产品</option>{productOptions.map((item) => <option key={item.id} value={item.id}>{item.productCode || "无货号"} · {item.nameCN || item.nameEN || "未命名"}</option>)}</select></label>
       </fieldset>
       <fieldset className="form-section-block">
         <legend>下一步</legend>
@@ -183,7 +214,7 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
       </fieldset>
       <div className="form-actions">{opportunityPermission.canOperate ? <button className="primary-button" type="submit">保存商机</button> : null}{selected ? <button className="secondary-button" type="button" onClick={() => changeView("history")}>查看版本历史</button> : null}{selected && opportunityPermission.canManage ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除商机</button> : null}</div>
     </form> : null}
-    {selected && view === "history" ? <section className="form-section"><div className="section-header"><h3>阶段与报价版本历史</h3><span>{history.length} 个版本</span></div>
+    {selected && view === "history" ? <section className="form-section" {...getTaskViewPanelProps(opportunityTabsId, "history")}><div className="section-header"><h3>阶段与报价版本历史</h3><span>{history.length} 个版本</span></div>
       <ResponsiveTableFrame label="商机版本历史" mobileLayout="scroll"><table className="data-table"><thead><tr><th>版本</th><th>类型</th><th>阶段</th><th>报价编号</th><th>金额</th><th>概率</th><th>变更说明</th><th>操作信息</th></tr></thead><tbody>
         {history.map((item) => <tr key={item.id}><td>V{item.versionNumber}</td><td>{item.changeType}</td><td><BusinessStatusBadge value={item.stage} /></td><td>{item.quotationNo || "-"}</td><td>{item.currency} {item.estimatedAmount.toFixed(2)}</td><td>{item.probabilityPercent}%</td><td>{item.changeNote || "-"}</td><td>{item.changedBy || "-"}<br /><small>{new Date(item.createdAt).toLocaleString("zh-CN", { hour12: false })}</small></td></tr>)}
         {!history.length ? <tr><td className="empty-cell" colSpan={8}>暂无版本历史。</td></tr> : null}
@@ -193,5 +224,5 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
 }
 
 function readOpportunityView(value: string | null): "directory" | "editor" | "history" {
-  return value === "editor" ? "editor" : "directory";
+  return value === "editor" || value === "history" ? value : "directory";
 }

@@ -54,9 +54,11 @@ namespace ExportDocManager.Services.EmailTemplates
             string name = Required(request.Name, "模板名称");
             string category = string.IsNullOrWhiteSpace(request.Category) ? "通用" : request.Category.Trim();
             string subject = Clean(request.Subject);
-            string bodyHtml = Clean(request.BodyHtml);
-            if (name.Length > 150 || category.Length > 50 || subject.Length > 300 || bodyHtml.Length > 10000)
+            string rawBodyHtml = Clean(request.BodyHtml);
+            if (name.Length > 150 || category.Length > 50 || subject.Length > 300 || rawBodyHtml.Length > 10000)
                 throw new ArgumentException("邮件模板字段超过允许长度。");
+            string bodyHtml = EmailTemplateHtmlPolicy.Sanitize(rawBodyHtml);
+            if (bodyHtml.Length > 10000) throw new ArgumentException("邮件模板正文超过允许长度。");
 
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             EmailTemplate entity;
@@ -143,7 +145,7 @@ namespace ExportDocManager.Services.EmailTemplates
             entity.Name = source.Name;
             entity.Category = source.Category;
             entity.Subject = source.Subject;
-            entity.BodyHtml = source.BodyHtml;
+            entity.BodyHtml = EmailTemplateHtmlPolicy.Sanitize(source.BodyHtml);
             entity.IsActive = source.IsActive;
             entity.IsShared = source.IsShared;
             entity.VersionNumber = Math.Max(1, entity.VersionNumber + 1);
@@ -186,7 +188,7 @@ namespace ExportDocManager.Services.EmailTemplates
             ArgumentNullException.ThrowIfNull(request);
             var supplied = request.Variables ?? new Dictionary<string, string>();
             string subject = request.Subject ?? string.Empty;
-            string body = request.BodyHtml ?? string.Empty;
+            string body = EmailTemplateHtmlPolicy.Sanitize(request.BodyHtml);
             foreach (var variable in Variables)
             {
                 supplied.TryGetValue(variable.Key, out string value);

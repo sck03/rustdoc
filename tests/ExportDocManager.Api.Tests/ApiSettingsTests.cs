@@ -340,6 +340,34 @@ namespace ExportDocManager.Api.Tests
             Assert.False(ApiSettingsDtoFactory.RequiresRestartForSystemSettingsChange(current, current));
         }
 
+        [Theory]
+        [InlineData("..\\outside.db")]
+        [InlineData("C:\\Windows\\system32\\exportdoc.db")]
+        [InlineData("tenant/data.db")]
+        public void PrepareForSave_ShouldRejectSqlitePathsOutsideRuntimeDatabaseDirectory(string value)
+        {
+            var request = new AppSettings
+            {
+                System = new SystemSettings
+                {
+                    DatabaseProvider = DatabaseConnectionSettings.SqliteProvider,
+                    SqliteDatabaseFileName = value
+                }
+            };
+
+            Assert.Throws<ArgumentException>(() =>
+                ApiSettingsDtoFactory.PrepareForSave(request, new AppSettings(), updateSecrets: false));
+
+            var validation = ApiSettingsDtoFactory.ValidateDraft(request, new AppSettings(), updateSecrets: false);
+            Assert.False(validation.IsValid);
+            Assert.True(validation.CanAutoFix);
+            Assert.Equal(DatabaseConnectionSettings.DefaultSqliteDatabaseFileName,
+                validation.NormalizedSettings.System.SqliteDatabaseFileName);
+            Assert.Contains(validation.Messages, message =>
+                message.PropertyName == "system.sqliteDatabaseFileName" &&
+                message.Level == "error");
+        }
+
         [Fact]
         public void RequiresRestartForSystemSettingsChange_UpdaterEndpointOnly_ShouldNotRequireRestart()
         {

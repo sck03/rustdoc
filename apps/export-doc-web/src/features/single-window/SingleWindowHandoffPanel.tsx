@@ -87,7 +87,7 @@ export function SingleWindowHandoffPanel({ businessType, client, invoiceId, canO
       <div className="single-window-handoff-guidance">
         <span>1. 当前页面完成字段复核</span>
         <span>2. 导出带公司绑定和完整性摘要的提交包</span>
-        <span>3. 对应公司的持卡机将 XML 写入交接 OutBox，操作员再在官方客户端确认导入和提交</span>
+        <span>3. 对应公司的持卡机把申报文件送入官方客户端待导入目录，操作员再确认导入和提交</span>
         <span>4. 持卡机导出回执包，办公室系统再导入归档</span>
       </div>
       {message ? <InlineNotice tone={exportMutation.isError ? "error" : "success"}>{message}</InlineNotice> : null}

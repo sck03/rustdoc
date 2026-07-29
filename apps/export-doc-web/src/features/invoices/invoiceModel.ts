@@ -1,5 +1,5 @@
 import { ApiInvoiceDetailDto, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
-import { dateInputToApiDate, readNumber, toDateInputValue } from "../../ui/formUtils.ts";
+import { currentLocalDateInputValue, dateInputToApiDate, readNumber, toDateInputValue } from "../../ui/formUtils.ts";
 import {
   calculateInvoiceTotals,
   createEmptyInvoiceItem,
@@ -84,7 +84,7 @@ export function canTransitionInvoiceStatus(value?: string, target?: string) {
 }
 
 export function createEmptyInvoice(): ApiInvoiceDetailDto {
-  const today = dateInputToApiDate(new Date().toISOString().slice(0, 10));
+  const today = dateInputToApiDate(currentLocalDateInputValue());
 
   return {
     id: 0,

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { ApiCrmCustomerDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { readApiError } from "../../ui/formUtils.ts";
+import { currentLocalDateInputValue, readApiError } from "../../ui/formUtils.ts";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { OperationFeedback, errorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
@@ -50,7 +50,7 @@ export function CrmCustomerDirectoryPanel({ client, canOperate, onCreateCustomer
     try {
       const blob = await client.exportCrmCustomers({ keyword, status });
       const url = URL.createObjectURL(blob); const anchor = document.createElement("a");
-      anchor.href = url; anchor.download = `crm-customers-${new Date().toISOString().slice(0, 10)}.xlsx`; anchor.click();
+      anchor.href = url; anchor.download = `crm-customers-${currentLocalDateInputValue()}.xlsx`; anchor.click();
       URL.revokeObjectURL(url); setFeedback(successFeedback("CRM 客户与主要联系人 Excel 已生成。"));
     } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
   }

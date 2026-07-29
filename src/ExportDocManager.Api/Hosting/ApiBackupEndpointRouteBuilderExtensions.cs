@@ -53,14 +53,17 @@ namespace ExportDocManager.Api.Hosting
                     return WriteForbidden("只有管理员可以创建数据库备份。");
                 }
 
-                await backupService.BackupDatabaseAsync();
+                var backupResult = await backupService.BackupDatabaseAsync(context.RequestAborted);
                 var list = CreateBackupListResponse(backupService, pathProvider);
-                return Results.Ok(new ApiBackupCreateResponse(
-                    true,
-                    list.Backups.Count > 0 ? "数据库备份已创建。" : "未创建新的本地 SQLite 备份。",
+                var response = new ApiBackupCreateResponse(
+                    backupResult.Success,
+                    backupResult.Message,
                     list.Backups,
                     list.BackupRoot,
-                    list.StoragePolicy));
+                    list.StoragePolicy);
+                return backupResult.Success || backupResult.Skipped
+                    ? Results.Ok(response)
+                    : WriteConflict(backupResult.Message);
             })
             .WithName("CreateDatabaseBackup");
 
@@ -104,7 +107,7 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("CleanupDatabaseBackups");
 
-            endpoints.MapPost("/api/backup/restore", (
+            endpoints.MapPost("/api/backup/restore", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -139,8 +142,14 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    backupService.RestoreDatabase(backupPath);
-                    return Results.Ok(new ApiCommandResponse(true, "数据库已从备份还原，请重启桌面程序后继续使用。"));
+                    var result = await backupService
+                        .ScheduleRestoreAsync(backupPath, context.RequestAborted)
+                        .ConfigureAwait(false);
+                    return Results.Ok(new ApiCommandResponse(result.Success, result.Message));
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {

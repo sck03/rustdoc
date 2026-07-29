@@ -1,5 +1,6 @@
 import { ApiPaymentDto } from "../../api/index.ts";
 import {
+  currentLocalDateInputValue,
   dateInputToApiDate,
   normalizeText,
   numberValue,
@@ -7,7 +8,7 @@ import {
 } from "../../ui/formUtils.ts";
 
 export function createEmptyPayment(): ApiPaymentDto {
-  const today = dateInputToApiDate(new Date().toISOString().slice(0, 10));
+  const today = dateInputToApiDate(currentLocalDateInputValue());
 
   return {
     id: 0,
@@ -66,7 +67,7 @@ export function normalizePaymentForSave(payment: ApiPaymentDto, id: number): Api
 }
 
 function normalizeRequiredDate(value?: string) {
-  return dateInputToApiDate(toDateInputValue(value) || new Date().toISOString().slice(0, 10));
+  return dateInputToApiDate(toDateInputValue(value) || currentLocalDateInputValue());
 }
 
 function normalizeOptionalDate(value?: string) {

@@ -127,6 +127,148 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task RunAsync_WhenNewBackupFails_ShouldNotUploadAnOlderBackup()
+        {
+            string root = CreateTestRoot("shutdown-maintenance-backup-error");
+            try
+            {
+                string appRoot = Path.Combine(root, "app");
+                string dataRoot = Path.Combine(root, "data");
+                string backupRoot = Path.Combine(dataRoot, "Backups");
+                Directory.CreateDirectory(Path.Combine(dataRoot, "Logs"));
+                Directory.CreateDirectory(backupRoot);
+                string oldBackupPath = Path.Combine(backupRoot, "old_data.zip");
+                await File.WriteAllTextAsync(oldBackupPath, "old backup");
+
+                var settingsService = new TestSettingsService(new AppSettings
+                {
+                    System = new SystemSettings { BackupRetentionDays = 7 },
+                    WebDav = new WebDavSettings { Enabled = true }
+                });
+                var backupService = new TestBackupService([oldBackupPath])
+                {
+                    BackupResult = new DatabaseBackupResult(
+                        Success: false,
+                        Skipped: false,
+                        Message: "database is locked",
+                        FilePath: string.Empty)
+                };
+                var cloudSyncService = new TestCloudSyncService();
+                var service = new ShutdownMaintenanceService(
+                    settingsService,
+                    backupService,
+                    cloudSyncService,
+                    new TestAuditLogService(0),
+                    new TestAppPathProvider(appRoot, dataRoot));
+
+                var result = await service.RunAsync();
+
+                Assert.True(result.CloudSyncFailed);
+                Assert.Contains("database is locked", result.CloudSyncErrorMessage, StringComparison.Ordinal);
+                Assert.Equal(string.Empty, result.UploadedBackupFileName);
+                Assert.Equal(string.Empty, cloudSyncService.UploadedLocalPath);
+                Assert.True(File.Exists(oldBackupPath));
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(root);
+            }
+        }
+
+        [Fact]
+        public async Task RunAsync_WhenReportedBackupFileIsMissing_ShouldNotFallBackToAnOlderBackup()
+        {
+            string root = CreateTestRoot("shutdown-maintenance-missing-new-backup");
+            try
+            {
+                string appRoot = Path.Combine(root, "app");
+                string dataRoot = Path.Combine(root, "data");
+                string backupRoot = Path.Combine(dataRoot, "Backups");
+                Directory.CreateDirectory(Path.Combine(dataRoot, "Logs"));
+                Directory.CreateDirectory(backupRoot);
+                string oldBackupPath = Path.Combine(backupRoot, "old_data.zip");
+                await File.WriteAllTextAsync(oldBackupPath, "old backup");
+                string missingNewBackupPath = Path.Combine(backupRoot, "new_data.zip");
+
+                var settingsService = new TestSettingsService(new AppSettings
+                {
+                    System = new SystemSettings { BackupRetentionDays = 7 },
+                    WebDav = new WebDavSettings { Enabled = true }
+                });
+                var backupService = new TestBackupService([oldBackupPath])
+                {
+                    BackupResult = new DatabaseBackupResult(
+                        Success: true,
+                        Skipped: false,
+                        Message: "ok",
+                        FilePath: missingNewBackupPath)
+                };
+                var cloudSyncService = new TestCloudSyncService();
+                var service = new ShutdownMaintenanceService(
+                    settingsService,
+                    backupService,
+                    cloudSyncService,
+                    new TestAuditLogService(0),
+                    new TestAppPathProvider(appRoot, dataRoot));
+
+                var result = await service.RunAsync();
+
+                Assert.True(result.CloudSyncFailed);
+                Assert.Contains("新创建的数据库备份文件不存在", result.CloudSyncErrorMessage, StringComparison.Ordinal);
+                Assert.Equal(string.Empty, cloudSyncService.UploadedLocalPath);
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(root);
+            }
+        }
+
+        [Fact]
+        public async Task RunAsync_WhenReportedBackupIsOutsideRuntimeBackupRoot_ShouldRejectUpload()
+        {
+            string root = CreateTestRoot("shutdown-maintenance-outside-backup");
+            try
+            {
+                string appRoot = Path.Combine(root, "app");
+                string dataRoot = Path.Combine(root, "data");
+                Directory.CreateDirectory(Path.Combine(dataRoot, "Logs"));
+                string outsideBackupPath = Path.Combine(root, "outside.zip");
+                await File.WriteAllTextAsync(outsideBackupPath, "outside backup");
+
+                var settingsService = new TestSettingsService(new AppSettings
+                {
+                    System = new SystemSettings { BackupRetentionDays = 7 },
+                    WebDav = new WebDavSettings { Enabled = true }
+                });
+                var backupService = new TestBackupService([])
+                {
+                    BackupResult = new DatabaseBackupResult(
+                        Success: true,
+                        Skipped: false,
+                        Message: "ok",
+                        FilePath: outsideBackupPath)
+                };
+                var cloudSyncService = new TestCloudSyncService();
+                var service = new ShutdownMaintenanceService(
+                    settingsService,
+                    backupService,
+                    cloudSyncService,
+                    new TestAuditLogService(0),
+                    new TestAppPathProvider(appRoot, dataRoot));
+
+                var result = await service.RunAsync();
+
+                Assert.True(result.CloudSyncFailed);
+                Assert.Contains("运行数据根 Backups", result.CloudSyncErrorMessage, StringComparison.Ordinal);
+                Assert.Equal(string.Empty, cloudSyncService.UploadedLocalPath);
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(root);
+            }
+        }
+
+        [Fact]
         public async Task CleanAsync_ShouldCleanAuditLogsAndRuntimeDataTextLogs()
         {
             string root = CreateTestRoot("system-log-cleanup");
@@ -235,10 +377,16 @@ namespace ExportDocManager.Infrastructure.Tests
 
             public bool BackupDatabaseCalled { get; private set; }
 
-            public Task BackupDatabaseAsync()
+            public DatabaseBackupResult BackupResult { get; init; }
+
+            public Task<DatabaseBackupResult> BackupDatabaseAsync(CancellationToken cancellationToken = default)
             {
                 BackupDatabaseCalled = true;
-                return Task.CompletedTask;
+                return Task.FromResult(BackupResult ?? new DatabaseBackupResult(
+                    Success: true,
+                    Skipped: false,
+                    Message: "ok",
+                    FilePath: _availableBackups.FirstOrDefault() ?? string.Empty));
             }
 
             public void CleanOldBackups(int daysToKeep)
@@ -251,7 +399,9 @@ namespace ExportDocManager.Infrastructure.Tests
                 return _availableBackups;
             }
 
-            public void RestoreDatabase(string backupFilePath)
+            public Task<DatabaseRestoreScheduleResult> ScheduleRestoreAsync(
+                string backupFilePath,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
@@ -152,6 +153,39 @@ public sealed class SettingsServiceTests
 
             Assert.Contains("JSON 损坏", error.Message, StringComparison.Ordinal);
             Assert.Equal(corruptedJson, await File.ReadAllTextAsync(settingsPath));
+        }
+        finally
+        {
+            TryDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task LoadAsync_WhenSqlitePathEscapesRuntimeDatabaseRoot_ShouldFailWithoutReplacingFile()
+    {
+        string root = CreateTempRoot();
+        try
+        {
+            var paths = new RuntimeAppPathProvider(root, Path.Combine(root, "App_Data"));
+            string settingsPath = Path.Combine(paths.ConfigRoot, "appsettings.json");
+            var settings = new AppSettings
+            {
+                System = new SystemSettings
+                {
+                    DatabaseProvider = "SQLite",
+                    SqliteDatabaseFileName = "..\\outside.db"
+                }
+            };
+            string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(settingsPath, json);
+
+            var service = new SettingsService(paths);
+            var error = await Assert.ThrowsAsync<InvalidDataException>(() => service.LoadAsync());
+
+            Assert.Contains("SQLite", error.Message, StringComparison.Ordinal);
+            Assert.Equal(json, await File.ReadAllTextAsync(settingsPath));
+            Assert.Equal(DatabaseConnectionSettings.DefaultSqliteDatabaseFileName,
+                service.Settings.System.SqliteDatabaseFileName);
         }
         finally
         {

@@ -2,6 +2,7 @@ using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Infrastructure.Tests
 {
@@ -78,6 +79,83 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 DbHelper.ConfigurePathProvider(previousProvider);
                 DeleteDirectory(appRoot);
+            }
+        }
+
+        [Theory]
+        [InlineData("data.db", "data.db")]
+        [InlineData(" team.sqlite ", "team.sqlite")]
+        [InlineData("tenant.sqlite3", "tenant.sqlite3")]
+        public void NormalizeRuntimeSqliteDatabaseFileName_ShouldAcceptSimpleDatabaseFileNames(
+            string value,
+            string expected)
+        {
+            Assert.Equal(expected, DbHelper.NormalizeRuntimeSqliteDatabaseFileName(value));
+        }
+
+        [Theory]
+        [InlineData("..\\outside.db")]
+        [InlineData("tenant/data.db")]
+        [InlineData("C:\\data.db")]
+        [InlineData("data:archive.db")]
+        [InlineData("data\\archive.db")]
+        [InlineData("data\narchive.db")]
+        [InlineData("CON.db")]
+        [InlineData("com1.sqlite")]
+        [InlineData("LPT9.sqlite3")]
+        [InlineData("data.txt")]
+        [InlineData("data.db.")]
+        public void NormalizeRuntimeSqliteDatabaseFileName_ShouldRejectPathsAndUnsupportedExtensions(string value)
+        {
+            Assert.Throws<ArgumentException>(() => DbHelper.NormalizeRuntimeSqliteDatabaseFileName(value));
+        }
+
+        [Fact]
+        public void ResolveRuntimeSqliteDatabasePath_ShouldRejectOutsidePathWithoutCreatingItsDirectory()
+        {
+            var root = CreateTempDirectory();
+            var outsideRoot = Path.Combine(Path.GetDirectoryName(root)!, $"outside-{Guid.NewGuid():N}");
+            var outsidePath = Path.Combine(outsideRoot, "outside.db");
+            try
+            {
+                var provider = new RuntimeAppPathProvider(Path.Combine(root, "app"), Path.Combine(root, "data"));
+
+                var error = Assert.Throws<InvalidOperationException>(() =>
+                    DbHelper.ResolveRuntimeSqliteDatabasePath(provider, outsidePath));
+
+                Assert.Contains("运行数据根 Database", error.Message, StringComparison.Ordinal);
+                Assert.False(Directory.Exists(outsideRoot));
+            }
+            finally
+            {
+                DeleteDirectory(root);
+                DeleteDirectory(outsideRoot);
+            }
+        }
+
+        [Fact]
+        public void ConfigureDbContextOptions_WithExplicitPathProvider_ShouldNotDependOnGlobalProvider()
+        {
+            var root = CreateTempDirectory();
+            try
+            {
+                var provider = new RuntimeAppPathProvider(Path.Combine(root, "app"), Path.Combine(root, "data"));
+                var databasePath = Path.Combine(provider.DatabaseRoot, "isolated.db");
+                var settings = new DatabaseConnectionSettings
+                {
+                    Provider = DatabaseConnectionSettings.SqliteProvider,
+                    SqliteDatabaseFileName = databasePath,
+                };
+                var options = new DbContextOptionsBuilder<AppDbContext>();
+
+                DbHelper.ConfigureDbContextOptions(options, settings, provider);
+
+                using var context = new AppDbContext(options.Options);
+                Assert.Equal(Path.GetFullPath(databasePath), Path.GetFullPath(context.Database.GetDbConnection().DataSource));
+            }
+            finally
+            {
+                DeleteDirectory(root);
             }
         }
 

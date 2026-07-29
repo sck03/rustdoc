@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -90,7 +91,7 @@ namespace ExportDocManager.Api.Hosting
             }
         }
 
-        private static bool ShouldRun(
+        internal static bool ShouldRun(
             SystemSettings settings,
             DateTimeOffset now,
             PostgreSqlAutomaticBackupState state)
@@ -100,34 +101,38 @@ namespace ExportDocManager.Api.Hosting
                 scheduledTime = new TimeSpan(2, 0, 0);
             }
 
-            if (now.TimeOfDay < scheduledTime)
-            {
-                return false;
-            }
-
             bool weekly = string.Equals(settings.PostgreSqlAutoBackupSchedule, "Weekly", StringComparison.OrdinalIgnoreCase);
-            if (weekly && (int)now.DayOfWeek != Math.Clamp(settings.PostgreSqlAutoBackupDayOfWeek, 0, 6))
+            DateTimeOffset scheduledOccurrence = weekly
+                ? GetWeeklyScheduledOccurrence(now, Math.Clamp(settings.PostgreSqlAutoBackupDayOfWeek, 0, 6), scheduledTime)
+                : new DateTimeOffset(now.Year, now.Month, now.Day, scheduledTime.Hours, scheduledTime.Minutes, 0, now.Offset);
+            if (now < scheduledOccurrence)
             {
                 return false;
             }
 
-            var currentPeriod = GetPeriodKey(now, weekly);
-            var lastPeriod = state?.LastSuccessfulRunAt == null
-                ? string.Empty
-                : GetPeriodKey(state.LastSuccessfulRunAt.Value, weekly);
-
-            return !string.Equals(currentPeriod, lastPeriod, StringComparison.Ordinal);
+            return state?.LastSuccessfulRunAt == null ||
+                state.LastSuccessfulRunAt.Value < scheduledOccurrence;
         }
 
-        private static string GetPeriodKey(DateTimeOffset value, bool weekly)
+        private static DateTimeOffset GetWeeklyScheduledOccurrence(
+            DateTimeOffset now,
+            int scheduledDayOfWeek,
+            TimeSpan scheduledTime)
         {
-            if (!weekly)
-            {
-                return value.ToString("yyyy-MM-dd");
-            }
-
-            var date = value.DateTime;
-            return $"{System.Globalization.ISOWeek.GetYear(date):0000}-W{System.Globalization.ISOWeek.GetWeekOfYear(date):00}";
+            int daysSinceMonday = ((int)now.DayOfWeek + 6) % 7;
+            DateTime monday = now.Date.AddDays(-daysSinceMonday);
+            int scheduledOffsetFromMonday = scheduledDayOfWeek == (int)DayOfWeek.Sunday
+                ? 6
+                : scheduledDayOfWeek - 1;
+            DateTime scheduledDate = monday.AddDays(scheduledOffsetFromMonday);
+            return new DateTimeOffset(
+                scheduledDate.Year,
+                scheduledDate.Month,
+                scheduledDate.Day,
+                scheduledTime.Hours,
+                scheduledTime.Minutes,
+                0,
+                now.Offset);
         }
 
         private Task PruneBackupsAsync(int retentionCount, CancellationToken cancellationToken)
@@ -190,10 +195,10 @@ namespace ExportDocManager.Api.Hosting
         private async Task WriteStateAsync(PostgreSqlAutomaticBackupState state, CancellationToken cancellationToken)
         {
             Directory.CreateDirectory(PostgreSqlBackupRoot);
-            await File.WriteAllTextAsync(
+            await AtomicFileHelper.WriteAllTextAtomicAsync(
                 StatePath,
                 JsonSerializer.Serialize(state, JsonOptions),
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         private string PostgreSqlBackupRoot =>
@@ -202,7 +207,7 @@ namespace ExportDocManager.Api.Hosting
         private string StatePath =>
             Path.Combine(PostgreSqlBackupRoot, StateFileName);
 
-        private sealed class PostgreSqlAutomaticBackupState
+        internal sealed class PostgreSqlAutomaticBackupState
         {
             public DateTimeOffset? LastSuccessfulRunAt { get; set; }
             public string LastBackupFileName { get; set; } = string.Empty;

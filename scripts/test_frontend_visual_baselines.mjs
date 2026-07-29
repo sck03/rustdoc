@@ -200,31 +200,92 @@ try {
         };
       })()`, true);
       const value = audit.value;
-      const mobileNavigationInteraction = await evaluate(page, `(async () => {
-        const isShelllessPage = ["login", "login-expired", "state-fatal"].includes(${JSON.stringify(pageName)});
-        if (isShelllessPage || ${viewport.width} > 860) {
-          return { mobileNavigationInteractionPassed: true };
+      let mobileNavigationInteractionValue;
+      if (pageName === "dialog" && viewport.width <= 860) {
+        const protectedNavigation = await evaluate(page, `(() => {
+          const toggle = document.querySelector(".mobile-nav-toggle");
+          const list = document.querySelector(".nav-list");
+          const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+          if (!(toggle instanceof HTMLButtonElement) || !(list instanceof HTMLElement) || !(dialog instanceof HTMLElement)) {
+            return { ready: false };
+          }
+          const rect = toggle.getBoundingClientRect();
+          return {
+            ready: true,
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+            backgroundIsInert: Boolean(toggle.closest("[inert]")),
+            initiallyClosed: toggle.getAttribute("aria-expanded") === "false"
+              && getComputedStyle(list).display === "none"
+              && !document.querySelector(".workspace-nav-backdrop"),
+          };
+        })()`, true);
+        const protectedValue = protectedNavigation.value ?? { ready: false };
+        if (protectedValue.ready && Number.isFinite(protectedValue.x) && Number.isFinite(protectedValue.y)) {
+          await page.send("Input.dispatchMouseEvent", {
+            type: "mousePressed",
+            x: protectedValue.x,
+            y: protectedValue.y,
+            button: "left",
+            clickCount: 1,
+          });
+          await page.send("Input.dispatchMouseEvent", {
+            type: "mouseReleased",
+            x: protectedValue.x,
+            y: protectedValue.y,
+            button: "left",
+            clickCount: 1,
+          });
+          await delay(50);
         }
-        const toggle = document.querySelector(".mobile-nav-toggle");
-        const list = document.querySelector(".nav-list");
-        const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        if (!(toggle instanceof HTMLButtonElement) || !(list instanceof HTMLElement)) {
-          return { mobileNavigationInteractionPassed: false };
-        }
-        toggle.click();
-        await settle();
-        const opened = toggle.getAttribute("aria-expanded") === "true"
-          && getComputedStyle(list).display !== "none"
-          && Boolean(document.querySelector(".workspace-nav-backdrop"));
-        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-        await settle();
-        const closed = toggle.getAttribute("aria-expanded") === "false"
-          && getComputedStyle(list).display === "none"
-          && !document.querySelector(".workspace-nav-backdrop")
-          && document.activeElement === toggle;
-        return { mobileNavigationInteractionPassed: opened && closed };
-      })()`, true);
-      const mobileNavigationInteractionValue = mobileNavigationInteraction.value ?? { mobileNavigationInteractionPassed: false };
+        const protectedNavigationAfterClick = await evaluate(page, `(() => {
+          const toggle = document.querySelector(".mobile-nav-toggle");
+          const list = document.querySelector(".nav-list");
+          const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+          return {
+            remainedClosed: toggle instanceof HTMLButtonElement
+              && list instanceof HTMLElement
+              && toggle.getAttribute("aria-expanded") === "false"
+              && getComputedStyle(list).display === "none"
+              && !document.querySelector(".workspace-nav-backdrop"),
+            dialogStillOpen: dialog instanceof HTMLElement,
+          };
+        })()`, true);
+        const protectedAfterValue = protectedNavigationAfterClick.value ?? {};
+        mobileNavigationInteractionValue = {
+          mobileNavigationInteractionPassed: protectedValue.ready
+            && protectedValue.backgroundIsInert
+            && protectedValue.initiallyClosed
+            && protectedAfterValue.remainedClosed
+            && protectedAfterValue.dialogStillOpen,
+        };
+      } else {
+        const mobileNavigationInteraction = await evaluate(page, `(async () => {
+          const isShelllessPage = ["login", "login-expired", "state-fatal"].includes(${JSON.stringify(pageName)});
+          if (isShelllessPage || ${viewport.width} > 860) {
+            return { mobileNavigationInteractionPassed: true };
+          }
+          const toggle = document.querySelector(".mobile-nav-toggle");
+          const list = document.querySelector(".nav-list");
+          const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          if (!(toggle instanceof HTMLButtonElement) || !(list instanceof HTMLElement)) {
+            return { mobileNavigationInteractionPassed: false };
+          }
+          toggle.click();
+          await settle();
+          const opened = toggle.getAttribute("aria-expanded") === "true"
+            && getComputedStyle(list).display !== "none"
+            && Boolean(document.querySelector(".workspace-nav-backdrop"));
+          window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          await settle();
+          const closed = toggle.getAttribute("aria-expanded") === "false"
+            && getComputedStyle(list).display === "none"
+            && !document.querySelector(".workspace-nav-backdrop")
+            && document.activeElement === toggle;
+          return { mobileNavigationInteractionPassed: opened && closed };
+        })()`, true);
+        mobileNavigationInteractionValue = mobileNavigationInteraction.value ?? { mobileNavigationInteractionPassed: false };
+      }
       const screenshotPath = path.join(outputRoot, `${pageName}-${viewport.name}.png`);
       await captureScreenshot(page, screenshotPath, { captureBeyondViewport: false });
       const approvedPath = path.join(approvedRoot, path.basename(screenshotPath));

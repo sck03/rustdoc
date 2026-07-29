@@ -39,12 +39,20 @@ namespace ExportDocManager.Services.Suppliers
 
     public sealed record SupplierImportResult(int CreatedSuppliers, int CreatedContacts, int SkippedRows);
 
+    public sealed record SupplierDeleteResult(
+        bool Found,
+        bool Deleted,
+        bool Deactivated,
+        int ContactCount,
+        int ProductLinkCount,
+        int AssessmentCount);
+
     public interface ISupplierDirectoryService
     {
         Task<IReadOnlyList<SupplierRecord>> ListAsync(CancellationToken cancellationToken = default);
         Task<PagedResult<SupplierRecord>> QueryAsync(string keyword, string status, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
         Task<SupplierRecord> SaveAsync(SupplierSaveRequest request, CancellationToken cancellationToken = default);
-        Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
+        Task<SupplierDeleteResult> DeleteAsync(int id, CancellationToken cancellationToken = default);
         Task<int> UpdateStatusAsync(IReadOnlyList<int> ids, string status, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<SupplierContactRecord>> ListContactsAsync(int supplierCompanyId, CancellationToken cancellationToken = default);
         Task<SupplierContactRecord> SaveContactAsync(SupplierContactSaveRequest request, CancellationToken cancellationToken = default);

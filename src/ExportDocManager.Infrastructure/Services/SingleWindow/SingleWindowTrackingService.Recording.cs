@@ -182,6 +182,7 @@ namespace ExportDocManager.Services.SingleWindow
                     {
                         throw new InvalidDataException("回执内容的业务类型与回执包 manifest 不一致。");
                     }
+                    ValidateReceiptReferences(batch, manifest, normalizedReceiptEntries);
                     var existingReceiptKeys = await LoadExistingReceiptKeysAsync(
                         context,
                         batch.Id,
@@ -225,7 +226,11 @@ namespace ExportDocManager.Services.SingleWindow
                     if (shouldUpdateSummary)
                     {
                         batch.LastBusinessStatus = primaryReceipt?.BusinessStatus.ToString() ?? string.Empty;
-                        batch.ReferenceNo = primaryReceipt?.ReferenceNo ?? batch.ReferenceNo;
+                        if (string.IsNullOrWhiteSpace(batch.ReferenceNo) &&
+                            !string.IsNullOrWhiteSpace(primaryReceipt?.ReferenceNo))
+                        {
+                            batch.ReferenceNo = primaryReceipt.ReferenceNo.Trim();
+                        }
                         batch.LastReceiptKind = primaryReceipt?.ReceiptKind.ToString() ?? string.Empty;
                         batch.LastReceiptCode = primaryReceipt?.ReceiptCode ?? string.Empty;
                         batch.LastReceiptMessage = primaryReceipt?.ReceiptMessage ?? string.Empty;
@@ -280,6 +285,38 @@ namespace ExportDocManager.Services.SingleWindow
             if (!canAccess)
             {
                 throw new UnauthorizedAccessException("无权限写入该发票的单一窗口跟踪记录。");
+            }
+        }
+
+        private static void ValidateReceiptReferences(
+            SwSubmissionBatch batch,
+            SingleWindowPackageManifest manifest,
+            IReadOnlyList<ReceiptImportEntry> receiptEntries)
+        {
+            string manifestReference = manifest.ReceiptReferenceNo?.Trim() ?? string.Empty;
+            var parsedReferences = receiptEntries
+                .Select(item => item.Receipt.ReferenceNo?.Trim() ?? string.Empty)
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (parsedReferences.Length > 1)
+            {
+                throw new InvalidDataException("回执包包含多个不同的官方业务编号，不能写入同一批次。" );
+            }
+
+            if (parsedReferences.Length == 1 &&
+                !string.Equals(parsedReferences[0], manifestReference, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("回执内容的官方业务编号与回执包 manifest 不一致。" );
+            }
+
+            string parsedReference = parsedReferences.SingleOrDefault() ?? manifestReference;
+            if (!string.IsNullOrWhiteSpace(batch.ReferenceNo) &&
+                !string.IsNullOrWhiteSpace(parsedReference) &&
+                !string.Equals(batch.ReferenceNo, parsedReference, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("回执官方业务编号不属于当前批次。" );
             }
         }
 

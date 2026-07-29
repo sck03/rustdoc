@@ -4,15 +4,24 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Infrastructure
 {
     public sealed class SharedDatabaseMaintenanceService : ISharedDatabaseMaintenanceService
     {
+        private static readonly SemaphoreSlim PostgreSqlBackupGate = new(1, 1);
+        private static readonly TimeSpan PostgreSqlBackupTimeout = TimeSpan.FromMinutes(30);
+        private static readonly TimeSpan PostgreSqlVersionCheckTimeout = TimeSpan.FromSeconds(15);
+        private static readonly Regex PostgreSqlVersionPattern = new(
+            @"(?<!\d)(?<major>\d{1,3})(?:\.\d+)?",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant,
+            TimeSpan.FromSeconds(1));
         private const string OwnershipStoragePolicy =
             "共享库权限改派只更新发票、付款报销、CRM、供应商、商机、邮件/报表模板和装柜方案的 OwnerUserId、DepartmentId、CompanyScope 归属字段；关联子记录继续随所属业务聚合访问，不移动附件、不生成导出目录、不读取用户显式导出文件。";
         private const string SupportPackageStoragePolicy =
@@ -97,47 +106,60 @@ namespace ExportDocManager.Services.Infrastructure
                 throw new InvalidOperationException("未找到 pg_dump。请把 PostgreSQL 客户端工具放到程序根 Tools/PostgreSQL/bin，或用 EXPORTDOCMANAGER_POSTGRES_BIN 指向工具目录。");
             }
 
-            string database = DbHelper.NormalizePostgreSqlText(_databaseSettings.PostgreSqlDatabase);
-            string timestamp = DateTimeOffset.Now.ToString("yyyyMMdd_HHmmss");
-            string fileName = $"{timestamp}_{NormalizeFileToken(database)}.dump";
-            string outputPath = Path.Combine(PostgreSqlBackupRoot, fileName);
-            string tempPath = outputPath + ".tmp";
-
-            var arguments = new[]
-            {
-                "--format=custom",
-                "--blobs",
-                "--verbose",
-                "--no-owner",
-                "--file", tempPath,
-                "--host", DbHelper.NormalizePostgreSqlText(_databaseSettings.PostgreSqlHost),
-                "--port", DbHelper.NormalizePostgreSqlPort(_databaseSettings.PostgreSqlPort).ToString(),
-                "--username", DbHelper.NormalizePostgreSqlText(_databaseSettings.PostgreSqlUsername),
-                "--dbname", database
-            };
-
+            await PostgreSqlBackupGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                await RunPostgreSqlToolAsync(tools.PgDumpPath, arguments, cancellationToken).ConfigureAwait(false);
-                if (File.Exists(outputPath))
-                {
-                    File.Delete(outputPath);
-                }
+                await ValidatePgDumpCompatibilityAsync(tools.PgDumpPath, cancellationToken).ConfigureAwait(false);
 
-                File.Move(tempPath, outputPath);
-                var file = new FileInfo(outputPath);
-                return new PostgreSqlPhysicalBackupResult(
-                    true,
-                    $"PostgreSQL 团队库物理备份已创建：{file.Name}",
-                    file.Name,
-                    file.FullName,
-                    file.Length,
-                    PostgreSqlBackupRoot,
-                    PostgreSqlPhysicalBackupStoragePolicy);
+                string database = DbHelper.NormalizePostgreSqlText(_databaseSettings.PostgreSqlDatabase);
+                string timestamp = DateTimeOffset.Now.ToString("yyyyMMdd_HHmmss_fff");
+                string fileName = $"{timestamp}_{NormalizeFileToken(database)}_{Guid.NewGuid():N}.dump";
+                string outputPath = Path.Combine(PostgreSqlBackupRoot, fileName);
+                string tempPath = AtomicFileHelper.GetSiblingTempFilePath(outputPath);
+                var arguments = new[]
+                {
+                    "--format=custom",
+                    "--blobs",
+                    "--verbose",
+                    "--no-owner",
+                    "--file", tempPath,
+                    "--host", DbHelper.NormalizePostgreSqlText(_databaseSettings.PostgreSqlHost),
+                    "--port", DbHelper.NormalizePostgreSqlPort(_databaseSettings.PostgreSqlPort).ToString(),
+                    "--username", DbHelper.NormalizePostgreSqlText(_databaseSettings.PostgreSqlUsername),
+                    "--dbname", database
+                };
+
+                try
+                {
+                    await RunPostgreSqlToolAsync(
+                        tools.PgDumpPath,
+                        arguments,
+                        PostgreSqlBackupTimeout,
+                        cancellationToken).ConfigureAwait(false);
+                    if (!File.Exists(tempPath) || new FileInfo(tempPath).Length == 0)
+                    {
+                        throw new InvalidOperationException("pg_dump 未生成有效的备份文件。");
+                    }
+
+                    AtomicFileHelper.ReplaceFile(tempPath, outputPath);
+                    var file = new FileInfo(outputPath);
+                    return new PostgreSqlPhysicalBackupResult(
+                        true,
+                        $"PostgreSQL 团队库物理备份已创建：{file.Name}",
+                        file.Name,
+                        file.FullName,
+                        file.Length,
+                        PostgreSqlBackupRoot,
+                        PostgreSqlPhysicalBackupStoragePolicy);
+                }
+                finally
+                {
+                    AtomicFileHelper.TryDeleteFile(tempPath);
+                }
             }
             finally
             {
-                TryDelete(tempPath);
+                PostgreSqlBackupGate.Release();
             }
         }
 
@@ -164,10 +186,10 @@ namespace ExportDocManager.Services.Infrastructure
             }
 
             var tools = PostgreSqlToolLocator.Resolve(_pathProvider);
-            string timestamp = DateTimeOffset.Now.ToString("yyyyMMdd_HHmmss");
-            string planRoot = EnsureDirectory(Path.Combine(PostgreSqlRestorePlanRoot, timestamp));
+            string timestamp = DateTimeOffset.Now.ToString("yyyyMMdd_HHmmss_fff");
+            string planRoot = EnsureDirectory(Path.Combine(PostgreSqlRestorePlanRoot, $"{timestamp}_{Guid.NewGuid():N}"));
             string ownershipSqlPath = Path.Combine(planRoot, "post_restore_ownership.sql");
-            string restoreScriptPath = Path.Combine(planRoot, OperatingSystem.IsWindows() ? "restore-postgresql.cmd" : "restore-postgresql.sh");
+            string restoreScriptPath = Path.Combine(planRoot, OperatingSystem.IsWindows() ? "restore-postgresql.ps1" : "restore-postgresql.sh");
 
             await File.WriteAllTextAsync(
                 ownershipSqlPath,
@@ -766,11 +788,39 @@ namespace ExportDocManager.Services.Infrastructure
                 .FirstOrDefault();
         }
 
-        private async Task RunPostgreSqlToolAsync(
-            string executablePath,
-            IReadOnlyList<string> arguments,
+        private async Task ValidatePgDumpCompatibilityAsync(
+            string pgDumpPath,
             CancellationToken cancellationToken)
         {
+            PostgreSqlToolRunResult versionResult = await RunPostgreSqlToolAsync(
+                pgDumpPath,
+                ["--version"],
+                PostgreSqlVersionCheckTimeout,
+                cancellationToken).ConfigureAwait(false);
+            int pgDumpMajor = ParsePostgreSqlMajorVersion(
+                string.IsNullOrWhiteSpace(versionResult.StandardOutput)
+                    ? versionResult.StandardError
+                    : versionResult.StandardOutput,
+                "pg_dump");
+
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+            await context.Database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            string serverVersionText = context.Database.GetDbConnection().ServerVersion ?? string.Empty;
+            int serverMajor = ParsePostgreSqlMajorVersion(serverVersionText, "PostgreSQL 服务器");
+            EnsurePgDumpVersionSupported(pgDumpMajor, serverMajor);
+        }
+
+        private async Task<PostgreSqlToolRunResult> RunPostgreSqlToolAsync(
+            string executablePath,
+            IReadOnlyList<string> arguments,
+            TimeSpan timeout,
+            CancellationToken cancellationToken)
+        {
+            if (timeout <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(timeout));
+            }
+
             var startInfo = new ProcessStartInfo
             {
                 FileName = executablePath,
@@ -790,35 +840,101 @@ namespace ExportDocManager.Services.Infrastructure
             }
 
             using var process = new Process { StartInfo = startInfo };
-            var outputBuilder = new StringBuilder();
-            var errorBuilder = new StringBuilder();
-            process.OutputDataReceived += (_, args) =>
-            {
-                if (args.Data != null)
-                {
-                    outputBuilder.AppendLine(args.Data);
-                }
-            };
-            process.ErrorDataReceived += (_, args) =>
-            {
-                if (args.Data != null)
-                {
-                    errorBuilder.AppendLine(args.Data);
-                }
-            };
 
             if (!process.Start())
             {
                 throw new InvalidOperationException("无法启动 PostgreSQL 客户端工具。");
             }
 
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            Task<string> standardOutputTask = process.StandardOutput.ReadToEndAsync();
+            Task<string> standardErrorTask = process.StandardError.ReadToEndAsync();
+            using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutSource.CancelAfter(timeout);
+            try
+            {
+                await process.WaitForExitAsync(timeoutSource.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (timeoutSource.IsCancellationRequested)
+            {
+                TryKillProcessTree(process);
+                await DrainExitedProcessAsync(process).ConfigureAwait(false);
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+
+                throw new TimeoutException(
+                    $"PostgreSQL 客户端工具执行超过 {timeout.TotalMinutes:0.#} 分钟，进程已终止。");
+            }
+
+            string standardOutput = await standardOutputTask.ConfigureAwait(false);
+            string standardError = await standardErrorTask.ConfigureAwait(false);
             if (process.ExitCode != 0)
             {
-                string message = errorBuilder.Length > 0 ? errorBuilder.ToString().Trim() : outputBuilder.ToString().Trim();
+                string message = !string.IsNullOrWhiteSpace(standardError)
+                    ? standardError.Trim()
+                    : standardOutput.Trim();
                 throw new InvalidOperationException($"PostgreSQL 客户端工具执行失败：{message}");
+            }
+
+            return new PostgreSqlToolRunResult(standardOutput.Trim(), standardError.Trim());
+        }
+
+        internal static int ParsePostgreSqlMajorVersion(string value, string sourceName)
+        {
+            Match match;
+            try
+            {
+                match = PostgreSqlVersionPattern.Match(value ?? string.Empty);
+            }
+            catch (RegexMatchTimeoutException exception)
+            {
+                throw new InvalidOperationException($"无法解析 {sourceName} 版本。", exception);
+            }
+
+            if (!match.Success ||
+                !int.TryParse(match.Groups["major"].Value, out int major) ||
+                major <= 0)
+            {
+                throw new InvalidOperationException($"无法解析 {sourceName} 版本：{value}");
+            }
+
+            return major;
+        }
+
+        internal static void EnsurePgDumpVersionSupported(int pgDumpMajor, int serverMajor)
+        {
+            if (pgDumpMajor < serverMajor)
+            {
+                throw new InvalidOperationException(
+                    $"pg_dump 主版本 {pgDumpMajor} 低于 PostgreSQL 服务器主版本 {serverMajor}。请把匹配或更新版本的客户端工具放入程序 Tools/PostgreSQL/bin。");
+            }
+        }
+
+        private static void TryKillProcessTree(Process process)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static async Task DrainExitedProcessAsync(Process process)
+        {
+            try
+            {
+                await process.WaitForExitAsync(CancellationToken.None)
+                    .WaitAsync(TimeSpan.FromSeconds(5))
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
             }
         }
 
@@ -856,15 +972,34 @@ namespace ExportDocManager.Services.Infrastructure
 
             if (OperatingSystem.IsWindows())
             {
-                return $"""
-@echo off
-setlocal
-rem PostgreSQL 团队版业务数据库还原计划。执行前请确认目标服务器、数据库名和应用账号。
-rem 如需避免输入密码，可临时设置 PGPASSWORD，或使用 .pgpass / 密码管理工具。
-"{pgRestore}" --clean --if-exists --no-owner --role "{EscapeCmd(appRole)}" --host "{EscapeCmd(host)}" --port "{EscapeCmd(port)}" --username "{EscapeCmd(username)}" --dbname "{EscapeCmd(targetDatabase)}" "{backupPath}"
-if errorlevel 1 exit /b %errorlevel%
-"{psql}" --host "{EscapeCmd(host)}" --port "{EscapeCmd(port)}" --username "{EscapeCmd(username)}" --dbname "{EscapeCmd(targetDatabase)}" --file "{ownershipSqlPath}"
-endlocal
+                return $$"""
+$ErrorActionPreference = 'Stop'
+# PostgreSQL 团队版业务数据库还原计划。执行前请确认目标服务器、数据库名和应用账号。
+# 如需避免输入密码，可临时设置 PGPASSWORD，或使用 pgpass.conf / 密码管理工具。
+$pgRestore = {{QuotePowerShellLiteral(pgRestore)}}
+$restoreArgs = @(
+    '--clean', '--if-exists', '--no-owner',
+    '--role', {{QuotePowerShellLiteral(appRole)}},
+    '--host', {{QuotePowerShellLiteral(host)}},
+    '--port', {{QuotePowerShellLiteral(port)}},
+    '--username', {{QuotePowerShellLiteral(username)}},
+    '--dbname', {{QuotePowerShellLiteral(targetDatabase)}},
+    {{QuotePowerShellLiteral(backupPath)}}
+)
+& $pgRestore @restoreArgs
+if ($LASTEXITCODE -ne 0) { throw "pg_restore failed with exit code $LASTEXITCODE." }
+
+$psql = {{QuotePowerShellLiteral(psql)}}
+$psqlArgs = @(
+    '--host', {{QuotePowerShellLiteral(host)}},
+    '--port', {{QuotePowerShellLiteral(port)}},
+    '--username', {{QuotePowerShellLiteral(username)}},
+    '--dbname', {{QuotePowerShellLiteral(targetDatabase)}},
+    '--set', 'ON_ERROR_STOP=1',
+    '--file', {{QuotePowerShellLiteral(ownershipSqlPath)}}
+)
+& $psql @psqlArgs
+if ($LASTEXITCODE -ne 0) { throw "psql failed with exit code $LASTEXITCODE." }
 """;
             }
 
@@ -872,17 +1007,19 @@ endlocal
 #!/usr/bin/env sh
 set -eu
 # PostgreSQL 团队版业务数据库还原计划。执行前请确认目标服务器、数据库名和应用账号。
-"{pgRestore}" --clean --if-exists --no-owner --role "{EscapeShell(appRole)}" --host "{EscapeShell(host)}" --port "{EscapeShell(port)}" --username "{EscapeShell(username)}" --dbname "{EscapeShell(targetDatabase)}" "{EscapeShell(backupPath)}"
-"{psql}" --host "{EscapeShell(host)}" --port "{EscapeShell(port)}" --username "{EscapeShell(username)}" --dbname "{EscapeShell(targetDatabase)}" --file "{EscapeShell(ownershipSqlPath)}"
+{QuotePosixShellArgument(pgRestore)} --clean --if-exists --no-owner --role {QuotePosixShellArgument(appRole)} --host {QuotePosixShellArgument(host)} --port {QuotePosixShellArgument(port)} --username {QuotePosixShellArgument(username)} --dbname {QuotePosixShellArgument(targetDatabase)} {QuotePosixShellArgument(backupPath)}
+{QuotePosixShellArgument(psql)} --host {QuotePosixShellArgument(host)} --port {QuotePosixShellArgument(port)} --username {QuotePosixShellArgument(username)} --dbname {QuotePosixShellArgument(targetDatabase)} --set=ON_ERROR_STOP=1 --file {QuotePosixShellArgument(ownershipSqlPath)}
 """;
         }
 
-        private static string BuildPostRestoreOwnershipSql(
+        internal static string BuildPostRestoreOwnershipSql(
             string targetDatabase,
             string appRole,
             IReadOnlyList<string> oldOwnerRoles)
         {
             string roleLiteral = ToSqlLiteral(appRole);
+            string targetDatabaseComment = NormalizeSqlCommentValue(targetDatabase);
+            string appRoleComment = NormalizeSqlCommentValue(appRole);
             var oldRoles = (oldOwnerRoles ?? Array.Empty<string>())
                 .Select(role => (role ?? string.Empty).Trim())
                 .Where(role => !string.IsNullOrWhiteSpace(role))
@@ -894,8 +1031,8 @@ set -eu
 
             return $"""
 -- PostgreSQL 团队版业务数据库还原后 owner / schema / table / sequence / 权限改派脚本
--- Target database: {targetDatabase}
--- Application role: {appRole}
+-- Target database: {targetDatabaseComment}
+-- Application role: {appRoleComment}
 
 {reassignBlock}
 
@@ -939,12 +1076,21 @@ BEGIN
     END LOOP;
 
     FOR item IN
-        SELECT n.nspname AS schema_name, p.proname AS routine_name, pg_get_function_identity_arguments(p.oid) AS args
+        SELECT n.nspname AS schema_name,
+               p.proname AS routine_name,
+               p.prokind AS routine_kind,
+               pg_get_function_identity_arguments(p.oid) AS args
         FROM pg_proc p
         JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
     LOOP
-        EXECUTE format('ALTER FUNCTION %I.%I(%s) OWNER TO %I', item.schema_name, item.routine_name, item.args, app_role);
+        IF item.routine_kind = 'p' THEN
+            EXECUTE format('ALTER PROCEDURE %I.%I(%s) OWNER TO %I', item.schema_name, item.routine_name, item.args, app_role);
+        ELSIF item.routine_kind = 'a' THEN
+            EXECUTE format('ALTER AGGREGATE %I.%I(%s) OWNER TO %I', item.schema_name, item.routine_name, item.args, app_role);
+        ELSE
+            EXECUTE format('ALTER FUNCTION %I.%I(%s) OWNER TO %I', item.schema_name, item.routine_name, item.args, app_role);
+        END IF;
     END LOOP;
 END $$;
 
@@ -952,10 +1098,10 @@ GRANT CONNECT, TEMPORARY ON DATABASE {QuoteIdentifier(targetDatabase)} TO {Quote
 GRANT USAGE, CREATE ON SCHEMA public TO {QuoteIdentifier(appRole)};
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO {QuoteIdentifier(appRole)};
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO {QuoteIdentifier(appRole)};
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO {QuoteIdentifier(appRole)};
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {QuoteIdentifier(appRole)};
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO {QuoteIdentifier(appRole)};
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO {QuoteIdentifier(appRole)};
+GRANT EXECUTE ON ALL ROUTINES IN SCHEMA public TO {QuoteIdentifier(appRole)};
+ALTER DEFAULT PRIVILEGES FOR ROLE {QuoteIdentifier(appRole)} IN SCHEMA public GRANT ALL ON TABLES TO {QuoteIdentifier(appRole)};
+ALTER DEFAULT PRIVILEGES FOR ROLE {QuoteIdentifier(appRole)} IN SCHEMA public GRANT ALL ON SEQUENCES TO {QuoteIdentifier(appRole)};
+ALTER DEFAULT PRIVILEGES FOR ROLE {QuoteIdentifier(appRole)} IN SCHEMA public GRANT EXECUTE ON ROUTINES TO {QuoteIdentifier(appRole)};
 """;
         }
 
@@ -1069,14 +1215,37 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO {QuoteId
             return "'" + (value ?? string.Empty).Replace("'", "''", StringComparison.Ordinal) + "'";
         }
 
-        private static string EscapeCmd(string value)
+        private static string NormalizeSqlCommentValue(string value)
         {
-            return (value ?? string.Empty).Replace("\"", "\"\"", StringComparison.Ordinal);
+            var output = new StringBuilder((value ?? string.Empty).Length);
+            bool previousWasWhitespace = false;
+            foreach (char ch in value ?? string.Empty)
+            {
+                if (char.IsWhiteSpace(ch) || char.IsControl(ch))
+                {
+                    if (output.Length > 0 && !previousWasWhitespace)
+                    {
+                        output.Append(' ');
+                    }
+                    previousWasWhitespace = true;
+                    continue;
+                }
+
+                output.Append(ch);
+                previousWasWhitespace = false;
+            }
+
+            return output.ToString().Trim();
         }
 
-        private static string EscapeShell(string value)
+        internal static string QuotePowerShellLiteral(string value)
         {
-            return (value ?? string.Empty).Replace("\"", "\\\"", StringComparison.Ordinal);
+            return "'" + (value ?? string.Empty).Replace("'", "''", StringComparison.Ordinal) + "'";
+        }
+
+        internal static string QuotePosixShellArgument(string value)
+        {
+            return "'" + (value ?? string.Empty).Replace("'", "'\"'\"'", StringComparison.Ordinal) + "'";
         }
 
         private static string ReadFileVersion(string path)
@@ -1122,6 +1291,10 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO {QuoteId
                 // Best effort cleanup for an interrupted package write.
             }
         }
+
+        private sealed record PostgreSqlToolRunResult(
+            string StandardOutput,
+            string StandardError);
 
     }
 }

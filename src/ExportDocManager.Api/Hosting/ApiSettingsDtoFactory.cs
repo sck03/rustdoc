@@ -68,7 +68,7 @@ namespace ExportDocManager.Api.Hosting
             settings.System.LogFileSizeLimitMB = Math.Max(1, settings.System.LogFileSizeLimitMB);
             settings.System.DatabaseProvider = DatabaseModeHelper.NormalizeProvider(settings.System.DatabaseProvider);
             settings.System.SqliteDatabaseFileName =
-                DbHelper.NormalizeSqliteDatabaseFileName(settings.System.SqliteDatabaseFileName);
+                DbHelper.NormalizeRuntimeSqliteDatabaseFileName(settings.System.SqliteDatabaseFileName);
             settings.System.PostgreSqlPort = DbHelper.NormalizePostgreSqlPort(settings.System.PostgreSqlPort);
             settings.System.PostgreSqlHost = DbHelper.NormalizePostgreSqlText(settings.System.PostgreSqlHost);
             settings.System.PostgreSqlDatabase = DbHelper.NormalizePostgreSqlText(settings.System.PostgreSqlDatabase);

@@ -2683,6 +2683,16 @@ export interface ApiSupplierContactSaveRequest {
   title?: string;
 }
 
+export interface ApiSupplierDeleteResponse {
+  assessmentCount: number;
+  contactCount: number;
+  deactivated: boolean;
+  deleted: boolean;
+  message: string;
+  productLinkCount: number;
+  success: boolean;
+}
+
 export interface ApiSupplierDto {
   category?: string;
   countryRegion?: string;
@@ -3229,6 +3239,7 @@ export interface SingleWindowPackageManifest {
   packageId: string;
   packageType: number;
   payloadFiles: SingleWindowPackageFile[];
+  receiptReferenceNo: string;
   schemaVersion: string;
   snapshotSha256: string;
   sourceBaselineHash: string;
@@ -5034,9 +5045,9 @@ export class ExportDocManagerApiClient {
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteSupplier(request: DeleteSupplierRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteSupplier(request: DeleteSupplierRequest, init?: RequestInit): Promise<ApiSupplierDeleteResponse> {
     const path = `/api/suppliers/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
+    return this.request<ApiSupplierDeleteResponse>("DELETE", path, { init });
   }
 
   public deleteSupplierAssessment(request: DeleteSupplierAssessmentRequest, init?: RequestInit): Promise<ApiCommandResponse> {

@@ -5,10 +5,6 @@ namespace ExportDocManager.Api.Hosting
 {
     public static class ApiStartupValidator
     {
-        private static readonly StringComparison PathComparison = OperatingSystem.IsWindows()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
-
         public static void Validate(
             IAppPathProvider pathProvider,
             DatabaseConnectionSettings databaseSettings,
@@ -138,16 +134,19 @@ namespace ExportDocManager.Api.Hosting
                 return;
             }
 
-            string sqliteFileName = DbHelper.NormalizeSqliteDatabaseFileName(databaseSettings.SqliteDatabaseFileName);
-            string databasePath = DbHelper.GetDatabasePath(sqliteFileName);
-            EnsureWritableDirectory(Path.GetDirectoryName(databasePath), "SQLite 数据库目录");
-
-            if (!Path.IsPathRooted(sqliteFileName) &&
-                !IsPathUnderRoot(databasePath, pathProvider.DatabaseRoot))
+            string databasePath;
+            try
             {
-                throw new InvalidOperationException(
-                    $"相对 SQLite 数据库路径必须解析到运行目录数据库目录下: {databasePath}");
+                databasePath = DbHelper.ResolveRuntimeSqliteDatabasePath(
+                    pathProvider,
+                    databaseSettings.SqliteDatabaseFileName);
             }
+            catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
+            {
+                throw new InvalidOperationException(exception.Message, exception);
+            }
+
+            EnsureWritableDirectory(Path.GetDirectoryName(databasePath), "SQLite 数据库目录");
         }
 
         private static void EnsureWritableDirectory(string directory, string description)
@@ -171,19 +170,6 @@ namespace ExportDocManager.Api.Hosting
                     File.Delete(probePath);
                 }
             }
-        }
-
-        private static bool IsPathUnderRoot(string path, string root)
-        {
-            string normalizedPath = Path.GetFullPath(path)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            string normalizedRoot = Path.GetFullPath(root)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-
-            return string.Equals(normalizedPath, normalizedRoot, PathComparison) ||
-                normalizedPath.StartsWith(
-                    normalizedRoot + Path.DirectorySeparatorChar,
-                    PathComparison);
         }
 
         private static bool IsLoopbackHost(string host)

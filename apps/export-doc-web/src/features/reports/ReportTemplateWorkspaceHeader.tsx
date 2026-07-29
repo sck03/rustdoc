@@ -46,7 +46,7 @@ export function ReportTemplateWorkspaceHeader({
               onClick={() => onDesignerModeChange("new")}
             >
               <LayoutTemplate size={16} aria-hidden="true" />
-              <span>新版设计器</span>
+              <span>可视化设计</span>
             </button>
             <button
               className={designerMode === "source" ? "segmented-active" : ""}
@@ -54,11 +54,11 @@ export function ReportTemplateWorkspaceHeader({
               role="tab"
               aria-selected={designerMode === "source"}
               disabled={designDisabled}
-              title={designDisabled ? "源码编辑请使用桌面端" : undefined}
+              title={designDisabled ? "高级 HTML 编辑请使用桌面端" : "适合熟悉 HTML 的高级用户"}
               onClick={() => onDesignerModeChange("source")}
             >
               <Code2 size={16} aria-hidden="true" />
-              <span>源码</span>
+              <span>高级 HTML</span>
             </button>
           </div>
           <IconButton label="刷新报表模板" disabled={isBusy} onClick={onRefresh}>

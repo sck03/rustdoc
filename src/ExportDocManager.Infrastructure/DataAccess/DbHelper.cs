@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Utils;
 using Npgsql;
 
 namespace ExportDocManager.DataAccess
@@ -98,8 +99,17 @@ namespace ExportDocManager.DataAccess
             DbContextOptionsBuilder options,
             DatabaseConnectionSettings databaseSettings)
         {
+            ConfigureDbContextOptions(options, databaseSettings, _pathProvider);
+        }
+
+        public static void ConfigureDbContextOptions(
+            DbContextOptionsBuilder options,
+            DatabaseConnectionSettings databaseSettings,
+            IAppPathProvider pathProvider)
+        {
             ArgumentNullException.ThrowIfNull(options);
             ArgumentNullException.ThrowIfNull(databaseSettings);
+            ArgumentNullException.ThrowIfNull(pathProvider);
 
             var validationMessage = DatabaseModeHelper.Validate(databaseSettings);
             if (!string.IsNullOrWhiteSpace(validationMessage))
@@ -113,8 +123,7 @@ namespace ExportDocManager.DataAccess
                 return;
             }
 
-            var sqliteFileName = NormalizeSqliteDatabaseFileName(databaseSettings.SqliteDatabaseFileName);
-            var dbPath = GetDatabasePath(sqliteFileName);
+            var dbPath = ResolveRuntimeSqliteDatabasePath(pathProvider, databaseSettings.SqliteDatabaseFileName);
             var connectionString = BuildConnectionString(dbPath);
 
             options.UseSqlite(connectionString);
@@ -164,6 +173,80 @@ namespace ExportDocManager.DataAccess
             return string.IsNullOrWhiteSpace(sqliteDatabaseFileName)
                 ? DatabaseConnectionSettings.DefaultSqliteDatabaseFileName
                 : sqliteDatabaseFileName.Trim();
+        }
+
+        public static string NormalizeRuntimeSqliteDatabaseFileName(string sqliteDatabaseFileName)
+        {
+            string normalized = NormalizeSqliteDatabaseFileName(sqliteDatabaseFileName);
+            if (Path.IsPathRooted(normalized) ||
+                !string.Equals(normalized, Path.GetFileName(normalized), StringComparison.Ordinal) ||
+                normalized.Any(ch => char.IsControl(ch) || ch is '<' or '>' or ':' or '"' or '/' or '\\' or '|' or '?' or '*') ||
+                normalized.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+                normalized.EndsWith(' ') ||
+                normalized.EndsWith('.'))
+            {
+                throw new ArgumentException(
+                    "SQLite 只能填写运行数据根 Database 目录内的文件名，不能填写绝对路径、上级目录或子目录。",
+                    nameof(sqliteDatabaseFileName));
+            }
+
+            string windowsBaseName = normalized.Split('.', 2)[0];
+            if (windowsBaseName.Equals("CON", StringComparison.OrdinalIgnoreCase) ||
+                windowsBaseName.Equals("PRN", StringComparison.OrdinalIgnoreCase) ||
+                windowsBaseName.Equals("AUX", StringComparison.OrdinalIgnoreCase) ||
+                windowsBaseName.Equals("NUL", StringComparison.OrdinalIgnoreCase) ||
+                IsWindowsNumberedDeviceName(windowsBaseName, "COM") ||
+                IsWindowsNumberedDeviceName(windowsBaseName, "LPT"))
+            {
+                throw new ArgumentException(
+                    "SQLite 文件名不能使用 Windows 保留设备名。",
+                    nameof(sqliteDatabaseFileName));
+            }
+
+            string extension = Path.GetExtension(normalized).ToLowerInvariant();
+            if (extension is not (".db" or ".sqlite" or ".sqlite3"))
+            {
+                throw new ArgumentException(
+                    "SQLite 文件名必须以 .db、.sqlite 或 .sqlite3 结尾。",
+                    nameof(sqliteDatabaseFileName));
+            }
+
+            return normalized;
+        }
+
+        public static string ResolveRuntimeSqliteDatabasePath(
+            IAppPathProvider pathProvider,
+            string sqliteDatabaseFileName)
+        {
+            ArgumentNullException.ThrowIfNull(pathProvider);
+
+            string normalized = NormalizeSqliteDatabaseFileName(sqliteDatabaseFileName);
+            string databasePath;
+            if (Path.IsPathRooted(normalized))
+            {
+                _ = NormalizeRuntimeSqliteDatabaseFileName(Path.GetFileName(normalized));
+                databasePath = Path.GetFullPath(normalized);
+            }
+            else
+            {
+                normalized = NormalizeRuntimeSqliteDatabaseFileName(normalized);
+                databasePath = Path.GetFullPath(Path.Combine(pathProvider.DatabaseRoot, normalized));
+            }
+
+            if (!PathBoundaryHelper.IsWithinRoot(databasePath, pathProvider.DatabaseRoot))
+            {
+                throw new InvalidOperationException(
+                    $"SQLite 数据库必须位于运行数据根 Database 目录下: {databasePath}");
+            }
+
+            return databasePath;
+        }
+
+        private static bool IsWindowsNumberedDeviceName(string value, string prefix)
+        {
+            return value.Length == prefix.Length + 1 &&
+                value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                value[^1] is >= '1' and <= '9';
         }
 
         public static string BuildPostgreSqlConnectionString(DatabaseConnectionSettings settings)

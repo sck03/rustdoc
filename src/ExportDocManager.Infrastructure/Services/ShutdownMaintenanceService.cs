@@ -38,7 +38,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
 
             string uploadedBackupFileName = string.Empty;
-            string cloudSyncErrorMessage = string.Empty;
+            var maintenanceErrors = new List<string>();
             int deletedAuditLogs = 0;
             int deletedTextLogs = 0;
 
@@ -46,16 +46,27 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 _backupService.CleanOldBackups(systemSettings.BackupRetentionDays);
-                await _backupService.BackupDatabaseAsync().ConfigureAwait(false);
-
-                try
+                var backupResult = await _backupService
+                    .BackupDatabaseAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                if (!backupResult.Success && !backupResult.Skipped)
                 {
-                    uploadedBackupFileName = await UploadLatestBackupAsync(cancellationToken).ConfigureAwait(false);
+                    AddMaintenanceError(maintenanceErrors, backupResult.Message);
+                    Log.Warning("Local database backup failed during shutdown maintenance: {Message}", backupResult.Message);
                 }
-                catch (Exception ex)
+                else if (backupResult.Success)
                 {
-                    cloudSyncErrorMessage = ex.Message;
-                    Log.Warning(ex, "Cloud backup upload failed during shutdown maintenance.");
+                    try
+                    {
+                        uploadedBackupFileName = await UploadBackupAsync(
+                            backupResult.FilePath,
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        AddMaintenanceError(maintenanceErrors, ex.Message);
+                        Log.Warning(ex, "Cloud backup upload failed during shutdown maintenance.");
+                    }
                 }
             }
 
@@ -81,11 +92,11 @@ namespace ExportDocManager.Services.Infrastructure
                 DeletedAuditLogs = deletedAuditLogs,
                 DeletedTextLogs = deletedTextLogs,
                 UploadedBackupFileName = uploadedBackupFileName,
-                CloudSyncErrorMessage = cloudSyncErrorMessage
+                CloudSyncErrorMessage = string.Join("；", maintenanceErrors)
             };
         }
 
-        private async Task<string> UploadLatestBackupAsync(CancellationToken cancellationToken)
+        private async Task<string> UploadBackupAsync(string backupFilePath, CancellationToken cancellationToken)
         {
             if (_settingsService.Settings?.WebDav?.Enabled != true)
             {
@@ -93,21 +104,44 @@ namespace ExportDocManager.Services.Infrastructure
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            var backups = _backupService.GetAvailableBackups();
-            if (backups == null || backups.Count == 0)
+            string resolvedBackupPath;
+            try
             {
-                return string.Empty;
+                resolvedBackupPath = Path.GetFullPath(backupFilePath ?? string.Empty);
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                throw new InvalidDataException("新创建的数据库备份路径无效，已停止云端上传。", ex);
             }
 
-            var latestBackup = backups[0];
-            var fileName = Path.GetFileName(latestBackup);
+            if (!PathBoundaryHelper.IsWithinRoot(resolvedBackupPath, _pathProvider.BackupRoot) ||
+                !string.Equals(Path.GetExtension(resolvedBackupPath), ".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("新创建的数据库备份不在运行数据根 Backups 目录内或不是 ZIP 文件，已停止云端上传。");
+            }
+
+            if (!File.Exists(resolvedBackupPath))
+            {
+                throw new FileNotFoundException("新创建的数据库备份文件不存在，已停止云端上传。", resolvedBackupPath);
+            }
+
+            var fileName = Path.GetFileName(resolvedBackupPath);
             if (string.IsNullOrWhiteSpace(fileName))
             {
-                return string.Empty;
+                throw new InvalidDataException("新创建的数据库备份文件名无效，已停止云端上传。");
             }
 
-            await _cloudSyncService.UploadFileAsync(latestBackup, fileName).ConfigureAwait(false);
+            await _cloudSyncService.UploadFileAsync(resolvedBackupPath, fileName).ConfigureAwait(false);
             return fileName;
+        }
+
+        private static void AddMaintenanceError(ICollection<string> errors, string message)
+        {
+            string normalized = (message ?? string.Empty).Trim();
+            if (normalized.Length > 0 && !errors.Contains(normalized, StringComparer.Ordinal))
+            {
+                errors.Add(normalized);
+            }
         }
     }
 }

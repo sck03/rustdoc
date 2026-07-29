@@ -91,6 +91,29 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public void AppDbContext_Model_ShouldRestrictSupplierHistoryDeletion()
+        {
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+                .Options;
+            using var context = new AppDbContext(options);
+
+            var productLinkForeignKey = Assert.Single(
+                context.Model.FindEntityType(typeof(SupplierProductLink))!.GetForeignKeys(),
+                foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(SupplierCompany));
+            var assessmentForeignKey = Assert.Single(
+                context.Model.FindEntityType(typeof(SupplierAssessment))!.GetForeignKeys(),
+                foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(SupplierCompany));
+            var contactForeignKey = Assert.Single(
+                context.Model.FindEntityType(typeof(SupplierContact))!.GetForeignKeys(),
+                foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(SupplierCompany));
+
+            Assert.Equal(DeleteBehavior.Restrict, contactForeignKey.DeleteBehavior);
+            Assert.Equal(DeleteBehavior.Restrict, productLinkForeignKey.DeleteBehavior);
+            Assert.Equal(DeleteBehavior.Restrict, assessmentForeignKey.DeleteBehavior);
+        }
+
+        [Fact]
         public void AuditInterceptor_ShouldUseConfiguredAuditUserProvider()
         {
             var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -129,6 +152,34 @@ namespace ExportDocManager.Infrastructure.Tests
             var auditLog = context.AuditLogs.Single(item => item.EntityName == nameof(Customer));
             Assert.Equal(customer.Id.ToString(), auditLog.EntityId);
             Assert.DoesNotContain("generated-after-save", auditLog.EntityId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void AppDbContext_ShouldEnforceOnePrimaryContactPerCrmCustomerAndSupplier()
+        {
+            using var connection = new SqliteConnection("Data Source=:memory:");
+            connection.Open();
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite(connection)
+                .Options;
+            using var context = new AppDbContext(options);
+            context.Database.EnsureCreated();
+            var customer = new CrmCustomer { Name = "客户" };
+            var supplier = new SupplierCompany { Name = "供应商", Status = "合作中" };
+            context.CrmCustomers.Add(customer);
+            context.SupplierCompanies.Add(supplier);
+            context.SaveChanges();
+
+            context.CrmContacts.AddRange(
+                new CrmContact { CrmCustomerId = customer.Id, Name = "甲", IsPrimary = true },
+                new CrmContact { CrmCustomerId = customer.Id, Name = "乙", IsPrimary = true });
+            Assert.Throws<DbUpdateException>(() => context.SaveChanges());
+            context.ChangeTracker.Clear();
+
+            context.SupplierContacts.AddRange(
+                new SupplierContact { SupplierCompanyId = supplier.Id, Name = "甲", IsPrimary = true },
+                new SupplierContact { SupplierCompanyId = supplier.Id, Name = "乙", IsPrimary = true });
+            Assert.Throws<DbUpdateException>(() => context.SaveChanges());
         }
 
         [Fact]

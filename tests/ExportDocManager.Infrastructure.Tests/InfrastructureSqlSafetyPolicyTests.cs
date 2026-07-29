@@ -11,13 +11,14 @@ public sealed class InfrastructureSqlSafetyPolicyTests
     ];
 
     [Fact]
-    public void RawSql_ShouldRemainConfinedToReviewedSchemaInitialization()
+    public void RawSql_ShouldRemainConfinedToReviewedInfrastructureGateways()
     {
         string sourceRoot = ResolveSourceRoot("src", "ExportDocManager.Infrastructure");
         var allowedRelativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "Services/DatabaseInitializationService.cs",
-            "Services/DatabaseSchemaBaseline.cs"
+            "Services/DatabaseSchemaBaseline.cs",
+            "Services/SqliteMaintenanceGateway.cs"
         };
         var violations = Directory
             .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
@@ -36,7 +37,7 @@ public sealed class InfrastructureSqlSafetyPolicyTests
 
         Assert.True(
             violations.Count == 0,
-            "Raw SQL is restricted to the reviewed schema-initialization module."
+            "Raw SQL is restricted to the reviewed schema-initialization and SQLite maintenance gateways."
             + Environment.NewLine
             + string.Join(Environment.NewLine, violations));
 
@@ -44,6 +45,12 @@ public sealed class InfrastructureSqlSafetyPolicyTests
         Assert.Contains("MetadataTableName", initialization, StringComparison.Ordinal);
         Assert.Contains("ExecuteSqlRawAsync", initialization, StringComparison.Ordinal);
         Assert.Contains("CreatePerformanceIndexesAsync", initialization, StringComparison.Ordinal);
+
+        string sqliteMaintenance = File.ReadAllText(Path.Combine(sourceRoot, "Services", "SqliteMaintenanceGateway.cs"));
+        Assert.Contains("QuickCheckCommandText", sqliteMaintenance, StringComparison.Ordinal);
+        Assert.Contains("PRAGMA quick_check;", sqliteMaintenance, StringComparison.Ordinal);
+        Assert.Contains("RunQuickCheckAsync", sqliteMaintenance, StringComparison.Ordinal);
+        Assert.Contains("RunQuickCheck", sqliteMaintenance, StringComparison.Ordinal);
     }
 
     [Fact]

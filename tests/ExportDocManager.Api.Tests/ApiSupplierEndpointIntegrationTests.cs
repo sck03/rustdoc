@@ -48,6 +48,7 @@ namespace ExportDocManager.Api.Tests
             var first = await client.PostAsJsonAsync($"/api/suppliers/{supplier.Id}/contacts",
                 new ApiSupplierContactSaveRequest(0, supplier.Id, "张三", "业务员", "a@example.com", "100", "wx-a", true));
             Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+            var firstContact = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSupplierContactDto>(first);
             var second = await client.PostAsJsonAsync($"/api/suppliers/{supplier.Id}/contacts",
                 new ApiSupplierContactSaveRequest(0, supplier.Id, "李四", "经理", "b@example.com", "200", "wx-b", true));
             Assert.Equal(HttpStatusCode.Created, second.StatusCode);
@@ -68,6 +69,24 @@ namespace ExportDocManager.Api.Tests
                     secondContact.Email, secondContact.Phone, secondContact.InstantMessaging, true,
                     secondContact.VersionNumber));
             Assert.Equal(HttpStatusCode.Conflict, staleContactResponse.StatusCode);
+
+            var currentContacts = await client.GetFromJsonAsync<List<ApiSupplierContactDto>>($"/api/suppliers/{supplier.Id}/contacts") ?? [];
+            var currentFirst = currentContacts.Single(item => item.Id == firstContact.Id);
+            var currentSecond = currentContacts.Single(item => item.Id == secondContact.Id);
+            var primarySwitches = await Task.WhenAll(
+                client.PutAsJsonAsync(
+                    $"/api/suppliers/{supplier.Id}/contacts/{currentFirst.Id}",
+                    new ApiSupplierContactSaveRequest(currentFirst.Id, supplier.Id, currentFirst.Name, currentFirst.Title,
+                        currentFirst.Email, currentFirst.Phone, currentFirst.InstantMessaging, true, currentFirst.VersionNumber)),
+                client.PutAsJsonAsync(
+                    $"/api/suppliers/{supplier.Id}/contacts/{currentSecond.Id}",
+                    new ApiSupplierContactSaveRequest(currentSecond.Id, supplier.Id, currentSecond.Name, currentSecond.Title,
+                        currentSecond.Email, currentSecond.Phone, currentSecond.InstantMessaging, true, currentSecond.VersionNumber)));
+            Assert.All(primarySwitches, response => Assert.Contains(response.StatusCode,
+                new[] { HttpStatusCode.OK, HttpStatusCode.Conflict }));
+            Assert.Single(
+                await client.GetFromJsonAsync<List<ApiSupplierContactDto>>($"/api/suppliers/{supplier.Id}/contacts") ?? [],
+                item => item.IsPrimary);
 
             var productOptions = await client.GetFromJsonAsync<List<ApiSupplierProductOptionDto>>("/api/suppliers/product-options?keyword=FAB-001");
             Assert.Equal(productId, Assert.Single(productOptions!).Id);
@@ -182,9 +201,38 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal((byte)'K', workbook[1]);
 
             Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync($"/api/suppliers/{supplier.Id}/contacts/{secondContact.Id}")).StatusCode);
-            Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync($"/api/suppliers/{supplier.Id}")).StatusCode);
+            var deactivateResponse = await client.DeleteAsync($"/api/suppliers/{supplier.Id}");
+            Assert.Equal(HttpStatusCode.OK, deactivateResponse.StatusCode);
+            var deactivateResult = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSupplierDeleteResponse>(deactivateResponse);
+            Assert.False(deactivateResult.Deleted);
+            Assert.True(deactivateResult.Deactivated);
+            Assert.Equal(1, deactivateResult.ContactCount);
+            Assert.Equal(0, deactivateResult.ProductLinkCount);
+            Assert.Equal(1, deactivateResult.AssessmentCount);
+
+            var disposableResponse = await client.PostAsJsonAsync("/api/suppliers",
+                new ApiSupplierSaveRequest(0, "Disposable Supplier", "CN", "临时", string.Empty,
+                    "合作中", string.Empty, string.Empty));
+            var disposable = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSupplierDto>(disposableResponse);
+            var disposableContactResponse = await client.PostAsJsonAsync($"/api/suppliers/{disposable.Id}/contacts",
+                new ApiSupplierContactSaveRequest(0, disposable.Id, "临时联系人", string.Empty, string.Empty,
+                    string.Empty, string.Empty, true));
+            Assert.Equal(HttpStatusCode.Created, disposableContactResponse.StatusCode);
+            var hardDeleteResponse = await client.DeleteAsync($"/api/suppliers/{disposable.Id}");
+            Assert.Equal(HttpStatusCode.OK, hardDeleteResponse.StatusCode);
+            var hardDeleteResult = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSupplierDeleteResponse>(hardDeleteResponse);
+            Assert.True(hardDeleteResult.Deleted);
+            Assert.False(hardDeleteResult.Deactivated);
+            Assert.Equal(1, hardDeleteResult.ContactCount);
+
             await using (var context = CreateContext(harness.DatabasePath))
-                Assert.False(await context.SupplierAssessments.AnyAsync(item => item.SupplierCompanyId == supplier.Id));
+            {
+                Assert.Equal("停用", (await context.SupplierCompanies.SingleAsync(item => item.Id == supplier.Id)).Status);
+                Assert.True(await context.SupplierAssessments.AnyAsync(item => item.SupplierCompanyId == supplier.Id));
+                Assert.True(await context.SupplierContacts.AnyAsync(item => item.SupplierCompanyId == supplier.Id));
+                Assert.False(await context.SupplierCompanies.AnyAsync(item => item.Id == disposable.Id));
+                Assert.False(await context.SupplierContacts.AnyAsync(item => item.SupplierCompanyId == disposable.Id));
+            }
         }
 
         private static AppDbContext CreateContext(string databasePath)

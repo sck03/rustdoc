@@ -28,7 +28,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["deletedAuditLogs"] = new { type = "integer", format = "int32" },
                                 ["deletedTextLogs"] = new { type = "integer", format = "int32" },
                                 ["uploadedBackupFileName"] = StringProperty("Latest runtime backup ZIP uploaded to WebDAV, when enabled."),
-                                ["cloudSyncErrorMessage"] = StringProperty("Non-blocking WebDAV upload error message."),
+                                ["cloudSyncErrorMessage"] = StringProperty("Local backup or WebDAV upload maintenance error message."),
                                 ["cloudSyncFailed"] = new { type = "boolean" },
                                 ["backupRoot"] = StringProperty("Runtime data root Backups directory."),
                                 ["logRoot"] = StringProperty("Program root logs directory."),

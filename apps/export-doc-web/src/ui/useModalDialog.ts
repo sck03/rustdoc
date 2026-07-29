@@ -1,5 +1,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 
+const inertBranchStates = new WeakMap<HTMLElement, { count: number; previousInert: boolean }>();
+
 type ModalDialogOptions = {
   active?: boolean;
   canClose?: boolean;
@@ -38,6 +40,7 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
     const previouslyFocusedElement = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
+    const restoreInertBranches = setBackgroundBranchesInert(dialogRef.current);
     const focusInitialElement = window.requestAnimationFrame(() => {
       const preferred = initialFocusRefRef.current?.current;
       if (preferred && !preferred.hasAttribute("disabled")) {
@@ -101,9 +104,45 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
     return () => {
       window.cancelAnimationFrame(focusInitialElement);
       window.removeEventListener("keydown", handleKeyDown);
+      restoreInertBranches();
       previouslyFocusedElement?.focus();
     };
   }, [active]);
 
   return dialogRef;
+}
+
+function setBackgroundBranchesInert(dialog: HTMLElement | null) {
+  const inertElements: HTMLElement[] = [];
+  let activeBranch = dialog;
+  while (activeBranch && activeBranch !== document.body) {
+    const parent = activeBranch.parentElement;
+    if (!parent) break;
+    for (const sibling of Array.from(parent.children)) {
+      if (sibling === activeBranch || !(sibling instanceof HTMLElement)) continue;
+      const existingState = inertBranchStates.get(sibling);
+      if (existingState) {
+        existingState.count += 1;
+      } else {
+        inertBranchStates.set(sibling, { count: 1, previousInert: sibling.inert });
+      }
+      sibling.inert = true;
+      inertElements.push(sibling);
+    }
+    activeBranch = parent;
+  }
+
+  return () => {
+    for (const element of inertElements.reverse()) {
+      const state = inertBranchStates.get(element);
+      if (!state) continue;
+      state.count -= 1;
+      if (state.count <= 0) {
+        element.inert = state.previousInert;
+        inertBranchStates.delete(element);
+      } else {
+        element.inert = true;
+      }
+    }
+  };
 }

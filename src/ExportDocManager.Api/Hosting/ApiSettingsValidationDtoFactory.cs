@@ -20,6 +20,7 @@ namespace ExportDocManager.Api.Hosting
 
             var messages = new List<ApiSettingsValidationMessageDto>();
             NormalizeProviderForValidation(draft, raw, messages);
+            NormalizeSqliteFileNameForValidation(draft, messages);
 
             AppSettings prepared;
             try
@@ -28,7 +29,7 @@ namespace ExportDocManager.Api.Hosting
             }
             catch (Exception ex)
             {
-                messages.Add(Error("system.databaseProvider", ex.Message, isAutoFixable: false));
+                messages.Add(Error("settings", ex.Message, isAutoFixable: false));
                 prepared = CloneSettings(draft);
                 EnsureValidationObjects(prepared);
             }
@@ -98,6 +99,25 @@ namespace ExportDocManager.Api.Hosting
             }
         }
 
+        private static void NormalizeSqliteFileNameForValidation(
+            AppSettings draft,
+            ICollection<ApiSettingsValidationMessageDto> messages)
+        {
+            try
+            {
+                draft.System.SqliteDatabaseFileName =
+                    DbHelper.NormalizeRuntimeSqliteDatabaseFileName(draft.System.SqliteDatabaseFileName);
+            }
+            catch (ArgumentException ex)
+            {
+                draft.System.SqliteDatabaseFileName = DatabaseConnectionSettings.DefaultSqliteDatabaseFileName;
+                messages.Add(Error(
+                    "system.sqliteDatabaseFileName",
+                    $"{ex.Message} 自动修复会恢复为 {DatabaseConnectionSettings.DefaultSqliteDatabaseFileName}。",
+                    isAutoFixable: true));
+            }
+        }
+
         private static void AddSystemValidationMessages(
             SystemSettings raw,
             SystemSettings normalized,
@@ -138,7 +158,8 @@ namespace ExportDocManager.Api.Hosting
                     true));
             }
 
-            if (!string.Equals(
+            if (!messages.Any(message => message.PropertyName == "system.sqliteDatabaseFileName" && IsError(message.Level)) &&
+                !string.Equals(
                     raw.SqliteDatabaseFileName?.Trim() ?? string.Empty,
                     normalized.SqliteDatabaseFileName ?? string.Empty,
                     StringComparison.Ordinal))

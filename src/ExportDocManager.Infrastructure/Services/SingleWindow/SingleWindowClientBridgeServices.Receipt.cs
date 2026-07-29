@@ -192,6 +192,13 @@ namespace ExportDocManager.Services.SingleWindow
             var parsedReceipt = await TryParseReceiptAsync(batch, path, cancellationToken);
             if (parsedReceipt != null)
             {
+                if (!string.IsNullOrWhiteSpace(batch.ReferenceNo) &&
+                    !string.IsNullOrWhiteSpace(parsedReceipt.ReferenceNo) &&
+                    !string.Equals(parsedReceipt.ReferenceNo, batch.ReferenceNo, StringComparison.OrdinalIgnoreCase))
+                {
+                    return 0;
+                }
+
                 score += 180;
 
                 if (!string.IsNullOrWhiteSpace(batch.ReferenceNo) &&
@@ -247,14 +254,38 @@ namespace ExportDocManager.Services.SingleWindow
                 ContainsToken(text, batch.ReferenceNo);
         }
 
-        private static bool ContainsToken(string text, string token)
+        internal static bool ContainsToken(string text, string token)
         {
             if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(token))
             {
                 return false;
             }
 
-            return text.Contains(token.Trim(), StringComparison.OrdinalIgnoreCase);
+            string normalizedToken = token.Trim();
+            int searchIndex = 0;
+            while (searchIndex <= text.Length - normalizedToken.Length)
+            {
+                int matchIndex = text.IndexOf(
+                    normalizedToken,
+                    searchIndex,
+                    StringComparison.OrdinalIgnoreCase);
+                if (matchIndex < 0)
+                {
+                    return false;
+                }
+
+                int matchEnd = matchIndex + normalizedToken.Length;
+                bool startsAtBoundary = matchIndex == 0 || !char.IsLetterOrDigit(text[matchIndex - 1]);
+                bool endsAtBoundary = matchEnd == text.Length || !char.IsLetterOrDigit(text[matchEnd]);
+                if (startsAtBoundary && endsAtBoundary)
+                {
+                    return true;
+                }
+
+                searchIndex = matchIndex + 1;
+            }
+
+            return false;
         }
 
         private static bool StartsWithAny(string text, IReadOnlyList<string> prefixes)

@@ -31,17 +31,33 @@ export function toDateInputValue(value?: string) {
     return "";
   }
 
+  const datePrefix = /^(\d{4}-\d{2}-\d{2})(?:T|$)/.exec(value.trim());
+  if (datePrefix) {
+    return datePrefix[1];
+  }
+
   const parsed = new Date(value);
   if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString().slice(0, 10);
+    return currentLocalDateInputValue(parsed);
   }
 
   return value.slice(0, 10);
 }
 
 export function dateInputToApiDate(value: string) {
-  const date = value || new Date().toISOString().slice(0, 10);
+  const date = value || currentLocalDateInputValue();
   return `${date}T00:00:00`;
+}
+
+export function currentLocalDateInputValue(value = new Date()) {
+  if (Number.isNaN(value.getTime())) {
+    return "";
+  }
+
+  const year = String(value.getFullYear()).padStart(4, "0");
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function readNumber(value: string) {

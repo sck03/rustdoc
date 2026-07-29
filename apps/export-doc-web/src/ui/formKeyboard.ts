@@ -50,7 +50,14 @@ function isExcelLikeFormNavigationTarget(target: HTMLElement) {
 }
 
 function isArrowFormNavigationTarget(target: HTMLElement) {
-  return target instanceof HTMLInputElement || target instanceof HTMLSelectElement;
+  return target instanceof HTMLInputElement && [
+    "email",
+    "password",
+    "search",
+    "tel",
+    "text",
+    "url",
+  ].includes(target.type);
 }
 
 function moveFocusWithinForm(form: HTMLFormElement, current: HTMLElement, backwards: boolean) {

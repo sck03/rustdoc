@@ -47,7 +47,7 @@ namespace ExportDocManager.Api.Hosting
 
                 string sqliteDatabasePath = DatabaseModeHelper.UsesPostgreSql(databaseSettings)
                     ? string.Empty
-                    : DbHelper.GetDatabasePath(databaseSettings.SqliteDatabaseFileName);
+                    : DbHelper.ResolveRuntimeSqliteDatabasePath(paths, databaseSettings.SqliteDatabaseFileName);
 
                 var response = ApiHealthResponseFactory.Create(
                     paths,
@@ -138,9 +138,12 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     var result = await shutdownMaintenanceService.RunAsync(cancellationToken).ConfigureAwait(false);
+                    bool success = !result.CloudSyncFailed;
                     return Results.Ok(CreateShutdownMaintenanceResponse(
-                        success: true,
-                        message: "退出维护已完成。",
+                        success,
+                        message: success
+                            ? "退出维护已完成。"
+                            : $"退出维护未完全完成：{result.CloudSyncErrorMessage}",
                         result,
                         pathProvider));
                 }

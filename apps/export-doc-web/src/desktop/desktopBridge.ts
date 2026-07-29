@@ -4,6 +4,8 @@ export type DesktopRuntimeContext = {
   apiBaseUrl: string;
   desktopAccessToken: string;
   productEdition: "Document" | "Sales" | "Full";
+  platform: string;
+  singleWindowStationCapable: boolean;
 };
 
 export type TauriUpdaterCheckResult = {

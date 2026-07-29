@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Files, FolderInput, Send } from "lucide-react";
-import { type KeyboardEvent, useState } from "react";
+import { type KeyboardEvent, useEffect, useState } from "react";
 import type {
   ExportDocManagerApiClient,
   SingleWindowClientDispatchResult,
@@ -73,7 +73,7 @@ export function OperationCenterTable({
   }
 
   return (
-    <ResponsiveTableFrame label="单一窗口操作批次" busy={isBusy}>
+    <ResponsiveTableFrame label="单一窗口操作批次" mobileLayout="cards" busy={isBusy}>
       <table className="single-window-operation-table">
         <thead><tr><th>发票号</th><th>公司抬头</th><th>业务</th><th>状态</th><th>批次号</th><th>版本</th><th>回执</th><th>持卡档案</th><th>更新</th><th>操作</th></tr></thead>
         <tbody>
@@ -87,16 +87,16 @@ export function OperationCenterTable({
               onDoubleClick={() => onOpen(row.batchId)}
               onKeyDown={(event) => handleRowKeyDown(event, row.batchId)}
             >
-              <td className="strong-cell">{readDisplayText(row.invoiceNo)}</td>
-              <td>{readDisplayText(row.companyScope)}</td>
-              <td>{formatBusinessType(row.businessType)}</td>
-              <td><span className="status-pill">{formatBatchStatus(row.status)}</span></td>
-              <td>{readDisplayText(row.batchReference)}</td>
-              <td>{`S${row.submissionVersion} / D${row.draftRevision}`}</td>
-              <td title={row.lastReceiptMessage ?? ""}>{row.receiptCount > 0 ? `${row.receiptCount} · ${readDisplayText(row.lastReceiptCode)}` : "0"}</td>
-              <td>{readDisplayText(row.clientProfileName || row.assignedCardIdentifier)}</td>
-              <td>{formatDateTime(row.updatedAt)}</td>
-              <td><button className="icon-button compact-icon-button" type="button" title="打开批次详情" aria-label="打开批次详情" onClick={(event) => { event.stopPropagation(); onOpen(row.batchId); }}><Files size={15} aria-hidden="true" /></button></td>
+              <td className="strong-cell" data-label="发票号">{readDisplayText(row.invoiceNo)}</td>
+              <td data-label="公司抬头">{readDisplayText(row.companyScope)}</td>
+              <td data-label="业务">{formatBusinessType(row.businessType)}</td>
+              <td data-label="状态"><span className="status-pill">{formatBatchStatus(row.status)}</span></td>
+              <td data-label="批次号">{readDisplayText(row.batchReference)}</td>
+              <td data-label="版本">{`S${row.submissionVersion} / D${row.draftRevision}`}</td>
+              <td data-label="回执" title={row.lastReceiptMessage ?? ""}>{row.receiptCount > 0 ? `${row.receiptCount} · ${readDisplayText(row.lastReceiptCode)}` : "0"}</td>
+              <td data-label="持卡档案">{readDisplayText(row.clientProfileName || row.assignedCardIdentifier)}</td>
+              <td data-label="更新">{formatDateTime(row.updatedAt)}</td>
+              <td data-label="操作"><button className="icon-button compact-icon-button" type="button" title="打开批次详情" aria-label="打开批次详情" onClick={(event) => { event.stopPropagation(); onOpen(row.batchId); }}><Files size={15} aria-hidden="true" /></button></td>
             </tr>
           ))}
         </tbody>
@@ -125,6 +125,14 @@ export function OperationCenterListActionsPanel({
   const [dispatchResult, setDispatchResult] = useState<SingleWindowClientDispatchResult | null>(null);
   const [receiptResult, setReceiptResult] = useState<SingleWindowReceiptCollectionResult | null>(null);
 
+  useEffect(() => {
+    setMessage(null);
+    setMessageKind("success");
+    setSavedReceiptPackagePath("");
+    setDispatchResult(null);
+    setReceiptResult(null);
+  }, [row.batchId]);
+
   const profileQuery = useQuery({
     queryKey: queryKeys.singleWindowClientProfiles(),
     queryFn: () => client.getSingleWindowClientProfiles(),
@@ -136,7 +144,7 @@ export function OperationCenterListActionsPanel({
     mutationFn: () => client.dispatchSingleWindowBatchToClient({ body: { batchId: row.batchId } }),
     onSuccess: async (response) => {
       setDispatchResult(response);
-      setMessage("XML 已写入当前档案交接 OutBox；这不代表官方客户端已导入，请由操作员继续确认导入和提交。");
+      setMessage("申报文件已送入当前档案的待导入目录；这不代表官方客户端已经导入，请由操作员继续确认导入和提交。");
       setMessageKind("success");
       await invalidateSingleWindowBatchQueries(queryClient, row.batchId);
     },
@@ -151,7 +159,7 @@ export function OperationCenterListActionsPanel({
     mutationFn: async () => {
       const collection = await client.collectSingleWindowClientReceipts({ body: { batchId: row.batchId } });
       if (collection.receiptFiles.length === 0) {
-        throw new Error("当前档案 InBox 中尚未找到与当前批次匹配的回执文件。");
+        throw new Error("当前档案的回执目录中尚未找到与当前批次精确匹配的回执文件。");
       }
 
       const targetPath = await selectSavePackagePath(buildReceiptPackageFileName(row));
@@ -203,7 +211,7 @@ export function OperationCenterListActionsPanel({
         <div><h2>{isDesktopStation ? "当前持卡机任务" : "当前办公室批次"}</h2><span>{readDisplayText(row.batchReference)}</span></div>
         <div className="toolbar-actions">
           <button className="command-button secondary" type="button" disabled={isBusy} onClick={onOpenDetail}><Files size={17} aria-hidden="true" /><span>批次详情</span></button>
-          {isDesktopStation ? <button className="command-button" type="button" disabled={!canOperate || isBusy || !canDispatch} onClick={() => dispatchMutation.mutate()}><Send size={17} aria-hidden="true" /><span>写入交接 OutBox</span></button> : null}
+          {isDesktopStation ? <button className="command-button" type="button" disabled={!canOperate || isBusy || !canDispatch} onClick={() => dispatchMutation.mutate()}><Send size={17} aria-hidden="true" /><span>送入官方客户端待办目录</span></button> : null}
           {isDesktopStation ? <button className="command-button secondary" type="button" disabled={!canOperate || isBusy || !canCollect} onClick={() => receiptMutation.mutate()}><FolderInput size={17} aria-hidden="true" /><span>收集并导出回执</span></button> : null}
         </div>
       </div>
@@ -225,8 +233,8 @@ export function OperationCenterListActionsPanel({
         <DetailItem label="业务" value={formatBusinessType(row.businessType)} />
         <DetailItem label="状态" value={formatBatchStatus(row.status)} />
         {isDesktopStation ? <DetailItem label="操作卡" value={profile?.cardIdentifier || row.assignedCardIdentifier} /> : <DetailItem label="持卡档案" value={row.clientProfileName || row.assignedCardIdentifier} />}
-        {isDesktopStation ? <DetailItem label="OutBox" value={outBoxPath} actions={renderOpenPathAction(outBoxPath, "打开 OutBox", setMessage)} /> : null}
-        {isDesktopStation ? <DetailItem label="InBox" value={inBoxPath} actions={renderOpenPathAction(inBoxPath, "打开 InBox", setMessage)} /> : null}
+        {isDesktopStation ? <DetailItem label="待导入目录" value={outBoxPath} actions={renderOpenPathAction(outBoxPath, "打开待导入目录", setMessage)} /> : null}
+        {isDesktopStation ? <DetailItem label="回执目录" value={inBoxPath} actions={renderOpenPathAction(inBoxPath, "打开回执目录", setMessage)} /> : null}
         {dispatchResult ? <DetailItem label="已写入文件" value={dispatchResult.payloadFileCount} /> : null}
         {receiptResult ? <DetailItem label="已收集回执" value={receiptResult.receiptFiles.length} /> : null}
         {savedReceiptPackagePath ? <DetailItem label="回执包" value={savedReceiptPackagePath} wide actions={renderOpenPathAction(savedReceiptPackagePath, "打开回执包位置", setMessage)} /> : null}

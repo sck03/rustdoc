@@ -8,6 +8,7 @@ import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { FormGuidance } from "../../ui/PageState.tsx";
+import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
 export function SupplierProductLinksPanel({
   client,
@@ -30,8 +31,13 @@ export function SupplierProductLinksPanel({
   const [keyword, setKeyword] = useState("");
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
   const [view, setView] = useState<"directory" | "editor">("directory");
+  const [draftDirty, setDraftDirty] = useState(false);
   const productSearchController = useRef<AbortController | null>(null);
   const selected = links.find((item) => item.id === selectedId);
+  const { confirmDiscardChanges } = useUnsavedChangesGuard({
+    isDirty: draftDirty,
+    message: "当前供货关系有未保存的修改。",
+  });
   const productOptions = useMemo(() => {
     if (!selected || options.some((item) => item.id === selected.productId)) return options;
     return [{ id: selected.productId, productCode: selected.productCode, nameCN: selected.productNameCN, nameEN: selected.productNameEN }, ...options];
@@ -52,12 +58,28 @@ export function SupplierProductLinksPanel({
 
   useEffect(() => {
     setFeedback(null);
+    setDraftDirty(false);
     setView("directory");
     const controller = new AbortController();
     void Promise.all([loadLinks(undefined, controller.signal), searchProducts("", controller.signal)])
       .catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); });
     return () => controller.abort();
   }, [client, supplierId]);
+
+  async function changeView(nextView: "directory" | "editor") {
+    if (nextView === view) return true;
+    if (!await confirmDiscardChanges("切换供货关系视图")) return false;
+    setDraftDirty(false);
+    setView(nextView);
+    return true;
+  }
+
+  async function openEditor(nextSelectedId: number) {
+    if (!await confirmDiscardChanges(nextSelectedId ? "切换供货关系" : "新增供货关系")) return;
+    setDraftDirty(false);
+    setSelectedId(nextSelectedId);
+    setView("editor");
+  }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -80,37 +102,47 @@ export function SupplierProductLinksPanel({
         ? await client.updateSupplierProductLink({ supplierId, id, body })
         : await client.createSupplierProductLink({ supplierId, body });
       await loadLinks(saved.id);
+      setDraftDirty(false);
       setView("editor");
       setFeedback(successFeedback(id ? "供货关系已更新。" : "供货关系已建立。"));
     } catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
 
   async function remove() {
-    if (!canManage || !selected || !await requestConfirmation({ title: "删除供货关系", description: `确定删除“${selected.productCode || selected.productNameCN}”的供货关系吗？`, details: ["供应商和商品主数据将保留。"], confirmLabel: "确认删除", tone: "danger" })) return;
+    if (!canManage || !selected || !await requestConfirmation({ title: "删除供货关系", description: `确定删除“${selected.productCode || selected.productNameCN}”的供货关系吗？`, details: ["供应商和商品主数据将保留。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除供货关系")) return;
     try {
       await client.deleteSupplierProductLink({ supplierId, id: selected.id });
       await loadLinks();
+      setDraftDirty(false);
       setView("directory");
       setFeedback(successFeedback("供货关系已删除，产品资料保持不变。"));
     } catch (error) { setFeedback(requestErrorFeedback(error)); }
+  }
+
+  async function openProductDirectory() {
+    if (!await confirmDiscardChanges("打开产品资料")) return;
+    setDraftDirty(false);
+    navigate("/master-data/products");
   }
 
   return <section className="form-section supplier-product-workspace">
     <div className="section-header"><div><h3>{view === "directory" ? "供应产品目录" : selected ? "编辑供货关系" : "新增供货关系"}</h3><p>为 {supplierName || "当前供应商"} 维护独立供货关系，不修改产品主数据。</p></div><span>{links.length} 项</span></div>
     <OperationFeedback feedback={feedback} />
     {view === "directory" ? <>
-      <div className="section-header-actions supplier-product-directory-actions"><span>每条关系只记录当前供应商的报价、货号和交期。</span>{canOperate ? <button className="primary-button" type="button" onClick={() => { setSelectedId(0); setView("editor"); }}>新增供货关系</button> : null}</div>
+      <div className="section-header-actions supplier-product-directory-actions"><span>每条关系只记录当前供应商的报价、货号和交期。</span>{canOperate ? <button className="primary-button" type="button" onClick={() => void openEditor(0)}>新增供货关系</button> : null}</div>
       <ResponsiveTableFrame label="供应商供货关系" mobileLayout="scroll"><table className="data-table"><thead><tr><th>产品</th><th>供应商货号</th><th>参考价</th><th>交期</th><th>状态</th><th /></tr></thead><tbody>
-        {links.map((item) => <tr key={item.id}><td><TablePrimaryText value={item.productNameCN || item.productNameEN || "未命名"} secondary={item.productCode || "无产品货号"} /></td><td><TablePrimaryText value={item.supplierProductCode} /></td><td>{item.currency} {item.referencePrice.toFixed(2)}</td><td>{item.leadTimeDays ? `${item.leadTimeDays} 天` : "未设置"}</td><td><BusinessStatusBadge value={item.status} /></td><td><button className="secondary-button" type="button" onClick={() => { setSelectedId(item.id); setView("editor"); }}>{canOperate ? "编辑" : "查看"}</button></td></tr>)}
-        {!links.length ? <tr><td className="empty-cell" colSpan={6}><div className="empty-cell-content"><strong>尚未关联供应产品</strong><span>{canOperate ? "需要记录供应商货号、参考价或交期时，再建立供货关系。" : "当前供应商还没有供货关系。"}</span>{canOperate ? <button className="primary-button" type="button" onClick={() => { setSelectedId(0); setView("editor"); }}>新增第一条供货关系</button> : null}</div></td></tr> : null}
+        {links.map((item) => <tr key={item.id}><td><TablePrimaryText value={item.productNameCN || item.productNameEN || "未命名"} secondary={item.productCode || "无产品货号"} /></td><td><TablePrimaryText value={item.supplierProductCode} /></td><td>{item.currency} {item.referencePrice.toFixed(2)}</td><td>{item.leadTimeDays ? `${item.leadTimeDays} 天` : "未设置"}</td><td><BusinessStatusBadge value={item.status} /></td><td><button className="secondary-button" type="button" onClick={() => void openEditor(item.id)}>{canOperate ? "编辑" : "查看"}</button></td></tr>)}
+        {!links.length ? <tr><td className="empty-cell" colSpan={6}><div className="empty-cell-content"><strong>尚未关联供应产品</strong><span>{canOperate ? "需要记录供应商货号、参考价或交期时，再建立供货关系。" : "当前供应商还没有供货关系。"}</span>{canOperate ? <button className="primary-button" type="button" onClick={() => void openEditor(0)}>新增第一条供货关系</button> : null}</div></td></tr> : null}
       </tbody></table></ResponsiveTableFrame>
     </> : null}
-    {view === "editor" ? <form className="form-grid" key={selected?.id ?? `new-${supplierId}`} onSubmit={save}>
-      <div className="section-heading-row"><h4>{selected ? "编辑供货关系" : "新增供货关系"}</h4><button className="secondary-button" type="button" onClick={() => setView("directory")}>返回供应产品目录</button></div>
+    {view === "editor" ? <form className="form-grid" key={`${selected?.id ?? "new"}-${selected?.versionNumber ?? 0}-${supplierId}`} onSubmit={save}>
+      <div className="section-heading-row"><h4>{selected ? "编辑供货关系" : "新增供货关系"}</h4><button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回供应产品目录</button></div>
       <div className="form-field-wide context-strip"><strong>{supplierName}</strong><span>这里只建立供应商与现有产品的关系，不会修改产品主数据。</span></div>
-      {!productOptions.length ? <FormGuidance className="form-field-wide" title="先建立产品资料" description="供货关系必须关联现有产品。建立产品后返回此处即可继续。" action={canOperate ? <button className="secondary-button" type="button" onClick={() => navigate("/master-data/products")}>打开产品资料</button> : undefined} /> : null}
-      <fieldset className="permission-fieldset form-field-wide" disabled={!canOperate}>
-      <label className="form-field-wide">查找产品<div className="toolbar"><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="输入产品货号或名称" /><button className="secondary-button" type="button" onClick={() => { productSearchController.current?.abort(); const controller = new AbortController(); productSearchController.current = controller; void searchProducts(keyword, controller.signal).catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); }); }}>查找</button></div></label>
+      {!productOptions.length ? <FormGuidance className="form-field-wide" title="先建立产品资料" description="供货关系必须关联现有产品。建立产品后返回此处即可继续。" action={canOperate ? <button className="secondary-button" type="button" onClick={() => void openProductDirectory()}>打开产品资料</button> : undefined} /> : null}
+      <fieldset className="permission-fieldset form-field-wide" disabled={!canOperate} onChangeCapture={(event) => {
+        if (!(event.target instanceof Element) || !event.target.closest("[data-draft-ignore]")) setDraftDirty(true);
+      }}>
+      <label className="form-field-wide">查找产品<div className="toolbar" data-draft-ignore><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="输入产品货号或名称" /><button className="secondary-button" type="button" onClick={() => { productSearchController.current?.abort(); const controller = new AbortController(); productSearchController.current = controller; void searchProducts(keyword, controller.signal).catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); }); }}>查找</button></div></label>
       <label className="form-field-wide">产品<select name="productId" required defaultValue={selected?.productId ?? ""}><option value="">请选择产品</option>{productOptions.map((item) => <option key={item.id} value={item.id}>{item.productCode || "无货号"} · {item.nameCN || item.nameEN || "未命名"}</option>)}</select></label>
       <label>供应商货号<input name="supplierProductCode" defaultValue={selected?.supplierProductCode} /></label>
       <label>参考价<input name="referencePrice" type="number" min="0" step="0.0001" defaultValue={selected?.referencePrice ?? 0} /></label>

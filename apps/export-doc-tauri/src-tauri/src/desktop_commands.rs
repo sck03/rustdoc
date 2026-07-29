@@ -1,9 +1,10 @@
 use std::{
     ffi::OsString,
-    fs,
+    fs::{self, OpenOptions},
     io::{self, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -14,6 +15,8 @@ use crate::runtime_paths::RuntimePaths;
 const MAX_OCR_PREVIEW_IMAGE_BYTES: u64 = 25 * 1024 * 1024;
 const MAX_PDF_EXPORT_BYTES: usize = 25 * 1024 * 1024;
 const MAX_FRONTEND_LOG_FIELD_LENGTH: usize = 8 * 1024;
+const PDF_TEMP_FILE_CREATE_ATTEMPTS: usize = 16;
+static PDF_TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[tauri::command]
 pub(crate) fn select_single_window_package_file() -> Result<Option<String>, String> {
@@ -363,8 +366,120 @@ fn write_pdf_file(output_path: &Path, bytes: &[u8]) -> Result<(), String> {
         return Err("PDF 保存目录不存在，请重新选择保存位置。".to_owned());
     }
 
-    fs::write(output_path, bytes)
-        .map_err(|error| format!("无法保存 PDF '{}'：{error}", output_path.display()))
+    let (temp_path, mut temp_file) = create_pdf_temp_file(output_path).map_err(|error| {
+        format!(
+            "无法创建 PDF 临时文件（目录 '{}'）：{error}",
+            parent.display()
+        )
+    })?;
+    let result = (|| -> Result<(), String> {
+        temp_file
+            .write_all(bytes)
+            .and_then(|_| temp_file.flush())
+            .and_then(|_| temp_file.sync_all())
+            .map_err(|error| {
+                format!(
+                    "无法完整写入 PDF 临时文件 '{}'：{error}",
+                    temp_path.display()
+                )
+            })?;
+        drop(temp_file);
+        replace_file_atomically(&temp_path, output_path)
+            .map_err(|error| format!("无法保存 PDF '{}'：{error}", output_path.display()))
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temp_path);
+    }
+    result
+}
+
+fn create_pdf_temp_file(output_path: &Path) -> io::Result<(PathBuf, fs::File)> {
+    create_pdf_temp_file_with(|| build_pdf_temp_path(output_path))
+}
+
+fn create_pdf_temp_file_with<F>(mut next_path: F) -> io::Result<(PathBuf, fs::File)>
+where
+    F: FnMut() -> PathBuf,
+{
+    let mut last_collision = None;
+    for _ in 0..PDF_TEMP_FILE_CREATE_ATTEMPTS {
+        let temp_path = next_path();
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+        {
+            Ok(file) => return Ok((temp_path, file)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+                last_collision = Some(error);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
+    Err(last_collision.unwrap_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "could not allocate a unique PDF temporary file",
+        )
+    }))
+}
+
+fn build_pdf_temp_path(output_path: &Path) -> PathBuf {
+    let parent = output_path.parent().unwrap_or_else(|| Path::new("."));
+    let file_name = output_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("export.pdf");
+    let sequence = PDF_TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    parent.join(format!(
+        ".{file_name}.{}.{}.tmp",
+        std::process::id(),
+        sequence
+    ))
+}
+
+#[cfg(windows)]
+fn replace_file_atomically(source: &Path, target: &Path) -> io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+
+    const MOVEFILE_REPLACE_EXISTING: u32 = 0x1;
+    const MOVEFILE_WRITE_THROUGH: u32 = 0x8;
+
+    #[link(name = "Kernel32")]
+    extern "system" {
+        fn MoveFileExW(
+            existing_file_name: *const u16,
+            new_file_name: *const u16,
+            flags: u32,
+        ) -> i32;
+    }
+
+    let source_wide: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
+    let target_wide: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
+    let result = unsafe {
+        MoveFileExW(
+            source_wide.as_ptr(),
+            target_wide.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if result == 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(not(windows))]
+fn replace_file_atomically(source: &Path, target: &Path) -> io::Result<()> {
+    fs::rename(source, target)?;
+    if let Some(parent) = target.parent() {
+        if let Ok(directory) = fs::File::open(parent) {
+            let _ = directory.sync_all();
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -678,6 +793,27 @@ mod tests {
         write_pdf_file(&output_path, b"%PDF-1.4\n%%EOF").unwrap();
 
         assert_eq!(fs::read(&output_path).unwrap(), b"%PDF-1.4\n%%EOF");
+        assert!(!fs::read_dir(&data_root).unwrap().any(|entry| {
+            entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .ends_with(".tmp")
+        }));
+        let _ = fs::remove_dir_all(data_root);
+    }
+
+    #[test]
+    fn write_pdf_file_atomically_replaces_existing_file_and_preserves_it_on_validation_failure() {
+        let data_root = fresh_desktop_command_test_dir("replace-pdf");
+        let output_path = data_root.join("report.pdf");
+        fs::write(&output_path, b"%PDF-1.4\nold").unwrap();
+
+        write_pdf_file(&output_path, b"%PDF-1.7\nnew").unwrap();
+        assert_eq!(fs::read(&output_path).unwrap(), b"%PDF-1.7\nnew");
+
+        assert!(write_pdf_file(&output_path, b"invalid").is_err());
+        assert_eq!(fs::read(&output_path).unwrap(), b"%PDF-1.7\nnew");
         let _ = fs::remove_dir_all(data_root);
     }
 
@@ -687,6 +823,23 @@ mod tests {
 
         assert!(write_pdf_file(&data_root.join("plan.txt"), b"%PDF-1.4").is_err());
         assert!(write_pdf_file(&data_root.join("plan.pdf"), b"not a pdf").is_err());
+        let _ = fs::remove_dir_all(data_root);
+    }
+
+    #[test]
+    fn pdf_temp_file_creation_retries_after_a_stale_name_collision() {
+        let data_root = fresh_desktop_command_test_dir("pdf-temp-collision");
+        let collision_path = data_root.join(".report.pdf.collision.tmp");
+        let available_path = data_root.join(".report.pdf.available.tmp");
+        fs::write(&collision_path, "stale").unwrap();
+        let mut candidates = vec![collision_path.clone(), available_path.clone()].into_iter();
+
+        let (selected_path, file) =
+            create_pdf_temp_file_with(|| candidates.next().unwrap()).unwrap();
+        drop(file);
+
+        assert_eq!(selected_path, available_path);
+        assert_eq!(fs::read_to_string(collision_path).unwrap(), "stale");
         let _ = fs::remove_dir_all(data_root);
     }
 

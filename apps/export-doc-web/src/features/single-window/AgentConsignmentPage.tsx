@@ -583,7 +583,7 @@ function AgentConsignmentWorkbench({
     <div className="agent-consignment-workbench">
       <div className="agent-consignment-workbench-main">
         <AgentConsignmentCard
-          title="OperInfo 操作信息"
+          title="企业与操作资料"
           meta="企业编码、操作类型和签名会进入导入请求的操作段。"
         >
           <div className="field-grid agent-consignment-compact-grid">
@@ -611,7 +611,7 @@ function AgentConsignmentWorkbench({
         </AgentConsignmentCard>
 
         <AgentConsignmentCard
-          title="ImportInfo 核心申报"
+          title="核心申报信息"
           meta="优先复核必填字段，决定交接包能否顺利导入。"
         >
           <div className="field-grid agent-consignment-critical-grid">

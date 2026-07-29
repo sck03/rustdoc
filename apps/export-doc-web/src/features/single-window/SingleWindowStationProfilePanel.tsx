@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, CreditCard, FolderOpen, Plus, RefreshCw, Save, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ApiSingleWindowClientProfileDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { selectDirectory } from "../../desktop/desktopBridge.ts";
@@ -9,6 +9,7 @@ import { TextField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { PathField } from "../../ui/PathField.tsx";
+import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
 const NEW_PROFILE_KEY = "__new__";
 
@@ -31,6 +32,7 @@ export function SingleWindowStationProfilePanel({
   const [message, setMessage] = useState<string | null>(null);
   const [messageKind, setMessageKind] = useState<"success" | "error">("success");
   const [desktopMessage, setDesktopMessage] = useState<string | null>(null);
+  const loadedProfileKeyRef = useRef("");
 
   const profilesQuery = useQuery({
     queryKey: queryKeys.singleWindowClientProfiles(),
@@ -46,6 +48,37 @@ export function SingleWindowStationProfilePanel({
     () => profiles.find((profile) => profile.profileKey === selectedProfileKey) ?? null,
     [profiles, selectedProfileKey],
   );
+  const currentDraftSnapshot = JSON.stringify({
+    profileName,
+    companyScope,
+    cardIdentifier,
+    customsCooClientRootPath,
+    agentConsignmentClientRootPath,
+    canSubmitCustomsCoo,
+    canSubmitAgentConsignment,
+  });
+  const persistedDraftSnapshot = JSON.stringify(selectedProfile ? {
+    profileName: selectedProfile.profileName ?? "",
+    companyScope: selectedProfile.companyScope ?? "",
+    cardIdentifier: selectedProfile.cardIdentifier ?? "",
+    customsCooClientRootPath: selectedProfile.customsCooClientRootPath ?? "",
+    agentConsignmentClientRootPath: selectedProfile.agentConsignmentClientRootPath ?? "",
+    canSubmitCustomsCoo: selectedProfile.canSubmitCustomsCoo,
+    canSubmitAgentConsignment: selectedProfile.canSubmitAgentConsignment,
+  } : {
+    profileName: "",
+    companyScope: "",
+    cardIdentifier: "",
+    customsCooClientRootPath: "",
+    agentConsignmentClientRootPath: "",
+    canSubmitCustomsCoo: true,
+    canSubmitAgentConsignment: true,
+  });
+  const hasUnsavedProfileChanges = canOperate && currentDraftSnapshot !== persistedDraftSnapshot;
+  const { confirmDiscardChanges } = useUnsavedChangesGuard({
+    isDirty: hasUnsavedProfileChanges,
+    message: "当前持卡机公司与操作卡档案有未保存的修改。",
+  });
 
   useEffect(() => {
     if (!profilesQuery.data) return;
@@ -60,13 +93,21 @@ export function SingleWindowStationProfilePanel({
   }, [activeProfile?.profileKey, profiles, profiles.length, profilesQuery.data, selectedProfileKey]);
 
   useEffect(() => {
+    const draftKey = selectedProfile?.profileKey ?? (selectedProfileKey === NEW_PROFILE_KEY ? NEW_PROFILE_KEY : "");
+    if (draftKey && loadedProfileKeyRef.current !== draftKey) {
+      loadedProfileKeyRef.current = draftKey;
+      if (selectedProfile) loadProfile(selectedProfile);
+      else resetDraft();
+      return;
+    }
+    if (hasUnsavedProfileChanges) return;
     if (!selectedProfile) {
       if (selectedProfileKey === NEW_PROFILE_KEY) resetDraft();
       return;
     }
 
     loadProfile(selectedProfile);
-  }, [selectedProfile, selectedProfileKey]);
+  }, [hasUnsavedProfileChanges, selectedProfile, selectedProfileKey]);
 
   const saveMutation = useMutation({
     mutationFn: () => client.saveSingleWindowClientProfile({
@@ -83,7 +124,14 @@ export function SingleWindowStationProfilePanel({
     }),
     onSuccess: async (response) => {
       queryClient.setQueryData(queryKeys.singleWindowClientProfiles(), response);
-      setSelectedProfileKey(response.activeProfileKey || NEW_PROFILE_KEY);
+      const savedProfile = response.profiles.find((profile) => profile.profileKey === response.activeProfileKey)
+        ?? response.profiles[0]
+        ?? null;
+      const nextProfileKey = savedProfile?.profileKey ?? NEW_PROFILE_KEY;
+      loadedProfileKeyRef.current = nextProfileKey;
+      setSelectedProfileKey(nextProfileKey);
+      if (savedProfile) loadProfile(savedProfile);
+      else resetDraft();
       setMessage(response.message || "操作档案已保存并启用。");
       setMessageKind("success");
       await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowClientProfiles() });
@@ -98,7 +146,10 @@ export function SingleWindowStationProfilePanel({
     mutationFn: (profileKey: string) => client.activateSingleWindowClientProfile({ profileKey }),
     onSuccess: async (response) => {
       queryClient.setQueryData(queryKeys.singleWindowClientProfiles(), response);
+      const activatedProfile = response.profiles.find((profile) => profile.profileKey === response.activeProfileKey) ?? null;
+      loadedProfileKeyRef.current = activatedProfile?.profileKey ?? response.activeProfileKey;
       setSelectedProfileKey(response.activeProfileKey);
+      if (activatedProfile) loadProfile(activatedProfile);
       setMessage(response.message || "当前操作档案已切换。");
       setMessageKind("success");
       await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowClientProfiles() });
@@ -153,6 +204,47 @@ export function SingleWindowStationProfilePanel({
     }
   }
 
+  async function changeSelectedProfile(nextProfileKey: string) {
+    if (nextProfileKey === selectedProfileKey) return;
+    if (hasUnsavedProfileChanges && !await confirmDiscardChanges("切换操作档案")) return;
+    setSelectedProfileKey(nextProfileKey);
+    setMessage(null);
+    setDesktopMessage(null);
+  }
+
+  async function startNewProfile() {
+    if (hasUnsavedProfileChanges && !await confirmDiscardChanges("新建操作档案")) return;
+    setSelectedProfileKey(NEW_PROFILE_KEY);
+    resetDraft();
+    setMessage(null);
+  }
+
+  async function refreshProfiles() {
+    if (hasUnsavedProfileChanges && !await confirmDiscardChanges("刷新操作档案")) return;
+    if (selectedProfile) loadProfile(selectedProfile);
+    else resetDraft();
+
+    const refreshed = await profilesQuery.refetch();
+    const refreshedProfiles = refreshed.data?.profiles ?? [];
+    const refreshedProfile = selectedProfileKey === NEW_PROFILE_KEY
+      ? null
+      : refreshedProfiles.find((profile) => profile.profileKey === selectedProfileKey)
+        ?? refreshedProfiles.find((profile) => profile.isActive)
+        ?? refreshedProfiles.find((profile) => profile.profileKey === refreshed.data?.activeProfileKey)
+        ?? refreshedProfiles[0]
+        ?? null;
+    const nextProfileKey = refreshedProfile?.profileKey ?? NEW_PROFILE_KEY;
+    loadedProfileKeyRef.current = nextProfileKey;
+    setSelectedProfileKey(nextProfileKey);
+    if (refreshedProfile) loadProfile(refreshedProfile);
+    else resetDraft();
+  }
+
+  async function activateProfile(profileKey: string) {
+    if (hasUnsavedProfileChanges && !await confirmDiscardChanges("切换当前操作卡")) return;
+    activateMutation.mutate(profileKey);
+  }
+
   return (
     <section className="form-section single-window-station-profile" aria-label="本机持卡机操作档案">
       <div className="section-header">
@@ -170,7 +262,7 @@ export function SingleWindowStationProfilePanel({
             title="刷新操作档案"
             aria-label="刷新操作档案"
             disabled={isBusy}
-            onClick={() => void profilesQuery.refetch()}
+            onClick={() => void refreshProfiles()}
           >
             <RefreshCw size={18} aria-hidden="true" />
           </button>
@@ -178,11 +270,7 @@ export function SingleWindowStationProfilePanel({
             className="command-button secondary"
             type="button"
             disabled={!canOperate || isBusy}
-            onClick={() => {
-              setSelectedProfileKey(NEW_PROFILE_KEY);
-              resetDraft();
-              setMessage(null);
-            }}
+            onClick={() => void startNewProfile()}
           >
             <Plus size={17} aria-hidden="true" />
             <span>新增档案</span>
@@ -218,11 +306,7 @@ export function SingleWindowStationProfilePanel({
             aria-label="选择操作档案"
             value={selectedProfileKey}
             disabled={isBusy}
-            onChange={(event) => {
-              setSelectedProfileKey(event.target.value);
-              setMessage(null);
-              setDesktopMessage(null);
-            }}
+            onChange={(event) => void changeSelectedProfile(event.target.value)}
           >
             <option value={NEW_PROFILE_KEY}>新建操作档案</option>
             {profiles.map((profile) => (
@@ -256,7 +340,7 @@ export function SingleWindowStationProfilePanel({
             className="command-button secondary"
             type="button"
             disabled={!canOperate || isBusy}
-            onClick={() => activateMutation.mutate(selectedProfile.profileKey)}
+            onClick={() => void activateProfile(selectedProfile.profileKey)}
           >
             <CreditCard size={17} aria-hidden="true" />
             <span>切换为当前操作卡</span>

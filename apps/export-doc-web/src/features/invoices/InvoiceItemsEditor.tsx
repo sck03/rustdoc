@@ -379,7 +379,8 @@ export function InvoiceItemsEditor({
   ]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === "c" && selectedCellCount > 1) {
+    const primaryModifier = event.ctrlKey || event.metaKey;
+    if (primaryModifier && !event.shiftKey && event.key.toLowerCase() === "c" && selectedCellCount > 1) {
       event.preventDefault();
       void copySelectedCells();
       return;
@@ -409,7 +410,7 @@ export function InvoiceItemsEditor({
       return;
     }
 
-    if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === "z") {
+    if (primaryModifier && !event.shiftKey && event.key.toLowerCase() === "z") {
       event.preventDefault();
       if (!readOnly) {
         undoItemEdit();
@@ -417,7 +418,7 @@ export function InvoiceItemsEditor({
       return;
     }
 
-    if ((event.ctrlKey && event.key.toLowerCase() === "y") || (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "z")) {
+    if ((primaryModifier && event.key.toLowerCase() === "y") || (primaryModifier && event.shiftKey && event.key.toLowerCase() === "z")) {
       event.preventDefault();
       if (!readOnly) {
         redoItemEdit();
@@ -440,7 +441,7 @@ export function InvoiceItemsEditor({
       return;
     }
 
-    if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === "d") {
+    if (primaryModifier && !event.shiftKey && event.key.toLowerCase() === "d") {
       event.preventDefault();
       if (readOnly) {
         return;
@@ -449,7 +450,7 @@ export function InvoiceItemsEditor({
       return;
     }
 
-    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "d") {
+    if (primaryModifier && event.shiftKey && event.key.toLowerCase() === "d") {
       event.preventDefault();
       if (readOnly) {
         return;

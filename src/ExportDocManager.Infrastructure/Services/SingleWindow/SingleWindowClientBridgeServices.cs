@@ -37,6 +37,12 @@ namespace ExportDocManager.Services.SingleWindow
 
         private void EnsureSqliteStation()
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                throw new PlatformNotSupportedException(
+                    "官方单一窗口客户端和实体操作卡只支持 Windows 持卡机；macOS、Linux 和浏览器端只能制作或归档交接包。" );
+            }
+
             if (!_isSqlite)
             {
                 throw new InvalidOperationException("官方单一窗口客户端只能由独立 SQLite 持卡机操作。");

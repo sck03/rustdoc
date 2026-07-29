@@ -664,7 +664,7 @@ namespace ExportDocManager.Api.Hosting
                             parameters = new[] { PathParameter("id", "integer", "int32", "Supplier id.") },
                             responses = new Dictionary<string, object>
                             {
-                                ["200"] = new { description = "Supplier deleted.", content = JsonContent("ApiCommandResponse") },
+                                ["200"] = new { description = "Supplier deleted or deactivated while preserving referenced history.", content = JsonContent("ApiSupplierDeleteResponse") },
                                 ["401"] = new { description = "Unauthorized." }, ["403"] = new { description = "Forbidden." },
                                 ["404"] = new { description = "Supplier not found." }
                             }

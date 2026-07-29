@@ -507,6 +507,25 @@ namespace ExportDocManager.Api.Hosting
                             type = "object", required = new[] { "affectedCount", "status" },
                             properties = new Dictionary<string, object> { ["affectedCount"] = new { type = "integer", format = "int32" }, ["status"] = StringProperty("Updated status.") }
                         },
+                        ["ApiSupplierDeleteResponse"] = new
+                        {
+                            type = "object",
+                            required = new[]
+                            {
+                                "success", "deleted", "deactivated", "message",
+                                "contactCount", "productLinkCount", "assessmentCount"
+                            },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["success"] = new { type = "boolean" },
+                                ["deleted"] = new { type = "boolean", description = "True when the supplier and its contacts were permanently deleted." },
+                                ["deactivated"] = new { type = "boolean", description = "True when referenced history required the supplier to be retained and deactivated." },
+                                ["message"] = StringProperty("User-facing outcome message."),
+                                ["contactCount"] = new { type = "integer", format = "int32" },
+                                ["productLinkCount"] = new { type = "integer", format = "int32" },
+                                ["assessmentCount"] = new { type = "integer", format = "int32" }
+                            }
+                        },
                         ["ApiSupplierProductOptionDto"] = new
                         {
                             type = "object", required = new[] { "id", "productCode", "nameCN", "nameEN" },

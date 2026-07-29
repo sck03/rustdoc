@@ -605,7 +605,7 @@ export function ReportTemplateDesignerPage({
     setContent(nextContent);
     setContentTemplatePath(selectedTemplatePath);
     setPreview(null);
-    setMessage("新版设计器内容已应用到模板源码，保存后写入模板文件。");
+    setMessage("可视化设计内容已应用到模板，保存后写入模板文件。");
     setMessageType("success");
   }
 
@@ -641,7 +641,7 @@ export function ReportTemplateDesignerPage({
       return true;
     }
 
-    return requestConfirmation({ title: "转换为新版设计器结构", description: "当前模板未包含新版设计器结构。继续后将使用结构化模板 HTML 覆盖当前旧 HTML。", details: ["建议在转换前导出模板包备份。"], confirmLabel: "确认转换" });
+    return requestConfirmation({ title: "启用可视化设计结构", description: "当前模板尚未包含可视化设计结构。继续后将使用当前布局覆盖原有高级 HTML。", details: ["建议在转换前导出模板包备份。"], confirmLabel: "确认启用" });
   }
 
   function handleFormatSource() {
@@ -653,7 +653,7 @@ export function ReportTemplateDesignerPage({
     setContent(formatted);
     setContentTemplatePath(selectedTemplatePath);
     setPreview(null);
-    setMessage("源码已格式化，保存后写入模板文件。");
+    setMessage("高级 HTML 已格式化，保存后写入模板文件。");
     setMessageType("success");
   }
 
@@ -717,8 +717,8 @@ export function ReportTemplateDesignerPage({
 
         <WorkspaceDeviceNotice
           mode={workspaceDeviceMode}
-          phone="可选择模板、查看预览和进行轻量确认；结构化拖拽、源码编辑、模板保存和模板包导入导出请使用桌面端。"
-          tablet="可选择模板、查看预览和进行现场确认；完整报表设计、源码编辑、模板保存和模板包导入导出请使用桌面端。"
+          phone="可选择模板、查看预览和进行轻量确认；可视化设计、高级 HTML、模板保存和模板包导入导出请使用桌面端。"
+          tablet="可选择模板、查看预览和进行现场确认；完整报表设计、高级 HTML、模板保存和模板包导入导出请使用桌面端。"
         />
 
         {isLimitedReportView ? (

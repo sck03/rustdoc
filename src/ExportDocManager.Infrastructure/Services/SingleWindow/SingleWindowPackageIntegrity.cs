@@ -48,6 +48,7 @@ namespace ExportDocManager.Services.SingleWindow
             Append(builder, manifest.CompanyScope);
             Append(builder, manifest.SnapshotSha256);
             Append(builder, manifest.SourcePackageDigest);
+            Append(builder, manifest.ReceiptReferenceNo);
             Append(builder, manifest.StationKey);
             Append(builder, manifest.CardIdentifier);
             Append(builder, manifest.ClientProfileKey);
@@ -106,7 +107,9 @@ namespace ExportDocManager.Services.SingleWindow
                  !IsStationKey(manifest.StationKey) ||
                  string.IsNullOrWhiteSpace(manifest.CardIdentifier) ||
                  manifest.CardIdentifier.Length > 120 ||
-                 !IsClientProfileKey(manifest.ClientProfileKey) ||
+                  (manifest.ReceiptReferenceNo?.Length ?? 0) > 120 ||
+                  (manifest.ReceiptReferenceNo ?? string.Empty).Any(char.IsControl) ||
+                  !IsClientProfileKey(manifest.ClientProfileKey) ||
                  string.IsNullOrWhiteSpace(manifest.ClientProfileName) ||
                  manifest.ClientProfileName.Length > 80))
             {
@@ -116,6 +119,7 @@ namespace ExportDocManager.Services.SingleWindow
             if (expectedPackageType == SingleWindowPackageType.SubmitPackage &&
                 (!string.IsNullOrWhiteSpace(manifest.StationKey) ||
                  !string.IsNullOrWhiteSpace(manifest.CardIdentifier) ||
+                 !string.IsNullOrWhiteSpace(manifest.ReceiptReferenceNo) ||
                  !string.IsNullOrWhiteSpace(manifest.ClientProfileKey) ||
                  !string.IsNullOrWhiteSpace(manifest.ClientProfileName)))
             {

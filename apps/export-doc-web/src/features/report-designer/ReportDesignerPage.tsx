@@ -250,13 +250,13 @@ export function ReportDesignerPage({
       />
       <div className="new-report-designer-header">
         <div>
-          <span>新版设计器</span>
+          <span>可视化设计</span>
           <h2>{displayName || "报表模板"}</h2>
         </div>
       </div>
       {existingContentWithoutSchema ? (
         <div className="new-report-designer-warning">
-          当前模板未包含新版设计器结构，实验入口已打开默认结构草稿。应用或保存前会再次确认，不会静默转换现有 HTML。
+          当前模板尚未包含可视化设计结构，系统已创建默认布局草稿。应用或保存前会再次确认，不会自动覆盖现有高级 HTML。
         </div>
       ) : null}
       {schemaIssues.length > 0 ? (

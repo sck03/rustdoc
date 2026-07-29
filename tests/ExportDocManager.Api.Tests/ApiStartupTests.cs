@@ -111,6 +111,71 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public void Validate_ShouldAllowOnlySqliteDatabasePathsInsideRuntimeDatabaseRoot()
+        {
+            string appRoot = CreateTempDirectory("edm-api-path-app");
+            string dataRoot = Path.Combine(Path.GetTempPath(), $"edm-api-path-data-{Guid.NewGuid():N}");
+            try
+            {
+                var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
+                DbHelper.ConfigurePathProvider(pathProvider);
+                var runtimeOptions = new ApiRuntimeOptions
+                {
+                    AppRoot = appRoot,
+                    DataRoot = dataRoot,
+                    ListenUrls = "http://127.0.0.1:5199"
+                };
+
+                ApiStartupValidator.Validate(
+                    pathProvider,
+                    new DatabaseConnectionSettings
+                    {
+                        Provider = DatabaseConnectionSettings.SqliteProvider,
+                        SqliteDatabaseFileName = Path.Combine(pathProvider.DatabaseRoot, "inside.db")
+                    },
+                    runtimeOptions);
+
+                Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.Validate(
+                    pathProvider,
+                    new DatabaseConnectionSettings
+                    {
+                        Provider = DatabaseConnectionSettings.SqliteProvider,
+                        SqliteDatabaseFileName = "..\\outside.db"
+                    },
+                    runtimeOptions));
+                Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.Validate(
+                    pathProvider,
+                    new DatabaseConnectionSettings
+                    {
+                        Provider = DatabaseConnectionSettings.SqliteProvider,
+                        SqliteDatabaseFileName = "tenant/data.db"
+                    },
+                    runtimeOptions));
+                Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.Validate(
+                    pathProvider,
+                    new DatabaseConnectionSettings
+                    {
+                        Provider = DatabaseConnectionSettings.SqliteProvider,
+                        SqliteDatabaseFileName = "C:\\outside.db"
+                    },
+                    runtimeOptions));
+                Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.Validate(
+                    pathProvider,
+                    new DatabaseConnectionSettings
+                    {
+                        Provider = DatabaseConnectionSettings.SqliteProvider,
+                        SqliteDatabaseFileName = Path.Combine(appRoot, "outside.db")
+                    },
+                    runtimeOptions));
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        [Fact]
         public void ValidateLocalListenUrls_ShouldRejectLanOrWildcardAddresses()
         {
             Assert.Throws<InvalidOperationException>(

@@ -78,10 +78,10 @@ namespace ExportDocManager.Services.Infrastructure
                 Settings.System.PostgreSqlPassword = _secretProtector.UnprotectSettingsValue(Settings.System.PostgreSqlPassword);
                 Settings.AI.ApiKey = _secretProtector.UnprotectSettingsValue(Settings.AI.ApiKey);
             }
-            catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or IOException or UnauthorizedAccessException or ArgumentException)
             {
                 Settings = previous;
-                throw;
+                throw new InvalidDataException($"设置文件包含无效配置：{_filePath}。{ex.Message}", ex);
             }
         }
 
@@ -228,10 +228,8 @@ namespace ExportDocManager.Services.Infrastructure
 
             Settings.System.DatabaseProvider = DatabaseModeHelper.NormalizeProvider(Settings.System.DatabaseProvider);
 
-            if (string.IsNullOrWhiteSpace(Settings.System.SqliteDatabaseFileName))
-            {
-                Settings.System.SqliteDatabaseFileName = DatabaseConnectionSettings.DefaultSqliteDatabaseFileName;
-            }
+            Settings.System.SqliteDatabaseFileName =
+                DbHelper.NormalizeRuntimeSqliteDatabaseFileName(Settings.System.SqliteDatabaseFileName);
 
             Settings.System.PostgreSqlPort = DbHelper.NormalizePostgreSqlPort(Settings.System.PostgreSqlPort);
             Settings.System.PostgreSqlHost = DbHelper.NormalizePostgreSqlText(Settings.System.PostgreSqlHost);

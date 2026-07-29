@@ -161,6 +161,10 @@ namespace ExportDocManager.DataAccess
                 .OnDelete(DeleteBehavior.SetNull);
             modelBuilder.Entity<CrmContact>().HasIndex(item => new { item.CrmCustomerId, item.Name });
             modelBuilder.Entity<CrmContact>()
+                .HasIndex(item => item.CrmCustomerId)
+                .IsUnique()
+                .HasFilter(Database.IsSqlite() ? "\"IsPrimary\" = 1" : "\"IsPrimary\" = TRUE");
+            modelBuilder.Entity<CrmContact>()
                 .HasOne<CrmCustomer>()
                 .WithMany()
                 .HasForeignKey(item => item.CrmCustomerId)
@@ -197,10 +201,14 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<SupplierCompany>().HasIndex(item => new { item.CompanyScope, item.DepartmentId });
             modelBuilder.Entity<SupplierContact>().HasIndex(item => new { item.SupplierCompanyId, item.Name });
             modelBuilder.Entity<SupplierContact>()
+                .HasIndex(item => item.SupplierCompanyId)
+                .IsUnique()
+                .HasFilter(Database.IsSqlite() ? "\"IsPrimary\" = 1" : "\"IsPrimary\" = TRUE");
+            modelBuilder.Entity<SupplierContact>()
                 .HasOne<SupplierCompany>()
                 .WithMany()
                 .HasForeignKey(item => item.SupplierCompanyId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<SupplierProductLink>()
                 .HasIndex(item => new { item.SupplierCompanyId, item.ProductId })
                 .IsUnique();
@@ -210,7 +218,7 @@ namespace ExportDocManager.DataAccess
                 .HasOne<SupplierCompany>()
                 .WithMany()
                 .HasForeignKey(item => item.SupplierCompanyId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<SupplierProductLink>()
                 .HasOne<Product>()
                 .WithMany()
@@ -222,7 +230,7 @@ namespace ExportDocManager.DataAccess
                 .HasOne<SupplierCompany>()
                 .WithMany()
                 .HasForeignKey(item => item.SupplierCompanyId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<EmailTemplate>().HasIndex(item => new { item.OwnerUserId, item.Category, item.Name });
             modelBuilder.Entity<EmailTemplate>().HasIndex(item => new { item.CompanyScope, item.DepartmentId });
             modelBuilder.Entity<EmailTemplate>().HasIndex(item => new { item.IsShared, item.IsActive });

@@ -30,6 +30,10 @@ namespace ExportDocManager.Api.Hosting
             ArgumentNullException.ThrowIfNull(databaseSettings);
             runtimeOptions ??= new ApiRuntimeOptions();
 
+            // A scheduled SQLite restore must be applied before any DbContext,
+            // hosted service, or request can open the database.
+            SqlitePendingRestoreManager.ApplyPendingRestore(pathProvider, databaseSettings);
+
             services.AddSingleton(pathProvider);
             services.AddSingleton(databaseSettings);
             services.AddSingleton(runtimeOptions);
@@ -189,7 +193,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddSharedReadRepositories();
             services.AddDbContextFactory<AppDbContext>((serviceProvider, options) =>
             {
-                DbHelper.ConfigureDbContextOptions(options, databaseSettings);
+                DbHelper.ConfigureDbContextOptions(options, databaseSettings, pathProvider);
                 options.AddInterceptors(serviceProvider.GetRequiredService<AuditInterceptor>());
             });
 

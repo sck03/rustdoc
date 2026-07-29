@@ -88,6 +88,46 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal(3, (await service.ListVersionsAsync(copy.Id)).Count);
         }
 
+        [Fact]
+        public async Task SaveAndPreview_ShouldSanitizeDangerousEmailHtmlAndKeepBusinessFormatting()
+        {
+            using var factory = new TestDbContextFactory();
+            var currentUser = new FixedCurrentUserContext(new User { Id = 7, Username = "sales", Role = "Sales" });
+            var service = new EmailTemplateService(factory, new BusinessDataAccessScope(CreatePostgreSqlModeSettings(), currentUser));
+
+            var saved = await service.SaveAsync(new EmailTemplateSaveRequest(
+                0,
+                "安全模板",
+                "通用",
+                "Hello {{ContactName}}",
+                "<h2 onclick=\"alert(1)\">Hello</h2><script>alert(1)</script>" +
+                "<p><a href=\"javascript:alert(1)\">危险链接</a>" +
+                "<a href=\"https://example.com/order/{{QuotationNo}}\" target=\"_blank\">安全链接</a></p>",
+                true,
+                false));
+
+            Assert.Contains("<h2>Hello</h2>", saved.BodyHtml, StringComparison.Ordinal);
+            Assert.DoesNotContain("script", saved.BodyHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("onclick", saved.BodyHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("javascript:", saved.BodyHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("https://example.com/order/{{QuotationNo}}", saved.BodyHtml, StringComparison.Ordinal);
+            Assert.Contains("rel=\"noopener noreferrer\"", saved.BodyHtml, StringComparison.Ordinal);
+
+            var preview = service.Preview(new EmailTemplatePreviewRequest(
+                saved.Subject,
+                saved.BodyHtml + "<img src=x onerror=alert(1)>",
+                new Dictionary<string, string>
+                {
+                    ["ContactName"] = "<管理员>",
+                    ["QuotationNo"] = "QT-001\" onclick=\"alert(1)"
+                }));
+
+            Assert.Equal("Hello <管理员>", preview.Subject);
+            Assert.DoesNotContain("<img", preview.BodyHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("onerror", preview.BodyHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("QT-001&quot; onclick=&quot;alert(1)", preview.BodyHtml, StringComparison.Ordinal);
+        }
+
         private static DatabaseConnectionSettings CreatePostgreSqlModeSettings() => new()
         {
             Provider = DatabaseConnectionSettings.PostgreSqlProvider,

@@ -45,12 +45,12 @@ export function ReportDesignerToolbar({
     <div className="new-report-designer-toolbar">
       <button className="command-button secondary" type="button" onClick={onBack}>
         <Code2 size={17} aria-hidden="true" />
-        <span>源码</span>
+        <span>高级 HTML</span>
       </button>
       <div className="new-report-designer-toolbar-actions">
         <button className="command-button secondary" type="button" disabled={!canApply} onClick={onApply}>
           <FileCheck2 size={17} aria-hidden="true" />
-          <span>应用到源码</span>
+          <span>应用到模板</span>
         </button>
         <button className="command-button" type="button" disabled={!canSave} onClick={onSave}>
           <Save size={17} aria-hidden="true" />
