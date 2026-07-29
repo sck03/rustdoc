@@ -90,7 +90,9 @@ namespace ExportDocManager.Services.Reporting
                         ReportType = reportType,
                         DisplayName = displayName,
                         TemplatePath = templatePath,
-                        WithSealDefault = cfg.WithSeal ?? true
+                        WithSealDefault = reportType == ReportDocumentType.PaymentVoucher
+                            ? null
+                            : cfg.WithSeal ?? true
                     });
                 }
             }
@@ -105,7 +107,7 @@ namespace ExportDocManager.Services.Reporting
                         ReportType = reportType,
                         DisplayName = "默认模板 (Default)",
                         TemplatePath = defaultPath,
-                        WithSealDefault = true
+                        WithSealDefault = reportType == ReportDocumentType.PaymentVoucher ? null : true
                     });
                 }
             }
@@ -179,7 +181,6 @@ namespace ExportDocManager.Services.Reporting
         public async Task<ReportHtmlRenderResult> RenderPaymentVoucherAsync(
             int paymentId,
             string templatePath = null,
-            bool withSeal = true,
             CancellationToken cancellationToken = default)
         {
             if (paymentId <= 0)
@@ -198,14 +199,14 @@ namespace ExportDocManager.Services.Reporting
                     templatePath,
                     cancellationToken)
                 .ConfigureAwait(false);
-            string html = await GeneratePaymentVoucherHtmlAsync(payment, templateContent, withSeal, cancellationToken).ConfigureAwait(false);
+            string html = await GeneratePaymentVoucherHtmlAsync(payment, templateContent, cancellationToken).ConfigureAwait(false);
 
             return new ReportHtmlRenderResult
             {
                 ReportType = ReportDocumentType.PaymentVoucher,
                 SourceId = paymentId,
                 TemplatePath = resolvedTemplatePath,
-                WithSeal = withSeal,
+                WithSeal = null,
                 Html = html
             };
         }
@@ -213,7 +214,6 @@ namespace ExportDocManager.Services.Reporting
         public async Task<ReportHtmlRenderResult> RenderPaymentVoucherDraftAsync(
             Payment payment,
             string templatePath = null,
-            bool withSeal = true,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(payment);
@@ -223,14 +223,14 @@ namespace ExportDocManager.Services.Reporting
                     templatePath,
                     cancellationToken)
                 .ConfigureAwait(false);
-            string html = await GeneratePaymentVoucherHtmlAsync(payment, templateContent, withSeal, cancellationToken).ConfigureAwait(false);
+            string html = await GeneratePaymentVoucherHtmlAsync(payment, templateContent, cancellationToken).ConfigureAwait(false);
 
             return new ReportHtmlRenderResult
             {
                 ReportType = ReportDocumentType.PaymentVoucher,
                 SourceId = payment.Id,
                 TemplatePath = resolvedTemplatePath,
-                WithSeal = withSeal,
+                WithSeal = null,
                 Html = html
             };
         }
@@ -245,6 +245,7 @@ namespace ExportDocManager.Services.Reporting
         {
             try
             {
+                ReportTemplateContentPolicy.Validate(reportType, templateContent);
                 templateContent = ScribanReportTemplateRenderer.PreprocessHtmlTemplate(templateContent);
 
                 if (!isPreview)
@@ -273,7 +274,6 @@ namespace ExportDocManager.Services.Reporting
         private async Task<string> GeneratePaymentVoucherHtmlAsync(
             Payment payment,
             string templateContent,
-            bool withSeal,
             CancellationToken cancellationToken)
         {
             if (payment == null)
@@ -283,11 +283,13 @@ namespace ExportDocManager.Services.Reporting
 
             try
             {
-                var (exporter, payee) = await _entityLoader
+                ReportTemplateContentPolicy.Validate(ReportDocumentType.PaymentVoucher, templateContent);
+                templateContent = ScribanReportTemplateRenderer.PreprocessHtmlTemplate(templateContent);
+                var payee = await _entityLoader
                     .LoadPaymentVoucherEntitiesAsync(payment, cancellationToken)
                     .ConfigureAwait(false);
 
-                var globals = ReportTemplateGlobalsBuilder.BuildPaymentVoucherGlobals(exporter, payment, payee, withSeal, _pathProvider);
+                var globals = ReportTemplateGlobalsBuilder.BuildPaymentVoucherGlobals(payment, payee);
                 return ScribanReportTemplateRenderer.Render(templateContent, globals);
             }
             catch (Exception ex)

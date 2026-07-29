@@ -110,6 +110,7 @@ export function SingleWindowStationProfilePanel({
   });
 
   const isBusy = profilesQuery.isFetching || saveMutation.isPending || activateMutation.isPending;
+  const identityLocked = Boolean(selectedProfile);
   const canSaveProfile = Boolean(
     profileName.trim() &&
     companyScope.trim() &&
@@ -232,16 +233,22 @@ export function SingleWindowStationProfilePanel({
           </select>
         </label>
         <TextField label="档案名称" value={profileName} required disabled={!canOperate || isBusy} onChange={setProfileName} />
-        <TextField label="公司抬头" value={companyScope} required disabled={!canOperate || isBusy} onChange={setCompanyScope} />
+        <TextField label="公司抬头" value={companyScope} required disabled={!canOperate || isBusy || identityLocked} onChange={setCompanyScope} />
         <TextField
           label="操作卡标识"
           value={cardIdentifier}
           required
-          disabled={!canOperate || isBusy}
+          disabled={!canOperate || isBusy || identityLocked}
           description="填写卡片编号、公司简称或内部资产编号；系统不保存卡密码。"
           onChange={setCardIdentifier}
         />
       </div>
+
+      {identityLocked ? (
+        <InlineNotice tone="info" title="档案身份保持固定">
+          已有档案的公司抬头和操作卡标识不可原地更换。换公司、换卡或同机操作另一抬头时，请使用“新增档案”，以免历史批次归属混淆。
+        </InlineNotice>
+      ) : null}
 
       {selectedProfile && !selectedProfile.isActive ? (
         <div className="toolbar-actions single-window-profile-switch-actions">
@@ -263,13 +270,13 @@ export function SingleWindowStationProfilePanel({
           <span><strong>海关原产地证</strong><small>COO 提交与回执目录</small></span>
         </label>
         <PathField
-          label="COO 官方客户端目录"
+          label="COO 交接目录（官方客户端或手工导入）"
           value={customsCooClientRootPath}
           disabled={!canOperate || isBusy || !canSubmitCustomsCoo}
-          description="留空保存时，会在运行数据根为该档案创建独立目录。"
+          description="留空时在运行数据根为该档案创建受管交接目录；这不代表官方客户端会自动监听，请按客户端要求确认导入。"
           actions={<>
-            <DesktopIconButton title="选择 COO 客户端目录" disabled={!canOperate || isBusy || !canSubmitCustomsCoo} onClick={() => void chooseRoot("coo")}><FolderOpen size={17} aria-hidden="true" /></DesktopIconButton>
-            {renderOpenPathAction(customsCooClientRootPath, "打开 COO 客户端目录", setDesktopMessage)}
+            <DesktopIconButton title="选择 COO 交接目录" disabled={!canOperate || isBusy || !canSubmitCustomsCoo} onClick={() => void chooseRoot("coo")}><FolderOpen size={17} aria-hidden="true" /></DesktopIconButton>
+            {renderOpenPathAction(customsCooClientRootPath, "打开 COO 交接目录", setDesktopMessage)}
           </>}
           onChange={setCustomsCooClientRootPath}
         />
@@ -278,13 +285,13 @@ export function SingleWindowStationProfilePanel({
           <span><strong>报关代理委托</strong><small>ACD 提交与回执目录</small></span>
         </label>
         <PathField
-          label="ACD 官方客户端目录"
+          label="ACD 交接目录（官方客户端或手工导入）"
           value={agentConsignmentClientRootPath}
           disabled={!canOperate || isBusy || !canSubmitAgentConsignment}
-          description="与 COO 以及其他公司档案目录必须完全分开。"
+          description="与 COO 及其他公司档案目录必须完全分开；留空会创建受管交接目录，仍需人工确认官方客户端导入。"
           actions={<>
-            <DesktopIconButton title="选择 ACD 客户端目录" disabled={!canOperate || isBusy || !canSubmitAgentConsignment} onClick={() => void chooseRoot("acd")}><FolderOpen size={17} aria-hidden="true" /></DesktopIconButton>
-            {renderOpenPathAction(agentConsignmentClientRootPath, "打开 ACD 客户端目录", setDesktopMessage)}
+            <DesktopIconButton title="选择 ACD 交接目录" disabled={!canOperate || isBusy || !canSubmitAgentConsignment} onClick={() => void chooseRoot("acd")}><FolderOpen size={17} aria-hidden="true" /></DesktopIconButton>
+            {renderOpenPathAction(agentConsignmentClientRootPath, "打开 ACD 交接目录", setDesktopMessage)}
           </>}
           onChange={setAgentConsignmentClientRootPath}
         />

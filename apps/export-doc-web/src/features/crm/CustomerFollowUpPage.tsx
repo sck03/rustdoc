@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import type {
   ApiCrmContactDto,
@@ -6,6 +7,7 @@ import type {
   ApiCrmFollowUpDto,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
+import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { CrmPartyManagementPanel } from "./CrmPartyManagementPanel.tsx";
 import { CrmCustomerDirectoryPanel } from "./CrmCustomerDirectoryPanel.tsx";
@@ -30,6 +32,7 @@ type CustomerTaskView = "followups" | "followup-editor" | "directory" | "profile
 export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
   const crmPermission = useModulePermission("sales.crm");
   const requestConfirmation = useConfirmation();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [customers, setCustomers] = useState<ApiCrmCustomerDto[]>([]);
   const [contacts, setContacts] = useState<ApiCrmContactDto[]>([]);
@@ -109,6 +112,10 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
       ? preferred.id
       : nextCustomers[0]?.id ?? 0;
     setCustomerId(nextId);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.crmCustomersRoot() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() }),
+    ]);
   }
 
   async function searchCustomerOptions() {

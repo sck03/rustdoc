@@ -546,11 +546,32 @@ export function createInvoiceItemTableSmokeScene(runtime) {
       };
     })()`;
   
+    await waitFor(async () => {
+      const state = await evaluate(page, readStateExpression, true).catch(() => ({ value: null }));
+      const value = state.value ?? {};
+      return value.found ? value : null;
+    }, timeoutMs, () => "Timed out waiting for invoice item product-library controls.");
+
+    await evaluate(
+      page,
+      `(() => {
+        const toolbar = document.querySelector('[aria-label="商品库工具"]');
+        const button = toolbar ? Array.from(toolbar.querySelectorAll('button')).find((element) => (element.title || '').includes('刷新商品库')) : null;
+        if (!button || button.disabled) {
+          throw new Error('Invoice product-library refresh button is not available.');
+        }
+
+        button.click();
+        return true;
+      })()`,
+      true,
+    );
+
     const initial = await waitFor(async () => {
       const state = await evaluate(page, readStateExpression, true).catch(() => ({ value: null }));
       const value = state.value ?? {};
-      return value.found && value.hasProductOption ? value : null;
-    }, timeoutMs, () => `Timed out waiting for invoice item product-library controls: ${product.productCode}`);
+      return value.hasProductOption ? value : null;
+    }, timeoutMs, () => `Timed out waiting for invoice product-library data: ${product.productCode}`);
   
     await evaluate(
       page,
@@ -625,7 +646,6 @@ export function createInvoiceItemTableSmokeScene(runtime) {
     await evaluate(
       page,
       `(() => {
-        window.confirm = () => true;
         const toolbar = document.querySelector('[aria-label="商品库工具"]');
         const button = toolbar ? Array.from(toolbar.querySelectorAll('button')).find((element) => (element.title || '').includes('保存当前明细到商品库')) : null;
         if (!button || button.disabled) {
@@ -637,7 +657,26 @@ export function createInvoiceItemTableSmokeScene(runtime) {
       })()`,
       true,
     );
-  
+
+    await waitFor(async () => {
+      const state = await evaluate(
+        page,
+        `(() => {
+          const dialog = document.querySelector('.confirmation-dialog[role="dialog"]');
+          const confirmButton = dialog ? dialog.querySelector('button.confirmation-dialog-confirm') : null;
+          const text = dialog ? dialog.innerText || '' : '';
+          if (!dialog || !confirmButton || !text.includes('更新商品库')) {
+            return false;
+          }
+
+          confirmButton.click();
+          return true;
+        })()`,
+        true,
+      ).catch(() => ({ value: false }));
+      return state.value === true;
+    }, timeoutMs, () => `Timed out confirming product-library update: ${product.productCode}`);
+
     const saved = await waitFor(async () => {
       const state = await evaluate(page, readStateExpression, true).catch(() => ({ value: null }));
       const value = state.value ?? {};
@@ -666,20 +705,23 @@ export function createInvoiceItemTableSmokeScene(runtime) {
       return value.rowCount === initial.rowCount ? value : null;
     }, timeoutMs, () => `Timed out waiting for product item row to restore after undo: ${product.productCode}`);
   
-    await evaluate(
-      page,
-      `(() => {
-        const toolbar = document.querySelector('[aria-label="商品库工具"]');
-        const button = toolbar ? Array.from(toolbar.querySelectorAll('button')).find((element) => (element.title || '').includes('打开商品库选择')) : null;
-        if (!button || button.disabled) {
-          throw new Error('Invoice product-library picker button is not available.');
-        }
-  
-        button.click();
-        return true;
-      })()`,
-      true,
-    );
+    await waitFor(async () => {
+      const state = await evaluate(
+        page,
+        `(() => {
+          const toolbar = document.querySelector('[aria-label="商品库工具"]');
+          const button = toolbar ? Array.from(toolbar.querySelectorAll('button')).find((element) => (element.title || '').includes('打开商品库选择')) : null;
+          if (!button || button.disabled) {
+            return false;
+          }
+
+          button.click();
+          return true;
+        })()`,
+        true,
+      ).catch(() => ({ value: false }));
+      return state.value === true;
+    }, timeoutMs, () => "Timed out waiting for invoice product-library picker button to become available.");
   
     const dialogStateExpression = `(() => {
       const productId = ${productId};

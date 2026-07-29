@@ -298,12 +298,12 @@ function validateDetailTableItemFieldPath(
 }
 
 function isTemplateSystemFieldForReportType(reportType: ReportDesignerReportType, fieldPath: string) {
-  if (fieldPath === "ShowSeal" || fieldPath === "doc_seal_path") {
-    return true;
-  }
-
-  return reportType === "ExportDocument" &&
-    (fieldPath === "customs_seal_path" || fieldPath === "shipping_marks_image_data");
+  return reportType === "ExportDocument" && (
+    fieldPath === "ShowSeal" ||
+    fieldPath === "doc_seal_path" ||
+    fieldPath === "customs_seal_path" ||
+    fieldPath === "shipping_marks_image_data"
+  );
 }
 
 function normalizePageSettings(value: unknown, issues: ReportDesignerSchemaIssue[]): ReportPageSettings | null {

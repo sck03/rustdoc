@@ -162,14 +162,12 @@ namespace ExportDocManager.Api.Hosting
             }
 
             string paymentTemplatePath = paymentRequest.Body.TemplatePath?.Trim() ?? string.Empty;
-            bool paymentWithSeal = paymentRequest.Body.WithSeal;
             return ApiEndpointRouteBuilderExtensions.AcceptedBackgroundJob(
                 ApiEndpointRouteBuilderExtensions.EnqueuePaymentReportPdfJob(
                     jobRunner,
                     requestedBy,
                     paymentRequest.PaymentId,
                     paymentTemplatePath,
-                    paymentWithSeal,
                     paymentDestinationPath));
         }
 

@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace ExportDocManager.Api.Hosting
 {
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
     public sealed class ApiPaymentDto
     {
         public int Id { get; init; }

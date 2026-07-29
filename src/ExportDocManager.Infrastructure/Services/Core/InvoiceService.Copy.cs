@@ -85,8 +85,12 @@ namespace ExportDocManager.Services.Core
 
                         var newInvoice = CreateInvoiceClone(originalInvoice, originalInvoice.InvoiceNo, cloneOptions);
                         newInvoice.Type = normalizedTargetType;
-                        newInvoice.OwnerUserId = null;
-                        _businessDataAccessScope.ApplyOwner(newInvoice);
+                        // The actual/customs pair is one logical invoice and
+                        // must stay in the source company's ownership scope,
+                        // even when an administrator creates the other type.
+                        newInvoice.OwnerUserId = originalInvoice.OwnerUserId;
+                        newInvoice.DepartmentId = originalInvoice.DepartmentId;
+                        newInvoice.CompanyScope = originalInvoice.CompanyScope;
 
                         var targetExists = await context.Invoices
                             .AsNoTracking()

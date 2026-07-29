@@ -101,7 +101,7 @@ function OperationCenterDetail({ detail }: { detail: SingleWindowOperationCenter
           <DetailItem label="待确认事项" value={detail.warningCount} />
           <DetailItem label="创建时间" value={formatDateTime(detail.createdAt)} />
           <DetailItem label="更新时间" value={formatDateTime(detail.updatedAt)} />
-          <DetailItem label="发送客户端时间" value={formatDateTime(detail.lastClientDispatchAt)} />
+          <DetailItem label="写入 OutBox 时间" value={formatDateTime(detail.lastClientDispatchAt)} />
           <DetailItem label="最近回执时间" value={formatDateTime(detail.lastReceiptAt)} />
         </div>
       </section>
@@ -123,7 +123,7 @@ function OperationCenterDetail({ detail }: { detail: SingleWindowOperationCenter
       </section>
 
       <InlineNotice tone="info" title="操作说明">
-        提交包导入、发送官方客户端、收集回执和导出回执包均在操作中心列表完成；详情页只保留业务审计信息。
+        提交包导入、写入当前档案交接 OutBox、收集回执和导出回执包均在操作中心列表完成；官方客户端的导入与提交仍由操作员确认，详情页只保留业务审计信息。
       </InlineNotice>
     </div>
   );

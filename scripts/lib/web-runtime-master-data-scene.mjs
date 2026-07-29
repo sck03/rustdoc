@@ -411,12 +411,6 @@ export function createMasterDataSmokeScene(runtime) {
     await evaluate(
       page,
       `(() => {
-        window.__masterDataDeleteConfirmMessages = [];
-        window.confirm = (message) => {
-          window.__masterDataDeleteConfirmMessages.push(String(message || ''));
-          return true;
-        };
-
         const toolbar = document.querySelector(${JSON.stringify(`[aria-label="${deleteCase.editLabel}"] .editor-toolbar`)});
         const buttons = toolbar ? Array.from(toolbar.querySelectorAll('button')) : [];
         const button = buttons.find((element) => (element.innerText || '').includes('删除'));
@@ -430,15 +424,33 @@ export function createMasterDataSmokeScene(runtime) {
       true,
     );
 
+    const confirmationState = await waitFor(async () => {
+      const state = await evaluate(
+        page,
+        `(() => {
+          const dialog = document.querySelector('.confirmation-dialog[role="dialog"]');
+          const confirmButton = dialog ? dialog.querySelector('button.confirmation-dialog-confirm') : null;
+          const text = dialog ? dialog.innerText || dialog.textContent || '' : '';
+          if (!dialog || !confirmButton || confirmButton.disabled || !text.includes(${JSON.stringify(`删除${deleteCase.label}`)})) {
+            return null;
+          }
+          confirmButton.click();
+          return {
+            text,
+            confirmLabel: confirmButton.innerText || confirmButton.textContent || '',
+          };
+        })()`,
+        true,
+      ).catch(() => ({ value: null }));
+      return state.value ?? null;
+    }, timeoutMs, () => `Timed out waiting for ${deleteCase.label} delete confirmation: ${deleteCase.displayName}`);
+
     const deletedState = await waitFor(async () => {
       const state = await evaluate(
           page,
           `(() => ({
             hash: window.location.hash || '',
             text: document.body ? document.body.innerText || '' : '',
-            confirmMessages: Array.isArray(window.__masterDataDeleteConfirmMessages)
-              ? window.__masterDataDeleteConfirmMessages.slice()
-              : [],
           }))()`,
           true,
         ).catch(() => ({ value: null }));
@@ -470,7 +482,7 @@ export function createMasterDataSmokeScene(runtime) {
       expectedText: expectedText.map((value) => ({ value, found: includesText(pageText, value) })),
       keyboardFlowCheck,
       deleteButtonCheck,
-      confirmMessages: deletedState.confirmMessages,
+      confirmMessages: [confirmationState.text],
       redirectedToList: deletedState.hash.includes(`/master-data/${deleteCase.entityKey}`) &&
         !deletedState.hash.includes(`/master-data/${deleteCase.entityKey}/${deleteCase.routeId}`),
       successText: deleteCase.successText,

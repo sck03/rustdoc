@@ -88,7 +88,7 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
         <div>
           <strong>{isDesktopStation ? "持卡机本地模式" : "办公室归档模式"}</strong>
           <span>{isDesktopStation
-            ? "选择当前公司与操作卡档案，导入对应提交包，发送官方客户端并回传回执包。"
+            ? "选择当前公司与操作卡档案，导入对应提交包，将 XML 写入交接 OutBox，再由操作员在官方客户端确认导入和提交。"
             : "生成业务提交包并导入持卡机返回的回执包；办公室端不显示持卡机本地目录。"}</span>
         </div>
       </div>

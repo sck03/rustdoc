@@ -310,7 +310,7 @@ namespace ExportDocManager.Services.Reporting
 </head>
 <body data-edm-report-font="serif">
     <div class="report-container">
-        <div class="company">{{ Exporter.ExporterNameCN }}</div>
+        <div class="company">{{ Payment.PayerName }}</div>
         <div class="document-title">{{{ encodedHeading }}}</div>
 
         <table>
@@ -381,7 +381,7 @@ namespace ExportDocManager.Services.Reporting
 </head>
 <body data-edm-report-font="serif">
     <div class="report-container">
-        <div class="company">{{ Exporter.ExporterNameCN }}</div>
+        <div class="company">{{ Payment.PayerName }}</div>
         <div class="document-title">{{{ encodedHeading }}}</div>
 
         <table>

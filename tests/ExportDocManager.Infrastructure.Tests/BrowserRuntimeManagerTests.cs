@@ -7,6 +7,7 @@ using ExportDocManager.Utils;
 
 namespace ExportDocManager.Infrastructure.Tests
 {
+    [Collection(BrowserIntegrationCollection.Name)]
     public sealed class BrowserRuntimeManagerTests
     {
         [Fact]

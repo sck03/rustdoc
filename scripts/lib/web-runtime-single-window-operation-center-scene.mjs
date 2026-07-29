@@ -215,11 +215,11 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
           const section = document.querySelector('[aria-label="选中批次快捷操作"]');
           const text = section?.innerText || '';
           const dispatchButton = section
-            ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('发送官方客户端'))
+            ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('写入交接 OutBox'))
             : null;
           return Boolean(section &&
             text.includes(${JSON.stringify(batchReference)}) &&
-            text.includes('发送官方客户端') &&
+            text.includes('写入交接 OutBox') &&
             text.includes('收集并导出回执') &&
             text.includes(${JSON.stringify(activeProfile.cardIdentifier)}) &&
             dispatchButton &&
@@ -233,7 +233,7 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
         page,
         `(() => {
           const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('发送官方客户端')) : null;
+          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('写入交接 OutBox')) : null;
           if (!button || button.disabled) throw new Error('Dispatch button is unavailable.');
           button.click();
           return true;
@@ -246,10 +246,24 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
         `(() => {
           const section = document.querySelector('[aria-label="选中批次快捷操作"]');
           const text = section?.innerText || '';
-          return Boolean(text.includes('XML 已发送到本机官方客户端 OutBox') && text.includes('已发送文件'));
+          return Boolean(text.includes('这不代表官方客户端已导入') && text.includes('已写入文件'));
         })()`,
         timeoutMs,
         "Timed out waiting for the dispatch result.",
+      );
+
+      const receiptActionReady = await waitForPageExpression(
+        page,
+        `(() => {
+          const section = document.querySelector('[aria-label="选中批次快捷操作"]');
+          const text = section?.innerText || '';
+          const button = section
+            ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('收集并导出回执'))
+            : null;
+          return Boolean(text.includes('已送入导入目录') && button && !button.disabled);
+        })()`,
+        timeoutMs,
+        "Timed out waiting for the dispatched batch to become eligible for receipt collection.",
       );
 
       const outBoxFiles = await waitFor(async () => {
@@ -347,6 +361,7 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
         activeStationProfileKey: activeProfile.profileKey,
         activeCardIdentifier: activeProfile.cardIdentifier,
         dispatchUi: Boolean(dispatchUi?.found),
+        receiptActionReady: Boolean(receiptActionReady?.found),
         receiptExportUi: Boolean(receiptExportUi?.found),
         savePackageInvocation: Boolean(savePackageInvocation?.found),
         detailStatus: detail.status,

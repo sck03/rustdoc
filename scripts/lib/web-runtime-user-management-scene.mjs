@@ -480,7 +480,7 @@ export function createUserManagementSmokeScene(runtime) {
           };
           return {
             rows,
-            alerts: Array.from(section?.querySelectorAll('.alert, .success-alert') || []).map((item) => item.innerText || ''),
+            alerts: Array.from(section?.querySelectorAll('.inline-notice, .alert, .success-alert') || []).map((item) => item.innerText || ''),
             fields: {
               username: readField('账号'),
               fullName: readField('姓名'),

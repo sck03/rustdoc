@@ -1,6 +1,9 @@
 export const queryKeys = {
   dashboard: () => ["dashboard"] as const,
   crmDashboard: () => ["crm", "dashboard"] as const,
+  crmCustomers: (keyword: string, status: string, pageNumber: number, pageSize: number) =>
+    ["crm-customers", { keyword, status, pageNumber, pageSize }] as const,
+  crmCustomersRoot: () => ["crm-customers"] as const,
   backups: () => ["backups"] as const,
   auditLogs: (
     pageNumber: number,

@@ -11,7 +11,7 @@ export const invoiceCustomOptionTypes = [
   "TransportMode",
 ] as const;
 
-export const paymentCustomOptionTypes = ["PaymentMethod"] as const;
+export const paymentCustomOptionTypes = ["PaymentMethod", "PaymentPayerName"] as const;
 
 export const masterDataCustomOptionTypes = ["PayeeCategory"] as const;
 

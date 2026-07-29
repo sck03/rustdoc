@@ -152,17 +152,17 @@ namespace ExportDocManager.Api.Tests
                 },
                 PaymentTemplates =
                 [
-                    new BatchExportItem
+                    new PaymentTemplateItem
                     {
                         Name = "Payment Request",
                         TemplatePath = @"Templates\Internal\payment_request_template.html",
-                        ReportType = "PaymentDocument"
+                        ReportType = "PaymentVoucher"
                     },
-                    new BatchExportItem
+                    new PaymentTemplateItem
                     {
                         Name = "Expense Reimbursement",
                         TemplatePath = @"Templates\Internal\expense_reimbursement_template.html",
-                        ReportType = "PaymentDocument"
+                        ReportType = "PaymentVoucher"
                     }
                 ]
             };

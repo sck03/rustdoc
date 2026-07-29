@@ -66,19 +66,17 @@ namespace ExportDocManager.Services.Reporting
             return (customer, exporter);
         }
 
-        public async Task<(Exporter exporter, Payee payee)> LoadPaymentVoucherEntitiesAsync(
+        public async Task<Payee> LoadPaymentVoucherEntitiesAsync(
             Payment payment,
             CancellationToken cancellationToken = default)
         {
             await using var dbContext = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
-            var exporter = await dbContext.Exporters.AsNoTracking().OrderBy(x => x.Id).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false) ?? new Exporter();
-
             var payee = payment.PayeeId > 0
                 ? await dbContext.Payees.AsNoTracking().FirstOrDefaultAsync(x => x.Id == payment.PayeeId, cancellationToken).ConfigureAwait(false)
                 : null;
 
-            return (exporter, payee);
+            return payee;
         }
 
         private static async Task<Customer> LoadCustomerAsync(

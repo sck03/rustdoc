@@ -9,9 +9,11 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Scriban.Runtime;
 
 namespace ExportDocManager.Infrastructure.Tests
 {
+    [Collection(BrowserIntegrationCollection.Name)]
     public class ReportHtmlServiceInfrastructureTests
     {
         [Fact]
@@ -57,7 +59,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public async Task RenderPaymentVoucherAsync_ShouldKeepPaymentDataIndependentFromInvoiceData()
+        public async Task RenderPaymentVoucherAsync_ShouldRejectInvoiceDomainFields()
         {
             string appRoot = CreateTempDirectory("payment-html-app");
             string dataRoot = CreateTempDirectory("payment-html-data");
@@ -77,15 +79,12 @@ namespace ExportDocManager.Infrastructure.Tests
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
                 var service = new ReportHtmlService(factory, new StubSettingsService(), pathProvider);
 
-                var result = await service.RenderPaymentVoucherAsync(paymentId, withSeal: false);
+                var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    service.RenderPaymentVoucherAsync(paymentId));
 
-                Assert.Equal(ReportDocumentType.PaymentVoucher, result.ReportType);
-                Assert.Equal(paymentId, result.SourceId);
-                Assert.Equal(templatePath, result.TemplatePath);
-                Assert.Contains("PAY-REF-001", result.Html, StringComparison.Ordinal);
-                Assert.Contains("Detached Payee", result.Html, StringComparison.Ordinal);
-                Assert.DoesNotContain("CT-SHOULD-NOT-LEAK", result.Html, StringComparison.Ordinal);
-                Assert.DoesNotContain("Customer Should Not Leak", result.Html, StringComparison.Ordinal);
+                Assert.Contains("付款报销模板不能使用另一业务域字段", error.Message, StringComparison.Ordinal);
+                Assert.Contains("Invoice", error.Message, StringComparison.Ordinal);
+                Assert.Contains("Customer", error.Message, StringComparison.Ordinal);
             }
             finally
             {
@@ -95,7 +94,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public async Task RenderInvoiceReportAsync_ShouldKeepInvoiceDataIndependentFromPaymentData()
+        public async Task RenderInvoiceReportAsync_ShouldRejectPaymentDomainFields()
         {
             string appRoot = CreateTempDirectory("invoice-html-app");
             string dataRoot = CreateTempDirectory("invoice-html-data");
@@ -115,17 +114,14 @@ namespace ExportDocManager.Infrastructure.Tests
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
                 var service = new ReportHtmlService(factory, new StubSettingsService(), pathProvider);
 
-                var result = await service.RenderInvoiceReportAsync(
-                    invoiceId,
-                    ReportDocumentType.ExportDocument,
-                    withSeal: false);
+                var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    service.RenderInvoiceReportAsync(
+                        invoiceId,
+                        ReportDocumentType.ExportDocument,
+                        withSeal: false));
 
-                Assert.Equal(ReportDocumentType.ExportDocument, result.ReportType);
-                Assert.Equal(invoiceId, result.SourceId);
-                Assert.Contains("INV-REF-001", result.Html, StringComparison.Ordinal);
-                Assert.Contains("Invoice Customer", result.Html, StringComparison.Ordinal);
-                Assert.DoesNotContain("PAYMENT-METHOD-SHOULD-NOT-LEAK", result.Html, StringComparison.Ordinal);
-                Assert.DoesNotContain("Payee Should Not Leak", result.Html, StringComparison.Ordinal);
+                Assert.Contains("报关单证模板不能使用另一业务域字段", error.Message, StringComparison.Ordinal);
+                Assert.Contains("Payment", error.Message, StringComparison.Ordinal);
             }
             finally
             {
@@ -189,8 +185,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 var error = await Assert.ThrowsAsync<ArgumentException>(() => service.RenderPaymentVoucherAsync(
                     paymentId,
-                    templatePath,
-                    withSeal: false));
+                    templatePath));
 
                 Assert.Contains("不能交叉使用", error.Message, StringComparison.Ordinal);
             }
@@ -276,8 +271,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 var paymentVoucherResult = await paymentService.RenderPaymentVoucherAsync(
                     paymentId,
-                    paymentVoucherTemplatePath,
-                    withSeal: false);
+                    paymentVoucherTemplatePath);
                 AssertRenderedTemplate(paymentVoucherResult, paymentVoucherTemplatePath, appRoot, "付款单", "PAY-REF-001");
                 Assert.Contains("Detached Payee", paymentVoucherResult.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("CT-SHOULD-NOT-LEAK", paymentVoucherResult.Html, StringComparison.Ordinal);
@@ -285,8 +279,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 var reimbursementResult = await paymentService.RenderPaymentVoucherAsync(
                     paymentId,
-                    reimbursementTemplatePath,
-                    withSeal: false);
+                    reimbursementTemplatePath);
                 AssertRenderedTemplate(reimbursementResult, reimbursementTemplatePath, appRoot, "费用报销明细单", "Detached Payer");
                 Assert.DoesNotContain("CT-SHOULD-NOT-LEAK", reimbursementResult.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("Customer Should Not Leak", reimbursementResult.Html, StringComparison.Ordinal);
@@ -388,12 +381,10 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 foreach (var testCase in paymentTemplates)
                 {
-                    var result = await paymentPdfService.RenderPaymentVoucherPdfAsync(new ReportPdfRenderRequest
+                    var result = await paymentPdfService.RenderPaymentVoucherPdfAsync(new PaymentReportPdfRenderRequest
                     {
                         SourceId = paymentId,
-                        ReportType = testCase.ReportType,
                         TemplatePath = testCase.TemplatePath,
-                        WithSeal = false,
                         DestinationPath = Path.Combine(dataRoot, "RenderedPdfs", $"{testCase.Slug}.pdf"),
                         DocumentTitle = $"BuiltIn-{testCase.Slug}"
                     });
@@ -475,8 +466,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 var paymentHtml = await htmlService.RenderPaymentVoucherAsync(
                     seed.PaymentId,
-                    paymentVoucherTemplatePath,
-                    withSeal: false);
+                    paymentVoucherTemplatePath);
                 Assert.Contains("PAYMENT-SAME-NO-SHOULD-NOT-LEAK", paymentHtml.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("MULTI-ACTUAL-ITEM", paymentHtml.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("MULTI-CUSTOMS-ITEM", paymentHtml.Html, StringComparison.Ordinal);
@@ -543,12 +533,10 @@ namespace ExportDocManager.Infrastructure.Tests
                     appRoot,
                     dataRoot);
 
-                var paymentResult = await pdfService.RenderPaymentVoucherPdfAsync(new ReportPdfRenderRequest
+                var paymentResult = await pdfService.RenderPaymentVoucherPdfAsync(new PaymentReportPdfRenderRequest
                 {
                     SourceId = seed.PaymentId,
-                    ReportType = ReportDocumentType.PaymentVoucher,
                     TemplatePath = paymentVoucherTemplatePath,
-                    WithSeal = false,
                     DestinationPath = Path.Combine(dataRoot, "RenderedPdfs", "same-no-payment-voucher.pdf"),
                     DocumentTitle = "BuiltIn-SameNo-PaymentVoucher"
                 });
@@ -645,7 +633,93 @@ namespace ExportDocManager.Infrastructure.Tests
 
             Assert.DoesNotContain("--no-sandbox", sandboxed);
             Assert.Contains("--no-sandbox", explicitlyUnsandboxed);
+            Assert.Contains("--disable-javascript", sandboxed);
+            Assert.Contains("--disable-javascript", explicitlyUnsandboxed);
             Assert.Equal(sandboxed.Count + 1, explicitlyUnsandboxed.Count);
+        }
+
+        [Fact]
+        public void ChromiumHtmlToPdfService_PrepareHtml_ShouldPutCspFirstInHead()
+        {
+            string appRoot = CreateTempDirectory("report-csp-app");
+            string dataRoot = CreateTempDirectory("report-csp-data");
+            try
+            {
+                var service = new ChromiumHtmlToPdfService(new RuntimeAppPathProvider(appRoot, dataRoot));
+                string prepared = service.PrepareHtml(
+                    "<!doctype html><html><head><title>Existing</title></head><body>Report</body></html>",
+                    null);
+
+                int headEnd = prepared.IndexOf('>', prepared.IndexOf("<head", StringComparison.OrdinalIgnoreCase));
+                int cspIndex = prepared.IndexOf("Content-Security-Policy", StringComparison.Ordinal);
+                int titleIndex = prepared.IndexOf("<title>", StringComparison.OrdinalIgnoreCase);
+                Assert.True(headEnd >= 0);
+                Assert.True(cspIndex > headEnd);
+                Assert.True(cspIndex < titleIndex);
+                Assert.Contains("default-src 'none'", prepared, StringComparison.Ordinal);
+                Assert.Contains("script-src 'none'", prepared, StringComparison.Ordinal);
+                Assert.Contains("connect-src 'none'", prepared, StringComparison.Ordinal);
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        [Fact]
+        public void ScribanTemplateCache_ShouldRemainBounded()
+        {
+            ScribanReportTemplateRenderer.ClearTemplateCacheForTests();
+            try
+            {
+                var globals = new ScriptObject { ["value"] = "ok" };
+                for (int index = 0; index < ScribanReportTemplateRenderer.MaximumCachedTemplates + 80; index++)
+                {
+                    string rendered = ScribanReportTemplateRenderer.Render(
+                        $"<html><body>{{{{ value }}}}-{index}</body></html>",
+                        globals);
+                    Assert.Contains("ok", rendered, StringComparison.Ordinal);
+                }
+
+                Assert.InRange(
+                    ScribanReportTemplateRenderer.CachedTemplateCount,
+                    1,
+                    ScribanReportTemplateRenderer.MaximumCachedTemplates);
+            }
+            finally
+            {
+                ScribanReportTemplateRenderer.ClearTemplateCacheForTests();
+            }
+        }
+
+        [Theory]
+        [InlineData("<html><body><img src=\"{{ value }}\"></body></html>", "https://example.com/pixel.png")]
+        [InlineData("<html><body><img src=\"{{ value }}\"></body></html>", "images/pixel.png")]
+        [InlineData("<html><body><img srcset=\"{{ value }}\"></body></html>", "https://example.com/a.png 1x")]
+        [InlineData("<html><body><div style=\"background-image:url({{ value }})\"></div></body></html>", "https://example.com/background.png")]
+        [InlineData("<html><body><svg><rect fill=\"url({{ value }})\"></rect></svg></body></html>", "https://example.com/paint.svg#gradient")]
+        public void ScribanRenderer_ShouldRejectUnsafeUrlsGeneratedAtRenderTime(string template, string value)
+        {
+            var globals = new ScriptObject { ["value"] = value };
+
+            var error = Assert.Throws<InvalidOperationException>(() =>
+                ScribanReportTemplateRenderer.Render(template, globals));
+
+            Assert.Contains("不安全内容", error.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void ScribanRenderer_ShouldAllowSafeBase64RasterImageGeneratedAtRenderTime()
+        {
+            const string imageData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB";
+            var globals = new ScriptObject { ["value"] = imageData };
+
+            string rendered = ScribanReportTemplateRenderer.Render(
+                "<html><body><img src=\"{{ value }}\"></body></html>",
+                globals);
+
+            Assert.Contains(imageData, rendered, StringComparison.Ordinal);
         }
 
         [Fact]
@@ -1250,4 +1324,3 @@ namespace ExportDocManager.Infrastructure.Tests
         }
     }
 }
-

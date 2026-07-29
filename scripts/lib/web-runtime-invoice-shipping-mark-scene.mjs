@@ -12,6 +12,24 @@ export function createInvoiceShippingMarkSmokeScene(runtime) {
   async function run(page, options, accessToken, tokenType, invoice, timeoutMs) {
     const marker = `SMOKE-MARK-${Date.now()}`;
     const editedMarker = `${marker}-EDIT`;
+
+    await evaluate(
+      page,
+      `(() => {
+        const section = document.querySelector(':is([aria-label="商品明细"], [aria-label="唛头和明细"])');
+        const supportDetails = section ? section.querySelector('details.invoice-items-support-details') : null;
+        if (!supportDetails) {
+          throw new Error('Shipping mark support section is not available.');
+        }
+        if (!supportDetails.open) {
+          supportDetails.querySelector('summary')?.click();
+        }
+        supportDetails.scrollIntoView({ block: 'center', behavior: 'auto' });
+        return true;
+      })()`,
+      true,
+    );
+
     const readStateExpression = `(() => {
       const section = document.querySelector(':is([aria-label="商品明细"], [aria-label="唛头和明细"])');
       const dialog = document.querySelector('[aria-labelledby="shipping-mark-editor-title"]');

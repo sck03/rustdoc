@@ -44,17 +44,13 @@ namespace ExportDocManager.Api.Tests
 
             var anonymousPaymentPreviewResponse = await anonymousClient.PostAsJsonAsync(
                 "/api/reports/payments/1/html-preview",
-                new
-                {
-                    reportType = "PaymentVoucher"
-                });
+                new { });
             Assert.Equal(HttpStatusCode.Unauthorized, anonymousPaymentPreviewResponse.StatusCode);
 
             var anonymousPaymentDraftPreviewResponse = await anonymousClient.PostAsJsonAsync(
                 "/api/reports/payments/draft/html-preview",
                 new
                 {
-                    reportType = "PaymentVoucher",
                     payment = new
                     {
                         id = 0,
@@ -70,7 +66,6 @@ namespace ExportDocManager.Api.Tests
                 "/api/reports/payments/1/pdf/download",
                 new
                 {
-                    reportType = "PaymentVoucher",
                     destinationPath = Path.Combine("Reports", "payment.pdf")
                 });
             Assert.Equal(HttpStatusCode.Unauthorized, anonymousPaymentPdfResponse.StatusCode);
@@ -162,6 +157,26 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains(paymentFields.Fields, field => field.Category == "付款报销" && field.Value == "{{ Payment.PayeeName }}");
             Assert.Contains(paymentFields.Fields, field => field.Category == "付款报销" && field.Label.Contains("业务参考号", StringComparison.Ordinal));
 
+            var paymentTemplateSealPreviewResponse = await adminClient.PostAsJsonAsync(
+                "/api/reports/templates/preview",
+                new
+                {
+                    reportType = "PaymentVoucher",
+                    content = "<html><body>{{ Payment.PayerName }}</body></html>",
+                    withSeal = false
+                });
+            Assert.Equal(HttpStatusCode.BadRequest, paymentTemplateSealPreviewResponse.StatusCode);
+
+            var paymentTemplateUnknownSealPreviewResponse = await adminClient.PostAsJsonAsync(
+                "/api/reports/templates/preview",
+                new
+                {
+                    reportType = "PaymentVoucher",
+                    content = "<html><body>{{ Payment.PayerName }}</body></html>",
+                    customsSealPath = "forbidden.png"
+                });
+            Assert.Equal(HttpStatusCode.BadRequest, paymentTemplateUnknownSealPreviewResponse.StatusCode);
+
             var paymentTemplatePath = Path.Combine(harness.AppRoot, "Templates", "Internal", "api_payment_preview.html");
             Directory.CreateDirectory(Path.GetDirectoryName(paymentTemplatePath)!);
             await File.WriteAllTextAsync(
@@ -204,11 +219,13 @@ namespace ExportDocManager.Api.Tests
                 $"/api/reports/payments/{createdPayment.Id}/html-preview",
                 new
                 {
-                    reportType = "PaymentVoucher",
-                    templatePath = paymentTemplatePath,
-                    withSeal = false
+                    templatePath = paymentTemplatePath
                 });
             Assert.Equal(HttpStatusCode.OK, paymentPreviewResponse.StatusCode);
+            using (var paymentPreviewDocument = JsonDocument.Parse(await paymentPreviewResponse.Content.ReadAsStringAsync()))
+            {
+                Assert.False(paymentPreviewDocument.RootElement.TryGetProperty("withSeal", out _));
+            }
             var paymentPreview = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPaymentReportHtmlPreviewResponse>(paymentPreviewResponse);
             Assert.Equal(createdPayment.Id, paymentPreview.PaymentId);
             Assert.Equal("PaymentVoucher", paymentPreview.ReportType);
@@ -223,9 +240,7 @@ namespace ExportDocManager.Api.Tests
                 $"/api/reports/payments/{createdPayment.Id}/html-preview",
                 new
                 {
-                    reportType = "PaymentVoucher",
-                    templatePath = reimbursementTemplatePath,
-                    withSeal = false
+                    templatePath = reimbursementTemplatePath
                 });
             Assert.Equal(HttpStatusCode.OK, reimbursementPreviewResponse.StatusCode);
             var reimbursementPreview = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPaymentReportHtmlPreviewResponse>(reimbursementPreviewResponse);
@@ -358,7 +373,7 @@ namespace ExportDocManager.Api.Tests
                 Assert.Equal(HttpStatusCode.OK, uploadPackageResponse.StatusCode);
                 var uploadedPackage = await ApiIntegrationTestHarness.ReadJsonAsync<ApiReportTemplatePackageImportResponse>(uploadPackageResponse);
                 Assert.True(uploadedPackage.TemplateCount > 0);
-                Assert.Equal("1.0", uploadedPackage.PackageVersion);
+                Assert.Equal("1.1", uploadedPackage.PackageVersion);
                 Assert.Contains("Cache/TemplatePackages", uploadedPackage.StoragePolicy, StringComparison.Ordinal);
                 Assert.True(File.Exists(templatePath));
             }
@@ -468,17 +483,14 @@ namespace ExportDocManager.Api.Tests
 
             var invalidPaymentPreviewResponse = await adminClient.PostAsJsonAsync(
                 "/api/reports/payments/0/html-preview",
-                new
-                {
-                    reportType = "PaymentVoucher"
-                });
+                new { });
             Assert.Equal(HttpStatusCode.BadRequest, invalidPaymentPreviewResponse.StatusCode);
 
             var invalidPaymentPreviewTypeResponse = await adminClient.PostAsJsonAsync(
                 $"/api/reports/payments/{createdPayment.Id}/html-preview",
                 new
                 {
-                    reportType = "ExportDocument"
+                    withSeal = true
                 });
             Assert.Equal(HttpStatusCode.BadRequest, invalidPaymentPreviewTypeResponse.StatusCode);
 
@@ -503,7 +515,6 @@ namespace ExportDocManager.Api.Tests
                 $"/api/reports/payments/{createdPayment.Id}/pdf/save-to-path",
                 new
                 {
-                    reportType = "PaymentVoucher",
                     destinationPath = Path.Combine(harness.DataRoot, "Reports", "payment.txt")
                 });
             Assert.Equal(HttpStatusCode.Forbidden, invalidPaymentPdfResponse.StatusCode);
@@ -689,7 +700,7 @@ namespace ExportDocManager.Api.Tests
             Directory.CreateDirectory(Path.GetDirectoryName(invoiceTemplatePath)!);
             await File.WriteAllTextAsync(
                 invoiceTemplatePath,
-                "<html><body>{{ Invoice.InvoiceNo }}|{{ Invoice.CustomerNameEN }}|{{ Customer.CustomerNameEN }}|{{ Payment.PayeeName }}|{{ Payment.PaymentMethod }}</body></html>");
+                "<html><body>{{ Invoice.InvoiceNo }}|{{ Invoice.CustomerNameEN }}|{{ Customer.CustomerNameEN }}</body></html>");
 
             string invoicePackingTemplatePath = Path.Combine(
                 harness.AppRoot,
@@ -698,7 +709,7 @@ namespace ExportDocManager.Api.Tests
                 "api_invoice_package_boundary.html");
             await File.WriteAllTextAsync(
                 invoicePackingTemplatePath,
-                "<html><body>PACKAGE|{{ Invoice.InvoiceNo }}|{{ Invoice.ContractNo }}|{{ Payment.PayeeName }}</body></html>");
+                "<html><body>PACKAGE|{{ Invoice.InvoiceNo }}|{{ Invoice.ContractNo }}</body></html>");
 
             string paymentTemplatePath = Path.Combine(
                 harness.AppRoot,
@@ -708,7 +719,7 @@ namespace ExportDocManager.Api.Tests
             Directory.CreateDirectory(Path.GetDirectoryName(paymentTemplatePath)!);
             await File.WriteAllTextAsync(
                 paymentTemplatePath,
-                "<html><body>{{ Payment.InvoiceNo }}|{{ Payment.PayeeName }}|{{ Customer.CustomerNameEN }}|{{ Invoice.ContractNo }}</body></html>");
+                "<html><body>{{ Payment.InvoiceNo }}|{{ Payment.PayeeName }}|{{ Payment.PaymentMethod }}</body></html>");
 
             var createInvoiceResponse = await adminClient.PostAsJsonAsync(
                 "/api/invoices",
@@ -841,9 +852,7 @@ namespace ExportDocManager.Api.Tests
                 $"/api/reports/payments/{createdPayment.Id}/html-preview",
                 new
                 {
-                    reportType = "PaymentVoucher",
-                    templatePath = paymentTemplatePath,
-                    withSeal = false
+                    templatePath = paymentTemplatePath
                 });
             Assert.Equal(HttpStatusCode.OK, paymentPreviewResponse.StatusCode);
             var paymentPreview = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPaymentReportHtmlPreviewResponse>(paymentPreviewResponse);
@@ -857,9 +866,7 @@ namespace ExportDocManager.Api.Tests
                 "/api/reports/payments/draft/html-preview",
                 new
                 {
-                    reportType = "PaymentVoucher",
                     templatePath = paymentTemplatePath,
-                    withSeal = false,
                     payment = new
                     {
                         id = 0,

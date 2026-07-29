@@ -124,6 +124,14 @@ namespace ExportDocManager.Services.SingleWindow
                 throw new InvalidOperationException("未找到要修改的本机操作档案。");
             }
 
+            if (profile != null &&
+                (!string.Equals(profile.CompanyScope, companyScope, StringComparison.Ordinal) ||
+                 !string.Equals(profile.CardIdentifier, cardIdentifier, StringComparison.Ordinal)))
+            {
+                throw new InvalidOperationException(
+                    "操作档案创建后不能原地更换公司抬头或操作卡标识；如需换卡或切换抬头，请新增档案。档案名称、业务能力和交接目录仍可修改。");
+            }
+
             var otherProfiles = stationProfiles
                 .Where(item => profile == null || item.Id != profile.Id)
                 .ToList();

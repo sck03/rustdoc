@@ -115,12 +115,12 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("发送官方客户端目录只允许受控 Tauri 操作机执行。");
+                    return WriteForbidden("写入本机交接 OutBox 只允许受控 Tauri 持卡机执行。");
                 }
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
                 {
-                    return WriteConflict("官方单一窗口客户端只能由独立 SQLite 持卡机操作。");
+                    return WriteConflict("交接 OutBox 和官方单一窗口客户端只能由独立 SQLite 持卡机操作。");
                 }
 
                 return await DispatchSingleWindowBatchToClientAsync(
@@ -151,7 +151,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
                 {
-                    return WriteConflict("官方单一窗口客户端只能由独立 SQLite 持卡机操作。");
+                    return WriteConflict("本机回执目录和官方单一窗口客户端只能由独立 SQLite 持卡机操作。");
                 }
 
                 return await CollectSingleWindowReceiptFilesAsync(

@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 using Scriban;
 using Scriban.Runtime;
@@ -13,7 +12,11 @@ namespace ExportDocManager.Services.Reporting
 {
     internal static class ScribanReportTemplateRenderer
     {
+        internal const int MaximumCachedTemplates = 256;
         private static readonly ConcurrentDictionary<string, Template> TemplateCache = new();
+        private static readonly ConcurrentQueue<string> TemplateCacheOrder = new();
+
+        internal static int CachedTemplateCount => TemplateCache.Count;
 
         public static string PreprocessHtmlTemplate(string html)
         {
@@ -62,19 +65,27 @@ namespace ExportDocManager.Services.Reporting
                 MemberRenamer = member => member.Name,
                 StrictVariables = false,
                 EnableRelaxedMemberAccess = true,
-                EnableRelaxedTargetAccess = true
+                EnableRelaxedTargetAccess = true,
+                RegexTimeOut = TimeSpan.FromSeconds(1)
             };
+            if (context.BuiltinObject["object"] is ScriptObject objectFunctions)
+            {
+                objectFunctions.Remove("eval");
+                objectFunctions.Remove("eval_template");
+            }
             context.PushGlobal(globals);
 
             var templateKey = ComputeTemplateHash(templateContent);
-            var template = TemplateCache.GetOrAdd(templateKey, _ => Template.Parse(templateContent));
+            var template = GetOrAddTemplate(templateKey, templateContent);
 
             if (template.HasErrors)
             {
                 throw new InvalidOperationException(string.Join(Environment.NewLine, template.Messages));
             }
 
-            return template.Render(context);
+            string rendered = template.Render(context);
+            ReportTemplateContentPolicy.ValidateRenderedHtml(rendered);
+            return rendered;
         }
 
         private static bool RewriteBlockNodes(HtmlDocument doc, string attributeName, Func<string, string> startBuilder)
@@ -138,16 +149,77 @@ namespace ExportDocManager.Services.Reporting
 
         private static string DecodeScribanBlocks(string html)
         {
-            return string.IsNullOrWhiteSpace(html)
-                ? html
-                : Regex.Replace(html, @"\{\{[\s\S]*?\}\}", match => WebUtility.HtmlDecode(match.Value));
+            if (string.IsNullOrWhiteSpace(html))
+            {
+                return html;
+            }
+
+            int searchIndex = 0;
+            StringBuilder decoded = null;
+            while (searchIndex < html.Length)
+            {
+                int blockStart = html.IndexOf("{{", searchIndex, StringComparison.Ordinal);
+                if (blockStart < 0)
+                {
+                    break;
+                }
+
+                int blockEnd = html.IndexOf("}}", blockStart + 2, StringComparison.Ordinal);
+                if (blockEnd < 0)
+                {
+                    break;
+                }
+
+                decoded ??= new StringBuilder(html.Length);
+                decoded.Append(html, searchIndex, blockStart - searchIndex);
+                decoded.Append(WebUtility.HtmlDecode(html.Substring(blockStart, blockEnd + 2 - blockStart)));
+                searchIndex = blockEnd + 2;
+            }
+
+            if (decoded == null)
+            {
+                return html;
+            }
+
+            decoded.Append(html, searchIndex, html.Length - searchIndex);
+            return decoded.ToString();
         }
 
         private static string ComputeTemplateHash(string content)
         {
             var inputBytes = Encoding.UTF8.GetBytes(content ?? string.Empty);
-            var hashBytes = MD5.HashData(inputBytes);
+            var hashBytes = SHA256.HashData(inputBytes);
             return Convert.ToHexString(hashBytes);
+        }
+
+        private static Template GetOrAddTemplate(string key, string content)
+        {
+            if (TemplateCache.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
+
+            var parsed = Template.Parse(content ?? string.Empty);
+            if (!TemplateCache.TryAdd(key, parsed))
+            {
+                return TemplateCache[key];
+            }
+
+            TemplateCacheOrder.Enqueue(key);
+            while (TemplateCache.Count > MaximumCachedTemplates && TemplateCacheOrder.TryDequeue(out string oldestKey))
+            {
+                TemplateCache.TryRemove(oldestKey, out _);
+            }
+
+            return parsed;
+        }
+
+        internal static void ClearTemplateCacheForTests()
+        {
+            TemplateCache.Clear();
+            while (TemplateCacheOrder.TryDequeue(out _))
+            {
+            }
         }
     }
 }

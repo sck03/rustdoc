@@ -20,6 +20,7 @@ import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { useModalDialog } from "../../ui/useModalDialog.ts";
+import { getClipboardPasteInstruction, readClipboardText } from "../../ui/clipboard.ts";
 import {
   CatalogCellPosition,
   CatalogColumn,
@@ -350,18 +351,14 @@ export function SingleWindowReferenceCatalogPage({
   }
 
   async function pasteFromSystemClipboard() {
-    if (!navigator.clipboard?.readText) {
-      setMessage("当前运行环境无法直接读取剪贴板，可在表格单元格内使用 Ctrl+V。");
+    const text = await readClipboardText();
+    if (text == null) {
+      setMessage(getClipboardPasteInstruction("参考数据表格单元格"));
       setSuccessMessage(null);
       return;
     }
 
-    try {
-      pasteCatalogText(await navigator.clipboard.readText(), focusedCell);
-    } catch (error) {
-      setMessage(`读取剪贴板失败：${readApiError(error)}`);
-      setSuccessMessage(null);
-    }
+    pasteCatalogText(text, focusedCell);
   }
 
   function handleCatalogPaste(event: ReactClipboardEvent<HTMLDivElement>) {

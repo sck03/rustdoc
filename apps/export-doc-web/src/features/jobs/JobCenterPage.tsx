@@ -135,7 +135,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
 
     const preferredTemplate = findPreferredInvoiceTemplate(reportTemplatesQuery.data);
     operations.setReportTemplatePath(preferredTemplate.templatePath);
-    operations.setReportWithSeal(preferredTemplate.withSealDefault);
+    operations.setReportWithSeal(preferredTemplate.withSealDefault ?? true);
   }, [reportTemplatePath, reportTemplatesQuery.data]);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
@@ -364,7 +364,7 @@ function InvoiceReportZipJobPanel({
     onTemplatePathChange(value);
     const template = templates.find((item) => item.templatePath === value);
     if (template) {
-      onWithSealChange(template.withSealDefault);
+      onWithSealChange(template.withSealDefault ?? true);
     }
     onMessage(null);
   }

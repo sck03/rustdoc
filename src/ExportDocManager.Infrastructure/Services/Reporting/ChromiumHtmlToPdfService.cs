@@ -15,6 +15,12 @@ namespace ExportDocManager.Services.Reporting
 
         private static readonly TimeSpan DefaultRenderTimeout = TimeSpan.FromSeconds(60);
         private static readonly TimeSpan ProcessDrainTimeout = TimeSpan.FromSeconds(5);
+        private const int TemporaryDirectoryCleanupAttempts = 20;
+        private const int TemporaryDirectoryCleanupDelayMilliseconds = 250;
+        private const string ContentSecurityPolicy =
+            "default-src 'none'; script-src 'none'; connect-src 'none'; frame-src 'none'; " +
+            "object-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src file: data:; " +
+            "form-action 'none'; base-uri 'self'";
 
         private readonly IAppPathProvider _pathProvider;
         private readonly BrowserExecutableResolver _executableResolver;
@@ -97,7 +103,7 @@ namespace ExportDocManager.Services.Reporting
 
         public string ResolveRendererExecutablePath() => _executableResolver.Resolve();
 
-        private string PrepareHtml(string html, HtmlToPdfRenderOptions options)
+        internal string PrepareHtml(string html, HtmlToPdfRenderOptions options)
         {
             string content = html ?? string.Empty;
             if (string.IsNullOrWhiteSpace(content))
@@ -138,6 +144,8 @@ namespace ExportDocManager.Services.Reporting
                 }
             }
 
+            string csp = $"<meta http-equiv=\"Content-Security-Policy\" content=\"{ContentSecurityPolicy}\">";
+            content = InsertHeadContentAtStart(content, csp);
             content = InsertHeadContent(content, ReportFontPolicy.BuildHtmlStyle(_pathProvider));
 
             return content;
@@ -151,6 +159,31 @@ namespace ExportDocManager.Services.Reporting
                 return content.Insert(headCloseIndex, headContent);
             }
 
+            int headIndex = content.IndexOf("<head", StringComparison.OrdinalIgnoreCase);
+            if (headIndex >= 0)
+            {
+                int headEnd = content.IndexOf('>', headIndex);
+                if (headEnd >= 0)
+                {
+                    return content.Insert(headEnd + 1, headContent);
+                }
+            }
+
+            int htmlIndex = content.IndexOf("<html", StringComparison.OrdinalIgnoreCase);
+            if (htmlIndex >= 0)
+            {
+                int htmlEnd = content.IndexOf('>', htmlIndex);
+                if (htmlEnd >= 0)
+                {
+                    return content.Insert(htmlEnd + 1, $"<head>{headContent}</head>");
+                }
+            }
+
+            return $"<!doctype html><html><head>{headContent}</head><body>{content}</body></html>";
+        }
+
+        private static string InsertHeadContentAtStart(string content, string headContent)
+        {
             int headIndex = content.IndexOf("<head", StringComparison.OrdinalIgnoreCase);
             if (headIndex >= 0)
             {
@@ -311,6 +344,7 @@ namespace ExportDocManager.Services.Reporting
             {
                 "--headless=new",
                 "--disable-gpu",
+                "--disable-javascript",
                 "--disable-extensions",
                 "--disable-background-networking",
                 "--disable-dev-shm-usage",
@@ -407,12 +441,12 @@ namespace ExportDocManager.Services.Reporting
 
         private static async Task DeleteTemporaryDirectoryAsync(string path)
         {
-            for (int attempt = 0; attempt < 5 && Directory.Exists(path); attempt++)
+            for (int attempt = 0; attempt < TemporaryDirectoryCleanupAttempts && Directory.Exists(path); attempt++)
             {
                 AtomicFileHelper.TryDeleteDirectory(path);
                 if (Directory.Exists(path))
                 {
-                    await Task.Delay(100).ConfigureAwait(false);
+                    await Task.Delay(TemporaryDirectoryCleanupDelayMilliseconds).ConfigureAwait(false);
                 }
             }
         }

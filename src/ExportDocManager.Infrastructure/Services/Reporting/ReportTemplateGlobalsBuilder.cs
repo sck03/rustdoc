@@ -49,22 +49,16 @@ namespace ExportDocManager.Services.Reporting
         }
 
         public static ScriptObject BuildPaymentVoucherGlobals(
-            Exporter exporter,
             Payment payment,
-            Payee payee,
-            bool withSeal,
-            IAppPathProvider pathProvider = null)
+            Payee payee)
         {
             payment ??= new Payment();
             var scriptObject = new ScriptObject();
-            scriptObject.Add("Exporter", exporter ?? new Exporter());
             scriptObject.Add("Payment", payment);
             scriptObject.Add("Payee", payee ?? new Payee());
             scriptObject.Import(new
             {
-                cny_amount_upper = ConvertNumberToChineseUpper(payment.CNYAmount),
-                doc_seal_path = withSeal ? ReportImageDataUriHelper.GetSealDataUri(exporter?.DocSealPath, pathProvider) : string.Empty,
-                customs_seal_path = withSeal ? ReportImageDataUriHelper.GetSealDataUri(exporter?.CustomsSealPath, pathProvider) : string.Empty
+                cny_amount_upper = ConvertNumberToChineseUpper(payment.CNYAmount)
             });
 
             AddSharedHelpers(scriptObject);

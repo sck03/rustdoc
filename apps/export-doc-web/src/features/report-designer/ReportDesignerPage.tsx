@@ -71,6 +71,7 @@ export function ReportDesignerPage({
   const designerPaperHeightMm = useMemo(() => readDesignerPaperHeightMm(history.state.schema), [history.state.schema]);
   const schemaIssues = useMemo(() => validateReportDesignerSchema(history.state.schema), [history.state.schema]);
   const hasBlockingSchemaIssues = hasBlockingReportDesignerSchemaIssues(schemaIssues);
+  const canInsertImage = reportType === "ExportDocument";
   const existingContentWithoutSchema = Boolean(content.trim()) && !hasReportDesignerSchema(content);
   const hasUnappliedDesignerChanges = exportedHtml !== content;
 
@@ -111,6 +112,10 @@ export function ReportDesignerPage({
   }
 
   function insertImageBlock() {
+    if (!canInsertImage) {
+      return;
+    }
+
     history.commitState(insertBlockAfterSelection(history.state, createImageBlock()));
   }
 
@@ -141,7 +146,7 @@ export function ReportDesignerPage({
       case "Conditional":
         return createConditionalBlock(reportType);
       case "Image":
-        return createImageBlock();
+        return canInsertImage ? createImageBlock() : null;
       case "DetailTable":
         return reportType === "ExportDocument" ? createDetailTableBlock() : null;
       case "PageBreak":
@@ -236,6 +241,7 @@ export function ReportDesignerPage({
         onInsertGrid={insertGridBlock}
         onInsertConditional={insertConditionalBlock}
         onInsertImage={insertImageBlock}
+        canInsertImage={canInsertImage}
         onInsertDetailTable={insertDetailTableBlock}
         onInsertPageBreak={insertPageBreakBlock}
         canInsertDetailTable={reportType === "ExportDocument"}
@@ -281,6 +287,7 @@ export function ReportDesignerPage({
           onInsertGrid={insertGridBlock}
           onInsertConditional={insertConditionalBlock}
           onInsertImage={insertImageBlock}
+          canInsertImage={canInsertImage}
           onInsertDetailTable={insertDetailTableBlock}
           onInsertPageBreak={insertPageBreakBlock}
           onInsertField={insertFieldBlock}

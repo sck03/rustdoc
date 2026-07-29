@@ -782,6 +782,10 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("importLetterOfCreditDocument", json, StringComparison.Ordinal);
             Assert.Contains("ApiLetterOfCreditImportRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiLetterOfCreditImportResponse", json, StringComparison.Ordinal);
+            Assert.Contains("/api/tools/letter-of-credit/import-upload", json, StringComparison.Ordinal);
+            Assert.Contains("uploadLetterOfCreditDocument", json, StringComparison.Ordinal);
+            Assert.Contains("runtime Cache/BrowserUploads/LetterOfCredit", json, StringComparison.Ordinal);
+            Assert.Contains("exceeds 25 MB", json, StringComparison.Ordinal);
             Assert.Contains("/api/tools/letter-of-credit/review", json, StringComparison.Ordinal);
             Assert.Contains("reviewLetterOfCreditCompliance", json, StringComparison.Ordinal);
             Assert.Contains("ApiLetterOfCreditReviewRequest", json, StringComparison.Ordinal);
@@ -1587,11 +1591,31 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("ApiReportTemplatePreviewRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiReportTemplatePreviewResponse", json, StringComparison.Ordinal);
             Assert.Contains("ApiReportHtmlPreviewRequest", json, StringComparison.Ordinal);
+            Assert.Contains("ApiPaymentReportHtmlPreviewRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiInvoiceDraftReportHtmlPreviewRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiPaymentDraftReportHtmlPreviewRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiReportHtmlPreviewResponse", json, StringComparison.Ordinal);
             Assert.Contains("ApiPaymentReportHtmlPreviewResponse", json, StringComparison.Ordinal);
             Assert.Contains("storagePolicy", json, StringComparison.Ordinal);
+
+            using var jsonDocument = JsonDocument.Parse(json);
+            var schemas = jsonDocument.RootElement.GetProperty("components").GetProperty("schemas");
+            var paymentPreviewRequestProperties = schemas
+                .GetProperty("ApiPaymentReportHtmlPreviewRequest")
+                .GetProperty("properties");
+            Assert.False(paymentPreviewRequestProperties.TryGetProperty("withSeal", out _));
+            Assert.False(paymentPreviewRequestProperties.TryGetProperty("reportType", out _));
+
+            var paymentDraftRequestProperties = schemas
+                .GetProperty("ApiPaymentDraftReportHtmlPreviewRequest")
+                .GetProperty("properties");
+            Assert.False(paymentDraftRequestProperties.TryGetProperty("withSeal", out _));
+            Assert.False(paymentDraftRequestProperties.TryGetProperty("reportType", out _));
+
+            var paymentPreviewResponseProperties = schemas
+                .GetProperty("ApiPaymentReportHtmlPreviewResponse")
+                .GetProperty("properties");
+            Assert.False(paymentPreviewResponseProperties.TryGetProperty("withSeal", out _));
         }
 
         [Fact]
@@ -1609,7 +1633,17 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("startInvoiceReportPdfDownloadJob", json, StringComparison.Ordinal);
             Assert.Contains("startPaymentVoucherPdfDownloadJob", json, StringComparison.Ordinal);
             Assert.Contains("ApiReportPdfRequest", json, StringComparison.Ordinal);
+            Assert.Contains("ApiPaymentReportPdfRequest", json, StringComparison.Ordinal);
             Assert.Contains("destinationPath", json, StringComparison.Ordinal);
+
+            using var jsonDocument = JsonDocument.Parse(json);
+            var paymentRequestProperties = jsonDocument.RootElement
+                .GetProperty("components")
+                .GetProperty("schemas")
+                .GetProperty("ApiPaymentReportPdfRequest")
+                .GetProperty("properties");
+            Assert.False(paymentRequestProperties.TryGetProperty("withSeal", out _));
+            Assert.False(paymentRequestProperties.TryGetProperty("reportType", out _));
         }
 
         [Fact]
@@ -2948,12 +2982,12 @@ namespace ExportDocManager.Api.Tests
                 });
             }
 
-            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string invoiceNo, string type)
+            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string companyScope, string invoiceNo, string type)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<bool> InvoiceNoExistsAsync(string invoiceNo)
+            public Task<bool> InvoiceNoExistsAsync(string companyScope, string invoiceNo)
             {
                 throw new NotSupportedException();
             }
@@ -3014,7 +3048,7 @@ namespace ExportDocManager.Api.Tests
             }
 
             public Task<ReportPdfRenderResult> RenderPaymentVoucherPdfAsync(
-                ReportPdfRenderRequest request,
+                PaymentReportPdfRenderRequest request,
                 CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
@@ -3119,12 +3153,12 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string invoiceNo, string type)
+            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string companyScope, string invoiceNo, string type)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<bool> InvoiceNoExistsAsync(string invoiceNo)
+            public Task<bool> InvoiceNoExistsAsync(string companyScope, string invoiceNo)
             {
                 throw new NotSupportedException();
             }

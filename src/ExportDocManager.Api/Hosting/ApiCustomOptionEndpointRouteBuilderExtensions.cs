@@ -19,6 +19,7 @@ namespace ExportDocManager.Api.Hosting
                 ["TransportMode"] = new("TransportMode", AppConstants.TransportModes, true),
                 ["SupervisionMode"] = new("SupervisionMode", AppConstants.SupervisionModes, true),
                 ["PaymentMethod"] = new("PaymentMethod", AppConstants.PaymentMethods, true),
+                ["PaymentPayerName"] = new("PaymentPayerName", [], true),
                 ["PayeeCategory"] = new("PayeeCategory", [], true),
                 ["Type"] = new("Type", AppConstants.TradeTypes, false)
             };

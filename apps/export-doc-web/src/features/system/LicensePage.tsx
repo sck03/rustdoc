@@ -8,6 +8,7 @@ import {
 import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import { writeClipboardText } from "../../ui/clipboard.ts";
 
 export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
   const queryClient = useQueryClient();
@@ -58,12 +59,11 @@ export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
       return;
     }
 
-    try {
-      await navigator.clipboard.writeText(status.machineId);
+    if (await writeClipboardText(status.machineId)) {
       setMessage("机器码已复制。");
       setMessageType("success");
-    } catch {
-      setMessage("复制机器码失败。");
+    } else {
+      setMessage("复制机器码失败，请手动选中机器码复制。");
       setMessageType("error");
     }
   }

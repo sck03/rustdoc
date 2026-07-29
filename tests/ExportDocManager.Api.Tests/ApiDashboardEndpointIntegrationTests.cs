@@ -98,6 +98,55 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("实际数据", recentInvoice.Type);
         }
 
+        [Fact]
+        public async Task DashboardEndpoint_ShouldKeepSameInvoiceNumberIndependentAcrossCompanies()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-dashboard-company-scope",
+                "api-dashboard-company-scope.db");
+            using var anonymousClient = harness.CreateClient();
+            var login = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(login.AccessToken);
+
+            var companyA = await CreateInvoiceAsync(
+                adminClient,
+                "DASH-COMPANY-001",
+                InvoiceStatusCatalog.Verified,
+                120m,
+                70m,
+                13m,
+                "实际数据");
+            var companyB = await CreateInvoiceAsync(
+                adminClient,
+                "DASH-COMPANY-001",
+                InvoiceStatusCatalog.Verified,
+                80m,
+                50m,
+                13m,
+                "报关数据");
+
+            await SetInvoiceCompanyAndTypeAsync(
+                harness.DatabasePath,
+                companyA.Id,
+                "Company-A",
+                "实际数据");
+            await SetInvoiceCompanyAndTypeAsync(
+                harness.DatabasePath,
+                companyB.Id,
+                "Company-B",
+                "实际数据");
+
+            var response = await adminClient.GetAsync("/api/dashboard");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var dashboard = await ApiIntegrationTestHarness.ReadJsonAsync<ApiDashboardResponse>(response);
+
+            Assert.Equal(200m, dashboard.MonthlyExportAmount);
+            Assert.Equal(2, dashboard.TotalActiveCount);
+            Assert.Equal(2, dashboard.RecentInvoices.Count);
+            Assert.Contains(dashboard.RecentInvoices, invoice => invoice.Id == companyA.Id);
+            Assert.Contains(dashboard.RecentInvoices, invoice => invoice.Id == companyB.Id);
+        }
+
         private static async Task<ApiInvoiceSaveResponse> CreateInvoiceAsync(
             HttpClient client,
             string invoiceNo,
@@ -191,6 +240,27 @@ namespace ExportDocManager.Api.Tests
             command.Parameters.AddWithValue("$invoiceNo", invoiceNo);
             int affected = await command.ExecuteNonQueryAsync();
             Assert.Equal(1, affected);
+        }
+
+        private static async Task SetInvoiceCompanyAndTypeAsync(
+            string databasePath,
+            int invoiceId,
+            string companyScope,
+            string type)
+        {
+            await using var connection = new SqliteConnection($"Data Source={databasePath}");
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE Invoices
+                SET CompanyScope = $companyScope,
+                    Type = $type
+                WHERE Id = $invoiceId
+                """;
+            command.Parameters.AddWithValue("$companyScope", companyScope);
+            command.Parameters.AddWithValue("$type", type);
+            command.Parameters.AddWithValue("$invoiceId", invoiceId);
+            Assert.Equal(1, await command.ExecuteNonQueryAsync());
         }
     }
 }

@@ -119,6 +119,10 @@ assert(new Set(["Document", "Sales", "Full"].map((edition) => product.getProduct
 assert(device.getWorkspaceDeviceCapabilities("phone").canUseDenseWorkbench === false, "phone blocks dense workbench");
 assert(device.getWorkspaceDeviceCapabilities("tablet").canImportExport === false, "tablet blocks full import and export");
 assert(device.getWorkspaceDeviceCapabilities("desktop").canUseBatchOperations === true, "desktop enables batch operations");
+assert(device.resolveWorkspaceDeviceMode(false, false, true) === "desktop", "fine pointer keeps narrow desktop windows fully capable");
+assert(device.resolveWorkspaceDeviceMode(true, false, true) === "desktop", "fine pointer avoids phone mode under desktop display scaling");
+assert(device.resolveWorkspaceDeviceMode(false, false, false) === "tablet", "touch-only medium viewport uses tablet mode");
+assert(device.resolveWorkspaceDeviceMode(true, false, false) === "phone", "touch-only narrow viewport uses phone mode");
 assert(permission.hasModulePermission([{ moduleKey: "document.payments", accessLevel: "view" }], "document.payments", "view"), "view grant permits view");
 assert(!permission.hasModulePermission([{ moduleKey: "document.payments", accessLevel: "view" }], "document.payments", "operate"), "view grant blocks operate");
 assert(permission.hasModulePermission([{ moduleKey: "document.reports", accessLevel: "manage" }], "document.reports", "manage"), "manage grant permits report design");

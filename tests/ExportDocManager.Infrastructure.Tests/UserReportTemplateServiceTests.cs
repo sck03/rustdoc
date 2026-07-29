@@ -94,6 +94,71 @@ namespace ExportDocManager.Infrastructure.Tests
                     "{{ Payment.InvoiceNo }}",
                     true,
                     false)));
+
+            await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(
+                new UserReportTemplateSaveRequest(
+                    0,
+                    ReportDocumentType.PaymentVoucher.ToString(),
+                    "错误付款索引模板",
+                    "{{ Exporter[\"ExporterNameCN\"] }}",
+                    true,
+                    false)));
+
+            await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(
+                new UserReportTemplateSaveRequest(
+                    0,
+                    ReportDocumentType.ExportDocument.ToString(),
+                    "错误出口索引模板",
+                    "{{ Payment[\"InvoiceNo\"] }}",
+                    true,
+                    false)));
+        }
+
+        [Theory]
+        [InlineData("{{ this[\"Exporter\"] }}")]
+        [InlineData("{{ object.eval \"Exporter.ExporterNameCN\" }}")]
+        [InlineData("{{ \"{{ Exporter.ExporterNameCN }}\" | object.eval_template }}")]
+        [InlineData("{{ object[\"eval_template\"] \"{{ Exporter.ExporterNameCN }}\" }}")]
+        public async Task Save_ShouldRejectDynamicGlobalAccessAndEvaluation(string content)
+        {
+            using var factory = new TestDbContextFactory();
+            var user = new User { Id = 7, Username = "document-user", Role = UserRoleCatalog.User };
+            var service = new UserReportTemplateService(
+                factory,
+                new BusinessDataAccessScope(new DatabaseConnectionSettings(), new FixedCurrentUserContext(user)));
+
+            await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(
+                new UserReportTemplateSaveRequest(
+                    0,
+                    ReportDocumentType.PaymentVoucher.ToString(),
+                    "动态访问模板",
+                    content,
+                    true,
+                    false)));
+        }
+
+        [Theory]
+        [InlineData("<script>alert('x')</script>")]
+        [InlineData("<div onclick=\"alert('x')\">unsafe</div>")]
+        [InlineData("<iframe src=\"https://example.com\"></iframe>")]
+        [InlineData("<img src=\"https://example.com/pixel.png\">")]
+        [InlineData("<style>@import url('https://example.com/style.css');</style>")]
+        public async Task Save_ShouldRejectUnsafeBrowserContent(string unsafeContent)
+        {
+            using var factory = new TestDbContextFactory();
+            var user = new User { Id = 7, Username = "document-user", Role = UserRoleCatalog.User };
+            var service = new UserReportTemplateService(
+                factory,
+                new BusinessDataAccessScope(new DatabaseConnectionSettings(), new FixedCurrentUserContext(user)));
+
+            await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(
+                new UserReportTemplateSaveRequest(
+                    0,
+                    ReportDocumentType.ExportDocument.ToString(),
+                    "不安全模板",
+                    unsafeContent,
+                    true,
+                    false)));
         }
 
         [Fact]

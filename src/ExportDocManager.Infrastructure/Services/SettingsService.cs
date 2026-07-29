@@ -3,6 +3,7 @@ using System.Threading;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Reporting;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -40,49 +41,47 @@ namespace ExportDocManager.Services.Infrastructure
 
         public async Task LoadAsync()
         {
-            if (File.Exists(_filePath))
-            {
-                try
-                {
-                    var json = await File.ReadAllTextAsync(_filePath);
-                    Settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
-                    EnsureSettingsDefaults();
-                    var ep = Settings.Email?.Password;
-                    if (!string.IsNullOrEmpty(ep))
-                    {
-                        var dec = _secretProtector.Unprotect(ep);
-                        if (!string.IsNullOrEmpty(dec)) Settings.Email.Password = dec;
-                    }
-                    var wp = Settings.WebDav?.Password;
-                    if (!string.IsNullOrEmpty(wp))
-                    {
-                        var dec2 = _secretProtector.Unprotect(wp);
-                        if (!string.IsNullOrEmpty(dec2)) Settings.WebDav.Password = dec2;
-                    }
-
-                    var dp = Settings.System?.PostgreSqlPassword;
-                    if (!string.IsNullOrEmpty(dp))
-                    {
-                        var dec3 = _secretProtector.Unprotect(dp);
-                        if (!string.IsNullOrEmpty(dec3)) Settings.System.PostgreSqlPassword = dec3;
-                    }
-
-                    var aiKey = Settings.AI?.ApiKey;
-                    if (!string.IsNullOrEmpty(aiKey))
-                    {
-                        var dec4 = _secretProtector.Unprotect(aiKey);
-                        if (!string.IsNullOrEmpty(dec4)) Settings.AI.ApiKey = dec4;
-                    }
-                }
-                catch
-                {
-                    Settings = new AppSettings();
-                    EnsureSettingsDefaults();
-                }
-            }
-            else
+            if (!File.Exists(_filePath))
             {
                 EnsureSettingsDefaults();
+                return;
+            }
+
+            string json;
+            try
+            {
+                json = await File.ReadAllTextAsync(_filePath).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                throw new InvalidDataException($"无法读取设置文件 {_filePath}。", ex);
+            }
+
+            AppSettings loaded;
+            try
+            {
+                loaded = JsonSerializer.Deserialize<AppSettings>(json)
+                    ?? throw new InvalidDataException("设置文件内容为空。");
+            }
+            catch (JsonException ex)
+            {
+                throw new InvalidDataException($"设置文件 JSON 损坏：{_filePath}。", ex);
+            }
+
+            var previous = Settings;
+            Settings = loaded;
+            try
+            {
+                EnsureSettingsDefaults();
+                Settings.Email.Password = _secretProtector.UnprotectSettingsValue(Settings.Email.Password);
+                Settings.WebDav.Password = _secretProtector.UnprotectSettingsValue(Settings.WebDav.Password);
+                Settings.System.PostgreSqlPassword = _secretProtector.UnprotectSettingsValue(Settings.System.PostgreSqlPassword);
+                Settings.AI.ApiKey = _secretProtector.UnprotectSettingsValue(Settings.AI.ApiKey);
+            }
+            catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or IOException or UnauthorizedAccessException)
+            {
+                Settings = previous;
+                throw;
             }
         }
 
@@ -183,7 +182,11 @@ namespace ExportDocManager.Services.Infrastructure
             Settings ??= new AppSettings();
             Settings.System ??= new SystemSettings();
             Settings.BatchExport ??= new BatchExportSettings();
-            Settings.PaymentTemplates ??= new List<BatchExportItem>();
+            Settings.PaymentTemplates ??= new List<PaymentTemplateItem>();
+            foreach (var paymentTemplate in Settings.PaymentTemplates.Where(item => item != null))
+            {
+                paymentTemplate.ReportType = ReportDocumentType.PaymentVoucher.ToString();
+            }
             Settings.ExcelImport ??= new ExcelImportSettings();
             Settings.ExcelImportSchemes ??= new List<ExcelImportSettings>();
             Settings.ExchangeRate ??= new ExchangeRateSettings();

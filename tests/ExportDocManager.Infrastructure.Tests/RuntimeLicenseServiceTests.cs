@@ -275,6 +275,38 @@ namespace ExportDocManager.Infrastructure.Tests
             }
         }
 
+        [Fact]
+        public async Task GetStatusAsync_WhenCalledConcurrently_ShouldSerializeLicenseMirrorWrites()
+        {
+            string appRoot = CreateTempDirectory();
+            string dataRoot = CreateTempDirectory();
+            string anchorRoot = CreateTempDirectory();
+
+            try
+            {
+                var provider = new RuntimeAppPathProvider(appRoot, dataRoot);
+                var service = CreateService(
+                    provider,
+                    () => "DEVICE-CONCURRENT",
+                    () => "LOCAL-SEAL-CONCURRENT",
+                    CreateAnchorStore(anchorRoot));
+
+                var statuses = await Task.WhenAll(
+                    Enumerable.Range(0, 16).Select(_ => service.GetStatusAsync()));
+
+                string machineId = Assert.Single(statuses.Select(status => status.MachineId).Distinct());
+                Assert.False(string.IsNullOrWhiteSpace(machineId));
+                Assert.All(statuses, status => Assert.False(status.IsTrialExpired));
+                Assert.True(File.Exists(Path.Combine(provider.SecurityRoot, "license.dat")));
+            }
+            finally
+            {
+                DeleteDirectory(appRoot);
+                DeleteDirectory(dataRoot);
+                DeleteDirectory(anchorRoot);
+            }
+        }
+
         private static string CreateTempDirectory()
         {
             string path = Path.Combine(GetTestRoot(), Guid.NewGuid().ToString("N"));

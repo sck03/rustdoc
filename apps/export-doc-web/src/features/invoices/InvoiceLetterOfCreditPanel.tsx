@@ -7,11 +7,18 @@ import {
   selectLetterOfCreditFile,
 } from "../../desktop/desktopBridge.ts";
 import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
-import { TextField } from "../../ui/FormFields.tsx";
+import { FieldShell, TextField } from "../../ui/FormFields.tsx";
 import { PathField, PathTextAreaField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { normalizeInvoiceForSave } from "./invoiceModel.ts";
+
+type LetterOfCreditImportSource =
+  | { kind: "desktop"; filePath: string }
+  | { kind: "browser"; file: File };
+
+const maximumLetterOfCreditBytes = 25 * 1024 * 1024;
+const letterOfCreditAccept = ".pdf,.txt,.md,.csv,.json,.xml,.png,.jpg,.jpeg,.bmp,.gif,.tif,.tiff,.webp";
 
 export function InvoiceLetterOfCreditPanel({
   client,
@@ -34,14 +41,14 @@ export function InvoiceLetterOfCreditPanel({
   const [importMessageType, setImportMessageType] = useState<"success" | "error" | null>(null);
   const [reviewMessage, setReviewMessage] = useState<string | null>(null);
   const [reviewResult, setReviewResult] = useState<ApiLetterOfCreditReviewResponse | null>(null);
+  const [browserFile, setBrowserFile] = useState<File | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const desktopAvailable = isDesktopBridgeAvailable();
 
   const importMutation = useMutation({
-    mutationFn: (filePath: string) =>
-      client.importLetterOfCreditDocument({
-        body: { filePath },
-      }),
+    mutationFn: (source: LetterOfCreditImportSource) => source.kind === "desktop"
+      ? client.importLetterOfCreditDocument({ body: { filePath: source.filePath } })
+      : client.uploadLetterOfCreditDocument({ fileName: source.file.name, body: source.file }),
     onSuccess: (response) => {
       onChange({
         letterOfCreditSourcePath: response.sourcePath,
@@ -92,6 +99,9 @@ export function InvoiceLetterOfCreditPanel({
       invoice.letterOfCreditContent?.trim() ||
       invoice.specialTerms?.trim(),
   );
+  const hasImportSource = desktopAvailable
+    ? Boolean(invoice.letterOfCreditSourcePath?.trim())
+    : Boolean(browserFile);
 
   useEffect(() => {
     onBusyChange?.(isImporting || isReviewing);
@@ -99,6 +109,7 @@ export function InvoiceLetterOfCreditPanel({
   }, [isImporting, isReviewing, onBusyChange]);
 
   useEffect(() => {
+    setBrowserFile(null);
     clearImportMessage();
     clearReviewState();
   }, [invoice.id]);
@@ -136,6 +147,7 @@ export function InvoiceLetterOfCreditPanel({
     try {
       const selected = await selectLetterOfCreditFile();
       if (selected) {
+        setBrowserFile(null);
         onChange({ letterOfCreditSourcePath: selected });
         onClearPageMessages();
         clearImportMessage();
@@ -150,15 +162,51 @@ export function InvoiceLetterOfCreditPanel({
       return;
     }
 
-    const filePath = invoice.letterOfCreditSourcePath?.trim() ?? "";
-    if (!filePath) {
-      showImportError("请选择或输入信用证来源文件。");
+    onClearPageMessages();
+    clearImportMessage();
+    if (desktopAvailable) {
+      const filePath = invoice.letterOfCreditSourcePath?.trim() ?? "";
+      if (!filePath) {
+        showImportError("请选择或输入信用证来源文件。");
+        return;
+      }
+
+      importMutation.mutate({ kind: "desktop", filePath });
       return;
     }
 
-    onClearPageMessages();
+    if (!browserFile) {
+      showImportError("请选择要上传的信用证文件。");
+      return;
+    }
+
+    if (browserFile.size <= 0 || browserFile.size > maximumLetterOfCreditBytes) {
+      showImportError("信用证文件不能为空，且不能超过 25 MB。");
+      return;
+    }
+
+    importMutation.mutate({ kind: "browser", file: browserFile });
+  }
+
+  function selectBrowserFile(file: File | null) {
+    if (disabled) {
+      return;
+    }
+
     clearImportMessage();
-    importMutation.mutate(filePath);
+    clearReviewState();
+    if (!file) {
+      setBrowserFile(null);
+      return;
+    }
+
+    if (file.size <= 0 || file.size > maximumLetterOfCreditBytes) {
+      setBrowserFile(null);
+      showImportError("信用证文件不能为空，且不能超过 25 MB。");
+      return;
+    }
+
+    setBrowserFile(file);
   }
 
   function reviewLetterOfCredit() {
@@ -204,7 +252,7 @@ export function InvoiceLetterOfCreditPanel({
             <button
               className="command-button secondary"
               type="button"
-              disabled={disabled || isImporting || !invoice.letterOfCreditSourcePath?.trim()}
+              disabled={disabled || isImporting || !hasImportSource}
               onClick={importLetterOfCredit}
             >
               <Upload size={17} aria-hidden="true" />
@@ -232,22 +280,47 @@ export function InvoiceLetterOfCreditPanel({
               onChange={(value) => patchInvoice({ letterOfCreditNo: value })}
             />
           </div>
-          <PathField
-            label="来源文件"
-            value={invoice.letterOfCreditSourcePath ?? ""}
-            disabled={disabled || isImporting}
-            onChange={(value) => patchInvoice({ letterOfCreditSourcePath: value })}
-            actions={
-              <>
-                {desktopAvailable ? (
+          {desktopAvailable ? (
+            <PathField
+              label="来源文件"
+              value={invoice.letterOfCreditSourcePath ?? ""}
+              disabled={disabled || isImporting}
+              onChange={(value) => patchInvoice({ letterOfCreditSourcePath: value })}
+              actions={
+                <>
                   <DesktopIconButton title="选择信用证文件" disabled={disabled || isImporting} onClick={chooseLetterOfCreditFile}>
                     <FileText size={15} aria-hidden="true" />
                   </DesktopIconButton>
-                ) : null}
-                {renderOpenPathAction(invoice.letterOfCreditSourcePath, "打开信用证来源", showImportError)}
-              </>
-            }
-          />
+                  {renderOpenPathAction(invoice.letterOfCreditSourcePath, "打开信用证来源", showImportError)}
+                </>
+              }
+            />
+          ) : (
+            <FieldShell
+              label="上传信用证文件"
+              disabled={disabled || isImporting}
+              description={browserFile
+                ? `待导入：${browserFile.name}`
+                : invoice.letterOfCreditSourcePath?.trim()
+                  ? `已记录原文件名：${invoice.letterOfCreditSourcePath}`
+                  : "浏览器只上传当前选择文件；服务端临时文件会立即删除，发票草稿仅保存原文件名。"}
+            >
+              {(descriptionId) => (
+                <input
+                  key={invoice.id ?? 0}
+                  type="file"
+                  accept={letterOfCreditAccept}
+                  disabled={disabled || isImporting}
+                  aria-describedby={descriptionId}
+                  onChange={(event) => {
+                    const selectedFile = event.currentTarget.files?.[0] ?? null;
+                    event.currentTarget.value = "";
+                    selectBrowserFile(selectedFile);
+                  }}
+                />
+              )}
+            </FieldShell>
+          )}
           <PathTextAreaField
             label="信用证文本"
             value={invoice.letterOfCreditContent ?? ""}

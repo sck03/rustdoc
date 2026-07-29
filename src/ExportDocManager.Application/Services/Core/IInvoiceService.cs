@@ -42,8 +42,8 @@ namespace ExportDocManager.Services.Core
         Task<bool> SaveInvoiceAsync(Invoice invoice);
         Task<bool> DeleteInvoiceAsync(int id);
         Task<Invoice> GetInvoiceByIdAsync(int id);
-        Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string invoiceNo, string type);
-        Task<bool> InvoiceNoExistsAsync(string invoiceNo);
+        Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string companyScope, string invoiceNo, string type);
+        Task<bool> InvoiceNoExistsAsync(string companyScope, string invoiceNo);
         Task<Invoice> CopyInvoiceAsync(int originalId, string newInvoiceNo, InvoiceCloneOptions options = null);
         Task<Invoice> CopyInvoiceAsTypeAsync(int originalId, string targetType, InvoiceCloneOptions options = null);
         Task<Invoice> TransitionInvoiceStatusAsync(InvoiceStatusTransitionRequest request);

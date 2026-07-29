@@ -136,7 +136,7 @@ export function OperationCenterListActionsPanel({
     mutationFn: () => client.dispatchSingleWindowBatchToClient({ body: { batchId: row.batchId } }),
     onSuccess: async (response) => {
       setDispatchResult(response);
-      setMessage("XML 已发送到本机官方客户端 OutBox，请在官方客户端完成导入提交。");
+      setMessage("XML 已写入当前档案交接 OutBox；这不代表官方客户端已导入，请由操作员继续确认导入和提交。");
       setMessageKind("success");
       await invalidateSingleWindowBatchQueries(queryClient, row.batchId);
     },
@@ -151,7 +151,7 @@ export function OperationCenterListActionsPanel({
     mutationFn: async () => {
       const collection = await client.collectSingleWindowClientReceipts({ body: { batchId: row.batchId } });
       if (collection.receiptFiles.length === 0) {
-        throw new Error("官方客户端目录中尚未找到与当前批次匹配的回执文件。");
+        throw new Error("当前档案 InBox 中尚未找到与当前批次匹配的回执文件。");
       }
 
       const targetPath = await selectSavePackagePath(buildReceiptPackageFileName(row));
@@ -203,7 +203,7 @@ export function OperationCenterListActionsPanel({
         <div><h2>{isDesktopStation ? "当前持卡机任务" : "当前办公室批次"}</h2><span>{readDisplayText(row.batchReference)}</span></div>
         <div className="toolbar-actions">
           <button className="command-button secondary" type="button" disabled={isBusy} onClick={onOpenDetail}><Files size={17} aria-hidden="true" /><span>批次详情</span></button>
-          {isDesktopStation ? <button className="command-button" type="button" disabled={!canOperate || isBusy || !canDispatch} onClick={() => dispatchMutation.mutate()}><Send size={17} aria-hidden="true" /><span>发送官方客户端</span></button> : null}
+          {isDesktopStation ? <button className="command-button" type="button" disabled={!canOperate || isBusy || !canDispatch} onClick={() => dispatchMutation.mutate()}><Send size={17} aria-hidden="true" /><span>写入交接 OutBox</span></button> : null}
           {isDesktopStation ? <button className="command-button secondary" type="button" disabled={!canOperate || isBusy || !canCollect} onClick={() => receiptMutation.mutate()}><FolderInput size={17} aria-hidden="true" /><span>收集并导出回执</span></button> : null}
         </div>
       </div>
@@ -227,7 +227,7 @@ export function OperationCenterListActionsPanel({
         {isDesktopStation ? <DetailItem label="操作卡" value={profile?.cardIdentifier || row.assignedCardIdentifier} /> : <DetailItem label="持卡档案" value={row.clientProfileName || row.assignedCardIdentifier} />}
         {isDesktopStation ? <DetailItem label="OutBox" value={outBoxPath} actions={renderOpenPathAction(outBoxPath, "打开 OutBox", setMessage)} /> : null}
         {isDesktopStation ? <DetailItem label="InBox" value={inBoxPath} actions={renderOpenPathAction(inBoxPath, "打开 InBox", setMessage)} /> : null}
-        {dispatchResult ? <DetailItem label="已发送文件" value={dispatchResult.payloadFileCount} /> : null}
+        {dispatchResult ? <DetailItem label="已写入文件" value={dispatchResult.payloadFileCount} /> : null}
         {receiptResult ? <DetailItem label="已收集回执" value={receiptResult.receiptFiles.length} /> : null}
         {savedReceiptPackagePath ? <DetailItem label="回执包" value={savedReceiptPackagePath} wide actions={renderOpenPathAction(savedReceiptPackagePath, "打开回执包位置", setMessage)} /> : null}
       </div>

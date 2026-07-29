@@ -41,6 +41,8 @@ if ($RequireBrowserPdfTests -and -not $hasBrowserPdfRenderer) {
 $arguments = @(
     "test",
     (Join-Path $repoRoot "ExportDocManager.sln"),
+    "-m:1",
+    "-p:BuildInParallel=false",
     "-c", $Configuration,
     "--logger", "trx;LogFilePrefix=ExportDocManager",
     "--results-directory", $resultsDirectory,

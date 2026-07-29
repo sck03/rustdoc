@@ -42,6 +42,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$scriptUtf8Encoding = New-Object System.Text.UTF8Encoding($false)
+[Console]::InputEncoding = $scriptUtf8Encoding
+[Console]::OutputEncoding = $scriptUtf8Encoding
+$OutputEncoding = $scriptUtf8Encoding
 
 function Get-FullPath {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -633,7 +637,7 @@ function Invoke-WebBackupRestoreSmoke {
 
     $webSmokeJsonPath = Join-Path $LogRoot "web-backup-restore-smoke.json"
     $webSmokeScreenshotPath = Join-Path $LogRoot "web-backup-restore-smoke.png"
-    $webUrl = "http://127.0.0.1:5173/#/settings"
+    $webUrl = "http://127.0.0.1:5173/#/settings?section=backup"
     $expectedText = @(
         "设置",
         "数据备份与还原",

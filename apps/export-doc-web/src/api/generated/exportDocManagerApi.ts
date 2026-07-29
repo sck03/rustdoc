@@ -1847,9 +1847,7 @@ export interface ApiPayeeDto {
 
 export interface ApiPaymentDraftReportHtmlPreviewRequest {
   payment: ApiPaymentDto;
-  reportType: string;
   templatePath?: string;
-  withSeal: boolean;
 }
 
 export interface ApiPaymentDto {
@@ -1886,13 +1884,21 @@ export interface ApiPaymentDto {
   usdAmount?: number;
 }
 
+export interface ApiPaymentReportHtmlPreviewRequest {
+  templatePath?: string;
+}
+
 export interface ApiPaymentReportHtmlPreviewResponse {
   html: string;
   paymentId: number;
   reportType: string;
   storagePolicy: string;
   templatePath: string;
-  withSeal: boolean;
+}
+
+export interface ApiPaymentReportPdfRequest {
+  destinationPath: string;
+  templatePath?: string;
 }
 
 export interface ApiPaymentSaveResponse {
@@ -2115,7 +2121,7 @@ export interface ApiReportTemplateContentDto {
   reportType: string;
   storagePolicy: string;
   templatePath: string;
-  withSealDefault: boolean;
+  withSealDefault?: boolean;
 }
 
 export interface ApiReportTemplateCreateRequest {
@@ -2128,7 +2134,7 @@ export interface ApiReportTemplateDto {
   displayName: string;
   reportType: string;
   templatePath: string;
-  withSealDefault: boolean;
+  withSealDefault?: boolean;
 }
 
 export type ApiReportTemplateDtoArray = ApiReportTemplateDto[];
@@ -2170,13 +2176,13 @@ export interface ApiReportTemplatePackageImportResponse {
 export interface ApiReportTemplatePreviewRequest {
   content: string;
   reportType: string;
-  withSeal: boolean;
+  withSeal?: boolean;
 }
 
 export interface ApiReportTemplatePreviewResponse {
   html: string;
   reportType: string;
-  withSeal: boolean;
+  withSeal?: boolean;
 }
 
 export interface ApiReportTemplateRenameRequest {
@@ -4022,7 +4028,7 @@ export interface PreviewPaymentVoucherDraftHtmlRequest {
 
 export interface PreviewPaymentVoucherHtmlRequest {
   paymentId: number;
-  body: ApiReportHtmlPreviewRequest;
+  body: ApiPaymentReportHtmlPreviewRequest;
 }
 
 export interface PreviewReportTemplateContentRequest {
@@ -4313,12 +4319,12 @@ export interface StartInvoiceReportPdfZipSaveToPathJobRequest {
 
 export interface StartPaymentVoucherPdfDownloadJobRequest {
   paymentId: number;
-  body: ApiReportPdfRequest;
+  body: ApiPaymentReportPdfRequest;
 }
 
 export interface StartPaymentVoucherPdfSaveToPathJobRequest {
   paymentId: number;
-  body: ApiReportPdfRequest;
+  body: ApiPaymentReportPdfRequest;
 }
 
 export interface StartPdfMergeSaveToPathJobRequest {
@@ -4493,6 +4499,11 @@ export interface UploadAndStartPdfMergeDownloadJobRequest {
 }
 
 export interface UploadHsCodesImportFileRequest {
+  fileName?: string;
+  body: Blob;
+}
+
+export interface UploadLetterOfCreditDocumentRequest {
   fileName?: string;
   body: Blob;
 }
@@ -6822,6 +6833,17 @@ export class ExportDocManagerApiClient {
   public uploadLatestDatabaseBackupToCloud(init?: RequestInit): Promise<ApiCloudBackupCommandResponse> {
     const path = "/api/backup/cloud/upload-latest";
     return this.request<ApiCloudBackupCommandResponse>("POST", path, { init });
+  }
+
+  public uploadLetterOfCreditDocument(request: UploadLetterOfCreditDocumentRequest, init?: RequestInit): Promise<ApiLetterOfCreditImportResponse> {
+    const path = "/api/tools/letter-of-credit/import-upload";
+    return this.request<ApiLetterOfCreditImportResponse>("POST", path, {
+      query: {
+        "fileName": request.fileName,
+      },
+      body: request.body,
+      init,
+    });
   }
 
   public uploadReportTemplatePackage(request: UploadReportTemplatePackageRequest, init?: RequestInit): Promise<ApiReportTemplatePackageImportResponse> {

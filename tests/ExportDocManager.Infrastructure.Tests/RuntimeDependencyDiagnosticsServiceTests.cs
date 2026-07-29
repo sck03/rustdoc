@@ -5,6 +5,7 @@ using ExportDocManager.Services.Tools;
 
 namespace ExportDocManager.Infrastructure.Tests
 {
+    [Collection(BrowserIntegrationCollection.Name)]
     public sealed class RuntimeDependencyDiagnosticsServiceTests
     {
         [Fact]

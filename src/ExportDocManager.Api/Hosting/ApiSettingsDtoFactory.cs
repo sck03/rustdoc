@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
+using ExportDocManager.Services.Reporting;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -29,7 +30,11 @@ namespace ExportDocManager.Api.Hosting
 
             settings.System ??= new SystemSettings();
             settings.BatchExport ??= new BatchExportSettings();
-            settings.PaymentTemplates ??= new List<BatchExportItem>();
+            settings.PaymentTemplates ??= new List<PaymentTemplateItem>();
+            foreach (var paymentTemplate in settings.PaymentTemplates.Where(item => item != null))
+            {
+                paymentTemplate.ReportType = ReportDocumentType.PaymentVoucher.ToString();
+            }
             settings.ExcelImport ??= new ExcelImportSettings();
             settings.ExcelImportSchemes ??= new List<ExcelImportSettings>();
             settings.ExchangeRate ??= new ExchangeRateSettings();

@@ -6,6 +6,7 @@ namespace ExportDocManager.Api.Hosting
     {
         public const long CrmImportBytes = 10L * 1024L * 1024L;
         public const long SupplierImportBytes = 10L * 1024L * 1024L;
+        public const long LetterOfCreditBytes = 25L * 1024L * 1024L;
         public const long ExcelImportBytes = 25L * 1024L * 1024L;
         public const long PackageImportBytes = 50L * 1024L * 1024L;
         public const long PdfMergeBytes = 100L * 1024L * 1024L;

@@ -507,7 +507,10 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("目标发票类型必须与源发票类型不同。"));
                 }
 
-                var existingTarget = await invoiceService.GetInvoiceByInvoiceNoAndTypeAsync(source.InvoiceNo, targetType);
+                var existingTarget = await invoiceService.GetInvoiceByInvoiceNoAndTypeAsync(
+                    source.CompanyScope,
+                    source.InvoiceNo,
+                    targetType);
                 if (existingTarget != null)
                 {
                     return Results.Conflict(new ApiErrorResponse($"同一发票号的{targetType}已存在，未覆盖。"));

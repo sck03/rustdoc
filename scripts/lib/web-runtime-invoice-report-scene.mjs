@@ -338,7 +338,7 @@ export function createInvoiceReportSmokeScene(runtime) {
               disabled: Boolean(button.disabled)
             })) : [];
             const templateSelect = panel ? panel.querySelector('select') : null;
-            const alerts = panel ? Array.from(panel.querySelectorAll('.alert, .success-alert, .info-alert')).map((element) => element.innerText || '') : [];
+            const alerts = panel ? Array.from(panel.querySelectorAll('.inline-notice, .alert, .success-alert, .info-alert')).map((element) => element.innerText || '') : [];
             return {
               found: srcdoc.includes(${JSON.stringify(invoice.invoiceNo)}) &&
                 srcdoc.includes(${JSON.stringify(invoice.customerNameEN)}),
@@ -431,6 +431,22 @@ export function createInvoiceReportSmokeScene(runtime) {
         })()`,
         timeoutMs,
         `Timed out waiting for invoice draft report preview HTML: ${invoice.invoiceNo}`,
+      );
+
+      await evaluate(
+        page,
+        `(() => {
+          const panel = document.querySelector('[aria-label="报表预览"]');
+          const advancedDetails = panel ? panel.querySelector('details.report-export-advanced') : null;
+          if (!advancedDetails) {
+            throw new Error('Invoice advanced export controls are not available.');
+          }
+          if (!advancedDetails.open) {
+            advancedDetails.querySelector('summary')?.click();
+          }
+          return true;
+        })()`,
+        true,
       );
   
       const draftSavedOutputGuardCheck = await waitForPageExpression(
@@ -527,7 +543,7 @@ export function createInvoiceReportSmokeScene(runtime) {
             const srcdocs = frames.map((frame) => frame.getAttribute('srcdoc') || frame.srcdoc || '');
             const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
             const packageButton = buttons.find((element) => (element.innerText || '').includes('预览单据包'));
-            const alerts = panel ? Array.from(panel.querySelectorAll('.alert, .success-alert')).map((element) => element.innerText || '') : [];
+            const alerts = panel ? Array.from(panel.querySelectorAll('.inline-notice, .alert, .success-alert')).map((element) => element.innerText || '') : [];
             return {
               found: frames.length > 0 && srcdocs.some((srcdoc) => srcdoc.includes(${JSON.stringify(invoice.invoiceNo)})),
               frameCount: frames.length,

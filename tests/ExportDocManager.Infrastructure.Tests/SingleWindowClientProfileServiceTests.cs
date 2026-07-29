@@ -113,6 +113,49 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task Save_ShouldLockCompanyAndCardIdentityImmediatelyAfterProfileCreation()
+        {
+            string root = CreateTempRoot();
+            try
+            {
+                using var factory = new TestDbContextFactory();
+                var service = CreateService(factory, root);
+                await service.SaveAsync(CreateUpdate("公司 A / 卡 A", "公司 A", "CARD-A"));
+                var profile = await service.GetActiveAsync();
+
+                var identityChange = CreateUpdate(
+                    "公司 A / 卡 A（修改身份）",
+                    "公司 B",
+                    "CARD-B",
+                    profile.CustomsCooClientRootPath,
+                    profile.AgentConsignmentClientRootPath,
+                    profile.ProfileKey);
+                var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    service.SaveAsync(identityChange));
+
+                Assert.Contains("请新增档案", error.Message, StringComparison.Ordinal);
+
+                var renameOnly = CreateUpdate(
+                    "公司 A / 卡 A（重命名）",
+                    profile.CompanyScope,
+                    profile.CardIdentifier,
+                    profile.CustomsCooClientRootPath,
+                    profile.AgentConsignmentClientRootPath,
+                    profile.ProfileKey);
+                await service.SaveAsync(renameOnly);
+
+                var renamed = await service.GetActiveAsync();
+                Assert.Equal("公司 A / 卡 A（重命名）", renamed.ProfileName);
+                Assert.Equal("公司 A", renamed.CompanyScope);
+                Assert.Equal("CARD-A", renamed.CardIdentifier);
+            }
+            finally
+            {
+                TryDeleteDirectory(root);
+            }
+        }
+
+        [Fact]
         public async Task PostgreSqlMode_ShouldRejectStationProfiles()
         {
             string root = CreateTempRoot();
@@ -183,10 +226,12 @@ namespace ExportDocManager.Infrastructure.Tests
             string companyScope,
             string cardIdentifier,
             string customsCooRoot = "",
-            string agentConsignmentRoot = "")
+            string agentConsignmentRoot = "",
+            string profileKey = "")
         {
             return new SingleWindowClientProfileUpdate
             {
+                ProfileKey = profileKey,
                 ProfileName = profileName,
                 CompanyScope = companyScope,
                 CardIdentifier = cardIdentifier,

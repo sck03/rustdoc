@@ -48,7 +48,7 @@ namespace ExportDocManager.Api.Hosting
                             required = new[] { "sourcePath", "sourceDescription", "extractedText", "storagePolicy" },
                             properties = new Dictionary<string, object>
                             {
-                                ["sourcePath"] = StringProperty("Normalized source path that was read."),
+                                ["sourcePath"] = StringProperty("Desktop import returns the normalized user-selected path; browser upload returns only the safe original file name and never exposes a server temporary path."),
                                 ["sourceDescription"] = StringProperty("Source type description, such as text file, PDF, or image OCR."),
                                 ["extractedText"] = StringProperty("Extracted letter of credit text returned to the caller; it is not persisted by the import endpoint."),
                                 ["storagePolicy"] = StringProperty("Path and storage policy for audit/review.")
@@ -109,13 +109,17 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiReportTemplateDto"] = new
                         {
                             type = "object",
-                            required = new[] { "reportType", "displayName", "templatePath", "withSealDefault" },
+                            required = new[] { "reportType", "displayName", "templatePath" },
                             properties = new Dictionary<string, object>
                             {
                                 ["reportType"] = StringProperty("Report type: ExportDocument or PaymentVoucher."),
                                 ["displayName"] = StringProperty("Template display name."),
                                 ["templatePath"] = StringProperty("Resolved path from the managed built-in or user template catalog."),
-                                ["withSealDefault"] = new { type = "boolean" }
+                                ["withSealDefault"] = new
+                                {
+                                    type = "boolean",
+                                    description = "Default customs-seal option for ExportDocument templates. Omitted for payment/reimbursement templates."
+                                }
                             }
                         },
                         ["ApiUserReportTemplateDto"] = new
@@ -176,13 +180,17 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiReportTemplateContentDto"] = new
                         {
                             type = "object",
-                            required = new[] { "reportType", "displayName", "templatePath", "withSealDefault", "content", "storagePolicy" },
+                            required = new[] { "reportType", "displayName", "templatePath", "content", "storagePolicy" },
                             properties = new Dictionary<string, object>
                             {
                                 ["reportType"] = StringProperty("Report type: ExportDocument or PaymentVoucher."),
                                 ["displayName"] = StringProperty("Template display name."),
                                 ["templatePath"] = StringProperty("Resolved path from the managed built-in or user template catalog."),
-                                ["withSealDefault"] = new { type = "boolean" },
+                                ["withSealDefault"] = new
+                                {
+                                    type = "boolean",
+                                    description = "Default customs-seal option for ExportDocument templates. Omitted for payment/reimbursement templates."
+                                },
                                 ["content"] = StringProperty("Editable HTML/Scriban template content."),
                                 ["storagePolicy"] = StringProperty("Runtime storage policy for report templates.")
                             }
@@ -300,22 +308,30 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiReportTemplatePreviewRequest"] = new
                         {
                             type = "object",
-                            required = new[] { "reportType", "content", "withSeal" },
+                            required = new[] { "reportType", "content" },
                             properties = new Dictionary<string, object>
                             {
                                 ["reportType"] = StringProperty("Report type: ExportDocument or PaymentVoucher."),
                                 ["content"] = StringProperty("HTML/Scriban template content to render with sample data."),
-                                ["withSeal"] = new { type = "boolean" }
+                                ["withSeal"] = new
+                                {
+                                    type = "boolean",
+                                    description = "Customs-seal option for ExportDocument previews. Omit for payment/reimbursement previews."
+                                }
                             }
                         },
                         ["ApiReportTemplatePreviewResponse"] = new
                         {
                             type = "object",
-                            required = new[] { "reportType", "withSeal", "html" },
+                            required = new[] { "reportType", "html" },
                             properties = new Dictionary<string, object>
                             {
                                 ["reportType"] = StringProperty("Report type."),
-                                ["withSeal"] = new { type = "boolean" },
+                                ["withSeal"] = new
+                                {
+                                    type = "boolean",
+                                    description = "Effective customs-seal option for ExportDocument previews. Omitted for payment/reimbursement previews."
+                                },
                                 ["html"] = StringProperty("Rendered sample HTML content.")
                             }
                         },
@@ -325,20 +341,26 @@ namespace ExportDocManager.Api.Hosting
                             required = new[] { "reportType", "withSeal" },
                             properties = new Dictionary<string, object>
                             {
-                                ["reportType"] = StringProperty("Report type. Invoice preview supports ExportDocument; payment/reimbursement preview supports PaymentVoucher."),
+                                ["reportType"] = StringProperty("Report type. Invoice preview supports ExportDocument."),
                                 ["templatePath"] = StringProperty("Optional managed export-document template path. When omitted, the default Export template is used."),
                                 ["withSeal"] = new { type = "boolean" }
+                            }
+                        },
+                        ["ApiPaymentReportHtmlPreviewRequest"] = new
+                        {
+                            type = "object",
+                            properties = new Dictionary<string, object>
+                            {
+                                ["templatePath"] = StringProperty("Optional managed payment/reimbursement template path. Export-document templates are rejected.")
                             }
                         },
                         ["ApiPaymentDraftReportHtmlPreviewRequest"] = new
                         {
                             type = "object",
-                            required = new[] { "reportType", "withSeal", "payment" },
+                            required = new[] { "payment" },
                             properties = new Dictionary<string, object>
                             {
-                                ["reportType"] = StringProperty("Report type. Payment/reimbursement draft preview supports PaymentVoucher."),
                                 ["templatePath"] = StringProperty("Optional managed payment/reimbursement template path. Export-document templates are rejected."),
-                                ["withSeal"] = new { type = "boolean" },
                                 ["payment"] = RefSchema("ApiPaymentDto")
                             }
                         },
@@ -371,15 +393,14 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiPaymentReportHtmlPreviewResponse"] = new
                         {
                             type = "object",
-                            required = new[] { "paymentId", "reportType", "templatePath", "withSeal", "html", "storagePolicy" },
+                            required = new[] { "paymentId", "reportType", "templatePath", "html", "storagePolicy" },
                             properties = new Dictionary<string, object>
                             {
                                 ["paymentId"] = new { type = "integer", format = "int32" },
                                 ["reportType"] = StringProperty("Report type."),
                                 ["templatePath"] = StringProperty("Resolved template path."),
-                                ["withSeal"] = new { type = "boolean" },
                                 ["html"] = StringProperty("Rendered HTML content."),
-                                ["storagePolicy"] = StringProperty("Runtime storage policy for payment/reimbursement draft previews.")
+                                ["storagePolicy"] = StringProperty("Runtime storage policy for payment/reimbursement previews. Seal data is never loaded or returned.")
                             }
                         },
                         ["ApiReportPdfRequest"] = new
@@ -388,10 +409,20 @@ namespace ExportDocManager.Api.Hosting
                             required = new[] { "reportType", "withSeal", "destinationPath" },
                             properties = new Dictionary<string, object>
                             {
-                                ["reportType"] = StringProperty("Report type. Invoice PDF supports ExportDocument; payment/reimbursement PDF supports PaymentVoucher."),
+                                ["reportType"] = StringProperty("Report type. Invoice PDF supports ExportDocument."),
                                 ["templatePath"] = StringProperty("Optional managed export-document template path. When omitted, the default Export template is used."),
                                 ["withSeal"] = new { type = "boolean" },
                                 ["destinationPath"] = StringProperty("User-selected PDF output path. The sidecar does not assign a default system-drive path.")
+                            }
+                        },
+                        ["ApiPaymentReportPdfRequest"] = new
+                        {
+                            type = "object",
+                            required = new[] { "destinationPath" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["templatePath"] = StringProperty("Optional managed payment/reimbursement template path."),
+                                ["destinationPath"] = StringProperty("User-selected PDF output path. Payment/reimbursement requests do not contain seal fields.")
                             }
                         },
                         ["ApiInvoiceReportZipRequest"] = new

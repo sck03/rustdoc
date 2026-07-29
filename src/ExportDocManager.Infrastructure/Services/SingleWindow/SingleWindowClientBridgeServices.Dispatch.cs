@@ -23,7 +23,7 @@ namespace ExportDocManager.Services.SingleWindow
             var batch = await _businessDataAccessScope
                 .ApplySubmissionBatchScope(context.SwSubmissionBatches, context)
                 .FirstOrDefaultAsync(item => item.Id == batchId, cancellationToken)
-                ?? throw new InvalidOperationException("未找到要发送的单一窗口批次。");
+                ?? throw new InvalidOperationException("未找到要写入交接 OutBox 的单一窗口批次。");
             if (!Enum.TryParse<SingleWindowBusinessType>(batch.BusinessType, true, out var businessType))
             {
                 throw new InvalidOperationException("单一窗口批次业务类型无效。");
@@ -32,7 +32,7 @@ namespace ExportDocManager.Services.SingleWindow
             EnsureBatchBelongsToCurrentStation(batch, profile, stationKey, businessType);
             if (batch.Status != SingleWindowBatchStatusCatalog.SubmitPackageImported)
             {
-                throw new InvalidOperationException("只有本机已导入且尚未发送的提交包可以进入官方客户端目录。");
+                throw new InvalidOperationException("只有本机已导入且尚未写入交接 OutBox 的提交包可以执行此操作。");
             }
 
             string importRootPath = ResolveConfiguredRoot(profile, businessType);
@@ -317,7 +317,7 @@ namespace ExportDocManager.Services.SingleWindow
 
                 if (targetFiles.Count == 0)
                 {
-                    throw new InvalidDataException("提交包没有可发送到官方客户端的 XML 报文。");
+                    throw new InvalidDataException("提交包没有可写入交接 OutBox 的 XML 报文。");
                 }
 
                 return targetFiles;

@@ -68,7 +68,7 @@ namespace ExportDocManager.Services.Reporting
             string name = Required(request.Name, "模板名称");
             string content = request.ContentHtml ?? string.Empty;
             string shareScope = UserReportTemplateShareScope.Normalize(request.ShareScope);
-            ValidateDataDomain(reportType, content);
+            ReportTemplateContentPolicy.Validate(reportType, content);
             if (name.Length > 150 || content.Length > 2_000_000)
             {
                 throw new ArgumentException("报表模板名称或内容超过允许长度。");
@@ -211,7 +211,7 @@ namespace ExportDocManager.Services.Reporting
             int expectedVersion = entity.VersionNumber;
             context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = expectedVersion;
 
-            ValidateDataDomain(Enum.Parse<ReportDocumentType>(entity.ReportType), source.ContentHtml);
+            ReportTemplateContentPolicy.Validate(Enum.Parse<ReportDocumentType>(entity.ReportType), source.ContentHtml);
             entity.Name = source.Name;
             entity.ContentHtml = source.ContentHtml;
             entity.IsActive = source.IsActive;
@@ -278,24 +278,5 @@ namespace ExportDocManager.Services.Reporting
                 ? throw new ArgumentException($"{field}不能为空。")
                 : value.Trim();
 
-        private static void ValidateDataDomain(ReportDocumentType reportType, string content)
-        {
-            content ??= string.Empty;
-            if (reportType == ReportDocumentType.PaymentVoucher)
-            {
-                string[] documentTokens = ["Invoice.", "Customer.", "Exporter.", "item.", "Invoice.Items"];
-                if (documentTokens.Any(token => content.Contains(token, StringComparison.OrdinalIgnoreCase)))
-                {
-                    throw new ArgumentException("付款报销模板不能使用报关单证数据字段。");
-                }
-
-                return;
-            }
-
-            if (content.Contains("Payment.", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new ArgumentException("报关单证模板不能使用付款报销数据字段。");
-            }
-        }
     }
 }
