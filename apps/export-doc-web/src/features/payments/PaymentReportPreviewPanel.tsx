@@ -35,7 +35,6 @@ export function PaymentReportPreviewPanel({
   const navigate = useNavigate();
   const reportType = "PaymentVoucher";
   const [selectedTemplatePath, setSelectedTemplatePath] = useState("");
-  const [withSeal, setWithSeal] = useState(true);
   const [preview, setPreview] = useState<ApiPaymentReportHtmlPreviewResponse | null>(null);
   const [pdfDestinationPath, setPdfDestinationPath] = useState("");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -86,17 +85,6 @@ export function PaymentReportPreviewPanel({
   }, [templateViews]);
 
   useEffect(() => {
-    if (!selectedTemplatePath) {
-      return;
-    }
-
-    const template = templateViews.find((item) => item.templatePath === selectedTemplatePath);
-    if (template) {
-      setWithSeal(template.withSealDefault);
-    }
-  }, [selectedTemplatePath, templateViews]);
-
-  useEffect(() => {
     setPreview(null);
     setStatusMessage(null);
     setLastCreatedJobId(null);
@@ -106,9 +94,7 @@ export function PaymentReportPreviewPanel({
   const previewMutation = useMutation({
     mutationFn: () => {
       const body = {
-        reportType,
         templatePath: selectedTemplatePath,
-        withSeal,
       };
 
       return paymentDraft
@@ -141,15 +127,13 @@ export function PaymentReportPreviewPanel({
         ? await client.startPaymentVoucherPdfSaveToPathJob({
         paymentId,
         body: {
-          reportType,
           templatePath: selectedTemplatePath,
-          withSeal,
           destinationPath: pdfDestinationPath.trim(),
         },
       })
         : await client.startPaymentVoucherPdfDownloadJob({
             paymentId,
-            body: { reportType, templatePath: selectedTemplatePath, withSeal, destinationPath: "" },
+            body: { templatePath: selectedTemplatePath, destinationPath: "" },
           });
       if (!desktopAvailable) {
         await downloadJobResultWhenReady(client, job, buildPaymentReportPdfDefaultFileName());
@@ -182,10 +166,6 @@ export function PaymentReportPreviewPanel({
 
   function handleTemplateChange(value: string) {
     setSelectedTemplatePath(value);
-    const template = templateViews.find((item) => item.templatePath === value);
-    if (template) {
-      setWithSeal(template.withSealDefault);
-    }
     setPreview(null);
     setStatusMessage(null);
     setLastCreatedJobId(null);
@@ -349,19 +329,6 @@ export function PaymentReportPreviewPanel({
           }))}
           onChange={handleTemplateChange}
         />
-        <label className="toggle-field">
-          <input
-            type="checkbox"
-            checked={withSeal}
-            disabled={isBusy || !reportOutputPermission.canOperate}
-            onChange={(event) => {
-              setWithSeal(event.target.checked);
-              setPreview(null);
-              setStatusMessage(null);
-            }}
-          />
-          <span>带章</span>
-        </label>
       </div>
 
       {hasSavedPayment ? (
@@ -422,14 +389,12 @@ type PaymentTemplateSetting = {
   name: string;
   templatePath: string;
   isEnabled: boolean;
-  showSeal: boolean;
   reportType: string;
 };
 
 type PaymentTemplateView = {
   templatePath: string;
   displayName: string;
-  withSealDefault: boolean;
 };
 
 function buildPaymentTemplateViews(
@@ -459,7 +424,6 @@ function buildPaymentTemplateViews(
     views.push({
       templatePath: template.templatePath,
       displayName: item.name || template.displayName || fileNameFromPath(template.templatePath),
-      withSealDefault: item.showSeal,
     });
   }
 
@@ -472,7 +436,6 @@ function buildPaymentTemplateViews(
     views.push({
       templatePath: template.templatePath,
       displayName: template.displayName || fileNameFromPath(template.templatePath),
-      withSealDefault: template.withSealDefault,
     });
   }
 
@@ -500,7 +463,6 @@ function readPaymentTemplateItems(settings?: Record<string, unknown>): PaymentTe
       name: readString(rawItem, "name", "Name"),
       templatePath: readString(rawItem, "templatePath", "TemplatePath"),
       isEnabled: readBoolean(rawItem, true, "isEnabled", "IsEnabled"),
-      showSeal: readBoolean(rawItem, true, "showSeal", "ShowSeal"),
       reportType,
     });
   }
@@ -537,13 +499,7 @@ function findTemplateForPaymentItem(
 }
 
 function isPaymentTemplateReportType(reportType: string) {
-  const normalized = reportType.trim().toLowerCase();
-  return (
-    normalized.length === 0 ||
-    normalized === "paymentvoucher" ||
-    normalized === "paymentdocument" ||
-    normalized === "internal"
-  );
+  return reportType.trim().toLowerCase() === "paymentvoucher";
 }
 
 function pathsReferToSameTemplate(left: string, right: string) {

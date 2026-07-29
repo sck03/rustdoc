@@ -206,7 +206,11 @@ namespace ExportDocManager.Services.Infrastructure
             // data, then newest row wins) while letting EF translate the
             // deduplication to SQL instead of materializing all rows.
             var preferredIds = source
-                .GroupBy(invoice => (invoice.InvoiceNo ?? string.Empty).Trim())
+                .GroupBy(invoice => new
+                {
+                    CompanyScope = (invoice.CompanyScope ?? string.Empty).Trim(),
+                    InvoiceNo = (invoice.InvoiceNo ?? string.Empty).Trim()
+                })
                 .Select(group => group
                     .OrderByDescending(invoice => invoice.Type != null && invoice.Type.Contains("实际"))
                     .ThenByDescending(invoice => invoice.Type != null && invoice.Type.Contains("报关"))

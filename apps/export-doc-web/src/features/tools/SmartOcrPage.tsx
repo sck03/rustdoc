@@ -9,6 +9,7 @@ import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../..
 import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
+import { getClipboardPasteInstruction, writeClipboardText } from "../../ui/clipboard.ts";
 
 type OcrImageSource =
   | {
@@ -170,8 +171,8 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
   }
 
   async function pasteImageFromClipboard() {
-    if (!navigator.clipboard?.read) {
-      showError("当前环境不支持读取剪贴板图片。");
+    if (!window.isSecureContext || !navigator.clipboard?.read) {
+      showError(getClipboardPasteInstruction("页面"));
       return;
     }
 
@@ -190,7 +191,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
 
       showError("剪贴板中没有图片。");
     } catch (error) {
-      showError(error instanceof Error ? error.message : "读取剪贴板图片失败。");
+      showError(`${error instanceof Error ? error.message : "读取剪贴板图片失败。"} ${getClipboardPasteInstruction("页面")}`);
     }
   }
 
@@ -243,12 +244,11 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
       return;
     }
 
-    try {
-      await navigator.clipboard.writeText(recognizedText);
+    if (await writeClipboardText(recognizedText)) {
       setMessage("识别文本已复制。");
       setMessageType("success");
-    } catch (error) {
-      showError(error instanceof Error ? error.message : "复制失败。");
+    } else {
+      showError("复制失败，请手动选中文本复制。");
     }
   }
 

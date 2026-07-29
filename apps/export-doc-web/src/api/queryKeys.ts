@@ -1,6 +1,9 @@
 export const queryKeys = {
   dashboard: () => ["dashboard"] as const,
   crmDashboard: () => ["crm", "dashboard"] as const,
+  crmCustomers: (keyword: string, status: string, pageNumber: number, pageSize: number) =>
+    ["crm-customers", { keyword, status, pageNumber, pageSize }] as const,
+  crmCustomersRoot: () => ["crm-customers"] as const,
   backups: () => ["backups"] as const,
   auditLogs: (
     pageNumber: number,
@@ -69,23 +72,10 @@ export const queryKeys = {
   settings: () => ["settings"] as const,
   users: () => ["users"] as const,
   permissionTemplates: () => ["permission-templates"] as const,
-  singleWindowCollaboration: (
-    pageNumber: number,
-    pageSize: number,
-    keyword: string,
-    businessType: string,
-    status: string,
-    includeDisabledWorkstations: boolean,
-  ) =>
-    [
-      "single-window",
-      "collaboration",
-      { pageNumber, pageSize, keyword, businessType, status, includeDisabledWorkstations },
-    ] as const,
   singleWindowAgentConsignmentDocument: (invoiceId: number) => ["single-window", "acd", invoiceId, "document"] as const,
   singleWindowAgentConsignmentExportReview: (invoiceId: number) =>
     ["single-window", "acd", invoiceId, "export-review"] as const,
-  singleWindowClientProfile: () => ["single-window", "client-profile", "default"] as const,
+  singleWindowClientProfiles: () => ["single-window", "client-profiles"] as const,
   singleWindowCustomsCooDocument: (invoiceId: number) => ["single-window", "coo", invoiceId, "document"] as const,
   singleWindowCustomsCooEditorOptions: () => ["single-window", "coo", "editor-options"] as const,
   singleWindowCustomsCooExportReview: (invoiceId: number) => ["single-window", "coo", invoiceId, "export-review"] as const,
@@ -103,5 +93,4 @@ export const queryKeys = {
   singleWindowOperationCenterDetail: (batchId: number) => ["single-window", "operation-center", batchId] as const,
   singleWindowReferenceCatalog: () => ["single-window", "reference-catalog"] as const,
   singleWindowOperationCenterRoot: () => ["single-window", "operation-center"] as const,
-  singleWindowWorkstations: () => ["single-window", "workstations"] as const,
 };

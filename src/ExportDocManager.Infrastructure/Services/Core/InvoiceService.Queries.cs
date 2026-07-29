@@ -66,32 +66,39 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string invoiceNo, string type)
+        public async Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string companyScope, string invoiceNo, string type)
         {
             try
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
+                string normalizedCompanyScope = companyScope?.Trim() ?? string.Empty;
                 string normalizedInvoiceNo = invoiceNo?.Trim() ?? string.Empty;
                 string normalizedType = InvoiceTypeCatalog.Normalize(type);
                 return await _businessDataAccessScope
                     .ApplyInvoiceScope(context.Invoices.AsNoTracking())
-                    .FirstOrDefaultAsync(x => x.InvoiceNo == normalizedInvoiceNo && x.Type == normalizedType);
+                    .FirstOrDefaultAsync(x =>
+                        x.CompanyScope == normalizedCompanyScope &&
+                        x.InvoiceNo == normalizedInvoiceNo &&
+                        x.Type == normalizedType);
             }
             catch (Exception ex)
             {
-                throw new Exception($"根据发票号和类型获取发票失败: {ex.Message}", ex);
+                throw new Exception($"根据公司范围、发票号和类型获取发票失败: {ex.Message}", ex);
             }
         }
 
-        public async Task<bool> InvoiceNoExistsAsync(string invoiceNo)
+        public async Task<bool> InvoiceNoExistsAsync(string companyScope, string invoiceNo)
         {
             try
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
+                string normalizedCompanyScope = companyScope?.Trim() ?? string.Empty;
                 string normalizedInvoiceNo = invoiceNo?.Trim() ?? string.Empty;
                 return await _businessDataAccessScope
                     .ApplyInvoiceScope(context.Invoices.AsNoTracking())
-                    .AnyAsync(x => x.InvoiceNo == normalizedInvoiceNo);
+                    .AnyAsync(x =>
+                        x.CompanyScope == normalizedCompanyScope &&
+                        x.InvoiceNo == normalizedInvoiceNo);
             }
             catch (Exception ex)
             {

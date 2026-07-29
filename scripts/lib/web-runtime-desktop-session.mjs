@@ -28,9 +28,9 @@ try {
 
 function buildMockTauriBootstrap(options) {
   return `
-  window.__TAURI__ = {
-    core: {
-      invoke: async (command, args = {}) => {
+  globalThis.isTauri = true;
+  window.__TAURI_INTERNALS__ = window.__TAURI_INTERNALS__ || {};
+  window.__TAURI_INTERNALS__.invoke = async (command, args = {}) => {
         window.__exportDocManagerSmokeTauriInvocations = window.__exportDocManagerSmokeTauriInvocations || [];
         const invocation = { command, args };
         window.__exportDocManagerSmokeTauriInvocations.push(invocation);
@@ -111,8 +111,12 @@ function buildMockTauriBootstrap(options) {
         }
 
         throw new Error("Unsupported mocked Tauri command: " + command);
-      },
-    },
   };
+  window.__TAURI__ = { core: {} };
+  Object.defineProperty(window.__TAURI__.core, "invoke", {
+    configurable: true,
+    get: () => window.__TAURI_INTERNALS__.invoke,
+    set: (value) => { window.__TAURI_INTERNALS__.invoke = value; },
+  });
 `;
 }

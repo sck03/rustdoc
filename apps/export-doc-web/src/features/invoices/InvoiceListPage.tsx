@@ -375,7 +375,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
     if (!isDesktopBridgeAvailable()) {
       setTransferDraft(createEmptyInvoiceTransferImportDraft());
       setTransferUploadFile(null);
-      setTransferMessage("请选择本机 .edpkg 单据包上传预览；浏览器不会读取服务器绝对路径。");
+      setTransferMessage("请选择本机 .edpkg 单据包上传预览；网页版只处理您主动选择的文件。");
       setTransferSuccessMessage(null);
       setLastExportedPackagePath(null);
       return;

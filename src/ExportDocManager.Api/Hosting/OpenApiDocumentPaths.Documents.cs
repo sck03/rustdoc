@@ -510,7 +510,7 @@ namespace ExportDocManager.Api.Hosting
                             requestBody = new
                             {
                                 required = true,
-                                content = JsonContent("ApiReportHtmlPreviewRequest")
+                                content = JsonContent("ApiPaymentReportHtmlPreviewRequest")
                             },
                             responses = new Dictionary<string, object>
                             {
@@ -611,7 +611,7 @@ namespace ExportDocManager.Api.Hosting
                             requestBody = new
                             {
                                 required = true,
-                                content = JsonContent("ApiReportPdfRequest")
+                                content = JsonContent("ApiPaymentReportPdfRequest")
                             },
                             responses = new Dictionary<string, object>
                             {
@@ -636,7 +636,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 PathParameter("paymentId", "integer", "int32", "Payment or reimbursement id.")
                             },
-                            requestBody = new { required = true, content = JsonContent("ApiReportPdfRequest") },
+                            requestBody = new { required = true, content = JsonContent("ApiPaymentReportPdfRequest") },
                             responses = new Dictionary<string, object>
                             {
                                 ["202"] = new { description = "Controlled PDF download job accepted.", content = JsonContent("BackgroundJobSnapshot") },

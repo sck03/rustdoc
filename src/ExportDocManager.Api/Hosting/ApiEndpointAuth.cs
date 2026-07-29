@@ -300,14 +300,10 @@ namespace ExportDocManager.Api.Hosting
         }
 
         private static bool IsPaymentReportType(string reportType) =>
-            string.Equals(reportType, "PaymentVoucher", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(reportType, "PaymentDocument", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(reportType, "Internal", StringComparison.OrdinalIgnoreCase);
+            string.Equals(reportType, "PaymentVoucher", StringComparison.OrdinalIgnoreCase);
 
         private static bool IsInvoiceReportType(string reportType) =>
-            string.Equals(reportType, "ExportDocument", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(reportType, "Invoice", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(reportType, "Export", StringComparison.OrdinalIgnoreCase);
+            string.Equals(reportType, "ExportDocument", StringComparison.OrdinalIgnoreCase);
 
         public static string GetRequiredAccessLevel(string method) =>
             HttpMethods.IsDelete(method)

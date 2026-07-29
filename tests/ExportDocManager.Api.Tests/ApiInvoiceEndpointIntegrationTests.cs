@@ -330,6 +330,53 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public async Task CloneType_ShouldUseCompanyScopeWhenSameInvoiceNumberExistsForAnotherCompany()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-invoice-clone-company-scope",
+                "api-invoice-clone-company-scope.db");
+            using var anonymousClient = harness.CreateClient();
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+
+            var sourceResponse = await adminClient.PostAsJsonAsync(
+                "/api/invoices",
+                CreateInvoiceRequest("INV-COMPANY-SAME-001", type: "实际数据"));
+            Assert.Equal(HttpStatusCode.Created, sourceResponse.StatusCode);
+            var source = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(sourceResponse);
+
+            var otherCompanyResponse = await adminClient.PostAsJsonAsync(
+                "/api/invoices",
+                CreateInvoiceRequest("INV-COMPANY-SAME-001", type: "报关数据"));
+            Assert.Equal(HttpStatusCode.Created, otherCompanyResponse.StatusCode);
+            var otherCompany = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(otherCompanyResponse);
+
+            await SetInvoiceCompanyScopeAsync(harness.DatabasePath, source.Id, "Company-A");
+            await SetInvoiceCompanyScopeAsync(harness.DatabasePath, otherCompany.Id, "Company-B");
+
+            var cloneResponse = await adminClient.PostAsJsonAsync(
+                $"/api/invoices/{source.Id}/clone-type",
+                new ApiInvoiceCloneTypeRequest("报关数据", new InvoiceCloneOptions()));
+            Assert.Equal(HttpStatusCode.OK, cloneResponse.StatusCode);
+            var clone = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceCloneTypeResponse>(cloneResponse);
+
+            Assert.Equal("Company-A", clone.Invoice.CompanyScope);
+            Assert.Equal("INV-COMPANY-SAME-001", clone.Invoice.InvoiceNo);
+            Assert.Equal("报关数据", clone.Invoice.Type);
+
+            await using var connection = new SqliteConnection($"Data Source={harness.DatabasePath}");
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT COUNT(DISTINCT CompanyScope)
+                FROM Invoices
+                WHERE InvoiceNo = 'INV-COMPANY-SAME-001'
+                  AND Type = '报关数据';
+                """;
+            Assert.Equal(2L, (long)(await command.ExecuteScalarAsync())!);
+        }
+
+        [Fact]
         public async Task InvoiceTransferPackageEndpoints_ShouldRoundTripWithoutMergingActualAndCustomsData()
         {
             await using var harness = await ApiIntegrationTestHarness.StartAsync(
@@ -425,6 +472,61 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, importedInvoiceResponse.StatusCode);
             var importedInvoice = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceDetailDto>(importedInvoiceResponse);
             Assert.Equal(InvoiceStatusCatalog.Draft, importedInvoice.Status);
+        }
+
+        [Fact]
+        public async Task InvoiceTransferPreview_ShouldScopeSameNumberAndTypeConflictsByCompany()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-invoice-transfer-company-scope",
+                "api-invoice-transfer-company-scope.db");
+            using var anonymousClient = harness.CreateClient();
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+
+            var sourceResponse = await adminClient.PostAsJsonAsync(
+                "/api/invoices",
+                CreateInvoiceRequest(
+                    "TRANSFER-COMPANY-001",
+                    type: "实际数据",
+                    totalAmount: 260m));
+            Assert.Equal(HttpStatusCode.Created, sourceResponse.StatusCode);
+            var source = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(sourceResponse);
+
+            var exportResponse = await adminClient.PostAsync(
+                $"/api/invoices/{source.Id}/transfer-package/download",
+                content: null);
+            Assert.Equal(HttpStatusCode.OK, exportResponse.StatusCode);
+            byte[] packageBytes = await exportResponse.Content.ReadAsByteArrayAsync();
+
+            await SetInvoiceCompanyScopeAsync(harness.DatabasePath, source.Id, "Other-Company");
+
+            var otherCompanyPreviewResponse = await adminClient.PostAsync(
+                "/api/invoices/transfer-package/upload/preview?fileName=other-company.edpkg",
+                new ByteArrayContent(packageBytes));
+            Assert.Equal(HttpStatusCode.OK, otherCompanyPreviewResponse.StatusCode);
+            var otherCompanyPreview = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceTransferPreviewResponse>(
+                otherCompanyPreviewResponse);
+            Assert.False(otherCompanyPreview.Preview.InvoiceExists);
+            Assert.Equal(0, otherCompanyPreview.Preview.ExistingInvoiceId);
+
+            var currentCompanyResponse = await adminClient.PostAsJsonAsync(
+                "/api/invoices",
+                CreateInvoiceRequest(
+                    "TRANSFER-COMPANY-001",
+                    type: "实际数据",
+                    totalAmount: 260m));
+            Assert.Equal(HttpStatusCode.Created, currentCompanyResponse.StatusCode);
+            var currentCompany = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(currentCompanyResponse);
+
+            var currentCompanyPreviewResponse = await adminClient.PostAsync(
+                "/api/invoices/transfer-package/upload/preview?fileName=current-company.edpkg",
+                new ByteArrayContent(packageBytes));
+            Assert.Equal(HttpStatusCode.OK, currentCompanyPreviewResponse.StatusCode);
+            var currentCompanyPreview = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceTransferPreviewResponse>(
+                currentCompanyPreviewResponse);
+            Assert.True(currentCompanyPreview.Preview.InvoiceExists);
+            Assert.Equal(currentCompany.Id, currentCompanyPreview.Preview.ExistingInvoiceId);
         }
 
         [Fact]
@@ -795,6 +897,20 @@ namespace ExportDocManager.Api.Tests
                     }
                 ]
             };
+        }
+
+        private static async Task SetInvoiceCompanyScopeAsync(
+            string databasePath,
+            int invoiceId,
+            string companyScope)
+        {
+            await using var connection = new SqliteConnection($"Data Source={databasePath}");
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE Invoices SET CompanyScope = $companyScope WHERE Id = $invoiceId;";
+            command.Parameters.AddWithValue("$companyScope", companyScope);
+            command.Parameters.AddWithValue("$invoiceId", invoiceId);
+            Assert.Equal(1, await command.ExecuteNonQueryAsync());
         }
     }
 }

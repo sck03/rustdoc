@@ -70,7 +70,7 @@ export function buildBatchExportConfigDraft(
         name: template.displayName || fileNameFromPath(template.templatePath),
         templatePath: template.templatePath,
         isEnabled: true,
-        showSeal: template.withSealDefault,
+        showSeal: template.withSealDefault ?? true,
         reportType: template.reportType || "ExportDocument",
       }));
 
@@ -234,7 +234,7 @@ export function buildPackageTemplateViewsFromItems(
     views.push({
       template,
       displayName: template.displayName || fileNameFromPath(template.templatePath),
-      withSealDefault: template.withSealDefault,
+      withSealDefault: template.withSealDefault ?? true,
       initiallySelected: !hasConfiguredItems,
     });
   }
@@ -344,14 +344,7 @@ export function findTemplateForBatchExportItem(
 }
 
 export function isExportBatchReportType(reportType: string) {
-  const normalized = reportType.trim().toLowerCase();
-  return (
-    normalized.length === 0 ||
-    normalized === "exportdocument" ||
-    normalized === "commercialinvoice" ||
-    normalized === "packinglist" ||
-    normalized === "generic"
-  );
+  return reportType.trim().toLowerCase() === "exportdocument";
 }
 
 export function pathsReferToSameTemplate(left: string, right: string) {

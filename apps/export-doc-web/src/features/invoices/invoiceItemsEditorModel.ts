@@ -227,37 +227,6 @@ export function sanitizeClipboardCell(value: string) {
   return value.replace(/\r?\n/g, " ").replace(/\t/g, " ");
 }
 
-export async function writeClipboardText(text: string) {
-  try {
-    if (navigator.clipboard?.writeText && window.isSecureContext) {
-      await Promise.race([
-        navigator.clipboard.writeText(text),
-        new Promise((_, reject) => window.setTimeout(() => reject(new Error("clipboard-timeout")), 500)),
-      ]);
-      return true;
-    }
-  } catch {
-    // Fall back to a temporary textarea below.
-  }
-
-  try {
-    const textArea = document.createElement("textarea");
-    textArea.value = text;
-    textArea.setAttribute("readonly", "readonly");
-    textArea.style.position = "fixed";
-    textArea.style.left = "-9999px";
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    const copied = document.execCommand("copy");
-    document.body.removeChild(textArea);
-    return copied;
-  } catch {
-    return false;
-  }
-}
-
-
 export function parseInvoiceItemClipboardRows(text: string): string[][] {
   const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n+$/, "");
   if (!normalized) {

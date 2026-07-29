@@ -77,10 +77,11 @@ namespace ExportDocManager.Services.SingleWindow
 
         private static string SanitizeFileName(string fileName)
         {
-            var invalidChars = Path.GetInvalidFileNameChars();
-            var sanitized = new string(fileName
-                .Select(ch => invalidChars.Contains(ch) ? '_' : ch)
+            const string invalidChars = "<>:\"/\\|?*";
+            var sanitized = new string((fileName ?? string.Empty)
+                .Select(ch => char.IsControl(ch) || invalidChars.Contains(ch) ? '_' : ch)
                 .ToArray());
+            sanitized = sanitized.Trim(' ', '.');
             return string.IsNullOrWhiteSpace(sanitized) ? "package" : sanitized;
         }
     }

@@ -1,5 +1,6 @@
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.SingleWindow
@@ -8,19 +9,35 @@ namespace ExportDocManager.Services.SingleWindow
     {
         public async Task<SingleWindowReceiptCollectionResult> CollectReceiptFilesAsync(
             int batchId,
-            string receiptRootPath,
             CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(receiptRootPath) || !Directory.Exists(receiptRootPath))
-            {
-                throw new InvalidOperationException("默认回执目录不存在。");
-            }
+            EnsureSqliteStation();
+            var profile = await _clientProfileService.GetActiveAsync(cancellationToken);
+            string stationKey = await _stationIdentity
+                .GetCurrentStationKeyAsync(cancellationToken)
+                .ConfigureAwait(false);
 
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var batch = await _businessDataAccessScope
                 .ApplySubmissionBatchScope(context.SwSubmissionBatches.AsNoTracking(), context)
                 .FirstOrDefaultAsync(item => item.Id == batchId, cancellationToken)
                 ?? throw new InvalidOperationException("未找到要收集回执的单一窗口批次。");
+            if (!Enum.TryParse<SingleWindowBusinessType>(batch.BusinessType, true, out var businessType))
+            {
+                throw new InvalidOperationException("单一窗口批次业务类型无效。");
+            }
+
+            EnsureBatchBelongsToCurrentStation(batch, profile, stationKey, businessType);
+            if (batch.Status == SingleWindowBatchStatusCatalog.SubmitPackageImported)
+            {
+                throw new InvalidOperationException("请先把该批次发送到官方客户端，再收集回执。");
+            }
+
+            string receiptRootPath = ResolveConfiguredRoot(profile, businessType);
+            if (string.IsNullOrWhiteSpace(receiptRootPath) || !Directory.Exists(receiptRootPath))
+            {
+                throw new InvalidOperationException("本机操作卡配置的官方回执目录不存在。");
+            }
 
             var receiptFiles = await CollectMatchingReceiptFilesAsync(receiptRootPath, batch, cancellationToken);
 
@@ -125,9 +142,25 @@ namespace ExportDocManager.Services.SingleWindow
             bool tokenMatch = false;
             bool parsedReferenceMatch = false;
 
+            if (batch.LastClientDispatchAt.HasValue)
+            {
+                DateTime dispatchAt = batch.LastClientDispatchAt.Value;
+                DateTime dispatchAtUtc = dispatchAt.Kind switch
+                {
+                    DateTimeKind.Utc => dispatchAt,
+                    DateTimeKind.Local => dispatchAt.ToUniversalTime(),
+                    _ => DateTime.SpecifyKind(dispatchAt, DateTimeKind.Utc)
+                };
+                DateTime earliestExpectedWriteUtc = dispatchAtUtc.AddMinutes(-5);
+                if (File.GetLastWriteTimeUtc(path) < earliestExpectedWriteUtc)
+                {
+                    return 0;
+                }
+            }
+
             string exactBatchDirectory = Path.Combine(candidateDirectories.FirstOrDefault() ?? string.Empty, string.Empty);
             if (!string.IsNullOrWhiteSpace(exactBatchDirectory) &&
-                directory.StartsWith(exactBatchDirectory.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+                PathBoundaryHelper.IsWithinRoot(directory, exactBatchDirectory))
             {
                 score += 1000;
                 exactBatchDirectoryMatch = true;

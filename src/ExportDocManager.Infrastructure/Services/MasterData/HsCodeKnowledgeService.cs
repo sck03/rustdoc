@@ -30,15 +30,27 @@ namespace ExportDocManager.Services.MasterData
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = false };
         private static readonly IReadOnlyDictionary<string, string> Synonyms = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["T-SHIRT"] = "T恤衫", ["TSHIRT"] = "T恤衫", ["T恤"] = "T恤衫",
-            ["男士"] = "男式", ["男款"] = "男式", ["MENS"] = "男式", ["MEN'S"] = "男式",
-            ["女士"] = "女式", ["女款"] = "女式", ["WOMENS"] = "女式", ["WOMEN'S"] = "女式",
-            ["全棉"] = "100%棉", ["纯棉"] = "100%棉", ["COTTON"] = "棉",
-            ["针织物"] = "针织", ["KNITTED"] = "针织"
+            ["T-SHIRT"] = "T恤衫",
+            ["TSHIRT"] = "T恤衫",
+            ["T恤"] = "T恤衫",
+            ["男士"] = "男式",
+            ["男款"] = "男式",
+            ["MENS"] = "男式",
+            ["MEN'S"] = "男式",
+            ["女士"] = "女式",
+            ["女款"] = "女式",
+            ["WOMENS"] = "女式",
+            ["WOMEN'S"] = "女式",
+            ["全棉"] = "100%棉",
+            ["纯棉"] = "100%棉",
+            ["COTTON"] = "棉",
+            ["针织物"] = "针织",
+            ["KNITTED"] = "针织"
         };
         private static readonly IReadOnlyDictionary<string, string> RelatedTerms = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["针织"] = "钩编", ["钩编"] = "针织"
+            ["针织"] = "钩编",
+            ["钩编"] = "针织"
         };
 
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
@@ -727,11 +739,15 @@ namespace ExportDocManager.Services.MasterData
                 {
                     existing = new HsCodeRemoteCandidate
                     {
-                        Fingerprint = fingerprint, QueryText = (query ?? string.Empty).Trim(), RawReportedHsCode = code,
-                        ProductName = item.Name.Trim(), Specification = (item.Description ?? string.Empty).Trim(),
+                        Fingerprint = fingerprint,
+                        QueryText = (query ?? string.Empty).Trim(),
+                        RawReportedHsCode = code,
+                        ProductName = item.Name.Trim(),
+                        Specification = (item.Description ?? string.Empty).Trim(),
                         Source = string.IsNullOrWhiteSpace(source) ? "i5a6" : source.Trim(),
                         SourceUrl = string.IsNullOrWhiteSpace(record.EvidenceUrl) ? item.DetailUrl : record.EvidenceUrl,
-                        ReviewStatus = "Pending", FirstSeenAt = now
+                        ReviewStatus = "Pending",
+                        FirstSeenAt = now
                     };
                     await context.HsCodeRemoteCandidates.AddAsync(existing, cancellationToken);
                     candidatesByFingerprint[fingerprint] = existing;
@@ -802,14 +818,23 @@ namespace ExportDocManager.Services.MasterData
                 .Take(200)
                 .ToList();
             if (normalized.Count == 0) return 0;
-            await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-            int reviewed = 0;
-            foreach (var input in normalized)
-                if (await ReviewRemoteCandidateInContextAsync(context, input, cancellationToken, saveChanges: false)) reviewed++;
-            await context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return reviewed;
+            return await AppDbContextExecution.ExecuteInTransactionAsync(
+                _dbContextFactory,
+                async (context, token) =>
+                {
+                    int reviewed = 0;
+                    foreach (var input in normalized)
+                    {
+                        if (await ReviewRemoteCandidateInContextAsync(context, input, token, saveChanges: false))
+                        {
+                            reviewed++;
+                        }
+                    }
+
+                    await context.SaveChangesAsync(token);
+                    return reviewed;
+                },
+                cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<int> ResetRemoteCandidatesAsync(
@@ -936,9 +961,14 @@ namespace ExportDocManager.Services.MasterData
                     {
                         await context.HsCodeReplacementRelations.AddAsync(new HsCodeReplacementRelation
                         {
-                            OldCode = oldCode, NewCode = newCode, EffectiveYear = preview.EffectiveYear,
-                            Source = preview.SourceName, Confidence = Math.Max(50, 80 - index * 10),
-                            IsManuallyVerified = false, CreatedAt = now, UpdatedAt = now
+                            OldCode = oldCode,
+                            NewCode = newCode,
+                            EffectiveYear = preview.EffectiveYear,
+                            Source = preview.SourceName,
+                            Confidence = Math.Max(50, 80 - index * 10),
+                            IsManuallyVerified = false,
+                            CreatedAt = now,
+                            UpdatedAt = now
                         }, cancellationToken);
                     }
                 }
@@ -1050,188 +1080,191 @@ namespace ExportDocManager.Services.MasterData
             HsCodeKnowledgePackagePreview preview, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(preview);
-            await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-            int addedCodes = 0, updatedCodes = 0, addedExamples = 0, updatedExamples = 0, addedRelations = 0, addedFeedback = 0;
-
-            var preparedCodes = preview.HsCodes
-                .Select(source => (Source: source, Code: HsCodeTextHelper.NormalizeCode(source.Code)))
-                .Where(item => !string.IsNullOrWhiteSpace(item.Code))
-                .ToList();
-            var existingCodes = new Dictionary<string, HsCode>(StringComparer.OrdinalIgnoreCase);
-            foreach (var batch in preparedCodes.Select(item => item.Code)
-                         .Distinct(StringComparer.OrdinalIgnoreCase)
-                         .Chunk(DatabaseInClauseBatchSize))
-            {
-                string[] keys = batch.ToArray();
-                var rows = await context.HsCodes
-                    .Where(item => keys.Contains(item.NormalizedCode))
-                    .ToListAsync(cancellationToken);
-                foreach (var row in rows)
+            return await AppDbContextExecution.ExecuteInTransactionAsync(
+                _dbContextFactory,
+                async (context, token) =>
                 {
-                    existingCodes.TryAdd(row.NormalizedCode, row);
-                }
-            }
+                    int addedCodes = 0, updatedCodes = 0, addedExamples = 0, updatedExamples = 0, addedRelations = 0, addedFeedback = 0;
 
-            foreach (var (source, code) in preparedCodes)
-            {
-                source.Code = code;
-                if (existingCodes.TryGetValue(code, out var target))
-                {
-                    MergeHsCode(source, target);
-                    updatedCodes++;
-                }
-                else
-                {
-                    source.Id = 0;
-                    source.RowVersion = null;
-                    await context.HsCodes.AddAsync(source, cancellationToken);
-                    existingCodes[code] = source;
-                    addedCodes++;
-                }
-            }
+                    var preparedCodes = preview.HsCodes
+                        .Select(source => (Source: CloneHsCode(source), Code: HsCodeTextHelper.NormalizeCode(source.Code)))
+                        .Where(item => !string.IsNullOrWhiteSpace(item.Code))
+                        .ToList();
+                    var existingCodes = new Dictionary<string, HsCode>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var batch in preparedCodes.Select(item => item.Code)
+                                 .Distinct(StringComparer.OrdinalIgnoreCase)
+                                 .Chunk(DatabaseInClauseBatchSize))
+                    {
+                        string[] keys = batch.ToArray();
+                        var rows = await context.HsCodes
+                            .Where(item => keys.Contains(item.NormalizedCode))
+                            .ToListAsync(token);
+                        foreach (var row in rows)
+                        {
+                            existingCodes.TryAdd(row.NormalizedCode, row);
+                        }
+                    }
 
-            var preparedExamples = new List<(HsCodeDeclarationExample Source, string Fingerprint)>(preview.Examples.Count);
-            foreach (var source in preview.Examples)
-            {
-                source.RawReportedHsCode = HsCodeTextHelper.NormalizeCode(source.RawReportedHsCode);
-                source.ResolvedCurrentHsCode = HsCodeTextHelper.NormalizeCode(source.ResolvedCurrentHsCode);
-                source.ProductName = source.ProductName.Trim();
-                source.Specification = (source.Specification ?? string.Empty).Trim();
-                source.SearchText = NormalizeSearchText($"{source.ProductName} {source.Specification}");
-                source.Fingerprint = BuildFingerprint(source.RawReportedHsCode, source.ProductName, source.Specification);
-                source.Source = string.IsNullOrWhiteSpace(source.Source) ? "KnowledgePackage" : source.Source.Trim();
-                source.ResolutionStatus = string.IsNullOrWhiteSpace(source.ResolutionStatus)
-                    ? "Unresolved"
-                    : source.ResolutionStatus.Trim();
-                preparedExamples.Add((source, source.Fingerprint));
-            }
+                    foreach (var (source, code) in preparedCodes)
+                    {
+                        source.Code = code;
+                        if (existingCodes.TryGetValue(code, out var target))
+                        {
+                            MergeHsCode(source, target);
+                            updatedCodes++;
+                        }
+                        else
+                        {
+                            source.Id = 0;
+                            source.RowVersion = null;
+                            await context.HsCodes.AddAsync(source, token);
+                            existingCodes[code] = source;
+                            addedCodes++;
+                        }
+                    }
 
-            var existingExamples = new Dictionary<string, HsCodeDeclarationExample>(StringComparer.OrdinalIgnoreCase);
-            foreach (var batch in preparedExamples.Select(item => item.Fingerprint)
-                         .Distinct(StringComparer.OrdinalIgnoreCase)
-                         .Chunk(DatabaseInClauseBatchSize))
-            {
-                string[] keys = batch.ToArray();
-                var rows = await context.HsCodeDeclarationExamples
-                    .Where(item => keys.Contains(item.Fingerprint))
-                    .ToListAsync(cancellationToken);
-                foreach (var row in rows)
-                {
-                    existingExamples.TryAdd(row.Fingerprint, row);
-                }
-            }
+                    var preparedExamples = new List<(HsCodeDeclarationExample Source, string Fingerprint)>(preview.Examples.Count);
+                    foreach (var source in preview.Examples.Select(CloneHsCodeDeclarationExample))
+                    {
+                        source.RawReportedHsCode = HsCodeTextHelper.NormalizeCode(source.RawReportedHsCode);
+                        source.ResolvedCurrentHsCode = HsCodeTextHelper.NormalizeCode(source.ResolvedCurrentHsCode);
+                        source.ProductName = source.ProductName.Trim();
+                        source.Specification = (source.Specification ?? string.Empty).Trim();
+                        source.SearchText = NormalizeSearchText($"{source.ProductName} {source.Specification}");
+                        source.Fingerprint = BuildFingerprint(source.RawReportedHsCode, source.ProductName, source.Specification);
+                        source.Source = string.IsNullOrWhiteSpace(source.Source) ? "KnowledgePackage" : source.Source.Trim();
+                        source.ResolutionStatus = string.IsNullOrWhiteSpace(source.ResolutionStatus)
+                            ? "Unresolved"
+                            : source.ResolutionStatus.Trim();
+                        preparedExamples.Add((source, source.Fingerprint));
+                    }
 
-            foreach (var (source, fingerprint) in preparedExamples)
-            {
-                if (existingExamples.TryGetValue(fingerprint, out var target))
-                {
-                    MergeExample(source, target);
-                    updatedExamples++;
-                }
-                else
-                {
-                    source.Id = 0;
-                    await context.HsCodeDeclarationExamples.AddAsync(source, cancellationToken);
-                    existingExamples[fingerprint] = source;
-                    addedExamples++;
-                }
-            }
+                    var existingExamples = new Dictionary<string, HsCodeDeclarationExample>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var batch in preparedExamples.Select(item => item.Fingerprint)
+                                 .Distinct(StringComparer.OrdinalIgnoreCase)
+                                 .Chunk(DatabaseInClauseBatchSize))
+                    {
+                        string[] keys = batch.ToArray();
+                        var rows = await context.HsCodeDeclarationExamples
+                            .Where(item => keys.Contains(item.Fingerprint))
+                            .ToListAsync(token);
+                        foreach (var row in rows)
+                        {
+                            existingExamples.TryAdd(row.Fingerprint, row);
+                        }
+                    }
 
-            var preparedRelations = new List<(HsCodeReplacementRelation Source, ReplacementRelationKey Key)>(preview.Replacements.Count);
-            foreach (var source in preview.Replacements)
-            {
-                source.OldCode = HsCodeTextHelper.NormalizeCode(source.OldCode);
-                source.NewCode = HsCodeTextHelper.NormalizeCode(source.NewCode);
-                source.Source = string.IsNullOrWhiteSpace(source.Source) ? "KnowledgePackage" : source.Source.Trim();
-                preparedRelations.Add((source, new ReplacementRelationKey(
-                    source.OldCode,
-                    source.NewCode,
-                    source.EffectiveYear)));
-            }
+                    foreach (var (source, fingerprint) in preparedExamples)
+                    {
+                        if (existingExamples.TryGetValue(fingerprint, out var target))
+                        {
+                            MergeExample(source, target);
+                            updatedExamples++;
+                        }
+                        else
+                        {
+                            source.Id = 0;
+                            await context.HsCodeDeclarationExamples.AddAsync(source, token);
+                            existingExamples[fingerprint] = source;
+                            addedExamples++;
+                        }
+                    }
 
-            var existingRelations = new HashSet<ReplacementRelationKey>();
-            foreach (var batch in preparedRelations.Select(item => item.Key.OldCode)
-                         .Distinct(StringComparer.OrdinalIgnoreCase)
-                         .Chunk(DatabaseInClauseBatchSize))
-            {
-                string[] oldCodes = batch.ToArray();
-                var rows = await context.HsCodeReplacementRelations
-                    .AsNoTracking()
-                    .Where(item => oldCodes.Contains(item.OldCode))
-                    .Select(item => new { item.OldCode, item.NewCode, item.EffectiveYear })
-                    .ToListAsync(cancellationToken);
-                foreach (var row in rows)
-                {
-                    existingRelations.Add(new ReplacementRelationKey(
-                        row.OldCode,
-                        row.NewCode,
-                        row.EffectiveYear));
-                }
-            }
+                    var preparedRelations = new List<(HsCodeReplacementRelation Source, ReplacementRelationKey Key)>(preview.Replacements.Count);
+                    foreach (var source in preview.Replacements.Select(CloneHsCodeReplacementRelation))
+                    {
+                        source.OldCode = HsCodeTextHelper.NormalizeCode(source.OldCode);
+                        source.NewCode = HsCodeTextHelper.NormalizeCode(source.NewCode);
+                        source.Source = string.IsNullOrWhiteSpace(source.Source) ? "KnowledgePackage" : source.Source.Trim();
+                        preparedRelations.Add((source, new ReplacementRelationKey(
+                            source.OldCode,
+                            source.NewCode,
+                            source.EffectiveYear)));
+                    }
 
-            foreach (var (source, key) in preparedRelations)
-            {
-                if (existingRelations.Add(key))
-                {
-                    source.Id = 0;
-                    await context.HsCodeReplacementRelations.AddAsync(source, cancellationToken);
-                    addedRelations++;
-                }
-            }
+                    var existingRelations = new HashSet<ReplacementRelationKey>();
+                    foreach (var batch in preparedRelations.Select(item => item.Key.OldCode)
+                                 .Distinct(StringComparer.OrdinalIgnoreCase)
+                                 .Chunk(DatabaseInClauseBatchSize))
+                    {
+                        string[] oldCodes = batch.ToArray();
+                        var rows = await context.HsCodeReplacementRelations
+                            .AsNoTracking()
+                            .Where(item => oldCodes.Contains(item.OldCode))
+                            .Select(item => new { item.OldCode, item.NewCode, item.EffectiveYear })
+                            .ToListAsync(token);
+                        foreach (var row in rows)
+                        {
+                            existingRelations.Add(new ReplacementRelationKey(
+                                row.OldCode,
+                                row.NewCode,
+                                row.EffectiveYear));
+                        }
+                    }
 
-            var preparedFeedback = new List<(HsCodeSearchFeedback Source, string Fingerprint)>(preview.Feedback.Count);
-            foreach (var source in preview.Feedback)
-            {
-                source.QueryText = (source.QueryText ?? string.Empty).Trim();
-                source.ProductName = string.IsNullOrWhiteSpace(source.ProductName) ? null : source.ProductName.Trim();
-                source.Specification = string.IsNullOrWhiteSpace(source.Specification) ? null : source.Specification.Trim();
-                source.CandidateCode = HsCodeTextHelper.NormalizeCode(source.CandidateCode);
-                source.Fingerprint = BuildFingerprint(
-                    NormalizeSearchText(source.QueryText),
-                    source.CandidateCode,
-                    source.ProductName,
-                    source.Specification);
-                preparedFeedback.Add((source, source.Fingerprint));
-            }
+                    foreach (var (source, key) in preparedRelations)
+                    {
+                        if (existingRelations.Add(key))
+                        {
+                            source.Id = 0;
+                            await context.HsCodeReplacementRelations.AddAsync(source, token);
+                            addedRelations++;
+                        }
+                    }
 
-            var existingFeedback = new Dictionary<string, HsCodeSearchFeedback>(StringComparer.OrdinalIgnoreCase);
-            foreach (var batch in preparedFeedback.Select(item => item.Fingerprint)
-                         .Distinct(StringComparer.OrdinalIgnoreCase)
-                         .Chunk(DatabaseInClauseBatchSize))
-            {
-                string[] keys = batch.ToArray();
-                var rows = await context.HsCodeSearchFeedback
-                    .Where(item => keys.Contains(item.Fingerprint))
-                    .ToListAsync(cancellationToken);
-                foreach (var row in rows)
-                {
-                    existingFeedback.TryAdd(row.Fingerprint, row);
-                }
-            }
+                    var preparedFeedback = new List<(HsCodeSearchFeedback Source, string Fingerprint)>(preview.Feedback.Count);
+                    foreach (var source in preview.Feedback.Select(CloneHsCodeSearchFeedback))
+                    {
+                        source.QueryText = (source.QueryText ?? string.Empty).Trim();
+                        source.ProductName = string.IsNullOrWhiteSpace(source.ProductName) ? null : source.ProductName.Trim();
+                        source.Specification = string.IsNullOrWhiteSpace(source.Specification) ? null : source.Specification.Trim();
+                        source.CandidateCode = HsCodeTextHelper.NormalizeCode(source.CandidateCode);
+                        source.Fingerprint = BuildFingerprint(
+                            NormalizeSearchText(source.QueryText),
+                            source.CandidateCode,
+                            source.ProductName,
+                            source.Specification);
+                        preparedFeedback.Add((source, source.Fingerprint));
+                    }
 
-            foreach (var (source, fingerprint) in preparedFeedback)
-            {
-                if (existingFeedback.TryGetValue(fingerprint, out var target))
-                {
-                    target.AcceptedCount = Math.Max(target.AcceptedCount, source.AcceptedCount);
-                    target.RejectedCount = Math.Max(target.RejectedCount, source.RejectedCount);
-                    target.LastConfirmedAt = Max(target.LastConfirmedAt, source.LastConfirmedAt);
-                    target.UpdatedAt = Max(target.UpdatedAt, source.UpdatedAt);
-                }
-                else
-                {
-                    source.Id = 0;
-                    await context.HsCodeSearchFeedback.AddAsync(source, cancellationToken);
-                    existingFeedback[fingerprint] = source;
-                    addedFeedback++;
-                }
-            }
+                    var existingFeedback = new Dictionary<string, HsCodeSearchFeedback>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var batch in preparedFeedback.Select(item => item.Fingerprint)
+                                 .Distinct(StringComparer.OrdinalIgnoreCase)
+                                 .Chunk(DatabaseInClauseBatchSize))
+                    {
+                        string[] keys = batch.ToArray();
+                        var rows = await context.HsCodeSearchFeedback
+                            .Where(item => keys.Contains(item.Fingerprint))
+                            .ToListAsync(token);
+                        foreach (var row in rows)
+                        {
+                            existingFeedback.TryAdd(row.Fingerprint, row);
+                        }
+                    }
 
-            await context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return new HsCodeKnowledgeImportResult(addedCodes, updatedCodes, addedExamples, updatedExamples, addedRelations, addedFeedback,
-                $"HS知识库合并完成：编码新增{addedCodes}/更新{updatedCodes}，实例新增{addedExamples}/更新{updatedExamples}，替代关系新增{addedRelations}，学习记录新增{addedFeedback}。");
+                    foreach (var (source, fingerprint) in preparedFeedback)
+                    {
+                        if (existingFeedback.TryGetValue(fingerprint, out var target))
+                        {
+                            target.AcceptedCount = Math.Max(target.AcceptedCount, source.AcceptedCount);
+                            target.RejectedCount = Math.Max(target.RejectedCount, source.RejectedCount);
+                            target.LastConfirmedAt = Max(target.LastConfirmedAt, source.LastConfirmedAt);
+                            target.UpdatedAt = Max(target.UpdatedAt, source.UpdatedAt);
+                        }
+                        else
+                        {
+                            source.Id = 0;
+                            await context.HsCodeSearchFeedback.AddAsync(source, token);
+                            existingFeedback[fingerprint] = source;
+                            addedFeedback++;
+                        }
+                    }
+
+                    await context.SaveChangesAsync(token);
+                    return new HsCodeKnowledgeImportResult(addedCodes, updatedCodes, addedExamples, updatedExamples, addedRelations, addedFeedback,
+                        $"HS知识库合并完成：编码新增{addedCodes}/更新{updatedCodes}，实例新增{addedExamples}/更新{updatedExamples}，替代关系新增{addedRelations}，学习记录新增{addedFeedback}。");
+                },
+                cancellationToken).ConfigureAwait(false);
         }
 
         private static IQueryable<HsCodeDeclarationExample> BuildExampleQuery(AppDbContext context, string keyword)
@@ -1749,6 +1782,80 @@ namespace ExportDocManager.Services.MasterData
             target.LastUsedAt = Max(source.LastUsedAt, target.LastUsedAt); target.UpdatedAt = Max(source.UpdatedAt, target.UpdatedAt);
             if (source.IsManuallyVerified) target.ResolutionStatus = source.ResolutionStatus;
         }
+
+        private static HsCode CloneHsCode(HsCode source) => new()
+        {
+            Id = source?.Id ?? 0,
+            Code = source?.Code ?? string.Empty,
+            Name = source?.Name ?? string.Empty,
+            Unit = source?.Unit,
+            Description = source?.Description,
+            Elements = source?.Elements,
+            SupervisionConditions = source?.SupervisionConditions,
+            InspectionCategory = source?.InspectionCategory,
+            RebateRate = source?.RebateRate,
+            UpdateTime = source?.UpdateTime,
+            Status = source?.Status,
+            SourceName = source?.SourceName,
+            EffectiveYear = source?.EffectiveYear,
+            LastVerifiedAt = source?.LastVerifiedAt,
+            ReplacedByCodes = source?.ReplacedByCodes,
+            NormalTariffRate = source?.NormalTariffRate,
+            PreferentialTariffRate = source?.PreferentialTariffRate,
+            ExportTariffRate = source?.ExportTariffRate,
+            ConsumptionTaxRate = source?.ConsumptionTaxRate,
+            ValueAddedTaxRate = source?.ValueAddedTaxRate,
+            Notes = source?.Notes,
+            RowVersion = source?.RowVersion == null ? null : source.RowVersion.ToArray(),
+            DetailUrl = source?.DetailUrl
+        };
+
+        private static HsCodeDeclarationExample CloneHsCodeDeclarationExample(HsCodeDeclarationExample source) => new()
+        {
+            Id = source?.Id ?? 0,
+            Fingerprint = source?.Fingerprint ?? string.Empty,
+            RawReportedHsCode = source?.RawReportedHsCode ?? string.Empty,
+            ResolvedCurrentHsCode = source?.ResolvedCurrentHsCode,
+            ProductName = source?.ProductName ?? string.Empty,
+            Specification = source?.Specification,
+            SearchText = source?.SearchText ?? string.Empty,
+            Source = source?.Source ?? string.Empty,
+            SourceYear = source?.SourceYear,
+            ResolutionStatus = source?.ResolutionStatus ?? "Unresolved",
+            IsManuallyVerified = source?.IsManuallyVerified ?? false,
+            UseCount = source?.UseCount ?? 0,
+            RejectedCount = source?.RejectedCount ?? 0,
+            LastUsedAt = source?.LastUsedAt,
+            CreatedAt = source?.CreatedAt ?? DateTime.UtcNow,
+            UpdatedAt = source?.UpdatedAt ?? DateTime.UtcNow
+        };
+
+        private static HsCodeReplacementRelation CloneHsCodeReplacementRelation(HsCodeReplacementRelation source) => new()
+        {
+            Id = source?.Id ?? 0,
+            OldCode = source?.OldCode ?? string.Empty,
+            NewCode = source?.NewCode ?? string.Empty,
+            EffectiveYear = source?.EffectiveYear,
+            Source = source?.Source ?? string.Empty,
+            Confidence = source?.Confidence ?? 0,
+            IsManuallyVerified = source?.IsManuallyVerified ?? false,
+            CreatedAt = source?.CreatedAt ?? DateTime.UtcNow,
+            UpdatedAt = source?.UpdatedAt ?? DateTime.UtcNow
+        };
+
+        private static HsCodeSearchFeedback CloneHsCodeSearchFeedback(HsCodeSearchFeedback source) => new()
+        {
+            Id = source?.Id ?? 0,
+            Fingerprint = source?.Fingerprint ?? string.Empty,
+            QueryText = source?.QueryText ?? string.Empty,
+            ProductName = source?.ProductName,
+            Specification = source?.Specification,
+            CandidateCode = source?.CandidateCode ?? string.Empty,
+            AcceptedCount = source?.AcceptedCount ?? 0,
+            RejectedCount = source?.RejectedCount ?? 0,
+            LastConfirmedAt = source?.LastConfirmedAt,
+            UpdatedAt = source?.UpdatedAt ?? DateTime.UtcNow
+        };
 
         private static string Prefer(string primary, string fallback) => string.IsNullOrWhiteSpace(primary) ? fallback : primary.Trim();
 

@@ -39,6 +39,43 @@ export function createInvoiceLetterOfCreditSmokeScene(runtime) {
     try {
       const checkUrl = buildInvoiceLetterOfCreditCheckUrl(options.webUrl, invoice.id);
       await page.send("Page.navigate", { url: checkUrl });
+
+      await waitForPageExpression(
+        page,
+        `(() => {
+          const section = document.querySelector('[aria-label="信用证"]');
+          const button = section
+            ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('展开信用证'))
+            : null;
+          return Boolean(section && button && !button.disabled);
+        })()`,
+        timeoutMs,
+        "Timed out waiting for the collapsed letter-of-credit panel.",
+      );
+
+      await evaluate(
+        page,
+        `(() => {
+          const navigation = document.querySelector('[aria-label="发票编辑分区"]');
+          const analysisButton = navigation
+            ? Array.from(navigation.querySelectorAll('button')).find((button) => (button.innerText || '').includes('利润/信用证'))
+            : null;
+          analysisButton?.click();
+
+          const section = document.querySelector('[aria-label="信用证"]');
+          const expandButton = section
+            ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('展开信用证'))
+            : null;
+          if (!section || !expandButton || expandButton.disabled) {
+            throw new Error('Letter-of-credit expand button is not available.');
+          }
+          section.scrollIntoView({ block: 'center', behavior: 'auto' });
+          expandButton.click();
+          return true;
+        })()`,
+        true,
+      );
+
       const expectedText = [
         "信用证",
         "导入信用证",

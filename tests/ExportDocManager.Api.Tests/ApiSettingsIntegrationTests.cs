@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Security;
@@ -81,21 +83,19 @@ namespace ExportDocManager.Api.Tests
             ];
             requestedSettings.PaymentTemplates =
             [
-                new BatchExportItem
+                new PaymentTemplateItem
                 {
                     Name = "Smoke Payment Request",
                     TemplatePath = @"Templates\Internal\payment_request_template.html",
-                    ReportType = "PaymentDocument",
-                    IsEnabled = true,
-                    ShowSeal = false
+                    ReportType = "PaymentVoucher",
+                    IsEnabled = true
                 },
-                new BatchExportItem
+                new PaymentTemplateItem
                 {
                     Name = "Smoke Expense Reimbursement",
                     TemplatePath = @"Templates\Internal\expense_reimbursement_template.html",
-                    ReportType = "PaymentDocument",
-                    IsEnabled = true,
-                    ShowSeal = true
+                    ReportType = "PaymentVoucher",
+                    IsEnabled = true
                 }
             ];
             var saveResponse = await adminClient.PutAsJsonAsync("/api/settings", new
@@ -117,6 +117,13 @@ namespace ExportDocManager.Api.Tests
                 StringComparison.OrdinalIgnoreCase);
             Assert.False(File.Exists(Path.Combine(harness.AppRoot, "appsettings.json")));
             string settingsJson = await File.ReadAllTextAsync(settingsPath);
+            using (var settingsDocument = JsonDocument.Parse(settingsJson))
+            {
+                foreach (var item in settingsDocument.RootElement.GetProperty("PaymentTemplates").EnumerateArray())
+                {
+                    Assert.False(item.TryGetProperty("ShowSeal", out _));
+                }
+            }
             Assert.Contains("Settings Endpoint Smoke", settingsJson);
             Assert.Contains("http://updates.internal:8080/desktop/latest.json", settingsJson);
             Assert.True(
@@ -151,13 +158,13 @@ namespace ExportDocManager.Api.Tests
                 {
                     Assert.Equal("Smoke Payment Request", item.Name);
                     Assert.True(item.IsEnabled);
-                    Assert.False(item.ShowSeal);
+                    Assert.Equal("PaymentVoucher", item.ReportType);
                 },
                 item =>
                 {
                     Assert.Equal("Smoke Expense Reimbursement", item.Name);
                     Assert.True(item.IsEnabled);
-                    Assert.True(item.ShowSeal);
+                    Assert.Equal("PaymentVoucher", item.ReportType);
                 });
 
             var invalidSettings = CloneSettings(settingsAfterSave.Settings);
@@ -174,6 +181,42 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(
                 "http://updates.internal:8080/desktop/latest.json",
                 settingsAfterInvalidSave.Settings.System.UpdaterEndpoint);
+        }
+
+        [Fact]
+        public async Task UpdateSettings_ShouldRejectSealMetadataInPaymentTemplates()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-settings-payment-seal",
+                "api-settings-payment-seal.db");
+            using var anonymousClient = harness.CreateClient();
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+
+            using var request = new StringContent(
+                """
+                {
+                  "settings": {
+                    "paymentTemplates": [
+                      {
+                        "name": "付款模板",
+                        "templatePath": "user:Internal/payment.html",
+                        "reportType": "PaymentVoucher",
+                        "isEnabled": true,
+                        "showSeal": true
+                      }
+                    ]
+                  },
+                  "updateSecrets": false
+                }
+                """,
+                Encoding.UTF8,
+                "application/json");
+
+            var response = await adminClient.PutAsync("/api/settings", request);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.False(File.Exists(Path.Combine(harness.DataRoot, "Config", "appsettings.json")));
         }
 
         private static AppSettings CloneSettings(AppSettings settings)

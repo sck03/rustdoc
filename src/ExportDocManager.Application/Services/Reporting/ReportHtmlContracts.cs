@@ -17,7 +17,7 @@ namespace ExportDocManager.Services.Reporting
 
         public string TemplatePath { get; init; } = string.Empty;
 
-        public bool WithSealDefault { get; init; }
+        public bool? WithSealDefault { get; init; }
     }
 
     public sealed class ReportHtmlRenderResult
@@ -28,7 +28,7 @@ namespace ExportDocManager.Services.Reporting
 
         public string TemplatePath { get; init; } = string.Empty;
 
-        public bool WithSeal { get; init; }
+        public bool? WithSeal { get; init; }
 
         public string Html { get; init; } = string.Empty;
     }
@@ -41,7 +41,7 @@ namespace ExportDocManager.Services.Reporting
 
         public string TemplatePath { get; init; } = string.Empty;
 
-        public bool WithSealDefault { get; init; }
+        public bool? WithSealDefault { get; init; }
 
         public string Content { get; init; } = string.Empty;
 
@@ -52,7 +52,7 @@ namespace ExportDocManager.Services.Reporting
     {
         public ReportDocumentType ReportType { get; init; }
 
-        public bool WithSeal { get; init; }
+        public bool? WithSeal { get; init; }
 
         public string Html { get; init; } = string.Empty;
     }
@@ -101,7 +101,7 @@ namespace ExportDocManager.Services.Reporting
     {
         public int TemplateCount { get; init; }
 
-        public string PackageVersion { get; init; } = "1.0";
+        public string PackageVersion { get; init; } = "1.1";
 
         public string StoragePolicy { get; init; } = string.Empty;
     }
@@ -149,13 +149,11 @@ namespace ExportDocManager.Services.Reporting
         Task<ReportHtmlRenderResult> RenderPaymentVoucherAsync(
             int paymentId,
             string templatePath = null,
-            bool withSeal = true,
             CancellationToken cancellationToken = default);
 
         Task<ReportHtmlRenderResult> RenderPaymentVoucherDraftAsync(
             Payment payment,
             string templatePath = null,
-            bool withSeal = true,
             CancellationToken cancellationToken = default);
     }
 

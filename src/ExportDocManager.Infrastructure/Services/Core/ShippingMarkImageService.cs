@@ -1,5 +1,6 @@
 using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Core
 {
@@ -81,7 +82,7 @@ namespace ExportDocManager.Services.Core
 
             string marksRoot = GetMarksRoot();
             string fullPath = Path.GetFullPath(imagePath.Trim());
-            if (!IsWithinRoot(fullPath, marksRoot))
+            if (!PathBoundaryHelper.IsWithinRoot(fullPath, marksRoot))
             {
                 throw new UnauthorizedAccessException("只能读取运行数据根 Marks 目录下的唛头图片。");
             }
@@ -169,16 +170,5 @@ namespace ExportDocManager.Services.Core
                    bytes[7] == 0x0A;
         }
 
-        private static bool IsWithinRoot(string path, string root)
-        {
-            string normalizedPath = Path.GetFullPath(path)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            string normalizedRoot = Path.GetFullPath(root)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-
-            return string.Equals(normalizedPath, normalizedRoot, StringComparison.OrdinalIgnoreCase) ||
-                   normalizedPath.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
-                   normalizedPath.StartsWith(normalizedRoot + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-        }
     }
 }

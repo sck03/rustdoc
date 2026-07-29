@@ -1,35 +1,28 @@
-import { keepPreviousData,useMutation,useQuery,useQueryClient } from "@tanstack/react-query";
-import { FileInput,FolderOpen,RefreshCw,Search,Upload } from "lucide-react";
-import { FormEvent,useEffect,useState } from "react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FileInput, HardDrive, RefreshCw, Search, Server, Upload } from "lucide-react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-ApiSingleWindowImportedPackageResponse,
-ExportDocManagerApiClient
-} from "../../api/index.ts";
-import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import type { ApiSingleWindowImportedPackageResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import {
-isDesktopBridgeAvailable,
-selectDirectory,
-selectSingleWindowPackageFile
-} from "../../desktop/desktopBridge.ts";
-import { DesktopIconButton,readDesktopError,renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
+import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import { isDesktopBridgeAvailable, selectSingleWindowPackageFile } from "../../desktop/desktopBridge.ts";
+import { DesktopIconButton, readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
-import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
-import { listPageSizeOptions,normalizeListPageSize } from "../../ui/listViewState.ts";
-
+import { listPageSizeOptions, normalizeListPageSize } from "../../ui/listViewState.ts";
 import {
-batchStatusOptions,
-businessTypeOptions,
-loadSingleWindowOperationCenterViewState,
-saveSingleWindowOperationCenterViewState
+  batchStatusOptions,
+  businessTypeOptions,
+  formatBatchStatus,
+  formatBusinessType,
+  loadSingleWindowOperationCenterViewState,
+  saveSingleWindowOperationCenterViewState,
 } from "./singleWindowOperationCenterModel.ts";
-
+import { FilterSelect, OperationCenterListActionsPanel, OperationCenterTable } from "./SingleWindowOperationCenterList.tsx";
 import { SingleWindowTabs } from "./SingleWindowNavigation.tsx";
-import { FilterSelect,OperationCenterListActionsPanel,OperationCenterTable } from "./SingleWindowOperationCenterList.tsx";
-import { PackageImportResult } from "./SingleWindowReceiptResults.tsx";
+import { SingleWindowStationProfilePanel } from "./SingleWindowStationProfilePanel.tsx";
 
 export function SingleWindowOperationCenterPage({ client }: { client: ExportDocManagerApiClient }) {
   const permission = useModulePermission("document.single-window");
@@ -43,17 +36,17 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
   const [pageSize, setPageSize] = useState(initialListViewState.pageSize);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
   const navigate = useNavigate();
+  const isDesktopStation = isDesktopBridgeAvailable();
 
   const operationCenterQuery = useQuery({
     queryKey: queryKeys.singleWindowOperationCenter(pageNumber, pageSize, committedKeyword.trim(), businessType, status),
-    queryFn: () =>
-      client.listSingleWindowOperationCenter({
-        businessType: businessType || undefined,
-        status: status || undefined,
-        keyword: committedKeyword.trim() || undefined,
-        pageNumber,
-        pageSize,
-      }),
+    queryFn: () => client.listSingleWindowOperationCenter({
+      businessType: businessType || undefined,
+      status: status || undefined,
+      keyword: committedKeyword.trim() || undefined,
+      pageNumber,
+      pageSize,
+    }),
     placeholderData: keepPreviousData,
   });
 
@@ -64,13 +57,17 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
   }, [operationCenterQuery.data, pageNumber]);
 
   useEffect(() => {
-    saveSingleWindowOperationCenterViewState({
-      keyword: committedKeyword,
-      businessType,
-      status,
-      pageSize,
-    });
+    saveSingleWindowOperationCenterViewState({ keyword: committedKeyword, businessType, status, pageSize });
   }, [businessType, committedKeyword, pageSize, status]);
+
+  const rows = operationCenterQuery.data?.rows ?? [];
+  useEffect(() => {
+    if (rows.length === 0) {
+      setSelectedBatchId(null);
+    } else if (!selectedBatchId || !rows.some((row) => row.batchId === selectedBatchId)) {
+      setSelectedBatchId(rows[0].batchId);
+    }
+  }, [rows, selectedBatchId]);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,256 +75,144 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
     setPageNumber(1);
   }
 
-  function changeBusinessType(value: string) {
-    setBusinessType(value);
-    setPageNumber(1);
-  }
-
-  function changeStatus(value: string) {
-    setStatus(value);
-    setPageNumber(1);
-  }
-
-  function handlePageSizeChange(nextPageSize: number) {
-    setPageSize(normalizeListPageSize(nextPageSize));
-    setPageNumber(1);
-  }
-
-  const page = operationCenterQuery.data ?? null;
-  const rows = page?.rows ?? [];
+  const page = operationCenterQuery.data;
   const selectedRow = rows.find((row) => row.batchId === selectedBatchId) ?? null;
-  const totalPages = Math.max(page?.totalPages ?? 1, 1);
-  const message = operationCenterQuery.isError ? readApiError(operationCenterQuery.error) : null;
   const isBusy = operationCenterQuery.isFetching;
-
-  useEffect(() => {
-    if (rows.length === 0) {
-      setSelectedBatchId(null);
-      return;
-    }
-
-    if (!selectedBatchId || !rows.some((row) => row.batchId === selectedBatchId)) {
-      setSelectedBatchId(rows[0].batchId);
-    }
-  }, [rows, selectedBatchId]);
 
   return (
     <section className="work-surface single-window-surface" aria-label="单一窗口操作中心">
       <SingleWindowTabs activeKey="operation-center" />
 
-      <div className="toolbar single-window-toolbar">
-        <form className="search-form" onSubmit={handleSearch}>
-          <Search size={17} aria-hidden="true" />
-          <input
-            aria-label="搜索单一窗口批次"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="发票号、合同号、批次号、回执号"
-          />
-        </form>
-        <div className="filter-bar">
-          <FilterSelect
-            label="业务"
-            value={businessType}
-            options={businessTypeOptions}
-            onChange={changeBusinessType}
-          />
-          <FilterSelect label="状态" value={status} options={batchStatusOptions} onChange={changeStatus} />
-        </div>
-        <div className="toolbar-actions">
-          <button
-            className="icon-button"
-            type="button"
-            title="刷新" aria-label="刷新"
-            disabled={isBusy}
-            onClick={() => void operationCenterQuery.refetch()}
-          >
-            <RefreshCw size={18} aria-hidden="true" />
-          </button>
+      <div className={isDesktopStation ? "single-window-mode-banner station-mode" : "single-window-mode-banner office-mode"}>
+        {isDesktopStation ? <HardDrive size={20} aria-hidden="true" /> : <Server size={20} aria-hidden="true" />}
+        <div>
+          <strong>{isDesktopStation ? "持卡机本地模式" : "办公室归档模式"}</strong>
+          <span>{isDesktopStation
+            ? "选择当前公司与操作卡档案，导入对应提交包，将 XML 写入交接 OutBox，再由操作员在官方客户端确认导入和提交。"
+            : "生成业务提交包并导入持卡机返回的回执包；办公室端不显示持卡机本地目录。"}</span>
         </div>
       </div>
 
-      {message ? <InlineNotice tone="error" title="操作中心加载失败">{message}</InlineNotice> : null}
-      {!permission.canOperate ? <PermissionNotice>当前权限模板仅允许查看批次和回执；提交包导入、派发、收件和目录维护已禁用。</PermissionNotice> : null}
+      {isDesktopStation ? <SingleWindowStationProfilePanel client={client} canOperate={permission.canOperate} /> : null}
+      {isDesktopStation
+        ? <StationSubmitPackageImportPanel client={client} canOperate={permission.canOperate} />
+        : <OfficeReceiptPackageImportPanel client={client} canOperate={permission.canOperate} />}
 
-      <SubmitPackageImportPanel client={client} queryClient={queryClient} canOperate={permission.canOperate} />
+      <div className="toolbar single-window-toolbar">
+        <form className="search-form" onSubmit={handleSearch}>
+          <Search size={17} aria-hidden="true" />
+          <input aria-label="搜索单一窗口批次" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="发票号、合同号、批次号、回执号" />
+        </form>
+        <div className="filter-bar">
+          <FilterSelect label="业务" value={businessType} options={businessTypeOptions} onChange={(value) => { setBusinessType(value); setPageNumber(1); }} />
+          <FilterSelect label="状态" value={status} options={batchStatusOptions} onChange={(value) => { setStatus(value); setPageNumber(1); }} />
+        </div>
+        <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void operationCenterQuery.refetch()}>
+          <RefreshCw size={18} aria-hidden="true" />
+        </button>
+      </div>
+
+      {operationCenterQuery.isError ? <InlineNotice tone="error" title="操作中心加载失败">{readApiError(operationCenterQuery.error)}</InlineNotice> : null}
+      {!permission.canOperate ? <PermissionNotice>当前权限仅允许查看批次和回执，交接包处理已禁用。</PermissionNotice> : null}
 
       {selectedRow ? (
         <OperationCenterListActionsPanel
           client={client}
           row={selectedRow}
           canOperate={permission.canOperate}
+          isDesktopStation={isDesktopStation}
           onOpenDetail={() => navigate(`/single-window/operation-center/${selectedRow.batchId}`)}
         />
       ) : null}
 
-      <OperationCenterTable
-        data={rows}
-        isBusy={isBusy}
-        selectedBatchId={selectedBatchId}
-        onSelect={setSelectedBatchId}
-        onOpen={(batchId) => navigate(`/single-window/operation-center/${batchId}`)}
-      />
-
+      <OperationCenterTable data={rows} isBusy={isBusy} selectedBatchId={selectedBatchId} onSelect={setSelectedBatchId} onOpen={(batchId) => navigate(`/single-window/operation-center/${batchId}`)} />
       <ListPaginationControls
         pageNumber={page?.pageNumber ?? pageNumber}
-        totalPages={totalPages}
+        totalPages={Math.max(page?.totalPages ?? 1, 1)}
         totalCount={page?.totalCount ?? 0}
         pageSize={pageSize}
         pageSizeOptions={listPageSizeOptions}
         isBusy={isBusy}
         onPageChange={setPageNumber}
-        onPageSizeChange={handlePageSizeChange}
+        onPageSizeChange={(value) => { setPageSize(normalizeListPageSize(value)); setPageNumber(1); }}
       />
     </section>
   );
 }
 
-function SubmitPackageImportPanel({
-  client,
-  queryClient,
-  canOperate,
-}: {
-  client: ExportDocManagerApiClient;
-  queryClient: ReturnType<typeof useQueryClient>;
-  canOperate: boolean;
-}) {
+function StationSubmitPackageImportPanel({ client, canOperate }: { client: ExportDocManagerApiClient; canOperate: boolean }) {
+  const queryClient = useQueryClient();
   const [packagePath, setPackagePath] = useState("");
-  const [workingDirectory, setWorkingDirectory] = useState("");
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [desktopMessage, setDesktopMessage] = useState<string | null>(null);
   const [result, setResult] = useState<ApiSingleWindowImportedPackageResponse | null>(null);
-  const isDesktop = isDesktopBridgeAvailable();
 
-  const importMutation = useMutation({
-    mutationFn: () => isDesktop
-      ? client.importSingleWindowSubmitPackage({
-        body: {
-          packagePath: packagePath.trim(),
-          workingDirectory: workingDirectory.trim() || undefined,
-          keepWorkingDirectory: true,
-        },
-      })
-      : client.uploadSingleWindowSubmitPackage({
-          fileName: uploadFile?.name,
-          keepWorkingDirectory: false,
-          body: uploadFile ?? new Blob(),
-        }),
+  const profilesQuery = useQuery({
+    queryKey: queryKeys.singleWindowClientProfiles(),
+    queryFn: () => client.getSingleWindowClientProfiles(),
+    staleTime: 60_000,
+  });
+  const activeProfile = profilesQuery.data?.profiles.find((profile) => profile.isActive) ?? null;
+
+  const mutation = useMutation({
+    mutationFn: () => client.importSingleWindowSubmitPackage({ body: { packagePath: packagePath.trim(), keepWorkingDirectory: false } }),
     onSuccess: async (response) => {
       setResult(response);
-      setMessage(response.message || "提交包已导入。");
+      setMessage(response.message || "提交包已绑定到本持卡机。");
       await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() });
-      if (response.trackingBatchId) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterDetail(response.trackingBatchId) });
-      }
     },
-    onError: (error) => {
-      setResult(null);
-      setMessage(readApiError(error));
-    },
+    onError: (error) => { setResult(null); setMessage(readApiError(error)); },
   });
 
-  function importSubmitPackage() {
-    if (!canOperate) return;
-
-    setMessage(null);
-    if (isDesktop ? !packagePath.trim() : !uploadFile) {
-      setResult(null);
-      setMessage(isDesktop ? "提交包路径不能为空。" : "请选择要上传的提交包。");
-      return;
-    }
-
-    importMutation.mutate();
-  }
-
-  async function choosePackagePath() {
-    if (!canOperate) return;
-
+  async function choosePackage() {
     try {
-      const selectedPath = await selectSingleWindowPackageFile();
-      if (selectedPath) {
-        setPackagePath(selectedPath);
-        setMessage(null);
-        setDesktopMessage(null);
-      }
+      const selected = await selectSingleWindowPackageFile();
+      if (selected) setPackagePath(selected);
     } catch (error) {
-      setDesktopMessage(readDesktopError(error));
-    }
-  }
-
-  async function chooseWorkingDirectory() {
-    if (!canOperate) return;
-
-    try {
-      const selectedPath = await selectDirectory();
-      if (selectedPath) {
-        setWorkingDirectory(selectedPath);
-        setMessage(null);
-        setDesktopMessage(null);
-      }
-    } catch (error) {
-      setDesktopMessage(readDesktopError(error));
+      setMessage(readDesktopError(error));
     }
   }
 
   return (
-    <section className="form-section single-window-import-section" aria-label="提交包导入">
+    <section className="form-section single-window-intake-card" aria-label="持卡机提交包导入">
       <div className="section-header">
-        <h2>提交包导入</h2>
-        <button className="command-button secondary" type="button" disabled={!canOperate || importMutation.isPending} onClick={importSubmitPackage}>
-          <Upload size={17} aria-hidden="true" />
-          <span>导入提交包</span>
-        </button>
+        <div><h2>导入待办提交包</h2><span>导入时校验当前档案、公司抬头、业务能力、文件摘要和 XML 完整性</span></div>
+        <button className="command-button" type="button" disabled={!canOperate || mutation.isPending || !packagePath.trim() || !activeProfile} onClick={() => mutation.mutate()}><Upload size={17} aria-hidden="true" /><span>导入并绑定当前档案</span></button>
       </div>
+      {activeProfile ? (
+        <InlineNotice tone="info" title="当前操作档案">
+          {activeProfile.profileName} · {activeProfile.companyScope} · {activeProfile.cardIdentifier}
+        </InlineNotice>
+      ) : <InlineNotice tone="warning">请先在上方创建并启用公司与操作卡档案。</InlineNotice>}
+      <PathField label="提交包文件" value={packagePath} disabled={!canOperate || mutation.isPending} actions={<DesktopIconButton title="选择提交包" disabled={!canOperate || mutation.isPending} onClick={() => void choosePackage()}><FileInput size={17} aria-hidden="true" /></DesktopIconButton>} onChange={(value) => { setPackagePath(value); setMessage(null); }} />
+      {message ? <InlineNotice tone={mutation.isError ? "error" : "success"}>{message}</InlineNotice> : null}
+      {result ? <div className="single-window-import-summary"><strong>{result.manifest.invoiceNo || result.manifest.batchReference}</strong><span>{formatBusinessType(String(result.manifest.businessType === 0 ? "CustomsCoo" : "AgentConsignment"))}</span><span>{result.manifest.companyScope}</span></div> : null}
+    </section>
+  );
+}
 
-      {message ? <InlineNotice tone={importMutation.isError || !result ? "error" : "success"}>{message}</InlineNotice> : null}
-      {desktopMessage ? <InlineNotice tone="error" title="提交包导入失败">{desktopMessage}</InlineNotice> : null}
+function OfficeReceiptPackageImportPanel({ client, canOperate }: { client: ExportDocManagerApiClient; canOperate: boolean }) {
+  const queryClient = useQueryClient();
+  const [file, setFile] = useState<File | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
-      <div className="field-grid">
-        {isDesktop ? <PathField
-          label="提交包路径"
-          value={packagePath}
-          disabled={!canOperate || importMutation.isPending}
-          actions={
-            isDesktop ? (
-              <>
-                <DesktopIconButton title="选择提交包" disabled={!canOperate || importMutation.isPending} onClick={choosePackagePath}>
-                  <FileInput size={17} aria-hidden="true" />
-                </DesktopIconButton>
-                {renderOpenPathAction(packagePath, "打开提交包位置", setDesktopMessage)}
-              </>
-            ) : undefined
-          }
-          onChange={(value) => {
-            setPackagePath(value);
-            setMessage(null);
-            setDesktopMessage(null);
-          }}
-        /> : <label className="inline-filter"><span>提交包文件</span><input type="file" accept=".swpkg" disabled={!canOperate || importMutation.isPending} onChange={(event) => { setUploadFile(event.target.files?.[0] ?? null); setMessage(null); }} /></label>}
-        {isDesktop ? <PathField
-          label="导入工作目录"
-          value={workingDirectory}
-          disabled={!canOperate || importMutation.isPending}
-          actions={
-            isDesktop ? (
-              <>
-                <DesktopIconButton title="选择工作目录" disabled={!canOperate || importMutation.isPending} onClick={chooseWorkingDirectory}>
-                  <FolderOpen size={17} aria-hidden="true" />
-                </DesktopIconButton>
-                {renderOpenPathAction(workingDirectory, "打开工作目录", setDesktopMessage)}
-              </>
-            ) : undefined
-          }
-          onChange={(value) => {
-            setWorkingDirectory(value);
-            setMessage(null);
-            setDesktopMessage(null);
-          }}
-        /> : null}
+  const mutation = useMutation({
+    mutationFn: () => client.uploadSingleWindowReceiptPackage({ fileName: file?.name, keepWorkingDirectory: false, body: file ?? new Blob() }),
+    onSuccess: async (response) => {
+      setMessage(`回执包已归档，新增 ${response.persistedReceiptCount} 条回执，批次状态为“${formatBatchStatus(response.trackingStatus)}”。`);
+      setFile(null);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() });
+    },
+    onError: (error) => setMessage(readApiError(error)),
+  });
+
+  return (
+    <section className="form-section single-window-intake-card" aria-label="办公室回执包导入">
+      <div className="section-header">
+        <div><h2>导入持卡机回执包</h2><span>只接受能精确绑定原提交批次、公司抬头和原包摘要的 .swpkg</span></div>
+        <button className="command-button" type="button" disabled={!canOperate || mutation.isPending || !file} onClick={() => mutation.mutate()}><Upload size={17} aria-hidden="true" /><span>导入回执包</span></button>
       </div>
-
-      {result && isDesktop ? <PackageImportResult result={result} includeReceipts={false} onOpenError={setDesktopMessage} /> : null}
+      <label className="form-field"><span className="form-field-label"><span>回执包文件</span></span><input type="file" accept=".swpkg" disabled={!canOperate || mutation.isPending} onChange={(event) => { setFile(event.target.files?.[0] ?? null); setMessage(null); }} /></label>
+      {message ? <InlineNotice tone={mutation.isError ? "error" : "success"}>{message}</InlineNotice> : null}
     </section>
   );
 }

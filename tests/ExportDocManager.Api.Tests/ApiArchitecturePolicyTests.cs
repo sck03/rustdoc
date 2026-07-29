@@ -253,7 +253,6 @@ namespace ExportDocManager.Api.Tests
             {
                 "MapSingleWindowReferenceCatalogEndpoints",
                 "MapSingleWindowIssuingAuthorityEndpoints",
-                "MapSingleWindowCollaborationEndpoints",
                 "MapSingleWindowProducerProfileEndpoints",
                 "MapSingleWindowDocumentEndpoints",
                 "MapSingleWindowPackageEndpoints",

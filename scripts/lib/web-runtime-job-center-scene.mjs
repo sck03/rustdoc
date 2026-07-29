@@ -1787,7 +1787,7 @@ export function createJobCenterSmokeScene(runtime) {
               projectName: fieldByLabel("方案名称").value || "",
               cargoName: firstCargoNameInput().value || "",
               selectedProjectId: fieldByLabel("已存方案", "select").value || "",
-              message: Array.from(panel.querySelectorAll(".success-alert, .alert")).map((item) => item.innerText || "").join("\\n"),
+              message: Array.from(panel.querySelectorAll(".inline-notice, .success-alert, .alert")).map((item) => item.innerText || "").join("\\n"),
               optionText: Array.from(fieldByLabel("已存方案", "select").options).map((option) => option.textContent || "").join("\\n"),
             };
 
@@ -1830,40 +1830,46 @@ export function createJobCenterSmokeScene(runtime) {
           "加载装柜方案",
         );
 
-        let confirmMessage = "";
-        const originalConfirm = window.confirm;
-        window.confirm = (message) => {
-          confirmMessage = String(message || "");
-          return true;
-        };
-        try {
-          const refreshedOption = Array.from(projectSelect.options).find((option) => (option.textContent || "").includes(payload.projectName));
-          if (refreshedOption) {
-            setNativeValue(projectSelect, refreshedOption.value);
-          }
-          const deleteButtonText = clickButton("删除方案");
-          const deletedState = await waitForCondition(
-            (state) => !state.optionText.includes(payload.projectName) && state.message.includes("装柜方案已删除"),
-            "删除装柜方案",
-          );
-
-          return {
-            projectName: payload.projectName,
-            savedProjectId: Number(savedOption.value || 0),
-            saveButtonText,
-            loadButtonText,
-            deleteButtonText,
-            confirmMessage,
-            savedState,
-            loadedState,
-            deletedState,
-            saved: true,
-            loaded: true,
-            deleted: true,
-          };
-        } finally {
-          window.confirm = originalConfirm;
+        const refreshedOption = Array.from(projectSelect.options).find((option) => (option.textContent || "").includes(payload.projectName));
+        if (refreshedOption) {
+          setNativeValue(projectSelect, refreshedOption.value);
         }
+        const deleteButtonText = clickButton("删除方案");
+        const confirmationDeadline = Date.now() + ${Number(timeoutMs)};
+        let confirmMessage = "";
+        while (Date.now() < confirmationDeadline) {
+          const dialog = document.querySelector('.confirmation-dialog[role="dialog"]');
+          const confirmButton = dialog ? dialog.querySelector('button.confirmation-dialog-confirm') : null;
+          const text = dialog ? dialog.innerText || dialog.textContent || "" : "";
+          if (dialog && confirmButton && !confirmButton.disabled && text.includes("删除装柜方案")) {
+            confirmMessage = text;
+            confirmButton.click();
+            break;
+          }
+          await delay(100);
+        }
+        if (!confirmMessage) {
+          throw new Error("删除装柜方案确认窗口未出现。");
+        }
+        const deletedState = await waitForCondition(
+          (state) => !state.optionText.includes(payload.projectName) && state.message.includes("装柜方案已删除"),
+          "删除装柜方案",
+        );
+
+        return {
+          projectName: payload.projectName,
+          savedProjectId: Number(savedOption.value || 0),
+          saveButtonText,
+          loadButtonText,
+          deleteButtonText,
+          confirmMessage,
+          savedState,
+          loadedState,
+          deletedState,
+          saved: true,
+          loaded: true,
+          deleted: true,
+        };
       })(${JSON.stringify(payload)})`,
       true,
     );

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Text.Json.Serialization;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Models
@@ -9,7 +10,7 @@ namespace ExportDocManager.Models
     {
         public SystemSettings System { get; set; } = new SystemSettings();
         public BatchExportSettings BatchExport { get; set; } = new BatchExportSettings();
-        public List<BatchExportItem> PaymentTemplates { get; set; } = new List<BatchExportItem>();
+        public List<PaymentTemplateItem> PaymentTemplates { get; set; } = new List<PaymentTemplateItem>();
         public ExcelImportSettings ExcelImport { get; set; } = new ExcelImportSettings();
         public List<ExcelImportSettings> ExcelImportSchemes { get; set; } = new List<ExcelImportSettings>();
         public ExchangeRateSettings ExchangeRate { get; set; } = new ExchangeRateSettings();
@@ -72,12 +73,11 @@ namespace ExportDocManager.Models
         public bool ZipAfterExport { get; set; } = true;
     }
 
-    public class BatchExportItem : INotifyPropertyChanged
+    public abstract class TemplateItemBase : INotifyPropertyChanged
     {
         private string _name = string.Empty;
         private string _templatePath = string.Empty;
         private bool _isEnabled = true;
-        private bool _showSeal = true;
         private string _reportType = string.Empty;
 
         public string Name
@@ -98,17 +98,11 @@ namespace ExportDocManager.Models
             set => SetProperty(ref _isEnabled, value);
         }
 
-        public bool ShowSeal
-        {
-            get => _showSeal;
-            set => SetProperty(ref _showSeal, value);
-        }
-
         public string ReportType
         {
             get => _reportType;
             set => SetProperty(ref _reportType, value);
-        } // "CommercialInvoice", "PackingList", or "Generic"
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -117,7 +111,7 @@ namespace ExportDocManager.Models
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        private void SetProperty<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        protected void SetProperty<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
         {
             if (EqualityComparer<T>.Default.Equals(field, value))
             {
@@ -127,6 +121,22 @@ namespace ExportDocManager.Models
             field = value;
             OnPropertyChanged(propertyName);
         }
+    }
+
+    public sealed class BatchExportItem : TemplateItemBase
+    {
+        private bool _showSeal = true;
+
+        public bool ShowSeal
+        {
+            get => _showSeal;
+            set => SetProperty(ref _showSeal, value);
+        }
+    }
+
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+    public sealed class PaymentTemplateItem : TemplateItemBase
+    {
     }
 
     public class SystemSettings

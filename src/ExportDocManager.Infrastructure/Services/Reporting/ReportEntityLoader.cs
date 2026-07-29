@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Reporting
@@ -7,16 +8,20 @@ namespace ExportDocManager.Services.Reporting
     internal sealed class ReportEntityLoader
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
+        private readonly BusinessDataAccessScope _accessScope;
 
-        public ReportEntityLoader(IDbContextFactory<AppDbContext> contextFactory)
+        public ReportEntityLoader(
+            IDbContextFactory<AppDbContext> contextFactory,
+            BusinessDataAccessScope accessScope)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+            _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
         }
 
         public async Task<Invoice> LoadInvoiceAsync(int invoiceId, CancellationToken cancellationToken = default)
         {
             await using var dbContext = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-            return await dbContext.Invoices
+            return await _accessScope.ApplyInvoiceScope(dbContext.Invoices)
                 .AsNoTracking()
                 .Include(invoice => invoice.Items)
                 .FirstOrDefaultAsync(invoice => invoice.Id == invoiceId, cancellationToken)
@@ -26,7 +31,7 @@ namespace ExportDocManager.Services.Reporting
         public async Task<Payment> LoadPaymentAsync(int paymentId, CancellationToken cancellationToken = default)
         {
             await using var dbContext = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-            return await dbContext.Payments
+            return await _accessScope.ApplyPaymentScope(dbContext.Payments)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(payment => payment.Id == paymentId, cancellationToken)
                 .ConfigureAwait(false);
@@ -61,19 +66,17 @@ namespace ExportDocManager.Services.Reporting
             return (customer, exporter);
         }
 
-        public async Task<(Exporter exporter, Payee payee)> LoadPaymentVoucherEntitiesAsync(
+        public async Task<Payee> LoadPaymentVoucherEntitiesAsync(
             Payment payment,
             CancellationToken cancellationToken = default)
         {
             await using var dbContext = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
-            var exporter = await dbContext.Exporters.AsNoTracking().OrderBy(x => x.Id).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false) ?? new Exporter();
-
             var payee = payment.PayeeId > 0
                 ? await dbContext.Payees.AsNoTracking().FirstOrDefaultAsync(x => x.Id == payment.PayeeId, cancellationToken).ConfigureAwait(false)
                 : null;
 
-            return (exporter, payee);
+            return payee;
         }
 
         private static async Task<Customer> LoadCustomerAsync(

@@ -1,6 +1,6 @@
 import { ApiInvoiceItemDto, ApiProductDto } from "../../api/index.ts";
 import { normalizeText, numberValue } from "../../ui/formUtils.ts";
-import { createEmptyInvoiceItem, normalizeInvoiceItemForSave, recalculateInvoiceItem } from "./InvoiceItemsEditor.tsx";
+import { createEmptyInvoiceItem, normalizeInvoiceItemForSave, recalculateInvoiceItem } from "./invoiceItemsEditorModel.ts";
 
 const productMappedItemFields = [
   "styleNo",
@@ -81,6 +81,7 @@ export function createProductDraftFromInvoiceItem(item: ApiInvoiceItemDto, exist
     defaultPrice: numberValue(normalized.unitPrice),
     createdAt: existing?.createdAt,
     updatedAt: existing?.updatedAt,
+    rowVersion: existing?.rowVersion ?? "",
   };
 }
 

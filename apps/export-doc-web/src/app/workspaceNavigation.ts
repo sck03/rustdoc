@@ -99,7 +99,6 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     icon: Network,
     items: [
       { label: "单一窗口", to: "/single-window/operation-center", icon: Network, isActive: isSingleWindowOperationRoute, workspace: "document", moduleKey: "document.single-window" },
-      { label: "申报协同", to: "/single-window/collaboration", icon: ClipboardList, isActive: isSingleWindowCollaborationRoute, workspace: "document", moduleKey: "document.single-window" },
       { label: "申报词典", to: "/single-window/reference-catalog", icon: Database, isActive: isSingleWindowReferenceCatalogRoute, workspace: "document", moduleKey: "document.single-window" },
       { label: "HS 编码知识", to: "/master-data/hs-knowledge/search", icon: BookOpen, isActive: isHsKnowledgeRoute, workspace: "document", moduleKey: "document.master-data" },
     ],
@@ -331,16 +330,13 @@ function getSingleWindowWorkspaceContext(pathname: string): WorkspaceContext {
   if (pathname.startsWith("/single-window/reference-catalog")) {
     return createWorkspaceContext("申报与归类", "参考词典", "维护申报代码、字段选项与 Excel 导入数据", Database);
   }
-  if (pathname.startsWith("/single-window/collaboration")) {
-    return createWorkspaceContext("申报与归类", "协同看板", "跟踪工作站、协同工单和提交处理进度", ClipboardList);
-  }
   if (pathname.startsWith("/single-window/coo")) {
     return createWorkspaceContext("申报与归类", "海关原产地证", "编辑 COO 草稿、审查字段并生成提交交接包", FileText);
   }
   if (pathname.startsWith("/single-window/acd")) {
     return createWorkspaceContext("申报与归类", "报关代理委托", "编辑 ACD 草稿、审查权限项并处理回执", FileText);
   }
-  return createWorkspaceContext("申报与归类", "单一窗口操作中心", "管理提交批次、客户端目录、交接包和回执", Network);
+  return createWorkspaceContext("申报与归类", "单一窗口操作中心", "办公室归档批次与回执；持卡机负责官方客户端交接", Network);
 }
 
 export function isDashboardRoute(pathname: string) { return pathname === "/" || pathname.startsWith("/dashboard"); }
@@ -358,7 +354,6 @@ function isPaymentRoute(pathname: string) { return pathname.startsWith("/payment
 function isMasterDataRoute(pathname: string) { return pathname.startsWith("/master-data") && !isHsKnowledgeRoute(pathname); }
 function isHsKnowledgeRoute(pathname: string) { return pathname.startsWith("/master-data/hs-knowledge"); }
 function isSingleWindowOperationRoute(pathname: string) { return pathname === "/single-window" || pathname.startsWith("/single-window/operation-center") || pathname.startsWith("/single-window/coo") || pathname.startsWith("/single-window/acd"); }
-function isSingleWindowCollaborationRoute(pathname: string) { return pathname.startsWith("/single-window/collaboration"); }
 function isSingleWindowReferenceCatalogRoute(pathname: string) { return pathname.startsWith("/single-window/reference-catalog"); }
 function isReportRoute(pathname: string) { return pathname.startsWith("/reports"); }
 function isJobRoute(pathname: string) { return pathname.startsWith("/jobs"); }

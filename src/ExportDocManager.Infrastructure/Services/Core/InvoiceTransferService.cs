@@ -376,9 +376,14 @@ namespace ExportDocManager.Services.Core
 
             if (!string.IsNullOrWhiteSpace(preview.InvoiceNo))
             {
+                string companyScope = ResolveImportCompanyScope(pkg.Invoice.CompanyScope);
                 var existing = await _businessDataAccessScope
                     .ApplyInvoiceScope(context.Invoices.AsNoTracking())
-                    .FirstOrDefaultAsync(i => i.InvoiceNo == preview.InvoiceNo && i.Type == preview.Type, cancellationToken);
+                    .FirstOrDefaultAsync(i =>
+                        i.CompanyScope == companyScope &&
+                        i.InvoiceNo == preview.InvoiceNo &&
+                        i.Type == preview.Type,
+                        cancellationToken);
                 if (existing != null)
                 {
                     preview.InvoiceExists = true;
@@ -389,7 +394,6 @@ namespace ExportDocManager.Services.Core
 
                 if (!preview.InvoiceExists)
                 {
-                    string companyScope = ResolveImportCompanyScope(pkg.Invoice.CompanyScope);
                     bool hiddenCompanyScopedConflict = await context.Invoices.AsNoTracking().AnyAsync(
                         i => i.CompanyScope == companyScope &&
                             i.InvoiceNo == preview.InvoiceNo &&

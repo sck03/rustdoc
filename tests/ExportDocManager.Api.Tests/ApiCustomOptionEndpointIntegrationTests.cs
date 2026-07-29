@@ -73,6 +73,21 @@ namespace ExportDocManager.Api.Tests
                 new { value = "o/a 120" });
             Assert.Equal(HttpStatusCode.OK, duplicateSaveResponse.StatusCode);
 
+            var payerNameResponse = await adminClient.GetAsync("/api/custom-options/PaymentPayerName");
+            Assert.Equal(HttpStatusCode.OK, payerNameResponse.StatusCode);
+            var payerNames = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCustomOptionListResponse>(payerNameResponse);
+            Assert.Equal("PaymentPayerName", payerNames.OptionType);
+            Assert.True(payerNames.AllowCustomValues);
+            Assert.Empty(payerNames.PredefinedOptions);
+
+            var payerNameSaveResponse = await adminClient.PostAsJsonAsync(
+                "/api/custom-options/PaymentPayerName",
+                new { value = " 独立付款主体 " });
+            Assert.Equal(HttpStatusCode.OK, payerNameSaveResponse.StatusCode);
+            var savedPayerNames = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCustomOptionListResponse>(payerNameSaveResponse);
+            Assert.Contains("独立付款主体", savedPayerNames.CustomOptions);
+            Assert.Contains("独立付款主体", savedPayerNames.Options);
+
             await using (var connection = new SqliteConnection($"Data Source={harness.DatabasePath}"))
             {
                 await connection.OpenAsync();

@@ -6,7 +6,7 @@ namespace ExportDocManager.Services.SingleWindow
             string rootPath,
             bool createDirectories)
         {
-            string normalizedRoot = NormalizeClientRootPath(rootPath);
+            string normalizedRoot = SingleWindowClientProfilePathResolver.NormalizeClientRootPath(rootPath);
             string bizRoot = normalizedRoot;
 
             string outBox = Path.Combine(bizRoot, "OutBox");
@@ -31,36 +31,6 @@ namespace ExportDocManager.Services.SingleWindow
                 InBox = inBox,
                 FailBox = failBox
             };
-        }
-
-        private static string NormalizeClientRootPath(string rootPath)
-        {
-            if (string.IsNullOrWhiteSpace(rootPath))
-            {
-                return string.Empty;
-            }
-
-            string normalized = rootPath.Trim();
-            string leafName = Path.GetFileName(normalized.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            if (IsClientBoxDirectoryName(leafName))
-            {
-                return Directory.GetParent(normalized)?.FullName ?? normalized;
-            }
-
-            return normalized;
-        }
-
-        private static bool IsClientBoxDirectoryName(string directoryName)
-        {
-            if (string.IsNullOrWhiteSpace(directoryName))
-            {
-                return false;
-            }
-
-            return string.Equals(directoryName, "OutBox", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(directoryName, "SentBox", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(directoryName, "InBox", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(directoryName, "FailBox", StringComparison.OrdinalIgnoreCase);
         }
 
         private sealed class SingleWindowClientFolderLayout

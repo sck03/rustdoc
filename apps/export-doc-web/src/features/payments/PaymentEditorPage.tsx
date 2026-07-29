@@ -62,12 +62,6 @@ export function PaymentEditorPage({
     staleTime: 5 * 60 * 1000,
   });
 
-  const exportersQuery = useQuery({
-    queryKey: queryKeys.masterDataRoot("exporters"),
-    queryFn: () => client.listExporters({}),
-    staleTime: 5 * 60 * 1000,
-  });
-
   useEffect(() => {
     if (isNew) {
       const nextPayment = createEmptyPayment();
@@ -175,22 +169,15 @@ export function PaymentEditorPage({
     [payeesQuery.data],
   );
   const payerNameOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          (exportersQuery.data ?? [])
-            .map((exporter) => exporter.exporterNameCN?.trim())
-            .filter((value): value is string => Boolean(value)),
-        ),
-      ).sort((left, right) => left.localeCompare(right, "zh-CN")),
-    [exportersQuery.data],
+    () => paymentCustomOptions.PaymentPayerName ?? [],
+    [paymentCustomOptions.PaymentPayerName],
   );
   const referenceDataMessage = payeesQuery.isError
     ? readApiError(payeesQuery.error)
-    : exportersQuery.isError
-      ? readApiError(exportersQuery.error)
+    : customOptionsQuery.isError
+      ? readApiError(customOptionsQuery.error)
       : null;
-  const isReferenceDataBusy = payeesQuery.isFetching || exportersQuery.isFetching;
+  const isReferenceDataBusy = payeesQuery.isFetching || customOptionsQuery.isFetching;
   const currentPaymentSnapshot = useMemo(
     () => (payment ? buildPaymentSnapshot(payment, isNew || !isPaymentIdValid ? 0 : parsedPaymentId) : null),
     [isNew, isPaymentIdValid, parsedPaymentId, payment],
@@ -359,7 +346,7 @@ export function PaymentEditorPage({
             canOpenPayeeManagement={masterDataPermission.canView}
             onRefreshReferenceData={() => {
               void payeesQuery.refetch();
-              void exportersQuery.refetch();
+              void customOptionsQuery.refetch();
             }}
           />
           {isNew ? (

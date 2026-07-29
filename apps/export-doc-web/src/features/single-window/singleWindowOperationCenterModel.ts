@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { ApiSingleWindowClientProfileDto,SingleWindowOperationCenterDetail,SingleWindowWorkstationRow } from "../../api/index.ts";
+import type { ApiSingleWindowClientProfileDto,SingleWindowOperationCenterDetail } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { readStoredJsonObject,writeStoredJson } from "../../ui/browserStorage.ts";
 import { normalizeListPageSize } from "../../ui/listViewState.ts";
@@ -7,7 +7,6 @@ import { normalizeListPageSize } from "../../ui/listViewState.ts";
 import { formatPlainNumber } from "../../ui/formUtils.ts";
 
 export const singleWindowOperationCenterViewStateStorageKey = "export-doc-manager.single-window.operation-center.list-view-state.v1";
-export const singleWindowCollaborationViewStateStorageKey = "export-doc-manager.single-window.collaboration.list-view-state.v1";
 
 export const businessTypeOptions = [
   { value: "CustomsCoo", label: "海关原产地证" },
@@ -28,23 +27,11 @@ export const batchStatusOptions = [
   { value: "Failed", label: "失败" },
 ];
 
-export const collaborationStatusOptions = [
-  { value: "Pending", label: "待处理" },
-  { value: "Assigned", label: "已指派" },
-  { value: "Submitted", label: "已提交" },
-  { value: "Completed", label: "已完成" },
-  { value: "Failed", label: "失败" },
-];
-
 export type SingleWindowOperationCenterViewState = {
   keyword: string;
   businessType: string;
   status: string;
   pageSize: number;
-};
-
-export type SingleWindowCollaborationViewState = SingleWindowOperationCenterViewState & {
-  includeDisabledWorkstations: boolean;
 };
 
 export function loadSingleWindowOperationCenterViewState(): SingleWindowOperationCenterViewState {
@@ -66,27 +53,6 @@ export function saveSingleWindowOperationCenterViewState(state: SingleWindowOper
   });
 }
 
-export function loadSingleWindowCollaborationViewState(): SingleWindowCollaborationViewState {
-  const parsed = readStoredViewState(singleWindowCollaborationViewStateStorageKey);
-  return {
-    keyword: readStoredString(parsed.keyword),
-    businessType: readStoredString(parsed.businessType),
-    status: readStoredString(parsed.status),
-    includeDisabledWorkstations: parsed.includeDisabledWorkstations === true,
-    pageSize: normalizeListPageSize(parsed.pageSize),
-  };
-}
-
-export function saveSingleWindowCollaborationViewState(state: SingleWindowCollaborationViewState) {
-  writeStoredViewState(singleWindowCollaborationViewStateStorageKey, {
-    keyword: state.keyword.trim(),
-    businessType: state.businessType,
-    status: state.status,
-    includeDisabledWorkstations: state.includeDisabledWorkstations,
-    pageSize: normalizeListPageSize(state.pageSize),
-  });
-}
-
 export function readStoredViewState(storageKey: string): Record<string, unknown> {
   return readStoredJsonObject(storageKey);
 }
@@ -100,29 +66,12 @@ export function readStoredString(value: unknown) {
 }
 
 
-export function formatWorkstationCapabilities(workstation: SingleWindowWorkstationRow) {
-  const capabilities = [];
-  if (workstation.canSubmitCustomsCoo) {
-    capabilities.push("海关原产地证");
-  }
-
-  if (workstation.canSubmitAgentConsignment) {
-    capabilities.push("代理委托");
-  }
-
-  return capabilities.length > 0 ? capabilities.join("、") : "-";
-}
-
 export function formatBusinessType(value?: string) {
   return formatOptionLabel(value, businessTypeOptions);
 }
 
 export function formatBatchStatus(value?: string) {
   return formatOptionLabel(value, batchStatusOptions);
-}
-
-export function formatCollaborationStatus(value?: string) {
-  return formatOptionLabel(value, collaborationStatusOptions);
 }
 
 export function formatReceiptStatus(value?: string) {
@@ -229,62 +178,10 @@ export function readDisplayValue(value?: string | number) {
 export function resolveBusinessClientRoot(
   profile: ApiSingleWindowClientProfileDto,
   businessType: string,
-  kind: "import" | "receipt",
 ) {
-  const override = readBusinessDirectoryOverride(profile.businessDirectoryOverridesJson, businessType);
-  const overridePath = kind === "import" ? override?.importRootPath : override?.receiptRootPath;
-  if (overridePath?.trim()) {
-    return overridePath.trim();
-  }
-
-  const globalPath = kind === "import" ? profile.importRootPath : profile.receiptRootPath;
-  return globalPath?.trim() ?? "";
-}
-
-export function readBusinessDirectoryOverride(json: string | undefined, businessType: string) {
-  if (!json?.trim() || !businessType.trim()) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(json) as {
-      businesses?: SingleWindowBusinessDirectoryOverride[];
-      Businesses?: SingleWindowBusinessDirectoryOverride[];
-    };
-    const businesses = parsed.businesses ?? parsed.Businesses ?? [];
-    const normalizedBusinessType = businessType.trim().toLowerCase();
-    const matched = businesses.find((item) => readOverrideString(item, "businessType").toLowerCase() === normalizedBusinessType);
-    if (!matched) {
-      return null;
-    }
-
-    return {
-      businessType: readOverrideString(matched, "businessType"),
-      importRootPath: readOverrideString(matched, "importRootPath"),
-      receiptRootPath: readOverrideString(matched, "receiptRootPath"),
-    };
-  } catch {
-    return null;
-  }
-}
-
-export type SingleWindowBusinessDirectoryOverride = {
-  businessType?: string;
-  importRootPath?: string;
-  receiptRootPath?: string;
-  BusinessType?: string;
-  ImportRootPath?: string;
-  ReceiptRootPath?: string;
-};
-
-export function readOverrideString(
-  item: SingleWindowBusinessDirectoryOverride,
-  key: "businessType" | "importRootPath" | "receiptRootPath",
-) {
-  const pascalKey: keyof SingleWindowBusinessDirectoryOverride =
-    key === "businessType" ? "BusinessType" : key === "importRootPath" ? "ImportRootPath" : "ReceiptRootPath";
-  const value = item[key] ?? item[pascalKey];
-  return typeof value === "string" ? value.trim() : "";
+  return businessType.trim().toLowerCase() === "customscoo"
+    ? profile.customsCooClientRootPath?.trim() ?? ""
+    : profile.agentConsignmentClientRootPath?.trim() ?? "";
 }
 
 export function buildClientBoxPath(rootPath: string, boxName: "OutBox" | "SentBox" | "InBox" | "FailBox") {

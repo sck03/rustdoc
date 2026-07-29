@@ -36,8 +36,18 @@ const capabilities: Record<WorkspaceDeviceMode, WorkspaceDeviceCapabilities> = {
 export function useWorkspaceDeviceMode(): WorkspaceDeviceMode {
   const isPhone = useMediaQuery(`(max-width: ${workspacePhoneMaxWidth}px)`);
   const isDesktop = useMediaQuery(`(min-width: ${workspaceDesktopMinWidth}px)`);
-  if (isPhone) return "phone";
-  return isDesktop ? "desktop" : "tablet";
+  const hasFinePointer = useMediaQuery("(any-pointer: fine) and (any-hover: hover)");
+  return resolveWorkspaceDeviceMode(isPhone, isDesktop, hasFinePointer);
+}
+
+export function resolveWorkspaceDeviceMode(
+  isPhoneWidth: boolean,
+  isDesktopWidth: boolean,
+  hasFinePointer: boolean,
+): WorkspaceDeviceMode {
+  if (isPhoneWidth && !hasFinePointer) return "phone";
+  if (hasFinePointer) return "desktop";
+  return isDesktopWidth ? "desktop" : "tablet";
 }
 
 export function getWorkspaceDeviceCapabilities(mode: WorkspaceDeviceMode) {

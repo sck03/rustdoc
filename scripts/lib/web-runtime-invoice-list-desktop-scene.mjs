@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+const SESSION_STORAGE_KEY = "exportdocmanager.web.session";
+
 export function createInvoiceListDesktopSmokeScene(runtime) {
   const {
     authorizedHeaders,
@@ -9,6 +11,7 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
     buildSmokeCustomsCooReceiptXml,
     createSmokeInvoice,
     deleteSmokeInvoice,
+    desktopAccessHeaders,
     ensureTrailingSlash,
     evaluate,
     getSingleWindowBatchDetail,
@@ -40,20 +43,59 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
     const bookingSheetPath = path.join(smokeRoot, `invoice-booking-${timestamp}.xlsx`);
     const cooSubmitPackagePath = path.join(smokeRoot, `invoice-list-coo-${timestamp}.swpkg`);
     const acdSubmitPackagePath = path.join(smokeRoot, `invoice-list-acd-${timestamp}.swpkg`);
-    const cooReceiptFilePath = path.join(smokeRoot, `coo-receipt-${timestamp}.xml`);
-    const acdReceiptFilePath = path.join(smokeRoot, `acd-receipt-${timestamp}.xml`);
     const cooReceiptPackagePath = path.join(smokeRoot, `coo-receipt-${timestamp}.swpkg`);
     const acdReceiptPackagePath = path.join(smokeRoot, `acd-receipt-${timestamp}.swpkg`);
+    const stationRoot = path.join(smokeRoot, "OfficialClient");
+    const cooClientRoot = path.join(stationRoot, "COO");
+    const acdClientRoot = path.join(stationRoot, "ACD");
+    const cooReceiptInbox = path.join(cooClientRoot, "InBox");
+    const acdReceiptInbox = path.join(acdClientRoot, "InBox");
     const url = buildInvoiceListDesktopWorkflowCheckUrl(options.webUrl);
     let invoice = null;
+    let operatorUserId = 0;
+    let operatorDeleted = false;
+    let browserSessionOverrideId = "";
+    let browserSessionSwitched = false;
     let result = null;
     let deletedInvoice = false;
     let cleanedSmokeRoot = false;
   
     try {
       mkdirSync(smokeRoot, { recursive: true });
-      invoice = await createSmokeInvoice(options, accessToken, tokenType);
+      const companyScope = `Smoke Company Invoice List ${timestamp}`;
+      const operator = await createScopedSmokeUser(
+        options,
+        accessToken,
+        tokenType,
+        companyScope,
+        timestamp,
+      );
+      operatorUserId = operator.userId;
+      const operatorLogin = await loginScopedSmokeUser(options, operator.username, operator.password);
+      invoice = await createSmokeInvoice(options, operatorLogin.accessToken, operatorLogin.tokenType);
+      const stationProfile = await saveStationProfile(
+        options,
+        operatorLogin.accessToken,
+        operatorLogin.tokenType,
+        companyScope,
+        cooClientRoot,
+        acdClientRoot,
+        timestamp,
+      );
+      browserSessionOverrideId = await installBrowserSessionOverride(page, {
+        accessToken: operatorLogin.accessToken,
+        expiresAt: operatorLogin.expiresAt,
+        apiBaseUrl: options.apiBaseUrl,
+        user: operatorLogin.user,
+      });
+      browserSessionSwitched = true;
       await navigateToInvoiceListSmokeRow(page, options, invoice, timeoutMs);
+      await waitForPageExpression(
+        page,
+        `document.body && (document.body.innerText || '').includes(${JSON.stringify("Single Window Invoice List Smoke")})`,
+        timeoutMs,
+        "Timed out waiting for the scoped invoice-list browser session.",
+      );
   
       const transferExport = await runInvoiceListTransferExportCheck(
         page,
@@ -71,8 +113,8 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
       const bookingSheet = await runInvoiceListBookingSheetExportCheck(
         page,
         options,
-        accessToken,
-        tokenType,
+        operatorLogin.accessToken,
+        operatorLogin.tokenType,
         invoice,
         bookingSheetPath,
         timeoutMs,
@@ -80,16 +122,18 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
       const singleWindow = await runInvoiceListSingleWindowCheck(
         page,
         options,
-        accessToken,
-        tokenType,
+        operatorLogin.accessToken,
+        operatorLogin.tokenType,
         invoice,
         {
           cooSubmitPackagePath,
           acdSubmitPackagePath,
-          cooReceiptFilePath,
-          acdReceiptFilePath,
           cooReceiptPackagePath,
           acdReceiptPackagePath,
+          cooClientRoot,
+          acdClientRoot,
+          cooReceiptInbox,
+          acdReceiptInbox,
         },
         timeoutMs,
       );
@@ -111,20 +155,45 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
             bookingSheet?.saveDialogInvocation === true &&
             singleWindow?.coo?.submitPackageHeader === "PK" &&
             singleWindow?.acd?.submitPackageHeader === "PK" &&
+            singleWindow?.coo?.stationImported === true &&
+            singleWindow?.acd?.stationImported === true &&
+            singleWindow?.coo?.stationDispatched === true &&
+            singleWindow?.acd?.stationDispatched === true &&
+            singleWindow?.coo?.stationReceiptCollected === true &&
+            singleWindow?.acd?.stationReceiptCollected === true &&
             singleWindow?.coo?.detailStatus === "Approved" &&
             singleWindow?.acd?.detailStatus === "Accepted" &&
             singleWindow?.coo?.receiptImportDialogInvocation === true &&
             singleWindow?.acd?.receiptImportDialogInvocation === true),
         deletedInvoice,
+        deletedOperator: operatorDeleted,
         cleanedSmokeRoot,
+        companyScope,
+        stationProfileKey: stationProfile.profileKey,
         dataBoundary: "发票列表桌面闭环 smoke 由 invoice.id 触发托单、发票单据包和单一窗口 COO/ACD 提交包；发票号只用于列表检索和回执批次引用，不作为付款/报销或实际/报关数据合并键。",
         storagePolicy: "所有列表级桌面文件选择输出均由 Tauri mock 文件对话框显式返回，并写入 smoke userDataDir 下的临时运行目录；完成后删除临时输出目录。",
       };
     } finally {
+      if (browserSessionSwitched) {
+        await restoreBrowserSession(page, browserSessionOverrideId, options.webUrl, timeoutMs)
+          .catch(() => undefined);
+      }
+
       if (invoice?.id) {
         deletedInvoice = await deleteSmokeInvoice(options, accessToken, tokenType, invoice.id).catch(() => false);
       } else {
         deletedInvoice = true;
+      }
+
+      if (operatorUserId) {
+        operatorDeleted = await deleteScopedSmokeUser(
+          options,
+          accessToken,
+          tokenType,
+          operatorUserId,
+        ).catch(() => false);
+      } else {
+        operatorDeleted = true;
       }
   
       if (existsSync(smokeRoot)) {
@@ -135,6 +204,7 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
   
       if (result) {
         result.deletedInvoice = deletedInvoice;
+        result.deletedOperator = operatorDeleted;
         result.cleanedSmokeRoot = cleanedSmokeRoot;
       }
     }
@@ -305,7 +375,7 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
       page,
       `(() => {
         const text = document.body ? document.body.innerText || '' : '';
-        return text.includes('单据包已导入') || text.includes('导入完成') || text.includes('已跳过');
+        return text.includes('单据包已导入') || text.includes('导入完成') || text.includes('导入成功') || text.includes('已跳过');
       })()`,
       timeoutMs,
       "Timed out waiting for invoice transfer import submit result.",
@@ -430,9 +500,51 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
       paths.acdSubmitPackagePath,
       timeoutMs,
     );
+
+    const cooStation = await importAndDispatchSubmitPackage(
+      options,
+      accessToken,
+      tokenType,
+      coo.batchId,
+      paths.cooSubmitPackagePath,
+      paths.cooClientRoot,
+    );
+    const acdStation = await importAndDispatchSubmitPackage(
+      options,
+      accessToken,
+      tokenType,
+      acd.batchId,
+      paths.acdSubmitPackagePath,
+      paths.acdClientRoot,
+    );
   
-    writeFileSync(paths.cooReceiptFilePath, buildSmokeCustomsCooReceiptXml(coo.batchReference), "utf8");
-    writeFileSync(paths.acdReceiptFilePath, buildSmokeAgentConsignmentReceiptXml(acd.batchReference), "utf8");
+    mkdirSync(paths.cooReceiptInbox, { recursive: true });
+    mkdirSync(paths.acdReceiptInbox, { recursive: true });
+    const cooStationReceiptPath = path.join(
+      paths.cooReceiptInbox,
+      `Successed_${coo.batchReference}_${invoice.invoiceNo}.xml`,
+    );
+    const acdStationReceiptPath = path.join(
+      paths.acdReceiptInbox,
+      `Successed_${acd.batchReference}_${invoice.invoiceNo}.xml`,
+    );
+    writeFileSync(cooStationReceiptPath, buildSmokeCustomsCooReceiptXml(coo.batchReference), "utf8");
+    writeFileSync(acdStationReceiptPath, buildSmokeAgentConsignmentReceiptXml(acd.batchReference), "utf8");
+
+    const cooReceiptCollection = await collectStationReceipts(
+      options,
+      accessToken,
+      tokenType,
+      coo.batchId,
+      cooStationReceiptPath,
+    );
+    const acdReceiptCollection = await collectStationReceipts(
+      options,
+      accessToken,
+      tokenType,
+      acd.batchId,
+      acdStationReceiptPath,
+    );
   
     await exportSmokeSingleWindowReceiptPackage(
       options,
@@ -442,7 +554,7 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
       invoice.invoiceNo,
       coo.batchReference,
       paths.cooReceiptPackagePath,
-      [paths.cooReceiptFilePath],
+      cooReceiptCollection.receiptFiles,
     );
     await exportSmokeSingleWindowReceiptPackage(
       options,
@@ -452,7 +564,7 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
       invoice.invoiceNo,
       acd.batchReference,
       paths.acdReceiptPackagePath,
-      [paths.acdReceiptFilePath],
+      acdReceiptCollection.receiptFiles,
     );
   
     const cooReceiptImport = await runInvoiceListSingleWindowReceiptImportCheck(
@@ -480,9 +592,202 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
   
     return {
       panelReady: Boolean(panelReady?.found),
-      coo: { ...coo, ...cooReceiptImport },
-      acd: { ...acd, ...acdReceiptImport },
+      coo: { ...coo, ...cooStation, ...cooReceiptCollection, ...cooReceiptImport },
+      acd: { ...acd, ...acdStation, ...acdReceiptCollection, ...acdReceiptImport },
     };
+  }
+
+  async function importAndDispatchSubmitPackage(
+    options,
+    accessToken,
+    tokenType,
+    batchId,
+    packagePath,
+    expectedClientRoot,
+  ) {
+    const importResponse = await fetch(new URL("/api/single-window/packages/import", ensureTrailingSlash(options.apiBaseUrl)), {
+      method: "POST",
+      headers: authorizedJsonHeaders(options, accessToken, tokenType),
+      body: JSON.stringify({ packagePath, workingDirectory: "", keepWorkingDirectory: false }),
+    });
+    if (!importResponse.ok) {
+      throw new Error(`Single Window submit package station import failed with HTTP ${importResponse.status}: ${await importResponse.text()}`);
+    }
+    const imported = await importResponse.json();
+    if (!imported?.success || Number(imported.trackingBatchId || 0) !== Number(batchId)) {
+      throw new Error(`Single Window submit package station import response is incomplete: ${JSON.stringify(imported)}`);
+    }
+
+    const dispatchResponse = await fetch(new URL("/api/single-window/client/dispatch", ensureTrailingSlash(options.apiBaseUrl)), {
+      method: "POST",
+      headers: authorizedJsonHeaders(options, accessToken, tokenType),
+      body: JSON.stringify({ batchId }),
+    });
+    if (!dispatchResponse.ok) {
+      throw new Error(`Single Window station dispatch failed with HTTP ${dispatchResponse.status}: ${await dispatchResponse.text()}`);
+    }
+    const dispatched = await dispatchResponse.json();
+    const expectedOutBox = normalizePathForCompare(path.join(expectedClientRoot, "OutBox"));
+    if (Number(dispatched?.batchId || 0) !== Number(batchId) ||
+        normalizePathForCompare(dispatched?.targetDirectory) !== expectedOutBox) {
+      throw new Error(`Single Window station dispatch response is incomplete: ${JSON.stringify(dispatched)}`);
+    }
+
+    return {
+      stationImported: true,
+      stationDispatched: true,
+      stationOutBoxPath: dispatched.targetDirectory,
+      stationPayloadFileCount: Number(dispatched.payloadFileCount || 0),
+      stationAttachmentFileCount: Number(dispatched.attachmentFileCount || 0),
+    };
+  }
+
+  async function collectStationReceipts(
+    options,
+    accessToken,
+    tokenType,
+    batchId,
+    expectedReceiptPath,
+  ) {
+    const response = await fetch(new URL("/api/single-window/client/collect-receipts", ensureTrailingSlash(options.apiBaseUrl)), {
+      method: "POST",
+      headers: authorizedJsonHeaders(options, accessToken, tokenType),
+      body: JSON.stringify({ batchId }),
+    });
+    if (!response.ok) {
+      throw new Error(`Single Window station receipt collection failed with HTTP ${response.status}: ${await response.text()}`);
+    }
+    const payload = await response.json();
+    const receiptFiles = Array.isArray(payload?.receiptFiles) ? payload.receiptFiles : [];
+    if (Number(payload?.batchId || 0) !== Number(batchId) ||
+        !receiptFiles.some((candidate) => normalizePathForCompare(candidate) === normalizePathForCompare(expectedReceiptPath))) {
+      throw new Error(`Single Window station receipt collection response is incomplete: ${JSON.stringify(payload)}`);
+    }
+    return {
+      stationReceiptCollected: true,
+      receiptFiles,
+      stationReceiptRootPath: payload.receiptRootPath,
+    };
+  }
+
+  async function createScopedSmokeUser(options, accessToken, tokenType, companyScope, timestamp) {
+    const username = `sw-invoice-list-${timestamp}`;
+    const password = `Sw-Invoice-List-${timestamp}!`;
+    const fullName = "Single Window Invoice List Smoke";
+    const response = await fetch(new URL("/api/users", ensureTrailingSlash(options.apiBaseUrl)), {
+      method: "POST",
+      headers: authorizedJsonHeaders(options, accessToken, tokenType),
+      body: JSON.stringify({
+        username,
+        fullName,
+        role: "Admin",
+        departmentId: "SW-SMOKE",
+        companyScope,
+        isActive: true,
+        resetPassword: password,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Single Window invoice-list scoped user create failed with HTTP ${response.status}: ${await response.text()}`);
+    }
+    const payload = await response.json();
+    const userId = Number(payload?.user?.id || 0);
+    if (!userId) {
+      throw new Error(`Single Window invoice-list scoped user response is incomplete: ${JSON.stringify(payload)}`);
+    }
+    return { userId, username, password, fullName };
+  }
+
+  async function loginScopedSmokeUser(options, username, password) {
+    const response = await fetch(new URL("/api/auth/login", ensureTrailingSlash(options.apiBaseUrl)), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...desktopAccessHeaders(options) },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!response.ok) {
+      throw new Error(`Single Window invoice-list scoped login failed with HTTP ${response.status}: ${await response.text()}`);
+    }
+    const payload = await response.json();
+    if (!payload?.accessToken || !payload?.expiresAt || !payload?.user) {
+      throw new Error(`Single Window invoice-list scoped login response is incomplete: ${JSON.stringify(payload)}`);
+    }
+    return {
+      accessToken: payload.accessToken,
+      tokenType: payload.tokenType || "Bearer",
+      expiresAt: payload.expiresAt,
+      user: payload.user,
+    };
+  }
+
+  async function installBrowserSessionOverride(page, session) {
+    const source = `try {
+      window.sessionStorage.setItem(
+        ${JSON.stringify(SESSION_STORAGE_KEY)},
+        ${JSON.stringify(JSON.stringify(session))}
+      );
+    } catch (error) {
+      console.error('ExportDocManager invoice-list smoke failed to inject scoped session', error);
+    }`;
+    const result = await page.send("Page.addScriptToEvaluateOnNewDocument", { source });
+    if (!result?.identifier) {
+      throw new Error("Chrome did not return an identifier for the scoped browser session override.");
+    }
+    return result.identifier;
+  }
+
+  async function restoreBrowserSession(page, overrideId, webUrl, timeoutMs) {
+    if (overrideId) {
+      await page.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: overrideId });
+    }
+    await page.send("Page.navigate", { url: webUrl });
+    await waitForRuntimeDiagnostics(page, ["工作台"], timeoutMs);
+  }
+
+  async function deleteScopedSmokeUser(options, accessToken, tokenType, userId) {
+    const response = await fetch(new URL(`/api/users/${encodeURIComponent(String(userId))}`, ensureTrailingSlash(options.apiBaseUrl)), {
+      method: "DELETE",
+      headers: authorizedHeaders(options, accessToken, tokenType),
+    });
+    return response.ok || response.status === 404;
+  }
+
+  async function saveStationProfile(
+    options,
+    accessToken,
+    tokenType,
+    companyScope,
+    cooClientRoot,
+    acdClientRoot,
+    timestamp,
+  ) {
+    const response = await fetch(new URL("/api/single-window/client-profiles", ensureTrailingSlash(options.apiBaseUrl)), {
+      method: "PUT",
+      headers: authorizedJsonHeaders(options, accessToken, tokenType),
+      body: JSON.stringify({
+        profileKey: "",
+        profileName: `Smoke Invoice List ${timestamp}`,
+        companyScope,
+        cardIdentifier: `SMOKE-INVOICE-LIST-${timestamp}`,
+        customsCooClientRootPath: cooClientRoot,
+        agentConsignmentClientRootPath: acdClientRoot,
+        canSubmitCustomsCoo: true,
+        canSubmitAgentConsignment: true,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Single Window invoice-list station profile save failed with HTTP ${response.status}: ${await response.text()}`);
+    }
+    const payload = await response.json();
+    const activeProfile = Array.isArray(payload?.profiles)
+      ? payload.profiles.find((profile) => profile?.isActive)
+      : null;
+    if (!activeProfile ||
+        activeProfile.companyScope !== companyScope ||
+        normalizePathForCompare(activeProfile.customsCooClientRootPath) !== normalizePathForCompare(cooClientRoot) ||
+        normalizePathForCompare(activeProfile.agentConsignmentClientRootPath) !== normalizePathForCompare(acdClientRoot)) {
+      throw new Error(`Single Window invoice-list station profile response is incomplete: ${JSON.stringify(payload)}`);
+    }
+    return activeProfile;
   }
   
   async function runInvoiceListSingleWindowSubmitPackageCheck(
@@ -575,7 +880,6 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
       tokenType,
       invoice.invoiceNo,
       businessType,
-      packagePath,
       timeoutMs,
     );
   
@@ -640,8 +944,7 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
     const detail = await waitFor(async () => {
       const candidate = await getSingleWindowBatchDetail(options, accessToken, tokenType, batchId);
       const receiptRecords = Array.isArray(candidate.receiptRecords) ? candidate.receiptRecords : [];
-      return normalizePathForCompare(candidate.lastReceiptPackagePath) === normalizePathForCompare(packagePath) &&
-        candidate.status === expectedStatus &&
+      return candidate.status === expectedStatus &&
         receiptRecords.some((record) => String(record.receiptMessage || "").includes(expectedMessage))
         ? candidate
         : null;
@@ -652,7 +955,6 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
       receiptImportDialogInvocation: Boolean(invocation?.found),
       receiptImportUi: Boolean(importUi?.found),
       detailStatus: detail.status,
-      detailLastReceiptPackagePath: detail.lastReceiptPackagePath,
       detailReceiptRecordCount: Array.isArray(detail.receiptRecords) ? detail.receiptRecords.length : 0,
       detailReceiptMessages: Array.isArray(detail.receiptRecords)
         ? detail.receiptRecords.map((record) => record.receiptMessage).filter(Boolean)
@@ -736,10 +1038,8 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
     tokenType,
     invoiceNo,
     businessType,
-    submitPackagePath,
     timeoutMs,
   ) {
-    const expectedPathKey = normalizePathForCompare(submitPackagePath);
     return waitFor(async () => {
       const response = await fetch(
         new URL(
@@ -757,7 +1057,8 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
       return rows.find((row) =>
         String(row.invoiceNo || "") === String(invoiceNo || "") &&
         String(row.businessType || "") === String(businessType || "") &&
-        normalizePathForCompare(row.submitPackagePath) === expectedPathKey) || null;
+        Number(row.batchId || 0) > 0 &&
+        String(row.batchReference || "").trim().length > 0) || null;
     }, timeoutMs, `Timed out waiting for Single Window operation center row: ${invoiceNo} / ${businessType}.`);
   }
 

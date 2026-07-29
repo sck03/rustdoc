@@ -6,27 +6,41 @@ using Microsoft.EntityFrameworkCore;
 namespace ExportDocManager.Services.SingleWindow
 {
     public sealed partial class ManualImportClientBridge :
-        ISingleWindowClientProfileService,
         ISingleWindowClientBridge
     {
-        private const string DefaultProfileName = "默认持卡机";
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly ISingleWindowReceiptParser _singleWindowReceiptParser;
         private readonly BusinessDataAccessScope _businessDataAccessScope;
         private readonly IAppPathProvider _pathProvider;
+        private readonly ISingleWindowClientProfileService _clientProfileService;
+        private readonly ISingleWindowStationIdentityService _stationIdentity;
+        private readonly bool _isSqlite;
 
         public ManualImportClientBridge(
             IDbContextFactory<AppDbContext> contextFactory,
             ISingleWindowReceiptParser singleWindowReceiptParser,
             DatabaseConnectionSettings databaseSettings,
             BusinessDataAccessScope businessDataAccessScope,
-            IAppPathProvider pathProvider)
+            IAppPathProvider pathProvider,
+            ISingleWindowClientProfileService clientProfileService,
+            ISingleWindowStationIdentityService stationIdentity)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _singleWindowReceiptParser = singleWindowReceiptParser ?? throw new ArgumentNullException(nameof(singleWindowReceiptParser));
-            _ = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
+            _isSqlite = !DatabaseModeHelper.UsesPostgreSql(
+                databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings)));
             _businessDataAccessScope = businessDataAccessScope ?? throw new ArgumentNullException(nameof(businessDataAccessScope));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            _clientProfileService = clientProfileService ?? throw new ArgumentNullException(nameof(clientProfileService));
+            _stationIdentity = stationIdentity ?? throw new ArgumentNullException(nameof(stationIdentity));
+        }
+
+        private void EnsureSqliteStation()
+        {
+            if (!_isSqlite)
+            {
+                throw new InvalidOperationException("官方单一窗口客户端只能由独立 SQLite 持卡机操作。");
+            }
         }
     }
 }

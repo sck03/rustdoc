@@ -9,7 +9,7 @@ const packageRoot = process.argv[2]
   : path.join(repositoryRoot, "apps", "export-doc-web");
 const allowReviewedRouterRsc = process.argv.includes("--allow-reviewed-react-router-rsc");
 const npmExecPath = String(process.env.npm_execpath || "").trim();
-const npmCommand = npmExecPath ? process.execPath : (process.platform === "win32" ? "npm.cmd" : "npm");
+const npmCommand = npmExecPath ? process.execPath : "npm";
 const npmArguments = [
   ...(npmExecPath ? [npmExecPath] : []),
   "audit",
@@ -21,7 +21,12 @@ const npmArguments = [
 const audit = spawnSync(
   npmCommand,
   npmArguments,
-  { cwd: packageRoot, encoding: "utf8", windowsHide: true },
+  {
+    cwd: packageRoot,
+    encoding: "utf8",
+    windowsHide: true,
+    shell: !npmExecPath && process.platform === "win32",
+  },
 );
 
 if (audit.error) throw audit.error;

@@ -782,6 +782,10 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("importLetterOfCreditDocument", json, StringComparison.Ordinal);
             Assert.Contains("ApiLetterOfCreditImportRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiLetterOfCreditImportResponse", json, StringComparison.Ordinal);
+            Assert.Contains("/api/tools/letter-of-credit/import-upload", json, StringComparison.Ordinal);
+            Assert.Contains("uploadLetterOfCreditDocument", json, StringComparison.Ordinal);
+            Assert.Contains("runtime Cache/BrowserUploads/LetterOfCredit", json, StringComparison.Ordinal);
+            Assert.Contains("exceeds 25 MB", json, StringComparison.Ordinal);
             Assert.Contains("/api/tools/letter-of-credit/review", json, StringComparison.Ordinal);
             Assert.Contains("reviewLetterOfCreditCompliance", json, StringComparison.Ordinal);
             Assert.Contains("ApiLetterOfCreditReviewRequest", json, StringComparison.Ordinal);
@@ -1587,11 +1591,31 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("ApiReportTemplatePreviewRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiReportTemplatePreviewResponse", json, StringComparison.Ordinal);
             Assert.Contains("ApiReportHtmlPreviewRequest", json, StringComparison.Ordinal);
+            Assert.Contains("ApiPaymentReportHtmlPreviewRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiInvoiceDraftReportHtmlPreviewRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiPaymentDraftReportHtmlPreviewRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiReportHtmlPreviewResponse", json, StringComparison.Ordinal);
             Assert.Contains("ApiPaymentReportHtmlPreviewResponse", json, StringComparison.Ordinal);
             Assert.Contains("storagePolicy", json, StringComparison.Ordinal);
+
+            using var jsonDocument = JsonDocument.Parse(json);
+            var schemas = jsonDocument.RootElement.GetProperty("components").GetProperty("schemas");
+            var paymentPreviewRequestProperties = schemas
+                .GetProperty("ApiPaymentReportHtmlPreviewRequest")
+                .GetProperty("properties");
+            Assert.False(paymentPreviewRequestProperties.TryGetProperty("withSeal", out _));
+            Assert.False(paymentPreviewRequestProperties.TryGetProperty("reportType", out _));
+
+            var paymentDraftRequestProperties = schemas
+                .GetProperty("ApiPaymentDraftReportHtmlPreviewRequest")
+                .GetProperty("properties");
+            Assert.False(paymentDraftRequestProperties.TryGetProperty("withSeal", out _));
+            Assert.False(paymentDraftRequestProperties.TryGetProperty("reportType", out _));
+
+            var paymentPreviewResponseProperties = schemas
+                .GetProperty("ApiPaymentReportHtmlPreviewResponse")
+                .GetProperty("properties");
+            Assert.False(paymentPreviewResponseProperties.TryGetProperty("withSeal", out _));
         }
 
         [Fact]
@@ -1609,7 +1633,17 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("startInvoiceReportPdfDownloadJob", json, StringComparison.Ordinal);
             Assert.Contains("startPaymentVoucherPdfDownloadJob", json, StringComparison.Ordinal);
             Assert.Contains("ApiReportPdfRequest", json, StringComparison.Ordinal);
+            Assert.Contains("ApiPaymentReportPdfRequest", json, StringComparison.Ordinal);
             Assert.Contains("destinationPath", json, StringComparison.Ordinal);
+
+            using var jsonDocument = JsonDocument.Parse(json);
+            var paymentRequestProperties = jsonDocument.RootElement
+                .GetProperty("components")
+                .GetProperty("schemas")
+                .GetProperty("ApiPaymentReportPdfRequest")
+                .GetProperty("properties");
+            Assert.False(paymentRequestProperties.TryGetProperty("withSeal", out _));
+            Assert.False(paymentRequestProperties.TryGetProperty("reportType", out _));
         }
 
         [Fact]
@@ -2181,7 +2215,7 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
-        public void OpenApiDocument_ShouldExposeSingleWindowCollaborationEndpoints()
+        public void OpenApiDocument_ShouldNotExposeRemovedSingleWindowCollaborationEndpoints()
         {
             var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
             {
@@ -2190,13 +2224,9 @@ namespace ExportDocManager.Api.Tests
 
             string json = JsonSerializer.Serialize(document);
 
-            Assert.Contains("/api/single-window/collaboration", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/collaboration/workstations", json, StringComparison.Ordinal);
-            Assert.Contains("listSingleWindowCollaboration", json, StringComparison.Ordinal);
-            Assert.Contains("listSingleWindowWorkstations", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowCollaborationPageResult", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowOperationTicketRow", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowWorkstationRow", json, StringComparison.Ordinal);
+            Assert.DoesNotContain("/api/single-window/collaboration", json, StringComparison.Ordinal);
+            Assert.DoesNotContain("SingleWindowOperationTicketRow", json, StringComparison.Ordinal);
+            Assert.DoesNotContain("SingleWindowWorkstationRow", json, StringComparison.Ordinal);
         }
 
         [Fact]
@@ -2352,14 +2382,17 @@ namespace ExportDocManager.Api.Tests
 
             string json = JsonSerializer.Serialize(document);
 
-            Assert.Contains("/api/single-window/client-profile/default", json, StringComparison.Ordinal);
+            Assert.Contains("/api/single-window/client-profiles", json, StringComparison.Ordinal);
+            Assert.Contains("/api/single-window/client-profiles/{profileKey}/activate", json, StringComparison.Ordinal);
             Assert.Contains("/api/single-window/client/dispatch", json, StringComparison.Ordinal);
             Assert.Contains("/api/single-window/client/collect-receipts", json, StringComparison.Ordinal);
-            Assert.Contains("getSingleWindowDefaultClientProfile", json, StringComparison.Ordinal);
-            Assert.Contains("saveSingleWindowDefaultClientProfile", json, StringComparison.Ordinal);
+            Assert.Contains("getSingleWindowClientProfiles", json, StringComparison.Ordinal);
+            Assert.Contains("saveSingleWindowClientProfile", json, StringComparison.Ordinal);
+            Assert.Contains("activateSingleWindowClientProfile", json, StringComparison.Ordinal);
             Assert.Contains("dispatchSingleWindowBatchToClient", json, StringComparison.Ordinal);
             Assert.Contains("collectSingleWindowClientReceipts", json, StringComparison.Ordinal);
             Assert.Contains("ApiSingleWindowClientProfileDto", json, StringComparison.Ordinal);
+            Assert.Contains("ApiSingleWindowClientProfilesResponse", json, StringComparison.Ordinal);
             Assert.Contains("ApiSingleWindowClientProfileSaveRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiSingleWindowClientDispatchRequest", json, StringComparison.Ordinal);
             Assert.Contains("SingleWindowClientDispatchResult", json, StringComparison.Ordinal);
@@ -2530,25 +2563,29 @@ namespace ExportDocManager.Api.Tests
         [Fact]
         public void SingleWindowDtoFactory_ShouldWrapClientProfileWithStoragePolicy()
         {
-            var response = ApiSingleWindowDtoFactory.FromClientProfile(new SwClientProfile
-            {
-                Id = 3,
-                ProfileName = "Profile A",
-                MachineName = "MACHINE-A",
-                ImportRootPath = "D:\\SingleWindow\\Acd",
-                ReceiptRootPath = "D:\\SingleWindow\\Acd",
-                CanSubmitAgentConsignment = true,
-                CanSubmitCustomsCoo = false,
-                IsEnabled = true,
-                UpdatedAt = new DateTime(2026, 6, 23)
-            });
+            var response = ApiSingleWindowDtoFactory.FromClientProfiles([
+                new SwClientProfile
+                {
+                    Id = 3,
+                    ProfileKey = "SWP-11111111111111111111111111111111",
+                    ProfileName = "Profile A",
+                    CustomsCooClientRootPath = "D:\\SingleWindow\\Coo",
+                    AgentConsignmentClientRootPath = "D:\\SingleWindow\\Acd",
+                    CanSubmitAgentConsignment = true,
+                    CanSubmitCustomsCoo = false,
+                    IsEnabled = true,
+                    IsActive = true,
+                    UpdatedAt = new DateTime(2026, 6, 23)
+                }
+            ]);
 
-            Assert.Equal(3, response.Profile.Id);
-            Assert.Equal("Profile A", response.Profile.ProfileName);
-            Assert.Equal("D:\\SingleWindow\\Acd", response.Profile.ImportRootPath);
-            Assert.False(response.Profile.CanSubmitCustomsCoo);
-            Assert.Contains("运行目录数据库", response.StoragePolicy, StringComparison.Ordinal);
-            Assert.Contains("SingleWindow/Inbox", response.StoragePolicy, StringComparison.Ordinal);
+            Assert.Single(response.Profiles);
+            Assert.Equal(3, response.Profiles[0].Id);
+            Assert.Equal("Profile A", response.Profiles[0].ProfileName);
+            Assert.Equal("D:\\SingleWindow\\Acd", response.Profiles[0].AgentConsignmentClientRootPath);
+            Assert.False(response.Profiles[0].CanSubmitCustomsCoo);
+            Assert.Equal("SWP-11111111111111111111111111111111", response.ActiveProfileKey);
+            Assert.Contains("SQLite", response.StoragePolicy, StringComparison.Ordinal);
             Assert.Contains("运行数据根 Security", response.StoragePolicy, StringComparison.Ordinal);
         }
 
@@ -2616,7 +2653,6 @@ namespace ExportDocManager.Api.Tests
                 var trackingService = scope.ServiceProvider.GetRequiredService<SingleWindowTrackingService>();
                 var trackingPort = scope.ServiceProvider.GetRequiredService<ISingleWindowTrackingService>();
                 var handoffService = scope.ServiceProvider.GetRequiredService<ISingleWindowHandoffPackageService>();
-                var bridgeService = scope.ServiceProvider.GetRequiredService<ManualImportClientBridge>();
                 var profilePort = scope.ServiceProvider.GetRequiredService<ISingleWindowClientProfileService>();
                 var bridgePort = scope.ServiceProvider.GetRequiredService<ISingleWindowClientBridge>();
                 var pdfMergeService = scope.ServiceProvider.GetRequiredService<IPdfMergeService>();
@@ -2635,8 +2671,9 @@ namespace ExportDocManager.Api.Tests
 
                 Assert.Same(trackingService, trackingPort);
                 Assert.NotNull(handoffService);
-                Assert.Same(bridgeService, profilePort);
-                Assert.Same(bridgeService, bridgePort);
+                Assert.IsType<SingleWindowClientProfileService>(profilePort);
+                Assert.IsType<ManualImportClientBridge>(bridgePort);
+                Assert.NotSame(profilePort, bridgePort);
                 Assert.NotNull(pdfMergeService);
                 Assert.NotNull(reportHtmlService);
                 Assert.NotNull(reportTemplateService);
@@ -2945,12 +2982,12 @@ namespace ExportDocManager.Api.Tests
                 });
             }
 
-            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string invoiceNo, string type)
+            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string companyScope, string invoiceNo, string type)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<bool> InvoiceNoExistsAsync(string invoiceNo)
+            public Task<bool> InvoiceNoExistsAsync(string companyScope, string invoiceNo)
             {
                 throw new NotSupportedException();
             }
@@ -3011,7 +3048,7 @@ namespace ExportDocManager.Api.Tests
             }
 
             public Task<ReportPdfRenderResult> RenderPaymentVoucherPdfAsync(
-                ReportPdfRenderRequest request,
+                PaymentReportPdfRenderRequest request,
                 CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
@@ -3116,12 +3153,12 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string invoiceNo, string type)
+            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string companyScope, string invoiceNo, string type)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<bool> InvoiceNoExistsAsync(string invoiceNo)
+            public Task<bool> InvoiceNoExistsAsync(string companyScope, string invoiceNo)
             {
                 throw new NotSupportedException();
             }

@@ -151,6 +151,7 @@ export function PaymentBasicInfoPanel({
           value={payment.payerName}
           options={payerNameOptions}
           onChange={(value) => onChange({ payerName: value })}
+          onCommit={(value) => onCommitCustomOption?.("PaymentPayerName", value)}
         />
         <EditableComboField
           label="付款方式"

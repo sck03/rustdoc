@@ -209,34 +209,9 @@ namespace ExportDocManager.Services.Security
                 return query;
             }
 
-            int userId = user?.Id ?? 0;
-            return userId > 0
-                ? query.Where(batch => context.Invoices.Any(invoice =>
-                    invoice.Id == batch.SourceInvoiceId &&
-                    invoice.OwnerUserId == userId))
-                : query.Where(_ => false);
-        }
-
-        public IQueryable<SwOperationTicket> ApplyOperationTicketScope(
-            IQueryable<SwOperationTicket> query,
-            AppDbContext context,
-            User user = null)
-        {
-            ArgumentNullException.ThrowIfNull(query);
-            ArgumentNullException.ThrowIfNull(context);
-            user ??= _currentUserContext?.CurrentUser;
-
-            if (!ShouldFilterBusinessData(user))
-            {
-                return query;
-            }
-
-            int userId = user?.Id ?? 0;
-            return userId > 0
-                ? query.Where(ticket => context.Invoices.Any(invoice =>
-                    invoice.Id == ticket.SourceInvoiceId &&
-                    invoice.OwnerUserId == userId))
-                : query.Where(_ => false);
+            var accessibleInvoices = ApplyInvoiceScope(context.Invoices.AsNoTracking(), user);
+            return query.Where(batch => accessibleInvoices.Any(invoice =>
+                invoice.Id == batch.SourceInvoiceId));
         }
 
         public async Task<bool> CanAccessPaymentAsync(

@@ -13,10 +13,6 @@ export function getSingleWindowTitle(pathname: string) {
     return "单一窗口批次详情";
   }
 
-  if (pathname.startsWith("/single-window/collaboration")) {
-    return "单一窗口协同";
-  }
-
   if (pathname.startsWith("/single-window/reference-catalog")) {
     return "参考词典";
   }
@@ -27,7 +23,7 @@ export function getSingleWindowTitle(pathname: string) {
 export function SingleWindowTabs({
   activeKey,
 }: {
-  activeKey: "operation-center" | "collaboration" | "reference-catalog" | "customs-coo" | "agent-consignment";
+  activeKey: "operation-center" | "reference-catalog" | "customs-coo" | "agent-consignment";
 }) {
   return (
     <nav className="workspace-tabs" aria-label="单一窗口分类">
@@ -36,12 +32,6 @@ export function SingleWindowTabs({
         to="/single-window/operation-center"
       >
         操作中心
-      </Link>
-      <Link
-        className={activeKey === "collaboration" ? "workspace-tab workspace-tab-active" : "workspace-tab"}
-        to="/single-window/collaboration"
-      >
-        协同看板
       </Link>
       <Link
         className={activeKey === "reference-catalog" ? "workspace-tab workspace-tab-active" : "workspace-tab"}

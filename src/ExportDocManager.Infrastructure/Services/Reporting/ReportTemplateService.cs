@@ -47,6 +47,7 @@ namespace ExportDocManager.Services.Reporting
                 ? Path.GetFileNameWithoutExtension(resolvedPath)
                 : displayName.Trim();
             string content = ReportTemplateStarterFactory.Create(reportType, title, resolvedPath);
+            ReportTemplateContentPolicy.Validate(reportType, content);
 
             await AtomicFileHelper.WriteAllTextAtomicAsync(
                     resolvedPath,
@@ -78,6 +79,7 @@ namespace ExportDocManager.Services.Reporting
             string content,
             CancellationToken cancellationToken = default)
         {
+            ReportTemplateContentPolicy.Validate(reportType, content ?? string.Empty);
             var resolved = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: false, cancellationToken)
                 .ConfigureAwait(false);
             string previousPath = resolved.TemplatePath;
@@ -168,15 +170,17 @@ namespace ExportDocManager.Services.Reporting
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ReportTemplateContentPolicy.Validate(reportType, content ?? string.Empty);
             string templateContent = ScribanReportTemplateRenderer.PreprocessHtmlTemplate(content ?? string.Empty);
+            bool effectiveWithSeal = reportType != ReportDocumentType.PaymentVoucher && withSeal;
             string html = reportType == ReportDocumentType.PaymentVoucher
-                ? RenderPaymentVoucherPreview(templateContent, withSeal)
-                : RenderInvoicePreview(templateContent, withSeal);
+                ? RenderPaymentVoucherPreview(templateContent)
+                : RenderInvoicePreview(templateContent, effectiveWithSeal);
 
             return Task.FromResult(new ReportTemplatePreviewResult
             {
                 ReportType = reportType,
-                WithSeal = withSeal,
+                WithSeal = reportType == ReportDocumentType.PaymentVoucher ? null : effectiveWithSeal,
                 Html = html
             });
         }
@@ -277,7 +281,9 @@ namespace ExportDocManager.Services.Reporting
                 ReportType = reportType,
                 DisplayName = ReportTemplateCatalogLoader.NormalizeTemplateDisplayName(matched?.Name, resolvedPath),
                 TemplatePath = resolvedPath,
-                WithSealDefault = matched?.WithSeal ?? true
+                WithSealDefault = reportType == ReportDocumentType.PaymentVoucher
+                    ? null
+                    : matched?.WithSeal ?? true
             };
         }
 
@@ -337,7 +343,9 @@ namespace ExportDocManager.Services.Reporting
                     Type = ReportTemplateCatalogLoader.NormalizeTemplateCatalogType(config.Type, config.FileName),
                     FileName = _pathResolver.ToStoredPath(config.FileName),
                     Name = ReportTemplateCatalogLoader.NormalizeTemplateDisplayName(config.Name, config.FileName),
-                    WithSeal = config.WithSeal ?? true
+                    WithSeal = ReportTemplateCatalogLoader.ResolveCatalogReportType(config.Type, config.FileName) == ReportDocumentType.PaymentVoucher
+                        ? null
+                        : config.WithSeal ?? true
                 })
                 .ToList();
             var root = new ReportTemplateConfigRoot { Reports = rows };
@@ -352,7 +360,7 @@ namespace ExportDocManager.Services.Reporting
         }
 
         private bool UpdateTemplateReferences(
-            IEnumerable<BatchExportItem> items,
+            IEnumerable<TemplateItemBase> items,
             string previousTemplatePath,
             string previousAbsoluteTemplatePath,
             string currentTemplatePath)
@@ -416,7 +424,7 @@ namespace ExportDocManager.Services.Reporting
                 ReportType = reportType,
                 DisplayName = ReportTemplateCatalogLoader.NormalizeTemplateDisplayName(displayName, templatePath),
                 TemplatePath = Path.GetFullPath(templatePath),
-                WithSealDefault = true
+                WithSealDefault = reportType == ReportDocumentType.PaymentVoucher ? null : true
             };
         }
 
@@ -480,9 +488,8 @@ namespace ExportDocManager.Services.Reporting
             return ScribanReportTemplateRenderer.Render(templateContent, globals);
         }
 
-        private static string RenderPaymentVoucherPreview(string templateContent, bool withSeal)
+        private static string RenderPaymentVoucherPreview(string templateContent)
         {
-            var exporter = BuildSampleExporter();
             var payee = new Payee
             {
                 Name = "Sample Payee",
@@ -496,6 +503,7 @@ namespace ExportDocManager.Services.Reporting
                 InvoiceNo = "PREVIEW-INTERNAL-001",
                 PaymentDate = DateTime.Today,
                 ShipmentDate = DateTime.Today.AddDays(-3),
+                PayerName = "示例付款单位",
                 PayeeName = payee.Name,
                 PaymentMethod = "Bank Transfer",
                 USDAmount = 100m,
@@ -505,7 +513,7 @@ namespace ExportDocManager.Services.Reporting
                 AccountNo = payee.RMBAccount
             };
 
-            var globals = ReportTemplateGlobalsBuilder.BuildPaymentVoucherGlobals(exporter, payment, payee, withSeal);
+            var globals = ReportTemplateGlobalsBuilder.BuildPaymentVoucherGlobals(payment, payee);
             return ScribanReportTemplateRenderer.Render(templateContent, globals);
         }
 
@@ -575,7 +583,7 @@ namespace ExportDocManager.Services.Reporting
 
             public string TemplatePath { get; init; } = string.Empty;
 
-            public bool WithSealDefault { get; init; }
+            public bool? WithSealDefault { get; init; }
         }
     }
 }

@@ -34,6 +34,7 @@ namespace ExportDocManager.Services.Security
         private readonly IRuntimeLicenseAnchorStore _anchorStore;
         private readonly ILicenseSignatureVerifier _signatureVerifier;
         private readonly LocalSecretProtector _secretProtector;
+        private readonly SemaphoreSlim _stateGate = new(1, 1);
 
         public RuntimeLicenseService(IAppPathProvider pathProvider)
             : this(pathProvider, null, null, null, null)
@@ -103,6 +104,19 @@ namespace ExportDocManager.Services.Security
         }
 
         public async Task<LicenseStatus> GetStatusAsync(CancellationToken cancellationToken = default)
+        {
+            await _stateGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                return await GetStatusCoreAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _stateGate.Release();
+            }
+        }
+
+        private async Task<LicenseStatus> GetStatusCoreAsync(CancellationToken cancellationToken)
         {
             var now = DateTime.Now;
             var anchor = await ReadOrCreateMachineAnchorAsync(now, cancellationToken).ConfigureAwait(false);
@@ -357,6 +371,21 @@ namespace ExportDocManager.Services.Security
             string licenseKey,
             CancellationToken cancellationToken = default)
         {
+            await _stateGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                return await RegisterCoreAsync(licenseKey, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _stateGate.Release();
+            }
+        }
+
+        private async Task<LicenseRegistrationResult> RegisterCoreAsync(
+            string licenseKey,
+            CancellationToken cancellationToken)
+        {
             string normalizedKey = LicenseValueNormalizer.NormalizeLicenseKey(licenseKey);
             if (string.IsNullOrWhiteSpace(normalizedKey))
             {
@@ -364,7 +393,7 @@ namespace ExportDocManager.Services.Security
                 {
                     Success = false,
                     Message = "注册码不能为空。",
-                    Status = await GetStatusAsync(cancellationToken).ConfigureAwait(false)
+                    Status = await GetStatusCoreAsync(cancellationToken).ConfigureAwait(false)
                 };
             }
 
@@ -383,7 +412,7 @@ namespace ExportDocManager.Services.Security
                 {
                     Success = false,
                     Message = "注册码无效或机器码不匹配。",
-                    Status = await GetStatusAsync(cancellationToken).ConfigureAwait(false)
+                    Status = await GetStatusCoreAsync(cancellationToken).ConfigureAwait(false)
                 };
             }
 
@@ -421,7 +450,7 @@ namespace ExportDocManager.Services.Security
             {
                 Success = true,
                 Message = "注册成功。",
-                Status = await GetStatusAsync(cancellationToken).ConfigureAwait(false)
+                Status = await GetStatusCoreAsync(cancellationToken).ConfigureAwait(false)
             };
         }
 

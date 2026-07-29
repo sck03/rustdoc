@@ -6,20 +6,29 @@ namespace ExportDocManager.Models.Entities
     {
         public int Id { get; set; }
 
+        [MaxLength(64)]
+        public string ProfileKey { get; set; } = string.Empty;
+
         [MaxLength(80)]
         public string ProfileName { get; set; } = string.Empty;
+
+        [MaxLength(64)]
+        public string StationKey { get; set; } = string.Empty;
 
         [MaxLength(80)]
         public string MachineName { get; set; } = Environment.MachineName;
 
-        [MaxLength(520)]
-        public string ImportRootPath { get; set; } = string.Empty;
+        [MaxLength(120)]
+        public string CompanyScope { get; set; } = string.Empty;
+
+        [MaxLength(120)]
+        public string CardIdentifier { get; set; } = string.Empty;
 
         [MaxLength(520)]
-        public string ReceiptRootPath { get; set; } = string.Empty;
+        public string CustomsCooClientRootPath { get; set; } = string.Empty;
 
-        [MaxLength(4000)]
-        public string BusinessDirectoryOverridesJson { get; set; } = string.Empty;
+        [MaxLength(520)]
+        public string AgentConsignmentClientRootPath { get; set; } = string.Empty;
 
         public bool CanSubmitCustomsCoo { get; set; } = true;
 
@@ -27,6 +36,8 @@ namespace ExportDocManager.Models.Entities
 
         public bool IsEnabled { get; set; } = true;
 
-        public DateTime UpdatedAt { get; set; } = DateTime.Now;
+        public bool IsActive { get; set; }
+
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 }

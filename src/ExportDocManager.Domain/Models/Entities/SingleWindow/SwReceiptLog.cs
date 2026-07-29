@@ -35,6 +35,9 @@ namespace ExportDocManager.Models.Entities
 
         public string RawContent { get; set; } = string.Empty;
 
+        [MaxLength(64)]
+        public string ContentSha256 { get; set; } = string.Empty;
+
         public SwSubmissionBatch Batch { get; set; }
     }
 }

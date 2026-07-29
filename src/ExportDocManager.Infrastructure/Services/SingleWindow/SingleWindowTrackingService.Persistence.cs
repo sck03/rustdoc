@@ -9,69 +9,23 @@ namespace ExportDocManager.Services.SingleWindow
 {
     public sealed partial class SingleWindowTrackingService
     {
-        private static async Task<SwSubmissionBatch> FindOrCreateBatchAsync(
+        private static async Task<SwSubmissionBatch> FindOrCreateSubmitBatchAsync(
             AppDbContext context,
             SingleWindowPackageManifest manifest,
             CancellationToken cancellationToken)
         {
+            if (manifest.PackageType != SingleWindowPackageType.SubmitPackage)
+            {
+                throw new InvalidOperationException("只有提交包可以建立新的单一窗口跟踪批次。");
+            }
+
             string batchReference = NormalizeBatchReference(manifest.BatchReference);
             var batch = await context.SwSubmissionBatches
                 .FirstOrDefaultAsync(item => item.BatchReference == batchReference, cancellationToken);
 
-            if (batch == null && manifest.SourceInvoiceId > 0)
-            {
-                batch = await context.SwSubmissionBatches
-                    .Where(item =>
-                        item.SourceInvoiceId == manifest.SourceInvoiceId &&
-                        item.BusinessType == manifest.BusinessType.ToString() &&
-                        (manifest.SubmissionVersion <= 0 || item.SubmissionVersion == manifest.SubmissionVersion))
-                    .OrderByDescending(item => item.CreatedAt)
-                    .FirstOrDefaultAsync(cancellationToken);
-            }
-
-            if (batch == null && !string.IsNullOrWhiteSpace(manifest.InvoiceNo))
-            {
-                batch = await context.SwSubmissionBatches
-                    .Where(item =>
-                        item.InvoiceNo == manifest.InvoiceNo &&
-                        item.BusinessType == manifest.BusinessType.ToString() &&
-                        (manifest.SubmissionVersion <= 0 || item.SubmissionVersion == manifest.SubmissionVersion))
-                    .OrderByDescending(item => item.CreatedAt)
-                    .FirstOrDefaultAsync(cancellationToken);
-            }
-
             if (batch != null)
             {
-                if (string.IsNullOrWhiteSpace(batch.BatchReference))
-                {
-                    batch.BatchReference = batchReference;
-                }
-
-                if (string.IsNullOrWhiteSpace(batch.SourceDocumentType) && !string.IsNullOrWhiteSpace(manifest.SourceDocumentType))
-                {
-                    batch.SourceDocumentType = manifest.SourceDocumentType;
-                }
-
-                if (batch.SourceDocumentId <= 0 && manifest.SourceDocumentId > 0)
-                {
-                    batch.SourceDocumentId = manifest.SourceDocumentId;
-                }
-
-                if (batch.SubmissionVersion <= 0 && manifest.SubmissionVersion > 0)
-                {
-                    batch.SubmissionVersion = manifest.SubmissionVersion;
-                }
-
-                if (batch.DraftRevision < manifest.DraftRevision)
-                {
-                    batch.DraftRevision = manifest.DraftRevision;
-                }
-
-                if (string.IsNullOrWhiteSpace(batch.SourceBaselineHash) && !string.IsNullOrWhiteSpace(manifest.SourceBaselineHash))
-                {
-                    batch.SourceBaselineHash = manifest.SourceBaselineHash;
-                }
-
+                EnsureManifestMatchesBatch(batch, manifest, requireSourcePackageDigest: false);
                 return batch;
             }
 
@@ -86,13 +40,13 @@ namespace ExportDocManager.Services.SingleWindow
                 DraftRevision = manifest.DraftRevision,
                 InvoiceNo = manifest.InvoiceNo ?? string.Empty,
                 ContractNo = manifest.ContractNo ?? string.Empty,
-                Status = manifest.PackageType == SingleWindowPackageType.SubmitPackage
-                    ? SingleWindowBatchStatusCatalog.SubmitPackageImported
-                    : SingleWindowBatchStatusCatalog.ReceiptImported,
+                Status = SingleWindowBatchStatusCatalog.SubmitPackageImported,
                 PayloadFileCount = manifest.PayloadFiles.Count,
                 AttachmentFileCount = manifest.AttachmentFiles.Count,
                 WarningCount = manifest.Warnings.Count,
                 SourceBaselineHash = manifest.SourceBaselineHash ?? string.Empty,
+                CompanyScope = manifest.CompanyScope ?? string.Empty,
+                SubmitPackageDigest = manifest.ContentDigest ?? string.Empty,
                 CreatedOnMachine = manifest.CreatedOnMachine ?? string.Empty,
                 CreatedAt = manifest.CreatedAt,
                 UpdatedAt = DateTime.Now
@@ -101,6 +55,76 @@ namespace ExportDocManager.Services.SingleWindow
             await context.SwSubmissionBatches.AddAsync(batch, cancellationToken);
             await context.SaveChangesAsync(cancellationToken);
             return batch;
+        }
+
+        private async Task<SwSubmissionBatch> FindReceiptBatchAsync(
+            AppDbContext context,
+            SingleWindowPackageManifest manifest,
+            CancellationToken cancellationToken)
+        {
+            if (manifest.PackageType != SingleWindowPackageType.ReceiptPackage)
+            {
+                throw new InvalidOperationException("当前交接包不是单一窗口回执包。");
+            }
+
+            string batchReference = NormalizeBatchReference(manifest.BatchReference);
+            var batch = await _businessDataAccessScope
+                .ApplySubmissionBatchScope(context.SwSubmissionBatches, context)
+                .FirstOrDefaultAsync(item => item.BatchReference == batchReference, cancellationToken)
+                .ConfigureAwait(false)
+                ?? throw new InvalidOperationException("回执包对应的原提交批次不存在或当前账号无权访问。");
+            EnsureManifestMatchesBatch(batch, manifest, requireSourcePackageDigest: true);
+            if ((!string.IsNullOrWhiteSpace(batch.AssignedStationKey) &&
+                 !string.Equals(batch.AssignedStationKey, manifest.StationKey, StringComparison.Ordinal)) ||
+                (!string.IsNullOrWhiteSpace(batch.AssignedProfileKey) &&
+                 !string.Equals(batch.AssignedProfileKey, manifest.ClientProfileKey, StringComparison.Ordinal)) ||
+                (!string.IsNullOrWhiteSpace(batch.AssignedCardIdentifier) &&
+                 !string.Equals(batch.AssignedCardIdentifier, manifest.CardIdentifier, StringComparison.Ordinal)))
+            {
+                throw new InvalidDataException("回执包持卡机、操作档案或操作卡绑定与原批次记录不一致。");
+            }
+
+            batch.AssignedStationKey = manifest.StationKey ?? string.Empty;
+            batch.AssignedProfileKey = manifest.ClientProfileKey ?? string.Empty;
+            batch.AssignedCardIdentifier = manifest.CardIdentifier ?? string.Empty;
+            batch.ClientProfileName = manifest.ClientProfileName ?? string.Empty;
+            return batch;
+        }
+
+        private static void EnsureManifestMatchesBatch(
+            SwSubmissionBatch batch,
+            SingleWindowPackageManifest manifest,
+            bool requireSourcePackageDigest)
+        {
+            bool matches = string.Equals(batch.BatchReference, manifest.BatchReference?.Trim(), StringComparison.Ordinal) &&
+                           string.Equals(batch.BusinessType, manifest.BusinessType.ToString(), StringComparison.Ordinal) &&
+                           batch.SourceInvoiceId == manifest.SourceInvoiceId &&
+                           batch.SourceDocumentId == manifest.SourceDocumentId &&
+                           string.Equals(batch.SourceDocumentType, manifest.SourceDocumentType ?? string.Empty, StringComparison.Ordinal) &&
+                           batch.SubmissionVersion == manifest.SubmissionVersion &&
+                           batch.DraftRevision == manifest.DraftRevision &&
+                           string.Equals(batch.SourceBaselineHash, manifest.SourceBaselineHash ?? string.Empty, StringComparison.Ordinal) &&
+                           string.Equals(batch.InvoiceNo, manifest.InvoiceNo ?? string.Empty, StringComparison.Ordinal) &&
+                           string.Equals(batch.ContractNo, manifest.ContractNo ?? string.Empty, StringComparison.Ordinal) &&
+                           string.Equals(batch.CompanyScope, manifest.CompanyScope ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+            if (!matches)
+            {
+                throw new InvalidDataException("单一窗口交接包与数据库提交批次的来源、版本或公司绑定不一致。");
+            }
+
+            string expectedDigest = requireSourcePackageDigest
+                ? manifest.SourcePackageDigest
+                : manifest.ContentDigest;
+            if (!string.IsNullOrWhiteSpace(batch.SubmitPackageDigest) &&
+                !string.Equals(batch.SubmitPackageDigest, expectedDigest, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("单一窗口交接包绑定的原提交包摘要不一致。");
+            }
+
+            if (requireSourcePackageDigest && string.IsNullOrWhiteSpace(batch.SubmitPackageDigest))
+            {
+                throw new InvalidDataException("数据库提交批次缺少原提交包摘要，不能接收回执。");
+            }
         }
 
         private static List<ReceiptImportEntry> BuildReceiptImportEntries(
@@ -115,24 +139,23 @@ namespace ExportDocManager.Services.SingleWindow
             foreach (var entry in receiptEntries)
             {
                 var receipt = entry?.Receipt;
-                if (receipt == null)
+                if (receipt == null ||
+                    receipt.ReceiptKind == SingleWindowReceiptKind.Unknown)
                 {
                     continue;
                 }
 
+                string rawContent = entry.RawContent ?? string.Empty;
                 entries.Add(new ReceiptImportEntry(
                     receipt,
-                    CreateReceiptLogIdentity(
-                        receipt.SourceFileName,
-                        receipt.ReferenceNo,
-                        receipt.ReceiptCode),
-                    entry.RawContent));
+                    SingleWindowPackageIntegrity.ComputeTextSha256(rawContent),
+                    rawContent));
             }
 
             return entries;
         }
 
-        private static async Task<HashSet<ReceiptLogIdentity>> LoadExistingReceiptKeysAsync(
+        private static async Task<HashSet<string>> LoadExistingReceiptKeysAsync(
             AppDbContext context,
             int batchId,
             IReadOnlyList<ReceiptImportEntry> receiptEntries,
@@ -143,8 +166,8 @@ namespace ExportDocManager.Services.SingleWindow
                 return [];
             }
 
-            var sourceFileNames = receiptEntries
-                .Select(item => item.Identity.SourceFileName)
+            var contentHashes = receiptEntries
+                .Select(item => item.ContentSha256)
                 .Where(item => !string.IsNullOrWhiteSpace(item))
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
@@ -153,32 +176,16 @@ namespace ExportDocManager.Services.SingleWindow
                 .AsNoTracking()
                 .Where(log => log.BatchId == batchId);
 
-            if (sourceFileNames.Count > 0)
+            if (contentHashes.Count > 0)
             {
-                existingLogs = existingLogs.Where(log => sourceFileNames.Contains(log.SourceFileName));
+                existingLogs = existingLogs.Where(log => contentHashes.Contains(log.ContentSha256));
             }
 
             return (await existingLogs
-                    .Select(log => new
-                    {
-                        log.SourceFileName,
-                        log.ReferenceNo,
-                        log.ReceiptCode
-                    })
+                    .Select(log => log.ContentSha256)
                     .ToListAsync(cancellationToken))
-                .Select(item => CreateReceiptLogIdentity(item.SourceFileName, item.ReferenceNo, item.ReceiptCode))
-                .ToHashSet();
-        }
-
-        private static ReceiptLogIdentity CreateReceiptLogIdentity(
-            string sourceFileName,
-            string referenceNo,
-            string receiptCode)
-        {
-            return new ReceiptLogIdentity(
-                NormalizeReceiptKeyPart(sourceFileName),
-                NormalizeReceiptKeyPart(referenceNo),
-                NormalizeReceiptKeyPart(receiptCode));
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
 
         private static string NormalizeReceiptKeyPart(string value)
@@ -201,6 +208,8 @@ namespace ExportDocManager.Services.SingleWindow
                 SourceDocumentType = manifest.SourceDocumentType ?? string.Empty,
                 SourceDocumentId = manifest.SourceDocumentId,
                 InvoiceNo = manifest.InvoiceNo ?? string.Empty,
+                CompanyScope = manifest.CompanyScope ?? string.Empty,
+                StationKey = manifest.StationKey ?? string.Empty,
                 PackageType = manifest.PackageType.ToString(),
                 Direction = direction,
                 FilePath = packagePath ?? string.Empty,
@@ -208,7 +217,8 @@ namespace ExportDocManager.Services.SingleWindow
                 PayloadFileCount = manifest.PayloadFiles.Count,
                 AttachmentFileCount = manifest.AttachmentFiles.Count,
                 WarningCount = manifest.Warnings.Count,
-                CreatedAt = DateTime.Now,
+                ContentDigest = manifest.ContentDigest ?? string.Empty,
+                CreatedAt = DateTime.UtcNow,
                 ManifestJson = JsonSerializer.Serialize(manifest, JsonOptions)
             };
         }
@@ -220,13 +230,51 @@ namespace ExportDocManager.Services.SingleWindow
                 : batchReference.Trim();
         }
 
-        private static SingleWindowReceiptParseResult SelectPrimaryReceipt(IReadOnlyList<SingleWindowReceiptParseResult> parsedReceipts)
+        internal static SingleWindowReceiptParseResult SelectPrimaryReceipt(IReadOnlyList<SingleWindowReceiptParseResult> parsedReceipts)
         {
             return parsedReceipts
                 .Where(item => item != null)
                 .OrderByDescending(item => GetStatusRank(item.BusinessStatus))
                 .ThenByDescending(item => item.OccurredAt ?? DateTime.MinValue)
                 .FirstOrDefault();
+        }
+
+        internal static bool ShouldUpdateReceiptSummary(
+            SwSubmissionBatch batch,
+            SingleWindowReceiptParseResult candidate)
+        {
+            if (candidate == null)
+            {
+                return false;
+            }
+
+            int currentRank = Enum.TryParse<SingleWindowReceiptBusinessStatus>(
+                batch.LastBusinessStatus,
+                ignoreCase: true,
+                out var currentStatus)
+                ? GetStatusRank(currentStatus)
+                : 0;
+            int candidateRank = GetStatusRank(candidate.BusinessStatus);
+            if (candidateRank != currentRank)
+            {
+                return candidateRank > currentRank;
+            }
+
+            return !batch.LastReceiptAt.HasValue ||
+                   !candidate.OccurredAt.HasValue ||
+                   candidate.OccurredAt.Value >= batch.LastReceiptAt.Value;
+        }
+
+        private static string ResolveMonotonicBatchStatus(
+            SwSubmissionBatch batch,
+            SingleWindowReceiptParseResult candidate)
+        {
+            if (!ShouldUpdateReceiptSummary(batch, candidate))
+            {
+                return batch.Status;
+            }
+
+            return MapReceiptStatus(candidate.BusinessStatus);
         }
 
         private static string ResolveBatchStatus(IReadOnlyList<SingleWindowReceiptParseResult> parsedReceipts)
@@ -273,13 +321,27 @@ namespace ExportDocManager.Services.SingleWindow
         {
             return businessStatus switch
             {
-                SingleWindowReceiptBusinessStatus.Approved => 6,
+                SingleWindowReceiptBusinessStatus.Approved => 5,
                 SingleWindowReceiptBusinessStatus.Rejected => 5,
-                SingleWindowReceiptBusinessStatus.PendingReview => 4,
-                SingleWindowReceiptBusinessStatus.Failed => 3,
+                SingleWindowReceiptBusinessStatus.Failed => 4,
+                SingleWindowReceiptBusinessStatus.PendingReview => 3,
                 SingleWindowReceiptBusinessStatus.Accepted => 2,
                 SingleWindowReceiptBusinessStatus.Received => 1,
                 _ => 0
+            };
+        }
+
+        private static string MapReceiptStatus(SingleWindowReceiptBusinessStatus status)
+        {
+            return status switch
+            {
+                SingleWindowReceiptBusinessStatus.Approved => SingleWindowBatchStatusCatalog.Approved,
+                SingleWindowReceiptBusinessStatus.Rejected => SingleWindowBatchStatusCatalog.Rejected,
+                SingleWindowReceiptBusinessStatus.Failed => SingleWindowBatchStatusCatalog.Failed,
+                SingleWindowReceiptBusinessStatus.PendingReview => SingleWindowBatchStatusCatalog.PendingReview,
+                SingleWindowReceiptBusinessStatus.Accepted => SingleWindowBatchStatusCatalog.Accepted,
+                SingleWindowReceiptBusinessStatus.Received => SingleWindowBatchStatusCatalog.Received,
+                _ => SingleWindowBatchStatusCatalog.ReceiptImported
             };
         }
 
@@ -330,135 +392,24 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        private async Task UpsertOperationTicketAsync(
-            AppDbContext context,
-            SwSubmissionBatch batch,
-            string targetStatus,
-            CancellationToken cancellationToken,
-            string lastError = "")
-        {
-            if (batch == null)
-            {
-                return;
-            }
-
-            string mappedBusinessType = MapBusinessType(batch.BusinessType);
-            var ticket = await context.SwOperationTickets
-                .FirstOrDefaultAsync(
-                    item => item.BatchId == batch.Id ||
-                            (item.SourceInvoiceId == batch.SourceInvoiceId &&
-                             item.DocumentId == batch.SourceDocumentId &&
-                             item.BusinessType == mappedBusinessType),
-                    cancellationToken);
-
-            ticket ??= new SwOperationTicket
-            {
-                BusinessType = mappedBusinessType,
-                SourceInvoiceId = batch.SourceInvoiceId,
-                DocumentId = batch.SourceDocumentId,
-                RequestedAt = batch.CreatedAt == default ? DateTime.Now : batch.CreatedAt,
-                RequestedBy = ResolveCurrentOperatorName(batch.CreatedOnMachine)
-            };
-
-            ticket.BusinessType = mappedBusinessType;
-            ticket.SourceInvoiceId = batch.SourceInvoiceId;
-            ticket.DocumentId = batch.SourceDocumentId;
-            ticket.BatchId = batch.Id;
-            ticket.Status = SingleWindowCollaborationStatusCatalog.Normalize(targetStatus);
-
-            string currentOperator = ResolveCurrentOperatorName(batch.CreatedOnMachine);
-            if (!string.IsNullOrWhiteSpace(currentOperator) &&
-                string.IsNullOrWhiteSpace(ticket.AssignedOperator) &&
-                ticket.Status != SingleWindowCollaborationStatusCatalog.Pending)
-            {
-                ticket.AssignedOperator = currentOperator;
-            }
-
-            if (ticket.Status == SingleWindowCollaborationStatusCatalog.Submitted ||
-                ticket.Status == SingleWindowCollaborationStatusCatalog.Completed ||
-                ticket.Status == SingleWindowCollaborationStatusCatalog.Failed)
-            {
-                ticket.SubmittedAt ??= DateTime.Now;
-                if (!string.IsNullOrWhiteSpace(currentOperator))
-                {
-                    ticket.AssignedOperator = currentOperator;
-                }
-            }
-
-            if (ticket.Status == SingleWindowCollaborationStatusCatalog.Completed ||
-                ticket.Status == SingleWindowCollaborationStatusCatalog.Failed)
-            {
-                ticket.CompletedAt ??= DateTime.Now;
-            }
-
-            ticket.LastError = ticket.Status == SingleWindowCollaborationStatusCatalog.Failed
-                ? (lastError ?? string.Empty).Trim()
-                : string.Empty;
-
-            if (ticket.Id <= 0)
-            {
-                await context.SwOperationTickets.AddAsync(ticket, cancellationToken);
-            }
-        }
-
-        private static string MapBatchStatusToTicketStatus(string batchStatus)
-        {
-            return SingleWindowBatchStatusCatalog.Normalize(batchStatus) switch
-            {
-                SingleWindowBatchStatusCatalog.Approved => SingleWindowCollaborationStatusCatalog.Completed,
-                SingleWindowBatchStatusCatalog.Rejected => SingleWindowCollaborationStatusCatalog.Failed,
-                SingleWindowBatchStatusCatalog.Failed => SingleWindowCollaborationStatusCatalog.Failed,
-                SingleWindowBatchStatusCatalog.Accepted => SingleWindowCollaborationStatusCatalog.Submitted,
-                SingleWindowBatchStatusCatalog.PendingReview => SingleWindowCollaborationStatusCatalog.Submitted,
-                SingleWindowBatchStatusCatalog.Received => SingleWindowCollaborationStatusCatalog.Submitted,
-                SingleWindowBatchStatusCatalog.ReceiptImported => SingleWindowCollaborationStatusCatalog.Submitted,
-                SingleWindowBatchStatusCatalog.ReceiptPackageExported => SingleWindowCollaborationStatusCatalog.Submitted,
-                _ => SingleWindowCollaborationStatusCatalog.Pending
-            };
-        }
-
-        private static string MapBusinessType(string businessType)
-        {
-            return businessType switch
-            {
-                nameof(SingleWindowBusinessType.CustomsCoo) => "海关原产地证",
-                nameof(SingleWindowBusinessType.AgentConsignment) => "报关代理委托",
-                _ => businessType ?? string.Empty
-            };
-        }
-
-        private string ResolveCurrentOperatorName(string fallbackMachineName)
-        {
-            var currentUser = _businessDataAccessScope.CurrentUser;
-            return (currentUser?.FullName ??
-                    currentUser?.Username ??
-                    fallbackMachineName ??
-                    Environment.MachineName ??
-                    string.Empty).Trim();
-        }
-
         private sealed class ReceiptImportEntry
         {
             public ReceiptImportEntry(
                 SingleWindowReceiptParseResult receipt,
-                ReceiptLogIdentity identity,
+                string contentSha256,
                 string rawContent)
             {
                 Receipt = receipt;
-                Identity = identity;
+                ContentSha256 = contentSha256 ?? string.Empty;
                 RawContent = rawContent ?? string.Empty;
             }
 
             public SingleWindowReceiptParseResult Receipt { get; }
 
-            public ReceiptLogIdentity Identity { get; }
+            public string ContentSha256 { get; }
 
             public string RawContent { get; }
         }
 
-        private readonly record struct ReceiptLogIdentity(
-            string SourceFileName,
-            string ReferenceNo,
-            string ReceiptCode);
     }
 }

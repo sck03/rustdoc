@@ -105,14 +105,19 @@ export async function waitForRuntimeDependencyClassification(page, options, time
           status: card.querySelector('.runtime-dependency-status')?.textContent?.trim() || '',
         }));
         const dependencyLabels = dependencies.map((item) => item.label);
+        const dependencyStatus = Object.fromEntries(dependencies.map((item) => [item.label, item.status]));
+        const requiredReadyDependencies = ['报表 PDF 浏览器', '受控网页自动化', '智能 OCR'];
+        const expectedDependencies = [...requiredReadyDependencies, 'PostgreSQL 维护工具'];
+        const postgreSqlToolStatus = dependencyStatus['PostgreSQL 维护工具'] || '';
         return {
           found: text.includes('核心路径正常')
             && !text.includes('核心路径需处理')
             && classification.core > 0
             && classification.feature > 0
             && classification.optional > 0
-            && dependencies.length === 3
-            && ['报表 PDF 浏览器', '智能 OCR', 'PostgreSQL 维护工具'].every((label) => dependencyLabels.includes(label)),
+            && expectedDependencies.every((label) => dependencyLabels.includes(label))
+            && requiredReadyDependencies.every((label) => dependencyStatus[label] === '已就绪')
+            && (postgreSqlToolStatus === '已就绪' || postgreSqlToolStatus === '未安装'),
           classification,
           dependencies,
           textExcerpt: text.slice(0, 1600),
@@ -157,7 +162,10 @@ export async function waitForTemplateStorageCheck(page, options, timeoutMs) {
         const text = section ? section.innerText || '' : '';
         const path = section?.querySelector('.runtime-template-storage-path code')?.textContent || '';
         return {
-          found: text.includes('模板目录可用') && text.includes('新建、编辑和导入模板可继续使用 Templates 目录'),
+          found: text.includes('模板目录可用')
+            && text.includes('内置模板目录可读取')
+            && text.includes('用户模板目录可写')
+            && text.includes('导入功能可正常使用'),
           path,
           textExcerpt: text.slice(0, 1400),
         };

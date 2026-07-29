@@ -12,7 +12,7 @@ namespace ExportDocManager.Api.Hosting
             "发票草稿 HTML 预览只使用请求体中的当前发票/报关草稿、程序根 Templates 模板以及客户/出口商主数据快照；不按发票号读取付款/报销单据或另一种发票口径，不写数据库、缓存、默认导出目录、系统用户数据目录或系统 C 盘默认路径。";
 
         private const string PaymentDraftPreviewStoragePolicy =
-            "付款/报销草稿 HTML 预览只使用请求体中的付款/报销草稿、程序根 Templates/Internal 模板以及收款对象/出口商主数据；不按 Payment.InvoiceNo 读取发票/报关单据，不写数据库、缓存、默认导出目录、系统用户数据目录或系统 C 盘默认路径。";
+            "付款/报销草稿 HTML 预览只使用请求体中的付款/报销草稿、程序根 Templates/Internal 模板以及收款对象主数据；不读取出口商及其印章数据，不按 Payment.InvoiceNo 读取发票/报关单据，不写数据库、缓存、默认导出目录、系统用户数据目录或系统 C 盘默认路径。";
 
         private static void MapInvoiceReportHtmlPreviewEndpoints(this IEndpointRouteBuilder endpoints)
         {
@@ -53,7 +53,7 @@ namespace ExportDocManager.Api.Hosting
                         result.SourceId,
                         result.ReportType.ToString(),
                         result.TemplatePath,
-                        result.WithSeal,
+                        result.WithSeal ?? false,
                         result.Html));
                 }
                 catch (KeyNotFoundException ex)
@@ -120,7 +120,7 @@ namespace ExportDocManager.Api.Hosting
                         result.SourceId,
                         result.ReportType.ToString(),
                         result.TemplatePath,
-                        result.WithSeal,
+                        result.WithSeal ?? false,
                         result.Html,
                         InvoiceDraftPreviewStoragePolicy));
                 }
@@ -184,7 +184,7 @@ namespace ExportDocManager.Api.Hosting
                             item.Name,
                             renderResult.ReportType.ToString(),
                             renderResult.TemplatePath,
-                            renderResult.WithSeal,
+                            renderResult.WithSeal ?? false,
                             renderResult.Html));
                     }
 
@@ -237,29 +237,18 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("付款/报销草稿不能为空。"));
                 }
 
-                var requestedReportType = string.IsNullOrWhiteSpace(request.ReportType)
-                    ? ReportDocumentType.PaymentVoucher.ToString()
-                    : request.ReportType;
-                if (!TryParseReportDocumentType(requestedReportType, out var reportType)
-                    || reportType != ReportDocumentType.PaymentVoucher)
-                {
-                    return Results.BadRequest(new ApiErrorResponse("付款/报销草稿 HTML 预览仅支持 PaymentVoucher 报表类型。"));
-                }
-
                 try
                 {
                     var payment = ApiPaymentDtoFactory.ToPaymentForSave(request.Payment);
                     var result = await reportHtmlService.RenderPaymentVoucherDraftAsync(
                         payment,
                         request.TemplatePath,
-                        request.WithSeal,
-                        cancellationToken);
+                        cancellationToken: cancellationToken);
 
                     return Results.Ok(new ApiPaymentReportHtmlPreviewResponse(
                         result.SourceId,
                         result.ReportType.ToString(),
                         result.TemplatePath,
-                        result.WithSeal,
                         result.Html,
                         PaymentDraftPreviewStoragePolicy));
                 }
@@ -286,7 +275,7 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 IReportHtmlService reportHtmlService,
                 int paymentId,
-                ApiReportHtmlPreviewRequest request,
+                ApiPaymentReportHtmlPreviewRequest request,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -299,26 +288,19 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("付款/报销单 ID 必须大于0。"));
                 }
 
-                request ??= new ApiReportHtmlPreviewRequest { ReportType = ReportDocumentType.PaymentVoucher.ToString() };
-                if (!TryParseReportDocumentType(request.ReportType, out var reportType)
-                    || reportType != ReportDocumentType.PaymentVoucher)
-                {
-                    return Results.BadRequest(new ApiErrorResponse("付款/报销单 HTML 预览仅支持 PaymentVoucher 报表类型。"));
-                }
+                request ??= new ApiPaymentReportHtmlPreviewRequest();
 
                 try
                 {
                     var result = await reportHtmlService.RenderPaymentVoucherAsync(
                         paymentId,
                         request.TemplatePath,
-                        request.WithSeal,
-                        cancellationToken);
+                        cancellationToken: cancellationToken);
 
                     return Results.Ok(new ApiPaymentReportHtmlPreviewResponse(
                         result.SourceId,
                         result.ReportType.ToString(),
                         result.TemplatePath,
-                        result.WithSeal,
                         result.Html));
                 }
                 catch (KeyNotFoundException ex)

@@ -234,7 +234,7 @@ export function createSystemToolsSmokeScene(runtime) {
         const page = document.querySelector('[aria-label="软件更新"]');
         const statusSection = page?.querySelector('[aria-label="更新状态"]');
         return {
-          alerts: Array.from(page?.querySelectorAll('.alert, .success-alert, .info-alert') || []).map((item) => item.innerText || ''),
+          alerts: Array.from(page?.querySelectorAll('.inline-notice, .alert, .success-alert, .info-alert') || []).map((item) => item.innerText || ''),
           releaseNotes: page?.querySelector('[aria-label="更新日志"] .update-release-notes')?.innerText || '',
           statusDetails: readDetails(statusSection),
           invocations: window.__exportDocManagerSmokeTauriInvocations || [],
@@ -771,7 +771,7 @@ export function createSystemToolsSmokeScene(runtime) {
           .filter((row) => !((row.innerText || '').includes('暂无审计日志') || (row.innerText || '').includes('加载中')))
           .length;
         return {
-          alerts: Array.from(section?.querySelectorAll('.alert, .success-alert') || []).map((item) => item.innerText || ''),
+          alerts: Array.from(section?.querySelectorAll('.inline-notice, .alert, .success-alert') || []).map((item) => item.innerText || ''),
           rowCount,
           outputPath: section?.querySelector('input[placeholder="AuditLogs.xlsx"]')?.value || '',
           buttons: Array.from(section?.querySelectorAll('button') || []).map((button) => ({

@@ -20,7 +20,10 @@ const hsModelPath = path
 const itemModelPath = path
   .join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "invoiceItemsEditorModel.ts")
   .replaceAll("\\", "/");
-fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as hsModel from ${JSON.stringify(hsModelPath)}; import * as itemModel from ${JSON.stringify(itemModelPath)}; globalThis.__model = model; globalThis.__hsModel = hsModel; globalThis.__itemModel = itemModel;`, "utf8");
+const productLibraryPath = path
+  .join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "invoiceProductLibrary.ts")
+  .replaceAll("\\", "/");
+fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as hsModel from ${JSON.stringify(hsModelPath)}; import * as itemModel from ${JSON.stringify(itemModelPath)}; import * as productLibrary from ${JSON.stringify(productLibraryPath)}; globalThis.__model = model; globalThis.__hsModel = hsModel; globalThis.__itemModel = itemModel; globalThis.__productLibrary = productLibrary;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -28,6 +31,7 @@ await import(pathToFileURL(bundle).href);
 const model = globalThis.__model;
 const hsModel = globalThis.__hsModel;
 const itemModel = globalThis.__itemModel;
+const productLibrary = globalThis.__productLibrary;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const draft = model.uppercaseInvoiceEnglishText({
   ...model.createEmptyInvoice(),
@@ -89,4 +93,24 @@ assert(itemModel.invoiceItemUnitPriceDisplayValue(14.2857) === "14.2857", "exten
 assert(itemModel.invoiceItemUnitPriceDisplayValue(14.225) === "14.225", "extended unit price keeps meaningful three decimals");
 assert(itemModel.invoiceItemWeightDisplayValue(1.236) === "1.24", "gross/net weight uses two decimals");
 assert(itemModel.invoiceItemVolumeDisplayValue(1.23456) === "1.235", "volume uses three decimals");
+const productSourceItem = {
+  ...itemModel.createEmptyInvoiceItem(7),
+  styleNo: " SKU-001 ",
+  styleName: "Existing product",
+  styleNameCN: "已有商品",
+};
+const existingProduct = {
+  id: 42,
+  productCode: "SKU-001",
+  nameEN: "Old product",
+  nameCN: "旧商品",
+  description: "Preserved description",
+  rowVersion: "concurrency-token-42",
+};
+const updatedProductDraft = productLibrary.createProductDraftFromInvoiceItem(productSourceItem, existingProduct);
+assert(updatedProductDraft.id === 42, "existing product update preserves id");
+assert(updatedProductDraft.rowVersion === "concurrency-token-42", "existing product update preserves row version");
+const newProductDraft = productLibrary.createProductDraftFromInvoiceItem(productSourceItem);
+assert(newProductDraft.id === 0, "new product draft uses zero id");
+assert(newProductDraft.rowVersion === "", "new product draft starts without a row version");
 process.stdout.write("invoice-text-normalization model tests passed\n");

@@ -17,6 +17,7 @@ export function ReportDesignerToolbar({
   onInsertDetailTable,
   onInsertPageBreak,
   canInsertDetailTable,
+  canInsertImage,
   onUndo,
   onRedo,
 }: {
@@ -36,6 +37,7 @@ export function ReportDesignerToolbar({
   onInsertDetailTable: () => void;
   onInsertPageBreak: () => void;
   canInsertDetailTable: boolean;
+  canInsertImage: boolean;
   onUndo: () => void;
   onRedo: () => void;
 }) {
@@ -70,10 +72,12 @@ export function ReportDesignerToolbar({
           <ListFilter size={17} aria-hidden="true" />
           <span>条件</span>
         </button>
-        <button className="command-button secondary" type="button" onClick={onInsertImage}>
-          <ImageIcon size={17} aria-hidden="true" />
-          <span>图片/印章</span>
-        </button>
+        {canInsertImage ? (
+          <button className="command-button secondary" type="button" onClick={onInsertImage}>
+            <ImageIcon size={17} aria-hidden="true" />
+            <span>图片/印章</span>
+          </button>
+        ) : null}
         {canInsertDetailTable ? (
           <button className="command-button secondary" type="button" onClick={onInsertDetailTable}>
             <Table2 size={17} aria-hidden="true" />

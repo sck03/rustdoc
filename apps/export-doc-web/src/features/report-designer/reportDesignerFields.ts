@@ -21,10 +21,7 @@ const exportTemplateSystemFields = [
   { category: "模板系统字段", label: "唛头图片 (shipping_marks_image_data)", value: "shipping_marks_image_data" },
 ];
 
-const paymentTemplateSystemFields = [
-  { category: "模板系统字段", label: "是否带章 (ShowSeal)", value: "ShowSeal" },
-  { category: "模板系统字段", label: "单证章图片 (doc_seal_path)", value: "doc_seal_path" },
-];
+const paymentTemplateSystemFields: typeof exportTemplateSystemFields = [];
 
 const exportDesignerCategoryOrder = [
   "发票表头",

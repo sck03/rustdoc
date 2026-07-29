@@ -139,10 +139,12 @@ namespace ExportDocManager.Api.Tests
         [Fact]
         public async Task HsCodeImportEndpoints_ShouldImportExplicitPathAndUploadedWorkbookUnderRuntimeDataRoot()
         {
+            const string desktopToken = "hs-code-import-desktop-token";
             await using var harness = await ApiIntegrationTestHarness.StartAsync(
                 "edm-api-hs-code-import",
-                "api-hs-code-import.db");
-            using var anonymousClient = harness.CreateClient();
+                "api-hs-code-import.db",
+                desktopAccessToken: desktopToken);
+            using var anonymousClient = harness.CreateClient(desktopAccessToken: desktopToken);
 
             var anonymousImportResponse = await anonymousClient.PostAsJsonAsync(
                 "/api/master-data/hs-codes/import-path",
@@ -150,7 +152,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.Unauthorized, anonymousImportResponse.StatusCode);
 
             var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
-            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken, desktopToken);
 
             string importPath = Path.Combine(harness.DataRoot, "Imports", "hs-codes-path.xlsx");
             CreateHsCodeWorkbook(

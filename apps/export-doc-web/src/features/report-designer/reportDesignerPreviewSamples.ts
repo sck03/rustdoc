@@ -8,11 +8,12 @@ export type ReportDesignerPreviewSampleProfile =
 
 type PreviewSampleData = {
   globals: Record<string, string | boolean>;
-  Invoice: Record<string, string>;
-  Customer: Record<string, string>;
-  Exporter: Record<string, string>;
-  Payment: Record<string, string>;
-  items: Array<Record<string, string>>;
+  Invoice?: Record<string, string>;
+  Customer?: Record<string, string>;
+  Exporter?: Record<string, string>;
+  Payee?: Record<string, string>;
+  Payment?: Record<string, string>;
+  items?: Array<Record<string, string>>;
 };
 
 export function getReportDesignerPreviewSampleProfiles(reportType: ReportDesignerReportType) {
@@ -52,15 +53,14 @@ function createPreviewSampleData(profile: Exclude<ReportDesignerPreviewSamplePro
     return {
       globals: {
         cny_amount_upper: "人民币壹万贰仟叁佰肆拾伍元陆角柒分",
-        doc_seal_path: "",
-        customs_seal_path: "",
-        shipping_marks_image_data: "",
-        ShowSeal: false,
       },
-      Invoice: {},
-      Customer: {},
-      Exporter: {},
+      Payee: {
+        Name: "宁波样例供应商有限公司",
+        BankName: "中国银行宁波分行",
+        RMBAccount: "6222 0200 0000 0000",
+      },
       Payment: {
+        PayerName: "宁波样例付款有限公司",
         Department: "外贸业务部",
         InvoiceNo: "PAY-2026-0707",
         PaymentDate: "2026-07-07",
@@ -73,7 +73,6 @@ function createPreviewSampleData(profile: Exclude<ReportDesignerPreviewSamplePro
         Purpose: "样品采购及报关杂费",
         Remark: "用于新版报表设计器付款票据样例预览",
       },
-      items: [],
     };
   }
 
@@ -147,7 +146,7 @@ function expandInvoiceItemLoops(sourceHtml: string, data: PreviewSampleData) {
 
     result += sourceHtml.slice(cursor, loopStart);
     const rowTemplate = sourceHtml.slice(contentStart, loopEnd);
-    result += data.items.map((item) => renderLoopItem(rowTemplate, data, item)).join("");
+    result += (data.items ?? []).map((item) => renderLoopItem(rowTemplate, data, item)).join("");
     cursor = loopEnd + "{{ end }}".length;
     loopOpenPattern.lastIndex = cursor;
   }
@@ -234,19 +233,23 @@ function readSampleValue(path: string, data: PreviewSampleData, item: Record<str
   }
 
   if (normalized.startsWith("Invoice.")) {
-    return data.Invoice[normalized.slice("Invoice.".length)];
+    return data.Invoice?.[normalized.slice("Invoice.".length)];
   }
 
   if (normalized.startsWith("Customer.")) {
-    return data.Customer[normalized.slice("Customer.".length)];
+    return data.Customer?.[normalized.slice("Customer.".length)];
   }
 
   if (normalized.startsWith("Exporter.")) {
-    return data.Exporter[normalized.slice("Exporter.".length)];
+    return data.Exporter?.[normalized.slice("Exporter.".length)];
+  }
+
+  if (normalized.startsWith("Payee.")) {
+    return data.Payee?.[normalized.slice("Payee.".length)];
   }
 
   if (normalized.startsWith("Payment.")) {
-    return data.Payment[normalized.slice("Payment.".length)];
+    return data.Payment?.[normalized.slice("Payment.".length)];
   }
 
   return data.globals[normalized];

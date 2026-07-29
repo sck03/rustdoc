@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ExportDocManager.Api.Hosting
 {
     public sealed class ApiReportHtmlPreviewRequest
@@ -9,13 +11,16 @@ namespace ExportDocManager.Api.Hosting
         public bool WithSeal { get; set; } = true;
     }
 
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+    public sealed class ApiPaymentReportHtmlPreviewRequest
+    {
+        public string TemplatePath { get; set; } = string.Empty;
+    }
+
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
     public sealed class ApiPaymentDraftReportHtmlPreviewRequest
     {
-        public string ReportType { get; set; } = "PaymentVoucher";
-
         public string TemplatePath { get; set; } = string.Empty;
-
-        public bool WithSeal { get; set; } = true;
 
         public ApiPaymentDto Payment { get; set; }
     }
@@ -38,6 +43,14 @@ namespace ExportDocManager.Api.Hosting
         public string TemplatePath { get; set; } = string.Empty;
 
         public bool WithSeal { get; set; } = true;
+
+        public string DestinationPath { get; set; } = string.Empty;
+    }
+
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+    public sealed class ApiPaymentReportPdfRequest
+    {
+        public string TemplatePath { get; set; } = string.Empty;
 
         public string DestinationPath { get; set; } = string.Empty;
     }
@@ -178,14 +191,12 @@ namespace ExportDocManager.Api.Hosting
             int paymentId,
             string reportType,
             string templatePath,
-            bool withSeal,
             string html,
             string storagePolicy = "")
         {
             PaymentId = paymentId;
             ReportType = reportType ?? string.Empty;
             TemplatePath = templatePath ?? string.Empty;
-            WithSeal = withSeal;
             Html = html ?? string.Empty;
             StoragePolicy = storagePolicy ?? string.Empty;
         }
@@ -195,8 +206,6 @@ namespace ExportDocManager.Api.Hosting
         public string ReportType { get; }
 
         public string TemplatePath { get; }
-
-        public bool WithSeal { get; }
 
         public string Html { get; }
 
@@ -209,7 +218,7 @@ namespace ExportDocManager.Api.Hosting
             string reportType,
             string displayName,
             string templatePath,
-            bool withSealDefault)
+            bool? withSealDefault)
         {
             ReportType = reportType ?? string.Empty;
             DisplayName = displayName ?? string.Empty;
@@ -223,7 +232,8 @@ namespace ExportDocManager.Api.Hosting
 
         public string TemplatePath { get; }
 
-        public bool WithSealDefault { get; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? WithSealDefault { get; }
     }
 
     public sealed class ApiReportTemplateContentDto
@@ -232,7 +242,7 @@ namespace ExportDocManager.Api.Hosting
             string reportType,
             string displayName,
             string templatePath,
-            bool withSealDefault,
+            bool? withSealDefault,
             string content,
             string storagePolicy)
         {
@@ -250,7 +260,8 @@ namespace ExportDocManager.Api.Hosting
 
         public string TemplatePath { get; }
 
-        public bool WithSealDefault { get; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? WithSealDefault { get; }
 
         public string Content { get; }
 
@@ -284,20 +295,21 @@ namespace ExportDocManager.Api.Hosting
         public string NewTemplatePath { get; set; } = string.Empty;
     }
 
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
     public sealed class ApiReportTemplatePreviewRequest
     {
         public string ReportType { get; set; } = "ExportDocument";
 
         public string Content { get; set; } = string.Empty;
 
-        public bool WithSeal { get; set; } = true;
+        public bool? WithSeal { get; set; }
     }
 
     public sealed class ApiReportTemplatePreviewResponse
     {
         public ApiReportTemplatePreviewResponse(
             string reportType,
-            bool withSeal,
+            bool? withSeal,
             string html)
         {
             ReportType = reportType ?? string.Empty;
@@ -307,7 +319,8 @@ namespace ExportDocManager.Api.Hosting
 
         public string ReportType { get; }
 
-        public bool WithSeal { get; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? WithSeal { get; }
 
         public string Html { get; }
     }

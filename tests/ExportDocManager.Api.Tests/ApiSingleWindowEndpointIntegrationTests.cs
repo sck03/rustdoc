@@ -376,6 +376,90 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.NotFound, getAfterDeleteResponse.StatusCode);
         }
 
+        [Fact]
+        public async Task SqliteStationProfileEndpoints_ShouldSupportMultipleCompanyCardsAndExplicitSwitching()
+        {
+            const string desktopToken = "single-window-station-desktop-token";
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-single-window-station-profiles",
+                "api-single-window-station-profiles.db",
+                desktopAccessToken: desktopToken);
+            using var anonymousClient = harness.CreateClient(desktopAccessToken: desktopToken);
+
+            var anonymousResponse = await anonymousClient.GetAsync("/api/single-window/client-profiles");
+            Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
+
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken, desktopToken);
+
+            var emptyResponse = await adminClient.GetAsync("/api/single-window/client-profiles");
+            Assert.Equal(HttpStatusCode.OK, emptyResponse.StatusCode);
+            var empty = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSingleWindowClientProfilesResponse>(emptyResponse);
+            Assert.Empty(empty.Profiles);
+            Assert.Empty(empty.ActiveProfileKey);
+
+            string companyARoot = Path.Combine(harness.DataRoot, "StationClient", "CompanyA");
+            var saveAResponse = await adminClient.PutAsJsonAsync(
+                "/api/single-window/client-profiles",
+                new ApiSingleWindowClientProfileSaveRequest(
+                    string.Empty,
+                    "公司 A 操作卡",
+                    "公司 A",
+                    "CARD-A",
+                    Path.Combine(companyARoot, "Coo"),
+                    Path.Combine(companyARoot, "Acd"),
+                    true,
+                    true));
+            Assert.Equal(HttpStatusCode.OK, saveAResponse.StatusCode);
+            var savedA = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSingleWindowClientProfilesResponse>(saveAResponse);
+            var profileA = Assert.Single(savedA.Profiles);
+            Assert.True(profileA.IsActive);
+            Assert.Equal(profileA.ProfileKey, savedA.ActiveProfileKey);
+
+            string companyBRoot = Path.Combine(harness.DataRoot, "StationClient", "CompanyB");
+            var saveBResponse = await adminClient.PutAsJsonAsync(
+                "/api/single-window/client-profiles",
+                new ApiSingleWindowClientProfileSaveRequest(
+                    string.Empty,
+                    "公司 B 操作卡",
+                    "公司 B",
+                    "CARD-B",
+                    Path.Combine(companyBRoot, "Coo"),
+                    Path.Combine(companyBRoot, "Acd"),
+                    true,
+                    true));
+            Assert.Equal(HttpStatusCode.OK, saveBResponse.StatusCode);
+            var savedB = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSingleWindowClientProfilesResponse>(saveBResponse);
+            Assert.Equal(2, savedB.Profiles.Count);
+            var profileB = Assert.Single(savedB.Profiles, profile => profile.IsActive);
+            Assert.Equal("公司 B", profileB.CompanyScope);
+
+            var overlapResponse = await adminClient.PutAsJsonAsync(
+                "/api/single-window/client-profiles",
+                new ApiSingleWindowClientProfileSaveRequest(
+                    string.Empty,
+                    "公司 C 操作卡",
+                    "公司 C",
+                    "CARD-C",
+                    Path.Combine(companyARoot, "Coo", "Nested"),
+                    Path.Combine(harness.DataRoot, "StationClient", "CompanyC", "Acd"),
+                    true,
+                    true));
+            Assert.Equal(HttpStatusCode.Conflict, overlapResponse.StatusCode);
+
+            var activateAResponse = await adminClient.PostAsync(
+                $"/api/single-window/client-profiles/{Uri.EscapeDataString(profileA.ProfileKey)}/activate",
+                content: null);
+            Assert.Equal(HttpStatusCode.OK, activateAResponse.StatusCode);
+            var activatedA = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSingleWindowClientProfilesResponse>(activateAResponse);
+            Assert.Equal(profileA.ProfileKey, activatedA.ActiveProfileKey);
+            Assert.Single(activatedA.Profiles, profile => profile.IsActive && profile.CompanyScope == "公司 A");
+            Assert.All(activatedA.Profiles, profile => Assert.StartsWith(
+                Path.Combine(harness.DataRoot, "StationClient"),
+                profile.CustomsCooClientRootPath,
+                StringComparison.OrdinalIgnoreCase));
+        }
+
         private static SingleWindowReferenceCatalogModel BuildMinimalReferenceCatalog(
             SingleWindowReferenceCatalogModel source)
         {

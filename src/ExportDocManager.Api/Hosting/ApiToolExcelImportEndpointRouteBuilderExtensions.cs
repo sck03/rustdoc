@@ -11,6 +11,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/tools/excel/import-preview", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 ISettingsService settingsService,
                 IExcelImportService excelImportService,
                 ApiExcelImportPreviewRequest request) =>
@@ -18,6 +19,11 @@ namespace ExportDocManager.Api.Hosting
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
                     return Results.Unauthorized();
+                }
+
+                if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
+                {
+                    return WriteForbidden("服务器 Excel 路径预览仅允许可信 Tauri 桌面端；浏览器请上传 Excel 文件。");
                 }
 
                 var validation = ValidateExcelSourcePath(

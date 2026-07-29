@@ -60,6 +60,26 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
       for (const config of pages) {
         const checkUrl = buildSingleWindowEditorToolsCheckUrl(options.webUrl, invoice.id, config.routeKey);
         await page.send("Page.navigate", { url: checkUrl });
+        await waitForRuntimeDiagnostics(
+          page,
+          [config.expectedTitle, "标准模式", "高级模式", "回填空白", "预检", "保存草稿", invoice.invoiceNo],
+          timeoutMs,
+        );
+        await waitForPageExpression(
+          page,
+          `(() => {
+            const surface = document.querySelector('[aria-label="${config.ariaLabel}"]');
+            const button = surface
+              ? Array.from(surface.querySelectorAll('[aria-label="操作模式"] button'))
+                .find((element) => (element.innerText || '').trim() === '高级模式')
+              : null;
+            if (!button || button.disabled) return false;
+            if (button.getAttribute('aria-pressed') !== 'true') button.click();
+            return true;
+          })()`,
+          timeoutMs,
+          `Timed out switching ${config.expectedTitle} to advanced mode.`,
+        );
         const expectedText = [
           config.expectedTitle,
           "取默认",

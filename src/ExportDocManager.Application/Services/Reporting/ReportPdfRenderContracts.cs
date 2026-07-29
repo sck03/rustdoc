@@ -15,6 +15,17 @@ namespace ExportDocManager.Services.Reporting
         public string DocumentTitle { get; init; } = string.Empty;
     }
 
+    public sealed class PaymentReportPdfRenderRequest
+    {
+        public int SourceId { get; init; }
+
+        public string TemplatePath { get; init; } = string.Empty;
+
+        public string DestinationPath { get; init; } = string.Empty;
+
+        public string DocumentTitle { get; init; } = string.Empty;
+    }
+
     public sealed class ReportPdfRenderResult
     {
         public int SourceId { get; init; }
@@ -23,7 +34,7 @@ namespace ExportDocManager.Services.Reporting
 
         public string TemplatePath { get; init; } = string.Empty;
 
-        public bool WithSeal { get; init; }
+        public bool? WithSeal { get; init; }
 
         public string DestinationPath { get; init; } = string.Empty;
 
@@ -39,7 +50,7 @@ namespace ExportDocManager.Services.Reporting
             CancellationToken cancellationToken = default);
 
         Task<ReportPdfRenderResult> RenderPaymentVoucherPdfAsync(
-            ReportPdfRenderRequest request,
+            PaymentReportPdfRenderRequest request,
             CancellationToken cancellationToken = default);
     }
 }

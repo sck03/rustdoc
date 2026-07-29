@@ -1,6 +1,7 @@
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Tools;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Utils;
 using System.Text.Json;
 
 namespace ExportDocManager.Api.Hosting
@@ -15,6 +16,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/tools/letter-of-credit/import", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 ILetterOfCreditDocumentService documentService,
                 ApiLetterOfCreditImportRequest request,
                 CancellationToken cancellationToken) =>
@@ -22,6 +24,11 @@ namespace ExportDocManager.Api.Hosting
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
                     return Results.Unauthorized();
+                }
+
+                if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
+                {
+                    return WriteForbidden("服务器文件路径导入仅允许可信 Tauri 桌面端；浏览器请上传信用证文件。");
                 }
 
                 string filePath = request?.FilePath?.Trim() ?? string.Empty;
@@ -57,6 +64,10 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
+                catch (InvalidDataException ex)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                }
                 catch (ArgumentException ex)
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
@@ -67,6 +78,82 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("ImportLetterOfCreditDocument");
+
+            endpoints.MapPost("/api/tools/letter-of-credit/import-upload", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                ILetterOfCreditDocumentService documentService,
+                IAppPathProvider pathProvider,
+                CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                string uploadRoot = Path.Combine(
+                    pathProvider.CacheRoot,
+                    "BrowserUploads",
+                    "LetterOfCredit",
+                    Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(uploadRoot);
+
+                try
+                {
+                    string fileName = NormalizeUploadedLetterOfCreditFileName(
+                        context.Request.Query["fileName"].ToString());
+                    string uploadPath = Path.Combine(uploadRoot, fileName);
+                    await using (var output = File.Create(uploadPath))
+                    {
+                        await ApiUploadLimits.CopyRequestBodyAsync(
+                            context.Request,
+                            output,
+                            ApiUploadLimits.LetterOfCreditBytes,
+                            cancellationToken);
+                    }
+
+                    if (new FileInfo(uploadPath).Length == 0)
+                    {
+                        return Results.BadRequest(new ApiErrorResponse("上传的信用证文件不能为空。"));
+                    }
+
+                    var result = await documentService.ImportAsync(uploadPath, cancellationToken);
+                    return Results.Ok(new ApiLetterOfCreditImportResponse(
+                        fileName,
+                        result.SourceDescription,
+                        result.ExtractedText,
+                        "浏览器上传文件仅暂存在运行数据根 Cache/BrowserUploads/LetterOfCredit，请求结束后立即删除；响应和发票草稿只保留安全原文件名，不返回或保存服务器临时绝对路径。"));
+                }
+                catch (PayloadLimitExceededException ex)
+                {
+                    return WritePayloadTooLarge(ex);
+                }
+                catch (NotSupportedException ex)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                }
+                catch (InvalidDataException ex)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                }
+                catch (IOException ex)
+                {
+                    return WriteConflict(ex.Message);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return WriteConflict(ex.Message);
+                }
+                finally
+                {
+                    AtomicFileHelper.TryDeleteDirectory(uploadRoot);
+                }
+            })
+            .WithName("UploadLetterOfCreditDocument");
 
             endpoints.MapPost("/api/tools/letter-of-credit/review", async (
                 HttpContext context,
@@ -143,6 +230,26 @@ namespace ExportDocManager.Api.Hosting
                 TransportMode = invoice.TransportMode,
                 SpecialTerms = invoice.SpecialTerms
             };
+        }
+
+        private static string NormalizeUploadedLetterOfCreditFileName(string fileName)
+        {
+            string portableName = (fileName ?? string.Empty).Trim().Replace('\\', '/');
+            string normalized = Path.GetFileName(portableName).Trim();
+            if (string.IsNullOrWhiteSpace(normalized) ||
+                string.Equals(normalized, ".", StringComparison.Ordinal) ||
+                string.Equals(normalized, "..", StringComparison.Ordinal))
+            {
+                throw new ArgumentException("请上传有效的信用证文件。", nameof(fileName));
+            }
+
+            if (normalized.Length > 240 ||
+                normalized.Any(character => char.IsControl(character) || "<>:\"/\\|?*".Contains(character)))
+            {
+                throw new ArgumentException("信用证文件名包含无效字符或超过长度限制。", nameof(fileName));
+            }
+
+            return normalized;
         }
     }
 }

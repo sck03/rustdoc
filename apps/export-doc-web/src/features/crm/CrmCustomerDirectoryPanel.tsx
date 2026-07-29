@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import type { ApiCrmCustomerDto, ExportDocManagerApiClient } from "../../api/index.ts";
+import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { OperationFeedback, errorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
@@ -24,7 +25,7 @@ export function CrmCustomerDirectoryPanel({ client, canOperate, onCreateCustomer
   const [revision, setRevision] = useState(0);
 
   const pageQuery = usePagedDirectoryQuery(
-    ["crm-customers", keyword, status, pageNumber, pageSize, revision],
+    [...queryKeys.crmCustomers(keyword, status, pageNumber, pageSize), revision],
     (signal) => client.queryCrmCustomers({ keyword, status, pageNumber, pageSize }, { signal }),
   );
   const page = pageQuery.data ?? null;

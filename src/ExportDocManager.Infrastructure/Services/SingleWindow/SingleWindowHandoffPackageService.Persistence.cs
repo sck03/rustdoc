@@ -9,18 +9,10 @@ namespace ExportDocManager.Services.SingleWindow
             CooMappedDocument mapped,
             CancellationToken cancellationToken)
         {
-            try
-            {
-                return await _singleWindowDocumentPersistenceService.UpsertCustomsCooDocumentAsync(
-                    source,
-                    mapped,
-                    cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                Serilog.Log.Warning(ex, "Persisting customs coo document failed for invoice {InvoiceId}", source.Invoice?.Id);
-                return 0;
-            }
+            return await _singleWindowDocumentPersistenceService.UpsertCustomsCooDocumentAsync(
+                source,
+                mapped,
+                cancellationToken);
         }
 
         private async Task<int> TryPersistAgentConsignmentDocumentAsync(
@@ -28,18 +20,10 @@ namespace ExportDocManager.Services.SingleWindow
             AcdMappedDocument mapped,
             CancellationToken cancellationToken)
         {
-            try
-            {
-                return await _singleWindowDocumentPersistenceService.UpsertAgentConsignmentDocumentAsync(
-                    source,
-                    mapped,
-                    cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                Serilog.Log.Warning(ex, "Persisting agent consignment document failed for invoice {InvoiceId}", source.Invoice?.Id);
-                return 0;
-            }
+            return await _singleWindowDocumentPersistenceService.UpsertAgentConsignmentDocumentAsync(
+                source,
+                mapped,
+                cancellationToken);
         }
     }
 }

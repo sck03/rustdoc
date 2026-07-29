@@ -52,12 +52,6 @@ export function createInvoiceQuerySmokeScene(runtime) {
       await evaluate(
         page,
         `(() => {
-          window.__invoiceDeleteConfirmMessages = [];
-          window.confirm = (message) => {
-            window.__invoiceDeleteConfirmMessages.push(String(message || ''));
-            return true;
-          };
-
           const toolbar = document.querySelector('[aria-label="编辑发票"] .editor-toolbar');
           const buttons = toolbar ? Array.from(toolbar.querySelectorAll('button')) : [];
           const button = buttons.find((element) => (element.innerText || '').includes('删除'));
@@ -71,15 +65,33 @@ export function createInvoiceQuerySmokeScene(runtime) {
         true,
       );
 
+      const confirmationState = await waitFor(async () => {
+        const state = await evaluate(
+          page,
+          `(() => {
+            const dialog = document.querySelector('.confirmation-dialog[role="dialog"]');
+            const confirmButton = dialog ? dialog.querySelector('button.confirmation-dialog-confirm') : null;
+            const text = dialog ? dialog.innerText || dialog.textContent || '' : '';
+            if (!dialog || !confirmButton || confirmButton.disabled || !text.includes('删除发票')) {
+              return null;
+            }
+            confirmButton.click();
+            return {
+              text,
+              confirmLabel: confirmButton.innerText || confirmButton.textContent || '',
+            };
+          })()`,
+          true,
+        ).catch(() => ({ value: null }));
+        return state.value ?? null;
+      }, timeoutMs, () => `Timed out waiting for invoice delete confirmation: ${invoice.invoiceNo}`);
+
       const deletedState = await waitFor(async () => {
         const state = await evaluate(
           page,
           `(() => ({
             hash: window.location.hash || '',
             text: document.body ? document.body.innerText || '' : '',
-            confirmMessages: Array.isArray(window.__invoiceDeleteConfirmMessages)
-              ? window.__invoiceDeleteConfirmMessages.slice()
-              : [],
           }))()`,
           true,
         ).catch(() => ({ value: null }));
@@ -108,7 +120,7 @@ export function createInvoiceQuerySmokeScene(runtime) {
         url: redactDesktopAccessToken(checkUrl),
         expectedText: expectedText.map((value) => ({ value, found: includesText(pageText, value) })),
         deleteButtonCheck,
-        confirmMessages: deletedState.confirmMessages,
+        confirmMessages: [confirmationState.text],
         redirectedToList: deletedState.hash.includes("/invoices") && !deletedState.hash.includes(`/invoices/${invoice.id}`),
         successMessageFound: includesText(deletedState.text || "", "发票已删除"),
         detailStatus,

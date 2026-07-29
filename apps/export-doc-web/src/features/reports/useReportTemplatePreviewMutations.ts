@@ -29,7 +29,9 @@ export function useReportTemplatePreviewMutations({
   const samplePreviewMutation = useMutation({
     mutationFn: (nextContent?: string) =>
       client.previewReportTemplateContent({
-        body: { reportType, content: nextContent ?? content, withSeal },
+        body: reportType === "ExportDocument"
+          ? { reportType, content: nextContent ?? content, withSeal }
+          : { reportType, content: nextContent ?? content },
       }),
     onSuccess: onPreviewed,
     onError,
@@ -41,7 +43,7 @@ export function useReportTemplatePreviewMutations({
         invoiceId: previewInvoiceId,
         body: { reportType, templatePath: selectedTemplatePath, withSeal },
       }),
-    onSuccess: (response) => onPreviewed({ reportType: response.reportType, withSeal: response.withSeal, html: response.html }),
+    onSuccess: (response) => onPreviewed({ reportType: response.reportType, withSeal: response.withSeal ?? withSeal, html: response.html }),
     onError,
   });
 
@@ -49,9 +51,9 @@ export function useReportTemplatePreviewMutations({
     mutationFn: () =>
       client.previewPaymentVoucherHtml({
         paymentId: previewPaymentId,
-        body: { reportType: "PaymentVoucher", templatePath: selectedTemplatePath, withSeal },
+        body: { templatePath: selectedTemplatePath },
       }),
-    onSuccess: (response) => onPreviewed({ reportType: response.reportType, withSeal: response.withSeal, html: response.html }),
+    onSuccess: (response) => onPreviewed({ reportType: response.reportType, html: response.html }),
     onError,
   });
 

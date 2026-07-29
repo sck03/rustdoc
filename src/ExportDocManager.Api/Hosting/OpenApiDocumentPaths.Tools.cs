@@ -54,6 +54,35 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
+                    ["/api/tools/letter-of-credit/import-upload"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Upload and import a letter of credit document from a browser",
+                            operationId = "uploadLetterOfCreditDocument",
+                            parameters = new object[]
+                            {
+                                QueryParameter("fileName", "string", null, "Original file name used for validation and display. Server temporary paths are never returned.")
+                            },
+                            requestBody = new
+                            {
+                                required = true,
+                                content = BinaryContent()
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "Extracted text. The uploaded file is staged below runtime Cache/BrowserUploads/LetterOfCredit and deleted after the request.",
+                                    content = JsonContent("ApiLetterOfCreditImportResponse")
+                                },
+                                ["400"] = new { description = "Invalid file name, empty file, unsupported format, or document resource limit exceeded." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["409"] = new { description = "Text extraction failed or OCR runtime is not enabled." },
+                                ["413"] = new { description = "Uploaded file exceeds 25 MB." }
+                            }
+                        }
+                    },
                     ["/api/tools/letter-of-credit/review"] = new
                     {
                         post = new

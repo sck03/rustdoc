@@ -33,41 +33,45 @@ namespace ExportDocManager.Services.Reporting
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            return await RenderPdfAsync(htmlResult, request, cancellationToken).ConfigureAwait(false);
+            return await RenderPdfAsync(
+                htmlResult,
+                request.DestinationPath,
+                request.DocumentTitle,
+                cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<ReportPdfRenderResult> RenderPaymentVoucherPdfAsync(
-            ReportPdfRenderRequest request,
+            PaymentReportPdfRenderRequest request,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(request);
-            if (request.ReportType != ReportDocumentType.PaymentVoucher)
-            {
-                throw new ArgumentException("付款/报销单 PDF 生成仅支持 PaymentVoucher 报表类型。", nameof(request));
-            }
 
             var htmlResult = await _reportHtmlService.RenderPaymentVoucherAsync(
                     request.SourceId,
                     request.TemplatePath,
-                    request.WithSeal,
-                    cancellationToken)
+                    cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
-            return await RenderPdfAsync(htmlResult, request, cancellationToken).ConfigureAwait(false);
+            return await RenderPdfAsync(
+                htmlResult,
+                request.DestinationPath,
+                request.DocumentTitle,
+                cancellationToken).ConfigureAwait(false);
         }
 
         private async Task<ReportPdfRenderResult> RenderPdfAsync(
             ReportHtmlRenderResult htmlResult,
-            ReportPdfRenderRequest request,
+            string destinationPath,
+            string requestedDocumentTitle,
             CancellationToken cancellationToken)
         {
-            string documentTitle = string.IsNullOrWhiteSpace(request.DocumentTitle)
+            string documentTitle = string.IsNullOrWhiteSpace(requestedDocumentTitle)
                 ? $"{htmlResult.ReportType}-{htmlResult.SourceId}"
-                : request.DocumentTitle.Trim();
+                : requestedDocumentTitle.Trim();
 
             var pdfResult = await _htmlToPdfService.RenderAsync(
                     htmlResult.Html,
-                    request.DestinationPath,
+                    destinationPath,
                     new HtmlToPdfRenderOptions
                     {
                         DocumentTitle = documentTitle,

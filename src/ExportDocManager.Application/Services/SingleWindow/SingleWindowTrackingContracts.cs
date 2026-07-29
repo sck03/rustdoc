@@ -4,10 +4,27 @@ namespace ExportDocManager.Services.SingleWindow
 {
     public interface ISingleWindowTrackingService
     {
-        Task<int> ResolveNextSubmissionVersionAsync(
+        Task<SingleWindowSubmissionReservation> ReserveSubmissionAsync(
             SingleWindowBusinessType businessType,
             int sourceInvoiceId,
             int sourceDocumentId,
+            string sourceDocumentType,
+            int draftRevision,
+            string sourceBaselineHash,
+            string invoiceNo,
+            string contractNo,
+            string companyScope,
+            CancellationToken cancellationToken = default);
+
+        Task MarkSubmissionReservationFailedAsync(
+            int batchId,
+            string errorMessage,
+            CancellationToken cancellationToken = default);
+
+        Task<SingleWindowPackageBinding> ResolveReceiptPackageBindingAsync(
+            SingleWindowBusinessType businessType,
+            string batchReference,
+            string invoiceNo,
             CancellationToken cancellationToken = default);
 
         Task<int> RecordSubmitPackageExportAsync(

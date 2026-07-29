@@ -1,6 +1,7 @@
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.SingleWindow;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -68,39 +69,22 @@ namespace ExportDocManager.Api.Hosting
                 ? candidate
                 : Path.Combine(singleWindowRoot, candidate));
 
-            if (!IsPathWithinRoot(resolved, singleWindowRoot))
-            {
-                throw new UnauthorizedAccessException("单一窗口交接包只能解压到运行数据根 SingleWindow 目录下。");
-            }
-
-            return resolved;
+            return PathBoundaryHelper.EnsureWithinRoot(
+                resolved,
+                singleWindowRoot,
+                "单一窗口交接包只能解压到运行数据根 SingleWindow 目录下。");
         }
 
         private static string BuildSafeSingleWindowFileToken(string value)
         {
             string trimmed = string.IsNullOrWhiteSpace(value) ? "package" : value.Trim();
-            var invalidChars = Path.GetInvalidFileNameChars();
+            const string invalidChars = "<>:\"/\\|?*";
             var chars = trimmed
-                .Select(ch => invalidChars.Contains(ch) ? '-' : ch)
+                .Select(ch => char.IsControl(ch) || invalidChars.Contains(ch) ? '-' : ch)
                 .ToArray();
             string safe = new string(chars).Trim('-', '.', ' ');
             return string.IsNullOrWhiteSpace(safe) ? "package" : safe;
         }
 
-        private static bool IsPathWithinRoot(string path, string root)
-        {
-            string normalizedPath = Path.GetFullPath(path)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            string normalizedRoot = Path.GetFullPath(root)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-
-            return string.Equals(normalizedPath, normalizedRoot, StringComparison.OrdinalIgnoreCase) ||
-                   normalizedPath.StartsWith(
-                       normalizedRoot + Path.DirectorySeparatorChar,
-                       StringComparison.OrdinalIgnoreCase) ||
-                   normalizedPath.StartsWith(
-                       normalizedRoot + Path.AltDirectorySeparatorChar,
-                       StringComparison.OrdinalIgnoreCase);
-        }
     }
 }

@@ -25,6 +25,7 @@ export function ReportDesignerSidebar({
   selectedSectionId,
   fieldGroups,
   canInsertDetailTable,
+  canInsertImage,
   onSelectBlock,
   onSelectSection,
   onInsertText,
@@ -42,6 +43,7 @@ export function ReportDesignerSidebar({
   selectedSectionId: string | null;
   fieldGroups: ReportDesignerFieldGroup[];
   canInsertDetailTable: boolean;
+  canInsertImage: boolean;
   onSelectBlock: (blockId: string) => void;
   onSelectSection: (sectionId: string) => void;
   onInsertText: () => void;
@@ -99,7 +101,7 @@ export function ReportDesignerSidebar({
         <div className="new-report-designer-panel-title">
           <FileText size={16} aria-hidden="true" />
           <span>{activePanel === "components" ? "组件库" : activePanel === "model" ? "报表模型" : "字段目录"}</span>
-          <small>{activePanel === "components" ? (canInsertDetailTable ? 8 : 7) : activePanel === "model" ? blockCount : fieldCount}</small>
+          <small>{activePanel === "components" ? 6 + Number(canInsertImage) + Number(canInsertDetailTable) : activePanel === "model" ? blockCount : fieldCount}</small>
         </div>
         {activePanel === "components" ? (
           <div className="new-report-component-palette">
@@ -112,7 +114,9 @@ export function ReportDesignerSidebar({
             <div className="new-report-component-group">
               <span className="new-report-component-group-title">业务</span>
               <PaletteButton componentType="Conditional" icon={<ListFilter size={15} aria-hidden="true" />} label="条件块" onClick={onInsertConditional} />
-              <PaletteButton componentType="Image" icon={<ImageIcon size={15} aria-hidden="true" />} label="图片/印章" onClick={onInsertImage} />
+              {canInsertImage ? (
+                <PaletteButton componentType="Image" icon={<ImageIcon size={15} aria-hidden="true" />} label="图片/印章" onClick={onInsertImage} />
+              ) : null}
               {canInsertDetailTable ? (
                 <PaletteButton componentType="DetailTable" icon={<Table2 size={15} aria-hidden="true" />} label="明细表" onClick={onInsertDetailTable} />
               ) : null}

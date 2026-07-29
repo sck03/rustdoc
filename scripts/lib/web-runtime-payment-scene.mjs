@@ -78,12 +78,6 @@ export function createPaymentSmokeScene(runtime) {
       await evaluate(
         page,
         `(() => {
-          window.__paymentDeleteConfirmMessages = [];
-          window.confirm = (message) => {
-            window.__paymentDeleteConfirmMessages.push(String(message || ''));
-            return true;
-          };
-
           const toolbar = document.querySelector('[aria-label="编辑付款报销"] .editor-toolbar');
           const buttons = toolbar ? Array.from(toolbar.querySelectorAll('button')) : [];
           const button = buttons.find((element) => (element.innerText || '').includes('删除'));
@@ -97,15 +91,33 @@ export function createPaymentSmokeScene(runtime) {
         true,
       );
 
+      const confirmationState = await waitFor(async () => {
+        const state = await evaluate(
+          page,
+          `(() => {
+            const dialog = document.querySelector('.confirmation-dialog[role="dialog"]');
+            const confirmButton = dialog ? dialog.querySelector('button.confirmation-dialog-confirm') : null;
+            const text = dialog ? dialog.innerText || dialog.textContent || '' : '';
+            if (!dialog || !confirmButton || confirmButton.disabled || !text.includes('删除付款/报销记录')) {
+              return null;
+            }
+            confirmButton.click();
+            return {
+              text,
+              confirmLabel: confirmButton.innerText || confirmButton.textContent || '',
+            };
+          })()`,
+          true,
+        ).catch(() => ({ value: null }));
+        return state.value ?? null;
+      }, timeoutMs, () => `Timed out waiting for payment delete confirmation: ${payment.invoiceNo}`);
+
       const deletedState = await waitFor(async () => {
         const state = await evaluate(
           page,
           `(() => ({
             hash: window.location.hash || '',
             text: document.body ? document.body.innerText || '' : '',
-            confirmMessages: Array.isArray(window.__paymentDeleteConfirmMessages)
-              ? window.__paymentDeleteConfirmMessages.slice()
-              : [],
           }))()`,
           true,
         ).catch(() => ({ value: null }));
@@ -134,7 +146,7 @@ export function createPaymentSmokeScene(runtime) {
         url: redactDesktopAccessToken(checkUrl),
         expectedText: expectedText.map((value) => ({ value, found: includesText(pageText, value) })),
         deleteButtonCheck,
-        confirmMessages: deletedState.confirmMessages,
+        confirmMessages: [confirmationState.text],
         redirectedToList: deletedState.hash.includes("/payments") && !deletedState.hash.includes(`/payments/${payment.id}`),
         successMessageFound: includesText(deletedState.text || "", "付款已删除"),
         detailStatus,
@@ -383,8 +395,12 @@ export function createPaymentSmokeScene(runtime) {
           return srcdoc.includes(${JSON.stringify(payment.invoiceNo)}) &&
             srcdoc.includes(${JSON.stringify(draftProjectValue)}) &&
             !srcdoc.includes(${JSON.stringify(keyboardFlowCheck.persistedProject)}) &&
-            text.includes('付款/报销草稿 HTML 预览') &&
-            text.includes('不按 Payment.InvoiceNo 读取发票/报关单据');
+            text.includes('HTML 预览使用当前草稿') &&
+            !text.includes('带章') &&
+            !text.includes('印章') &&
+            !srcdoc.includes('doc_seal_path') &&
+            !srcdoc.includes('customs_seal_path') &&
+            !srcdoc.includes('payer_seal_path');
         })()`,
         timeoutMs,
         `Timed out waiting for payment draft report preview HTML: ${payment.invoiceNo}`,
@@ -703,9 +719,8 @@ export function createPaymentSmokeScene(runtime) {
       {
         name: preferredName,
         templatePath: preferredTemplate.templatePath,
-        reportType: "PaymentDocument",
+        reportType: "PaymentVoucher",
         isEnabled: true,
-        showSeal: false,
       },
     ];
 
@@ -713,9 +728,8 @@ export function createPaymentSmokeScene(runtime) {
       paymentTemplates.push({
         name: reimbursementName,
         templatePath: reimbursementTemplate.templatePath,
-        reportType: "PaymentDocument",
+        reportType: "PaymentVoucher",
         isEnabled: true,
-        showSeal: false,
       });
     }
 
@@ -723,9 +737,8 @@ export function createPaymentSmokeScene(runtime) {
       paymentTemplates.push({
         name: disabledName,
         templatePath: disabledTemplate.templatePath,
-        reportType: "PaymentDocument",
+        reportType: "PaymentVoucher",
         isEnabled: false,
-        showSeal: true,
       });
     }
 
@@ -740,7 +753,7 @@ export function createPaymentSmokeScene(runtime) {
       reimbursementPath: reimbursementTemplate?.templatePath ?? "",
       disabledName: disabledTemplate ? disabledName : "",
       disabledPath: disabledTemplate?.templatePath ?? "",
-      reportTypeAlias: "PaymentDocument",
+      reportType: "PaymentVoucher",
     };
   }
 
@@ -756,7 +769,6 @@ export function createPaymentSmokeScene(runtime) {
             text: (option.textContent || '').trim(),
             value: option.value || '',
           })) : [];
-          const sealCheckbox = panel ? panel.querySelector('.toggle-field input[type="checkbox"]') : null;
           const preferredName = ${JSON.stringify(settings.preferredName)};
           const preferredPath = ${JSON.stringify(settings.preferredPath)};
           const reimbursementName = ${JSON.stringify(settings.reimbursementName)};
@@ -769,18 +781,17 @@ export function createPaymentSmokeScene(runtime) {
           const disabledLabelHidden = !disabledName || !options.some((option) => option.text.includes(disabledName));
           const disabledPathHidden = !disabledPath || !options.some((option) => option.value === disabledPath);
           const selectedPreferred = Boolean(select && select.value === preferredPath);
-          const sealDefaultApplied = Boolean(sealCheckbox && sealCheckbox.checked === false);
+          const sealControlAbsent = Boolean(panel && !panel.querySelector('.toggle-field, [aria-label*="章"], [title*="章"]'));
           return {
-            found: Boolean(preferredVisible && reimbursementVisible && disabledLabelHidden && disabledPathHidden && selectedPreferred && sealDefaultApplied),
+            found: Boolean(preferredVisible && reimbursementVisible && disabledLabelHidden && disabledPathHidden && selectedPreferred && sealControlAbsent),
             preferredVisible,
             reimbursementVisible,
             disabledLabelHidden,
             disabledPathHidden,
             selectedPreferred,
-            sealDefaultApplied,
+            sealControlAbsent,
             selectedValue: select ? select.value : '',
             options,
-            withSeal: sealCheckbox ? sealCheckbox.checked : null,
           };
         })()`,
         true,
@@ -838,7 +849,6 @@ export function createPaymentSmokeScene(runtime) {
       `(() => {
         const panel = document.querySelector('[aria-label="付款/报销单预览"]');
         const select = panel ? panel.querySelector('select') : null;
-        const sealCheckbox = panel ? panel.querySelector('.toggle-field input[type="checkbox"]') : null;
         const frame = panel ? panel.querySelector('iframe[title="付款/报销单 HTML 预览"]') : null;
         const empty = panel ? panel.querySelector('.report-preview-empty') : null;
         return Boolean(select &&
@@ -846,9 +856,7 @@ export function createPaymentSmokeScene(runtime) {
           panel.getAttribute('data-selected-template-path') === ${JSON.stringify(settings.reimbursementPath)} &&
           !frame &&
           empty &&
-          (empty.innerText || '').includes('暂无预览') &&
-          sealCheckbox &&
-          sealCheckbox.checked === false);
+          (empty.innerText || '').includes('暂无预览'));
       })()`,
       timeoutMs,
       "Timed out waiting for expense reimbursement template selection.",
@@ -898,6 +906,11 @@ export function createPaymentSmokeScene(runtime) {
             hasTravelExpense: srcdoc.includes('11.11'),
             hasCnyTotal: srcdoc.includes('88.88'),
             excludesPayeeName: !srcdoc.includes(${JSON.stringify(payment.payeeName)}),
+            excludesSealData: !srcdoc.includes('doc_seal_path') &&
+              !srcdoc.includes('customs_seal_path') &&
+              !srcdoc.includes('payer_seal_path') &&
+              !srcdoc.includes('印章') &&
+              !srcdoc.includes('公章'),
           };
           const found = Boolean(
             checks.selectedTemplateMatches &&
@@ -909,7 +922,8 @@ export function createPaymentSmokeScene(runtime) {
             checks.hasNotes &&
             checks.hasTravelExpense &&
             checks.hasCnyTotal &&
-            checks.excludesPayeeName
+            checks.excludesPayeeName &&
+            checks.excludesSealData
           );
 
           return {

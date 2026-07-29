@@ -129,7 +129,7 @@ export function InvoiceReportPreviewPanel({
       (template) => fileNameFromPath(template.templatePath).toLowerCase() === "invoice_template.html",
     ) ?? templates[0];
     setSelectedTemplatePath((current) => current || preferredTemplate.templatePath);
-    setWithSeal((current) => selectedTemplatePath ? current : preferredTemplate.withSealDefault);
+    setWithSeal((current) => selectedTemplatePath ? current : preferredTemplate.withSealDefault ?? true);
   }, [selectedTemplatePath, templates]);
 
   useEffect(() => {
@@ -203,7 +203,7 @@ export function InvoiceReportPreviewPanel({
   function handleTemplateChange(value: string) {
     setSelectedTemplatePath(value);
     const template = templates.find((item) => item.templatePath === value);
-    if (template) setWithSeal(template.withSealDefault);
+    if (template) setWithSeal(template.withSealDefault ?? true);
     setPreview(null);
     documentPackage.clearPreview();
     clearFeedback();

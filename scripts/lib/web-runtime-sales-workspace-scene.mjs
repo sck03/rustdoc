@@ -63,7 +63,7 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
       selectedTask: document.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.trim() || '',
       documentWidth: document.documentElement.scrollWidth,
       innerWidth: window.innerWidth,
-      guidanceVisible: Boolean(document.querySelector('.empty-guidance'))
+      guidanceVisible: Boolean(document.querySelector('.form-guidance'))
     }))()`);
     if (followUpEditor.selectedTask !== "新增跟进" || !followUpEditor.guidanceVisible || followUpEditor.documentWidth > followUpEditor.innerWidth + 2) {
       throw new Error(`Sales follow-up editor task mismatch: ${JSON.stringify(followUpEditor)}`);
@@ -138,7 +138,8 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
     await clickButtonByText(page, "载入客户变量");
     await waitForText(page, ["请选择 CRM 客户"], timeoutMs);
     const operationFeedback = await read(page, `(() => {
-      const feedback = document.querySelector('.operation-feedback');
+      const feedback = Array.from(document.querySelectorAll('.inline-notice'))
+        .find((item) => (item.textContent || '').includes('请选择 CRM 客户'));
       return {
         tone: feedback?.getAttribute('data-tone') || '',
         role: feedback?.getAttribute('role') || '',
@@ -156,7 +157,7 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
       formColumns: getComputedStyle(document.querySelector('.form-grid')).gridTemplateColumns,
       sectionCount: document.querySelectorAll('.form-section-block').length,
       optionalDetailsOpen: Boolean(document.querySelector('.optional-form-details')?.open),
-      customerGuidanceVisible: Boolean(document.querySelector('.empty-guidance')),
+      customerGuidanceVisible: Boolean(document.querySelector('.form-guidance')),
       documentWidth: document.documentElement.scrollWidth,
       innerWidth: window.innerWidth
     }))()`);
@@ -322,7 +323,7 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
     const productEditorTask = await read(page, `(() => ({
       formCount: document.querySelectorAll('.supplier-product-workspace > form.form-grid').length,
       tableCount: document.querySelectorAll('.supplier-product-workspace > .table-frame').length,
-      guidanceVisible: Boolean(document.querySelector('.supplier-product-workspace .empty-guidance')),
+      guidanceVisible: Boolean(document.querySelector('.supplier-product-workspace .form-guidance')),
       documentWidth: document.documentElement.scrollWidth,
       innerWidth: window.innerWidth
     }))()`);
@@ -376,7 +377,7 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
     if (!submittedFollowUp) throw new Error("Sales follow-up form could not be submitted.");
     await waitFor(async () => {
       if (await readSelectedTask(page) === "跟进记录") return true;
-      const errorText = await read(page, "document.querySelector('.operation-feedback[data-tone=\"error\"]')?.textContent?.trim() || ''");
+      const errorText = await read(page, "document.querySelector('.inline-notice[data-tone=\"error\"]')?.textContent?.trim() || ''");
       if (errorText) throw new Error(`Follow-up save failed: ${errorText}`);
       return null;
     }, timeoutMs, () => "Timed out waiting for the follow-up directory after save.");
@@ -424,7 +425,9 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
       return {
         status: row?.querySelector('.business-status-badge')?.textContent?.trim() || '',
         tone: row?.querySelector('.business-status-badge')?.getAttribute('data-tone') || '',
-        feedbackTone: document.querySelector('.operation-feedback')?.getAttribute('data-tone') || ''
+        feedbackTone: Array.from(document.querySelectorAll('.inline-notice'))
+          .find((item) => (item.textContent || '').includes('跟进记录已标记完成'))
+          ?.getAttribute('data-tone') || ''
       };
     })()`);
     if (followUpCompletion.status !== "已完成" || followUpCompletion.tone !== "positive" || followUpCompletion.feedbackTone !== "success") {
@@ -442,7 +445,6 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
     if (!restoredFollowUp) throw new Error("Sales completed follow-up could not be restored.");
     await waitForText(page, [longFollowUpSummary, "待跟进", "跟进记录已恢复为待跟进"], timeoutMs);
     const cancelledFollowUpDelete = await read(page, `(() => {
-      window.confirm = () => false;
       const summary = Array.from(document.querySelectorAll('.follow-up-data-table .table-primary-text'))
         .find((item) => item.getAttribute('title') === ${JSON.stringify(longFollowUpSummary)});
       const button = Array.from(summary?.closest('tr')?.querySelectorAll('button') || [])
@@ -452,9 +454,12 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
       return true;
     })()`);
     if (!cancelledFollowUpDelete) throw new Error("Sales follow-up delete confirmation could not be cancelled.");
+    await waitForText(page, ["删除跟进记录", "取消", "确认删除"], timeoutMs);
+    await clickButtonByText(page, "取消", ".confirmation-dialog button");
+    await waitFor(async () => await read(page, "!document.querySelector('.confirmation-dialog')") ? true : null,
+      timeoutMs, () => "Timed out waiting for the cancelled follow-up delete dialog to close.");
     const followUpStillVisible = await read(page, `Array.from(document.querySelectorAll('.follow-up-data-table .table-primary-text')).some((item) => item.getAttribute('title') === ${JSON.stringify(longFollowUpSummary)})`);
     if (!followUpStillVisible) throw new Error("Sales follow-up was removed after cancelling delete confirmation.");
-    await read(page, "window.confirm = () => true; true");
     const confirmedFollowUpDelete = await read(page, `(() => {
       const summary = Array.from(document.querySelectorAll('.follow-up-data-table .table-primary-text'))
         .find((item) => item.getAttribute('title') === ${JSON.stringify(longFollowUpSummary)});
@@ -465,13 +470,19 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
       return true;
     })()`);
     if (!confirmedFollowUpDelete) throw new Error("Sales follow-up delete could not be confirmed.");
+    await waitForText(page, ["删除跟进记录", "确认删除"], timeoutMs);
+    await clickButtonByText(page, "确认删除", ".confirmation-dialog button");
     await waitForText(page, ["跟进记录已删除"], timeoutMs);
     await waitFor(async () => await read(page, `!Array.from(document.querySelectorAll('.follow-up-data-table .table-primary-text')).some((item) => item.getAttribute('title') === ${JSON.stringify(longFollowUpSummary)})`) ? true : null,
       timeoutMs, () => "Timed out waiting for the deleted follow-up to disappear.");
     const followUpLifecycle = await read(page, `(() => ({
       deleted: !Array.from(document.querySelectorAll('.follow-up-data-table .table-primary-text')).some((item) => item.getAttribute('title') === ${JSON.stringify(longFollowUpSummary)}),
-      feedbackTone: document.querySelector('.operation-feedback')?.getAttribute('data-tone') || '',
-      feedbackText: document.querySelector('.operation-feedback')?.textContent?.trim() || '',
+      feedbackTone: Array.from(document.querySelectorAll('.inline-notice'))
+        .find((item) => (item.textContent || '').includes('跟进记录已删除'))
+        ?.getAttribute('data-tone') || '',
+      feedbackText: Array.from(document.querySelectorAll('.inline-notice'))
+        .find((item) => (item.textContent || '').includes('跟进记录已删除'))
+        ?.textContent?.trim() || '',
       documentWidth: document.documentElement.scrollWidth,
       innerWidth: window.innerWidth
     }))()`);
@@ -618,8 +629,9 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
     if (!openedCopy) throw new Error("Sales copied template could not be opened for delete verification.");
     await waitFor(async () => await readSelectedTask(page) === "编辑模板" ? true : null,
       timeoutMs, () => "Timed out waiting for the copied template editor before deletion.");
-    await read(page, "window.confirm = () => true; true");
     await clickButtonByText(page, "删除", "form.form-grid button");
+    await waitForText(page, ["删除邮件模板", "确认删除"], timeoutMs);
+    await clickButtonByText(page, "确认删除", ".confirmation-dialog button");
     await waitFor(async () => await readSelectedTask(page) === "模板目录" ? true : null,
       timeoutMs, () => "Timed out waiting for the template directory after deletion.");
     await waitForText(page, ["邮件模板已删除", inactiveTemplateName], timeoutMs);

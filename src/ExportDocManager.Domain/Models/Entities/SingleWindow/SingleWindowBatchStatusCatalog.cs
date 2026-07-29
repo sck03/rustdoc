@@ -4,6 +4,7 @@ namespace ExportDocManager.Models.Entities
 {
     public static class SingleWindowBatchStatusCatalog
     {
+        public const string Preparing = "Preparing";
         public const string SubmitPackageExported = "SubmitPackageExported";
         public const string SubmitPackageImported = "SubmitPackageImported";
         public const string ReceiptPackageExported = "ReceiptPackageExported";
@@ -19,6 +20,7 @@ namespace ExportDocManager.Models.Entities
         private static readonly IReadOnlyDictionary<string, string> DisplayNames =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
+                [Preparing] = "正在生成提交包",
                 [SubmitPackageExported] = "已导出提交包",
                 [SubmitPackageImported] = "已导入提交包",
                 [ReceiptPackageExported] = "已导出回执包",

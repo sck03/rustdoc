@@ -357,12 +357,14 @@ namespace ExportDocManager.Api.Hosting
                         ["SingleWindowPackageFile"] = new
                         {
                             type = "object",
-                            required = new[] { "relativePath", "mediaType", "description" },
+                            required = new[] { "relativePath", "mediaType", "description", "sizeBytes", "sha256" },
                             properties = new Dictionary<string, object>
                             {
                                 ["relativePath"] = StringProperty("Package-relative file path."),
                                 ["mediaType"] = StringProperty("Payload media type."),
-                                ["description"] = StringProperty("File description.")
+                                ["description"] = StringProperty("File description."),
+                                ["sizeBytes"] = new { type = "integer", format = "int64" },
+                                ["sha256"] = StringProperty("Uppercase SHA-256 digest of the file content.")
                             }
                         },
                         ["SingleWindowPackageManifest"] = new
@@ -371,6 +373,7 @@ namespace ExportDocManager.Api.Hosting
                             required = new[]
                             {
                                 "schemaVersion",
+                                "packageId",
                                 "packageType",
                                 "businessType",
                                 "batchReference",
@@ -382,6 +385,14 @@ namespace ExportDocManager.Api.Hosting
                                 "sourceBaselineHash",
                                 "invoiceNo",
                                 "contractNo",
+                                "companyScope",
+                                "snapshotSha256",
+                                "sourcePackageDigest",
+                                "contentDigest",
+                                "stationKey",
+                                "cardIdentifier",
+                                "clientProfileKey",
+                                "clientProfileName",
                                 "createdAt",
                                 "createdOnMachine",
                                 "payloadFiles",
@@ -391,6 +402,7 @@ namespace ExportDocManager.Api.Hosting
                             properties = new Dictionary<string, object>
                             {
                                 ["schemaVersion"] = StringProperty("Package manifest schema version."),
+                                ["packageId"] = StringProperty("Unique package identifier."),
                                 ["packageType"] = new
                                 {
                                     type = "integer",
@@ -414,6 +426,14 @@ namespace ExportDocManager.Api.Hosting
                                 ["sourceBaselineHash"] = StringProperty("Source baseline hash."),
                                 ["invoiceNo"] = StringProperty("Source invoice number."),
                                 ["contractNo"] = StringProperty("Source contract number."),
+                                ["companyScope"] = StringProperty("Company identity bound to the package."),
+                                ["snapshotSha256"] = StringProperty("Submit snapshot SHA-256 digest."),
+                                ["sourcePackageDigest"] = StringProperty("Original submit package content digest for receipt packages."),
+                                ["contentDigest"] = StringProperty("Canonical manifest content digest."),
+                                ["stationKey"] = StringProperty("Assigned card-station key for station-originated packages."),
+                                ["cardIdentifier"] = StringProperty("Non-secret operation-card identifier for receipt packages."),
+                                ["clientProfileKey"] = StringProperty("Stable operation profile key for receipt packages."),
+                                ["clientProfileName"] = StringProperty("Operation-card profile name for receipt packages."),
                                 ["createdAt"] = new { type = "string", format = "date-time" },
                                 ["createdOnMachine"] = StringProperty("Machine that created the package."),
                                 ["payloadFiles"] = RefArraySchema("SingleWindowPackageFile"),
@@ -428,7 +448,7 @@ namespace ExportDocManager.Api.Hosting
                             properties = new Dictionary<string, object>
                             {
                                 ["success"] = new { type = "boolean" },
-                                ["packagePath"] = StringProperty("Resolved .swpkg file path."),
+                                ["packagePath"] = StringProperty("Generated .swpkg file name; server absolute paths are not returned."),
                                 ["manifest"] = RefSchema("SingleWindowPackageManifest"),
                                 ["trackingBatchId"] = new { type = "integer", format = "int32", nullable = true },
                                 ["storagePolicy"] = StringProperty("Submit package storage policy summary."),
@@ -497,8 +517,8 @@ namespace ExportDocManager.Api.Hosting
                             properties = new Dictionary<string, object>
                             {
                                 ["success"] = new { type = "boolean" },
-                                ["packagePath"] = StringProperty("Imported .swpkg file path."),
-                                ["workingDirectory"] = StringProperty("Extraction working directory path."),
+                                ["packagePath"] = StringProperty("Imported .swpkg file name; server absolute paths are not returned."),
+                                ["workingDirectory"] = StringProperty("Reserved for desktop-local display; server paths are not returned."),
                                 ["workingDirectoryKept"] = new { type = "boolean" },
                                 ["manifest"] = RefSchema("SingleWindowPackageManifest"),
                                 ["parsedReceipts"] = RefArraySchema("SingleWindowReceiptParseResult"),
@@ -515,62 +535,70 @@ namespace ExportDocManager.Api.Hosting
                             required = new[]
                             {
                                 "id",
+                                "profileKey",
                                 "profileName",
-                                "machineName",
-                                "importRootPath",
-                                "receiptRootPath",
-                                "businessDirectoryOverridesJson",
+                                "companyScope",
+                                "cardIdentifier",
+                                "customsCooClientRootPath",
+                                "agentConsignmentClientRootPath",
                                 "canSubmitCustomsCoo",
                                 "canSubmitAgentConsignment",
                                 "isEnabled",
+                                "isActive",
                                 "updatedAt"
                             },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" },
+                                ["profileKey"] = StringProperty("Stable operation-card profile key."),
                                 ["profileName"] = StringProperty("Client profile name."),
-                                ["machineName"] = StringProperty("Machine name."),
-                                ["importRootPath"] = StringProperty("Configured import root path."),
-                                ["receiptRootPath"] = StringProperty("Configured receipt root path."),
-                                ["businessDirectoryOverridesJson"] = StringProperty("Business-specific directory overrides JSON."),
+                                ["companyScope"] = StringProperty("Company identity bound to this operation card."),
+                                ["cardIdentifier"] = StringProperty("Non-secret card label or identifier."),
+                                ["customsCooClientRootPath"] = StringProperty("Independent official client root for Customs COO."),
+                                ["agentConsignmentClientRootPath"] = StringProperty("Independent official client root for agent consignment."),
                                 ["canSubmitCustomsCoo"] = new { type = "boolean" },
                                 ["canSubmitAgentConsignment"] = new { type = "boolean" },
                                 ["isEnabled"] = new { type = "boolean" },
+                                ["isActive"] = new { type = "boolean" },
                                 ["updatedAt"] = new { type = "string", format = "date-time" }
                             }
                         },
-                        ["ApiSingleWindowClientProfileResponse"] = new
+                        ["ApiSingleWindowClientProfilesResponse"] = new
                         {
                             type = "object",
-                            required = new[] { "profile", "storagePolicy" },
+                            required = new[] { "profiles", "activeProfileKey", "storagePolicy", "message" },
                             properties = new Dictionary<string, object>
                             {
-                                ["profile"] = RefSchema("ApiSingleWindowClientProfileDto"),
-                                ["storagePolicy"] = StringProperty("Client bridge storage policy summary.")
+                                ["profiles"] = RefArraySchema("ApiSingleWindowClientProfileDto"),
+                                ["activeProfileKey"] = StringProperty("Currently active operation profile key."),
+                                ["storagePolicy"] = StringProperty("Client bridge storage policy summary."),
+                                ["message"] = StringProperty("Profile operation result message.")
                             }
                         },
                         ["ApiSingleWindowClientProfileSaveRequest"] = new
                         {
                             type = "object",
-                            required = Array.Empty<string>(),
+                            required = new[]
+                            {
+                                "profileKey",
+                                "profileName",
+                                "companyScope",
+                                "cardIdentifier",
+                                "customsCooClientRootPath",
+                                "agentConsignmentClientRootPath",
+                                "canSubmitCustomsCoo",
+                                "canSubmitAgentConsignment"
+                            },
                             properties = new Dictionary<string, object>
                             {
-                                ["importRootPath"] = StringProperty("User-selected import root path. If receiptRootPath is omitted, this path is used for both."),
-                                ["receiptRootPath"] = StringProperty("User-selected receipt root path. If importRootPath is omitted, this path is used for both."),
-                                ["businessType"] = StringProperty("Optional business type for a business-specific directory override: CustomsCoo/coo or AgentConsignment/acd.")
-                            }
-                        },
-                        ["ApiSingleWindowClientProfileSaveResponse"] = new
-                        {
-                            type = "object",
-                            required = new[] { "success", "id", "profile", "storagePolicy", "message" },
-                            properties = new Dictionary<string, object>
-                            {
-                                ["success"] = new { type = "boolean" },
-                                ["id"] = new { type = "integer", format = "int32" },
-                                ["profile"] = RefSchema("ApiSingleWindowClientProfileDto"),
-                                ["storagePolicy"] = StringProperty("Client bridge storage policy summary."),
-                                ["message"] = StringProperty("Save result message.")
+                                ["profileKey"] = StringProperty("Existing profile key, or empty when creating a profile."),
+                                ["profileName"] = StringProperty("Operation-card profile display name."),
+                                ["companyScope"] = StringProperty("Required company identity bound to the card."),
+                                ["cardIdentifier"] = StringProperty("Required non-secret card label or identifier."),
+                                ["customsCooClientRootPath"] = StringProperty("Independent local official client root for Customs COO."),
+                                ["agentConsignmentClientRootPath"] = StringProperty("Independent local official client root for agent consignment."),
+                                ["canSubmitCustomsCoo"] = new { type = "boolean" },
+                                ["canSubmitAgentConsignment"] = new { type = "boolean" }
                             }
                         },
                         ["ApiSingleWindowClientDispatchRequest"] = new
@@ -579,9 +607,7 @@ namespace ExportDocManager.Api.Hosting
                             required = new[] { "batchId" },
                             properties = new Dictionary<string, object>
                             {
-                                ["batchId"] = new { type = "integer", format = "int32" },
-                                ["importRootPath"] = StringProperty("Optional import root path. When omitted, the saved configured directory is used."),
-                                ["profileName"] = StringProperty("Optional client profile name to record on the batch.")
+                                ["batchId"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["SingleWindowClientDispatchResult"] = new
@@ -604,8 +630,7 @@ namespace ExportDocManager.Api.Hosting
                             required = new[] { "batchId" },
                             properties = new Dictionary<string, object>
                             {
-                                ["batchId"] = new { type = "integer", format = "int32" },
-                                ["receiptRootPath"] = StringProperty("Optional receipt root path. When omitted, the saved configured directory is used.")
+                                ["batchId"] = new { type = "integer", format = "int32" }
                             }
                         },
                         ["SingleWindowReceiptCollectionResult"] = new
@@ -871,86 +896,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["storagePolicy"] = StringProperty("Reference catalog Excel import storage policy summary.")
                             }
                         },
-                        ["SingleWindowOperationTicketRow"] = new
-                        {
-                            type = "object",
-                            required = new[]
-                            {
-                                "ticketId",
-                                "businessType",
-                                "sourceInvoiceId",
-                                "documentId",
-                                "status",
-                                "priority",
-                                "requestedAt"
-                            },
-                            properties = new Dictionary<string, object>
-                            {
-                                ["ticketId"] = new { type = "integer", format = "int32" },
-                                ["businessType"] = StringProperty("Single Window business type."),
-                                ["sourceInvoiceId"] = new { type = "integer", format = "int32" },
-                                ["documentId"] = new { type = "integer", format = "int32" },
-                                ["batchId"] = new { type = "integer", format = "int32", nullable = true },
-                                ["status"] = StringProperty("Collaboration ticket status."),
-                                ["requestedBy"] = StringProperty("Requester."),
-                                ["assignedOperator"] = StringProperty("Assigned operator."),
-                                ["assignedWorkstationId"] = new { type = "integer", format = "int32", nullable = true },
-                                ["priority"] = new { type = "integer", format = "int32" },
-                                ["requestedAt"] = new { type = "string", format = "date-time" },
-                                ["assignedAt"] = new { type = "string", format = "date-time", nullable = true },
-                                ["submittedAt"] = new { type = "string", format = "date-time", nullable = true },
-                                ["completedAt"] = new { type = "string", format = "date-time", nullable = true },
-                                ["lastError"] = StringProperty("Last submission error.")
-                            }
-                        },
-                        ["SingleWindowWorkstationRow"] = new
-                        {
-                            type = "object",
-                            required = new[]
-                            {
-                                "workstationId",
-                                "machineName",
-                                "operatorName",
-                                "canSubmitAgentConsignment",
-                                "canSubmitCustomsCoo",
-                                "isEnabled",
-                                "updatedAt"
-                            },
-                            properties = new Dictionary<string, object>
-                            {
-                                ["workstationId"] = new { type = "integer", format = "int32" },
-                                ["machineName"] = StringProperty("Machine name."),
-                                ["profileId"] = new { type = "integer", format = "int32", nullable = true },
-                                ["operatorName"] = StringProperty("Current operator name."),
-                                ["canSubmitAgentConsignment"] = new { type = "boolean" },
-                                ["canSubmitCustomsCoo"] = new { type = "boolean" },
-                                ["isEnabled"] = new { type = "boolean" },
-                                ["remarks"] = StringProperty("Workstation remarks."),
-                                ["updatedAt"] = new { type = "string", format = "date-time" }
-                            }
-                        },
-                        ["SingleWindowCollaborationPageResult"] = new
-                        {
-                            type = "object",
-                            required = new[] { "tickets", "workstations", "totalTicketCount", "pageNumber", "pageSize" },
-                            properties = new Dictionary<string, object>
-                            {
-                                ["tickets"] = new
-                                {
-                                    type = "array",
-                                    items = RefSchema("SingleWindowOperationTicketRow")
-                                },
-                                ["workstations"] = new
-                                {
-                                    type = "array",
-                                    items = RefSchema("SingleWindowWorkstationRow")
-                                },
-                                ["totalTicketCount"] = new { type = "integer", format = "int32" },
-                                ["pageNumber"] = new { type = "integer", format = "int32" },
-                                ["pageSize"] = new { type = "integer", format = "int32" }
-                            }
-                        },
-                        ["SingleWindowOperationCenterRow"] = new
+                         ["SingleWindowOperationCenterRow"] = new
                         {
                             type = "object",
                             required = new[]
@@ -961,7 +907,8 @@ namespace ExportDocManager.Api.Hosting
                                 "draftRevision",
                                 "businessType",
                                 "invoiceNo",
-                                "contractNo",
+                                 "contractNo",
+                                 "companyScope",
                                 "status",
                                 "createdAt",
                                 "updatedAt",
@@ -975,15 +922,14 @@ namespace ExportDocManager.Api.Hosting
                                 ["draftRevision"] = new { type = "integer", format = "int32" },
                                 ["businessType"] = StringProperty("Single Window business type."),
                                 ["invoiceNo"] = StringProperty("Source invoice number."),
-                                ["contractNo"] = StringProperty("Source contract number."),
+                                 ["contractNo"] = StringProperty("Source contract number."),
+                                 ["companyScope"] = StringProperty("Company identity bound to the batch."),
                                 ["status"] = StringProperty("Submission batch status."),
                                 ["referenceNo"] = StringProperty("External Single Window reference number."),
                                 ["lastReceiptCode"] = StringProperty("Last receipt code."),
                                 ["lastReceiptMessage"] = StringProperty("Last receipt message."),
-                                ["createdOnMachine"] = StringProperty("Machine that created the batch."),
-                                ["submitPackagePath"] = StringProperty("Submit package path as recorded in the database."),
-                                ["clientProfileName"] = StringProperty("Single Window client profile name."),
-                                ["clientDispatchPath"] = StringProperty("Client dispatch path as recorded in the database."),
+                                 ["clientProfileName"] = StringProperty("Single Window client profile name."),
+                                 ["assignedCardIdentifier"] = StringProperty("Assigned non-secret operation-card identifier."),
                                 ["createdAt"] = new { type = "string", format = "date-time" },
                                 ["updatedAt"] = new { type = "string", format = "date-time" },
                                 ["receiptCount"] = new { type = "integer", format = "int32" }
@@ -1009,13 +955,11 @@ namespace ExportDocManager.Api.Hosting
                         ["SingleWindowOperationCenterPackageRecord"] = new
                         {
                             type = "object",
-                            required = new[] { "packageType", "direction", "filePath", "createdAt" },
+                             required = new[] { "packageType", "direction", "createdAt" },
                             properties = new Dictionary<string, object>
                             {
                                 ["packageType"] = StringProperty("Package type."),
                                 ["direction"] = StringProperty("Package direction."),
-                                ["filePath"] = StringProperty("Package file path as recorded in the database."),
-                                ["createdOnMachine"] = StringProperty("Machine that created the package record."),
                                 ["payloadFileCount"] = new { type = "integer", format = "int32" },
                                 ["attachmentFileCount"] = new { type = "integer", format = "int32" },
                                 ["warningCount"] = new { type = "integer", format = "int32" },
@@ -1049,7 +993,8 @@ namespace ExportDocManager.Api.Hosting
                                 "draftRevision",
                                 "businessType",
                                 "invoiceNo",
-                                "contractNo",
+                                 "contractNo",
+                                 "companyScope",
                                 "status",
                                 "createdAt",
                                 "updatedAt",
@@ -1064,15 +1009,12 @@ namespace ExportDocManager.Api.Hosting
                                 ["draftRevision"] = new { type = "integer", format = "int32" },
                                 ["businessType"] = StringProperty("Single Window business type."),
                                 ["invoiceNo"] = StringProperty("Source invoice number."),
-                                ["contractNo"] = StringProperty("Source contract number."),
+                                 ["contractNo"] = StringProperty("Source contract number."),
+                                 ["companyScope"] = StringProperty("Company identity bound to the batch."),
                                 ["status"] = StringProperty("Submission batch status."),
                                 ["referenceNo"] = StringProperty("External Single Window reference number."),
-                                ["submitPackagePath"] = StringProperty("Submit package path as recorded in the database."),
-                                ["lastReceiptPackagePath"] = StringProperty("Last receipt package path as recorded in the database."),
-                                ["workingDirectoryPath"] = StringProperty("Working directory path as recorded in the database."),
-                                ["clientProfileName"] = StringProperty("Single Window client profile name."),
-                                ["clientDispatchPath"] = StringProperty("Client dispatch path as recorded in the database."),
-                                ["createdOnMachine"] = StringProperty("Machine that created the batch."),
+                                 ["clientProfileName"] = StringProperty("Single Window client profile name."),
+                                 ["assignedCardIdentifier"] = StringProperty("Assigned non-secret operation-card identifier."),
                                 ["payloadFileCount"] = new { type = "integer", format = "int32" },
                                 ["attachmentFileCount"] = new { type = "integer", format = "int32" },
                                 ["warningCount"] = new { type = "integer", format = "int32" },

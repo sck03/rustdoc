@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
@@ -17,10 +18,12 @@ namespace ExportDocManager.Api.Tests
         [Fact]
         public async Task ToolEndpoints_ShouldRequireAuthenticationAndPreservePathValidationBehavior()
         {
+            const string desktopToken = "tools-desktop-token";
             await using var harness = await ApiIntegrationTestHarness.StartAsync(
                 "edm-api-tools",
-                "api-tools.db");
-            using var anonymousClient = harness.CreateClient();
+                "api-tools.db",
+                desktopAccessToken: desktopToken);
+            using var anonymousClient = harness.CreateClient(desktopAccessToken: desktopToken);
 
             var anonymousPdfMergeResponse = await anonymousClient.PostAsJsonAsync(
                 "/api/tools/pdf/merge/save-to-path",
@@ -84,7 +87,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.Unauthorized, anonymousLetterOfCreditReviewResponse.StatusCode);
 
             var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
-            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken, desktopToken);
 
             var emailStatusResponse = await adminClient.GetAsync("/api/tools/email/status");
             Assert.Equal(HttpStatusCode.OK, emailStatusResponse.StatusCode);
@@ -149,7 +152,7 @@ namespace ExportDocManager.Api.Tests
                     body = "Body",
                     attachmentPaths = new[] { Path.Combine(harness.DataRoot, "missing.pdf") }
                 });
-            Assert.Equal(HttpStatusCode.Forbidden, missingEmailAttachmentResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, missingEmailAttachmentResponse.StatusCode);
 
             var unconfiguredEmailResponse = await adminClient.PostAsJsonAsync(
                 "/api/tools/email/send",
@@ -181,7 +184,7 @@ namespace ExportDocManager.Api.Tests
                 });
             Assert.Equal(HttpStatusCode.OK, createOperatorResponse.StatusCode);
             var operatorLogin = await harness.LoginAsync(anonymousClient, "email-operator", "email-pass");
-            using var operatorClient = harness.CreateClient(operatorLogin.AccessToken);
+            using var operatorClient = harness.CreateClient(operatorLogin.AccessToken, desktopToken);
             var forbiddenEmailTestResponse = await operatorClient.PostAsync(
                 "/api/tools/email/test-connection",
                 content: null);
@@ -194,7 +197,7 @@ namespace ExportDocManager.Api.Tests
                     sourceFiles = Array.Empty<string>(),
                     destinationPath = Path.Combine(harness.DataRoot, "merged.pdf")
                 });
-            Assert.Equal(HttpStatusCode.Forbidden, invalidPdfMergeResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, invalidPdfMergeResponse.StatusCode);
 
             var invalidLetterOfCreditResponse = await adminClient.PostAsJsonAsync(
                 "/api/tools/letter-of-credit/import",
@@ -285,12 +288,72 @@ namespace ExportDocManager.Api.Tests
                 {
                     destinationPath = Path.Combine(harness.DataRoot, "template.txt")
                 });
-            Assert.Equal(HttpStatusCode.Forbidden, invalidExcelExportResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, invalidExcelExportResponse.StatusCode);
 
             var invalidBookingSheetResponse = await adminClient.PostAsync(
                 "/api/tools/excel/booking-sheet/from-invoice/0/download",
                 content: null);
             Assert.Equal(HttpStatusCode.BadRequest, invalidBookingSheetResponse.StatusCode);
+        }
+
+        [Fact]
+        public async Task LetterOfCreditUpload_ShouldImportBrowserFileHideServerPathEnforceLimitAndCleanupCache()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-letter-of-credit-upload",
+                "api-letter-of-credit-upload.db");
+            using var anonymousClient = harness.CreateClient();
+
+            using (var anonymousContent = CreateBinaryContent("IRREVOCABLE LETTER OF CREDIT"))
+            {
+                var anonymousResponse = await anonymousClient.PostAsync(
+                    "/api/tools/letter-of-credit/import-upload?fileName=credit.txt",
+                    anonymousContent);
+                Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
+            }
+
+            var login = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(login.AccessToken);
+
+            using (var invalidNameContent = CreateBinaryContent("LETTER OF CREDIT"))
+            {
+                var invalidNameResponse = await adminClient.PostAsync(
+                    "/api/tools/letter-of-credit/import-upload?fileName=bad%3Aname.txt",
+                    invalidNameContent);
+                Assert.Equal(HttpStatusCode.BadRequest, invalidNameResponse.StatusCode);
+            }
+
+            using (var content = CreateBinaryContent("IRREVOCABLE LETTER OF CREDIT\nAMOUNT USD 12,345.67"))
+            {
+                var response = await adminClient.PostAsync(
+                    "/api/tools/letter-of-credit/import-upload?fileName=..%2Fbrowser-credit.txt",
+                    content);
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                var result = await ApiIntegrationTestHarness.ReadJsonAsync<ApiLetterOfCreditImportResponse>(response);
+                Assert.Equal("browser-credit.txt", result.SourcePath);
+                Assert.Equal("文本文件", result.SourceDescription);
+                Assert.Contains("IRREVOCABLE LETTER OF CREDIT", result.ExtractedText, StringComparison.Ordinal);
+                Assert.Contains("Cache/BrowserUploads/LetterOfCredit", result.StoragePolicy, StringComparison.Ordinal);
+                Assert.DoesNotContain(harness.DataRoot, result.SourcePath, StringComparison.OrdinalIgnoreCase);
+            }
+
+            using (var oversizedContent = new ByteArrayContent(new byte[checked((int)ApiUploadLimits.LetterOfCreditBytes + 1)]))
+            {
+                oversizedContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                var oversizedResponse = await adminClient.PostAsync(
+                    "/api/tools/letter-of-credit/import-upload?fileName=oversized.txt",
+                    oversizedContent);
+                Assert.Equal(HttpStatusCode.RequestEntityTooLarge, oversizedResponse.StatusCode);
+            }
+
+            string uploadCache = Path.Combine(
+                harness.DataRoot,
+                "Cache",
+                "BrowserUploads",
+                "LetterOfCredit");
+            Assert.False(
+                Directory.Exists(uploadCache) &&
+                Directory.EnumerateFileSystemEntries(uploadCache, "*", SearchOption.AllDirectories).Any());
         }
 
         [Fact]
@@ -317,6 +380,13 @@ namespace ExportDocManager.Api.Tests
                 });
 
             Assert.Equal(HttpStatusCode.NotFound, missingAttachmentResponse.StatusCode);
+        }
+
+        private static ByteArrayContent CreateBinaryContent(string text)
+        {
+            var content = new ByteArrayContent(Encoding.UTF8.GetBytes(text));
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            return content;
         }
 
         [Fact]

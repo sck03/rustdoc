@@ -32,15 +32,6 @@ namespace ExportDocManager.Services.Core
                 context.AgentConsignmentDocuments.Remove(agentConsignmentDocument);
             }
 
-            var operationTickets = await context.SwOperationTickets
-                .Where(ticket => ticket.SourceInvoiceId == invoiceId)
-                .ToListAsync(cancellationToken)
-                .ConfigureAwait(false);
-            if (operationTickets.Count > 0)
-            {
-                context.SwOperationTickets.RemoveRange(operationTickets);
-            }
-
             var handoffPackageRecords = await context.SwHandoffPackageRecords
                 .Where(record => record.SourceInvoiceId == invoiceId)
                 .ToListAsync(cancellationToken)

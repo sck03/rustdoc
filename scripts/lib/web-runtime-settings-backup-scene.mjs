@@ -8,6 +8,7 @@ export function createSettingsBackupSmokeScene(runtime) {
     buildBatchExportSettingsDeepLinkUrl,
     buildDocumentEmailSettingsDeepLinkUrl,
     buildSettingsSectionUrl,
+    delay,
     ensureTrailingSlash,
     evaluate,
     includesText,
@@ -868,7 +869,7 @@ export function createSettingsBackupSmokeScene(runtime) {
         page,
         `(() => {
           const section = document.querySelector('[aria-label="数据备份与还原"]');
-          const messages = Array.from(section?.querySelectorAll('.success-alert') || [])
+          const messages = Array.from(section?.querySelectorAll('.inline-notice, .success-alert') || [])
             .map((item) => item.innerText || item.textContent || '')
             .filter(Boolean);
           return messages.find((message) =>

@@ -55,7 +55,7 @@ namespace ExportDocManager.Api.Hosting
         {
             settings.System ??= new SystemSettings();
             settings.BatchExport ??= new BatchExportSettings();
-            settings.PaymentTemplates ??= new List<BatchExportItem>();
+            settings.PaymentTemplates ??= new List<PaymentTemplateItem>();
             settings.ExcelImport ??= new ExcelImportSettings();
             settings.ExcelImportSchemes ??= new List<ExcelImportSettings>();
             settings.ExchangeRate ??= new ExchangeRateSettings();

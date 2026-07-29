@@ -15,7 +15,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ApiBackgroundJobRunner jobRunner,
                 int paymentId,
-                ApiReportPdfRequest request) =>
+                ApiPaymentReportPdfRequest request) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -38,13 +38,11 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 string templatePath = request.TemplatePath?.Trim() ?? string.Empty;
-                bool withSeal = request.WithSeal;
                 return AcceptedBackgroundJob(EnqueuePaymentReportPdfJob(
                     jobRunner,
                     user.Username,
                     paymentId,
                     templatePath,
-                    withSeal,
                     destinationPath));
             })
             .WithName("StartPaymentVoucherPdfSaveToPathJob");
@@ -55,7 +53,7 @@ namespace ExportDocManager.Api.Hosting
                 IAppPathProvider pathProvider,
                 ApiBackgroundJobRunner jobRunner,
                 int paymentId,
-                ApiReportPdfRequest request) =>
+                ApiPaymentReportPdfRequest request) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -63,7 +61,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Unauthorized();
                 }
 
-                request ??= new ApiReportPdfRequest();
+                request ??= new ApiPaymentReportPdfRequest();
                 request.DestinationPath = CreateBrowserDownloadPath(
                     pathProvider,
                     "PaymentPdf",
@@ -82,7 +80,6 @@ namespace ExportDocManager.Api.Hosting
                     user.Username,
                     paymentId,
                     request.TemplatePath?.Trim() ?? string.Empty,
-                    request.WithSeal,
                     destinationPath));
             })
             .WithName("StartPaymentVoucherPdfDownloadJob");
@@ -90,7 +87,7 @@ namespace ExportDocManager.Api.Hosting
 
         internal static IResult ValidatePaymentReportPdfRequest(
             int paymentId,
-            ApiReportPdfRequest request,
+            ApiPaymentReportPdfRequest request,
             out string destinationPath)
         {
             destinationPath = string.Empty;
@@ -103,12 +100,6 @@ namespace ExportDocManager.Api.Hosting
             if (request == null)
             {
                 return Results.BadRequest(new ApiErrorResponse("付款/报销单 PDF 请求体不能为空。"));
-            }
-
-            if (!TryParseReportDocumentType(request.ReportType, out var reportType)
-                || reportType != ReportDocumentType.PaymentVoucher)
-            {
-                return Results.BadRequest(new ApiErrorResponse("付款/报销单 PDF 生成仅支持 PaymentVoucher 报表类型。"));
             }
 
             string output = request.DestinationPath?.Trim() ?? string.Empty;
@@ -138,7 +129,6 @@ namespace ExportDocManager.Api.Hosting
             string requestedBy,
             int paymentId,
             string templatePath,
-            bool withSeal,
             string destinationPath)
         {
             return jobRunner.Enqueue(
@@ -155,12 +145,10 @@ namespace ExportDocManager.Api.Hosting
 
                     var reportPdfRenderService = provider.GetRequiredService<IReportPdfRenderService>();
                     var pdfResult = await reportPdfRenderService.RenderPaymentVoucherPdfAsync(
-                            new ReportPdfRenderRequest
+                            new PaymentReportPdfRenderRequest
                             {
                                 SourceId = paymentId,
-                                ReportType = ReportDocumentType.PaymentVoucher,
                                 TemplatePath = templatePath,
-                                WithSeal = withSeal,
                                 DestinationPath = destinationPath,
                                 DocumentTitle = $"PaymentVoucher-{paymentId}"
                             },
@@ -179,11 +167,9 @@ namespace ExportDocManager.Api.Hosting
                 retryRequestJson: SerializeBackgroundJobRetryRequest(new ApiPaymentReportPdfJobRetryRequest
                 {
                     PaymentId = paymentId,
-                    Body = new ApiReportPdfRequest
+                    Body = new ApiPaymentReportPdfRequest
                     {
-                        ReportType = ReportDocumentType.PaymentVoucher.ToString(),
                         TemplatePath = templatePath,
-                        WithSeal = withSeal,
                         DestinationPath = destinationPath
                     }
                 }),
@@ -194,7 +180,7 @@ namespace ExportDocManager.Api.Hosting
         {
             public int PaymentId { get; set; }
 
-            public ApiReportPdfRequest Body { get; set; } = new();
+            public ApiPaymentReportPdfRequest Body { get; set; } = new();
         }
     }
 }

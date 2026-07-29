@@ -12,11 +12,17 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
         public string MediaType { get; init; } = string.Empty;
 
         public string Description { get; init; } = string.Empty;
+
+        public long SizeBytes { get; init; }
+
+        public string Sha256 { get; init; } = string.Empty;
     }
 
     public sealed class SingleWindowPackageManifest
     {
-        public string SchemaVersion { get; init; } = "1.0";
+        public string SchemaVersion { get; init; } = "3.0";
+
+        public string PackageId { get; init; } = Guid.NewGuid().ToString("N");
 
         public SingleWindowPackageType PackageType { get; init; }
 
@@ -40,6 +46,22 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public string ContractNo { get; init; } = string.Empty;
 
+        public string CompanyScope { get; init; } = string.Empty;
+
+        public string SnapshotSha256 { get; init; } = string.Empty;
+
+        public string SourcePackageDigest { get; init; } = string.Empty;
+
+        public string ContentDigest { get; set; } = string.Empty;
+
+        public string StationKey { get; init; } = string.Empty;
+
+        public string CardIdentifier { get; init; } = string.Empty;
+
+        public string ClientProfileKey { get; init; } = string.Empty;
+
+        public string ClientProfileName { get; init; } = string.Empty;
+
         public DateTime CreatedAt { get; init; } = DateTime.Now;
 
         public string CreatedOnMachine { get; init; } = Environment.MachineName;
@@ -49,6 +71,52 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
         public IReadOnlyList<SingleWindowPackageFile> AttachmentFiles { get; init; } = [];
 
         public IReadOnlyList<string> Warnings { get; init; } = [];
+    }
+
+    public sealed class SingleWindowPackageBinding
+    {
+        public int BatchId { get; init; }
+
+        public string BatchReference { get; init; } = string.Empty;
+
+        public SingleWindowBusinessType BusinessType { get; init; }
+
+        public int SourceInvoiceId { get; init; }
+
+        public int SourceDocumentId { get; init; }
+
+        public string SourceDocumentType { get; init; } = string.Empty;
+
+        public int SubmissionVersion { get; init; }
+
+        public int DraftRevision { get; init; }
+
+        public string SourceBaselineHash { get; init; } = string.Empty;
+
+        public string InvoiceNo { get; init; } = string.Empty;
+
+        public string ContractNo { get; init; } = string.Empty;
+
+        public string CompanyScope { get; init; } = string.Empty;
+
+        public string SubmitPackageDigest { get; init; } = string.Empty;
+
+        public string AssignedStationKey { get; init; } = string.Empty;
+
+        public string AssignedCardIdentifier { get; init; } = string.Empty;
+
+        public string AssignedProfileKey { get; init; } = string.Empty;
+
+        public string ClientProfileName { get; init; } = string.Empty;
+    }
+
+    public sealed class SingleWindowSubmissionReservation
+    {
+        public int BatchId { get; init; }
+
+        public string BatchReference { get; init; } = string.Empty;
+
+        public int SubmissionVersion { get; init; }
     }
 
     public sealed class SingleWindowHandoffPackageResult

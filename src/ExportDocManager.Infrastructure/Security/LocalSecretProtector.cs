@@ -42,6 +42,11 @@ namespace ExportDocManager.Services.Security
                 return plainText;
             }
 
+            if (IsProtectedPayload(plainText))
+            {
+                throw new InvalidOperationException("不能把已经加密的本地主密钥载荷再次加密。");
+            }
+
             byte[] nonce = RandomNumberGenerator.GetBytes(NonceSize);
             byte[] plaintext = Encoding.UTF8.GetBytes(plainText);
             byte[] ciphertext = new byte[plaintext.Length];
@@ -78,12 +83,14 @@ namespace ExportDocManager.Services.Security
                 return null;
             }
 
+            EnsureExistingKeyForUnprotect();
+
             try
             {
                 byte[] payload = Convert.FromBase64String(protectedText[PayloadPrefix.Length..]);
                 if (payload.Length < NonceSize + TagSize)
                 {
-                    return null;
+                    throw new InvalidDataException("本地主密钥载荷长度无效。");
                 }
 
                 int ciphertextLength = payload.Length - NonceSize - TagSize;
@@ -108,7 +115,48 @@ namespace ExportDocManager.Services.Security
             }
             catch (Exception ex) when (ex is FormatException or CryptographicException)
             {
-                return null;
+                throw new InvalidDataException("本地主密钥载荷无法解密，可能已损坏或当前安装密钥已丢失。", ex);
+            }
+        }
+
+        public bool IsProtectedPayload(string value) =>
+            !string.IsNullOrEmpty(value) && value.StartsWith(PayloadPrefix, StringComparison.Ordinal);
+
+        internal string UnprotectSettingsValue(string value) =>
+            IsProtectedPayload(value) ? Unprotect(value) : value;
+
+        public bool TryUnprotect(string value, out string plainText)
+        {
+            if (!IsProtectedPayload(value))
+            {
+                plainText = null;
+                return false;
+            }
+
+            try
+            {
+                plainText = Unprotect(value);
+                return true;
+            }
+            catch (InvalidDataException)
+            {
+                plainText = null;
+                return false;
+            }
+        }
+
+        private void EnsureExistingKeyForUnprotect()
+        {
+            string configuredKey = Environment.GetEnvironmentVariable(MasterKeyEnvironmentVariable) ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(configuredKey))
+            {
+                return;
+            }
+
+            string keyPath = Path.Combine(_securityRoot, MasterKeyFileName);
+            if (!_key.IsValueCreated && !File.Exists(keyPath))
+            {
+                throw new InvalidDataException($"本机密钥文件不存在，无法解密本地设置：{keyPath}");
             }
         }
 

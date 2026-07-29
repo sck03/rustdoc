@@ -660,12 +660,17 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("模板内容不能为空。"));
                 }
 
+                if (parsedReportType == ReportDocumentType.PaymentVoucher && request.WithSeal.HasValue)
+                {
+                    return Results.BadRequest(new ApiErrorResponse("付款报销模板不接受任何印章配置，请移除 withSeal 字段。"));
+                }
+
                 try
                 {
                     var result = await reportTemplateService.PreviewTemplateContentAsync(
                         parsedReportType,
                         request.Content,
-                        request.WithSeal,
+                        parsedReportType == ReportDocumentType.ExportDocument && (request.WithSeal ?? true),
                         cancellationToken);
 
                     return Results.Ok(new ApiReportTemplatePreviewResponse(

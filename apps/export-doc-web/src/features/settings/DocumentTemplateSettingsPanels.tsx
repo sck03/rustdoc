@@ -18,6 +18,13 @@ type BatchExportItemDraft = {
   reportType: string;
 };
 
+type PaymentTemplateItemDraft = {
+  name: string;
+  templatePath: string;
+  isEnabled: boolean;
+  reportType: string;
+};
+
 type TemplateSettingsPanelProps = {
   settings: SettingsRecord;
   canManageSettings: boolean;
@@ -236,7 +243,7 @@ export function PaymentTemplateSettingsPanel({
   const templateOptions = useMemo(() => buildTemplateOptions(templates), [templates]);
   const disabled = !canManageSettings || isBusy;
 
-  function updateItems(nextItems: BatchExportItemDraft[]) {
+  function updateItems(nextItems: PaymentTemplateItemDraft[]) {
     onChange(["paymentTemplates"], nextItems.map(toPaymentTemplateRecord));
   }
 
@@ -249,13 +256,12 @@ export function PaymentTemplateSettingsPanel({
         name: firstTemplate?.displayName || fileNameFromPath(templatePath) || "新付款单模板",
         templatePath,
         isEnabled: true,
-        showSeal: true,
         reportType: "PaymentVoucher",
       },
     ]);
   }
 
-  function updateItem(index: number, patch: Partial<BatchExportItemDraft>) {
+  function updateItem(index: number, patch: Partial<PaymentTemplateItemDraft>) {
     updateItems(
       items.map((item, itemIndex) => {
         if (itemIndex !== index) {
@@ -313,7 +319,6 @@ export function PaymentTemplateSettingsPanel({
                 <th>启用</th>
                 <th>名称</th>
                 <th>模板</th>
-                <th>带章</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -355,16 +360,6 @@ export function PaymentTemplateSettingsPanel({
                       </select>
                     </td>
                     <td>
-                      <input
-                        className="batch-export-check-input"
-                        type="checkbox"
-                        checked={item.showSeal}
-                        disabled={disabled}
-                        aria-label={`付款模板带章 ${item.name || index + 1}`}
-                        onChange={(event) => updateItem(index, { showSeal: event.target.checked })}
-                      />
-                    </td>
-                    <td>
                       <div className="batch-export-row-actions">
                         <button
                           className="icon-button compact-icon-button"
@@ -399,7 +394,7 @@ export function PaymentTemplateSettingsPanel({
                 ))
               ) : (
                 <tr>
-                  <td className="empty-cell" colSpan={6}>
+                  <td className="empty-cell" colSpan={5}>
                     暂无付款/报销模板
                   </td>
                 </tr>
@@ -450,7 +445,7 @@ function CheckboxSetting({
   );
 }
 
-function readBatchExportItemsForSettings(settings: SettingsRecord) {
+export function readBatchExportItemsForSettings(settings: SettingsRecord) {
   const batchExport = readNestedValue(settings, ["batchExport"]);
   if (!isRecord(batchExport)) {
     return [];
@@ -484,13 +479,13 @@ function readBatchExportItemsForSettings(settings: SettingsRecord) {
   return items;
 }
 
-function readPaymentTemplateItemsForSettings(settings: SettingsRecord) {
+export function readPaymentTemplateItemsForSettings(settings: SettingsRecord) {
   const rawItems = readNestedValue(settings, ["paymentTemplates"]);
   if (!Array.isArray(rawItems)) {
     return [];
   }
 
-  const items: BatchExportItemDraft[] = [];
+  const items: PaymentTemplateItemDraft[] = [];
   for (const rawItem of rawItems) {
     if (!isRecord(rawItem)) {
       continue;
@@ -505,7 +500,6 @@ function readPaymentTemplateItemsForSettings(settings: SettingsRecord) {
       name: readRecordString(rawItem, "name", "Name"),
       templatePath: readRecordString(rawItem, "templatePath", "TemplatePath"),
       isEnabled: readRecordBoolean(rawItem, true, "isEnabled", "IsEnabled"),
-      showSeal: readRecordBoolean(rawItem, true, "showSeal", "ShowSeal"),
       reportType,
     });
   }
@@ -513,7 +507,7 @@ function readPaymentTemplateItemsForSettings(settings: SettingsRecord) {
   return items;
 }
 
-function toBatchExportItemRecord(item: BatchExportItemDraft) {
+export function toBatchExportItemRecord(item: BatchExportItemDraft) {
   return {
     name: item.name.trim() || "新单证",
     templatePath: item.templatePath.trim(),
@@ -523,12 +517,11 @@ function toBatchExportItemRecord(item: BatchExportItemDraft) {
   };
 }
 
-function toPaymentTemplateRecord(item: BatchExportItemDraft) {
+export function toPaymentTemplateRecord(item: PaymentTemplateItemDraft) {
   return {
     name: item.name.trim() || "新付款单模板",
     templatePath: item.templatePath.trim(),
     isEnabled: item.isEnabled,
-    showSeal: item.showSeal,
     reportType: "PaymentVoucher",
   };
 }
@@ -560,24 +553,11 @@ function readTemplateDisplayName(templatePath: string, templates: ReportTemplate
 }
 
 function isExportBatchReportType(reportType: string) {
-  const normalized = reportType.trim().toLowerCase();
-  return (
-    normalized.length === 0 ||
-    normalized === "exportdocument" ||
-    normalized === "commercialinvoice" ||
-    normalized === "packinglist" ||
-    normalized === "generic"
-  );
+  return reportType.trim().toLowerCase() === "exportdocument";
 }
 
 function isPaymentTemplateReportType(reportType: string) {
-  const normalized = reportType.trim().toLowerCase();
-  return (
-    normalized.length === 0 ||
-    normalized === "paymentvoucher" ||
-    normalized === "paymentdocument" ||
-    normalized === "internal"
-  );
+  return reportType.trim().toLowerCase() === "paymentvoucher";
 }
 
 function readString(settings: SettingsRecord, path: string[]) {

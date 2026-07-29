@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import { normalizeText } from "../../ui/formUtils.ts";
+import { getClipboardPasteInstruction, readClipboardText, writeClipboardText } from "../../ui/clipboard.ts";
 import { InvoiceItemHistoryOptionCache } from "./invoiceItemHistory.ts";
 import { InvoiceItemShortcutGuide } from "./InvoiceItemShortcutGuide.tsx";
 import { formatProductOptionLabel, ProductLibraryPickerDialog } from "./InvoiceProductLibraryPickerDialog.tsx";
@@ -41,7 +42,7 @@ import { InvoiceItemsTable } from "./InvoiceItemsTable.tsx";
 import { InvoiceItemsEditorDialogs } from "./InvoiceItemsEditorDialogs.tsx";
 import { useInvoiceItemsEditorInteraction } from "./useInvoiceItemsEditorInteraction.ts";
 import { invoiceItemHeaderHeightPx, invoiceItemRowHeightPx, invoiceItemUnitLookupTargets, invoiceItemVirtualizationThreshold, isInvoiceItemArrowNavigationKey, isInvoiceItemCellInputTarget, isInvoiceItemVerticalNavigationKey, shouldMoveInvoiceItemCellByArrow } from "./invoiceItemsEditorInteraction.ts";
-import { isUnitLookupSourceField, buildUnitCandidateLookup, findChineseUnitCandidates, normalizeUnitEnglishKey, createCellKey, parseCellKey, readSelectedCells, canFillDownSelectedCells, buildCellRangeKeys, getInvoiceItemColumnIndex, normalizeInvoiceItemBlankRowCount, calculateInvoiceItemVirtualRange, buildSelectedCellsClipboardText, calculateInvoiceItemTableMinWidth, getInvoiceItemColumnWidth, readItemClipboardValue, readItemTextValue, sanitizeClipboardCell, writeClipboardText, parseInvoiceItemClipboardRows, createEmptyInvoiceItem, calculateInvoiceTotals, isMeaningfulInvoiceItem } from "./invoiceItemsEditorModel.ts";
+import { isUnitLookupSourceField, buildUnitCandidateLookup, findChineseUnitCandidates, normalizeUnitEnglishKey, createCellKey, parseCellKey, readSelectedCells, canFillDownSelectedCells, buildCellRangeKeys, getInvoiceItemColumnIndex, normalizeInvoiceItemBlankRowCount, calculateInvoiceItemVirtualRange, buildSelectedCellsClipboardText, calculateInvoiceItemTableMinWidth, getInvoiceItemColumnWidth, readItemClipboardValue, readItemTextValue, sanitizeClipboardCell, parseInvoiceItemClipboardRows, createEmptyInvoiceItem, calculateInvoiceTotals, isMeaningfulInvoiceItem } from "./invoiceItemsEditorModel.ts";
 import {
   EditableInvoiceItemField,
   firstEditableInvoiceItemField,
@@ -506,17 +507,13 @@ export function InvoiceItemsEditor({
       return;
     }
 
-    if (!navigator.clipboard?.readText) {
-      setEditorMessage("当前环境不能直接读取剪贴板。");
+    const text = await readClipboardText();
+    if (text == null) {
+      setEditorMessage(getClipboardPasteInstruction("商品明细表格"));
       return;
     }
 
-    try {
-      const text = await navigator.clipboard.readText();
-      pasteClipboardText(text);
-    } catch {
-      setEditorMessage("读取剪贴板失败。");
-    }
+    pasteClipboardText(text);
   }
 
   function pasteClipboardText(text: string) {

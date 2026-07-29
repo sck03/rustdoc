@@ -47,6 +47,17 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(80)]
         public string SourceBaselineHash { get; set; } = string.Empty;
 
+        [MaxLength(120)]
+        public string CompanyScope { get; set; } = string.Empty;
+
+        [MaxLength(64)]
+        public string SubmitPackageDigest { get; set; } = string.Empty;
+
+        [MaxLength(64)]
+        public string SubmitPackageArchiveSha256 { get; set; } = string.Empty;
+
+        public long SubmitPackageArchiveSizeBytes { get; set; }
+
         [MaxLength(520)]
         public string SubmitPackagePath { get; set; } = string.Empty;
 
@@ -73,6 +84,9 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(2000)]
         public string LastReceiptMessage { get; set; } = string.Empty;
 
+        [MaxLength(2000)]
+        public string LastError { get; set; } = string.Empty;
+
         [MaxLength(80)]
         public string CreatedOnMachine { get; set; } = string.Empty;
 
@@ -82,8 +96,19 @@ namespace ExportDocManager.Models.Entities
 
         public DateTime? LastReceiptAt { get; set; }
 
+        [MaxLength(64)]
+        public string AssignedStationKey { get; set; } = string.Empty;
+
+        [MaxLength(64)]
+        public string AssignedProfileKey { get; set; } = string.Empty;
+
+        [MaxLength(120)]
+        public string AssignedCardIdentifier { get; set; } = string.Empty;
+
         public List<SwReceiptLog> ReceiptLogs { get; set; } = [];
 
         public List<SwHandoffPackageRecord> PackageRecords { get; set; } = [];
+
+        public SwSubmitPackageArchive SubmitPackageArchive { get; set; }
     }
 }

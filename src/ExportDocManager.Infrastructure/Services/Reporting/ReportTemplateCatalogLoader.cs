@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Serilog;
 
 namespace ExportDocManager.Services.Reporting
@@ -12,7 +13,8 @@ namespace ExportDocManager.Services.Reporting
         public static readonly JsonSerializerOptions JsonOptions = new()
         {
             WriteIndented = true,
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
 
         private readonly ReportTemplatePathResolver _pathResolver;
@@ -87,12 +89,15 @@ namespace ExportDocManager.Services.Reporting
                     continue;
                 }
 
+                string catalogType = DetermineTemplateCatalogType(fullPath);
                 configuredByPath[fullPath] = new ReportTemplateConfig
                 {
-                    Type = DetermineTemplateCatalogType(fullPath),
+                    Type = catalogType,
                     FileName = fullPath,
                     Name = NormalizeTemplateDisplayName(row.Name, fullPath),
-                    WithSeal = row.WithSeal ?? true
+                    WithSeal = ResolveCatalogReportType(catalogType, fullPath) == ReportDocumentType.PaymentVoucher
+                        ? null
+                        : row.WithSeal ?? true
                 };
             }
 
@@ -130,7 +135,9 @@ namespace ExportDocManager.Services.Reporting
                         Type = NormalizeTemplateCatalogType(null, fullPath),
                         FileName = fullPath,
                         Name = NormalizeTemplateDisplayName(null, fullPath),
-                        WithSeal = true
+                        WithSeal = ResolveCatalogReportType(null, fullPath) == ReportDocumentType.PaymentVoucher
+                            ? null
+                            : true
                     };
             }
         }

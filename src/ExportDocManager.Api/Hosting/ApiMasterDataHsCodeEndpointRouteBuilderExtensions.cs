@@ -16,12 +16,15 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/master-data/hs-codes/import-preview-path", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 IHsCodeService hsCodeService,
                 IAppPathProvider pathProvider,
                 ApiHsCodeImportPreviewPathRequest request,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
+                    return WriteForbidden("服务器 HS Excel 路径预览仅允许可信 Tauri 桌面端；浏览器请上传文件。");
                 if (request == null || string.IsNullOrWhiteSpace(request.FilePath))
                     return Results.BadRequest(new ApiErrorResponse("HS编码导入文件路径不能为空。"));
                 if (!File.Exists(request.FilePath)) return Results.NotFound(new ApiErrorResponse("HS编码导入文件不存在。"));
@@ -50,6 +53,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/master-data/hs-codes/import-preview-upload", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 IHsCodeService hsCodeService,
                 IAppPathProvider pathProvider,
                 CancellationToken cancellationToken) =>
@@ -154,7 +158,6 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.Unauthorized();
                 }
-
                 var result = await repository.QueryPageAsync(
                     new HsCodeReadQuery
                     {
@@ -171,6 +174,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/master-data/hs-codes/import-path", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 IHsCodeService hsCodeService,
                 IHsCodeReadRepository repository,
                 ApiHsCodeImportPathRequest request,
@@ -179,6 +183,11 @@ namespace ExportDocManager.Api.Hosting
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
                     return Results.Unauthorized();
+                }
+
+                if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
+                {
+                    return WriteForbidden("服务器 HS Excel 路径导入仅允许可信 Tauri 桌面端；浏览器请上传文件。");
                 }
 
                 if (request == null || string.IsNullOrWhiteSpace(request.FilePath))

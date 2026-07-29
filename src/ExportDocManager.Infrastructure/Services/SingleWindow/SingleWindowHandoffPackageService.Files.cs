@@ -31,12 +31,12 @@ namespace ExportDocManager.Services.SingleWindow
                     fileName);
                 string destination = Path.Combine(attachmentDirectory, fileName);
                 await FileCopyHelper.CopyAsync(attachment.FilePath, destination, overwrite: true, cancellationToken);
-                packageFiles.Add(new SingleWindowPackageFile
-                {
-                    RelativePath = Path.Combine("attachments", fileName),
-                    MediaType = string.IsNullOrWhiteSpace(attachment.MediaType) ? "application/octet-stream" : attachment.MediaType,
-                    Description = attachment.Description
-                });
+                packageFiles.Add(await SingleWindowPackageIntegrity.DescribeFileAsync(
+                    destination,
+                    PathBoundaryHelper.ToProtocolRelativePath("attachments", fileName),
+                    string.IsNullOrWhiteSpace(attachment.MediaType) ? "application/octet-stream" : attachment.MediaType,
+                    attachment.Description,
+                    cancellationToken));
             }
 
             return packageFiles;
@@ -54,18 +54,19 @@ namespace ExportDocManager.Services.SingleWindow
             foreach (var file in receiptFiles.Where(File.Exists))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                await SingleWindowPackageIntegrity.ValidateReceiptSourceFileAsync(file, cancellationToken);
                 string copiedFileName = CopyFileToPackageDirectory(
                     file,
                     usedFileNames,
                     Path.GetFileName(file));
                 string destination = Path.Combine(receiptsDirectory, copiedFileName);
                 await FileCopyHelper.CopyAsync(file, destination, overwrite: true, cancellationToken);
-                copiedFiles.Add(new SingleWindowPackageFile
-                {
-                    RelativePath = Path.Combine("receipts", copiedFileName),
-                    MediaType = "application/xml",
-                    Description = Path.GetFileName(file)
-                });
+                copiedFiles.Add(await SingleWindowPackageIntegrity.DescribeFileAsync(
+                    destination,
+                    PathBoundaryHelper.ToProtocolRelativePath("receipts", copiedFileName),
+                    "application/xml",
+                    Path.GetFileName(file),
+                    cancellationToken));
             }
 
             return copiedFiles;

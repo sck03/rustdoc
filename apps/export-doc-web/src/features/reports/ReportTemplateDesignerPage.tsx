@@ -411,7 +411,7 @@ export function ReportTemplateDesignerPage({
     reportType,
     selectedTemplatePath,
     content,
-    withSeal: currentTemplate?.withSealDefault ?? true,
+    withSeal: reportType === "ExportDocument" && (currentTemplate?.withSealDefault ?? true),
     previewInvoiceId,
     previewPaymentId,
     onPreviewed: (response) => {

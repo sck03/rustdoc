@@ -1,14 +1,19 @@
 using System.IO;
 using System.Threading;
 using PDFtoImage;
+using PDFtoImage.Exceptions;
 using SkiaSharp;
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 namespace ExportDocManager.Services.Tools
 {
     public sealed class LetterOfCreditDocumentService : ILetterOfCreditDocumentService
     {
+        public const long MaximumFileBytes = 25L * 1024L * 1024L;
+        public const int MaximumPdfPages = 50;
+        public const int MaximumExtractedTextCharacters = 500_000;
         private static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
             ".txt",
@@ -49,6 +54,12 @@ namespace ExportDocManager.Services.Tools
                 throw new FileNotFoundException("找不到指定的信用证文件。", filePath);
             }
 
+            var fileInfo = new FileInfo(filePath);
+            if (fileInfo.Length <= 0 || fileInfo.Length > MaximumFileBytes)
+            {
+                throw new InvalidDataException("信用证文件为空或超过 25 MB 限制。");
+            }
+
             string extension = Path.GetExtension(filePath);
             string extractedText;
             string sourceDescription;
@@ -79,6 +90,11 @@ namespace ExportDocManager.Services.Tools
                 throw new InvalidOperationException("未能从信用证文件中提取到有效文本。");
             }
 
+            if (extractedText.Length > MaximumExtractedTextCharacters)
+            {
+                throw new InvalidDataException("信用证提取文本超过允许长度，请拆分文件后重试。");
+            }
+
             return new LetterOfCreditDocumentImportResult
             {
                 SourcePath = filePath,
@@ -99,14 +115,25 @@ namespace ExportDocManager.Services.Tools
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            string directText = ExtractTextFromPdfWithPdfPig(filePath);
-            if (LooksLikeUsefulPdfText(directText))
+            try
             {
-                return directText;
-            }
+                string directText = ExtractTextFromPdfWithPdfPig(filePath);
+                if (LooksLikeUsefulPdfText(directText))
+                {
+                    return directText;
+                }
 
-            byte[] pdfBytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
-            return await ExtractTextFromPdfImagesAsync(pdfBytes, cancellationToken);
+                byte[] pdfBytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
+                return await ExtractTextFromPdfImagesAsync(pdfBytes, cancellationToken);
+            }
+            catch (PdfDocumentFormatException ex)
+            {
+                throw new InvalidDataException("信用证 PDF 已损坏、格式无效或不受支持。", ex);
+            }
+            catch (PdfException ex)
+            {
+                throw new InvalidDataException("信用证 PDF 已损坏、受密码保护或格式不受支持。", ex);
+            }
         }
 
         private static string ExtractTextFromPdfWithPdfPig(string filePath)
@@ -114,11 +141,22 @@ namespace ExportDocManager.Services.Tools
             var pages = new List<string>();
 
             using var document = PdfDocument.Open(filePath);
+            if (document.NumberOfPages <= 0 || document.NumberOfPages > MaximumPdfPages)
+            {
+                throw new InvalidDataException($"信用证 PDF 页数必须在 1 至 {MaximumPdfPages} 页以内。");
+            }
+
+            int characters = 0;
             foreach (var page in document.GetPages())
             {
                 string pageText = ContentOrderTextExtractor.GetText(page);
                 if (!string.IsNullOrWhiteSpace(pageText))
                 {
+                    characters += pageText.Length;
+                    if (characters > MaximumExtractedTextCharacters)
+                    {
+                        throw new InvalidDataException("信用证提取文本超过允许长度，请拆分文件后重试。");
+                    }
                     pages.Add(pageText);
                 }
             }
@@ -129,6 +167,7 @@ namespace ExportDocManager.Services.Tools
         private async Task<string> ExtractTextFromPdfImagesAsync(byte[] pdfBytes, CancellationToken cancellationToken)
         {
             var texts = new List<string>();
+            int characters = 0;
 
             // PDFtoImage supports the desktop platforms targeted by the sidecar.
 #pragma warning disable CA1416
@@ -149,6 +188,11 @@ namespace ExportDocManager.Services.Tools
 
                     if (!string.IsNullOrWhiteSpace(pageText))
                     {
+                        characters += pageText.Length;
+                        if (characters > MaximumExtractedTextCharacters)
+                        {
+                            throw new InvalidDataException("信用证提取文本超过允许长度，请拆分文件后重试。");
+                        }
                         texts.Add(pageText);
                     }
                 }

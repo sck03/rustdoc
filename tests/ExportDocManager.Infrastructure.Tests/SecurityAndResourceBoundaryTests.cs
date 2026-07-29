@@ -5,6 +5,7 @@ using ExportDocManager.Utils;
 
 namespace ExportDocManager.Infrastructure.Tests;
 
+[Collection(LocalSecretProtectionCollection.Name)]
 public sealed class SecurityAndResourceBoundaryTests
 {
     [Fact]
@@ -20,7 +21,14 @@ public sealed class SecurityAndResourceBoundaryTests
 
             Assert.NotEqual(encryptedOne, encryptedTwo);
             Assert.Equal("数据库密码", second.Unprotect(encryptedOne));
-            Assert.Null(second.Unprotect(encryptedOne[..^1] + (encryptedOne[^1] == 'A' ? 'B' : 'A')));
+            string tampered = encryptedOne[..^1] + (encryptedOne[^1] == 'A' ? 'B' : 'A');
+            Assert.Throws<InvalidDataException>(() => second.Unprotect(tampered));
+            Assert.False(second.TryUnprotect(tampered, out string plainText));
+            Assert.Null(plainText);
+            Assert.Throws<InvalidOperationException>(() => second.Protect(encryptedOne));
+            Assert.Null(second.Unprotect("plain-text-secret"));
+            Assert.False(second.TryUnprotect("plain-text-secret", out plainText));
+            Assert.Null(plainText);
         }
         finally
         {

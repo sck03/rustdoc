@@ -21,6 +21,15 @@ namespace ExportDocManager.Api.Tests
             var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
             using var adminClient = harness.CreateClient(adminLogin.AccessToken);
 
+            var sealBearingCreateResponse = await adminClient.PostAsJsonAsync("/api/payments", new
+            {
+                invoiceNo = "PAY-SEAL-REJECT",
+                payerName = "Payment Payer",
+                paymentDate = new DateTime(2026, 6, 2),
+                customsSealPath = "should-never-enter-payment-domain.png"
+            });
+            Assert.Equal(HttpStatusCode.BadRequest, sealBearingCreateResponse.StatusCode);
+
             var createResponse = await adminClient.PostAsJsonAsync("/api/payments", new
             {
                 invoiceNo = "PAY-API-001",
@@ -55,6 +64,14 @@ namespace ExportDocManager.Api.Tests
             Assert.True(created.Success);
             Assert.True(created.Id > 0);
             Assert.Equal("PAY-API-001", created.Payment.InvoiceNo);
+            using (var createDocument = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync()))
+            {
+                var paymentJson = createDocument.RootElement.GetProperty("payment");
+                Assert.False(paymentJson.TryGetProperty("docSealPath", out _));
+                Assert.False(paymentJson.TryGetProperty("customsSealPath", out _));
+                Assert.False(paymentJson.TryGetProperty("showSeal", out _));
+                Assert.False(paymentJson.TryGetProperty("withSeal", out _));
+            }
 
             Assert.True(File.Exists(harness.DatabasePath));
             Assert.StartsWith(

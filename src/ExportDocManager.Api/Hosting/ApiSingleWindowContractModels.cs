@@ -97,40 +97,37 @@ namespace ExportDocManager.Api.Hosting
 
     public sealed record ApiSingleWindowClientProfileDto(
         int Id,
+        string ProfileKey,
         string ProfileName,
-        string MachineName,
-        string ImportRootPath,
-        string ReceiptRootPath,
-        string BusinessDirectoryOverridesJson,
+        string CompanyScope,
+        string CardIdentifier,
+        string CustomsCooClientRootPath,
+        string AgentConsignmentClientRootPath,
         bool CanSubmitCustomsCoo,
         bool CanSubmitAgentConsignment,
         bool IsEnabled,
+        bool IsActive,
         DateTime UpdatedAt);
 
-    public sealed record ApiSingleWindowClientProfileResponse(
-        ApiSingleWindowClientProfileDto Profile,
-        string StoragePolicy);
-
-    public sealed record ApiSingleWindowClientProfileSaveRequest(
-        string ImportRootPath,
-        string ReceiptRootPath,
-        string BusinessType);
-
-    public sealed record ApiSingleWindowClientProfileSaveResponse(
-        bool Success,
-        int Id,
-        ApiSingleWindowClientProfileDto Profile,
+    public sealed record ApiSingleWindowClientProfilesResponse(
+        IReadOnlyList<ApiSingleWindowClientProfileDto> Profiles,
+        string ActiveProfileKey,
         string StoragePolicy,
         string Message);
 
-    public sealed record ApiSingleWindowClientDispatchRequest(
-        int BatchId,
-        string ImportRootPath,
-        string ProfileName);
+    public sealed record ApiSingleWindowClientProfileSaveRequest(
+        string ProfileKey,
+        string ProfileName,
+        string CompanyScope,
+        string CardIdentifier,
+        string CustomsCooClientRootPath,
+        string AgentConsignmentClientRootPath,
+        bool CanSubmitCustomsCoo,
+        bool CanSubmitAgentConsignment);
 
-    public sealed record ApiSingleWindowReceiptCollectionRequest(
-        int BatchId,
-        string ReceiptRootPath);
+    public sealed record ApiSingleWindowClientDispatchRequest(int BatchId);
+
+    public sealed record ApiSingleWindowReceiptCollectionRequest(int BatchId);
 
     public sealed record ApiSingleWindowHandoffPackageResponse(
         bool Success,
