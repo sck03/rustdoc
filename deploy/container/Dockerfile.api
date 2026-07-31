@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 FROM node:24-bookworm-slim AS report-fonts
 WORKDIR /src
 COPY scripts/provision-report-fonts.mjs scripts/verify-font-license-policy.mjs scripts/
@@ -7,13 +9,15 @@ RUN node scripts/provision-report-fonts.mjs \
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim AS build
 WORKDIR /src
+ARG TARGETARCH
 
 COPY Directory.Build.props Directory.Packages.props NuGet.Config version.json ./
 COPY src/ExportDocManager.Domain/ExportDocManager.Domain.csproj src/ExportDocManager.Domain/
 COPY src/ExportDocManager.Application/ExportDocManager.Application.csproj src/ExportDocManager.Application/
 COPY src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj src/ExportDocManager.Infrastructure/
 COPY src/ExportDocManager.Api/ExportDocManager.Api.csproj src/ExportDocManager.Api/
-RUN dotnet restore src/ExportDocManager.Api/ExportDocManager.Api.csproj --configfile NuGet.Config
+RUN --mount=type=cache,id=exportdoc-nuget-${TARGETARCH},target=/root/.nuget/packages,sharing=locked \
+    dotnet restore src/ExportDocManager.Api/ExportDocManager.Api.csproj --configfile NuGet.Config
 
 COPY src/ src/
 COPY Shared/ Shared/
@@ -21,24 +25,36 @@ COPY Templates/ Templates/
 COPY Resources/ Resources/
 COPY --from=report-fonts /src/Resources/Fonts/OpenSource/ Resources/Fonts/OpenSource/
 COPY OcrModels/ OcrModels/
-RUN dotnet publish src/ExportDocManager.Api/ExportDocManager.Api.csproj \
+RUN --mount=type=cache,id=exportdoc-nuget-${TARGETARCH},target=/root/.nuget/packages,sharing=locked \
+    dotnet publish src/ExportDocManager.Api/ExportDocManager.Api.csproj \
     --configuration Release \
     --no-restore \
     --output /out \
     /p:UseAppHost=false \
-    /p:ExportDocPackageProfile=Container
+    /p:ExportDocPackageProfile=Container \
+    && find src -type d \( -name bin -o -name obj \) -prune -exec rm -rf -- {} +
 
 FROM rust:1.96-bookworm AS ocr-build
 WORKDIR /src
+ARG TARGETARCH
 COPY apps/exportdoc-ocr-rs/Cargo.toml apps/exportdoc-ocr-rs/Cargo.lock ./
 COPY apps/exportdoc-ocr-rs/src/ ./src/
-RUN cargo build --release --locked
+RUN --mount=type=cache,id=exportdoc-cargo-registry-${TARGETARCH},target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=exportdoc-cargo-git-${TARGETARCH},target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,id=exportdoc-ocr-target-${TARGETARCH},target=/src/target,sharing=locked \
+    cargo build --release --locked \
+    && install -Dm755 /src/target/release/exportdoc-ocr /out/exportdoc-ocr
 
 FROM rust:1.96-bookworm AS excel-analyzer-build
 WORKDIR /src
+ARG TARGETARCH
 COPY tools/excel-analyzer-rs/Cargo.toml tools/excel-analyzer-rs/Cargo.lock ./
 COPY tools/excel-analyzer-rs/src/ ./src/
-RUN cargo build --release --locked
+RUN --mount=type=cache,id=exportdoc-cargo-registry-${TARGETARCH},target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=exportdoc-cargo-git-${TARGETARCH},target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,id=exportdoc-excel-target-${TARGETARCH},target=/src/target,sharing=locked \
+    cargo build --release --locked \
+    && install -Dm755 /src/target/release/exportdoc-excel-analyzer /out/exportdoc-excel-analyzer
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim AS runtime
 RUN apt-get update \
@@ -67,8 +83,8 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=build /out/ ./
-COPY --from=ocr-build /src/target/release/exportdoc-ocr ./sidecar/ocr/exportdoc-ocr
-COPY --from=excel-analyzer-build /src/target/release/exportdoc-excel-analyzer ./Tools/exportdoc-excel-analyzer
+COPY --from=ocr-build /out/exportdoc-ocr ./sidecar/ocr/exportdoc-ocr
+COPY --from=excel-analyzer-build /out/exportdoc-excel-analyzer ./Tools/exportdoc-excel-analyzer
 COPY tools/excel-analyzer-rs/THIRD_PARTY_NOTICES.md ./Tools/EXCEL_ANALYZER_NOTICES.md
 COPY apps/exportdoc-ocr-rs/README.md ./sidecar/ocr/README.md
 COPY THIRD_PARTY_NOTICES.md THIRD_PARTY_DEPENDENCIES.md ./Legal/

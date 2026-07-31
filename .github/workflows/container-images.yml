@@ -30,8 +30,10 @@ jobs:
         include:
           - component: api
             dockerfile: deploy/container/Dockerfile.api
+            cache_mode: min
           - component: web
             dockerfile: deploy/container/Dockerfile.web
+            cache_mode: max
 
     steps:
       - name: Checkout
@@ -64,6 +66,18 @@ jobs:
         id: image
         shell: bash
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/export-doc-manager-${{ matrix.component }}" >> "$GITHUB_OUTPUT"
+
+      - name: Reclaim unused hosted-runner tool space
+        if: matrix.component == 'api'
+        shell: bash
+        run: |
+          for path in /usr/local/lib/android /opt/ghc /usr/local/.ghcup /usr/share/swift; do
+            if [[ -e "$path" ]]; then
+              sudo rm -rf -- "$path"
+            fi
+          done
+          sudo apt-get clean
+          df -h /
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -100,7 +114,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.component }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=${{ matrix.cache_mode }},scope=${{ matrix.component }}
           provenance: true
           sbom: true
 

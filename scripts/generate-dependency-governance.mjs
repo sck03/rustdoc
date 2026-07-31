@@ -227,7 +227,10 @@ function readNuGetLicense(packagesRoot, packageId, version) {
     nuspec.match(/<license\b[^>]*type=["']file["'][^>]*>([\s\S]*?)<\/license>/iu)?.[1] || "",
   ).trim();
   if (licenseFileName) {
-    const licensePath = path.resolve(packageRoot, licenseFileName.replaceAll("/", path.sep));
+    const licensePath = path.resolve(
+      packageRoot,
+      licenseFileName.replaceAll("\\", path.sep).replaceAll("/", path.sep),
+    );
     if (licensePath.startsWith(path.resolve(packageRoot) + path.sep) && existsSync(licensePath)) {
       const detected = detectLicenseText(readFileSync(licensePath, "utf8"));
       if (detected) return detected;
@@ -332,10 +335,9 @@ function buildNotices(items) {
   const lines = [
     "# ExportDocManager third-party notices",
     "",
-    `Project version: ${readProjectVersion()}`,
-    "",
     "This file is the unified redistribution notice for package-manager dependencies and bundled runtime assets. " +
-      "The machine-readable SPDX and CycloneDX documents shipped beside it contain the same dependency inventory.",
+      "The machine-readable SPDX and CycloneDX documents shipped beside it contain the same dependency inventory " +
+      "and record the exact application build version.",
     "",
     "## Package dependencies",
     "",
@@ -378,9 +380,8 @@ function buildInventory(items) {
   const lines = [
     "# ExportDocManager third-party dependency inventory",
     "",
-    `Project version: ${readProjectVersion()}`,
-    "",
-    "Generated from committed npm/Cargo lock files, Cargo package metadata, restored NuGet package metadata, and the solution package graph.",
+    "Generated from committed npm/Cargo lock files, Cargo package metadata, restored NuGet package metadata, and the solution package graph. " +
+      "The exact application build version is recorded in the accompanying machine-readable SBOM files.",
     "",
   ];
   for (const ecosystem of ["npm", "nuget", "cargo"]) {
@@ -450,9 +451,29 @@ function readRequiredText(relativePath) {
 
 function verifyGeneratedFile(relativePath, expected) {
   const absolutePath = path.join(repositoryRoot, relativePath);
-  if (!existsSync(absolutePath) || readFileSync(absolutePath, "utf8") !== expected) {
-    throw new Error(`${relativePath} is stale. Run generate-dependency-governance.mjs with --write-repository.`);
+  if (!existsSync(absolutePath)) {
+    throw new Error(`${relativePath} is missing. Run generate-dependency-governance.mjs with --write-repository.`);
   }
+  const actual = readFileSync(absolutePath, "utf8");
+  if (actual !== expected) {
+    const difference = describeFirstDifference(actual, expected);
+    throw new Error(
+      `${relativePath} is stale${difference}. ` +
+      "Run generate-dependency-governance.mjs with --write-repository.",
+    );
+  }
+}
+
+function describeFirstDifference(actual, expected) {
+  const actualLines = actual.split(/\r?\n/u);
+  const expectedLines = expected.split(/\r?\n/u);
+  const count = Math.max(actualLines.length, expectedLines.length);
+  for (let index = 0; index < count; index += 1) {
+    if (actualLines[index] === expectedLines[index]) continue;
+    return ` at line ${index + 1}: repository=${JSON.stringify(actualLines[index] ?? "<missing>")}, ` +
+      `generated=${JSON.stringify(expectedLines[index] ?? "<missing>")}`;
+  }
+  return "";
 }
 
 function decodeXml(value) {

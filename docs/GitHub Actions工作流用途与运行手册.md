@@ -1,6 +1,6 @@
 # GitHub Actions 工作流用途与运行手册
 
-> 更新日期：2026-07-30
+> 更新日期：2026-07-31
 > 适用仓库：`sck03/rustdoc`
 > 工作流目录：[`../.github/workflows`](../.github/workflows)
 
@@ -112,7 +112,7 @@
 - **做什么：** 校验版本并同步 runner 工作区版本，构建带 provenance/SBOM 的多架构镜像，写入版本、`latest`（可选）和 SHA 标签。
 - **输出：** 推送到 `ghcr.io/<仓库所有者>/export-doc-manager-api` 和 `...-web`；不上传普通 Artifact、不创建 GitHub Release。
 - **Secrets/Variables：** 使用 GitHub 自动 `GITHUB_TOKEN`，工作流权限为 `packages: write`；不需要额外私钥。
-- **常见失败：** GHCR 权限/包可见性、版本格式错误、QEMU 或 Buildx 构建失败、Dockerfile 公开源码边界检查失败。工作流只在手工确认后推送，不能把测试分支镜像误当生产版本。
+- **常见失败：** GHCR 权限/包可见性、版本格式错误、QEMU 或 Buildx 构建失败、Dockerfile 公开源码边界检查失败。API 镜像会先回收一次性 Ubuntu runner 上明确无关的 Android/GHC/Swift 工具空间，NuGet/Cargo 使用 BuildKit cache mount，GHA cache 使用 `mode=min`；若仍出现 `No space left on device`，先确认这些步骤实际执行并查看 `df -h /`，不要通过关闭 provenance/SBOM 或删除随包 OCR/字体绕过交付契约。工作流只在手工确认后推送，不能把测试分支镜像误当生产版本。
 - **耗时：** 多架构 API/Web 通常 10—30 分钟，首次无缓存时可能更久。
 
 ### 2.8 Reusable desktop package build
@@ -125,7 +125,7 @@
 - **做什么：** 安装 .NET 8/Node 24/Rust，准备开源字体和 Chrome Headless Shell（Linux ARM64 使用明确的 Chromium ARM64 路径），构建 API/Web/Tauri、OCR 资源并验证精简 payload。`publish_release=false` 生成未签名验收包；`true` 才启用 updater 签名、上传安装包并合并 `latest.json`。
 - **输出：** `export-doc-manager-<platform>-<arch>-<edition>-<version>` Artifact，通常保留 14 天；发布模式另上传 GitHub Release 资产。
 - **Secrets/Variables：** 测试模式不需要签名材料；发布模式必须配置仓库 Variable `EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY`，以及带密码的 Secrets `TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。`EXPORTDOCMANAGER_UPDATER_ENDPOINT` 改为可选：留空时安装包只内置公钥，由管理员安装后在系统设置中配置 GitHub、自建服务器或公司内网地址。若构建时就要内置 HTTP 默认地址，还必须显式配置 `EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT=true`；公网默认地址仍应使用 HTTPS。调用方使用 `secrets: inherit`，不应把私钥写入仓库或日志。
-- **常见失败：** 版本格式、浏览器资源缺失/执行权限、OCR 运行时缺库、公钥或私钥缺失、未显式放行却尝试内置 HTTP endpoint、Release tag 已被其它版本占用。
+- **常见失败：** 版本格式、浏览器资源缺失/执行权限、OCR 运行时缺库、公钥或私钥缺失、未显式放行却尝试内置 HTTP endpoint、Release tag 已被其它版本占用。依赖清单校验不再因表单版本与仓库当前版本不同而失败；若提示 stale，错误会指出首个真实差异行，应重新生成并审查依赖，而不是删除 `--verify-repository`。
 - **耗时：** 15—40 分钟，首次下载浏览器和 Rust 依赖时更久。
 
 ### 2.9 Reusable browser server package
@@ -138,7 +138,7 @@
 - **做什么：** 构建 Web 静态资源和自包含 ASP.NET Core 服务器包，打入 Chrome Headless Shell、Rust OCR、Excel analyzer、运行配置、`initialize-windows.ps1`/`initialize-linux.sh` 一键初始化脚本和启动脚本；运行浏览器 PDF、payload 和 OCR 验证。该包由单个 ASP.NET Core 进程同源托管 Web/API，不需要 Nginx，但仍需要目标机 PostgreSQL。
 - **输出：** Windows ZIP 或 Linux x64/ARM64 tar.gz Artifact，通常保留 14 天；`publish_release=true` 时使用 `GITHUB_TOKEN` 上传同名 Release 资产。
 - **Secrets/Variables：** 不需要 updater 私钥；只使用 GitHub 自动 token 发布 Release。
-- **常见失败：** Chrome/Chromium ARM64 资源不可用、Linux 执行权限或 ONNX/libonnxruntime 缺失、服务器包缺少 `wwwroot/index.html`、版本格式错误。
+- **常见失败：** Chrome/Chromium ARM64 资源不可用、Linux 执行权限或 ONNX/libonnxruntime 缺失、服务器包缺少 `wwwroot/index.html`、版本格式错误。表单版本只写入 SBOM 应用元数据，不再改变根 notices/inventory；真实依赖漂移仍由 release 许可证和仓库清单门禁阻止。
 - **耗时：** 10—30 分钟。
 
 ### 2.10 Build Windows desktop package
@@ -234,6 +234,8 @@ Action runtime 的升级只影响 GitHub 托管 runner；它不会把 Node、Pyt
 | API 端口边界检查误报 | 先看 `compose-ps.txt` 的 `PORTS` 列；只有出现 `0.0.0.0:5188->5188` 或实际 host binding 才算发布，单独的 `5188/tcp` 是 Compose `expose`，不是宿主映射 |
 | PostgreSQL 测试很慢 | 输入容量、索引计划、runner 资源和测试 45 分钟上限；不要把未连接真实 PG 的本机测试当成容量结论 |
 | GHCR push denied | 仓库 Actions 权限、`packages: write`、镜像命名空间和组织包策略 |
+| 多架构 API 镜像出现 `No space left on device` | 查看 API job 的 runner 空间回收和 `df -h /`；确认 Dockerfile 使用按架构 NuGet/Cargo cache mount、只复制 `/out` 最终二进制，且 API `cache-to` 为 `mode=min` |
+| Linux/macOS 打包提示 `THIRD_PARTY_NOTICES.md is stale` | 查看错误中的首个差异行；版本行不再参与清单比较，若仍失败就是依赖、许可证、作用域或随包 notice 的真实变化，应运行 `node scripts/generate-dependency-governance.mjs artifacts/dependency-governance --release --write-repository` 并审查差异 |
 | 正式桌面包签名失败 | endpoint/public key Variables、带密码私钥两个 Secrets、版本 tag 和签名文件；不要把私钥贴到日志 |
 | 浏览器服务器包缺文件 | `verify-package-payload.ps1`、Chrome/Chromium 架构、Linux 执行权限、OCR 模型和 `wwwroot/index.html` |
 | 工作流没有自动启动 | 检查该工作流的 `paths` 过滤器；手工入口用 `workflow_dispatch`，可复用工作流必须由平台入口调用 |

@@ -1,8 +1,6 @@
 # ExportDocManager third-party notices
 
-Project version: 0.1.1
-
-This file is the unified redistribution notice for package-manager dependencies and bundled runtime assets. The machine-readable SPDX and CycloneDX documents shipped beside it contain the same dependency inventory.
+This file is the unified redistribution notice for package-manager dependencies and bundled runtime assets. The machine-readable SPDX and CycloneDX documents shipped beside it contain the same dependency inventory and record the exact application build version.
 
 ## Package dependencies
 
