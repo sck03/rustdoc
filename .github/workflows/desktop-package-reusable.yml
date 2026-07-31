@@ -280,7 +280,7 @@ jobs:
       - name: Write package summary
         shell: pwsh
         run: |
-          @"
+          @'
           ## ExportDocManager 桌面包
           - 平台：`${{ inputs.platform }}`
           - 架构：`${{ inputs.architecture }}`
@@ -291,4 +291,4 @@ jobs:
           - 更新签名：`${{ inputs.publish_release && '已启用，缺少构建密钥会直接失败' || '未启用，仅用于测试和人工验收' }}`
           - 系统商业签名：`本阶段暂不强制；Windows Authenticode 与 macOS Developer ID/公证列入正式商业发布前门禁`
           - 默认更新地址：`${{ inputs.publish_release && '产品版专属 GitHub Release 通道；配置对应产品版变量时使用自定义地址' || '不适用' }}`
-          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+          '@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append

@@ -39,6 +39,25 @@ for (const entry of readdirSync(workflowRoot, { withFileTypes: true })) {
   if (/node-version:\s*["']?(?:20|22)["']?\b/mu.test(lines.join("\n"))) {
     failures.push(`${entry.name}: workflow still declares Node 20 or Node 22.`);
   }
+
+  let doubleQuotedHereStringStart = -1;
+  for (let index = 0; index < lines.length; index += 1) {
+    const trimmed = lines[index].trim();
+    if (doubleQuotedHereStringStart < 0 && trimmed === '@"') {
+      doubleQuotedHereStringStart = index;
+      continue;
+    }
+    if (doubleQuotedHereStringStart < 0) continue;
+    if (trimmed.startsWith('"@')) {
+      doubleQuotedHereStringStart = -1;
+      continue;
+    }
+    if (lines[index].trimEnd().endsWith("`")) {
+      failures.push(
+        `${entry.name}:${index + 1}: a line-ending Markdown backtick inside a double-quoted PowerShell here-string escapes the newline; use a literal @' ... '@ here-string.`,
+      );
+    }
+  }
 }
 
 const dependencyWorkflowPath = path.join(workflowRoot, "dependency-governance.yml");
