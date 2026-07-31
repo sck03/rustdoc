@@ -7,6 +7,7 @@ namespace ExportDocManager.Services.SingleWindow
         Task<SingleWindowHandoffPackageResult> ExportSubmitPackageAsync(
             SingleWindowBusinessType businessType,
             int invoiceId,
+            string stationAssignmentCode,
             string savePath,
             CancellationToken cancellationToken = default);
 

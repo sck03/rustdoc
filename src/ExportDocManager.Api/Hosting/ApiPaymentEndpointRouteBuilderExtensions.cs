@@ -84,20 +84,20 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("新增付款不能包含已有ID。"));
                 }
 
-                var payment = ApiPaymentDtoFactory.ToPaymentForSave(request);
-                payment.Id = 0;
-                payment.OwnerUserId = null;
-                payment.DepartmentId = string.Empty;
-                payment.CompanyScope = string.Empty;
-
+                Payment payment;
                 int savedId;
                 try
                 {
+                    payment = ApiPaymentDtoFactory.ToPaymentForSave(request);
+                    payment.Id = 0;
+                    payment.OwnerUserId = null;
+                    payment.DepartmentId = string.Empty;
+                    payment.CompanyScope = string.Empty;
                     savedId = await paymentService.SavePaymentAsync(payment);
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WritePaymentFailure(context, ex, "create");
                 }
 
                 var savedPayment = await paymentDetailReadRepository.GetByIdAsync(savedId, cancellationToken);
@@ -151,25 +151,17 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 Payment payment;
-                try
-                {
-                    payment = ApiPaymentDtoFactory.ToPaymentForSave(request);
-                }
-                catch (ArgumentException ex)
-                {
-                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
-                }
-                payment.Id = id;
-                ApiPaymentDtoFactory.PreserveExistingOwnership(payment, existing);
-
                 int savedId;
                 try
                 {
+                    payment = ApiPaymentDtoFactory.ToPaymentForSave(request);
+                    payment.Id = id;
+                    ApiPaymentDtoFactory.PreserveExistingOwnership(payment, existing);
                     savedId = await paymentService.SavePaymentAsync(payment);
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WritePaymentFailure(context, ex, "update");
                 }
 
                 var savedPayment = await paymentDetailReadRepository.GetByIdAsync(savedId, cancellationToken);
@@ -203,7 +195,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WritePaymentFailure(context, ex, "delete");
                 }
 
                 return deleted
@@ -211,6 +203,36 @@ namespace ExportDocManager.Api.Hosting
                     : Results.NotFound();
             })
             .WithName("DeletePayment");
+        }
+
+        private static IResult WritePaymentFailure(HttpContext context, Exception exception, string operation)
+        {
+            return exception switch
+            {
+                ArgumentException argumentException =>
+                    Results.BadRequest(new ApiErrorResponse(argumentException.Message)),
+                UnauthorizedAccessException unauthorizedAccessException =>
+                    Results.Json(
+                        new ApiErrorResponse(unauthorizedAccessException.Message),
+                        statusCode: StatusCodes.Status403Forbidden),
+                BusinessConcurrencyException concurrencyException =>
+                    Results.Conflict(new ApiErrorResponse(concurrencyException.Message)),
+                _ => WriteUnexpectedPaymentFailure(context, exception, operation)
+            };
+        }
+
+        private static IResult WriteUnexpectedPaymentFailure(
+            HttpContext context,
+            Exception exception,
+            string operation)
+        {
+            context.RequestServices
+                .GetRequiredService<ILoggerFactory>()
+                .CreateLogger("ExportDocManager.Api.Payments")
+                .LogError(exception, "Unexpected payment {Operation} failure.", operation);
+            return Results.Json(
+                new ApiErrorResponse("付款操作未完成，请稍后重试；若问题持续，请联系管理员查看服务日志。"),
+                statusCode: StatusCodes.Status500InternalServerError);
         }
     }
 }

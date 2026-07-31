@@ -1,6 +1,7 @@
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Services.Tools;
 
 var runtimeOptions = ApiRuntimeOptions.Parse(args);
@@ -16,6 +17,7 @@ if (args.Any(value => string.Equals(value, "--verify-ocr-runtime", StringCompari
     return;
 }
 
+SingleWindowDisasterRecoveryManager.ApplyPendingRestore(pathProvider);
 var databaseSettings = DbHelper.LoadDatabaseSettings();
 ApiStartupValidator.Validate(pathProvider, databaseSettings, runtimeOptions);
 

@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs.SingleWindow;
@@ -18,90 +19,208 @@ namespace ExportDocManager.Services.SingleWindow
             string stationKey = await _stationIdentity
                 .GetCurrentStationKeyAsync(cancellationToken)
                 .ConfigureAwait(false);
-
-            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            var batch = await _businessDataAccessScope
-                .ApplySubmissionBatchScope(context.SwSubmissionBatches, context)
-                .FirstOrDefaultAsync(item => item.Id == batchId, cancellationToken)
-                ?? throw new InvalidOperationException("未找到要写入交接 OutBox 的单一窗口批次。");
-            if (!Enum.TryParse<SingleWindowBusinessType>(batch.BusinessType, true, out var businessType))
-            {
-                throw new InvalidOperationException("单一窗口批次业务类型无效。");
-            }
-
-            EnsureBatchBelongsToCurrentStation(batch, profile, stationKey, businessType);
-            if (batch.Status != SingleWindowBatchStatusCatalog.SubmitPackageImported)
-            {
-                throw new InvalidOperationException("只有本机已导入且尚未写入交接 OutBox 的提交包可以执行此操作。");
-            }
-
-            string importRootPath = ResolveConfiguredRoot(profile, businessType);
-
-            var workingPackage = await EnsureWorkingPackageAsync(context, batch, cancellationToken);
-            var layout = ResolveBusinessLayout(importRootPath, createDirectories: true);
-            var dispatchedFiles = await CopyPayloadFilesToOutBoxAsync(
-                workingPackage.Directory,
-                workingPackage.Manifest,
-                layout.OutBox,
-                batch.BatchReference,
+            var reservation = await ReserveClientDispatchAsync(
+                batchId,
+                profile,
+                stationKey,
                 cancellationToken);
-
+            string importRootPath = ResolveConfiguredRoot(profile, reservation.BusinessType);
+            var layout = ResolveBusinessLayout(importRootPath, createDirectories: true);
+            string stagingDirectory = Path.Combine(
+                _pathProvider.SingleWindowRoot,
+                "DispatchStaging",
+                $"{reservation.BatchReference}-{Guid.NewGuid():N}");
+            PathBoundaryHelper.EnsureWithinRoot(
+                stagingDirectory,
+                _pathProvider.SingleWindowRoot,
+                "单一窗口客户端派发暂存目录越界。");
+            IReadOnlyList<string> publishedFiles = [];
             try
             {
-                DateTime nowUtc = DateTime.UtcNow;
-                batch.Status = SingleWindowBatchStatusCatalog.QueuedToClient;
-                batch.ClientProfileName = profile.ProfileName;
-                batch.ClientDispatchPath = layout.OutBox;
-                batch.LastClientDispatchAt = nowUtc;
-                batch.AssignedStationKey = stationKey;
-                batch.AssignedProfileKey = profile.ProfileKey;
-                batch.AssignedCardIdentifier = profile.CardIdentifier;
-                batch.UpdatedAt = nowUtc;
-
-                context.SwHandoffPackageRecords.Add(new SwHandoffPackageRecord
-                {
-                    BatchId = batch.Id,
-                    BatchReference = batch.BatchReference,
-                    BusinessType = batch.BusinessType,
-                    SourceInvoiceId = batch.SourceInvoiceId,
-                    SourceDocumentType = batch.SourceDocumentType,
-                    SourceDocumentId = batch.SourceDocumentId,
-                    InvoiceNo = batch.InvoiceNo,
-                    CompanyScope = batch.CompanyScope,
-                    StationKey = stationKey,
-                    PackageType = "ClientDispatch",
-                    Direction = "ExportedToClient",
-                    FilePath = layout.OutBox,
-                    CreatedOnMachine = Environment.MachineName,
-                    PayloadFileCount = dispatchedFiles.Count,
-                    AttachmentFileCount = batch.AttachmentFileCount,
-                    WarningCount = batch.WarningCount,
-                    ContentDigest = batch.SubmitPackageDigest,
-                    CreatedAt = nowUtc,
-                    ManifestJson = string.Empty
-                });
-
-                await context.SaveChangesAsync(cancellationToken);
+                await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+                var batch = await _businessDataAccessScope
+                    .ApplySubmissionBatchScope(context.SwSubmissionBatches, context)
+                    .FirstAsync(item => item.Id == batchId, cancellationToken);
+                var workingPackage = await EnsureWorkingPackageAsync(context, batch, cancellationToken);
+                var stagedFiles = await CopyPayloadFilesToOutBoxAsync(
+                    workingPackage.Directory,
+                    workingPackage.Manifest,
+                    stagingDirectory,
+                    batch.BatchReference,
+                    cancellationToken);
+                publishedFiles = await PublishPayloadFilesAsync(
+                    stagedFiles,
+                    layout.OutBox,
+                    batch.BatchReference,
+                    cancellationToken);
+                await CompleteClientDispatchAsync(
+                    batchId,
+                    profile,
+                    stationKey,
+                    layout.OutBox,
+                    publishedFiles.Count,
+                    cancellationToken);
             }
-            catch
+            catch (Exception ex)
             {
-                foreach (string dispatchedFile in dispatchedFiles)
+                foreach (string publishedFile in publishedFiles.Reverse())
                 {
-                    AtomicFileHelper.TryDeleteFile(dispatchedFile);
+                    AtomicFileHelper.TryDeleteFile(publishedFile);
                 }
-
+                await MarkClientDispatchFailedAsync(batchId, ex.Message, CancellationToken.None);
                 throw;
+            }
+            finally
+            {
+                AtomicFileHelper.TryDeleteDirectory(stagingDirectory);
             }
 
             return new SingleWindowClientDispatchResult
             {
-                BatchId = batch.Id,
-                BatchReference = batch.BatchReference,
+                BatchId = reservation.BatchId,
+                BatchReference = reservation.BatchReference,
                 TargetDirectory = layout.OutBox,
-                ProfileName = batch.ClientProfileName,
-                PayloadFileCount = dispatchedFiles.Count,
-                AttachmentFileCount = batch.AttachmentFileCount
+                ProfileName = profile.ProfileName,
+                PayloadFileCount = publishedFiles.Count,
+                AttachmentFileCount = reservation.AttachmentFileCount
             };
+        }
+
+        private async Task<ClientDispatchReservation> ReserveClientDispatchAsync(
+            int batchId,
+            SwClientProfile profile,
+            string stationKey,
+            CancellationToken cancellationToken)
+        {
+            return await AppDbContextExecution.ExecuteInTransactionAsync(
+                _contextFactory,
+                async (context, token) =>
+                {
+                    var batch = await _businessDataAccessScope
+                        .ApplySubmissionBatchScope(context.SwSubmissionBatches, context)
+                        .FirstOrDefaultAsync(item => item.Id == batchId, token)
+                        ?? throw new InvalidOperationException("未找到要写入交接 OutBox 的单一窗口批次。");
+                    if (!Enum.TryParse<SingleWindowBusinessType>(batch.BusinessType, true, out var businessType))
+                    {
+                        throw new InvalidOperationException("单一窗口批次业务类型无效。");
+                    }
+
+                    EnsureBatchBelongsToCurrentStation(batch, profile, stationKey, businessType);
+                    if (batch.Status is not SingleWindowBatchStatusCatalog.SubmitPackageImported and
+                        not SingleWindowBatchStatusCatalog.ClientDispatchFailed)
+                    {
+                        throw new InvalidOperationException(
+                            "只有本机已导入且尚未派发，或上次派发已完整回滚的提交包可以写入官方客户端。" );
+                    }
+
+                    batch.Status = SingleWindowBatchStatusCatalog.ClientDispatching;
+                    batch.ClientProfileName = profile.ProfileName;
+                    batch.AssignedStationKey = stationKey;
+                    batch.AssignedProfileKey = profile.ProfileKey;
+                    batch.AssignedCardIdentifier = profile.CardIdentifier;
+                    batch.LastError = string.Empty;
+                    batch.UpdatedAt = DateTime.UtcNow;
+                    await context.SaveChangesAsync(token);
+                    return new ClientDispatchReservation(
+                        batch.Id,
+                        batch.BatchReference,
+                        businessType,
+                        batch.AttachmentFileCount);
+                },
+                IsolationLevel.Serializable,
+                cancellationToken);
+        }
+
+        private async Task CompleteClientDispatchAsync(
+            int batchId,
+            SwClientProfile profile,
+            string stationKey,
+            string outBoxPath,
+            int payloadFileCount,
+            CancellationToken cancellationToken)
+        {
+            await AppDbContextExecution.ExecuteInTransactionAsync(
+                _contextFactory,
+                async (context, token) =>
+                {
+                    var batch = await _businessDataAccessScope
+                        .ApplySubmissionBatchScope(context.SwSubmissionBatches, context)
+                        .FirstOrDefaultAsync(item => item.Id == batchId, token)
+                        ?? throw new InvalidOperationException("客户端派发批次在确认阶段不存在。");
+                    EnsureBatchBelongsToCurrentStation(
+                        batch,
+                        profile,
+                        stationKey,
+                        Enum.Parse<SingleWindowBusinessType>(batch.BusinessType, true));
+                    if (batch.Status != SingleWindowBatchStatusCatalog.ClientDispatching)
+                    {
+                        throw new InvalidOperationException("客户端派发状态已被其他操作修改，不能确认完成。");
+                    }
+
+                    DateTime nowUtc = DateTime.UtcNow;
+                    batch.Status = SingleWindowBatchStatusCatalog.QueuedToClient;
+                    batch.ClientDispatchPath = outBoxPath;
+                    batch.LastClientDispatchAt = nowUtc;
+                    batch.LastError = string.Empty;
+                    batch.UpdatedAt = nowUtc;
+                    context.SwHandoffPackageRecords.Add(new SwHandoffPackageRecord
+                    {
+                        BatchId = batch.Id,
+                        BatchReference = batch.BatchReference,
+                        BusinessType = batch.BusinessType,
+                        SourceInvoiceId = batch.SourceInvoiceId,
+                        SourceDocumentType = batch.SourceDocumentType,
+                        SourceDocumentId = batch.SourceDocumentId,
+                        InvoiceNo = batch.InvoiceNo,
+                        CompanyScope = batch.CompanyScope,
+                        StationKey = stationKey,
+                        PackageType = "ClientDispatch",
+                        Direction = "ExportedToClient",
+                        FilePath = outBoxPath,
+                        CreatedOnMachine = Environment.MachineName,
+                        PayloadFileCount = payloadFileCount,
+                        AttachmentFileCount = batch.AttachmentFileCount,
+                        WarningCount = batch.WarningCount,
+                        ContentDigest = batch.SubmitPackageDigest,
+                        CreatedAt = nowUtc,
+                        ManifestJson = string.Empty
+                    });
+                    await context.SaveChangesAsync(token);
+                    return true;
+                },
+                IsolationLevel.Serializable,
+                cancellationToken);
+        }
+
+        private async Task MarkClientDispatchFailedAsync(
+            int batchId,
+            string errorMessage,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+                var batch = await context.SwSubmissionBatches
+                    .FirstOrDefaultAsync(item => item.Id == batchId, cancellationToken);
+                if (batch == null || batch.Status != SingleWindowBatchStatusCatalog.ClientDispatching)
+                {
+                    return;
+                }
+
+                batch.Status = SingleWindowBatchStatusCatalog.ClientDispatchFailed;
+                batch.LastError = string.IsNullOrWhiteSpace(errorMessage)
+                    ? "写入官方客户端目录失败。"
+                    : errorMessage.Trim()[..Math.Min(errorMessage.Trim().Length, 2000)];
+                batch.UpdatedAt = DateTime.UtcNow;
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (Exception trackingException)
+            {
+                Serilog.Log.Error(
+                    trackingException,
+                    "Marking Single Window client dispatch {BatchId} as failed failed",
+                    batchId);
+            }
         }
 
         private static string ResolveConfiguredRoot(
@@ -333,10 +452,73 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        private static string BuildOutBoxFilePath(string outBoxDirectory, string originalFileName, string batchReference)
+        internal static async Task<IReadOnlyList<string>> PublishPayloadFilesAsync(
+            IReadOnlyList<string> stagedFiles,
+            string outBoxDirectory,
+            string batchReference,
+            CancellationToken cancellationToken,
+            Action<int, string> beforeCommit = null)
+        {
+            Directory.CreateDirectory(outBoxDirectory);
+            var publishedFiles = new List<string>(stagedFiles?.Count ?? 0);
+            var publishPlans = new List<(string PendingPath, string TargetPath)>(stagedFiles?.Count ?? 0);
+            var reservedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                foreach (string stagedFile in stagedFiles ?? [])
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string targetPath = BuildOutBoxFilePath(
+                        outBoxDirectory,
+                        Path.GetFileName(stagedFile),
+                        batchReference,
+                        reservedTargets);
+                    reservedTargets.Add(targetPath);
+                    string pendingPath = targetPath + $".pending-{Guid.NewGuid():N}";
+                    await FileCopyHelper.CopyAsync(
+                        stagedFile,
+                        pendingPath,
+                        overwrite: false,
+                        cancellationToken);
+                    publishPlans.Add((pendingPath, targetPath));
+                }
+
+                for (int index = 0; index < publishPlans.Count; index++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var plan = publishPlans[index];
+                    beforeCommit?.Invoke(index, plan.TargetPath);
+                    File.Move(plan.PendingPath, plan.TargetPath, overwrite: false);
+                    publishedFiles.Add(plan.TargetPath);
+                }
+
+                return publishedFiles;
+            }
+            catch
+            {
+                foreach (var plan in publishPlans)
+                {
+                    AtomicFileHelper.TryDeleteFile(plan.PendingPath);
+                }
+                foreach (string publishedFile in publishedFiles.AsEnumerable().Reverse())
+                {
+                    AtomicFileHelper.TryDeleteFile(publishedFile);
+                }
+
+                throw;
+            }
+        }
+
+        private static string BuildOutBoxFilePath(
+            string outBoxDirectory,
+            string originalFileName,
+            string batchReference,
+            ISet<string> reservedPaths = null)
         {
             string candidate = Path.Combine(outBoxDirectory, originalFileName);
-            if (!File.Exists(candidate))
+            if (!File.Exists(candidate) &&
+                !Directory.Exists(candidate) &&
+                !(reservedPaths?.Contains(candidate) ?? false))
             {
                 return candidate;
             }
@@ -346,11 +528,28 @@ namespace ExportDocManager.Services.SingleWindow
             string safeBatchReference = string.IsNullOrWhiteSpace(batchReference)
                 ? DateTime.Now.ToString("yyyyMMddHHmmssfff")
                 : batchReference.Trim();
-            return Path.Combine(outBoxDirectory, $"{baseName}_{safeBatchReference}{extension}");
+            candidate = Path.Combine(outBoxDirectory, $"{baseName}_{safeBatchReference}{extension}");
+            int suffix = 2;
+            while (File.Exists(candidate) ||
+                   Directory.Exists(candidate) ||
+                   (reservedPaths?.Contains(candidate) ?? false))
+            {
+                candidate = Path.Combine(
+                    outBoxDirectory,
+                    $"{baseName}_{safeBatchReference}_{suffix++}{extension}");
+            }
+
+            return candidate;
         }
 
         private sealed record SingleWindowWorkingPackage(
             string Directory,
             SingleWindowPackageManifest Manifest);
+
+        private sealed record ClientDispatchReservation(
+            int BatchId,
+            string BatchReference,
+            SingleWindowBusinessType BusinessType,
+            int AttachmentFileCount);
     }
 }

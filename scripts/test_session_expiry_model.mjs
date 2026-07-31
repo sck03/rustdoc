@@ -16,7 +16,7 @@ const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modu
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
 
-const { calculateSessionExpiryDelay, maximumBrowserTimeoutMs } = globalThis.__model;
+const { calculateSessionExpiryDelay, calculateSessionWarningDelay, maximumBrowserTimeoutMs } = globalThis.__model;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const now = Date.parse("2026-07-22T06:00:00.000Z");
 assert(calculateSessionExpiryDelay("invalid", now) === null, "invalid expiry should not schedule a timer");
@@ -24,4 +24,7 @@ assert(calculateSessionExpiryDelay("", now) === null, "missing expiry should not
 assert(calculateSessionExpiryDelay("2026-07-22T05:59:59.000Z", now) === 0, "expired session should end immediately");
 assert(calculateSessionExpiryDelay("2026-07-22T06:00:30.000Z", now) === 30_000, "future expiry should use exact delay");
 assert(calculateSessionExpiryDelay("2099-01-01T00:00:00.000Z", now) === maximumBrowserTimeoutMs, "long expiry should respect browser timeout limit");
+assert(calculateSessionWarningDelay("invalid", now) === null, "invalid expiry should not schedule a warning");
+assert(calculateSessionWarningDelay("2026-07-22T06:04:00.000Z", now) === 0, "sessions inside warning window should warn now");
+assert(calculateSessionWarningDelay("2026-07-22T06:10:00.000Z", now) === 300_000, "warning should start five minutes before expiry");
 process.stdout.write("session expiry model tests passed\n");

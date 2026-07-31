@@ -6,14 +6,29 @@ import { spawnSync } from "node:child_process";
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tauriRoot = path.join(repositoryRoot, "apps", "export-doc-tauri");
 const generatedRoot = path.join(repositoryRoot, "artifacts", "tauri-updater-config");
+const editionCatalog = JSON.parse(
+  readFileSync(path.join(repositoryRoot, "scripts", "product-editions.json"), "utf8"),
+);
 const buildArguments = process.argv.slice(2);
-const endpoint = String(process.env.EXPORTDOCMANAGER_UPDATER_ENDPOINT || "").trim();
-const publicKey = String(process.env.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY || "").trim();
-const privateKey = String(process.env.TAURI_SIGNING_PRIVATE_KEY || "").trim();
-const privateKeyPassword = String(process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || "");
+const productEdition = normalizeProductEdition(process.env.EXPORTDOCMANAGER_PRODUCT_EDITION);
+const editionMetadata = editionCatalog.editions?.[productEdition];
+if (!editionMetadata) {
+  throw new Error(`Product edition metadata is missing for ${productEdition}.`);
+}
+const projectVersion = String(
+  JSON.parse(readFileSync(path.join(repositoryRoot, "version.json"), "utf8")).version || "",
+).trim();
 const requireSignedUpdater = /^(?:1|true|yes)$/iu.test(
   String(process.env.EXPORTDOCMANAGER_REQUIRE_SIGNED_UPDATER || "").trim(),
 );
+const endpoint = resolveUpdaterEndpoint(
+  String(process.env.EXPORTDOCMANAGER_UPDATER_ENDPOINT || "").trim(),
+  editionMetadata,
+  projectVersion,
+);
+const publicKey = String(process.env.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY || "").trim();
+const privateKey = String(process.env.TAURI_SIGNING_PRIVATE_KEY || "").trim();
+const privateKeyPassword = String(process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || "");
 const allowInsecureUpdaterEndpoint = /^(?:1|true|yes)$/iu.test(
   String(process.env.EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT || "").trim(),
 );
@@ -52,6 +67,7 @@ if (requireSignedUpdater) {
   if (buildArguments.includes("--no-sign")) {
     throw new Error("A release updater build cannot use --no-sign.");
   }
+
 }
 
 const configIndex = buildArguments.findIndex((argument) => argument === "--config");
@@ -65,6 +81,11 @@ if (configIndex >= 0) {
   buildArguments.splice(configIndex, 2);
 }
 
+baseConfig = deepMerge(baseConfig, {
+  productName: editionMetadata.productName,
+  identifier: editionMetadata.identifier,
+});
+
 if (publicKey) {
   const releaseConfig = deepMerge(baseConfig, {
     bundle: { createUpdaterArtifacts: true },
@@ -72,17 +93,17 @@ if (publicKey) {
       updater: {
         endpoints: endpoint ? [endpoint] : [],
         pubkey: publicKey,
-        dangerousInsecureTransportProtocol: true,
+        dangerousInsecureTransportProtocol: endpoint.startsWith("http:"),
       },
     },
   });
   mkdirSync(generatedRoot, { recursive: true });
-  const configPath = path.join(generatedRoot, "tauri.release.conf.json");
+  const configPath = path.join(generatedRoot, `tauri.${editionMetadata.slug}.release.conf.json`);
   writeFileSync(configPath, `${JSON.stringify(releaseConfig, null, 2)}\n`, "utf8");
   buildArguments.push("--config", configPath);
-} else if (Object.keys(baseConfig).length > 0) {
+} else {
   mkdirSync(generatedRoot, { recursive: true });
-  const configPath = path.join(generatedRoot, "tauri.local.conf.json");
+  const configPath = path.join(generatedRoot, `tauri.${editionMetadata.slug}.local.conf.json`);
   writeFileSync(configPath, `${JSON.stringify(baseConfig, null, 2)}\n`, "utf8");
   buildArguments.push("--config", configPath);
 }
@@ -110,4 +131,27 @@ function deepMerge(base, overlay) {
 
 function isObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeProductEdition(value) {
+  const normalized = String(value || "Full").trim().toLowerCase();
+  if (normalized === "document") return "Document";
+  if (normalized === "sales") return "Sales";
+  if (normalized === "full") return "Full";
+  throw new Error(`Unsupported product edition: ${value}`);
+}
+
+function resolveUpdaterEndpoint(configuredEndpoint, metadata, version) {
+  if (configuredEndpoint) return configuredEndpoint;
+  if (!requireSignedUpdater) return "";
+
+  const repository = String(process.env.GITHUB_REPOSITORY || "").trim();
+  if (!/^[^/]+\/[^/]+$/u.test(repository)) {
+    return "";
+  }
+
+  const prerelease = version.includes("-");
+  const channelTag = prerelease ? metadata.prereleaseChannelTag : metadata.stableChannelTag;
+  const manifestAsset = prerelease ? metadata.prereleaseManifestAsset : metadata.stableManifestAsset;
+  return `https://github.com/${repository}/releases/download/${channelTag}/${manifestAsset}`;
 }

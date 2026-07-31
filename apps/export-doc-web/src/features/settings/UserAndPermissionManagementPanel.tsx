@@ -23,7 +23,7 @@ export function UserAndPermissionManagementPanel({
         <div>
           <span className="identity-management-eyebrow">账号与访问控制</span>
           <h2>让每个岗位只看到需要的功能</h2>
-          <p>适用于桌面端、局域网网页端和容器部署；导航显隐与服务端接口权限保持一致。</p>
+          <p>账号权限在不同使用方式下保持一致，未授权的页面和操作会自动隐藏。</p>
         </div>
         <span className="identity-management-security-note">
           <ShieldCheck size={18} aria-hidden="true" />

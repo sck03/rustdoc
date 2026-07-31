@@ -37,13 +37,21 @@ on:
         required: true
         type: boolean
     secrets:
-      TAURI_SIGNING_PRIVATE_KEY:
+      TAURI_SIGNING_PRIVATE_KEY_DOCUMENT:
         required: false
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD_DOCUMENT:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_SALES:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD_SALES:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_FULL:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD_FULL:
         required: false
 
 concurrency:
-  group: ${{ inputs.publish_release && format('desktop-release-{0}', inputs.version) || format('desktop-{0}-{1}-{2}', inputs.platform, inputs.architecture, inputs.version) }}
+  group: ${{ inputs.publish_release && format('desktop-release-{0}', inputs.edition) || format('desktop-{0}-{1}-{2}-{3}', inputs.edition, inputs.platform, inputs.architecture, inputs.version) }}
   cancel-in-progress: ${{ !inputs.publish_release }}
 
 permissions:
@@ -67,11 +75,11 @@ jobs:
       EXPORTDOCMANAGER_PRODUCT_EDITION: ${{ inputs.edition }}
       EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER: ${{ inputs.include_browser && 'false' || 'true' }}
       EXPORTDOCMANAGER_REQUIRE_SIGNED_UPDATER: ${{ inputs.publish_release && 'true' || 'false' }}
-      EXPORTDOCMANAGER_UPDATER_ENDPOINT: ${{ vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT }}
-      EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY: ${{ vars.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY }}
+      EXPORTDOCMANAGER_UPDATER_ENDPOINT: ${{ inputs.edition == 'Document' && vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT_DOCUMENT || inputs.edition == 'Sales' && vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT_SALES || vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT_FULL }}
+      EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY: ${{ inputs.edition == 'Document' && vars.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_DOCUMENT || inputs.edition == 'Sales' && vars.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_SALES || vars.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_FULL }}
       EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT: ${{ vars.EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT }}
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.edition == 'Document' && secrets.TAURI_SIGNING_PRIVATE_KEY_DOCUMENT || inputs.edition == 'Sales' && secrets.TAURI_SIGNING_PRIVATE_KEY_SALES || secrets.TAURI_SIGNING_PRIVATE_KEY_FULL }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.edition == 'Document' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_DOCUMENT || inputs.edition == 'Sales' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_SALES || secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_FULL }}
 
     steps:
       - name: Checkout
@@ -200,7 +208,7 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) { throw "请配置仓库 Secret TAURI_SIGNING_PRIVATE_KEY。" }
           if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)) { throw "请配置仓库 Secret TAURI_SIGNING_PRIVATE_KEY_PASSWORD，并使用带密码的私钥。" }
           if ([string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_UPDATER_ENDPOINT)) {
-            Write-Host "未内置默认更新地址；客户端将使用管理员在系统设置中保存的更新地址。"
+            Write-Host "未配置自定义更新地址；构建器将按产品版自动使用对应的 GitHub Release 更新通道。"
           }
           npm --prefix apps/export-doc-tauri run build -- --target ${{ inputs.rust_target }} --bundles ${{ inputs.bundle_targets }}
           exit $LASTEXITCODE
@@ -256,41 +264,7 @@ jobs:
           retention-days: 14
           compression-level: 0
 
-      - name: Publish package files to GitHub Release
-        if: inputs.publish_release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ steps.version.outputs.value }}
-        run: |
-          $tag = "v$($env:RELEASE_VERSION)"
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -ne 0) {
-            $createArgs = @("release", "create", $tag, "--title", "ExportDocManager $($env:RELEASE_VERSION)", "--notes", "ExportDocManager 经过签名校验的桌面安装包与容器版本。")
-            if ($env:RELEASE_VERSION.Contains("-")) {
-              $createArgs += "--prerelease"
-            }
-            & gh @createArgs
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
-
-          $extensions = switch ("${{ inputs.platform }}") {
-            "windows" { @(".exe", ".msi", ".sig") }
-            "linux" { @(".deb", ".rpm", ".appimage", ".sig") }
-            "macos" { @(".dmg", ".pkg", ".zip", ".gz", ".sig") }
-            default { @() }
-          }
-          $assets = @(
-            Get-ChildItem -Path $env:CARGO_TARGET_DIR -File -Recurse |
-              Where-Object { $_.FullName -match '[\\/]release[\\/]bundle[\\/]' -and $_.Extension.ToLowerInvariant() -in $extensions }
-          )
-          if ($assets.Count -eq 0) {
-            throw "没有找到可发布的 ${{ inputs.platform }} 安装包文件。"
-          }
-          & gh release upload $tag @($assets.FullName) --clobber
-          exit $LASTEXITCODE
-
-      - name: Merge signed updater manifest into GitHub Release
+      - name: Publish immutable edition release and update channel
         if: inputs.publish_release
         shell: pwsh
         env:
@@ -299,6 +273,7 @@ jobs:
           ./scripts/publish-tauri-updater-manifest.ps1
           -Platform ${{ inputs.platform }}
           -Architecture ${{ inputs.architecture }}
+          -Edition ${{ inputs.edition }}
           -Version ${{ steps.version.outputs.value }}
           -BundleRoot ${{ env.CARGO_TARGET_DIR }}
 
@@ -314,5 +289,6 @@ jobs:
           - 内置报表浏览器：`${{ inputs.include_browser }}`
           - 发布到 GitHub Release：`${{ inputs.publish_release }}`
           - 更新签名：`${{ inputs.publish_release && '已启用，缺少构建密钥会直接失败' || '未启用，仅用于测试和人工验收' }}`
-          - 默认更新地址：`${{ inputs.publish_release && (vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT || '未内置，由管理员运行时配置') || '不适用' }}`
+          - 系统商业签名：`本阶段暂不强制；Windows Authenticode 与 macOS Developer ID/公证列入正式商业发布前门禁`
+          - 默认更新地址：`${{ inputs.publish_release && '产品版专属 GitHub Release 通道；配置对应产品版变量时使用自定义地址' || '不适用' }}`
           "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append

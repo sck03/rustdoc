@@ -59,8 +59,8 @@ export function RuntimeDatabaseSettingsPanel({ settings, secrets, canManageSetti
             <span>管理员受控配置</span>
           </div>
         </div>
-        <InlineNotice tone="info" title="更新地址可切换，签名信任不可替换">
-          留空时使用安装包内置默认地址；可填写 GitHub、自建 HTTPS 地址，或受控公司内网的 HTTP 地址。HTTP 仅适用于可信内网或 VPN，公网仍应使用 HTTPS。更新签名公钥固定在安装包内，本页不会提供公钥输入框。
+        <InlineNotice tone="info" title="更新来源受保护">
+          留空时使用软件默认更新地址；只有系统管理员或软件服务商提供专用地址时才需要修改。公网地址应使用 HTTPS，HTTP 地址只适用于受控公司内网或 VPN。
         </InlineNotice>
         <fieldset className="settings-fieldset" disabled={!canManageSettings}>
           <div className="field-grid">

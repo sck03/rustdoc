@@ -320,10 +320,11 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiSingleWindowSubmitPackageRequest"] = new
                         {
                             type = "object",
-                            required = Array.Empty<string>(),
+                            required = new[] { "stationAssignmentCode" },
                             properties = new Dictionary<string, object>
                             {
-                                ["packagePath"] = StringProperty("Optional user-selected .swpkg save path. When omitted or blank, the sidecar writes under the runtime data root SingleWindow/Outbox directory.")
+                                ["packagePath"] = StringProperty("Optional user-selected .swpkg save path. When omitted or blank, the sidecar writes under the runtime data root SingleWindow/Outbox directory."),
+                                ["stationAssignmentCode"] = StringProperty("Sensitive assignment code copied from the exact SQLite card-station operation profile that must receive this package.")
                             }
                         },
                         ["ApiSingleWindowImportPackageRequest"] = new
@@ -394,6 +395,9 @@ namespace ExportDocManager.Api.Hosting
                                 "cardIdentifier",
                                 "clientProfileKey",
                                 "clientProfileName",
+                                "assignmentNonce",
+                                "authenticationAlgorithm",
+                                "authenticationTag",
                                 "createdAt",
                                 "createdOnMachine",
                                 "payloadFiles",
@@ -432,10 +436,13 @@ namespace ExportDocManager.Api.Hosting
                                 ["sourcePackageDigest"] = StringProperty("Original submit package content digest for receipt packages."),
                                 ["receiptReferenceNo"] = StringProperty("Official reference number shared by every receipt in a receipt package."),
                                 ["contentDigest"] = StringProperty("Canonical manifest content digest."),
-                                ["stationKey"] = StringProperty("Assigned card-station key for station-originated packages."),
-                                ["cardIdentifier"] = StringProperty("Non-secret operation-card identifier for receipt packages."),
-                                ["clientProfileKey"] = StringProperty("Stable operation profile key for receipt packages."),
-                                ["clientProfileName"] = StringProperty("Operation-card profile name for receipt packages."),
+                                ["stationKey"] = StringProperty("Pre-assigned card-station key for submit and receipt packages."),
+                                ["cardIdentifier"] = StringProperty("Pre-assigned non-secret operation-card identifier."),
+                                ["clientProfileKey"] = StringProperty("Pre-assigned stable operation profile key."),
+                                ["clientProfileName"] = StringProperty("Pre-assigned operation-card profile name."),
+                                ["assignmentNonce"] = StringProperty("Unique one-time assignment nonce."),
+                                ["authenticationAlgorithm"] = StringProperty("Package authentication algorithm; currently HMAC-SHA256."),
+                                ["authenticationTag"] = StringProperty("HMAC authentication tag bound to package content and the assigned station profile."),
                                 ["createdAt"] = new { type = "string", format = "date-time" },
                                 ["createdOnMachine"] = StringProperty("Machine that created the package."),
                                 ["payloadFiles"] = RefArraySchema("SingleWindowPackageFile"),
@@ -537,10 +544,12 @@ namespace ExportDocManager.Api.Hosting
                             required = new[]
                             {
                                 "id",
+                                "stationKey",
                                 "profileKey",
                                 "profileName",
                                 "companyScope",
                                 "cardIdentifier",
+                                "stationAssignmentCode",
                                 "customsCooClientRootPath",
                                 "agentConsignmentClientRootPath",
                                 "canSubmitCustomsCoo",
@@ -552,10 +561,12 @@ namespace ExportDocManager.Api.Hosting
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" },
+                                ["stationKey"] = StringProperty("Stable identity of this SQLite card station."),
                                 ["profileKey"] = StringProperty("Stable operation-card profile key."),
                                 ["profileName"] = StringProperty("Client profile name."),
                                 ["companyScope"] = StringProperty("Company identity bound to this operation card."),
                                 ["cardIdentifier"] = StringProperty("Non-secret card label or identifier."),
+                                ["stationAssignmentCode"] = StringProperty("Sensitive assignment code used by the office system to bind and authenticate packages for this exact station profile."),
                                 ["customsCooClientRootPath"] = StringProperty("Independent official client root for Customs COO."),
                                 ["agentConsignmentClientRootPath"] = StringProperty("Independent official client root for agent consignment."),
                                 ["canSubmitCustomsCoo"] = new { type = "boolean" },

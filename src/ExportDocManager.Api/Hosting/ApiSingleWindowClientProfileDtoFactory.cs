@@ -28,10 +28,12 @@ namespace ExportDocManager.Api.Hosting
             profile ??= new SwClientProfile();
             return new ApiSingleWindowClientProfileDto(
                 profile.Id,
+                profile.StationKey ?? string.Empty,
                 profile.ProfileKey ?? string.Empty,
                 profile.ProfileName ?? string.Empty,
                 profile.CompanyScope ?? string.Empty,
                 profile.CardIdentifier ?? string.Empty,
+                profile.StationAssignmentCode ?? string.Empty,
                 profile.CustomsCooClientRootPath ?? string.Empty,
                 profile.AgentConsignmentClientRootPath ?? string.Empty,
                 profile.CanSubmitCustomsCoo,

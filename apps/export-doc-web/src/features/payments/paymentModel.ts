@@ -52,7 +52,7 @@ export function normalizePaymentForSave(payment: ApiPaymentDto, id: number): Api
     otherExpense: numberValue(payment.otherExpense),
     payeeName: normalizeText(payment.payeeName),
     payerName: normalizeText(payment.payerName),
-    paymentDate: normalizeRequiredDate(payment.paymentDate),
+    paymentDate: normalizeOptionalDate(payment.paymentDate),
     paymentMethod: normalizeText(payment.paymentMethod),
     project: normalizeText(payment.project),
     quantity: normalizeText(payment.quantity),
@@ -66,11 +66,44 @@ export function normalizePaymentForSave(payment: ApiPaymentDto, id: number): Api
   };
 }
 
-function normalizeRequiredDate(value?: string) {
-  return dateInputToApiDate(toDateInputValue(value) || currentLocalDateInputValue());
-}
-
 function normalizeOptionalDate(value?: string) {
   const inputValue = toDateInputValue(value);
   return inputValue ? dateInputToApiDate(inputValue) : undefined;
+}
+
+export function validatePaymentDraft(payment: ApiPaymentDto) {
+  if ((payment.payeeId ?? 0) < 0) return "支付对象资料编号不能小于 0。";
+
+  const textLimits: Array<[string | undefined, number, string]> = [
+    [payment.invoiceNo, 100, "发票号"],
+    [payment.department, 100, "部门"],
+    [payment.paymentMethod, 100, "付款方式"],
+    [payment.quantity, 100, "数量"],
+    [payment.shipmentCountry, 100, "出运国家"],
+    [payment.project, 200, "项目"],
+    [payment.payeeName, 200, "收款方"],
+    [payment.payerName, 200, "付款方"],
+    [payment.bankName, 200, "银行"],
+    [payment.accountNo, 100, "账号"],
+    [payment.goodsName, 500, "品名"],
+    [payment.notes, 2000, "备注"],
+  ];
+  const overlong = textLimits.find(([value, maximumLength]) => (value?.trim().length ?? 0) > maximumLength);
+  if (overlong) return `${overlong[2]}不能超过 ${overlong[1]} 个字符。`;
+
+  const amounts: Array<[number | undefined, string]> = [
+    [payment.usdAmount, "USD 金额"],
+    [payment.cnyAmount, "CNY 金额"],
+    [payment.travelExpense, "差旅费"],
+    [payment.businessEntertainmentExpense, "业务招待费"],
+    [payment.telephoneExpense, "电话费"],
+    [payment.officeExpense, "办公费"],
+    [payment.repairExpense, "维修费"],
+    [payment.freightMiscExpense, "运杂费"],
+    [payment.inspectionExpense, "商检费"],
+    [payment.otherExpense, "其他费用"],
+  ];
+  const negative = amounts.find(([value]) => Number(value ?? 0) < 0);
+  if (negative) return `${negative[1]}不能小于 0。`;
+  return null;
 }

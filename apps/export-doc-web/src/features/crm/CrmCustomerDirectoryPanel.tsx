@@ -8,6 +8,7 @@ import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
+import { downloadBlob } from "../../ui/downloadBlob.ts";
 
 export function CrmCustomerDirectoryPanel({ client, canOperate, onCreateCustomer, onSelectCustomer }: {
   client: ExportDocManagerApiClient;
@@ -49,9 +50,8 @@ export function CrmCustomerDirectoryPanel({ client, canOperate, onCreateCustomer
   async function exportRows() {
     try {
       const blob = await client.exportCrmCustomers({ keyword, status });
-      const url = URL.createObjectURL(blob); const anchor = document.createElement("a");
-      anchor.href = url; anchor.download = `crm-customers-${currentLocalDateInputValue()}.xlsx`; anchor.click();
-      URL.revokeObjectURL(url); setFeedback(successFeedback("CRM 客户与主要联系人 Excel 已生成。"));
+      downloadBlob(blob, `crm-customers-${currentLocalDateInputValue()}.xlsx`);
+      setFeedback(successFeedback("CRM 客户与主要联系人 Excel 已生成。"));
     } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
   }
 

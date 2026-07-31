@@ -63,6 +63,38 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public void ShouldUpdateReceiptSummary_ShouldNeverFlipApprovedToRejected()
+        {
+            DateTime now = DateTime.UtcNow;
+            var batch = new SwSubmissionBatch
+            {
+                LastBusinessStatus = SingleWindowReceiptBusinessStatus.Approved.ToString(),
+                LastReceiptAt = now
+            };
+
+            bool shouldUpdate = SingleWindowTrackingService.ShouldUpdateReceiptSummary(
+                batch,
+                CreateReceipt(SingleWindowReceiptBusinessStatus.Rejected, now.AddMinutes(5)));
+
+            Assert.False(shouldUpdate);
+        }
+
+        [Fact]
+        public void SelectPrimaryReceipt_ShouldRejectConflictingTerminalStatuses()
+        {
+            DateTime now = DateTime.UtcNow;
+
+            var error = Assert.Throws<InvalidDataException>(() =>
+                SingleWindowTrackingService.SelectPrimaryReceipt(
+                [
+                    CreateReceipt(SingleWindowReceiptBusinessStatus.Approved, now),
+                    CreateReceipt(SingleWindowReceiptBusinessStatus.Rejected, now.AddMinutes(1))
+                ]));
+
+            Assert.Contains("放行和退单终态", error.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void SubmitPackageBinding_ShouldRejectRebindingToAnotherCardProfile()
         {
             var batch = new SwSubmissionBatch
@@ -81,6 +113,24 @@ namespace ExportDocManager.Infrastructure.Tests
                     "CARD-B"));
 
             Assert.Contains("不能通过重复导入改绑", error.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void SubmitPackageBinding_ShouldAllowFirstImportForPreassignedStation()
+        {
+            var batch = new SwSubmissionBatch
+            {
+                Status = SingleWindowBatchStatusCatalog.SubmitPackageExported,
+                AssignedStationKey = "SWS-11111111111111111111111111111111",
+                AssignedProfileKey = "SWP-22222222222222222222222222222222",
+                AssignedCardIdentifier = "CARD-A"
+            };
+
+            SingleWindowTrackingService.EnsureSubmitPackageCanBindToStation(
+                batch,
+                batch.AssignedStationKey,
+                batch.AssignedProfileKey,
+                batch.AssignedCardIdentifier);
         }
 
         [Fact]

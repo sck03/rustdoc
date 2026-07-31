@@ -4,19 +4,20 @@ use std::{
     io::{self, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::atomic::{AtomicU64, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
 };
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use tauri::Manager;
 
-use crate::runtime_paths::RuntimePaths;
+use crate::runtime_paths::{self, RuntimePaths};
 
 const MAX_OCR_PREVIEW_IMAGE_BYTES: u64 = 25 * 1024 * 1024;
 const MAX_PDF_EXPORT_BYTES: usize = 25 * 1024 * 1024;
 const MAX_FRONTEND_LOG_FIELD_LENGTH: usize = 8 * 1024;
 const PDF_TEMP_FILE_CREATE_ATTEMPTS: usize = 16;
 static PDF_TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
+static EXIT_CONFIRMED: AtomicBool = AtomicBool::new(false);
 
 #[tauri::command]
 pub(crate) fn select_single_window_package_file() -> Result<Option<String>, String> {
@@ -34,6 +35,14 @@ pub(crate) fn select_invoice_transfer_package_file() -> Result<Option<String>, S
     Ok(pick_file(
         "选择发票单据包",
         &[("发票单据包", &["edpkg"]), ("全部文件", &["*"])],
+    ))
+}
+
+#[tauri::command]
+pub(crate) fn select_disaster_recovery_package_file() -> Result<Option<String>, String> {
+    Ok(pick_file(
+        "选择持卡机灾难恢复包",
+        &[("持卡机灾难恢复包", &["edmrecovery"]), ("全部文件", &["*"])],
     ))
 }
 
@@ -496,6 +505,37 @@ pub(crate) fn open_path(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub(crate) fn get_runtime_storage_context(
+    paths: tauri::State<'_, RuntimePaths>,
+) -> runtime_paths::RuntimeStorageContext {
+    runtime_paths::runtime_storage_context(&paths)
+}
+
+#[tauri::command]
+pub(crate) fn schedule_data_root_migration(
+    paths: tauri::State<'_, RuntimePaths>,
+) -> Result<Option<runtime_paths::DataRootMigrationScheduleResult>, String> {
+    if paths.portable {
+        return Err(
+            "便携版的数据目录固定为程序目录旁的 App_Data；如需迁移，请退出程序后复制完整便携目录。"
+                .to_owned(),
+        );
+    }
+
+    let mut dialog = rfd::FileDialog::new().set_title("选择新的业务数据目录（必须为空）");
+    if let Some(parent) = paths.data_root.parent().filter(|path| path.is_dir()) {
+        dialog = dialog.set_directory(parent);
+    }
+    let Some(target_root) = dialog.pick_folder() else {
+        return Ok(None);
+    };
+
+    runtime_paths::schedule_data_root_migration(&paths, &target_root)
+        .map(Some)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub(crate) fn log_frontend_error(
     paths: tauri::State<'_, RuntimePaths>,
     message: String,
@@ -546,13 +586,21 @@ fn resolve_open_path_target(input: &Path) -> Result<(PathBuf, bool), String> {
 
 #[tauri::command]
 pub(crate) fn request_app_exit(app_handle: tauri::AppHandle) -> Result<(), String> {
+    EXIT_CONFIRMED.store(true, Ordering::SeqCst);
     if let Some(window) = app_handle.get_webview_window("main") {
-        window.close().map_err(|error| error.to_string())?;
+        if let Err(error) = window.close() {
+            EXIT_CONFIRMED.store(false, Ordering::SeqCst);
+            return Err(error.to_string());
+        }
         return Ok(());
     }
 
     app_handle.exit(0);
     Ok(())
+}
+
+pub(crate) fn is_app_exit_confirmed() -> bool {
+    EXIT_CONFIRMED.load(Ordering::SeqCst)
 }
 
 fn pick_file(title: &str, filters: &[(&str, &[&str])]) -> Option<String> {

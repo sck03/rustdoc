@@ -1,6 +1,6 @@
 # GitHub 开源发布与 Docker 镜像说明
 
-> 更新日期：2026-07-27
+> 更新日期：2026-07-30
 
 ## 1. 公开仓库边界
 
@@ -38,6 +38,7 @@ pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
 
 - `public-source-guard.yml`：当前只允许手工运行，检查公开边界、Action Node 24/Artifact 版本政策和 updater 信任契约。
 - `cross-platform-validation.yml`：只手工运行，检查 Windows、Linux、macOS 的 .NET/Web/Tauri 契约。
+- `browser-compatibility.yml`：Web/API 相关 push、PR 或手工运行；在真实 Firefox、WebKit 的桌面和手机视口检查登录、响应式分类、横向溢出、页面异常、HTTP 500 和严重无障碍问题。
 - `container-images.yml`：只手工运行；启动时填写版本号并选择是否更新 `latest`，随后构建 `linux/amd64`、`linux/arm64` 的 API/Web 镜像并发布到 GHCR。
 - `windows-desktop-package.yml`：只手工运行；选择版本和 Document/Sales/Full，构建 Windows x64 NSIS 安装包。
 - `linux-desktop-package.yml`：只手工运行；选择版本和产品版本，构建 Linux x64 deb/AppImage。
@@ -51,7 +52,9 @@ pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
 
 手工发布 Docker 镜像时：进入 Actions → Build and publish container images → Run workflow，填写 `version`，例如 `0.1.2` 或 `0.1.2-beta.1`；`publish_latest=true` 时同时覆盖 `latest`。工作流会在临时 runner 中同步 `.NET/Web/Tauri/Rust` 内部版本，不会反向修改或提交仓库源码。最终镜像同时带版本标签和 `sha-*` 标签。
 
-手工生成桌面包时，进入对应的 `Build Windows/Linux/macOS desktop package` → `Run workflow`，填写版本并选择产品版；macOS 还可选择 ARM64 或 x64。默认结果位于该次运行的 Artifacts，保留 14 天；只有把 `publish_release` 改为 `true` 才会上传到 `v<版本>` GitHub Release。三个入口都会自动下载当前平台的 Chrome Headless Shell，并在打包前后验证浏览器可执行文件已经进入 Tauri 资源目录，因此最终安装包不要求普通用户另行下载浏览器。源码仓库仍不保存这些大体积二进制。Chrome for Testing 当前官方 Headless Shell 平台为 `linux64 / mac-arm64 / mac-x64 / win32 / win64`，所以 macOS ARM64 已开放正式手工打包；Linux ARM64 和 Windows ARM64 没有对应官方包，仍只保留应用编译契约，不能把 x64 浏览器伪装成 ARM64 交付。桌面包当前未签名，正式分发前仍需完成代码签名、公证、安装启动、更新和卸载验收。
+手工生成桌面包时，进入对应的 `Build Windows/Linux/macOS desktop package` → `Run workflow`，填写版本并选择产品版；macOS 还可选择 ARM64 或 x64。默认结果位于该次运行的 Artifacts，保留 14 天。只有把 `publish_release` 改为 `true` 才会发布：Document、Sales、Full 分别进入 `exportdocmanager-document-v<版本>`、`exportdocmanager-sales-v<版本>`、`exportdocmanager-full-v<版本>` 的不可覆盖版本 Release，并分别更新自己的稳定或预发布通道清单。三个入口都会自动下载当前平台的 Chrome Headless Shell，并在打包前后验证浏览器可执行文件已经进入 Tauri 资源目录，因此最终安装包不要求普通用户另行下载浏览器。源码仓库仍不保存这些大体积二进制。Chrome for Testing 当前官方 Headless Shell 平台为 `linux64 / mac-arm64 / mac-x64 / win32 / win64`，所以 macOS ARM64 已开放手工打包；Linux ARM64 和 Windows ARM64 没有对应官方包，仍只保留应用编译契约，不能把 x64 浏览器伪装成 ARM64 交付。
+
+三产品版使用独立应用身份和更新信任材料：identifier 分别为 `com.exportdocmanager.desktop.document`、`com.exportdocmanager.desktop.sales`、`com.exportdocmanager.desktop.full`；仓库 Variables/Secrets 也按 `_DOCUMENT / _SALES / _FULL` 分开配置 updater 公钥、带密码私钥和私钥密码。`publish_release=false` 生成未签名验收 Artifact；`publish_release=true` 强制生成并校验 Tauri updater `.sig` 和独立 `latest-*.json`。Windows Authenticode、macOS Developer ID 和 Apple 公证按当前项目阶段暂缓，不是本轮 GitHub 构建门禁；正式商业分发前再配置并完成安装、升级、回滚和卸载验收。系统级代码签名暂缓不影响 updater 包签名继续强制。
 
 非 Docker 浏览器服务器版在 Actions 中选择 `Build Windows browser server package` 或 `Build Linux browser server package`。生成包由单个 ASP.NET Core 进程同时提供 React 页面与 `/api`，使用同源访问，不需要 Nginx 容器；包内自带 Chrome Headless Shell、启动脚本和“初始化配置并可立即启动”脚本。部署机器仍需原生 PostgreSQL，建议运行 `initialize-windows.ps1` 或 `initialize-linux.sh`，不要把数据库密码和首次部署令牌写进启动命令历史；脚本不会自动安装数据库、改防火墙或注册系统服务。GitHub 只负责编译和保存下载包，不提供长期运行服务器。
 

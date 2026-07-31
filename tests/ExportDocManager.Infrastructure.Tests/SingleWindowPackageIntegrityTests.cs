@@ -7,6 +7,9 @@ namespace ExportDocManager.Infrastructure.Tests
 {
     public sealed class SingleWindowPackageIntegrityTests
     {
+        private static readonly string AuthenticationSecret = Convert.ToBase64String(
+            Enumerable.Range(1, 32).Select(value => (byte)value).ToArray());
+
         [Fact]
         public async Task ValidateAsync_ShouldRejectFilesMissingFromManifest()
         {
@@ -54,6 +57,9 @@ namespace ExportDocManager.Infrastructure.Tests
                         }
                     ]);
                 manifest.ContentDigest = SingleWindowPackageIntegrity.ComputeContentDigest(manifest);
+                manifest.AuthenticationTag = SingleWindowPackageIntegrity.ComputeAuthenticationTag(
+                    manifest,
+                    AuthenticationSecret);
 
                 var error = await Assert.ThrowsAsync<InvalidDataException>(() =>
                     SingleWindowPackageIntegrity.ValidateAsync(
@@ -71,7 +77,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public async Task ValidateAsync_ShouldAcceptOnlyDeclaredSchemaThreeFiles()
+        public async Task ValidateAsync_ShouldAcceptOnlyDeclaredAuthenticatedSchemaFourFiles()
         {
             string root = CreateTempRoot();
             try
@@ -83,6 +89,29 @@ namespace ExportDocManager.Infrastructure.Tests
                     manifest,
                     SingleWindowPackageType.SubmitPackage,
                     CancellationToken.None);
+            }
+            finally
+            {
+                TryDeleteDirectory(root);
+            }
+        }
+
+        [Fact]
+        public async Task ValidateAuthentication_ShouldRejectTamperedPackageTag()
+        {
+            string root = CreateTempRoot();
+            try
+            {
+                var manifest = await CreateValidSubmitPackageAsync(root);
+                manifest.AuthenticationTag = new string('0', 64);
+
+                var error = Assert.Throws<InvalidDataException>(() =>
+                    SingleWindowPackageIntegrity.ValidateAuthentication(
+                        manifest,
+                        AuthenticationSecret,
+                        "认证失败"));
+
+                Assert.Equal("认证失败", error.Message);
             }
             finally
             {
@@ -122,6 +151,12 @@ namespace ExportDocManager.Infrastructure.Tests
                 SnapshotSha256 = await SingleWindowPackageIntegrity.ComputeFileSha256Async(
                     snapshotPath,
                     CancellationToken.None),
+                StationKey = "SWS-11111111111111111111111111111111",
+                CardIdentifier = "CARD-A",
+                ClientProfileKey = "SWP-22222222222222222222222222222222",
+                ClientProfileName = "测试公司 / 卡 A",
+                AssignmentNonce = "33333333333333333333333333333333",
+                AuthenticationAlgorithm = SingleWindowPackageIntegrity.AuthenticationAlgorithm,
                 PayloadFiles = [payload],
                 AttachmentFiles = [],
                 Warnings = [],
@@ -129,6 +164,9 @@ namespace ExportDocManager.Infrastructure.Tests
                 CreatedOnMachine = "TEST-STATION"
             };
             manifest.ContentDigest = SingleWindowPackageIntegrity.ComputeContentDigest(manifest);
+            manifest.AuthenticationTag = SingleWindowPackageIntegrity.ComputeAuthenticationTag(
+                manifest,
+                AuthenticationSecret);
             await File.WriteAllTextAsync(
                 Path.Combine(root, "manifest.json"),
                 JsonSerializer.Serialize(manifest));
@@ -157,10 +195,14 @@ namespace ExportDocManager.Infrastructure.Tests
                 CompanyScope = source.CompanyScope,
                 SnapshotSha256 = source.SnapshotSha256,
                 SourcePackageDigest = source.SourcePackageDigest,
+                ReceiptReferenceNo = source.ReceiptReferenceNo,
                 StationKey = source.StationKey,
                 CardIdentifier = source.CardIdentifier,
                 ClientProfileKey = source.ClientProfileKey,
                 ClientProfileName = source.ClientProfileName,
+                AssignmentNonce = source.AssignmentNonce,
+                AuthenticationAlgorithm = source.AuthenticationAlgorithm,
+                AuthenticationTag = source.AuthenticationTag,
                 CreatedAt = source.CreatedAt,
                 CreatedOnMachine = source.CreatedOnMachine,
                 PayloadFiles = payloadFiles,

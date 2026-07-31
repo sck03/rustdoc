@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, CreditCard, FolderOpen, Plus, RefreshCw, Save, ShieldCheck } from "lucide-react";
+import { Building2, Copy, CreditCard, FolderOpen, Plus, RefreshCw, Save, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ApiSingleWindowClientProfileDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -7,6 +7,7 @@ import { selectDirectory } from "../../desktop/desktopBridge.ts";
 import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { TextField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { writeClipboardText } from "../../ui/clipboard.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
@@ -245,6 +246,23 @@ export function SingleWindowStationProfilePanel({
     activateMutation.mutate(profileKey);
   }
 
+  async function copyAssignmentCode() {
+    const code = selectedProfile?.stationAssignmentCode?.trim() ?? "";
+    if (!code) {
+      setMessage("当前档案尚未生成持卡机授权码，请先保存档案。");
+      setMessageKind("error");
+      return;
+    }
+
+    if (await writeClipboardText(code)) {
+      setMessage("持卡机授权码已复制。请只交给负责为该档案制单的办公室系统。");
+      setMessageKind("success");
+    } else {
+      setMessage("浏览器未允许写入剪贴板，请手动选择授权码复制。");
+      setMessageKind("error");
+    }
+  }
+
   return (
     <section className="form-section single-window-station-profile" aria-label="本机持卡机操作档案">
       <div className="section-header">
@@ -348,6 +366,43 @@ export function SingleWindowStationProfilePanel({
         </div>
       ) : null}
 
+      {selectedProfile ? (
+        <section className="single-window-assignment-card" aria-label="持卡机预分派授权码">
+          <div className="section-header compact-section-header">
+            <div>
+              <h3>办公室预分派授权码</h3>
+              <span>用于把提交包锁定到本机当前公司、操作档案和操作卡</span>
+            </div>
+            <button
+              className="command-button secondary"
+              type="button"
+              disabled={!canOperate || isBusy || !selectedProfile.stationAssignmentCode}
+              onClick={() => void copyAssignmentCode()}
+            >
+              <Copy size={16} aria-hidden="true" />
+              <span>复制授权码</span>
+            </button>
+          </div>
+          <label className="form-field">
+            <span className="form-field-label"><span>授权码</span></span>
+            <textarea
+              rows={3}
+              readOnly
+              spellCheck={false}
+              value={selectedProfile.stationAssignmentCode ?? ""}
+              aria-label="当前操作档案的持卡机预分派授权码"
+            />
+            <small>此码包含交接认证凭据，作用类似钥匙。换卡或换公司请创建新档案并使用新授权码，不要发到公共群聊或写入普通说明文档。</small>
+          </label>
+          <div className="detail-grid single-window-assignment-details">
+            <div className="detail-item"><span>持卡机</span><strong>{selectedProfile.stationKey}</strong></div>
+            <div className="detail-item"><span>操作档案</span><strong>{selectedProfile.profileName}</strong></div>
+            <div className="detail-item"><span>公司抬头</span><strong>{selectedProfile.companyScope}</strong></div>
+            <div className="detail-item"><span>操作卡</span><strong>{selectedProfile.cardIdentifier}</strong></div>
+          </div>
+        </section>
+      ) : null}
+
       <div className="single-window-capability-grid">
         <label className="single-window-capability-card">
           <input type="checkbox" checked={canSubmitCustomsCoo} disabled={!canOperate || isBusy} onChange={(event) => setCanSubmitCustomsCoo(event.target.checked)} />
@@ -357,7 +412,7 @@ export function SingleWindowStationProfilePanel({
           label="COO 交接目录（官方客户端或手工导入）"
           value={customsCooClientRootPath}
           disabled={!canOperate || isBusy || !canSubmitCustomsCoo}
-          description="留空时在运行数据根为该档案创建受管交接目录；这不代表官方客户端会自动监听，请按客户端要求确认导入。"
+          description="留空时在业务数据目录中为该档案创建交接目录；官方客户端不会自动导入，请按客户端要求完成操作。"
           actions={<>
             <DesktopIconButton title="选择 COO 交接目录" disabled={!canOperate || isBusy || !canSubmitCustomsCoo} onClick={() => void chooseRoot("coo")}><FolderOpen size={17} aria-hidden="true" /></DesktopIconButton>
             {renderOpenPathAction(customsCooClientRootPath, "打开 COO 交接目录", setDesktopMessage)}

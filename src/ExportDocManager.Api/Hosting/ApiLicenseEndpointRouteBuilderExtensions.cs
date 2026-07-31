@@ -25,13 +25,22 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/system/license/register", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
+                ApiAuthorizationService authorizationService,
                 ILicenseService licenseService,
                 ApiLicenseRegisterRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                if (user == null)
                 {
                     return Results.Unauthorized();
+                }
+
+                if (!authorizationService.CanManageSettings(user))
+                {
+                    return Results.Json(
+                        new ApiErrorResponse("只有管理员可以注册或更换系统授权。"),
+                        statusCode: StatusCodes.Status403Forbidden);
                 }
 
                 if (request == null || string.IsNullOrWhiteSpace(request.LicenseKey))

@@ -165,6 +165,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<ISingleWindowOperationCenterService>(provider =>
                 provider.GetRequiredService<SingleWindowTrackingService>());
             services.AddSingleton<ISingleWindowStationIdentityService, SingleWindowStationIdentityService>();
+            services.AddScoped<ISingleWindowDisasterRecoveryService, SingleWindowDisasterRecoveryService>();
             services.AddScoped<ICustomsCooSourceAssembler, CustomsCooSourceAssembler>();
             services.AddScoped<IAgentConsignmentSourceAssembler, AgentConsignmentSourceAssembler>();
             services.AddScoped<ICustomsCooFieldMapper, CustomsCooFieldMapper>();

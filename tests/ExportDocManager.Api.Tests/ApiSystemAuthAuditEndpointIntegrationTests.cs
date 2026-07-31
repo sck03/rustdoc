@@ -84,6 +84,25 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("Admin", adminLogin.User.Role);
             using var adminClient = harness.CreateClient(adminLogin.AccessToken);
 
+            var createOperatorResponse = await adminClient.PostAsJsonAsync("/api/users", new
+            {
+                username = "license-operator",
+                fullName = "License Operator",
+                role = UserRoleCatalog.User,
+                departmentId = string.Empty,
+                companyScope = string.Empty,
+                isActive = true,
+                resetPassword = "operator-pass"
+            });
+            Assert.Equal(HttpStatusCode.OK, createOperatorResponse.StatusCode);
+
+            var operatorLogin = await harness.LoginAsync(anonymousClient, "license-operator", "operator-pass");
+            using var operatorClient = harness.CreateClient(operatorLogin.AccessToken);
+            var forbiddenRegisterResponse = await operatorClient.PostAsJsonAsync(
+                "/api/system/license/register",
+                new { licenseKey = ApiTestLicenseSignatureVerifier.ValidLicenseKey });
+            Assert.Equal(HttpStatusCode.Forbidden, forbiddenRegisterResponse.StatusCode);
+
             var adminHealthResponse = await adminClient.GetAsync("/healthz");
             Assert.Equal(HttpStatusCode.OK, adminHealthResponse.StatusCode);
             using (var adminHealthDocument = JsonDocument.Parse(await adminHealthResponse.Content.ReadAsStringAsync()))

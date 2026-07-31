@@ -354,6 +354,68 @@ namespace ExportDocManager.Api.Hosting
                                 ["confirmationText"] = StringProperty("Must be RESTORE to confirm destructive database restore.")
                             }
                         },
+                        ["ApiDisasterRecoveryStatusResponse"] = new
+                        {
+                            type = "object",
+                            required = new[] { "supported", "usesSqlite", "pendingRestore", "recoveryRoot", "message", "storagePolicy" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["supported"] = new { type = "boolean" },
+                                ["usesSqlite"] = new { type = "boolean" },
+                                ["pendingRestore"] = new { type = "boolean" },
+                                ["recoveryRoot"] = StringProperty("Runtime data root Backups/DisasterRecovery directory."),
+                                ["message"] = StringProperty("Current recovery availability or pending state."),
+                                ["storagePolicy"] = StringProperty("Encrypted package inclusion/exclusion and license policy.")
+                            }
+                        },
+                        ["ApiDisasterRecoveryCreateRequest"] = new
+                        {
+                            type = "object",
+                            required = new[] { "password" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["password"] = new { type = "string", format = "password", minLength = 12, maxLength = 128 }
+                            }
+                        },
+                        ["ApiDisasterRecoveryPackageResponse"] = new
+                        {
+                            type = "object",
+                            required = new[] { "success", "message", "fileName", "filePath", "sizeBytes", "storagePolicy" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["success"] = new { type = "boolean" },
+                                ["message"] = StringProperty("Package creation result."),
+                                ["fileName"] = StringProperty("Generated .edmrecovery file name."),
+                                ["filePath"] = StringProperty("Full local package path under the runtime data root."),
+                                ["sizeBytes"] = new { type = "integer", format = "int64" },
+                                ["storagePolicy"] = StringProperty("Encrypted package inclusion/exclusion and license policy.")
+                            }
+                        },
+                        ["ApiDisasterRecoveryRestoreRequest"] = new
+                        {
+                            type = "object",
+                            required = new[] { "packagePath", "password", "confirmationText" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["packagePath"] = StringProperty("Local .edmrecovery path selected by the trusted desktop shell."),
+                                ["password"] = new { type = "string", format = "password", minLength = 12, maxLength = 128 },
+                                ["confirmationText"] = StringProperty("Must be RECOVER to schedule offline disaster recovery.")
+                            }
+                        },
+                        ["ApiDisasterRecoveryRestoreResponse"] = new
+                        {
+                            type = "object",
+                            required = new[] { "success", "restartRequired", "message", "packageFileName", "safetyBackupRoot", "storagePolicy" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["success"] = new { type = "boolean" },
+                                ["restartRequired"] = new { type = "boolean" },
+                                ["message"] = StringProperty("Restore staging result and restart requirement."),
+                                ["packageFileName"] = StringProperty("Selected encrypted recovery package file name."),
+                                ["safetyBackupRoot"] = StringProperty("Safety copy directory created before offline replacement."),
+                                ["storagePolicy"] = StringProperty("Encrypted package inclusion/exclusion and license policy.")
+                            }
+                        },
                         ["ApiCloudBackupListResponse"] = new
                         {
                             type = "object",

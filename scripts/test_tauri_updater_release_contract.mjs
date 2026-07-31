@@ -6,9 +6,11 @@ import { fileURLToPath } from "node:url";
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relativePath) => readFileSync(path.join(repositoryRoot, relativePath), "utf8");
 const baseConfig = JSON.parse(read("apps/export-doc-tauri/src-tauri/tauri.conf.json"));
+const editionCatalog = JSON.parse(read("scripts/product-editions.json"));
 const buildWrapper = read("scripts/run-tauri-build.mjs");
 const manifestPublisher = read("scripts/publish-tauri-updater-manifest.ps1");
 const releaseWorkflow = read(".github/workflows/desktop-package-reusable.yml");
+const serverReleaseWorkflow = read(".github/workflows/browser-server-package-reusable.yml");
 const updatePage = read("apps/export-doc-web/src/features/system/UpdateCenterPage.tsx");
 const desktopBridge = read("apps/export-doc-web/src/desktop/desktopBridge.ts");
 const updaterCommands = read("apps/export-doc-tauri/src-tauri/src/tauri_updater_commands.rs");
@@ -17,39 +19,62 @@ const settingsModel = read("src/ExportDocManager.Application/Models/Configuratio
 
 assert.deepEqual(baseConfig.plugins?.updater?.endpoints, [], "base updater endpoint must remain unconfigured until release injection");
 assert.equal(baseConfig.plugins?.updater?.pubkey, "", "base updater public key must remain unconfigured until release injection");
+assert.equal(baseConfig.identifier, "com.exportdocmanager.desktop.full", "the default Tauri identifier must belong to Full edition");
+assert.equal(editionCatalog.schemaVersion, 1);
+const editionEntries = Object.entries(editionCatalog.editions || {});
+assert.deepEqual(editionEntries.map(([name]) => name).sort(), ["Document", "Full", "Sales"]);
+assert.equal(new Set(editionEntries.map(([, value]) => value.identifier)).size, 3, "each product edition requires a unique identifier");
+assert.equal(new Set(editionEntries.map(([, value]) => value.releaseTagPrefix)).size, 3, "each product edition requires a unique release tag prefix");
+assert.equal(new Set(editionEntries.map(([, value]) => value.stableManifestAsset)).size, 3, "each product edition requires a unique stable manifest");
+assert.equal(new Set(editionEntries.map(([, value]) => value.stableChannelTag)).size, 3, "each product edition requires a unique stable channel tag");
 for (const requiredBuildContract of [
+  "product-editions.json",
+  "editionMetadata.productName",
+  "editionMetadata.identifier",
   "EXPORTDOCMANAGER_UPDATER_ENDPOINT",
   "EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY",
   "TAURI_SIGNING_PRIVATE_KEY",
   "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
   "createUpdaterArtifacts: true",
   "EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT",
-  "dangerousInsecureTransportProtocol: true",
+  'dangerousInsecureTransportProtocol: endpoint.startsWith("http:")',
   "endpoint ? [endpoint] : []",
+  "releases/download",
 ]) {
   assert.ok(buildWrapper.includes(requiredBuildContract), `release build wrapper is missing ${requiredBuildContract}`);
 }
 for (const requiredWorkflowContract of [
   "EXPORTDOCMANAGER_REQUIRE_SIGNED_UPDATER",
   "Build signed updater package",
-  "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
-  "未内置默认更新地址",
-  "Merge signed updater manifest into GitHub Release",
+  "TAURI_SIGNING_PRIVATE_KEY_DOCUMENT",
+  "TAURI_SIGNING_PRIVATE_KEY_SALES",
+  "TAURI_SIGNING_PRIVATE_KEY_FULL",
+  "Publish immutable edition release and update channel",
   "publish-tauri-updater-manifest.ps1",
+  "-Edition ${{ inputs.edition }}",
 ]) {
   assert.ok(releaseWorkflow.includes(requiredWorkflowContract), `desktop release workflow is missing ${requiredWorkflowContract}`);
 }
-assert.doesNotMatch(
-  releaseWorkflow,
-  /IsNullOrWhiteSpace\(\$env:EXPORTDOCMANAGER_UPDATER_ENDPOINT\)\)\s*\{\s*throw/u,
-  "a signed release must allow the administrator endpoint to be configured after installation",
-);
+assert.doesNotMatch(releaseWorkflow, /WINDOWS_SIGNING_CERTIFICATE|APPLE_CERTIFICATE/u, "commercial OS signing is not mandatory before commercial release");
+assert.doesNotMatch(releaseWorkflow, /gh release upload[^\r\n]*--clobber/iu, "immutable desktop release assets must never be overwritten");
+assert.doesNotMatch(serverReleaseWorkflow, /gh release upload[^\r\n]*--clobber/iu, "immutable server release assets must never be overwritten");
 for (const signaturePattern of ["*-setup.exe.sig", "*.AppImage.sig", "*.app.tar.gz.sig"]) {
   assert.ok(manifestPublisher.includes(signaturePattern), `updater manifest publisher is missing ${signaturePattern}`);
 }
-for (const manifestContract of ["latest.json", "platforms", "signature", "releases/download"]) {
+for (const manifestContract of [
+  "product-editions.json",
+  "releaseTagPrefix",
+  "stableChannelTag",
+  "prereleaseChannelTag",
+  "platforms",
+  "signature",
+  "releases/download",
+  "Immutable release",
+  "Publish-ChannelManifestAtomically",
+]) {
   assert.ok(manifestPublisher.includes(manifestContract), `updater manifest publisher is missing ${manifestContract}`);
 }
+assert.doesNotMatch(manifestPublisher, /gh release upload[^\r\n]*--clobber/iu, "formal version assets must not use --clobber");
 
 for (const hiddenUpdateDetail of [
   "更新配置",
@@ -69,7 +94,7 @@ for (const hiddenUpdateDetail of [
 }
 assert.doesNotMatch(updatePage, /<input[^>]+(?:endpoint|publicKey)/iu, "update center must not expose a duplicate updater editor");
 assert.ok(settingsPanel.includes('path={systemUpdaterEndpointPath}'), "administrator settings must expose the updater endpoint");
-assert.ok(settingsPanel.includes("受控公司内网的 HTTP 地址"), "administrator settings must explain trusted intranet HTTP use");
+assert.match(settingsPanel, /HTTP 地址[^。]*受控公司内网|受控公司内网[^。]*HTTP 地址/u, "administrator settings must explain trusted intranet HTTP use");
 assert.doesNotMatch(settingsPanel, /publicKey|public_key/iu, "administrator settings must not expose the updater public key");
 assert.ok(settingsModel.includes("UpdaterEndpoint"), "system settings must persist the administrator endpoint");
 assert.match(desktopBridge, /checkTauriUpdate\(endpoint\?: string\)/u, "desktop bridge must accept an optional endpoint override");

@@ -47,6 +47,10 @@ namespace ExportDocManager.Services.SingleWindow
                 SourceBaselineHash = manifest.SourceBaselineHash ?? string.Empty,
                 CompanyScope = manifest.CompanyScope ?? string.Empty,
                 SubmitPackageDigest = manifest.ContentDigest ?? string.Empty,
+                AssignedStationKey = manifest.StationKey ?? string.Empty,
+                AssignedProfileKey = manifest.ClientProfileKey ?? string.Empty,
+                AssignedCardIdentifier = manifest.CardIdentifier ?? string.Empty,
+                ClientProfileName = manifest.ClientProfileName ?? string.Empty,
                 CreatedOnMachine = manifest.CreatedOnMachine ?? string.Empty,
                 CreatedAt = manifest.CreatedAt,
                 UpdatedAt = DateTime.Now
@@ -83,6 +87,11 @@ namespace ExportDocManager.Services.SingleWindow
             {
                 throw new InvalidDataException("回执包持卡机、操作档案或操作卡绑定与原批次记录不一致。");
             }
+
+            SingleWindowPackageIntegrity.ValidateAuthentication(
+                manifest,
+                UnprotectAssignmentSecret(batch),
+                "回执包来源认证失败，已拒绝写入办公室归档。" );
 
             batch.AssignedStationKey = manifest.StationKey ?? string.Empty;
             batch.AssignedProfileKey = manifest.ClientProfileKey ?? string.Empty;
@@ -232,6 +241,16 @@ namespace ExportDocManager.Services.SingleWindow
 
         internal static SingleWindowReceiptParseResult SelectPrimaryReceipt(IReadOnlyList<SingleWindowReceiptParseResult> parsedReceipts)
         {
+            var terminalStatuses = (parsedReceipts ?? [])
+                .Where(item => item != null && IsTerminalStatus(item.BusinessStatus))
+                .Select(item => item.BusinessStatus)
+                .Distinct()
+                .ToArray();
+            if (terminalStatuses.Length > 1)
+            {
+                throw new InvalidDataException("同一回执包同时包含放行和退单终态，已拒绝写入。" );
+            }
+
             return parsedReceipts
                 .Where(item => item != null)
                 .OrderByDescending(item => GetStatusRank(item.BusinessStatus))
@@ -255,6 +274,18 @@ namespace ExportDocManager.Services.SingleWindow
                 ? GetStatusRank(currentStatus)
                 : 0;
             int candidateRank = GetStatusRank(candidate.BusinessStatus);
+            if (IsTerminalStatus(currentStatus))
+            {
+                if (candidate.BusinessStatus != currentStatus)
+                {
+                    return false;
+                }
+
+                return !batch.LastReceiptAt.HasValue ||
+                       !candidate.OccurredAt.HasValue ||
+                       candidate.OccurredAt.Value >= batch.LastReceiptAt.Value;
+            }
+
             if (candidateRank != currentRank)
             {
                 return candidateRank > currentRank;
@@ -329,6 +360,12 @@ namespace ExportDocManager.Services.SingleWindow
                 SingleWindowReceiptBusinessStatus.Received => 1,
                 _ => 0
             };
+        }
+
+        private static bool IsTerminalStatus(SingleWindowReceiptBusinessStatus businessStatus)
+        {
+            return businessStatus is SingleWindowReceiptBusinessStatus.Approved or
+                SingleWindowReceiptBusinessStatus.Rejected;
         }
 
         private static string MapReceiptStatus(SingleWindowReceiptBusinessStatus status)

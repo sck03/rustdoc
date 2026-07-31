@@ -186,7 +186,6 @@ export function PaymentBusinessInfoPanel({
         <TextField label="数量" value={payment.quantity ?? ""} onChange={(value) => onChange({ quantity: value })} />
         <TextField label="出运国家" value={payment.shipmentCountry ?? ""} onChange={(value) => onChange({ shipmentCountry: value })} />
       </div>
-      <p className="section-description">数据权限范围由当前账号和权限模板自动管理，无需在付款单中填写内部部门 ID 或公司范围。</p>
       <TextAreaField
         className="field-grid-span-all"
         label="备注"

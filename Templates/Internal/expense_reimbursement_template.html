@@ -110,11 +110,11 @@
 
 <div class="header-info">
     <span>业务科别: {{ Payment.Department }}</span>
-    <span class="date-fields">
+    <span class="date-fields">{{ if Payment.PaymentDate }}
         {{ Payment.PaymentDate | date.to_string "%Y" }} 年
         <span>{{ Payment.PaymentDate | date.to_string "%m" }}</span> 月
         <span>{{ Payment.PaymentDate | date.to_string "%d" }}</span> 日
-    </span>
+    {{ end }}</span>
 </div>
 
 <table class="main-table">

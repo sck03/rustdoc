@@ -24,7 +24,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
-                    return WriteForbidden("服务器 HS Excel 路径预览仅允许可信 Tauri 桌面端；浏览器请上传文件。");
+                    return WriteForbidden("该本机 Excel 预览仅支持桌面版；浏览器版请上传文件。");
                 if (request == null || string.IsNullOrWhiteSpace(request.FilePath))
                     return Results.BadRequest(new ApiErrorResponse("HS编码导入文件路径不能为空。"));
                 if (!File.Exists(request.FilePath)) return Results.NotFound(new ApiErrorResponse("HS编码导入文件不存在。"));
@@ -187,7 +187,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器 HS Excel 路径导入仅允许可信 Tauri 桌面端；浏览器请上传文件。");
+                    return WriteForbidden("该本机 Excel 导入仅支持桌面版；浏览器版请上传文件。");
                 }
 
                 if (request == null || string.IsNullOrWhiteSpace(request.FilePath))

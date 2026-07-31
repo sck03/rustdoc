@@ -369,6 +369,8 @@ mod tests {
     fn paths(app_root: PathBuf, data_root: PathBuf, sidecar_path: PathBuf) -> RuntimePaths {
         RuntimePaths {
             log_root: data_root.join("Logs"),
+            runtime_config_root: app_root.join("platform-config"),
+            portable: false,
             app_root,
             data_root,
             sidecar_path,

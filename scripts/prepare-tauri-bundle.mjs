@@ -13,10 +13,12 @@ const resourcesRoot = path.join(bundleRoot, "resources");
 const sidecarRoot = path.join(resourcesRoot, "sidecar");
 const ocrSidecarRoot = path.join(sidecarRoot, "ocr");
 const toolsRoot = path.join(resourcesRoot, "Tools");
+const legalRoot = path.join(resourcesRoot, "Legal");
+const dependencyGovernanceRoot = path.join(repoRoot, "artifacts", "dependency-governance");
 const runtimeLayoutManifestFileName = "runtime-layout.json";
 const productEditionManifestFileName = "product-edition.json";
 
-const stableResourceDirs = new Set(["Templates", "OcrModels", "Resources", "Browsers"]);
+const stableResourceDirs = new Set(["Templates", "OcrModels", "Resources", "Browsers", "Legal"]);
 const sidecarExcludedExtensions = new Set([".pdb", ".xml"]);
 const rootConfigFiles = [];
 const runtimeDataDirectories = ["Database", "Templates", "Files", "Exports", "SingleWindow", "Backups", "Cache", "Config", "Security", "WebView", "Logs"];
@@ -25,6 +27,13 @@ const rid = process.env.EXPORTDOCMANAGER_TAURI_RID || detectRuntimeIdentifier();
 const rustTarget = resolveRustTargetTriple(rid);
 const selfContained = (process.env.EXPORTDOCMANAGER_TAURI_SELF_CONTAINED || "true").toLowerCase() !== "false";
 const productEdition = normalizeProductEdition(process.env.EXPORTDOCMANAGER_PRODUCT_EDITION);
+const productEditionCatalog = JSON.parse(
+  await readFile(path.join(repoRoot, "scripts", "product-editions.json"), "utf8"),
+);
+const productEditionMetadata = productEditionCatalog.editions?.[productEdition];
+if (!productEditionMetadata) {
+  throw new Error(`Product edition metadata is missing for ${productEdition}.`);
+}
 const allowMissingBrowser = (process.env.EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER || "").toLowerCase() === "true";
 
 run("node", [path.join(repoRoot, "scripts", "sync-version.mjs")], process.env);
@@ -111,6 +120,7 @@ for (const fileName of rootConfigFiles) {
 
 await copyWindowsWebView2LoaderIfNeeded();
 await copyExcelAnalyzerIfAvailable();
+await generateDependencyGovernance(env);
 const productEditionManifest = await createProductEditionManifest();
 await writeFile(
   path.join(resourcesRoot, productEditionManifestFileName),
@@ -135,6 +145,7 @@ console.log("  resources/OcrModels/      OCR models");
 console.log("  resources/Resources/      Excel and Single Window built-in resources");
 console.log("  resources/Browsers/       optional current-platform Chrome Headless Shell renderer");
 console.log("  resources/Tools/          optional platform-native helper tools such as Excel analyzer");
+console.log("  resources/Legal/          unified third-party notices, dependency inventory and SBOM files");
 if (rid.startsWith("win-")) {
   console.log("  resources/WebView2Loader.dll  Tauri WebView2 loader beside the desktop exe");
 }
@@ -203,21 +214,19 @@ async function ensureMacOsX64OnnxRuntime(buildEnv) {
 
 async function createProductEditionManifest() {
   const versionManifest = JSON.parse(await readFile(path.join(repoRoot, "version.json"), "utf8"));
-  const metadata = {
-    Document: { displayName: "单证员版", enabledWorkspaces: ["document"] },
-    Sales: { displayName: "业务员版", enabledWorkspaces: ["sales"] },
-    Full: { displayName: "全功能版", enabledWorkspaces: ["document", "sales"] },
-  }[productEdition];
 
   return {
     schemaVersion: 1,
     product: "ExportDocManager",
     productVersion: String(versionManifest.version || ""),
     edition: productEdition,
-    displayName: metadata.displayName,
-    enabledWorkspaces: metadata.enabledWorkspaces,
+    identifier: productEditionMetadata.identifier,
+    displayName: productEditionMetadata.displayName,
+    enabledWorkspaces: productEditionMetadata.enabledWorkspaces,
+    releaseTagPrefix: productEditionMetadata.releaseTagPrefix,
+    stableUpdaterManifest: productEditionMetadata.stableManifestAsset,
     generatedAt: new Date().toISOString(),
-    runtimeDataPolicy: "Runtime business data defaults to App_Data beside the installed program directory.",
+    runtimeDataPolicy: "Portable builds use App_Data beside the program; installed builds require an explicit first-run DataRoot selection and support verified migration.",
   };
 }
 
@@ -225,7 +234,30 @@ function normalizeProductEdition(value) {
   const normalized = String(value || "Full").trim().toLowerCase();
   if (normalized === "document") return "Document";
   if (normalized === "sales") return "Sales";
-  return "Full";
+  if (normalized === "full" || normalized === "") return "Full";
+  throw new Error(`Unsupported product edition: ${value}`);
+}
+
+async function generateDependencyGovernance(buildEnv) {
+  run(
+    "node",
+    [
+      path.join(repoRoot, "scripts", "generate-dependency-governance.mjs"),
+      dependencyGovernanceRoot,
+      "--release",
+      "--verify-repository",
+    ],
+    buildEnv,
+  );
+  await mkdir(legalRoot, { recursive: true });
+  for (const fileName of [
+    "THIRD_PARTY_NOTICES.md",
+    "THIRD_PARTY_DEPENDENCIES.md",
+    "exportdocmanager.spdx.json",
+    "exportdocmanager.cyclonedx.json",
+  ]) {
+    await cp(path.join(dependencyGovernanceRoot, fileName), path.join(legalRoot, fileName), { force: true });
+  }
 }
 
 function run(command, args, env) {
@@ -331,7 +363,7 @@ async function createRuntimeLayoutManifest() {
     selfContained,
     storagePolicy: {
       programRoot: "Program root carries the Tauri executable, API sidecar, stable templates, OCR models, browser renderer assets and built-in resources.",
-      dataRoot: "Runtime business data and operational logs default to App_Data beside the program root, or an explicit --data-root / environment / platform-config runtime-paths.json value.",
+      dataRoot: "Portable builds use App_Data beside the program. Installed builds persist an explicitly selected writable DataRoot and can migrate it through the verified restart workflow.",
       userSelectedOutput: "User-selected import and export paths remain outside the managed data root by explicit request.",
     },
     programRootResources,
@@ -572,7 +604,11 @@ async function copyBrowserRuntimeResources(sourceRoot, destinationRoot) {
     const chromiumArm64Source = path.join(sourceRoot, "ChromiumArm64");
     const chromiumArm64Stat = await tryStat(chromiumArm64Source);
     if (chromiumArm64Stat?.isDirectory()) {
-      await cp(chromiumArm64Source, path.join(destinationRoot, "ChromiumArm64"), { recursive: true, force: true });
+      await cp(chromiumArm64Source, path.join(destinationRoot, "ChromiumArm64"), {
+        recursive: true,
+        force: true,
+        filter: shouldCopyBrowserResource,
+      });
       return;
     }
     if (!allowMissingBrowser) {
@@ -603,6 +639,7 @@ async function copyBrowserRuntimeResources(sourceRoot, destinationRoot) {
     await cp(headlessShellSource, path.join(platformDestination, "ChromeHeadlessShell"), {
       recursive: true,
       force: true,
+      filter: shouldCopyBrowserResource,
     });
     return;
   }
@@ -618,7 +655,11 @@ async function copyBrowserRuntimeResources(sourceRoot, destinationRoot) {
     const relative = path.relative(sourceRoot, directExecutable);
     const directRoot = relative.includes(path.sep) ? relative.split(path.sep)[0] : relative;
     const directSource = path.join(sourceRoot, directRoot);
-    await cp(directSource, path.join(destinationRoot, directRoot), { recursive: true, force: true });
+    await cp(directSource, path.join(destinationRoot, directRoot), {
+      recursive: true,
+      force: true,
+      filter: shouldCopyBrowserResource,
+    });
     return;
   }
 
@@ -656,10 +697,14 @@ function chromeForTestingPlatform() {
 
 async function copyLooseFiles(sourceRoot, destinationRoot) {
   for (const entry of await readdir(sourceRoot, { withFileTypes: true })) {
-    if (entry.isFile()) {
+    if (entry.isFile() && shouldCopyBrowserResource(path.join(sourceRoot, entry.name))) {
       await cp(path.join(sourceRoot, entry.name), path.join(destinationRoot, entry.name), { force: true });
     }
   }
+}
+
+function shouldCopyBrowserResource(sourcePath) {
+  return path.extname(sourcePath).toLowerCase() !== ".log";
 }
 
 async function copyIfExists(source, destination) {

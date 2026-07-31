@@ -55,4 +55,35 @@ namespace ExportDocManager.Api.Hosting
         long SizeBytes,
         string BackupRoot,
         string StoragePolicy);
+
+    public sealed record ApiDisasterRecoveryStatusResponse(
+        bool Supported,
+        bool UsesSqlite,
+        bool PendingRestore,
+        string RecoveryRoot,
+        string Message,
+        string StoragePolicy);
+
+    public sealed record ApiDisasterRecoveryCreateRequest(string Password);
+
+    public sealed record ApiDisasterRecoveryPackageResponse(
+        bool Success,
+        string Message,
+        string FileName,
+        string FilePath,
+        long SizeBytes,
+        string StoragePolicy);
+
+    public sealed record ApiDisasterRecoveryRestoreRequest(
+        string PackagePath,
+        string Password,
+        string ConfirmationText);
+
+    public sealed record ApiDisasterRecoveryRestoreResponse(
+        bool Success,
+        bool RestartRequired,
+        string Message,
+        string PackageFileName,
+        string SafetyBackupRoot,
+        string StoragePolicy);
 }

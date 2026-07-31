@@ -20,7 +20,7 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
     public sealed class SingleWindowPackageManifest
     {
-        public string SchemaVersion { get; init; } = "3.0";
+        public string SchemaVersion { get; init; } = "4.0";
 
         public string PackageId { get; init; } = Guid.NewGuid().ToString("N");
 
@@ -68,6 +68,12 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public string ClientProfileName { get; init; } = string.Empty;
 
+        public string AssignmentNonce { get; init; } = string.Empty;
+
+        public string AuthenticationAlgorithm { get; init; } = string.Empty;
+
+        public string AuthenticationTag { get; set; } = string.Empty;
+
         public DateTime CreatedAt { get; init; } = DateTime.Now;
 
         public string CreatedOnMachine { get; init; } = Environment.MachineName;
@@ -114,6 +120,29 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
         public string AssignedProfileKey { get; init; } = string.Empty;
 
         public string ClientProfileName { get; init; } = string.Empty;
+
+        [JsonIgnore]
+        public string AuthenticationSecret { get; init; } = string.Empty;
+    }
+
+    public sealed class SingleWindowStationAssignment
+    {
+        public string StationKey { get; init; } = string.Empty;
+
+        public string ProfileKey { get; init; } = string.Empty;
+
+        public string ProfileName { get; init; } = string.Empty;
+
+        public string CompanyScope { get; init; } = string.Empty;
+
+        public string CardIdentifier { get; init; } = string.Empty;
+
+        public bool CanSubmitCustomsCoo { get; init; }
+
+        public bool CanSubmitAgentConsignment { get; init; }
+
+        [JsonIgnore]
+        public string AuthenticationSecret { get; init; } = string.Empty;
     }
 
     public sealed class SingleWindowSubmissionReservation

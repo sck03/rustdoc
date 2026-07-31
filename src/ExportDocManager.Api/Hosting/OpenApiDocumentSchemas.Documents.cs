@@ -734,7 +734,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["shippingMarksImage"] = StringProperty("Shipping marks image path."),
                                 ["tradeTerms"] = StringProperty("Trade terms."),
                                 ["transportMode"] = StringProperty("Transport mode."),
-                                ["shipmentDate"] = new { type = "string", format = "date-time" },
+                                ["shipmentDate"] = new { type = "string", format = "date-time", nullable = true },
                                 ["exporterId"] = new { type = "integer", format = "int32" },
                                 ["customerId"] = new { type = "integer", format = "int32" },
                                 ["totalCartons"] = DecimalProperty("Total cartons."),
@@ -1028,8 +1028,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 ["packagePath"] = StringProperty("User-selected .edpkg package path."),
                                 ["conflictAction"] = StringProperty("Conflict action: Skip, Overwrite, NewInvoiceNo, or AppendItems."),
-                                ["newInvoiceNo"] = StringProperty("Optional invoice number used when conflictAction is NewInvoiceNo."),
-                                ["allowInvalidChecksum"] = new { type = "boolean" }
+                                ["newInvoiceNo"] = StringProperty("Optional invoice number used when conflictAction is NewInvoiceNo.")
                             }
                         },
                         ["ApiInvoiceTransferPreviewDto"] = new
@@ -1163,7 +1162,7 @@ namespace ExportDocManager.Api.Hosting
                         ["ApiPaymentDto"] = new
                         {
                             type = "object",
-                            required = new[] { "id", "invoiceNo", "paymentDate", "payeeName", "payerName", "rowVersion" },
+                            required = new[] { "id", "rowVersion" },
                             properties = new Dictionary<string, object>
                             {
                                 ["id"] = new { type = "integer", format = "int32" },
@@ -1183,11 +1182,11 @@ namespace ExportDocManager.Api.Hosting
                                 ["bankName"] = StringProperty("Bank name."),
                                 ["accountNo"] = StringProperty("Account number."),
                                 ["notes"] = StringProperty("Notes."),
-                                ["paymentDate"] = new { type = "string", format = "date-time" },
+                                ["paymentDate"] = new { type = "string", format = "date-time", nullable = true },
                                 ["goodsName"] = StringProperty("Goods name."),
                                 ["quantity"] = StringProperty("Quantity text."),
                                 ["shipmentCountry"] = StringProperty("Shipment country."),
-                                ["receiptDate"] = new { type = "string", format = "date-time" },
+                                ["receiptDate"] = new { type = "string", format = "date-time", nullable = true },
                                 ["travelExpense"] = DecimalProperty("Travel expense."),
                                 ["businessEntertainmentExpense"] = DecimalProperty("Business entertainment expense."),
                                 ["telephoneExpense"] = DecimalProperty("Telephone expense."),

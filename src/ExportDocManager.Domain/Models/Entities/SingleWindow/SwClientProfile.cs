@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ExportDocManager.Models.Entities
 {
@@ -23,6 +24,12 @@ namespace ExportDocManager.Models.Entities
 
         [MaxLength(120)]
         public string CardIdentifier { get; set; } = string.Empty;
+
+        [MaxLength(512)]
+        public string ProtectedHandoffSecret { get; set; } = string.Empty;
+
+        [NotMapped]
+        public string StationAssignmentCode { get; set; } = string.Empty;
 
         [MaxLength(520)]
         public string CustomsCooClientRootPath { get; set; } = string.Empty;

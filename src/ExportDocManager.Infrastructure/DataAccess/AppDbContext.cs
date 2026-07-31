@@ -223,7 +223,7 @@ namespace ExportDocManager.DataAccess
                 .HasOne<Product>()
                 .WithMany()
                 .HasForeignKey(item => item.ProductId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<SupplierAssessment>()
                 .HasIndex(item => new { item.SupplierCompanyId, item.AssessedAt });
             modelBuilder.Entity<SupplierAssessment>()

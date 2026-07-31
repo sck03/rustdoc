@@ -15,6 +15,7 @@ import { PermissionNotice } from "../../ui/PageState.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { downloadBlob } from "../../ui/downloadBlob.ts";
 
 type SupplierTaskView = "overview" | "directory" | "profile" | "contacts" | "products" | "assessments" | "import";
 const supplierTabsId = "supplier-directory-workspace";
@@ -200,9 +201,8 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
   async function exportRows() {
     try {
       const blob = await client.exportSuppliers({ keyword, status });
-      const url = URL.createObjectURL(blob); const anchor = document.createElement("a");
-      anchor.href = url; anchor.download = `suppliers-${currentLocalDateInputValue()}.xlsx`; anchor.click();
-      URL.revokeObjectURL(url); setFeedback(successFeedback("供应商 Excel 已生成。"));
+      downloadBlob(blob, `suppliers-${currentLocalDateInputValue()}.xlsx`);
+      setFeedback(successFeedback("供应商 Excel 已生成。"));
     } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
   }
 
@@ -228,7 +228,7 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
     }} /></div> : null}
     {view === "import" ? <section className="form-section" {...getTaskViewPanelProps(supplierTabsId, "import")}><div className="section-header"><h3>导入、导出与批量维护</h3><span>CSV/XLSX 最多 5000 行、10 MB</span></div>
       <div className="form-actions">
-        {supplierPermission.canOperate ? <label className="secondary-button">选择导入文件<input type="file" hidden accept=".csv,.xlsx,.xlsm" onChange={(event) => void previewImport(event.target.files?.[0])} /></label> : null}
+        {supplierPermission.canOperate ? <label className="secondary-button">选择导入文件<input type="file" hidden accept=".csv,.xlsx,.xlsm" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; void previewImport(file); }} /></label> : null}
         {supplierPermission.canOperate ? <button className="primary-button" type="button" disabled={busy || !importPreview?.validRows} onClick={() => void confirmImport()}>确认导入有效行</button> : null}
         <button className="secondary-button" type="button" onClick={() => void exportRows()}>导出当前筛选</button>
         {supplierPermission.canOperate ? <select aria-label="批量状态" onChange={(event) => { if (event.target.value) void updateBatchStatus(event.target.value); event.target.value = ""; }} defaultValue="">

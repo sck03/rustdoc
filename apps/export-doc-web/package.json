@@ -32,6 +32,7 @@
     "test:visual-baselines": "node ../../scripts/test_frontend_visual_baselines.mjs",
     "test:visual-baselines:update": "node ../../scripts/update_frontend_visual_baselines.mjs",
     "test:browser-session-contracts": "node ../../scripts/test_web_runtime_browser_session.mjs && node ../../scripts/test_login_security_contracts.mjs && node ../../scripts/test_react_router_declarative_contract.mjs",
+    "test:cross-browser-ui": "node ../../scripts/smoke-cross-browser-ui.mjs",
     "test:login-security-contracts": "node ../../scripts/test_login_security_contracts.mjs",
     "test:router-contract": "node ../../scripts/test_react_router_declarative_contract.mjs",
     "audit:production": "node ../../scripts/audit-npm-production.mjs . --allow-reviewed-react-router-rsc",

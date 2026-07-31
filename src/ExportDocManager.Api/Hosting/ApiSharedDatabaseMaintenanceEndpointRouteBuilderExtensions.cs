@@ -225,7 +225,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("保存服务器支持包仅允许可信 Tauri 桌面端；浏览器请直接下载支持包。");
+                    return WriteForbidden("将支持包保存到本机仅支持桌面版；浏览器版请直接下载支持包。");
                 }
 
                 var includeOptional = request?.IncludeLatestDatabaseBackup == true || request?.IncludeSampleFiles == true;

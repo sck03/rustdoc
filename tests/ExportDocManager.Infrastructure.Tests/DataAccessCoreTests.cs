@@ -215,7 +215,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public void DbSeeder_ShouldSeedSqliteAdminAndReferenceData()
+        public void DbSeeder_ShouldSeedSqliteAdminWithEmptyPasswordAndReferenceData()
         {
             var options = new DbContextOptionsBuilder<AppDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
@@ -223,19 +223,21 @@ namespace ExportDocManager.Infrastructure.Tests
 
             using var context = new AppDbContext(options);
 
-            DbSeeder.SeedAuxiliaryData(context, new DatabaseConnectionSettings());
+            const string suppliedPassword = "desktop-password-must-be-ignored";
+            DbSeeder.SeedAuxiliaryData(context, new DatabaseConnectionSettings(), suppliedPassword);
 
             var admin = Assert.Single(context.Users);
             Assert.Equal("admin", admin.Username);
             Assert.Equal(UserRoleCatalog.Admin, admin.Role);
             Assert.True(PasswordHasher.VerifyPassword(admin.PasswordHash, string.Empty));
+            Assert.False(PasswordHasher.VerifyPassword(admin.PasswordHash, suppliedPassword));
             Assert.NotEmpty(context.Units);
             Assert.NotEmpty(context.Ports);
             Assert.NotEmpty(context.ContainerTypeDefinitions);
         }
 
         [Fact]
-        public void DbSeeder_WhenPostgreSqlWithoutInitialPassword_ShouldRequirePassword()
+        public void DbSeeder_WhenPostgreSqlHasNoInitialPassword_ShouldRequirePassword()
         {
             var options = new DbContextOptionsBuilder<AppDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
@@ -282,7 +284,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public void DatabaseInitialization_ShouldOnlyUseFirstLoginPasswordForAdminPostgreSqlBootstrap()
+        public void DatabaseInitialization_ShouldOnlyUsePostgreSqlAdminPasswordForBootstrap()
         {
             Assert.Equal(
                 "first-admin-password",
@@ -320,7 +322,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             var databasePath = Path.Combine(
                 Path.GetTempPath(),
-                "edm-v3-schema-" + Guid.NewGuid().ToString("N") + ".db");
+                "edm-v5-schema-" + Guid.NewGuid().ToString("N") + ".db");
             using var factory = new SqliteFileDbContextFactory(databasePath);
 
             var service = new DatabaseInitializationService(
@@ -328,7 +330,8 @@ namespace ExportDocManager.Infrastructure.Tests
                 new DatabaseConnectionSettings(),
                 new DatabaseInitializationCoordinator());
 
-            var result = await service.InitializeAsync("admin", string.Empty);
+            const string suppliedPassword = "desktop-password-must-be-ignored";
+            var result = await service.InitializeAsync("admin", suppliedPassword);
 
             Assert.True(result.IsSuccess, result.ErrorMessage);
 
@@ -336,7 +339,11 @@ namespace ExportDocManager.Infrastructure.Tests
             int schemaVersion = await verifyContext.Database
                 .SqlQueryRaw<int>("SELECT \"Version\" AS \"Value\" FROM \"__ExportDocManagerSchema\" WHERE \"Id\" = 1")
                 .SingleAsync();
-            Assert.Equal(3, schemaVersion);
+            Assert.Equal(5, schemaVersion);
+
+            var admin = await verifyContext.Users.SingleAsync(user => user.Username == "admin");
+            Assert.True(PasswordHasher.VerifyPassword(admin.PasswordHash, string.Empty));
+            Assert.False(PasswordHasher.VerifyPassword(admin.PasswordHash, suppliedPassword));
 
             verifyContext.Invoices.Add(new Invoice
             {

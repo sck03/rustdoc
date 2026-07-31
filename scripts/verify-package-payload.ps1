@@ -9,6 +9,46 @@ $ErrorActionPreference = "Stop"
 $root = [IO.Path]::GetFullPath($PackageRoot)
 if (-not (Test-Path -LiteralPath $root -PathType Container)) { throw "Package root does not exist: $root" }
 
+$allEntries = @(Get-ChildItem -LiteralPath $root -Force -Recurse)
+$forbiddenTopLevelDirectories = @("App_Data", "Database", "Security", "Backups", "Cache", "Config", "Logs", "WebView")
+$forbiddenExactFileNames = @(
+    "appsettings.json",
+    "license.dat",
+    "local-master-key.bin",
+    "station.id",
+    "machine-id.seed",
+    "machine-binding.dat",
+    "machine-trial-anchor.dat",
+    "license-reactivation-required.json",
+    "runtime-paths.json",
+    "runtime-paths.json.bak",
+    "pending-data-root-migration.json",
+    ".exportdoc-data-root-migration-complete",
+    "pending-disaster-recovery.json"
+)
+$sensitiveEntries = @($allEntries | Where-Object {
+    $relativePath = [IO.Path]::GetRelativePath($root, $_.FullName).Replace('\', '/')
+    $segments = @($relativePath.Split('/', [StringSplitOptions]::RemoveEmptyEntries))
+    $topLevel = if ($segments.Count -gt 0) { $segments[0] } else { "" }
+    $isForbiddenTopLevel = $forbiddenTopLevelDirectories -contains $topLevel
+    $isForbiddenRuntimeDirectory = $_.PSIsContainer -and (
+        $_.Name -match '(?i)^\.?.*exportdoc-migration-.*\.staging$' -or
+        $_.Name -match '(?i)^pending-[0-9a-f]{32}$')
+    $isForbiddenFile = -not $_.PSIsContainer -and (
+        $forbiddenExactFileNames -contains $_.Name -or
+        $_.Name -match '(?i)\.(?:db|sqlite|sqlite3)(?:-(?:wal|shm))?$' -or
+        $_.Name -match '(?i)\.restore-pending\.(?:db|json)$' -or
+        $_.Name -match '(?i)\.(?:edmrecovery|swpkg|edpkg)$' -or
+        $_.Extension -eq ".log")
+    $isForbiddenTopLevel -or $isForbiddenRuntimeDirectory -or $isForbiddenFile
+})
+if ($sensitiveEntries.Count) {
+    $relativeSensitiveEntries = @($sensitiveEntries | ForEach-Object {
+        [IO.Path]::GetRelativePath($root, $_.FullName).Replace('\', '/')
+    })
+    throw "Release payload contains runtime data, credentials, database files, restore staging, or logs: $($relativeSensitiveEntries -join '; ')"
+}
+
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $fontManifestPath = Join-Path $repositoryRoot "Resources/Fonts/OpenSource/font-manifest.json"
 if (-not (Test-Path -LiteralPath $fontManifestPath -PathType Leaf)) { throw "Approved font manifest is missing: $fontManifestPath" }
@@ -67,6 +107,24 @@ if ($Profile -ne "Container") {
     }
 }
 
+$requiredLegalFiles = if ($Profile -eq "Container") {
+    @("THIRD_PARTY_NOTICES.md", "THIRD_PARTY_DEPENDENCIES.md")
+} else {
+    @(
+        "THIRD_PARTY_NOTICES.md",
+        "THIRD_PARTY_DEPENDENCIES.md",
+        "exportdocmanager.spdx.json",
+        "exportdocmanager.cyclonedx.json"
+    )
+}
+$legalRoot = Join-Path $root "Legal"
+foreach ($legalFile in $requiredLegalFiles) {
+    $legalPath = Join-Path $legalRoot $legalFile
+    if (-not (Test-Path -LiteralPath $legalPath -PathType Leaf) -or (Get-Item -LiteralPath $legalPath).Length -le 0) {
+        throw "$Profile payload is missing the audited third-party legal file: $legalPath"
+    }
+}
+
 if ($Profile -eq "Server") {
     $requiredServerEntries = if ($RuntimeIdentifier.StartsWith("win-", [StringComparison]::OrdinalIgnoreCase)) {
         @("appsettings.example.json", "initialize-windows.ps1", "start-windows.ps1", "wwwroot/index.html")
@@ -116,6 +174,13 @@ if ($Profile -ne "Container") {
     }
     if ($platformDirectories.Count -ne 1 -or $platformDirectories[0].Name -ne $expectedPlatform) {
         throw "Browser payload must contain only '$expectedPlatform'; found '$($platformDirectories.Name -join ', ')'."
+    }
+
+    $browserNoticeFiles = @(Get-ChildItem -LiteralPath $browserRoot -File -Recurse | Where-Object {
+        $_.Name -match '(?i)(?:license|notice|copying)'
+    })
+    if ($browserNoticeFiles.Count -eq 0) {
+        throw "$Profile browser payload is missing its upstream license or third-party notice file."
     }
 }
 

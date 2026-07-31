@@ -16,7 +16,7 @@ namespace ExportDocManager.Models.Entities
         public decimal EstimatedAmount { get; set; }
         [MaxLength(3)] public string Currency { get; set; } = "USD";
         public int ProbabilityPercent { get; set; }
-        public DateTimeOffset? ExpectedCloseAt { get; set; }
+        public DateOnly? ExpectedCloseDate { get; set; }
         [MaxLength(500)] public string NextAction { get; set; } = string.Empty;
         [MaxLength(2000)] public string Notes { get; set; } = string.Empty;
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

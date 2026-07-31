@@ -31,6 +31,16 @@ namespace ExportDocManager.Infrastructure.Tests
                     firstActive.CustomsCooClientRootPath,
                     thirdActive.CustomsCooClientRootPath);
                 Assert.Equal(3, profiles.Select(profile => profile.CardIdentifier).Distinct().Count());
+                Assert.All(profiles, profile =>
+                {
+                    Assert.NotEmpty(profile.ProtectedHandoffSecret);
+                    Assert.StartsWith("SWAC1.", profile.StationAssignmentCode, StringComparison.Ordinal);
+                    var assignment = SingleWindowStationAssignmentCode.Decode(profile.StationAssignmentCode);
+                    Assert.Equal(profile.StationKey, assignment.StationKey);
+                    Assert.Equal(profile.ProfileKey, assignment.ProfileKey);
+                    Assert.Equal(profile.CompanyScope, assignment.CompanyScope);
+                    Assert.Equal(profile.CardIdentifier, assignment.CardIdentifier);
+                });
 
                 await service.ActivateAsync(firstActive.ProfileKey);
 

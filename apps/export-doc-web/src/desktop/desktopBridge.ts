@@ -1,4 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 export type DesktopRuntimeContext = {
   apiBaseUrl: string;
@@ -6,6 +7,20 @@ export type DesktopRuntimeContext = {
   productEdition: "Document" | "Sales" | "Full";
   platform: string;
   singleWindowStationCapable: boolean;
+};
+
+export type RuntimeStorageContext = {
+  dataRoot: string;
+  portable: boolean;
+  migrationSupported: boolean;
+  storagePolicy: string;
+};
+
+export type DataRootMigrationScheduleResult = {
+  currentDataRoot: string;
+  targetDataRoot: string;
+  restartRequired: boolean;
+  message: string;
 };
 
 export type TauriUpdaterCheckResult = {
@@ -54,6 +69,10 @@ export async function selectSingleWindowPackageFile() {
 
 export async function selectInvoiceTransferPackageFile() {
   return invokeOptionalPath("select_invoice_transfer_package_file");
+}
+
+export async function selectDisasterRecoveryPackageFile() {
+  return invokeOptionalPath("select_disaster_recovery_package_file");
 }
 
 export async function selectReceiptFile() {
@@ -228,6 +247,24 @@ export async function openPath(path: string) {
   return true;
 }
 
+export async function getRuntimeStorageContext() {
+  const invoke = getInvoke();
+  if (!invoke) {
+    return null;
+  }
+
+  return invoke<RuntimeStorageContext>("get_runtime_storage_context");
+}
+
+export async function scheduleDataRootMigration() {
+  const invoke = getInvoke();
+  if (!invoke) {
+    return null;
+  }
+
+  return invoke<DataRootMigrationScheduleResult | null>("schedule_data_root_migration");
+}
+
 export async function logFrontendError(payload: {
   message: string;
   source?: string;
@@ -278,6 +315,16 @@ export async function requestAppExit() {
 
   await invoke<void>("request_app_exit");
   return true;
+}
+
+export async function subscribeToAppExitRequests(handler: () => void | Promise<void>) {
+  if (!getInvoke()) {
+    return () => undefined;
+  }
+
+  return listen("exportdoc://exit-requested", () => {
+    void handler();
+  });
 }
 
 async function invokeOptionalPath(command: string) {

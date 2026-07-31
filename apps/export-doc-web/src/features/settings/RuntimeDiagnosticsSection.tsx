@@ -74,7 +74,7 @@ export function RuntimeDiagnosticsSection({
           </button>
         </div>
       </div>
-      {health?.storagePolicy ? <InlineNotice tone="info">{health.storagePolicy}</InlineNotice> : null}
+      {health?.storagePolicy ? <InlineNotice tone="info">业务数据统一保存在所选数据目录，可在下方查看位置和可用性。</InlineNotice> : null}
       {errorMessage ? <InlineNotice tone="error" title="运行诊断加载失败">{errorMessage}</InlineNotice> : null}
       {templateStorageMutation.isError ? <InlineNotice tone="error" title="模板存储检查失败">{readApiError(templateStorageMutation.error)}</InlineNotice> : null}
       {templateStorageMutation.data ? (
@@ -93,7 +93,7 @@ export function RuntimeDiagnosticsSection({
       ) : null}
 
       <div className="runtime-overview-grid" aria-label="运行状态摘要">
-        <RuntimeOverviewItem label="API 状态" value={health?.status || "-"} tone={health?.status === "ok" ? "positive" : "neutral"} />
+        <RuntimeOverviewItem label="服务状态" value={health?.status === "ok" ? "正常" : health?.status || "-"} tone={health?.status === "ok" ? "positive" : "neutral"} />
         <RuntimeOverviewItem label="数据库类型" value={health?.databaseProvider || "-"} tone="neutral" />
         <RuntimeOverviewItem label="核心目录" value={directoryCheckValue} tone={directoryCheckTone} />
         <RuntimeOverviewItem

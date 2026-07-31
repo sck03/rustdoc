@@ -44,6 +44,18 @@ export type WorkspaceNotice = {
   message: string;
 };
 
+export type WorkspaceSessionAttention = {
+  state: "warning" | "expired";
+  message: string;
+  isBusy: boolean;
+  password: string;
+  errorMessage?: string | null;
+  onPasswordChange: (value: string) => void;
+  onContinue: () => void;
+  onReauthenticate: () => void;
+  onDiscardAndLogout: () => void;
+};
+
 type WorkspaceShellProps = {
   pathname: string;
   apiBaseUrl: string;
@@ -55,6 +67,7 @@ type WorkspaceShellProps = {
   serviceAvailabilityOverride?: ServiceAvailability;
   notice?: WorkspaceNotice | null;
   onDismissNotice?: () => void;
+  sessionAttention?: WorkspaceSessionAttention | null;
 };
 
 export function WorkspaceShell({
@@ -68,12 +81,15 @@ export function WorkspaceShell({
   serviceAvailabilityOverride,
   notice,
   onDismissNotice,
+  sessionAttention,
 }: WorkspaceShellProps) {
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [interfaceDensity, setInterfaceDensity] = useState(readInterfaceDensity);
   const mobileNavToggleRef = useRef<HTMLButtonElement | null>(null);
   const mobileNavRef = useRef<HTMLElement | null>(null);
+  const workspaceMainRef = useRef<HTMLElement | null>(null);
+  const workspaceContentRef = useRef<HTMLDivElement | null>(null);
   const workspaceDeviceMode = useWorkspaceDeviceMode();
   const isOnline = useOnlineStatus(connectivityOverride);
   const { availability: serviceAvailability, retry: retryServiceAvailability } = useServiceAvailability({
@@ -114,9 +130,14 @@ export function WorkspaceShell({
     }
 
     const documentElement = document.documentElement;
+    const workspaceMain = workspaceMainRef.current;
     const previousOverflow = documentElement.style.overflow;
+    const previousMainInert = workspaceMain?.inert ?? false;
     documentElement.style.overflow = "hidden";
     documentElement.dataset.mobileNavigationOpen = "true";
+    if (workspaceMain) {
+      workspaceMain.inert = true;
+    }
 
     const focusableElements = () => [
       mobileNavToggleRef.current,
@@ -162,8 +183,24 @@ export function WorkspaceShell({
       window.removeEventListener("keydown", handleNavigationKeyDown);
       documentElement.style.overflow = previousOverflow;
       delete documentElement.dataset.mobileNavigationOpen;
+      if (workspaceMain) {
+        workspaceMain.inert = previousMainInert;
+      }
     };
   }, [isMobileNavOpen]);
+
+  useEffect(() => {
+    const workspaceContent = workspaceContentRef.current;
+    if (!workspaceContent) {
+      return undefined;
+    }
+
+    const previousInert = workspaceContent.inert;
+    workspaceContent.inert = sessionAttention?.state === "expired";
+    return () => {
+      workspaceContent.inert = previousInert;
+    };
+  }, [sessionAttention?.state]);
 
   useEffect(() => {
     applyInterfaceDensity(interfaceDensity);
@@ -289,7 +326,7 @@ export function WorkspaceShell({
         />
       ) : null}
 
-      <main className="workspace-main">
+      <main ref={workspaceMainRef} className="workspace-main">
         <header className="workspace-header">
           <div className="workspace-title-cluster">
             <span className="workspace-context-icon" aria-hidden="true">
@@ -359,7 +396,40 @@ export function WorkspaceShell({
           </InlineNotice>
         </div> : null}
 
-        <div className="workspace-content">{children}</div>
+        {sessionAttention ? (
+          <div className="workspace-service-notice" role={sessionAttention.state === "expired" ? "alert" : "status"} aria-live={sessionAttention.state === "expired" ? "assertive" : "polite"}>
+            <div>
+              <strong>{sessionAttention.state === "expired" ? "登录已到期，草稿仍保留" : "登录即将到期"}</strong>
+              <span>{sessionAttention.message}</span>
+              {sessionAttention.errorMessage ? <span className="field-error">{sessionAttention.errorMessage}</span> : null}
+            </div>
+            {sessionAttention.state === "warning" ? (
+              <Button variant="secondary" disabled={sessionAttention.isBusy} onClick={sessionAttention.onContinue}>
+                {sessionAttention.isBusy ? "正在续期" : "继续使用"}
+              </Button>
+            ) : (
+              <form className="toolbar" onSubmit={(event) => { event.preventDefault(); sessionAttention.onReauthenticate(); }}>
+                <input
+                  type="password"
+                  value={sessionAttention.password}
+                  autoComplete="current-password"
+                  placeholder="输入当前账号密码"
+                  aria-label="当前账号密码"
+                  disabled={sessionAttention.isBusy}
+                  onChange={(event) => sessionAttention.onPasswordChange(event.target.value)}
+                />
+                <Button type="submit" disabled={sessionAttention.isBusy || !sessionAttention.password}>
+                  {sessionAttention.isBusy ? "正在验证" : "重新登录并保留草稿"}
+                </Button>
+                <Button variant="text" type="button" disabled={sessionAttention.isBusy} onClick={sessionAttention.onDiscardAndLogout}>
+                  放弃草稿并退出
+                </Button>
+              </form>
+            )}
+          </div>
+        ) : null}
+
+        <div ref={workspaceContentRef} className="workspace-content">{children}</div>
       </main>
     </div>
   );

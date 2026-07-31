@@ -30,6 +30,7 @@ namespace ExportDocManager.Services.SingleWindow
         Task<int> RecordSubmitPackageExportAsync(
             string packagePath,
             SingleWindowPackageManifest manifest,
+            string authenticationSecret,
             CancellationToken cancellationToken = default);
 
         Task<int> RecordSubmitPackageImportAsync(

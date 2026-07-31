@@ -27,7 +27,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器路径导入仅允许可信 Tauri 桌面端；浏览器请上传提交包。");
+                    return WriteForbidden("导入本机提交包仅支持桌面版；浏览器版请上传提交包。");
                 }
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
@@ -60,7 +60,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器路径导入仅允许可信 Tauri 桌面端；浏览器请上传回执包。");
+                    return WriteForbidden("导入本机回执包仅支持桌面版；浏览器版请上传回执包。");
                 }
 
                 return await ImportSingleWindowPackageAsync(
@@ -91,7 +91,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("提交包只能由受控 Tauri 持卡机导入。");
+                    return WriteForbidden("提交包只能由受控持卡机导入。");
                 }
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
@@ -155,7 +155,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器路径保存仅允许可信 Tauri 桌面端；浏览器请下载回执包。");
+                    return WriteForbidden("该本机保存操作仅支持桌面版；浏览器版请下载回执包。");
                 }
 
                 return await ExportSingleWindowReceiptPackageAsync(
@@ -182,7 +182,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器回执文件打包仅允许受控 Tauri 操作机；浏览器不能提交服务器路径。");
+                    return WriteForbidden("本机回执文件打包只能由受控操作机执行；浏览器版请上传回执文件。");
                 }
 
                 return await DownloadSingleWindowReceiptPackageAsync(

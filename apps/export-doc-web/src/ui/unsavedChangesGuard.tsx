@@ -161,6 +161,15 @@ export function useConfirmUnsavedChanges() {
   return context.confirmDiscardChanges;
 }
 
+export function useHasUnsavedChanges() {
+  const context = useContext(UnsavedChangesContext);
+  if (!context) {
+    throw new Error("useHasUnsavedChanges must be used within UnsavedChangesProvider.");
+  }
+
+  return context.hasUnsavedChanges;
+}
+
 function normalizeUnsavedChangesMessage(message: string) {
   return message.trim() || defaultUnsavedChangesMessage;
 }

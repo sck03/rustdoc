@@ -44,7 +44,7 @@ namespace ExportDocManager.Services.Opportunities
                     item.Product != null ? (item.Product.NameCN ?? item.Product.NameEN ?? string.Empty) : string.Empty,
                     item.Opportunity.Title, item.Opportunity.Stage, item.Opportunity.QuotationNo,
                     item.Opportunity.EstimatedAmount, item.Opportunity.Currency, item.Opportunity.ProbabilityPercent,
-                    item.Opportunity.ExpectedCloseAt, item.Opportunity.NextAction, item.Opportunity.Notes,
+                    item.Opportunity.ExpectedCloseDate, item.Opportunity.NextAction, item.Opportunity.Notes,
                     item.Opportunity.VersionNumber))
                 .ToListAsync(cancellationToken);
             return new PagedResult<SalesOpportunityRecord>(rows, total, pageNumber, pageSize);
@@ -101,17 +101,17 @@ namespace ExportDocManager.Services.Opportunities
             decimal previousAmount = entity.EstimatedAmount;
             string previousCurrency = entity.Currency;
             int previousProbability = entity.ProbabilityPercent;
-            DateTimeOffset? previousExpectedCloseAt = entity.ExpectedCloseAt;
+            DateOnly? previousExpectedCloseDate = entity.ExpectedCloseDate;
             entity.CrmCustomerId = request.CrmCustomerId; entity.ProductId = request.ProductId is > 0 ? request.ProductId : null;
             entity.Title = title; entity.Stage = stage; entity.QuotationNo = quotationNo;
             entity.EstimatedAmount = request.EstimatedAmount; entity.Currency = currency;
-            entity.ProbabilityPercent = request.ProbabilityPercent; entity.ExpectedCloseAt = request.ExpectedCloseAt;
+            entity.ProbabilityPercent = request.ProbabilityPercent; entity.ExpectedCloseDate = request.ExpectedCloseDate;
             entity.NextAction = Clean(request.NextAction); entity.Notes = Clean(request.Notes); entity.UpdatedAt = DateTimeOffset.UtcNow;
 
             bool stageChanged = !string.Equals(previousStage, stage, StringComparison.Ordinal);
             bool quotationChanged = !string.Equals(previousQuotationNo, quotationNo, StringComparison.Ordinal) ||
                 previousAmount != request.EstimatedAmount || !string.Equals(previousCurrency, currency, StringComparison.Ordinal) ||
-                previousProbability != request.ProbabilityPercent || previousExpectedCloseAt != request.ExpectedCloseAt;
+                previousProbability != request.ProbabilityPercent || previousExpectedCloseDate != request.ExpectedCloseDate;
             string changeType = isNew ? "创建" : stageChanged && quotationChanged ? "阶段与报价更新" :
                 stageChanged ? "阶段变更" : quotationChanged ? "报价更新" : changeNote.Length > 0 ? "进展备注" : string.Empty;
             if (changeType.Length > 0)
@@ -123,7 +123,7 @@ namespace ExportDocManager.Services.Opportunities
                     SalesOpportunityId = entity.Id, Opportunity = isNew ? entity : null, VersionNumber = version,
                     ChangeType = changeType, Stage = stage, QuotationNo = quotationNo,
                     EstimatedAmount = request.EstimatedAmount, Currency = currency,
-                    ProbabilityPercent = request.ProbabilityPercent, ExpectedCloseAt = request.ExpectedCloseAt,
+                    ProbabilityPercent = request.ProbabilityPercent, ExpectedCloseDate = request.ExpectedCloseDate,
                     ChangeNote = changeNote, ChangedBy = _accessScope.CurrentUser?.Username ?? string.Empty
                 };
                 await context.SalesOpportunityHistories.AddAsync(history, cancellationToken);
@@ -138,7 +138,7 @@ namespace ExportDocManager.Services.Opportunities
             }
             return new(entity.Id, entity.CrmCustomerId, customer.Name, entity.ProductId, product?.ProductCode ?? string.Empty,
                 product?.NameCN ?? product?.NameEN ?? string.Empty, entity.Title, entity.Stage, entity.QuotationNo,
-                entity.EstimatedAmount, entity.Currency, entity.ProbabilityPercent, entity.ExpectedCloseAt,
+                entity.EstimatedAmount, entity.Currency, entity.ProbabilityPercent, entity.ExpectedCloseDate,
                 entity.NextAction, entity.Notes, entity.VersionNumber);
         }
 
@@ -171,7 +171,7 @@ namespace ExportDocManager.Services.Opportunities
                 .OrderByDescending(item => item.VersionNumber)
                 .Select(item => new SalesOpportunityHistoryRecord(item.Id, item.SalesOpportunityId,
                     item.VersionNumber, item.ChangeType, item.Stage, item.QuotationNo, item.EstimatedAmount,
-                    item.Currency, item.ProbabilityPercent, item.ExpectedCloseAt, item.ChangeNote,
+                    item.Currency, item.ProbabilityPercent, item.ExpectedCloseDate, item.ChangeNote,
                     item.ChangedBy, item.CreatedAt)).ToListAsync(cancellationToken);
         }
 
@@ -195,16 +195,16 @@ namespace ExportDocManager.Services.Opportunities
                     opportunity.ProductId, product != null ? product.ProductCode ?? string.Empty : string.Empty,
                     product != null ? (product.NameCN ?? product.NameEN ?? string.Empty) : string.Empty,
                     opportunity.Title, opportunity.Stage, opportunity.QuotationNo, opportunity.EstimatedAmount,
-                    opportunity.Currency, opportunity.ProbabilityPercent, opportunity.ExpectedCloseAt,
+                    opportunity.Currency, opportunity.ProbabilityPercent, opportunity.ExpectedCloseDate,
                     opportunity.NextAction, opportunity.Notes, opportunity.VersionNumber)).ToListAsync(cancellationToken);
             var currencies = rows.GroupBy(item => item.Currency, StringComparer.OrdinalIgnoreCase)
                 .Select(group => new SalesOpportunityCurrencySummary(group.Key.ToUpperInvariant(), group.Count(),
                     group.Sum(item => item.EstimatedAmount),
                     group.Sum(item => item.EstimatedAmount * item.ProbabilityPercent / 100m)))
                 .OrderBy(item => item.Currency).ToArray();
-            var now = DateTimeOffset.Now;
-            var upcoming = rows.Where(item => item.ExpectedCloseAt.HasValue && item.ExpectedCloseAt.Value >= now && item.ExpectedCloseAt.Value <= now.AddDays(30))
-                .OrderBy(item => item.ExpectedCloseAt).ThenByDescending(item => item.ProbabilityPercent).Take(8).ToArray();
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var upcoming = rows.Where(item => item.ExpectedCloseDate.HasValue && item.ExpectedCloseDate.Value >= today && item.ExpectedCloseDate.Value <= today.AddDays(30))
+                .OrderBy(item => item.ExpectedCloseDate).ThenByDescending(item => item.ProbabilityPercent).Take(8).ToArray();
             return new SalesOpportunityDashboard(stages, currencies, upcoming);
         }
 

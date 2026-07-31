@@ -204,6 +204,17 @@ This directory contains the open-source Chromium build downloaded by Microsoft.P
 on a native Linux ARM64 runner. It is not Google Chrome Headless Shell and is labelled accordingly.
 Chromium source and license information: https://www.chromium.org/Home/
 "@ | Set-Content -LiteralPath (Join-Path $destination "README.txt") -Encoding UTF8
+
+    @"
+Chromium ARM64 third-party notice
+
+This payload is the open-source Chromium build distributed by Microsoft.Playwright $playwrightPackageVersion.
+Chromium source, license texts, and redistribution information are published at:
+https://www.chromium.org/Home/
+https://chromium.googlesource.com/chromium/src/+/main/LICENSE
+
+The exact Playwright package version and executable path are recorded in chromium-arm64.manifest.json.
+"@ | Set-Content -LiteralPath (Join-Path $destination "THIRD_PARTY_NOTICES.txt") -Encoding UTF8
 } catch {
     Remove-RepositoryEntry -Path $destination -Purpose "incomplete Chromium ARM64 destination"
     throw

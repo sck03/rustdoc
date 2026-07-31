@@ -21,6 +21,13 @@ namespace ExportDocManager.Api.Tests
             var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
             using var adminClient = harness.CreateClient(adminLogin.AccessToken);
 
+            var blankCreateResponse = await adminClient.PostAsJsonAsync("/api/payments", new { });
+            Assert.Equal(HttpStatusCode.Created, blankCreateResponse.StatusCode);
+            var blankCreated = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPaymentSaveResponse>(blankCreateResponse);
+            Assert.Null(blankCreated.Payment.PaymentDate);
+            Assert.Equal(string.Empty, blankCreated.Payment.PayeeName);
+            Assert.Equal(string.Empty, blankCreated.Payment.PayerName);
+
             var sealBearingCreateResponse = await adminClient.PostAsJsonAsync("/api/payments", new
             {
                 invoiceNo = "PAY-SEAL-REJECT",

@@ -122,6 +122,17 @@ namespace ExportDocManager.Services.Security
             var anchor = await ReadOrCreateMachineAnchorAsync(now, cancellationToken).ConfigureAwait(false);
             var identity = await GetLicenseIdentityAsync(anchor, cancellationToken).ConfigureAwait(false);
             var machineId = identity.MachineId;
+            if (RecoveryLicenseReactivationMarker.Exists(_pathProvider))
+            {
+                return ToStatus(new MutableLicenseStatus
+                {
+                    IsRegistered = false,
+                    IsTrialExpired = true,
+                    DaysRemaining = 0,
+                    MachineId = machineId,
+                    Message = "持卡机灾难恢复已完成。为防止旧设备授权被复制，必须使用当前机器码重新激活授权。"
+                });
+            }
             var anchorInstallDate = NormalizeAnchorDate(anchor.InstallDate, now);
             var anchorLastRunDate = MaxDate(NormalizeAnchorDate(anchor.LastRunDate, now), anchorInstallDate);
             string anchorLicenseKey = LicenseValueNormalizer.NormalizeLicenseKey(anchor.LicenseKey);
@@ -445,6 +456,7 @@ namespace ExportDocManager.Services.Security
 
             SetAnchorRegistration(anchor, normalizedKey, expireDate);
             await SaveMachineAnchorAsync(anchor, cancellationToken).ConfigureAwait(false);
+            RecoveryLicenseReactivationMarker.Clear(_pathProvider);
 
             return new LicenseRegistrationResult
             {

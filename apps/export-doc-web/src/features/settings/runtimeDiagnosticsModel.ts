@@ -19,18 +19,18 @@ export type RuntimePathGroup = {
 const groupCatalog: Array<Omit<RuntimePathGroup, "items">> = [
   {
     key: "program-resource",
-    label: "程序与稳定资源",
-    description: "随软件发布或由明确功能维护，不应被健康检查和普通浏览动作隐式创建。",
+    label: "程序文件",
+    description: "随软件安装并由系统维护，普通业务操作不会改动这些文件。",
   },
   {
     key: "runtime-data",
     label: "运行数据",
-    description: "数据库、日志、缓存、备份和业务文件统一跟随运行数据根，可整体迁移到非系统盘。",
+    description: "数据库、日志、缓存、备份和业务文件统一保存在业务数据目录，并可整体迁移。只有一个磁盘时也可选择该磁盘上的专用目录。",
   },
   {
     key: "database-file",
     label: "当前数据库",
-    description: "SQLite 单机版使用运行数据根内的数据库文件；PostgreSQL 模式不会显示本地数据库文件。",
+    description: "单机版使用业务数据目录内的数据库文件；团队版数据由企业服务器统一管理。",
   },
 ];
 

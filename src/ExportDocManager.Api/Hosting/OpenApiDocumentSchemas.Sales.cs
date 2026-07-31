@@ -66,7 +66,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["title"] = StringProperty("Opportunity title."), ["stage"] = StringProperty("Opportunity stage."),
                                 ["quotationNo"] = StringProperty("Latest quotation tracking number."), ["estimatedAmount"] = new { type = "number", format = "decimal" },
                                 ["currency"] = StringProperty("ISO currency code."), ["probabilityPercent"] = new { type = "integer", format = "int32" },
-                                ["expectedCloseAt"] = new { type = "string", format = "date-time", nullable = true },
+                                ["expectedCloseDate"] = new { type = "string", format = "date", nullable = true },
                                 ["nextAction"] = StringProperty("Next action."), ["notes"] = StringProperty("Notes."),
                                 ["versionNumber"] = new { type = "integer", format = "int32" }
                             }
@@ -82,7 +82,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["stage"] = StringProperty("Opportunity stage."), ["quotationNo"] = StringProperty("Latest quotation tracking number."),
                                 ["estimatedAmount"] = new { type = "number", format = "decimal" }, ["currency"] = StringProperty("ISO currency code."),
                                 ["probabilityPercent"] = new { type = "integer", format = "int32" },
-                                ["expectedCloseAt"] = new { type = "string", format = "date-time", nullable = true },
+                                ["expectedCloseDate"] = new { type = "string", format = "date", nullable = true },
                                 ["nextAction"] = StringProperty("Next action."), ["notes"] = StringProperty("Notes."),
                                 ["changeNote"] = StringProperty("Append-only history note for this change."),
                                 ["expectedVersion"] = new { type = "integer", format = "int32" }
@@ -99,7 +99,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["stage"] = StringProperty("Stage snapshot."), ["quotationNo"] = StringProperty("Quotation number snapshot."),
                                 ["estimatedAmount"] = new { type = "number", format = "decimal" }, ["currency"] = StringProperty("Currency snapshot."),
                                 ["probabilityPercent"] = new { type = "integer", format = "int32" },
-                                ["expectedCloseAt"] = new { type = "string", format = "date-time", nullable = true },
+                                ["expectedCloseDate"] = new { type = "string", format = "date", nullable = true },
                                 ["changeNote"] = StringProperty("Change note."), ["changedBy"] = StringProperty("Operator."),
                                 ["createdAt"] = new { type = "string", format = "date-time" }
                             }

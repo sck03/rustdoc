@@ -56,14 +56,21 @@ assert.match(
 );
 
 for (const contract of [
-  "首次启用口令",
+  "管理员初始化口令",
   "value={bootstrapToken}",
   'type="password"',
   'autoComplete="off"',
-  "登录成功后会立即清除",
-  "仅首次启用系统时填写",
+  "仅首次建立管理员账号时填写",
 ]) {
   assert(loginPageSource.includes(contract), `login page is missing bootstrap-token contract: ${contract}`);
+}
+for (const deploymentHint of [
+  "首次登录可使用 admin 空密码",
+  "PostgreSQL 团队版首次启用需为 admin 设置强密码",
+  "首次启用口令",
+  "仅首次启用系统时填写",
+]) {
+  assert(!loginPageSource.includes(deploymentHint), `login page must not expose deployment guidance: ${deploymentHint}`);
 }
 assert(!loginPageSource.includes("localStorage"), "login page must not persist the bootstrap token in localStorage");
 assert(!loginPageSource.includes("sessionStorage"), "login page must not persist the bootstrap token in sessionStorage");

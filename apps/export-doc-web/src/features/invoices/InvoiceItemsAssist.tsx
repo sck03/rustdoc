@@ -8,7 +8,7 @@ type Props={focusedRowIndex:number|null;isBusy:boolean;isProductPickerOpen:boole
 export function InvoiceItemsAssist(props:Props){const {focusedRowIndex,isBusy,isProductPickerOpen,itemsCount,productKeyword,products,productLibraryPageNumber,productLibraryPageSize,productLibraryTotalCount,productLibraryTotalPages,readOnly,unitCandidateDialog,onApplyProduct,onApplyUnitCandidate:applyUnitCandidate,onCloseProductPicker,onCloseUnitCandidates,onRefresh,onSearch,onProductLibraryPageChange,onProductLibraryPageSizeChange}=props;return <>
       <div className="item-editor-assist-area">
         {unitCandidateDialog ? (
-          <div className="item-unit-candidate-panel" role="dialog" aria-label="选择中文单位">
+          <div className="item-unit-candidate-panel" role="group" aria-label="选择中文单位">
             <div className="item-unit-candidate-title">
               <span>第 {unitCandidateDialog.rowIndex + 1} 行</span>
               <strong>{unitCandidateDialog.unitEn}</strong>

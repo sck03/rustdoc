@@ -20,6 +20,7 @@ import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { useModalDialog } from "../../ui/useModalDialog.ts";
+import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { getClipboardPasteInstruction, readClipboardText } from "../../ui/clipboard.ts";
 import {
   CatalogCellPosition,
@@ -860,12 +861,5 @@ function resolveCatalogCellPosition(target: EventTarget | null): CatalogCellPosi
 
 function downloadJson(catalog: SingleWindowReferenceCatalogModel, fileName: string) {
   const blob = new Blob([JSON.stringify(catalog, null, 2)], { type: "application/json;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, fileName);
 }

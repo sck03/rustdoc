@@ -7,7 +7,7 @@ use std::{
     sync::OnceLock,
 };
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 mod desktop_commands;
 mod runtime_layout;
@@ -51,6 +51,7 @@ fn run_tauri_app() -> tauri::Result<()> {
         .invoke_handler(tauri::generate_handler![
             desktop_commands::select_single_window_package_file,
             desktop_commands::select_invoice_transfer_package_file,
+            desktop_commands::select_disaster_recovery_package_file,
             desktop_commands::select_receipt_file,
             desktop_commands::select_receipt_files,
             desktop_commands::select_pdf_files,
@@ -71,6 +72,8 @@ fn run_tauri_app() -> tauri::Result<()> {
             desktop_commands::select_save_excel_path,
             desktop_commands::save_pdf_file,
             desktop_commands::open_path,
+            desktop_commands::get_runtime_storage_context,
+            desktop_commands::schedule_data_root_migration,
             desktop_commands::log_frontend_error,
             desktop_commands::request_app_exit,
             tauri_updater_commands::check_tauri_update,
@@ -95,9 +98,21 @@ fn run_tauri_app() -> tauri::Result<()> {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if matches!(event, tauri::WindowEvent::CloseRequested { .. })
-                && window.label() == "main"
-            {
+            if window.label() != "main" {
+                return;
+            }
+
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if !desktop_commands::is_app_exit_confirmed() {
+                    api.prevent_close();
+                    if let Err(error) = window.emit("exportdoc://exit-requested", ()) {
+                        let _ = write_tauri_error(&format!(
+                            "Failed to emit native exit request to frontend: {error}"
+                        ));
+                    }
+                    return;
+                }
+
                 sidecar::run_shutdown_maintenance(window.app_handle());
                 sidecar::stop_sidecar(window.app_handle());
             }

@@ -83,7 +83,8 @@ function Copy-RequiredFile {
 function Copy-RequiredEntry {
     param(
         [Parameter(Mandatory = $true)][string]$Source,
-        [Parameter(Mandatory = $true)][string]$Destination
+        [Parameter(Mandatory = $true)][string]$Destination,
+        [switch]$ExcludeLogFiles
     )
 
     if (-not (Test-Path -LiteralPath $Source)) {
@@ -108,6 +109,10 @@ function Copy-RequiredEntry {
 
         if ($child.PSIsContainer) {
             New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
+            continue
+        }
+
+        if ($ExcludeLogFiles -and $child.Extension -ieq ".log") {
             continue
         }
 
@@ -255,10 +260,13 @@ function Copy-BrowserRuntimeResources {
     if (Test-Path -LiteralPath $headlessShellSource -PathType Container) {
         New-Item -ItemType Directory -Path $platformDestination -Force | Out-Null
         foreach ($file in Get-ChildItem -LiteralPath $platformSource -Force -File) {
+            if ($file.Extension -ieq ".log") {
+                continue
+            }
             Copy-RequiredFile -Source $file.FullName -Destination (Join-Path $platformDestination $file.Name)
         }
 
-        Copy-RequiredEntry -Source $headlessShellSource -Destination (Join-Path $platformDestination "ChromeHeadlessShell")
+        Copy-RequiredEntry -Source $headlessShellSource -Destination (Join-Path $platformDestination "ChromeHeadlessShell") -ExcludeLogFiles
         return
     }
 
@@ -272,7 +280,7 @@ function Copy-BrowserRuntimeResources {
         $candidate = Join-Path $Source $relativeCandidate
         if (Test-Path -LiteralPath $candidate -PathType Leaf) {
             $topLevel = ($relativeCandidate -split "[\\/]", 2)[0]
-            Copy-RequiredEntry -Source (Join-Path $Source $topLevel) -Destination (Join-Path $Destination $topLevel)
+            Copy-RequiredEntry -Source (Join-Path $Source $topLevel) -Destination (Join-Path $Destination $topLevel) -ExcludeLogFiles
             return
         }
     }
@@ -366,7 +374,14 @@ $editionMetadata = switch ($ProductEdition) {
     runtimeDataPolicy = "Runtime business data defaults to App_Data beside this program directory."
 } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $resolvedOutputDir "product-edition.json") -Encoding UTF8
 
-foreach ($entryName in @("sidecar", "Templates", "Resources", "OcrModels", "Browsers", "runtime-layout.json", "WebView2Loader.dll")) {
+[ordered]@{
+    schemaVersion = 1
+    mode = "portable"
+    dataRoot = "App_Data"
+    storagePolicy = "Runtime business data stays beside the portable executable and is never redirected to AppData or ProgramData."
+} | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $resolvedOutputDir "portable-runtime.json") -Encoding UTF8
+
+foreach ($entryName in @("sidecar", "Templates", "Resources", "OcrModels", "Browsers", "Legal", "runtime-layout.json", "WebView2Loader.dll")) {
     $entryDestination = Join-Path $resolvedOutputDir $entryName
 
     if ($entryName -eq "Browsers") {

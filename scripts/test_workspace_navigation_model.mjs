@@ -119,8 +119,9 @@ assert(new Set(["Document", "Sales", "Full"].map((edition) => product.getProduct
 assert(device.getWorkspaceDeviceCapabilities("phone").canUseDenseWorkbench === false, "phone blocks dense workbench");
 assert(device.getWorkspaceDeviceCapabilities("tablet").canImportExport === false, "tablet blocks full import and export");
 assert(device.getWorkspaceDeviceCapabilities("desktop").canUseBatchOperations === true, "desktop enables batch operations");
-assert(device.resolveWorkspaceDeviceMode(false, false, true) === "desktop", "fine pointer keeps narrow desktop windows fully capable");
-assert(device.resolveWorkspaceDeviceMode(true, false, true) === "desktop", "fine pointer avoids phone mode under desktop display scaling");
+assert(device.resolveWorkspaceDeviceMode(false, false, true) === "tablet", "medium viewport remains tablet even with a fine pointer");
+assert(device.resolveWorkspaceDeviceMode(true, false, true) === "phone", "phone width remains phone even with a fine pointer");
+assert(device.resolveWorkspaceDeviceMode(false, true, false) === "desktop", "desktop width remains desktop on touch hardware");
 assert(device.resolveWorkspaceDeviceMode(false, false, false) === "tablet", "touch-only medium viewport uses tablet mode");
 assert(device.resolveWorkspaceDeviceMode(true, false, false) === "phone", "touch-only narrow viewport uses phone mode");
 assert(permission.hasModulePermission([{ moduleKey: "document.payments", accessLevel: "view" }], "document.payments", "view"), "view grant permits view");
@@ -131,6 +132,7 @@ assert(permission.hasRouteModulePermission(undefined, undefined, "system.about",
 assert(!permission.hasRouteModulePermission(undefined, ["document.payments"], "document.payments", "operate"), "legacy enabled module list cannot imply operate access");
 assert(model.isAdminOnlyRoute("/settings"), "settings route requires administrator");
 assert(model.isAdminOnlyRoute("/system/access-control"), "access control route requires administrator");
+assert(model.isAdminOnlyRoute("/system/license"), "license registration route requires administrator");
 assert(model.isFullEditionOnlyRoute("/audit-logs"), "audit route requires full edition");
 assert(model.isFullEditionOnlyRoute("/system/access-control"), "access control route requires full edition");
 assert(model.isDesktopOnlyRoute("/system/update"), "updater route requires desktop runtime");

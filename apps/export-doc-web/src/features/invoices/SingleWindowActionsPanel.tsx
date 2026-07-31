@@ -19,6 +19,7 @@ export function SingleWindowActionsPanel({
   review,
   reviewBusinessType,
   reviewInvoiceId,
+  stationAssignmentCode,
   isReviewBusy,
   canOperate,
   canExportBookingSheet,
@@ -28,6 +29,7 @@ export function SingleWindowActionsPanel({
   onReviewCustomsCoo,
   onReviewAgentConsignment,
   onRepairReview,
+  onStationAssignmentCodeChange,
   onExportCustomsCoo,
   onExportAgentConsignment,
   onImportReceiptPackage,
@@ -44,6 +46,7 @@ export function SingleWindowActionsPanel({
   review: SingleWindowExportReview | null;
   reviewBusinessType: SingleWindowBusinessType | null;
   reviewInvoiceId: number | null;
+  stationAssignmentCode: string;
   isReviewBusy: boolean;
   canOperate: boolean;
   canExportBookingSheet: boolean;
@@ -53,6 +56,7 @@ export function SingleWindowActionsPanel({
   onReviewCustomsCoo: (invoice: ApiInvoiceListItemDto) => void;
   onReviewAgentConsignment: (invoice: ApiInvoiceListItemDto) => void;
   onRepairReview: () => void;
+  onStationAssignmentCodeChange: (value: string) => void;
   onExportCustomsCoo: (invoice: ApiInvoiceListItemDto) => void;
   onExportAgentConsignment: (invoice: ApiInvoiceListItemDto) => void;
   onImportReceiptPackage: () => void;
@@ -95,6 +99,20 @@ export function SingleWindowActionsPanel({
           当前单一窗口权限仅允许查看和预检；修复、导出提交包及导入回执包已禁用。
         </PermissionNotice>
       ) : null}
+
+      <label className="form-field single-window-assignment-code-field">
+        <span className="form-field-label"><span>目标持卡机授权码</span><em>导出必填</em></span>
+        <textarea
+          rows={3}
+          value={stationAssignmentCode}
+          disabled={!canOperate || isBusy}
+          spellCheck={false}
+          autoComplete="off"
+          placeholder="从目标持卡机当前操作档案复制后粘贴"
+          onChange={(event) => onStationAssignmentCodeChange(event.target.value)}
+        />
+        <small>提交包会被锁定到授权码对应的持卡机、公司抬头、操作档案和操作卡，其他持卡机无法领取。</small>
+      </label>
 
       <div className="detail-grid single-window-list-detail-grid">
         <div className="detail-item">

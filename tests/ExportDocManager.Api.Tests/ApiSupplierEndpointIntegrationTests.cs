@@ -113,6 +113,9 @@ namespace ExportDocManager.Api.Tests
                     "USD", 30, "暂停", productLink.VersionNumber));
             Assert.Equal(HttpStatusCode.Conflict, staleLinkResponse.StatusCode);
             Assert.Single(await client.GetFromJsonAsync<List<ApiSupplierProductLinkDto>>($"/api/suppliers/{supplier.Id}/products") ?? []);
+            var protectedProductDeleteResponse = await client.DeleteAsync($"/api/master-data/products/{productId}");
+            Assert.Equal(HttpStatusCode.Conflict, protectedProductDeleteResponse.StatusCode);
+            Assert.Contains("先解除供应商供货关联", await protectedProductDeleteResponse.Content.ReadAsStringAsync());
 
             var createAssessmentResponse = await client.PostAsJsonAsync($"/api/suppliers/{supplier.Id}/assessments",
                 new ApiSupplierAssessmentSaveRequest(0, supplier.Id, DateTimeOffset.UtcNow.AddDays(-1),

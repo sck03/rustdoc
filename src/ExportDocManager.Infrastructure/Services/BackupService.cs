@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Utils;
 using Microsoft.Data.Sqlite;
 using Serilog;
@@ -16,7 +17,7 @@ namespace ExportDocManager.Services.Infrastructure
 {
     public class BackupService : IBackupService
     {
-        private static readonly SemaphoreSlim SqliteMaintenanceGate = new(1, 1);
+        internal static readonly SemaphoreSlim SqliteMaintenanceGate = new(1, 1);
         private static readonly JsonSerializerOptions RestoreMarkerJsonOptions = new(JsonSerializerDefaults.Web)
         {
             WriteIndented = true
@@ -26,6 +27,7 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly string _databasePath;
         private readonly string _databaseFileName;
         private readonly bool _usesSqlite;
+        private readonly IAppPathProvider _pathProvider;
 
         public BackupService(
             DatabaseConnectionSettings databaseSettings,
@@ -43,6 +45,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             ArgumentNullException.ThrowIfNull(databaseSettings);
             ArgumentNullException.ThrowIfNull(pathProvider);
+            _pathProvider = pathProvider;
             _usesSqlite = !DatabaseModeHelper.UsesPostgreSql(databaseSettings);
 
             if (_usesSqlite)
@@ -191,6 +194,11 @@ namespace ExportDocManager.Services.Infrastructure
                 {
                     throw new InvalidOperationException(
                         "已有 SQLite 数据库还原任务等待下次启动执行。请先重启程序完成该任务，再安排新的还原。");
+                }
+
+                if (SingleWindowDisasterRecoveryManager.HasPendingRestore(_pathProvider))
+                {
+                    throw new InvalidOperationException("已有持卡机灾难恢复任务等待下次启动执行，请先重启完成恢复。");
                 }
 
                 string safetyBackupPath = File.Exists(_databasePath)

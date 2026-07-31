@@ -3,6 +3,7 @@ using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,7 @@ namespace ExportDocManager.Services.SingleWindow
         private readonly BusinessDataAccessScope _businessDataAccessScope;
         private readonly ISingleWindowStationIdentityService _stationIdentity;
         private readonly ISingleWindowClientProfileService _clientProfileService;
+        private readonly LocalSecretProtector _secretProtector;
         private readonly bool _isSqlite;
 
         public SingleWindowTrackingService(
@@ -27,13 +29,16 @@ namespace ExportDocManager.Services.SingleWindow
             DatabaseConnectionSettings databaseSettings,
             BusinessDataAccessScope businessDataAccessScope,
             ISingleWindowStationIdentityService stationIdentity,
-            ISingleWindowClientProfileService clientProfileService)
+            ISingleWindowClientProfileService clientProfileService,
+            IAppPathProvider pathProvider)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
             _businessDataAccessScope = businessDataAccessScope ?? throw new ArgumentNullException(nameof(businessDataAccessScope));
             _stationIdentity = stationIdentity ?? throw new ArgumentNullException(nameof(stationIdentity));
             _clientProfileService = clientProfileService ?? throw new ArgumentNullException(nameof(clientProfileService));
+            _secretProtector = new LocalSecretProtector(
+                pathProvider ?? throw new ArgumentNullException(nameof(pathProvider)));
             _isSqlite = !DatabaseModeHelper.UsesPostgreSql(normalizedSettings);
         }
 
@@ -232,8 +237,21 @@ namespace ExportDocManager.Services.SingleWindow
                 AssignedStationKey = batch.AssignedStationKey,
                 AssignedProfileKey = batch.AssignedProfileKey,
                 AssignedCardIdentifier = batch.AssignedCardIdentifier,
-                ClientProfileName = batch.ClientProfileName
+                ClientProfileName = batch.ClientProfileName,
+                AuthenticationSecret = UnprotectAssignmentSecret(batch)
             };
+        }
+
+        private string UnprotectAssignmentSecret(SwSubmissionBatch batch)
+        {
+            if (string.IsNullOrWhiteSpace(batch?.ProtectedAssignmentSecret))
+            {
+                throw new InvalidDataException("提交批次缺少交接认证密钥，不能生成或接收回执包。" );
+            }
+
+            string secret = _secretProtector.Unprotect(batch.ProtectedAssignmentSecret) ?? string.Empty;
+            SingleWindowStationAssignmentCode.EnsureValidSecret(secret);
+            return secret;
         }
 
         private async Task<int> ResolveNextSubmissionVersionCoreAsync(

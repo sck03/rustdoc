@@ -25,7 +25,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("PDF 路径合并仅允许可信 Tauri 桌面端。浏览器端不接受服务器文件路径。");
+                    return WriteForbidden("合并本机 PDF 仅支持桌面版；浏览器版请上传文件。");
                 }
 
                 var validation = ValidatePdfMergeRequest(request, out var sourceFiles, out string destinationPath);

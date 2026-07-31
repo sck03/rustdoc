@@ -163,7 +163,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器路径保存仅允许可信 Tauri 桌面端；浏览器请下载提交包。");
+                    return WriteForbidden("该本机保存操作仅支持桌面版；浏览器版请下载提交包。");
                 }
 
                 if (invoiceId <= 0)
@@ -206,6 +206,16 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Unauthorized();
                 }
 
+                ApiSingleWindowSubmitPackageRequest request;
+                try
+                {
+                    request = await ReadSingleWindowSubmitPackageRequestAsync(context, cancellationToken);
+                }
+                catch (InvalidDataException ex)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                }
+
                 return await DownloadSingleWindowSubmitPackageAsync(
                     context,
                     handoffPackageService,
@@ -213,6 +223,7 @@ namespace ExportDocManager.Api.Hosting
                     pathProvider,
                     SingleWindowBusinessType.CustomsCoo,
                     invoiceId,
+                    request,
                     cancellationToken);
             })
             .WithName("DownloadCustomsCooSubmitPackage");
@@ -370,7 +381,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器路径保存仅允许可信 Tauri 桌面端；浏览器请下载提交包。");
+                    return WriteForbidden("该本机保存操作仅支持桌面版；浏览器版请下载提交包。");
                 }
 
                 if (invoiceId <= 0)
@@ -413,6 +424,16 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Unauthorized();
                 }
 
+                ApiSingleWindowSubmitPackageRequest request;
+                try
+                {
+                    request = await ReadSingleWindowSubmitPackageRequestAsync(context, cancellationToken);
+                }
+                catch (InvalidDataException ex)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                }
+
                 return await DownloadSingleWindowSubmitPackageAsync(
                     context,
                     handoffPackageService,
@@ -420,6 +441,7 @@ namespace ExportDocManager.Api.Hosting
                     pathProvider,
                     SingleWindowBusinessType.AgentConsignment,
                     invoiceId,
+                    request,
                     cancellationToken);
             })
             .WithName("DownloadAgentConsignmentSubmitPackage");

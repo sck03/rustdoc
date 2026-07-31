@@ -194,7 +194,7 @@ export function PermissionTemplateManagementPanel({
       <div className="section-header">
         <div>
           <h2>权限模板</h2>
-          <p className="section-description">按岗位选择业务模块即可；界面导航和服务端接口会执行同一套权限规则。</p>
+          <p className="section-description">按岗位选择业务模块即可；未授权的页面和操作会自动隐藏或停用。</p>
         </div>
         <div className="toolbar-actions">
           <button className="icon-button" type="button" title="刷新模板" aria-label="刷新模板" disabled={isBusy} onClick={() => void catalogQuery.refetch()}><RefreshCw size={18} /></button>

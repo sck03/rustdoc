@@ -8,7 +8,9 @@ namespace ExportDocManager.Services.SingleWindow
 {
     internal static class SingleWindowPackageIntegrity
     {
-        public const string CurrentSchemaVersion = "3.0";
+        public const string CurrentSchemaVersion = "4.0";
+
+        public const string AuthenticationAlgorithm = "HMAC-SHA256";
 
         public static async Task<SingleWindowPackageFile> DescribeFileAsync(
             string fullPath,
@@ -53,6 +55,8 @@ namespace ExportDocManager.Services.SingleWindow
             Append(builder, manifest.CardIdentifier);
             Append(builder, manifest.ClientProfileKey);
             Append(builder, manifest.ClientProfileName);
+            Append(builder, manifest.AssignmentNonce);
+            Append(builder, manifest.AuthenticationAlgorithm);
             Append(builder, manifest.CreatedAt.ToUniversalTime().ToString("O"));
             Append(builder, manifest.CreatedOnMachine);
             AppendFiles(builder, manifest.PayloadFiles);
@@ -90,9 +94,21 @@ namespace ExportDocManager.Services.SingleWindow
                 manifest.SourceDocumentType.Length > 80 ||
                 (manifest.InvoiceNo?.Length ?? 0) > 80 ||
                 (manifest.ContractNo?.Length ?? 0) > 80 ||
-                string.IsNullOrWhiteSpace(manifest.CompanyScope) ||
-                manifest.CompanyScope.Length > 120 ||
-                manifest.PayloadFiles == null ||
+                 string.IsNullOrWhiteSpace(manifest.CompanyScope) ||
+                 manifest.CompanyScope.Length > 120 ||
+                 !IsStationKey(manifest.StationKey) ||
+                 string.IsNullOrWhiteSpace(manifest.CardIdentifier) ||
+                 manifest.CardIdentifier.Length > 120 ||
+                 !IsClientProfileKey(manifest.ClientProfileKey) ||
+                 string.IsNullOrWhiteSpace(manifest.ClientProfileName) ||
+                 manifest.ClientProfileName.Length > 80 ||
+                 !IsHexIdentifier(manifest.AssignmentNonce, 32) ||
+                 !string.Equals(
+                     manifest.AuthenticationAlgorithm,
+                     AuthenticationAlgorithm,
+                     StringComparison.Ordinal) ||
+                 !IsSha256(manifest.AuthenticationTag) ||
+                 manifest.PayloadFiles == null ||
                 manifest.PayloadFiles.Count == 0 ||
                 manifest.AttachmentFiles == null ||
                 manifest.Warnings == null)
@@ -104,26 +120,17 @@ namespace ExportDocManager.Services.SingleWindow
                 (!IsSha256(manifest.SourcePackageDigest) ||
                  !string.IsNullOrWhiteSpace(manifest.SnapshotSha256) ||
                  (manifest.AttachmentFiles?.Count ?? 0) != 0 ||
-                 !IsStationKey(manifest.StationKey) ||
-                 string.IsNullOrWhiteSpace(manifest.CardIdentifier) ||
-                 manifest.CardIdentifier.Length > 120 ||
-                  (manifest.ReceiptReferenceNo?.Length ?? 0) > 120 ||
-                  (manifest.ReceiptReferenceNo ?? string.Empty).Any(char.IsControl) ||
-                  !IsClientProfileKey(manifest.ClientProfileKey) ||
-                 string.IsNullOrWhiteSpace(manifest.ClientProfileName) ||
-                 manifest.ClientProfileName.Length > 80))
+                   (manifest.ReceiptReferenceNo?.Length ?? 0) > 120 ||
+                   (manifest.ReceiptReferenceNo ?? string.Empty).Any(char.IsControl) ||
+                   string.IsNullOrWhiteSpace(manifest.SourcePackageDigest)))
             {
                 throw new InvalidDataException("单一窗口回执包的原提交摘要、持卡机绑定、快照或附件清单无效。");
             }
 
             if (expectedPackageType == SingleWindowPackageType.SubmitPackage &&
-                (!string.IsNullOrWhiteSpace(manifest.StationKey) ||
-                 !string.IsNullOrWhiteSpace(manifest.CardIdentifier) ||
-                 !string.IsNullOrWhiteSpace(manifest.ReceiptReferenceNo) ||
-                 !string.IsNullOrWhiteSpace(manifest.ClientProfileKey) ||
-                 !string.IsNullOrWhiteSpace(manifest.ClientProfileName)))
+                !string.IsNullOrWhiteSpace(manifest.ReceiptReferenceNo))
             {
-                throw new InvalidDataException("提交包不能预先绑定持卡机或操作卡。");
+                throw new InvalidDataException("提交包不能携带官方回执业务编号。");
             }
 
             EnsureExpectedPathPrefix(manifest.PayloadFiles, expectedPackageType == SingleWindowPackageType.SubmitPackage
@@ -184,6 +191,57 @@ namespace ExportDocManager.Services.SingleWindow
         public static string ComputeTextSha256(string content)
         {
             return ComputeSha256Hex(Encoding.UTF8.GetBytes(content ?? string.Empty));
+        }
+
+        public static string ComputeAuthenticationTag(
+            SingleWindowPackageManifest manifest,
+            string authenticationSecret)
+        {
+            ArgumentNullException.ThrowIfNull(manifest);
+            byte[] key = DecodeAuthenticationSecret(authenticationSecret);
+            byte[] message = Encoding.UTF8.GetBytes(BuildAuthenticationPayload(manifest));
+            try
+            {
+                using var hmac = new HMACSHA256(key);
+                return Convert.ToHexString(hmac.ComputeHash(message));
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(key);
+                CryptographicOperations.ZeroMemory(message);
+            }
+        }
+
+        public static void ValidateAuthentication(
+            SingleWindowPackageManifest manifest,
+            string authenticationSecret,
+            string failureMessage)
+        {
+            string expected = ComputeAuthenticationTag(manifest, authenticationSecret);
+            byte[] expectedBytes = Convert.FromHexString(expected);
+            byte[] actualBytes;
+            try
+            {
+                actualBytes = Convert.FromHexString(manifest?.AuthenticationTag ?? string.Empty);
+            }
+            catch (FormatException ex)
+            {
+                throw new InvalidDataException(failureMessage, ex);
+            }
+
+            try
+            {
+                if (expectedBytes.Length != actualBytes.Length ||
+                    !CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes))
+                {
+                    throw new InvalidDataException(failureMessage);
+                }
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(expectedBytes);
+                CryptographicOperations.ZeroMemory(actualBytes);
+            }
         }
 
         public static async Task ValidateReceiptSourceFileAsync(
@@ -361,6 +419,44 @@ namespace ExportDocManager.Services.SingleWindow
                 {
                     throw new InvalidDataException($"单一窗口交接包包含未在 manifest 声明的文件：{relativePath}");
                 }
+            }
+        }
+
+        private static string BuildAuthenticationPayload(SingleWindowPackageManifest manifest)
+        {
+            var builder = new StringBuilder();
+            Append(builder, manifest.SchemaVersion);
+            Append(builder, manifest.PackageId);
+            Append(builder, manifest.PackageType.ToString());
+            Append(builder, manifest.BusinessType.ToString());
+            Append(builder, manifest.BatchReference);
+            Append(builder, manifest.ContentDigest);
+            Append(builder, manifest.SourcePackageDigest);
+            Append(builder, manifest.StationKey);
+            Append(builder, manifest.ClientProfileKey);
+            Append(builder, manifest.CardIdentifier);
+            Append(builder, manifest.CompanyScope);
+            Append(builder, manifest.AssignmentNonce);
+            Append(builder, manifest.AuthenticationAlgorithm);
+            return builder.ToString();
+        }
+
+        private static byte[] DecodeAuthenticationSecret(string authenticationSecret)
+        {
+            try
+            {
+                byte[] key = Convert.FromBase64String(authenticationSecret?.Trim() ?? string.Empty);
+                if (key.Length != 32)
+                {
+                    CryptographicOperations.ZeroMemory(key);
+                    throw new InvalidDataException("单一窗口交接认证密钥长度无效。" );
+                }
+
+                return key;
+            }
+            catch (FormatException ex)
+            {
+                throw new InvalidDataException("单一窗口交接认证密钥格式无效。", ex);
             }
         }
 

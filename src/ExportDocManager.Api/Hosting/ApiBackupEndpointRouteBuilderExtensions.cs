@@ -158,6 +158,153 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("RestoreDatabaseBackup");
 
+            endpoints.MapGet("/api/backup/disaster-recovery/status", (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                ApiAuthorizationService authorizationService,
+                ISingleWindowDisasterRecoveryService recoveryService) =>
+            {
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                if (user == null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                if (!authorizationService.CanManageSettings(user))
+                {
+                    return WriteForbidden("只有管理员可以查看持卡机灾难恢复状态。");
+                }
+
+                var status = recoveryService.GetStatus();
+                return Results.Ok(new ApiDisasterRecoveryStatusResponse(
+                    status.Supported,
+                    status.UsesSqlite,
+                    status.PendingRestore,
+                    status.RecoveryRoot,
+                    status.Message,
+                    status.StoragePolicy));
+            })
+            .WithName("GetDisasterRecoveryStatus");
+
+            endpoints.MapPost("/api/backup/disaster-recovery/create", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                ApiAuthorizationService authorizationService,
+                ApiDesktopAccessOptions desktopAccessOptions,
+                ISingleWindowDisasterRecoveryService recoveryService,
+                ApiDisasterRecoveryCreateRequest request) =>
+            {
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                if (user == null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                if (!authorizationService.CanManageSettings(user))
+                {
+                    return WriteForbidden("只有管理员可以创建持卡机灾难恢复包。");
+                }
+
+                if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
+                {
+                    return WriteForbidden("持卡机灾难恢复包只能由受信任的桌面版创建。");
+                }
+
+                if (request == null || string.IsNullOrWhiteSpace(request.Password))
+                {
+                    return Results.BadRequest(new ApiErrorResponse("恢复包密码不能为空。"));
+                }
+
+                try
+                {
+                    var result = await recoveryService
+                        .CreatePackageAsync(request.Password, context.RequestAborted)
+                        .ConfigureAwait(false);
+                    return Results.Ok(new ApiDisasterRecoveryPackageResponse(
+                        result.Success,
+                        result.Message,
+                        result.FileName,
+                        result.FilePath,
+                        result.SizeBytes,
+                        result.StoragePolicy));
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or
+                                           InvalidDataException or IOException or NotSupportedException)
+                {
+                    return WriteConflict(ex.Message);
+                }
+            })
+            .WithName("CreateDisasterRecoveryPackage");
+
+            endpoints.MapPost("/api/backup/disaster-recovery/restore", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                ApiAuthorizationService authorizationService,
+                ApiDesktopAccessOptions desktopAccessOptions,
+                ISingleWindowDisasterRecoveryService recoveryService,
+                ApiDisasterRecoveryRestoreRequest request) =>
+            {
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                if (user == null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                if (!authorizationService.CanManageSettings(user))
+                {
+                    return WriteForbidden("只有管理员可以安排持卡机灾难恢复。");
+                }
+
+                if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
+                {
+                    return WriteForbidden("持卡机灾难恢复只能由受信任的桌面版执行。");
+                }
+
+                if (request == null ||
+                    string.IsNullOrWhiteSpace(request.PackagePath) ||
+                    string.IsNullOrWhiteSpace(request.Password))
+                {
+                    return Results.BadRequest(new ApiErrorResponse("恢复包路径和密码不能为空。"));
+                }
+
+                if (!string.Equals(request.ConfirmationText?.Trim(), "RECOVER", StringComparison.Ordinal))
+                {
+                    return Results.BadRequest(new ApiErrorResponse("安排灾难恢复前需要输入确认文本 RECOVER。"));
+                }
+
+                try
+                {
+                    var result = await recoveryService
+                        .ScheduleRestoreAsync(
+                            request.PackagePath,
+                            request.Password,
+                            context.RequestAborted)
+                        .ConfigureAwait(false);
+                    return Results.Ok(new ApiDisasterRecoveryRestoreResponse(
+                        result.Success,
+                        result.RestartRequired,
+                        result.Message,
+                        result.PackageFileName,
+                        result.SafetyBackupRoot,
+                        result.StoragePolicy));
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or
+                                           InvalidDataException or IOException or NotSupportedException or
+                                           UnauthorizedAccessException)
+                {
+                    return WriteConflict(ex.Message);
+                }
+            })
+            .WithName("RestoreDisasterRecoveryPackage");
+
             endpoints.MapGet("/api/backup/cloud/status", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
@@ -396,6 +543,11 @@ namespace ExportDocManager.Api.Hosting
                     if (selectedBackup == null)
                     {
                         return Results.BadRequest(new ApiErrorResponse("只能下载当前 WebDAV 云备份列表中的 ZIP 文件。"));
+                    }
+
+                    if (selectedBackup.SizeBytes > WebDavCloudSyncService.MaximumDownloadBytes)
+                    {
+                        return Results.BadRequest(new ApiErrorResponse("所选 WebDAV 备份超过 4 GiB 下载上限。"));
                     }
 
                     string localBackupPath = BuildLocalBackupPath(pathProvider.BackupRoot, remoteFileName);

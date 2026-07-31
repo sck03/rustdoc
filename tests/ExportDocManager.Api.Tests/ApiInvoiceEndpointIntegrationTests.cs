@@ -444,14 +444,14 @@ namespace ExportDocManager.Api.Tests
             Assert.True(preview.Preview.InvoiceMatches);
 
             var overwriteLockedResponse = await adminClient.PostAsync(
-                "/api/invoices/transfer-package/upload/import?fileName=actual-source.edpkg&conflictAction=Overwrite&allowInvalidChecksum=false",
+                "/api/invoices/transfer-package/upload/import?fileName=actual-source.edpkg&conflictAction=Overwrite",
                 new ByteArrayContent(packageBytes));
             Assert.Equal(HttpStatusCode.Conflict, overwriteLockedResponse.StatusCode);
             var overwriteLockedError = await ApiIntegrationTestHarness.ReadJsonAsync<ApiErrorResponse>(overwriteLockedResponse);
             Assert.Contains("反审核", overwriteLockedError.Message, StringComparison.Ordinal);
 
             var importResponse = await adminClient.PostAsync(
-                "/api/invoices/transfer-package/upload/import?fileName=actual-source.edpkg&conflictAction=NewInvoiceNo&newInvoiceNo=TRANSFER-TARGET-001&allowInvalidChecksum=false",
+                "/api/invoices/transfer-package/upload/import?fileName=actual-source.edpkg&conflictAction=NewInvoiceNo&newInvoiceNo=TRANSFER-TARGET-001",
                 new ByteArrayContent(packageBytes));
             Assert.Equal(HttpStatusCode.OK, importResponse.StatusCode);
             var importResult = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceTransferImportResponse>(importResponse);

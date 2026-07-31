@@ -10,9 +10,14 @@ namespace ExportDocManager.Services.SingleWindow
         public async Task<int> RecordSubmitPackageExportAsync(
             string packagePath,
             SingleWindowPackageManifest manifest,
+            string authenticationSecret,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(manifest);
+            SingleWindowPackageIntegrity.ValidateAuthentication(
+                manifest,
+                authenticationSecret,
+                "提交包认证签名无效，已拒绝归档。" );
             var archive = await ReadSubmitPackageArchiveAsync(packagePath, cancellationToken)
                 .ConfigureAwait(false);
 
@@ -42,6 +47,11 @@ namespace ExportDocManager.Services.SingleWindow
                     batch.SubmitPackageDigest = manifest.ContentDigest ?? string.Empty;
                     batch.SubmitPackagePath = packagePath ?? string.Empty;
                     batch.CreatedOnMachine = manifest.CreatedOnMachine ?? string.Empty;
+                    batch.AssignedStationKey = manifest.StationKey ?? string.Empty;
+                    batch.AssignedProfileKey = manifest.ClientProfileKey ?? string.Empty;
+                    batch.AssignedCardIdentifier = manifest.CardIdentifier ?? string.Empty;
+                    batch.ClientProfileName = manifest.ClientProfileName ?? string.Empty;
+                    batch.ProtectedAssignmentSecret = _secretProtector.Protect(authenticationSecret);
                     batch.LastError = string.Empty;
                     batch.UpdatedAt = DateTime.UtcNow;
                     await StoreSubmitPackageArchiveAsync(context, batch, archive, cancellationToken)
@@ -101,6 +111,7 @@ namespace ExportDocManager.Services.SingleWindow
                     batch.AssignedProfileKey = stationBinding.Profile.ProfileKey;
                     batch.AssignedCardIdentifier = stationBinding.Profile.CardIdentifier;
                     batch.ClientProfileName = stationBinding.Profile.ProfileName;
+                    batch.ProtectedAssignmentSecret = stationBinding.Profile.ProtectedHandoffSecret;
                     if (string.IsNullOrWhiteSpace(batch.SubmitPackagePath))
                     {
                         batch.SubmitPackagePath = packagePath ?? string.Empty;
@@ -352,10 +363,15 @@ namespace ExportDocManager.Services.SingleWindow
                     "该提交包已绑定其他持卡机或操作卡档案，不能通过重复导入改绑。");
             }
 
-            if (!string.Equals(
-                    batch.Status,
-                    SingleWindowBatchStatusCatalog.SubmitPackageImported,
-                    StringComparison.Ordinal))
+            bool isAwaitingFirstImport = string.Equals(
+                batch.Status,
+                SingleWindowBatchStatusCatalog.SubmitPackageExported,
+                StringComparison.Ordinal);
+            bool isAlreadyImported = string.Equals(
+                batch.Status,
+                SingleWindowBatchStatusCatalog.SubmitPackageImported,
+                StringComparison.Ordinal);
+            if (!isAwaitingFirstImport && !isAlreadyImported)
             {
                 throw new InvalidOperationException(
                     "该提交包已经发送或进入回执阶段，不能重复导入并回退批次状态。");
@@ -386,6 +402,15 @@ namespace ExportDocManager.Services.SingleWindow
                 throw new InvalidOperationException("提交包公司抬头与本持卡机绑定公司不一致，已拒绝导入。");
             }
 
+            if (!string.Equals(profile.StationKey, manifest.StationKey, StringComparison.Ordinal) ||
+                !string.Equals(profile.ProfileKey, manifest.ClientProfileKey, StringComparison.Ordinal) ||
+                !string.Equals(profile.CardIdentifier, manifest.CardIdentifier, StringComparison.Ordinal) ||
+                !string.Equals(profile.ProfileName, manifest.ClientProfileName, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "提交包已预分派给其他持卡机、操作档案或操作卡，当前档案不能领取。" );
+            }
+
             bool canHandle = manifest.BusinessType switch
             {
                 SingleWindowBusinessType.CustomsCoo => profile.CanSubmitCustomsCoo,
@@ -404,6 +429,11 @@ namespace ExportDocManager.Services.SingleWindow
             {
                 throw new InvalidOperationException("本持卡机身份与操作卡档案不一致，请重新保存操作卡配置。");
             }
+
+            SingleWindowPackageIntegrity.ValidateAuthentication(
+                manifest,
+                SingleWindowStationAssignmentCode.UnprotectProfileSecret(profile, _secretProtector),
+                "提交包来源认证失败或授权码已失效，已拒绝导入。" );
 
             return new SingleWindowStationBinding(stationKey, profile);
         }

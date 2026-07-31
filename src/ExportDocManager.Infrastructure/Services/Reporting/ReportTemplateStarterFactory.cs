@@ -389,7 +389,7 @@ namespace ExportDocManager.Services.Reporting
                 <td style="width:14%;">业务科别</td>
                 <td style="width:26%;">{{ Payment.Department }}</td>
                 <td style="width:24%;"></td>
-                <td style="width:18%;">{{ Payment.PaymentDate | date.to_string '%Y年%m月%d日' }}</td>
+                <td style="width:18%;">{{ if Payment.PaymentDate }}{{ Payment.PaymentDate | date.to_string '%Y年%m月%d日' }}{{ end }}</td>
                 <td style="width:18%;"></td>
             </tr>
             <tr>

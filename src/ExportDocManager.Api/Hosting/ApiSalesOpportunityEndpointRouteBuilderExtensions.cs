@@ -64,14 +64,14 @@ namespace ExportDocManager.Api.Hosting
         private static ApiSalesOpportunityDto ToApiDto(SalesOpportunityRecord item) => new(item.Id, item.CrmCustomerId,
             item.CustomerName, item.ProductId, item.ProductCode, item.ProductName, item.Title, item.Stage,
             item.QuotationNo, item.EstimatedAmount, item.Currency, item.ProbabilityPercent,
-            item.ExpectedCloseAt, item.NextAction, item.Notes, item.VersionNumber);
+            item.ExpectedCloseDate, item.NextAction, item.Notes, item.VersionNumber);
         private static SalesOpportunitySaveRequest ToSaveRequest(ApiSalesOpportunitySaveRequest item, int id) =>
             new(id, item.CrmCustomerId, item.ProductId, item.Title, item.Stage, item.QuotationNo,
-                item.EstimatedAmount, item.Currency, item.ProbabilityPercent, item.ExpectedCloseAt, item.NextAction,
+                item.EstimatedAmount, item.Currency, item.ProbabilityPercent, item.ExpectedCloseDate, item.NextAction,
                 item.Notes, item.ChangeNote, item.ExpectedVersion);
         private static ApiSalesOpportunityHistoryDto ToApiDto(SalesOpportunityHistoryRecord item) =>
             new(item.Id, item.SalesOpportunityId, item.VersionNumber, item.ChangeType, item.Stage,
                 item.QuotationNo, item.EstimatedAmount, item.Currency, item.ProbabilityPercent,
-                item.ExpectedCloseAt, item.ChangeNote, item.ChangedBy, item.CreatedAt);
+                item.ExpectedCloseDate, item.ChangeNote, item.ChangedBy, item.CreatedAt);
     }
 }

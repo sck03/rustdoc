@@ -386,7 +386,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器路径保存仅允许可信 Tauri 桌面端；浏览器请下载模板包。");
+                    return WriteForbidden("该本机保存操作仅支持桌面版；浏览器版请下载模板包。");
                 }
 
                 if (request == null)
@@ -499,7 +499,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器路径导入仅允许可信 Tauri 桌面端；浏览器请上传模板包。");
+                    return WriteForbidden("该本机文件导入仅支持桌面版；浏览器版请上传模板包。");
                 }
 
                 if (request == null)

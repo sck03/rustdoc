@@ -47,8 +47,9 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
     queryFn: () => client.getHealth(),
   });
   const ocrRuntime = healthQuery.data?.runtimeDependencies.find((item) => item.key === "ocr-runtime") ?? null;
-  const ocrRuntimeUnavailable = Boolean(ocrRuntime && !ocrRuntime.ready);
-  const canUseOcr = ocrPermission.canOperate && !ocrRuntimeUnavailable;
+  const ocrRuntimeReady = healthQuery.isSuccess && ocrRuntime?.status === "ready" && ocrRuntime.ready;
+  const ocrRuntimeUnavailable = healthQuery.isSuccess && !ocrRuntimeReady;
+  const canUseOcr = ocrPermission.canOperate && ocrRuntimeReady;
   const previewViewportRef = useRef<HTMLDivElement | null>(null);
   const previewDragRef = useRef<PreviewDragState | null>(null);
   const [imagePath, setImagePath] = useState("");
@@ -367,6 +368,12 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
       </div>
 
       {!ocrPermission.canOperate ? <PermissionNotice>当前模板仅允许进入 OCR 模块，图片载入和识别操作已禁用。</PermissionNotice> : null}
+      {ocrPermission.canOperate && healthQuery.isPending ? (
+        <InlineNotice tone="info" title="正在检查智能识别组件">确认本机 OCR 运行组件状态后才能开始识别。</InlineNotice>
+      ) : null}
+      {ocrPermission.canOperate && healthQuery.isError ? (
+        <InlineNotice tone="error" title="无法确认智能识别组件状态">暂不能安全启用 OCR，请恢复业务服务后重试。</InlineNotice>
+      ) : null}
       {ocrPermission.canOperate && ocrRuntimeUnavailable ? (
         <InlineNotice tone="warning" title="智能识别暂不可用">
           {readOcrRuntimeUnavailableMessage(ocrRuntime?.status)}

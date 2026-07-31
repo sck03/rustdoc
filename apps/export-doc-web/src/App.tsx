@@ -8,18 +8,20 @@ import {
 } from "./api/index.ts";
 import { queryKeys } from "./api/queryKeys.ts";
 import { notifyAuthenticationFailure, subscribeToAuthenticationFailure } from "./api/authenticationFailureEvents.ts";
-import { calculateSessionExpiryDelay } from "./api/sessionExpiryModel.ts";
+import { calculateSessionExpiryDelay, calculateSessionWarningDelay } from "./api/sessionExpiryModel.ts";
 import {
   getDesktopRuntimeContext,
   isDesktopBridgeAvailable,
+  requestAppExit,
+  subscribeToAppExitRequests,
 } from "./desktop/desktopBridge.ts";
 import { LoginPage } from "./features/auth/LoginPage.tsx";
 import { readDesktopError } from "./ui/DesktopPathActions.tsx";
 import { readStoredJson, removeStoredValue, writeStoredJson } from "./ui/browserStorage.ts";
 import { readApiError } from "./ui/formUtils.ts";
 import { PageState } from "./ui/PageState.tsx";
-import { useConfirmUnsavedChanges } from "./ui/unsavedChangesGuard.tsx";
-import { WorkspaceShell, type WorkspaceNotice } from "./app/WorkspaceShell.tsx";
+import { useConfirmUnsavedChanges, useHasUnsavedChanges } from "./ui/unsavedChangesGuard.tsx";
+import { WorkspaceShell, type WorkspaceNotice, type WorkspaceSessionAttention } from "./app/WorkspaceShell.tsx";
 import { hasModulePermission, hasRouteModulePermission, PermissionAccessProvider } from "./app/PermissionAccessContext.tsx";
 import { getRequiredModule, getRequiredRouteAccessLevel, getRequiredWorkspace, isAdminOnlyRoute, isDashboardRoute, isDesktopOnlyRoute, isFullEditionOnlyRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
 import {
@@ -108,10 +110,15 @@ function App() {
   const [loginState, setLoginState] = useState<LoadState>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [workspaceNotice, setWorkspaceNotice] = useState<WorkspaceNotice | null>(null);
+  const [sessionAttentionState, setSessionAttentionState] = useState<"warning" | "expired" | null>(null);
+  const [sessionActionBusy, setSessionActionBusy] = useState(false);
+  const [sessionActionError, setSessionActionError] = useState<string | null>(null);
+  const [reauthPassword, setReauthPassword] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
   const confirmDiscardChanges = useConfirmUnsavedChanges();
+  const hasUnsavedChanges = useHasUnsavedChanges();
   const isDesktopRuntime = isDesktopBridgeAvailable();
   const sessionAccessToken = session?.accessToken;
   const sessionApiBaseUrl = session?.apiBaseUrl;
@@ -127,15 +134,70 @@ function App() {
     document.title = activeProduct.displayName;
   }, [activeProduct.displayName]);
 
-  const expireSession = useCallback((reason: string) => {
+  useEffect(() => {
+    if (!isDesktopRuntime) {
+      return undefined;
+    }
+
+    let disposed = false;
+    let handlingExitRequest = false;
+    let unsubscribe: (() => void) | undefined;
+    void subscribeToAppExitRequests(async () => {
+      if (disposed || handlingExitRequest) {
+        return;
+      }
+
+      handlingExitRequest = true;
+      try {
+        if (await confirmDiscardChanges("退出程序")) {
+          await requestAppExit();
+        }
+      } finally {
+        handlingExitRequest = false;
+      }
+    }).then((nextUnsubscribe) => {
+      if (disposed) {
+        nextUnsubscribe();
+      } else {
+        unsubscribe = nextUnsubscribe;
+      }
+    }).catch((error) => {
+      console.error("Failed to subscribe to native exit requests.", error);
+    });
+
+    return () => {
+      disposed = true;
+      unsubscribe?.();
+    };
+  }, [confirmDiscardChanges, isDesktopRuntime]);
+
+  const endSession = useCallback((reason: string | null) => {
     setSession(null);
     setMessage(reason);
     setWorkspaceNotice(null);
+    setSessionAttentionState(null);
+    setSessionActionError(null);
+    setSessionActionBusy(false);
+    setReauthPassword("");
     setLoginState("idle");
     clearStoredSession();
     queryClient.clear();
     navigate("/", { replace: true });
   }, [navigate, queryClient]);
+
+  const expireSession = useCallback((reason: string) => {
+    if (session && hasUnsavedChanges) {
+      clearStoredSession();
+      setWorkspaceNotice(null);
+      setSessionAttentionState("expired");
+      setSessionActionError(null);
+      setSessionActionBusy(false);
+      setReauthPassword("");
+      return;
+    }
+
+    endSession(reason);
+  }, [endSession, hasUnsavedChanges, session]);
 
   const client = useMemo(
     () =>
@@ -219,7 +281,8 @@ function App() {
       return undefined;
     }
 
-    let timerId: number | undefined;
+    let expiryTimerId: number | undefined;
+    let warningTimerId: number | undefined;
     const scheduleExpiry = () => {
       const delay = calculateSessionExpiryDelay(session.expiresAt);
       if (delay === null) {
@@ -229,12 +292,27 @@ function App() {
         expireSession("登录已到期，请重新登录后继续。为保护业务数据，系统已结束当前会话。");
         return;
       }
-      timerId = window.setTimeout(scheduleExpiry, delay);
+      expiryTimerId = window.setTimeout(scheduleExpiry, delay);
     };
+    const scheduleWarning = () => {
+      const delay = calculateSessionWarningDelay(session.expiresAt);
+      if (delay === null) {
+        return;
+      }
+      if (delay === 0) {
+        setSessionAttentionState((current) => current === "expired" ? current : "warning");
+        return;
+      }
+      warningTimerId = window.setTimeout(scheduleWarning, delay);
+    };
+    scheduleWarning();
     scheduleExpiry();
     return () => {
-      if (timerId !== undefined) {
-        window.clearTimeout(timerId);
+      if (expiryTimerId !== undefined) {
+        window.clearTimeout(expiryTimerId);
+      }
+      if (warningTimerId !== undefined) {
+        window.clearTimeout(warningTimerId);
       }
     };
   }, [expireSession, session?.expiresAt]);
@@ -323,7 +401,7 @@ function App() {
             title: "授权状态需要处理",
             message: status.message || "试用期已过，请先注册授权。",
           });
-          navigate("/system/license", { replace: true });
+          navigate(canManageSystem ? "/system/license" : "/access-denied", { replace: true });
         } else {
           setWorkspaceNotice((current) => current?.id === "license" ? null : current);
         }
@@ -340,14 +418,14 @@ function App() {
             title: "授权状态需要处理",
             message: readApiError(error),
           });
-          navigate("/system/license", { replace: true });
+          navigate(canManageSystem ? "/system/license" : "/access-denied", { replace: true });
         }
       });
 
     return () => {
       isStale = true;
     };
-  }, [client, desktopContextLoading, location.pathname, navigate, queryClient, sessionAccessToken]);
+  }, [canManageSystem, client, desktopContextLoading, location.pathname, navigate, queryClient, sessionAccessToken]);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -377,6 +455,8 @@ function App() {
       };
       setSession(nextSession);
       setWorkspaceNotice(null);
+      setSessionAttentionState(null);
+      setSessionActionError(null);
       writeStoredSession(nextSession);
       setPassword("");
       setBootstrapToken("");
@@ -398,13 +478,65 @@ function App() {
       void client.logout().catch(() => undefined);
     }
 
-    setSession(null);
-    setMessage(null);
-    setWorkspaceNotice(null);
-    setLoginState("idle");
-    clearStoredSession();
-    queryClient.clear();
-    navigate("/", { replace: true });
+    endSession(null);
+  }
+
+  async function handleRenewSession() {
+    if (!session || sessionActionBusy) return;
+    setSessionActionBusy(true);
+    setSessionActionError(null);
+    try {
+      const response = await client.renewSession();
+      const nextSession: SessionState = {
+        accessToken: response.accessToken,
+        expiresAt: response.expiresAt,
+        apiBaseUrl: session.apiBaseUrl,
+        user: response.user,
+      };
+      setSession(nextSession);
+      writeStoredSession(nextSession);
+      setSessionAttentionState(null);
+      setReauthPassword("");
+    } catch (error) {
+      setSessionActionError(readApiError(error));
+    } finally {
+      setSessionActionBusy(false);
+    }
+  }
+
+  async function handleReauthenticate() {
+    if (!session || sessionActionBusy || !reauthPassword) return;
+    setSessionActionBusy(true);
+    setSessionActionError(null);
+    const loginClient = createExportDocManagerApiClient({
+      baseUrl: session.apiBaseUrl,
+      desktopAccessToken: () => desktopAccessToken,
+    });
+    try {
+      const response = await loginClient.login({
+        body: { username: session.user.username, password: reauthPassword },
+      });
+      const nextSession: SessionState = {
+        accessToken: response.accessToken,
+        expiresAt: response.expiresAt,
+        apiBaseUrl: session.apiBaseUrl,
+        user: response.user,
+      };
+      setSession(nextSession);
+      writeStoredSession(nextSession);
+      setSessionAttentionState(null);
+      setReauthPassword("");
+    } catch (error) {
+      setSessionActionError(readApiError(error));
+    } finally {
+      setSessionActionBusy(false);
+    }
+  }
+
+  async function handleDiscardExpiredDraftAndLogout() {
+    if (await confirmDiscardChanges("放弃草稿并重新登录")) {
+      endSession("登录已到期，请重新登录后继续。");
+    }
   }
 
   useEffect(() => {
@@ -448,6 +580,21 @@ function App() {
     isDesktopRuntime,
     isFullEdition,
   });
+  const sessionAttention: WorkspaceSessionAttention | null = sessionAttentionState
+    ? {
+        state: sessionAttentionState,
+        message: sessionAttentionState === "expired"
+          ? "当前编辑内容仍保留在本页，但保存和导航已锁定。请用当前账号重新验证后继续。"
+          : "为避免保存过程中会话中断，请现在续期；无需重新输入密码。",
+        isBusy: sessionActionBusy,
+        password: reauthPassword,
+        errorMessage: sessionActionError,
+        onPasswordChange: setReauthPassword,
+        onContinue: () => { void handleRenewSession(); },
+        onReauthenticate: () => { void handleReauthenticate(); },
+        onDiscardAndLogout: () => { void handleDiscardExpiredDraftAndLogout(); },
+      }
+    : null;
 
   if (!session) {
     return (
@@ -482,6 +629,7 @@ function App() {
         onLogout={handleLogout}
         notice={workspaceNotice}
         onDismissNotice={() => setWorkspaceNotice(null)}
+        sessionAttention={sessionAttention}
       >
       {routeAccessAllowed ? <Suspense fallback={<RouteLoadingPanel />}>
           <Routes>

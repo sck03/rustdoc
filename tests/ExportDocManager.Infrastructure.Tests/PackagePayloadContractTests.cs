@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace ExportDocManager.Infrastructure.Tests;
 
 public sealed class PackagePayloadContractTests
@@ -34,6 +36,13 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("dashboard|recorder|traceViewer", verifier, StringComparison.Ordinal);
         Assert.Contains("forbiddenPrivateToolPayload", verifier, StringComparison.Ordinal);
         Assert.Contains("private license key generator", verifier, StringComparison.Ordinal);
+        Assert.Contains("pending-data-root-migration.json", verifier, StringComparison.Ordinal);
+        Assert.Contains("pending-disaster-recovery.json", verifier, StringComparison.Ordinal);
+        Assert.Contains("local-master-key.bin", verifier, StringComparison.Ordinal);
+        Assert.Contains("license-reactivation-required.json", verifier, StringComparison.Ordinal);
+        Assert.Contains("THIRD_PARTY_NOTICES.md", verifier, StringComparison.Ordinal);
+        Assert.Contains("exportdocmanager.spdx.json", verifier, StringComparison.Ordinal);
+        Assert.Contains("browser payload is missing its upstream license", verifier, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("requiredServerEntries", verifier, StringComparison.Ordinal);
         Assert.Contains("initialize-windows.ps1", verifier, StringComparison.Ordinal);
         Assert.Contains("initialize-linux.sh", verifier, StringComparison.Ordinal);
@@ -73,6 +82,71 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("const archiveDownload = `${archive}.download`;", bundleScript, StringComparison.Ordinal);
         Assert.Contains("await rm(extracted, { recursive: true, force: true });", bundleScript, StringComparison.Ordinal);
         Assert.Contains("EXPORTDOCMANAGER_RUST_TARGET: ${{ inputs.rust_target }}", desktopWorkflow, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReleasePayloadVerifier_ShouldRejectRuntimeDatabaseAndSecretFixtures()
+    {
+        string root = FindWorkspaceRoot();
+        string fixtureRoot = Path.Combine(
+            root,
+            ".codex-runtime",
+            "package-payload-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(fixtureRoot, "Database"));
+        File.WriteAllText(Path.Combine(fixtureRoot, "Database", "runtime.db"), "not-a-release-asset");
+        File.WriteAllText(Path.Combine(fixtureRoot, "license.dat"), "not-a-release-secret");
+
+        try
+        {
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "pwsh",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                }
+            };
+            process.StartInfo.ArgumentList.Add("-NoProfile");
+            process.StartInfo.ArgumentList.Add("-ExecutionPolicy");
+            process.StartInfo.ArgumentList.Add("Bypass");
+            process.StartInfo.ArgumentList.Add("-File");
+            process.StartInfo.ArgumentList.Add(Path.Combine(root, "scripts", "verify-package-payload.ps1"));
+            process.StartInfo.ArgumentList.Add("-PackageRoot");
+            process.StartInfo.ArgumentList.Add(fixtureRoot);
+            process.StartInfo.ArgumentList.Add("-Profile");
+            process.StartInfo.ArgumentList.Add("Desktop");
+            process.StartInfo.ArgumentList.Add("-RuntimeIdentifier");
+            process.StartInfo.ArgumentList.Add("win-x64");
+
+            Assert.True(process.Start());
+            Task<string> standardOutputTask = process.StandardOutput.ReadToEndAsync();
+            Task<string> standardErrorTask = process.StandardError.ReadToEndAsync();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                process.Kill(entireProcessTree: true);
+                Assert.Fail("Package payload verifier timed out.");
+            }
+            string standardOutput = await standardOutputTask;
+            string standardError = await standardErrorTask;
+            Assert.NotEqual(0, process.ExitCode);
+            Assert.Contains(
+                "Release payload contains runtime data",
+                standardOutput + standardError,
+                StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Directory.Delete(fixtureRoot, recursive: true);
+        }
     }
 
     private static string FindWorkspaceRoot()

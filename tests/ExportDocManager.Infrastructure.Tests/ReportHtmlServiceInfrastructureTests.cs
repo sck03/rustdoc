@@ -197,6 +197,38 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task RenderPaymentVoucherDraftAsync_ShouldAllowBlankOptionalFields()
+        {
+            string repositoryRoot = FindRepositoryRoot();
+            string appRoot = CreateTempDirectory("blank-payment-report-app");
+            string dataRoot = CreateTempDirectory("blank-payment-report-data");
+
+            try
+            {
+                string templatePath = CopyProgramTemplate(
+                    repositoryRoot,
+                    appRoot,
+                    "Internal",
+                    "expense_reimbursement_template.html");
+                await using var factory = new TestDbContextFactory();
+                var service = new ReportHtmlService(
+                    factory,
+                    new StubSettingsService(),
+                    new RuntimeAppPathProvider(appRoot, dataRoot));
+
+                var result = await service.RenderPaymentVoucherDraftAsync(new Payment(), templatePath);
+
+                Assert.Contains("费用报销明细单", result.Html, StringComparison.Ordinal);
+                Assert.DoesNotContain("0001", result.Html, StringComparison.Ordinal);
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        [Fact]
         public async Task RenderBuiltInProgramTemplates_ShouldRenderFromProgramRootWithoutCrossDomainLeakage()
         {
             string repositoryRoot = FindRepositoryRoot();

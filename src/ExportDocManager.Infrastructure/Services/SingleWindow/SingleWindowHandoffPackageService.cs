@@ -54,9 +54,11 @@ namespace ExportDocManager.Services.SingleWindow
         public async Task<SingleWindowHandoffPackageResult> ExportSubmitPackageAsync(
             SingleWindowBusinessType businessType,
             int invoiceId,
+            string stationAssignmentCode,
             string savePath,
             CancellationToken cancellationToken = default)
         {
+            var stationAssignment = SingleWindowStationAssignmentCode.Decode(stationAssignmentCode);
             string targetPath = PackagePathHelper.NormalizePackagePath(savePath, ".swpkg", nameof(savePath));
             bool targetExisted = File.Exists(targetPath);
             string tempDirectory = RuntimeCachePathHelper.CreateUniqueDirectory(
@@ -127,6 +129,8 @@ namespace ExportDocManager.Services.SingleWindow
                         throw new InvalidOperationException("不支持的单一窗口业务类型。");
                 }
 
+                EnsureAssignmentMatchesDocument(stationAssignment, businessType, companyScope);
+
                 var reservation = await _singleWindowTrackingService.ReserveSubmissionAsync(
                     businessType,
                     invoiceId,
@@ -181,11 +185,20 @@ namespace ExportDocManager.Services.SingleWindow
                     ContractNo = contractNo,
                     CompanyScope = companyScope,
                     SnapshotSha256 = snapshotSha256,
+                    StationKey = stationAssignment.StationKey,
+                    CardIdentifier = stationAssignment.CardIdentifier,
+                    ClientProfileKey = stationAssignment.ProfileKey,
+                    ClientProfileName = stationAssignment.ProfileName,
+                    AssignmentNonce = Guid.NewGuid().ToString("N"),
+                    AuthenticationAlgorithm = SingleWindowPackageIntegrity.AuthenticationAlgorithm,
                     PayloadFiles = payloadFiles,
                     AttachmentFiles = attachmentFiles,
                     Warnings = warnings.Distinct(StringComparer.Ordinal).ToList()
                 };
                 manifest.ContentDigest = SingleWindowPackageIntegrity.ComputeContentDigest(manifest);
+                manifest.AuthenticationTag = SingleWindowPackageIntegrity.ComputeAuthenticationTag(
+                    manifest,
+                    stationAssignment.AuthenticationSecret);
 
                 await File.WriteAllTextAsync(
                     Path.Combine(tempDirectory, "manifest.json"),
@@ -197,6 +210,7 @@ namespace ExportDocManager.Services.SingleWindow
                 int trackingBatchId = await _singleWindowTrackingService.RecordSubmitPackageExportAsync(
                     targetPath,
                     manifest,
+                    stationAssignment.AuthenticationSecret,
                     cancellationToken);
                 if (trackingBatchId != reservation.BatchId)
                 {
@@ -324,9 +338,14 @@ namespace ExportDocManager.Services.SingleWindow
                     CardIdentifier = binding.AssignedCardIdentifier,
                     ClientProfileKey = binding.AssignedProfileKey,
                     ClientProfileName = binding.ClientProfileName,
+                    AssignmentNonce = Guid.NewGuid().ToString("N"),
+                    AuthenticationAlgorithm = SingleWindowPackageIntegrity.AuthenticationAlgorithm,
                     PayloadFiles = copiedFiles
                 };
                 manifest.ContentDigest = SingleWindowPackageIntegrity.ComputeContentDigest(manifest);
+                manifest.AuthenticationTag = SingleWindowPackageIntegrity.ComputeAuthenticationTag(
+                    manifest,
+                    binding.AuthenticationSecret);
 
                 await File.WriteAllTextAsync(
                     Path.Combine(tempDirectory, "manifest.json"),
@@ -363,6 +382,32 @@ namespace ExportDocManager.Services.SingleWindow
                 workingDirectory,
                 SingleWindowPackageType.ReceiptPackage,
                 cancellationToken);
+        }
+
+        private static void EnsureAssignmentMatchesDocument(
+            SingleWindowStationAssignment assignment,
+            SingleWindowBusinessType businessType,
+            string companyScope)
+        {
+            if (!string.Equals(
+                    assignment.CompanyScope,
+                    companyScope?.Trim(),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "持卡机授权码绑定的公司抬头与当前单据不一致。" );
+            }
+
+            bool canHandle = businessType switch
+            {
+                SingleWindowBusinessType.CustomsCoo => assignment.CanSubmitCustomsCoo,
+                SingleWindowBusinessType.AgentConsignment => assignment.CanSubmitAgentConsignment,
+                _ => false
+            };
+            if (!canHandle)
+            {
+                throw new InvalidOperationException("目标操作档案未启用当前单一窗口业务。" );
+            }
         }
     }
 }

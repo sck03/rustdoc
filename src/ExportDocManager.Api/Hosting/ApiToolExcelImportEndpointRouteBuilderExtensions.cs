@@ -23,7 +23,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器 Excel 路径预览仅允许可信 Tauri 桌面端；浏览器请上传 Excel 文件。");
+                    return WriteForbidden("预览本机 Excel 仅支持桌面版；浏览器版请上传文件。");
                 }
 
                 var validation = ValidateExcelSourcePath(

@@ -39,6 +39,7 @@ foreach ($edition in @("Document", "Sales", "Full")) {
         (Join-Path $editionRoot "ExportDocManager.exe"),
         (Join-Path $editionRoot "sidecar\ExportDocManager.Api.exe"),
         (Join-Path $editionRoot "runtime-layout.json"),
+        (Join-Path $editionRoot "portable-runtime.json"),
         $editionManifestPath,
         (Join-Path $editionRoot "Tools\exportdoc-excel-analyzer.exe")
     )
@@ -51,6 +52,11 @@ foreach ($edition in @("Document", "Sales", "Full")) {
     $editionManifest = Get-Content -LiteralPath $editionManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($editionManifest.edition -ne $edition) {
         throw "Edition manifest mismatch in '$editionManifestPath'. Expected '$edition', got '$($editionManifest.edition)'."
+    }
+    $portableManifestPath = Join-Path $editionRoot "portable-runtime.json"
+    $portableManifest = Get-Content -LiteralPath $portableManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($portableManifest.schemaVersion -ne 1 -or $portableManifest.mode -ne "portable" -or $portableManifest.dataRoot -ne "App_Data") {
+        throw "Portable runtime manifest is invalid: $portableManifestPath"
     }
     $files = @(Get-ChildItem -LiteralPath $editionRoot -Recurse -File)
     $mainExe = Join-Path $editionRoot "ExportDocManager.exe"

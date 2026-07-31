@@ -20,6 +20,7 @@ export function SingleWindowHandoffPanel({ businessType, client, invoiceId, canO
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<string | null>(null);
   const [savedPath, setSavedPath] = useState("");
+  const [stationAssignmentCode, setStationAssignmentCode] = useState("");
   const isDesktop = isDesktopBridgeAvailable();
   const businessLabel = businessType === "CustomsCoo" ? "海关原产地证" : "报关代理委托";
   const filePrefix = businessType === "CustomsCoo" ? "COO" : "ACD";
@@ -27,9 +28,10 @@ export function SingleWindowHandoffPanel({ businessType, client, invoiceId, canO
   const exportMutation = useMutation({
     mutationFn: async () => {
       if (!isDesktop) {
+        const body = { stationAssignmentCode: stationAssignmentCode.trim() };
         const blob = businessType === "CustomsCoo"
-          ? await client.downloadCustomsCooSubmitPackage({ invoiceId })
-          : await client.downloadAgentConsignmentSubmitPackage({ invoiceId });
+          ? await client.downloadCustomsCooSubmitPackage({ invoiceId, body })
+          : await client.downloadAgentConsignmentSubmitPackage({ invoiceId, body });
         downloadBlob(blob, `${filePrefix}-${invoiceId}.swpkg`);
         return "";
       }
@@ -40,8 +42,8 @@ export function SingleWindowHandoffPanel({ businessType, client, invoiceId, canO
       }
 
       const response = businessType === "CustomsCoo"
-        ? await client.saveCustomsCooSubmitPackageToPath({ invoiceId, body: { packagePath: targetPath } })
-        : await client.saveAgentConsignmentSubmitPackageToPath({ invoiceId, body: { packagePath: targetPath } });
+        ? await client.saveCustomsCooSubmitPackageToPath({ invoiceId, body: { packagePath: targetPath, stationAssignmentCode: stationAssignmentCode.trim() } })
+        : await client.saveAgentConsignmentSubmitPackageToPath({ invoiceId, body: { packagePath: targetPath, stationAssignmentCode: stationAssignmentCode.trim() } });
       return response.success ? targetPath : "";
     },
     onSuccess: async (targetPath) => {
@@ -72,7 +74,7 @@ export function SingleWindowHandoffPanel({ businessType, client, invoiceId, canO
         <button
           className="command-button"
           type="button"
-          disabled={!canOperate || exportMutation.isPending}
+          disabled={!canOperate || exportMutation.isPending || !stationAssignmentCode.trim()}
           onClick={() => {
             setMessage(null);
             exportMutation.mutate();
@@ -84,9 +86,22 @@ export function SingleWindowHandoffPanel({ businessType, client, invoiceId, canO
       </div>
 
       {!canOperate ? <PermissionNotice>当前权限仅允许查看单据，不能生成单一窗口提交包。</PermissionNotice> : null}
+      <label className="form-field single-window-assignment-code-field">
+        <span className="form-field-label"><span>目标持卡机授权码</span><em>必填</em></span>
+        <textarea
+          rows={3}
+          value={stationAssignmentCode}
+          disabled={!canOperate || exportMutation.isPending}
+          spellCheck={false}
+          autoComplete="off"
+          placeholder="在目标持卡机的“公司与操作卡档案”中复制授权码，然后粘贴到这里"
+          onChange={(event) => setStationAssignmentCode(event.target.value)}
+        />
+        <small>授权码会把提交包锁定到一台持卡机、一个操作档案和一张卡；它属于敏感交接凭据，请勿发给无关人员。</small>
+      </label>
       <div className="single-window-handoff-guidance">
         <span>1. 当前页面完成字段复核</span>
-        <span>2. 导出带公司绑定和完整性摘要的提交包</span>
+        <span>2. 使用目标档案授权码导出带预分派和来源认证的提交包</span>
         <span>3. 对应公司的持卡机把申报文件送入官方客户端待导入目录，操作员再确认导入和提交</span>
         <span>4. 持卡机导出回执包，办公室系统再导入归档</span>
       </div>

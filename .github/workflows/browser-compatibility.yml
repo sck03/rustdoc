@@ -1,0 +1,78 @@
+name: Browser compatibility acceptance
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "apps/export-doc-web/**"
+      - "src/ExportDocManager.Api/**"
+      - "src/ExportDocManager.Application/**"
+      - "src/ExportDocManager.Infrastructure/**"
+      - "scripts/smoke-cross-browser-ui.mjs"
+      - ".github/workflows/browser-compatibility.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/export-doc-web/**"
+      - "src/ExportDocManager.Api/**"
+      - "src/ExportDocManager.Application/**"
+      - "src/ExportDocManager.Infrastructure/**"
+      - "scripts/smoke-cross-browser-ui.mjs"
+      - ".github/workflows/browser-compatibility.yml"
+
+concurrency:
+  group: browser-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  firefox-webkit:
+    name: Firefox + WebKit desktop/mobile
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_CLI_HOME: ${{ github.workspace }}/.codex-runtime/dotnet-cli
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+      NUGET_PACKAGES: ${{ github.workspace }}/.codex-runtime/nuget-packages
+      npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/artifacts/playwright-browsers
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/export-doc-web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix apps/export-doc-web
+
+      - name: Build frontend and API
+        shell: pwsh
+        run: |
+          npm --prefix apps/export-doc-web run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build src/ExportDocManager.Api/ExportDocManager.Api.csproj -c Release
+          exit $LASTEXITCODE
+
+      - name: Install Firefox and WebKit runtimes
+        shell: pwsh
+        run: |
+          $playwright = Join-Path $env:GITHUB_WORKSPACE "src/ExportDocManager.Api/bin/Release/net8.0/linux-x64/playwright.ps1"
+          & $playwright install --with-deps firefox webkit
+          exit $LASTEXITCODE
+
+      - name: Run real browser accessibility and responsive acceptance
+        run: npm --prefix apps/export-doc-web run test:cross-browser-ui

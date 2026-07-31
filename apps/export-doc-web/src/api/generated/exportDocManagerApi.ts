@@ -820,6 +820,43 @@ export interface ApiDashboardTodoItemDto {
   title: string;
 }
 
+export interface ApiDisasterRecoveryCreateRequest {
+  password: string;
+}
+
+export interface ApiDisasterRecoveryPackageResponse {
+  fileName: string;
+  filePath: string;
+  message: string;
+  sizeBytes: number;
+  storagePolicy: string;
+  success: boolean;
+}
+
+export interface ApiDisasterRecoveryRestoreRequest {
+  confirmationText: string;
+  packagePath: string;
+  password: string;
+}
+
+export interface ApiDisasterRecoveryRestoreResponse {
+  message: string;
+  packageFileName: string;
+  restartRequired: boolean;
+  safetyBackupRoot: string;
+  storagePolicy: string;
+  success: boolean;
+}
+
+export interface ApiDisasterRecoveryStatusResponse {
+  message: string;
+  pendingRestore: boolean;
+  recoveryRoot: string;
+  storagePolicy: string;
+  supported: boolean;
+  usesSqlite: boolean;
+}
+
 export interface ApiEmailSendRequest {
   attachmentPaths: string[];
   body: string;
@@ -1561,7 +1598,6 @@ export interface ApiInvoiceTransferExportResponse {
 }
 
 export interface ApiInvoiceTransferImportRequest {
-  allowInvalidChecksum?: boolean;
   conflictAction: string;
   newInvoiceNo?: string;
   packagePath: string;
@@ -1862,15 +1898,15 @@ export interface ApiPaymentDto {
   goodsName?: string;
   id: number;
   inspectionExpense?: number;
-  invoiceNo: string;
+  invoiceNo?: string;
   notes?: string;
   officeExpense?: number;
   otherExpense?: number;
   ownerUserId?: number;
   payeeId?: number;
-  payeeName: string;
-  payerName: string;
-  paymentDate: string;
+  payeeName?: string;
+  payerName?: string;
+  paymentDate?: string;
   paymentMethod?: string;
   project?: string;
   quantity?: string;
@@ -2238,7 +2274,7 @@ export interface ApiSalesOpportunityDto {
   currency: string;
   customerName: string;
   estimatedAmount: number;
-  expectedCloseAt?: string;
+  expectedCloseDate?: string;
   id: number;
   nextAction: string;
   notes: string;
@@ -2259,7 +2295,7 @@ export interface ApiSalesOpportunityHistoryDto {
   createdAt: string;
   currency: string;
   estimatedAmount: number;
-  expectedCloseAt?: string;
+  expectedCloseDate?: string;
   id: number;
   probabilityPercent: number;
   quotationNo: string;
@@ -2273,7 +2309,7 @@ export interface ApiSalesOpportunitySaveRequest {
   crmCustomerId: number;
   currency: string;
   estimatedAmount: number;
-  expectedCloseAt?: string;
+  expectedCloseDate?: string;
   expectedVersion: number;
   id: number;
   nextAction: string;
@@ -2444,6 +2480,8 @@ export interface ApiSingleWindowClientProfileDto {
   isEnabled: boolean;
   profileKey: string;
   profileName: string;
+  stationAssignmentCode: string;
+  stationKey: string;
   updatedAt: string;
 }
 
@@ -2579,6 +2617,7 @@ export interface ApiSingleWindowRepairGroupsResponse {
 
 export interface ApiSingleWindowSubmitPackageRequest {
   packagePath?: string;
+  stationAssignmentCode: string;
 }
 
 export interface ApiSingleWindowUnlockFieldsRequest {
@@ -3223,7 +3262,10 @@ export interface SingleWindowPackageFile {
 }
 
 export interface SingleWindowPackageManifest {
+  assignmentNonce: string;
   attachmentFiles: SingleWindowPackageFile[];
+  authenticationAlgorithm: string;
+  authenticationTag: string;
   batchReference: string;
   businessType: number;
   cardIdentifier: string;
@@ -3404,6 +3446,10 @@ export interface CreateCustomerRequest {
 
 export interface CreateCustomsCooProducerProfileRequest {
   body: ApiCustomsCooProducerProfileSaveRequest;
+}
+
+export interface CreateDisasterRecoveryPackageRequest {
+  body: ApiDisasterRecoveryCreateRequest;
 }
 
 export interface CreateEmailTemplateRequest {
@@ -3622,6 +3668,7 @@ export interface DispatchSingleWindowBatchToClientRequest {
 
 export interface DownloadAgentConsignmentSubmitPackageRequest {
   invoiceId: number;
+  body: ApiSingleWindowSubmitPackageRequest;
 }
 
 export interface DownloadAuditLogsRequest {
@@ -3634,6 +3681,7 @@ export interface DownloadCloudDatabaseBackupRequest {
 
 export interface DownloadCustomsCooSubmitPackageRequest {
   invoiceId: number;
+  body: ApiSingleWindowSubmitPackageRequest;
 }
 
 export interface DownloadInvoiceTransferPackageRequest {
@@ -3812,7 +3860,6 @@ export interface ImportUploadedInvoiceTransferPackageRequest {
   fileName?: string;
   conflictAction?: string;
   newInvoiceNo?: string;
-  allowInvalidChecksum?: boolean;
   body: Blob;
 }
 
@@ -4153,6 +4200,10 @@ export interface RestoreDatabaseBackupRequest {
   body: ApiBackupRestoreRequest;
 }
 
+export interface RestoreDisasterRecoveryPackageRequest {
+  body: ApiDisasterRecoveryRestoreRequest;
+}
+
 export interface RestoreEmailTemplateVersionRequest {
   id: number;
   versionNumber: number;
@@ -4186,7 +4237,7 @@ export interface SaveAgentConsignmentDocumentRequest {
 
 export interface SaveAgentConsignmentSubmitPackageToPathRequest {
   invoiceId: number;
-  body?: ApiSingleWindowSubmitPackageRequest;
+  body: ApiSingleWindowSubmitPackageRequest;
 }
 
 export interface SaveAuditLogsToPathRequest {
@@ -4213,7 +4264,7 @@ export interface SaveCustomsCooDocumentRequest {
 
 export interface SaveCustomsCooSubmitPackageToPathRequest {
   invoiceId: number;
-  body?: ApiSingleWindowSubmitPackageRequest;
+  body: ApiSingleWindowSubmitPackageRequest;
 }
 
 export interface SaveHsCodeKnowledgeExampleRequest {
@@ -4758,6 +4809,14 @@ export class ExportDocManagerApiClient {
     return this.request<ApiBackupCreateResponse>("POST", path, { init });
   }
 
+  public createDisasterRecoveryPackage(request: CreateDisasterRecoveryPackageRequest, init?: RequestInit): Promise<ApiDisasterRecoveryPackageResponse> {
+    const path = "/api/backup/disaster-recovery/create";
+    return this.request<ApiDisasterRecoveryPackageResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public createEmailTemplate(request: CreateEmailTemplateRequest, init?: RequestInit): Promise<ApiEmailTemplateDto> {
     const path = "/api/email-templates";
     return this.request<ApiEmailTemplateDto>("POST", path, {
@@ -5102,7 +5161,10 @@ export class ExportDocManagerApiClient {
 
   public downloadAgentConsignmentSubmitPackage(request: DownloadAgentConsignmentSubmitPackageRequest, init?: RequestInit): Promise<Blob> {
     const path = `/api/single-window/acd/${encodePath(request.invoiceId)}/submit-package/download`;
-    return this.request<Blob>("POST", path, { init });
+    return this.request<Blob>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public downloadAuditLogs(request: DownloadAuditLogsRequest, init?: RequestInit): Promise<Blob> {
@@ -5123,7 +5185,10 @@ export class ExportDocManagerApiClient {
 
   public downloadCustomsCooSubmitPackage(request: DownloadCustomsCooSubmitPackageRequest, init?: RequestInit): Promise<Blob> {
     const path = `/api/single-window/coo/${encodePath(request.invoiceId)}/submit-package/download`;
-    return this.request<Blob>("POST", path, { init });
+    return this.request<Blob>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public downloadInvoiceTransferPackage(request: DownloadInvoiceTransferPackageRequest, init?: RequestInit): Promise<Blob> {
@@ -5273,6 +5338,11 @@ export class ExportDocManagerApiClient {
   public getDashboard(init?: RequestInit): Promise<ApiDashboardResponse> {
     const path = "/api/dashboard";
     return this.request<ApiDashboardResponse>("GET", path, { init });
+  }
+
+  public getDisasterRecoveryStatus(init?: RequestInit): Promise<ApiDisasterRecoveryStatusResponse> {
+    const path = "/api/backup/disaster-recovery/status";
+    return this.request<ApiDisasterRecoveryStatusResponse>("GET", path, { init });
   }
 
   public getEmailToolStatus(init?: RequestInit): Promise<ApiEmailStatusResponse> {
@@ -5503,7 +5573,6 @@ export class ExportDocManagerApiClient {
         "fileName": request.fileName,
         "conflictAction": request.conflictAction,
         "newInvoiceNo": request.newInvoiceNo,
-        "allowInvalidChecksum": request.allowInvalidChecksum,
       },
       body: request.body,
       init,
@@ -6151,6 +6220,11 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public renewSession(init?: RequestInit): Promise<ApiLoginResponse> {
+    const path = "/api/auth/renew";
+    return this.request<ApiLoginResponse>("POST", path, { init });
+  }
+
   public repairSingleWindowExportReviewGroups(request: RepairSingleWindowExportReviewGroupsRequest, init?: RequestInit): Promise<ApiSingleWindowRepairGroupsResponse> {
     const path = `/api/single-window/export-review/${encodePath(request.businessType)}/${encodePath(request.invoiceId)}/repair`;
     return this.request<ApiSingleWindowRepairGroupsResponse>("POST", path, {
@@ -6183,6 +6257,14 @@ export class ExportDocManagerApiClient {
   public restoreDatabaseBackup(request: RestoreDatabaseBackupRequest, init?: RequestInit): Promise<ApiCommandResponse> {
     const path = "/api/backup/restore";
     return this.request<ApiCommandResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public restoreDisasterRecoveryPackage(request: RestoreDisasterRecoveryPackageRequest, init?: RequestInit): Promise<ApiDisasterRecoveryRestoreResponse> {
+    const path = "/api/backup/disaster-recovery/restore";
+    return this.request<ApiDisasterRecoveryRestoreResponse>("POST", path, {
       body: request.body,
       init,
     });

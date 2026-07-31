@@ -27,11 +27,7 @@ namespace ExportDocManager.Infrastructure.Tests
                         CompanyScope = "CN"
                     })));
 
-            await service.SavePaymentAsync(new Payment
-            {
-                InvoiceNo = " OWN-PAY ",
-                PaymentDate = new DateTime(2026, 6, 22)
-            });
+            await service.SavePaymentAsync(CreateValidPayment(" OWN-PAY "));
 
             using var context = factory.CreateDbContext();
             var payment = await context.Payments.SingleAsync();
@@ -67,17 +63,41 @@ namespace ExportDocManager.Infrastructure.Tests
                 .SingleAsync();
 
             var deleted = await service.DeletePaymentAsync(foreignPaymentId);
-            var updateException = await Assert.ThrowsAsync<Exception>(() =>
-                service.SavePaymentAsync(new Payment
-                {
-                    Id = foreignPaymentId,
-                    InvoiceNo = "FOREIGN-EDIT",
-                    OwnerUserId = 8,
-                    PaymentDate = new DateTime(2026, 6, 22)
-                }));
+            var updateException = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                service.SavePaymentAsync(CreateValidPayment("FOREIGN-EDIT", foreignPaymentId, 8)));
 
             Assert.False(deleted);
             Assert.Contains("无权限", updateException.ToString());
+        }
+
+        [Fact]
+        public async Task SavePaymentAsync_ShouldAllowBlankBusinessFieldsAndZeroAmounts()
+        {
+            using var factory = new TestDbContextFactory();
+            var service = new PaymentService(factory, new DatabaseConnectionSettings());
+
+            int paymentId = await service.SavePaymentAsync(new Payment());
+
+            using var context = factory.CreateDbContext();
+            var saved = await context.Payments.SingleAsync(payment => payment.Id == paymentId);
+            Assert.Null(saved.PaymentDate);
+            Assert.Equal(string.Empty, saved.PayeeName);
+            Assert.Equal(string.Empty, saved.PayerName);
+            Assert.Equal(0m, saved.CNYAmount);
+        }
+
+        private static Payment CreateValidPayment(string invoiceNo, int id = 0, int? ownerUserId = null)
+        {
+            return new Payment
+            {
+                Id = id,
+                OwnerUserId = ownerUserId,
+                InvoiceNo = invoiceNo,
+                PaymentDate = new DateTime(2026, 6, 22),
+                PayeeName = "测试收款方",
+                PayerName = "测试付款方",
+                CNYAmount = 100m
+            };
         }
 
         private static DatabaseConnectionSettings CreatePostgreSqlModeSettings()

@@ -22,13 +22,12 @@ namespace ExportDocManager.Services.Infrastructure
         public async Task<DashboardSnapshot> GetDashboardAsync(CancellationToken cancellationToken = default)
         {
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            // PostgreSQL maps these columns to timestamp with time zone.  Keep
-            // query boundaries explicitly UTC so Npgsql never receives an
-            // Unspecified value, while the displayed month remains the
-            // server's current calendar month.
-            var now = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Utc);
-            var startOfMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-            var endOfMonth = startOfMonth.AddMonths(1);
+            var localNow = DateTime.Now;
+            var localStartOfMonth = new DateTime(localNow.Year, localNow.Month, 1, 0, 0, 0, DateTimeKind.Unspecified);
+            var localEndOfMonth = localStartOfMonth.AddMonths(1);
+            var startOfMonth = TimeZoneInfo.ConvertTimeToUtc(localStartOfMonth, TimeZoneInfo.Local);
+            var endOfMonth = TimeZoneInfo.ConvertTimeToUtc(localEndOfMonth, TimeZoneInfo.Local);
+            var previousStartOfMonth = TimeZoneInfo.ConvertTimeToUtc(localStartOfMonth.AddMonths(-1), TimeZoneInfo.Local);
             var scopedInvoices = _businessDataAccessScope.ApplyInvoiceScope(context.Invoices.AsNoTracking());
             var activeInvoices = BuildPreferredInvoiceQuery(
                 scopedInvoices.Where(invoice => invoice.Status != InvoiceStatusCatalog.Cancelled));
@@ -42,7 +41,7 @@ namespace ExportDocManager.Services.Infrastructure
                 includeCustomer: true,
                 cancellationToken);
             var previousMonthlyInvoices = await SelectDashboardInvoiceSnapshots(activeInvoices
-                    .Where(invoice => invoice.InvoiceDate >= startOfMonth.AddMonths(-1) && invoice.InvoiceDate < startOfMonth),
+                    .Where(invoice => invoice.InvoiceDate >= previousStartOfMonth && invoice.InvoiceDate < startOfMonth),
                 includeCustomer: false,
                 cancellationToken);
 
@@ -84,7 +83,7 @@ namespace ExportDocManager.Services.Infrastructure
                 singleWindowStatusSummary,
                 recentInvoices,
                 todoItems,
-                $"{now:yyyy年M月}",
+                $"{localNow:yyyy年M月}",
                 previousMonthlyInvoices.Sum(invoice => invoice.TotalAmount),
                 previousMonthlyInvoices.Sum(invoice => invoice.TotalProfit),
                 previousMonthlyInvoices.Sum(invoice => invoice.TotalTaxRefundAmount),

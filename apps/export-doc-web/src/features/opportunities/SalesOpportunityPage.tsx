@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ApiCrmCustomerDto, ApiProductDto, ApiSalesOpportunityDto, ApiSalesOpportunityHistoryDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { TaskViewTabs, getTaskViewPanelProps } from "../../ui/TaskViewTabs.tsx";
@@ -13,6 +14,7 @@ import { FormGuidance, PermissionNotice } from "../../ui/PageState.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { queryKeys } from "../../api/queryKeys.ts";
 
 const stages = ["线索", "需求确认", "已报价", "谈判中", "已成交", "已失单"];
 const opportunityTabsId = "sales-opportunity-workspace";
@@ -20,6 +22,7 @@ const opportunityTabsId = "sales-opportunity-workspace";
 export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiClient }) {
   const opportunityPermission = useModulePermission("sales.opportunities");
   const requestConfirmation = useConfirmation();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selected, setSelected] = useState<ApiSalesOpportunityDto | null>(null);
@@ -132,7 +135,7 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
       title: String(form.get("title") ?? "").trim(), stage: String(form.get("stage") ?? "线索"),
       quotationNo: String(form.get("quotationNo") ?? "").trim(), estimatedAmount: Number(form.get("estimatedAmount") ?? 0),
       currency: String(form.get("currency") ?? "USD").trim().toUpperCase(), probabilityPercent: Number(form.get("probabilityPercent") ?? 0),
-      expectedCloseAt: expectedCloseDate ? new Date(`${expectedCloseDate}T00:00:00`).toISOString() : undefined,
+      expectedCloseDate: expectedCloseDate || undefined,
       nextAction: String(form.get("nextAction") ?? "").trim(), notes: String(form.get("notes") ?? "").trim(),
       changeNote: String(form.get("changeNote") ?? "").trim(),
       expectedVersion: id > 0 ? selected?.versionNumber ?? 0 : 0,
@@ -145,13 +148,14 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
         setKeywordInput(""); setKeyword(""); setStage(""); setPageNumber(1);
       }
       setRevision((value) => value + 1);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() });
       setFeedback(successFeedback(id ? "商机已更新并按规则追加历史版本。" : "商机已建立并生成版本 1。"));
     } catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
 
   async function remove() {
     if (!opportunityPermission.canManage || !selected || !await requestConfirmation({ title: "删除商机", description: `确定删除商机“${selected.title}”吗？`, details: ["客户和产品资料将保留。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除商机")) return;
-    try { await client.deleteSalesOpportunity({ id: selected.id }); setDraftDirty(false); setSelected(null); applyView("directory"); setRevision((value) => value + 1); setFeedback(successFeedback("商机已删除，客户和产品保持不变。")); }
+    try { await client.deleteSalesOpportunity({ id: selected.id }); setDraftDirty(false); setSelected(null); applyView("directory"); setRevision((value) => value + 1); await queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() }); setFeedback(successFeedback("商机已删除，客户和产品保持不变。")); }
     catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
 
@@ -200,7 +204,7 @@ export function SalesOpportunityPage({ client }: { client: ExportDocManagerApiCl
         <label>预计金额<input name="estimatedAmount" type="number" min="0" step="0.0001" defaultValue={selected?.estimatedAmount ?? 0} /></label>
         <label>币种<input name="currency" maxLength={3} defaultValue={selected?.currency ?? "USD"} /></label>
         <label>成交概率（%）<input name="probabilityPercent" type="number" min="0" max="100" defaultValue={selected?.probabilityPercent ?? 0} /></label>
-        <label>预计成交日<input name="expectedCloseDate" type="date" defaultValue={selected?.expectedCloseAt?.slice(0, 10)} /></label>
+        <label>预计成交日<input name="expectedCloseDate" type="date" defaultValue={selected?.expectedCloseDate ?? ""} /></label>
         <label className="form-field-wide">关联产品（可选）<div className="toolbar" data-draft-ignore><input value={productKeyword} onChange={(event) => setProductKeyword(event.target.value)} placeholder="搜索产品货号或名称" /><button className="secondary-button" type="button" onClick={() => void searchProducts()}>查找</button></div><select name="productId" defaultValue={selected?.productId ?? 0}><option value={0}>不关联产品</option>{productOptions.map((item) => <option key={item.id} value={item.id}>{item.productCode || "无货号"} · {item.nameCN || item.nameEN || "未命名"}</option>)}</select></label>
       </fieldset>
       <fieldset className="form-section-block">

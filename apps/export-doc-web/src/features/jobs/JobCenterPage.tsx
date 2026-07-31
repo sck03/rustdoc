@@ -241,7 +241,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
             onMessage={operations.handleChildMessage}
             defaultExportDirectory={defaultExportDirectory}
           /> : <form className="job-tool-panel" onSubmit={(event) => { event.preventDefault(); operations.clearFeedback(); operations.pdfMergeMutation.mutate(); }}>
-            <label className="inline-filter"><span>源 PDF</span><input type="file" accept="application/pdf,.pdf" multiple disabled={isBusy} onChange={(event) => operations.setPdfUploadFiles(Array.from(event.target.files ?? []))} /></label>
+            <label className="inline-filter"><span>源 PDF</span><input type="file" accept="application/pdf,.pdf" multiple disabled={isBusy} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; operations.setPdfUploadFiles(files); }} /></label>
             <div className="job-tool-submit-row"><span>{pdfUploadFiles.length} 个源文件</span><button className="solid action-button" type="submit" disabled={!canStartPdfMerge}><Play size={16} aria-hidden="true" /><span>合并并下载</span></button></div>
             <div className="field-help">文件仅暂存在程序临时区，任务结束后自动清理。</div>
           </form>}

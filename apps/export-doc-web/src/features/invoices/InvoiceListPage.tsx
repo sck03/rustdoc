@@ -238,14 +238,12 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
           packagePath: draft.packagePath.trim(),
           conflictAction: draft.conflictAction,
           newInvoiceNo: draft.newInvoiceNo.trim(),
-          allowInvalidChecksum: draft.allowInvalidChecksum,
         },
       })
       : client.importUploadedInvoiceTransferPackage({
           fileName: transferUploadFile?.name,
           conflictAction: draft.conflictAction,
           newInvoiceNo: draft.newInvoiceNo.trim() || undefined,
-          allowInvalidChecksum: draft.allowInvalidChecksum,
           body: transferUploadFile ?? new Blob(),
         }),
     onSuccess: async (response) => {
@@ -612,6 +610,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
           review={singleWindow.review}
           reviewBusinessType={singleWindow.reviewBusinessType}
           reviewInvoiceId={singleWindow.reviewInvoiceId}
+          stationAssignmentCode={singleWindow.stationAssignmentCode}
           isReviewBusy={singleWindow.isReviewBusy}
           canOperate={singleWindowPermission.canOperate}
           canExportBookingSheet={excelPermission.canOperate}
@@ -623,6 +622,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
           onReviewCustomsCoo={(invoice) => singleWindow.buildReview(invoice, "CustomsCoo")}
           onReviewAgentConsignment={(invoice) => singleWindow.buildReview(invoice, "AgentConsignment")}
           onRepairReview={singleWindow.repairReview}
+          onStationAssignmentCodeChange={singleWindow.setStationAssignmentCode}
           onExportCustomsCoo={(invoice) => void singleWindow.exportPackage(invoice, "CustomsCoo")}
           onExportAgentConsignment={(invoice) => void singleWindow.exportPackage(invoice, "AgentConsignment")}
           onImportReceiptPackage={() => void singleWindow.importReceipt()}

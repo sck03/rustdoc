@@ -38,6 +38,9 @@ function buildMockTauriBootstrap(options) {
           return {
             apiBaseUrl: ${JSON.stringify(options.apiBaseUrl)},
             desktopAccessToken: ${JSON.stringify(options.desktopAccessToken)},
+            productEdition: "Full",
+            platform: "windows",
+            singleWindowStationCapable: true,
           };
         }
 

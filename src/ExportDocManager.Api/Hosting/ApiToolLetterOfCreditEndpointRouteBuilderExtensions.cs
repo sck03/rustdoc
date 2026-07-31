@@ -28,7 +28,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器文件路径导入仅允许可信 Tauri 桌面端；浏览器请上传信用证文件。");
+                    return WriteForbidden("导入本机信用证文件仅支持桌面版；浏览器版请上传文件。");
                 }
 
                 string filePath = request?.FilePath?.Trim() ?? string.Empty;

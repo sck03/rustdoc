@@ -2,6 +2,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +14,7 @@ namespace ExportDocManager.Services.SingleWindow
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly ISingleWindowStationIdentityService _stationIdentity;
         private readonly IAppPathProvider _pathProvider;
+        private readonly LocalSecretProtector _secretProtector;
         private readonly bool _isSqlite;
 
         public SingleWindowClientProfileService(
@@ -24,6 +26,7 @@ namespace ExportDocManager.Services.SingleWindow
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _stationIdentity = stationIdentity ?? throw new ArgumentNullException(nameof(stationIdentity));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            _secretProtector = new LocalSecretProtector(_pathProvider);
             _isSqlite = !DatabaseModeHelper.UsesPostgreSql(
                 databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings)));
         }
@@ -35,7 +38,7 @@ namespace ExportDocManager.Services.SingleWindow
             string stationKey = await GetStationKeyAsync(cancellationToken).ConfigureAwait(false);
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken)
                 .ConfigureAwait(false);
-            return await context.SwClientProfiles
+            var profiles = await context.SwClientProfiles
                 .AsNoTracking()
                 .Where(item => item.StationKey == stationKey && item.IsEnabled)
                 .OrderByDescending(item => item.IsActive)
@@ -43,6 +46,14 @@ namespace ExportDocManager.Services.SingleWindow
                 .ThenBy(item => item.Id)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
+            foreach (var profile in profiles)
+            {
+                profile.StationAssignmentCode = SingleWindowStationAssignmentCode.Encode(
+                    profile,
+                    _secretProtector);
+            }
+
+            return profiles;
         }
 
         public async Task<SwClientProfile> GetActiveAsync(
@@ -58,8 +69,15 @@ namespace ExportDocManager.Services.SingleWindow
                     item => item.StationKey == stationKey && item.IsEnabled && item.IsActive,
                     cancellationToken)
                 .ConfigureAwait(false);
-            return profile ?? throw new InvalidOperationException(
-                "本持卡机尚未启用操作档案。请先创建公司抬头与操作卡档案，并设为当前档案。");
+            if (profile == null)
+            {
+                throw new InvalidOperationException(
+                    "本持卡机尚未启用操作档案。请先创建公司抬头与操作卡档案，并设为当前档案。");
+            }
+            profile.StationAssignmentCode = SingleWindowStationAssignmentCode.Encode(
+                profile,
+                _secretProtector);
+            return profile;
         }
 
         public async Task<int> SaveAsync(
@@ -156,8 +174,18 @@ namespace ExportDocManager.Services.SingleWindow
             profile ??= new SwClientProfile
             {
                 ProfileKey = profileKey,
-                StationKey = stationKey
+                StationKey = stationKey,
+                ProtectedHandoffSecret = SingleWindowStationAssignmentCode.CreateProtectedSecret(_secretProtector)
             };
+
+            if (string.IsNullOrWhiteSpace(profile.ProtectedHandoffSecret))
+            {
+                profile.ProtectedHandoffSecret = SingleWindowStationAssignmentCode.CreateProtectedSecret(_secretProtector);
+            }
+            else
+            {
+                _ = SingleWindowStationAssignmentCode.UnprotectProfileSecret(profile, _secretProtector);
+            }
 
             foreach (var item in stationProfiles)
             {

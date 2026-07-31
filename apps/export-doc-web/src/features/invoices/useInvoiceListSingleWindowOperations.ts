@@ -22,6 +22,7 @@ export function useInvoiceListSingleWindowOperations({ client, queryClient, defa
   const [review, setReview] = useState<SingleWindowExportReview | null>(null);
   const [reviewBusinessType, setReviewBusinessType] = useState<SingleWindowBusinessType | null>(null);
   const [reviewInvoiceId, setReviewInvoiceId] = useState<number | null>(null);
+  const [stationAssignmentCode, setStationAssignmentCode] = useState("");
   const clearResult = () => { setMessage(null); setJobId(null); setPackagePath(null); };
 
   const bookingSheetMutation = useMutation({
@@ -34,12 +35,13 @@ export function useInvoiceListSingleWindowOperations({ client, queryClient, defa
     onError: (error) => { setMessage(readApiError(error)); setMessageType("error"); setJobId(null); setPackagePath(null); },
   });
   const submitMutation = useMutation({
-    mutationFn: async ({ invoice, businessType, packagePath: targetPath }: { invoice: ApiInvoiceListItemDto; businessType: SingleWindowBusinessType; packagePath: string }) => {
+    mutationFn: async ({ invoice, businessType, packagePath: targetPath, assignmentCode }: { invoice: ApiInvoiceListItemDto; businessType: SingleWindowBusinessType; packagePath: string; assignmentCode: string }) => {
       if (isDesktopBridgeAvailable()) {
-        const response = businessType === "CustomsCoo" ? await client.saveCustomsCooSubmitPackageToPath({ invoiceId: invoice.id, body: { packagePath: targetPath } }) : await client.saveAgentConsignmentSubmitPackageToPath({ invoiceId: invoice.id, body: { packagePath: targetPath } });
+        const response = businessType === "CustomsCoo" ? await client.saveCustomsCooSubmitPackageToPath({ invoiceId: invoice.id, body: { packagePath: targetPath, stationAssignmentCode: assignmentCode } }) : await client.saveAgentConsignmentSubmitPackageToPath({ invoiceId: invoice.id, body: { packagePath: targetPath, stationAssignmentCode: assignmentCode } });
         return { mode: "desktop" as const, response };
       }
-      const blob = businessType === "CustomsCoo" ? await client.downloadCustomsCooSubmitPackage({ invoiceId: invoice.id }) : await client.downloadAgentConsignmentSubmitPackage({ invoiceId: invoice.id });
+      const body = { stationAssignmentCode: assignmentCode };
+      const blob = businessType === "CustomsCoo" ? await client.downloadCustomsCooSubmitPackage({ invoiceId: invoice.id, body }) : await client.downloadAgentConsignmentSubmitPackage({ invoiceId: invoice.id, body });
       downloadBlob(blob, buildSingleWindowPackageDefaultFileName(invoice, businessType));
       return { mode: "browser" as const };
     },
@@ -61,20 +63,22 @@ export function useInvoiceListSingleWindowOperations({ client, queryClient, defa
     onSuccess: async (response: ApiSingleWindowImportedPackageResponse) => { const receiptText = response.persistedReceiptCount > 0 ? `新增回执 ${response.persistedReceiptCount} 条。` : "没有新增回执。"; setMessage(`${response.message || "单一窗口回执包已导入。"} ${receiptText}`); setMessageType("success"); setJobId(null); setPackagePath(response.packagePath || null); await Promise.all([queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }), queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }), queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() }), queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() })]); },
     onError: (error) => { setMessage(readApiError(error)); setMessageType("error"); setJobId(null); setPackagePath(null); },
   });
-  function open(invoice: ApiInvoiceListItemDto) { if (!canView) return; setDraft({ invoice }); setMessage(null); setJobId(null); setPackagePath(null); setReview(null); setReviewBusinessType(null); setReviewInvoiceId(null); }
-  function close() { setDraft(null); setMessage(null); setPackagePath(null); setReview(null); setReviewBusinessType(null); setReviewInvoiceId(null); }
+  function open(invoice: ApiInvoiceListItemDto) { if (!canView) return; setDraft({ invoice }); setMessage(null); setJobId(null); setPackagePath(null); setReview(null); setReviewBusinessType(null); setReviewInvoiceId(null); setStationAssignmentCode(""); }
+  function close() { setDraft(null); setMessage(null); setPackagePath(null); setReview(null); setReviewBusinessType(null); setReviewInvoiceId(null); setStationAssignmentCode(""); }
   function buildReview(invoice: ApiInvoiceListItemDto, businessType: SingleWindowBusinessType) { if (!canView || reviewMutation.isPending) return; clearResult(); reviewMutation.mutate({ invoice, businessType }); }
   function repairReview() { if (!canOperate || !draft || !review || !reviewBusinessType || repairMutation.isPending) return; const groupKeys = getAutoRepairGroupKeys(review); if (!groupKeys.length) { setMessage("当前预检结果没有可自动修复的分组。"); setMessageType("error"); setJobId(null); return; } setMessage(null); setJobId(null); repairMutation.mutate({ invoice: draft.invoice, businessType: reviewBusinessType, groupKeys }); }
   async function exportPackage(invoice: ApiInvoiceListItemDto, businessType: SingleWindowBusinessType) {
     if (!canOperate || submitMutation.isPending || reviewMutation.isPending) return;
+    const assignmentCode = stationAssignmentCode.trim();
+    if (!assignmentCode) { setMessage("请先粘贴目标持卡机操作档案的授权码，再导出提交包。"); setMessageType("error"); setJobId(null); setPackagePath(null); return; }
     if (!matchesSingleWindowReview(invoice.id, businessType, reviewInvoiceId, reviewBusinessType, review)) { try { const result = await reviewMutation.mutateAsync({ invoice, businessType }); if (result.review.hasIssues || result.review.totalErrorCount > 0 || result.review.totalWarningCount > 0) return; } catch { return; } }
-    if (!isDesktopBridgeAvailable()) { clearResult(); submitMutation.mutate({ invoice, businessType, packagePath: "" }); return; }
+    if (!isDesktopBridgeAvailable()) { clearResult(); submitMutation.mutate({ invoice, businessType, packagePath: "", assignmentCode }); return; }
     const targetPath = await requestSingleWindowPackageSavePath(invoice, businessType, defaultExportDirectory).catch((error) => { setMessage(readPathDialogError(error)); setMessageType("error"); setJobId(null); setPackagePath(null); return ""; });
-    if (!targetPath) return; clearResult(); submitMutation.mutate({ invoice, businessType, packagePath: targetPath });
+    if (!targetPath) return; clearResult(); submitMutation.mutate({ invoice, businessType, packagePath: targetPath, assignmentCode });
   }
   async function exportBookingSheet(invoice: ApiInvoiceListItemDto) { if (!canExportBookingSheet || bookingSheetMutation.isPending) return; setDraft({ invoice }); if (!isDesktopBridgeAvailable()) { clearResult(); bookingSheetMutation.mutate({ invoice, destinationPath: "" }); return; } const destinationPath = await requestExcelSavePath(buildBookingSheetDefaultFileName(invoice), defaultExportDirectory).catch((error) => { setMessage(readPathDialogError(error)); setMessageType("error"); setJobId(null); setPackagePath(null); return ""; }); if (!destinationPath) return; clearResult(); bookingSheetMutation.mutate({ invoice, destinationPath }); }
   async function importReceipt() { if (!canOperate || receiptMutation.isPending) return; const targetPath = await requestSingleWindowPackageOpenPath().catch((error) => { setMessage(readPathDialogError(error)); setMessageType("error"); setJobId(null); setPackagePath(null); return ""; }); if (!targetPath) return; clearResult(); receiptMutation.mutate(targetPath); }
   async function openPackagePath() { if (!packagePath) return; try { await openPath(packagePath); } catch (error) { setMessage(error instanceof Error ? error.message : "打开单一窗口包失败。"); setMessageType("error"); setJobId(null); } }
   const isBusy = bookingSheetMutation.isPending || submitMutation.isPending || reviewMutation.isPending || repairMutation.isPending || receiptMutation.isPending;
-  return { draft, message, messageType, jobId, packagePath, review, reviewBusinessType, reviewInvoiceId, isBusy, isActionBusy: bookingSheetMutation.isPending || submitMutation.isPending || receiptMutation.isPending, isReviewBusy: reviewMutation.isPending || repairMutation.isPending, open, close, buildReview, repairReview, exportPackage, exportBookingSheet, importReceipt, openPackagePath };
+  return { draft, message, messageType, jobId, packagePath, review, reviewBusinessType, reviewInvoiceId, stationAssignmentCode, setStationAssignmentCode, isBusy, isActionBusy: bookingSheetMutation.isPending || submitMutation.isPending || receiptMutation.isPending, isReviewBusy: reviewMutation.isPending || repairMutation.isPending, open, close, buildReview, repairReview, exportPackage, exportBookingSheet, importReceipt, openPackagePath };
 }

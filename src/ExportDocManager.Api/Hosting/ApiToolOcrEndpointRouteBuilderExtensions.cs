@@ -34,7 +34,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器图片路径识别仅允许可信 Tauri 桌面端；浏览器请上传图片内容。");
+                    return WriteForbidden("识别本机图片仅支持桌面版；浏览器版请上传图片。");
                 }
 
                 string filePath = request?.FilePath?.Trim() ?? string.Empty;

@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
+using ExportDocManager.Services.Infrastructure;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -192,7 +193,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 messages.Add(Warning(
                     "system.defaultExportDirectory",
-                    "默认导出目录不存在；Tauri 文件对话框会忽略该初始目录，正式输出仍需用户显式选择。",
+                    "默认导出目录不存在；桌面版会忽略该初始位置，正式输出时仍需重新选择。",
                     false));
             }
 
@@ -267,7 +268,7 @@ namespace ExportDocManager.Api.Hosting
         {
             _ = raw;
             normalized ??= new WebDavSettings();
-            if (!normalized.Enabled)
+            if (!normalized.Enabled && string.IsNullOrWhiteSpace(normalized.Url))
             {
                 return;
             }
@@ -276,10 +277,9 @@ namespace ExportDocManager.Api.Hosting
             {
                 messages.Add(Error("webDav.url", "已启用 WebDAV 备份，但未填写 WebDAV 地址。", false));
             }
-            else if (!Uri.TryCreate(normalized.Url.Trim(), UriKind.Absolute, out var uri) ||
-                     (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            else if (!WebDavEndpointPolicy.TryNormalize(normalized.Url, out _, out string errorMessage))
             {
-                messages.Add(Error("webDav.url", "WebDAV 地址必须是 http 或 https 绝对地址。", false));
+                messages.Add(Error("webDav.url", errorMessage, false));
             }
         }
 

@@ -341,7 +341,7 @@ namespace ExportDocManager.Api.Hosting
                     },
                     requestBody = new
                     {
-                        required = false,
+                        required = true,
                         content = JsonContent("ApiSingleWindowSubmitPackageRequest")
                     },
                     responses = new Dictionary<string, object>
@@ -415,6 +415,11 @@ namespace ExportDocManager.Api.Hosting
                     parameters = new object[]
                     {
                         PathParameter("invoiceId", "integer", "int32", "Source invoice id.")
+                    },
+                    requestBody = new
+                    {
+                        required = true,
+                        content = JsonContent("ApiSingleWindowSubmitPackageRequest")
                     },
                     responses = new Dictionary<string, object>
                     {

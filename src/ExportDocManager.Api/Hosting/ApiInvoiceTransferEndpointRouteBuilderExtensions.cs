@@ -29,7 +29,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器路径保存仅允许可信 Tauri 桌面端；浏览器请直接下载单据包。");
+                    return WriteForbidden("该本机保存操作仅支持桌面版；浏览器版请直接下载单据包。");
                 }
 
                 if (id <= 0)
@@ -144,7 +144,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器路径预览仅允许可信 Tauri 桌面端；浏览器请上传单据包。");
+                    return WriteForbidden("该本机文件预览仅支持桌面版；浏览器版请上传单据包。");
                 }
 
                 if (request == null || string.IsNullOrWhiteSpace(request.PackagePath))
@@ -227,7 +227,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器路径导入仅允许可信 Tauri 桌面端；浏览器请上传单据包。");
+                    return WriteForbidden("该本机文件导入仅支持桌面版；浏览器版请上传单据包。");
                 }
 
                 if (request == null || string.IsNullOrWhiteSpace(request.PackagePath))
@@ -244,7 +244,7 @@ namespace ExportDocManager.Api.Hosting
                 {
                     var read = await transferService.ReadPackageAsync(request.PackagePath, cancellationToken);
                     var preview = await transferService.PreviewAsync(read.Package, cancellationToken);
-                    if (!read.ChecksumValid && !request.AllowInvalidChecksum)
+                    if (!read.ChecksumValid)
                     {
                         return WriteConflict($"单据包校验失败：{read.ChecksumMessage}");
                     }
@@ -286,7 +286,6 @@ namespace ExportDocManager.Api.Hosting
                 string fileName,
                 string conflictAction,
                 string newInvoiceNo,
-                bool allowInvalidChecksum,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -307,7 +306,7 @@ namespace ExportDocManager.Api.Hosting
                     {
                         var read = await transferService.ReadPackageAsync(packagePath, cancellationToken);
                         var preview = await transferService.PreviewAsync(read.Package, cancellationToken);
-                        if (!read.ChecksumValid && !allowInvalidChecksum)
+                        if (!read.ChecksumValid)
                         {
                             return WriteConflict($"单据包校验失败：{read.ChecksumMessage}");
                         }

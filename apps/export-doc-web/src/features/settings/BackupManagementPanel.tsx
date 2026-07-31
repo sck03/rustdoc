@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, CloudDownload, CloudUpload, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, CloudDownload, CloudUpload, HardDrive, RefreshCw, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
 import type {
   ApiBackupCreateResponse,
   ApiBackupListResponse,
@@ -8,7 +8,15 @@ import type {
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
+import {
+  getRuntimeStorageContext,
+  isDesktopBridgeAvailable,
+  scheduleDataRootMigration,
+  selectDisasterRecoveryPackageFile,
+  type RuntimeStorageContext,
+} from "../../desktop/desktopBridge.ts";
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { NumberField, SelectField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
@@ -25,12 +33,44 @@ export default function BackupManagementPanel({
   onPathError: (message: string) => void;
 }) {
   const queryClient = useQueryClient();
+  const requestConfirmation = useConfirmation();
+  const desktopBridgeAvailable = isDesktopBridgeAvailable();
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [cleanupDays, setCleanupDays] = useState(30);
   const [restoreFileName, setRestoreFileName] = useState("");
   const [restoreConfirmation, setRestoreConfirmation] = useState("");
   const [cloudDownloadFileName, setCloudDownloadFileName] = useState("");
+  const [runtimeStorage, setRuntimeStorage] = useState<RuntimeStorageContext | null>(null);
+  const [dataRootMigrationPending, setDataRootMigrationPending] = useState(false);
+  const [recoveryPassword, setRecoveryPassword] = useState("");
+  const [recoveryPasswordConfirmation, setRecoveryPasswordConfirmation] = useState("");
+  const [recoveryPackagePath, setRecoveryPackagePath] = useState("");
+  const [recoveryRestorePassword, setRecoveryRestorePassword] = useState("");
+  const [recoveryRestoreConfirmation, setRecoveryRestoreConfirmation] = useState("");
+  const [lastRecoveryPackagePath, setLastRecoveryPackagePath] = useState("");
+
+  useEffect(() => {
+    if (!desktopBridgeAvailable) {
+      return;
+    }
+
+    let cancelled = false;
+    void getRuntimeStorageContext()
+      .then((context) => {
+        if (!cancelled) {
+          setRuntimeStorage(context);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setMessage(readDesktopError(error));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [desktopBridgeAvailable]);
 
   const backupQuery = useQuery({
     queryKey: queryKeys.backups(),
@@ -48,6 +88,12 @@ export default function BackupManagementPanel({
     queryKey: queryKeys.cloudBackupBackups(),
     queryFn: () => client.listCloudDatabaseBackups(),
     enabled: canManageSettings && Boolean(cloudStatusQuery.data?.enabled) && Boolean(cloudStatusQuery.data?.isConfigured),
+  });
+
+  const disasterRecoveryQuery = useQuery({
+    queryKey: queryKeys.disasterRecoveryStatus(),
+    queryFn: () => client.getDisasterRecoveryStatus(),
+    enabled: canManageSettings && desktopBridgeAvailable,
   });
 
   useEffect(() => {
@@ -88,6 +134,13 @@ export default function BackupManagementPanel({
       setSuccessMessage(null);
     }
   }, [cloudBackupsQuery.error, cloudBackupsQuery.isError]);
+
+  useEffect(() => {
+    if (disasterRecoveryQuery.isError) {
+      setMessage(readApiError(disasterRecoveryQuery.error));
+      setSuccessMessage(null);
+    }
+  }, [disasterRecoveryQuery.error, disasterRecoveryQuery.isError]);
 
   const createMutation = useMutation({
     mutationFn: () => client.createDatabaseBackup(),
@@ -173,19 +226,65 @@ export default function BackupManagementPanel({
     },
   });
 
+  const createRecoveryMutation = useMutation({
+    mutationFn: () =>
+      client.createDisasterRecoveryPackage({
+        body: { password: recoveryPassword },
+      }),
+    onSuccess: async (response) => {
+      setMessage(null);
+      setSuccessMessage(response.message || "持卡机灾难恢复包已创建。");
+      setLastRecoveryPackagePath(response.filePath);
+      setRecoveryPassword("");
+      setRecoveryPasswordConfirmation("");
+      await queryClient.invalidateQueries({ queryKey: queryKeys.disasterRecoveryStatus() });
+    },
+    onError: (error) => {
+      setMessage(readApiError(error));
+      setSuccessMessage(null);
+    },
+  });
+
+  const restoreRecoveryMutation = useMutation({
+    mutationFn: () =>
+      client.restoreDisasterRecoveryPackage({
+        body: {
+          packagePath: recoveryPackagePath,
+          password: recoveryRestorePassword,
+          confirmationText: recoveryRestoreConfirmation.trim(),
+        },
+      }),
+    onSuccess: async (response) => {
+      setMessage(null);
+      setSuccessMessage(response.message || "持卡机灾难恢复已排队，请立即重启程序。");
+      setRecoveryRestorePassword("");
+      setRecoveryRestoreConfirmation("");
+      await queryClient.invalidateQueries({ queryKey: queryKeys.disasterRecoveryStatus() });
+    },
+    onError: (error) => {
+      setMessage(readApiError(error));
+      setSuccessMessage(null);
+    },
+  });
+
   const backups = backupQuery.data?.backups ?? [];
   const cloudStatus = cloudStatusQuery.data ?? null;
   const cloudBackups = cloudBackupsQuery.data?.backups ?? [];
+  const disasterRecoveryStatus = disasterRecoveryQuery.data ?? null;
   const cloudBackupsEnabled = canManageSettings && Boolean(cloudStatus?.enabled) && Boolean(cloudStatus?.isConfigured);
   const isBusy =
     backupQuery.isFetching ||
     cloudStatusQuery.isFetching ||
     cloudBackupsQuery.isFetching ||
+    disasterRecoveryQuery.isFetching ||
     createMutation.isPending ||
     cleanupMutation.isPending ||
     uploadCloudMutation.isPending ||
     downloadCloudMutation.isPending ||
-    restoreMutation.isPending;
+    restoreMutation.isPending ||
+    createRecoveryMutation.isPending ||
+    restoreRecoveryMutation.isPending ||
+    dataRootMigrationPending;
   const canRestore = canManageSettings && Boolean(restoreFileName) && restoreConfirmation.trim() === "RESTORE" && !isBusy;
   const canUploadCloud =
     canManageSettings &&
@@ -194,14 +293,83 @@ export default function BackupManagementPanel({
     backups.length > 0 &&
     !isBusy;
   const canDownloadCloud = cloudBackupsEnabled && Boolean(cloudDownloadFileName) && cloudBackups.length > 0 && !isBusy;
+  const canCreateRecovery =
+    canManageSettings &&
+    Boolean(disasterRecoveryStatus?.supported) &&
+    !disasterRecoveryStatus?.pendingRestore &&
+    isStrongRecoveryPassword(recoveryPassword) &&
+    recoveryPassword === recoveryPasswordConfirmation &&
+    !isBusy;
+  const canRestoreRecovery =
+    canManageSettings &&
+    Boolean(disasterRecoveryStatus?.supported) &&
+    !disasterRecoveryStatus?.pendingRestore &&
+    Boolean(recoveryPackagePath) &&
+    isStrongRecoveryPassword(recoveryRestorePassword) &&
+    recoveryRestoreConfirmation.trim() === "RECOVER" &&
+    !isBusy;
 
   function refreshBackups() {
     setMessage(null);
     setSuccessMessage(null);
     void backupQuery.refetch();
     void cloudStatusQuery.refetch();
+    if (desktopBridgeAvailable) {
+      void disasterRecoveryQuery.refetch();
+    }
     if (cloudBackupsEnabled) {
       void cloudBackupsQuery.refetch();
+    }
+  }
+
+  async function chooseNewDataRoot() {
+    if (!runtimeStorage?.migrationSupported || dataRootMigrationPending) {
+      return;
+    }
+    if (!await requestConfirmation({
+      title: "更换运行数据目录",
+      description: "程序将在退出后迁移现有数据，并于下次启动使用新目录。",
+      details: [
+        "请选择一个空目录，并确保当前账号拥有完整读写权限。",
+        "迁移期间请勿关闭计算机或拔出目标磁盘。",
+      ],
+      confirmLabel: "继续选择目录",
+      tone: "warning",
+    })) {
+      return;
+    }
+
+    setDataRootMigrationPending(true);
+    setMessage(null);
+    setSuccessMessage(null);
+    try {
+      const result = await scheduleDataRootMigration();
+      if (!result) {
+        return;
+      }
+      setSuccessMessage(`${result.message} 新目录：${result.targetDataRoot}`);
+      const context = await getRuntimeStorageContext();
+      if (context) {
+        setRuntimeStorage(context);
+      }
+    } catch (error) {
+      setMessage(readDesktopError(error));
+    } finally {
+      setDataRootMigrationPending(false);
+    }
+  }
+
+  async function chooseRecoveryPackage() {
+    setMessage(null);
+    setSuccessMessage(null);
+    try {
+      const selected = await selectDisasterRecoveryPackageFile();
+      if (selected) {
+        setRecoveryPackagePath(selected);
+        setRecoveryRestoreConfirmation("");
+      }
+    } catch (error) {
+      setMessage(readDesktopError(error));
     }
   }
 
@@ -239,6 +407,18 @@ export default function BackupManagementPanel({
             <CloudUpload size={17} aria-hidden="true" />
             <span>上传最新备份</span>
           </button>
+          {runtimeStorage ? (
+            <button
+              className="command-button secondary"
+              type="button"
+              disabled={!canManageSettings || !runtimeStorage.migrationSupported || isBusy}
+              title={runtimeStorage.portable ? "便携版请通过复制完整程序目录迁移" : "选择新的空目录，重启后安全迁移"}
+              onClick={() => void chooseNewDataRoot()}
+            >
+              <HardDrive size={17} aria-hidden="true" />
+              <span>更换数据目录</span>
+            </button>
+          ) : null}
           <button
             className="command-button secondary"
             type="button"
@@ -257,6 +437,21 @@ export default function BackupManagementPanel({
       {message ? <InlineNotice tone="error" title="备份操作失败">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       <div className="detail-grid runtime-detail-grid">
+        {runtimeStorage ? (
+          <>
+            <div className="detail-item detail-item-wide">
+              <span>当前业务数据目录</span>
+              <div className="detail-value-row">
+                <strong title={runtimeStorage.dataRoot}>{runtimeStorage.dataRoot}</strong>
+                <div className="detail-item-actions">{renderOpenPathAction(runtimeStorage.dataRoot, "打开业务数据目录", onPathError)}</div>
+              </div>
+            </div>
+            <div className="detail-item detail-item-wide">
+              <span>存储模式</span>
+              <strong title={runtimeStorage.storagePolicy}>{runtimeStorage.portable ? "便携版 · 程序旁存储" : "安装版 · 独立目录"}</strong>
+            </div>
+          </>
+        ) : null}
         <div className="detail-item detail-item-wide">
           <span>备份目录</span>
           <div className="detail-value-row">
@@ -324,6 +519,127 @@ export default function BackupManagementPanel({
           <span>还原数据库</span>
         </button>
       </div>
+      {desktopBridgeAvailable ? (
+        <section className="backup-recovery-card" aria-label="持卡机灾难恢复">
+          <div className="section-header">
+            <div>
+              <h3>持卡机灾难恢复</h3>
+              <p className="section-description">独立加密包用于整机损坏或更换持卡机，不等同于普通数据库 ZIP 备份。</p>
+            </div>
+            <ShieldCheck size={22} aria-hidden="true" />
+          </div>
+          {disasterRecoveryStatus ? (
+            <InlineNotice
+              tone={disasterRecoveryStatus.pendingRestore ? "warning" : disasterRecoveryStatus.supported ? "info" : "warning"}
+              title={disasterRecoveryStatus.pendingRestore ? "恢复任务等待重启" : "恢复包边界"}
+            >
+              {disasterRecoveryStatus.message} 恢复包不携带许可证或机器绑定，恢复后必须按当前机器码重新激活。
+            </InlineNotice>
+          ) : null}
+          <div className="detail-grid runtime-detail-grid">
+            <div className="detail-item detail-item-wide">
+              <span>恢复包目录</span>
+              <div className="detail-value-row">
+                <strong title={disasterRecoveryStatus?.recoveryRoot || "-"}>{disasterRecoveryStatus?.recoveryRoot || "-"}</strong>
+                <div className="detail-item-actions">
+                  {renderOpenPathAction(disasterRecoveryStatus?.recoveryRoot, "打开恢复包目录", onPathError)}
+                </div>
+              </div>
+            </div>
+            {lastRecoveryPackagePath ? (
+              <div className="detail-item detail-item-wide">
+                <span>本次生成</span>
+                <div className="detail-value-row">
+                  <strong title={lastRecoveryPackagePath}>{lastRecoveryPackagePath}</strong>
+                  <div className="detail-item-actions">{renderOpenPathAction(lastRecoveryPackagePath, "打开恢复包", onPathError)}</div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className="backup-action-grid">
+            <label>
+              <span>新恢复包密码</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={recoveryPassword}
+                disabled={!canManageSettings || isBusy || !disasterRecoveryStatus?.supported}
+                placeholder="至少 12 位，含大小写、数字和符号"
+                onChange={(event) => setRecoveryPassword(event.target.value)}
+              />
+            </label>
+            <label>
+              <span>再次输入密码</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={recoveryPasswordConfirmation}
+                disabled={!canManageSettings || isBusy || !disasterRecoveryStatus?.supported}
+                onChange={(event) => setRecoveryPasswordConfirmation(event.target.value)}
+              />
+            </label>
+            <button
+              className="command-button"
+              type="button"
+              disabled={!canCreateRecovery}
+              onClick={() => {
+                setMessage(null);
+                setSuccessMessage(null);
+                createRecoveryMutation.mutate();
+              }}
+            >
+              <ShieldCheck size={17} aria-hidden="true" />
+              <span>创建加密恢复包</span>
+            </button>
+          </div>
+          <div className="backup-action-grid">
+            <label>
+              <span>待恢复文件</span>
+              <input value={recoveryPackagePath} readOnly placeholder="请选择 .edmrecovery 文件" />
+            </label>
+            <button
+              className="command-button secondary"
+              type="button"
+              disabled={!canManageSettings || isBusy || !disasterRecoveryStatus?.supported}
+              onClick={() => void chooseRecoveryPackage()}
+            >
+              选择恢复包
+            </button>
+            <label>
+              <span>恢复包密码</span>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={recoveryRestorePassword}
+                disabled={!canManageSettings || isBusy || !recoveryPackagePath}
+                onChange={(event) => setRecoveryRestorePassword(event.target.value)}
+              />
+            </label>
+            <label>
+              <span>确认文本</span>
+              <input
+                value={recoveryRestoreConfirmation}
+                disabled={!canManageSettings || isBusy || !recoveryPackagePath}
+                placeholder="RECOVER"
+                onChange={(event) => setRecoveryRestoreConfirmation(event.target.value)}
+              />
+            </label>
+            <button
+              className="command-button danger-command"
+              type="button"
+              disabled={!canRestoreRecovery}
+              onClick={() => {
+                setMessage(null);
+                setSuccessMessage(null);
+                restoreRecoveryMutation.mutate();
+              }}
+            >
+              <RotateCcw size={17} aria-hidden="true" />
+              <span>安排灾难恢复</span>
+            </button>
+          </div>
+        </section>
+      ) : null}
       <ResponsiveTableFrame className="backup-table-frame" label="数据库备份列表">
         <table className="backup-table" aria-label="数据库备份列表">
           <thead>
@@ -363,6 +679,25 @@ export default function BackupManagementPanel({
       </ResponsiveTableFrame>
     </section>
   );
+}
+
+function readDesktopError(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  return "桌面运行目录操作失败。";
+}
+
+function isStrongRecoveryPassword(value: string) {
+  return value.length >= 12 &&
+    value.length <= 128 &&
+    /[A-Z]/.test(value) &&
+    /[a-z]/.test(value) &&
+    /\d/.test(value) &&
+    /[^A-Za-z0-9]/.test(value);
 }
 
 function CloudBackupStatusDetail({ status }: { status: ApiCloudBackupStatusResponse | null }) {

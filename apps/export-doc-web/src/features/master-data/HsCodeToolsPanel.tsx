@@ -12,6 +12,7 @@ readApiError
 } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import { useModalDialog } from "../../ui/useModalDialog.ts";
 
 
 import {
@@ -206,6 +207,10 @@ export function HsCodeToolsPanel({
     fetchDetailMutation.isPending ||
     saveRemoteMutation.isPending ||
     clearAllMutation.isPending;
+  const workspaceDialogRef = useModalDialog<HTMLElement>(closeWorkspace, {
+    active: mode === "hub" && workspace !== "none",
+    canClose: !isBusy,
+  });
   const canClearAllLocalHsCodes = !isBusy && clearAllConfirmation.trim() === hsCodeClearAllConfirmationText;
   const remoteResultStatus = remoteResults.length > 0
     ? `${remoteResults.length} 条联网结果`
@@ -368,7 +373,7 @@ export function HsCodeToolsPanel({
 
       {workspace !== "none" ? (
         <div className={mode === "hub" ? "hs-code-workspace-backdrop" : "hs-code-inline-workspace"} role="presentation">
-          <section className="hs-code-workspace" role={mode === "hub" ? "dialog" : "region"} aria-modal={mode === "hub" ? true : undefined} aria-label={workspace === "import" ? "HS编码智能导入" : "HS编码联网查询"}>
+          <section ref={mode === "hub" ? workspaceDialogRef : undefined} className="hs-code-workspace" role={mode === "hub" ? "dialog" : "region"} aria-modal={mode === "hub" ? true : undefined} aria-label={workspace === "import" ? "HS编码智能导入" : "HS编码联网查询"}>
             <header>
               <div>
                 <strong>{workspace === "import" ? "智能导入向导" : "联网查询"}</strong>

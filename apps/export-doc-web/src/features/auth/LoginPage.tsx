@@ -1,6 +1,5 @@
 import type { FormEventHandler } from "react";
 import { ArrowRight, FileText, LockKeyhole, LogIn, Server, ShieldCheck, UserRound } from "lucide-react";
-import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import type { ProductEditionPresentation } from "../../app/productEdition.ts";
 
 type LoginPageProps = {
@@ -55,7 +54,7 @@ export function LoginPage({
           <p>{product.loginTagline}</p>
         </section>
 
-        <form className="login-card" onSubmit={onSubmit} onKeyDownCapture={handleEnterAsTabFormKeyDown}>
+        <form className="login-card" onSubmit={onSubmit}>
           <div className="login-card-header">
             <div>
               <p className="login-kicker">工作区</p>
@@ -117,22 +116,22 @@ export function LoginPage({
               </label>
               <small>通常无需修改；仅在管理员要求切换业务服务器时填写。</small>
               <label className="login-field">
-                <span>首次启用口令</span>
+                <span>管理员初始化口令</span>
                 <span className="login-input-shell">
                   <ShieldCheck size={17} aria-hidden="true" />
                   <input
-                    aria-label="首次启用口令"
+                    aria-label="管理员初始化口令"
                     value={bootstrapToken}
                     onChange={(event) => onBootstrapTokenChange(event.target.value)}
                     type="password"
                     autoComplete="off"
                     maxLength={512}
-                    placeholder="仅首次启用系统时填写"
+                    placeholder="仅首次建立管理员账号时填写"
                     spellCheck={false}
                   />
                 </span>
               </label>
-              <small>由系统部署人员提供，仅首次建立管理员账号时使用；登录成功后会立即清除。</small>
+              <small>由系统管理员或软件服务商提供，仅首次建立管理员账号时使用。</small>
             </details>
           ) : null}
         </form>

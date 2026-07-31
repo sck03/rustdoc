@@ -455,7 +455,9 @@ export function ExcelToolsPanel({
                 accept=".xlsx,.xlsm,.xltx,.xltm,.xls"
                 disabled={isBusy}
                 onChange={(event) => {
-                  setConvertUploadFile(event.target.files?.[0] ?? null);
+                  const file = event.currentTarget.files?.[0] ?? null;
+                  event.currentTarget.value = "";
+                  setConvertUploadFile(file);
                   setMessage(null);
                 }}
               />

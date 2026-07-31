@@ -16,6 +16,7 @@ namespace ExportDocManager.Services.Infrastructure
 {
     public class WebDavCloudSyncService : ICloudSyncService
     {
+        public const long MaximumDownloadBytes = 4L * 1024L * 1024L * 1024L;
         private readonly ISettingsService _settingsService;
         private readonly ILogger<WebDavCloudSyncService> _logger;
 
@@ -92,6 +93,11 @@ namespace ExportDocManager.Services.Infrastructure
                 throw new HttpRequestException($"Download failed: {response.StatusCode} - {error}");
             }
 
+            if (response.Content.Headers.ContentLength is > MaximumDownloadBytes)
+            {
+                throw new PayloadLimitExceededException(MaximumDownloadBytes);
+            }
+
             await AtomicFileHelper.WriteFileAtomicAsync(
                 localFilePath,
                 async (tempPath, cancellationToken) =>
@@ -104,7 +110,11 @@ namespace ExportDocManager.Services.Infrastructure
                         FileShare.None,
                         81920,
                         FileOptions.Asynchronous | FileOptions.SequentialScan);
-                    await sourceStream.CopyToAsync(targetStream, cancellationToken);
+                    await BoundedStreamHelper.CopyToAsync(
+                        sourceStream,
+                        targetStream,
+                        MaximumDownloadBytes,
+                        cancellationToken);
                 });
 
             _logger.LogInformation("Successfully downloaded {RemoteFileName} from WebDAV to {LocalFilePath}", normalizedRemoteFileName, localFilePath);
@@ -113,9 +123,9 @@ namespace ExportDocManager.Services.Infrastructure
         public async Task<bool> TestConnectionAsync(WebDavSettings settings)
         {
             settings ??= new WebDavSettings();
-            string baseUrl = NormalizeBaseUrl(settings.Url);
+            bool urlValid = WebDavEndpointPolicy.TryNormalize(settings.Url, out string baseUrl, out _);
             string userName = settings.UserName?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(userName))
+            if (!urlValid || string.IsNullOrWhiteSpace(userName))
                 return false;
 
             Uri url;
@@ -152,19 +162,15 @@ namespace ExportDocManager.Services.Infrastructure
             }
         }
 
-        private static string NormalizeBaseUrl(string url)
-        {
-            return string.IsNullOrWhiteSpace(url)
-                ? string.Empty
-                : url.Trim().TrimEnd('/');
-        }
-
         private static string NormalizeConfiguredBaseUrl(WebDavSettings config, out string userName)
         {
             config ??= new WebDavSettings();
-            string baseUrl = NormalizeBaseUrl(config.Url);
+            if (!WebDavEndpointPolicy.TryNormalize(config.Url, out string baseUrl, out string errorMessage))
+            {
+                throw new InvalidOperationException(errorMessage);
+            }
             userName = config.UserName?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(userName))
+            if (string.IsNullOrWhiteSpace(userName))
                 throw new InvalidOperationException("WebDAV settings are not configured.");
 
             return baseUrl;

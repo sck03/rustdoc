@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "外贸业务综合管理系统（全功能版）",
   "version": "0.1.1",
-  "identifier": "com.exportdocmanager.desktop",
+  "identifier": "com.exportdocmanager.desktop.full",
   "build": {
     "beforeDevCommand": "npm --prefix ../export-doc-web run dev",
     "beforeBuildCommand": "npm run prepare:bundle",

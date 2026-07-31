@@ -104,6 +104,35 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("CurrentUser");
 
+            endpoints.MapPost("/api/auth/renew", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                ApiAuthorizationService authorizationService) =>
+            {
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                string currentToken = ApiCurrentUserContext.GetBearerToken(context);
+                if (user == null || string.IsNullOrWhiteSpace(currentToken))
+                {
+                    return Results.Unauthorized();
+                }
+
+                var renewed = await tokenService.IssueAsync(
+                    user,
+                    cancellationToken: context.RequestAborted);
+                if (!await tokenService.RevokeAsync(currentToken, context.RequestAborted))
+                {
+                    await tokenService.RevokeAsync(renewed.AccessToken, context.RequestAborted);
+                    return Results.Unauthorized();
+                }
+
+                return Results.Ok(new ApiLoginResponse(
+                    "Bearer",
+                    renewed.AccessToken,
+                    renewed.ExpiresAt,
+                    ApiUserDtoFactory.FromUser(user, authorizationService)));
+            })
+            .WithName("RenewSession");
+
             endpoints.MapPost("/api/auth/logout", async (HttpContext context, IApiSessionTokenService tokenService) =>
             {
                 bool revoked = await tokenService.RevokeAsync(

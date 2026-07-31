@@ -1317,8 +1317,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 QueryParameter("fileName", "string", null, "Uploaded .edpkg file name."),
                                 QueryParameter("conflictAction", "string", null, "Skip, Overwrite, NewInvoiceNo, or AppendItems."),
-                                QueryParameter("newInvoiceNo", "string", null, "Optional replacement invoice number."),
-                                QueryParameter("allowInvalidChecksum", "boolean", null, "Whether checksum failure is accepted.")
+                                QueryParameter("newInvoiceNo", "string", null, "Optional replacement invoice number.")
                             },
                             requestBody = new { required = true, content = BinaryContent() },
                             responses = new Dictionary<string, object>

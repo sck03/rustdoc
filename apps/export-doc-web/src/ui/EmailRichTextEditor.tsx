@@ -39,8 +39,16 @@ export function EmailRichTextEditor({
 
   function runCommand(command: string, commandValue?: string) {
     if (disabled) return;
-    editorRef.current?.focus();
-    document.execCommand(command, false, commandValue);
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    if (command === "bold") wrapCurrentSelection(editor, "strong");
+    else if (command === "italic") wrapCurrentSelection(editor, "em");
+    else if (command === "underline") wrapCurrentSelection(editor, "u");
+    else if (command === "insertUnorderedList") replaceSelectionWithList(editor, "ul");
+    else if (command === "insertOrderedList") replaceSelectionWithList(editor, "ol");
+    else if (command === "removeFormat") replaceSelectionWithPlainText(editor);
+    else if (commandValue) insertHtmlAtSelection(editor, commandValue);
     emitEditorValue();
   }
 
@@ -52,7 +60,10 @@ export function EmailRichTextEditor({
     const insertHtml = richContent
       ? sanitizeEmailHtml(richContent)
       : escapeHtml(plainContent).replace(/\r?\n/g, "<br>");
-    document.execCommand("insertHTML", false, insertHtml);
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    insertHtmlAtSelection(editor, insertHtml);
     emitEditorValue();
   }
 
@@ -67,8 +78,15 @@ export function EmailRichTextEditor({
       selection.removeAllRanges();
       selection.addRange(savedSelectionRef.current);
     }
-    if (selection && !selection.isCollapsed) document.execCommand("createLink", false, href);
-    else document.execCommand("insertHTML", false, `<a href="${escapeHtml(href)}">${escapeHtml(href)}</a>`);
+    const range = getEditorRange(editor);
+    if (range && !range.collapsed) {
+      const link = document.createElement("a");
+      link.href = href;
+      surroundRange(range, link);
+      moveCaretAfter(link);
+    } else {
+      insertHtmlAtSelection(editor, `<a href="${escapeHtml(href)}">${escapeHtml(href)}</a>`);
+    }
     emitEditorValue();
     savedSelectionRef.current = null;
     setLinkUrl("");
@@ -219,6 +237,93 @@ function isAllowedEmailHref(href: string) {
 
 function escapeHtml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function getEditorRange(editor: HTMLElement) {
+  const selection = window.getSelection();
+  if (selection?.rangeCount) {
+    const range = selection.getRangeAt(0);
+    if (editor.contains(range.commonAncestorContainer)) {
+      return range;
+    }
+  }
+
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  range.collapse(false);
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  return range;
+}
+
+function wrapCurrentSelection(editor: HTMLElement, tagName: "strong" | "em" | "u") {
+  const range = getEditorRange(editor);
+  if (!range || range.collapsed) return;
+  const wrapper = document.createElement(tagName);
+  surroundRange(range, wrapper);
+  moveCaretAfter(wrapper);
+}
+
+function surroundRange(range: Range, wrapper: HTMLElement) {
+  const contents = range.extractContents();
+  wrapper.appendChild(contents);
+  range.insertNode(wrapper);
+}
+
+function replaceSelectionWithList(editor: HTMLElement, tagName: "ul" | "ol") {
+  const range = getEditorRange(editor);
+  if (!range) return;
+  const list = document.createElement(tagName);
+  const lines = range.toString().split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  for (const line of lines.length > 0 ? lines : [""]) {
+    const item = document.createElement("li");
+    if (line) item.textContent = line;
+    else item.appendChild(document.createElement("br"));
+    list.appendChild(item);
+  }
+  range.deleteContents();
+  range.insertNode(list);
+  const firstItem = list.firstElementChild;
+  if (firstItem) moveCaretInside(firstItem);
+}
+
+function replaceSelectionWithPlainText(editor: HTMLElement) {
+  const range = getEditorRange(editor);
+  if (!range || range.collapsed) return;
+  const text = document.createTextNode(range.toString());
+  range.deleteContents();
+  range.insertNode(text);
+  moveCaretAfter(text);
+}
+
+function insertHtmlAtSelection(editor: HTMLElement, html: string) {
+  const range = getEditorRange(editor);
+  if (!range) return;
+  const fragment = range.createContextualFragment(html);
+  const lastNode = fragment.lastChild;
+  range.deleteContents();
+  range.insertNode(fragment);
+  if (lastNode) moveCaretAfter(lastNode);
+}
+
+function moveCaretAfter(node: Node) {
+  const range = document.createRange();
+  range.setStartAfter(node);
+  range.collapse(true);
+  setSelectionRange(range);
+}
+
+function moveCaretInside(node: Node) {
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  range.collapse(false);
+  setSelectionRange(range);
+}
+
+function setSelectionRange(range: Range) {
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
 }
 
 const allowedEmailElements = new Set([

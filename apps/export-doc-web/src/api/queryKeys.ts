@@ -52,6 +52,7 @@ export const queryKeys = {
   excelToolBookingInvoices: (pageSize: number) => ["tools", "excel", "booking-invoices", { pageSize }] as const,
   cloudBackupStatus: () => ["backups", "cloud", "status"] as const,
   cloudBackupBackups: () => ["backups", "cloud", "backups"] as const,
+  disasterRecoveryStatus: () => ["backups", "disaster-recovery", "status"] as const,
   postgreSqlMaintenanceBackups: () => ["postgresql-maintenance", "backups"] as const,
   sharedDatabaseOwnership: () => ["shared-database", "ownership"] as const,
   masterDataList: (entityKey: string, pageNumber: number, pageSize: number, keyword: string) =>

@@ -4,6 +4,7 @@ description = "Allow the main desktop window to call ExportDocManager Tauri brid
 commands.allow = [
   "select_single_window_package_file",
   "select_invoice_transfer_package_file",
+  "select_disaster_recovery_package_file",
   "select_receipt_file",
   "select_receipt_files",
   "select_pdf_files",
@@ -24,6 +25,8 @@ commands.allow = [
   "select_save_zip_path",
   "select_save_excel_path",
   "open_path",
+  "get_runtime_storage_context",
+  "schedule_data_root_migration",
   "log_frontend_error",
   "request_app_exit",
   "check_tauri_update",

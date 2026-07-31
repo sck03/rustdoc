@@ -96,6 +96,11 @@ namespace ExportDocManager.Services.MasterData
             var product = await context.Products.FindAsync(id);
             if (product == null) return false;
 
+            if (await context.SupplierProductLinks.AsNoTracking().AnyAsync(link => link.ProductId == id))
+            {
+                throw new InvalidOperationException("该商品仍有关联的供应商供货资料，请先解除供应商供货关联后再删除。");
+            }
+
             context.Products.Remove(product);
             await context.SaveChangesAsync();
             return true;

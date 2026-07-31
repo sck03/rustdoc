@@ -38,7 +38,7 @@ export function CrmCustomerImportPanel({ client, canOperate, onImported }: {
   return <section className="form-section">
     <div className="section-header"><h3>客户文件导入</h3><span>CSV / XLSX，最多 5000 行、10 MB</span></div>
     <div className="form-actions">
-      <label className={`secondary-button${canOperate ? "" : " disabled"}`}>选择文件<input type="file" hidden disabled={!canOperate} accept=".csv,.xlsx,.xlsm" onChange={(event) => void selectFile(event.target.files?.[0])} /></label>
+      <label className={`secondary-button${canOperate ? "" : " disabled"}`}>选择文件<input type="file" hidden disabled={!canOperate} accept=".csv,.xlsx,.xlsm" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; void selectFile(file); }} /></label>
       <button className="primary-button" type="button" disabled={!canOperate || busy || !preview?.validRows} onClick={() => void confirmImport()}>{busy ? "处理中..." : "确认导入有效行"}</button>
     </div>
     <OperationFeedback feedback={feedback} />

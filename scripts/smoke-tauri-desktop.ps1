@@ -253,6 +253,10 @@ function Start-LoggedProcess {
     $startInfo.WorkingDirectory = $WorkingDirectory
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.StandardOutputEncoding = $scriptUtf8Encoding
+    $startInfo.StandardErrorEncoding = $scriptUtf8Encoding
 
     foreach ($key in $Environment.Keys) {
         $startInfo.Environment[$key] = [string]$Environment[$key]
@@ -267,33 +271,86 @@ function Start-LoggedProcess {
     }
 
     $displayArguments = if ($ArgumentList.Count -gt 0) { $ArgumentList -join " " } else { $Arguments }
-    Add-Content -LiteralPath $StdoutPath -Value "Started $FileName $displayArguments at $(Get-Date -Format o)"
-    Add-Content -LiteralPath $StderrPath -Value "Started $FileName $displayArguments at $(Get-Date -Format o)"
+    $startedLine = "Started $FileName $displayArguments at $(Get-Date -Format o)$([Environment]::NewLine)"
+    [System.IO.File]::WriteAllText($StdoutPath, $startedLine, $scriptUtf8Encoding)
+    [System.IO.File]::WriteAllText($StderrPath, $startedLine, $scriptUtf8Encoding)
+    $process | Add-Member -NotePropertyName SmokeStdoutPath -NotePropertyValue $StdoutPath
+    $process | Add-Member -NotePropertyName SmokeStderrPath -NotePropertyValue $StderrPath
+    $process | Add-Member -NotePropertyName SmokeStdoutTask -NotePropertyValue $process.StandardOutput.ReadToEndAsync()
+    $process | Add-Member -NotePropertyName SmokeStderrTask -NotePropertyValue $process.StandardError.ReadToEndAsync()
 
     return $process
+}
+
+function Complete-LoggedProcess {
+    param([AllowNull()][System.Diagnostics.Process]$Process)
+
+    if ($null -eq $Process) {
+        return
+    }
+
+    foreach ($stream in @(
+        @{ Task = "SmokeStdoutTask"; Path = "SmokeStdoutPath" },
+        @{ Task = "SmokeStderrTask"; Path = "SmokeStderrPath" }
+    )) {
+        $taskProperty = $Process.PSObject.Properties[$stream.Task]
+        $pathProperty = $Process.PSObject.Properties[$stream.Path]
+        if ($null -eq $taskProperty -or $null -eq $pathProperty) {
+            continue
+        }
+
+        try {
+            $captureTask = $taskProperty.Value
+            if (-not $captureTask.Wait(3000)) {
+                [System.IO.File]::AppendAllText(
+                    [string]$pathProperty.Value,
+                    "Log capture stopped after a 3-second drain timeout because a descendant process retained the redirected stream.$([Environment]::NewLine)",
+                    $scriptUtf8Encoding)
+                continue
+            }
+
+            $content = $captureTask.GetAwaiter().GetResult()
+            if (-not [string]::IsNullOrEmpty($content)) {
+                [System.IO.File]::AppendAllText(
+                    [string]$pathProperty.Value,
+                    $content,
+                    $scriptUtf8Encoding)
+            }
+        } catch {
+        }
+    }
+
+    try {
+        $Process.Dispose()
+    } catch {
+    }
 }
 
 function Stop-StartedProcess {
     param([AllowNull()][System.Diagnostics.Process]$Process)
 
-    if ($null -eq $Process -or $Process.HasExited) {
+    if ($null -eq $Process) {
         return
     }
 
-    try {
-        if ($Process.CloseMainWindow()) {
-            if ($Process.WaitForExit(5000)) {
-                return
+    if (-not $Process.HasExited) {
+        try {
+            if ($Process.CloseMainWindow()) {
+                $null = $Process.WaitForExit(5000)
             }
+        } catch {
         }
-    } catch {
     }
 
-    try {
-        $null = $Process.Kill($true)
-        $null = $Process.WaitForExit(5000)
-    } catch {
+    if (-not $Process.HasExited) {
+        try {
+            $null = $Process.Kill($true)
+            $null = $Process.WaitForExit(5000)
+        } catch {
+        }
     }
+
+    Complete-LoggedProcess -Process $Process
 }
 
 function Invoke-WebProductionBuild {
@@ -984,7 +1041,7 @@ if ([string]::IsNullOrWhiteSpace($DataRoot)) {
     } elseif ($VerifySingleWindowOperationCenter) {
         Join-Path $resolvedAppRoot ("App_Data\SingleWindowSmoke-{0:yyyyMMdd-HHmmss}-{1}" -f (Get-Date), $PID)
     } else {
-        Join-Path $resolvedAppRoot "App_Data\Smoke"
+        Join-Path $resolvedAppRoot ("App_Data\Smoke-{0:yyyyMMdd-HHmmss}-{1}" -f (Get-Date), $PID)
     }
 }
 
@@ -1007,7 +1064,6 @@ $tauriStdout = Join-Path $logRoot "tauri-smoke-shell.stdout.log"
 $tauriStderr = Join-Path $logRoot "tauri-smoke-shell.stderr.log"
 $sidecarStdout = Join-Path $logRoot "api-sidecar.stdout.log"
 
-$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 $vite = $null
 $tauri = $null
 $desktopAccessToken = [Convert]::ToHexString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLowerInvariant()
@@ -1051,7 +1107,7 @@ try {
             -WorkingDirectory $repoRoot `
             -StdoutPath $viteStdout `
             -StderrPath $viteStderr
-        Wait-TcpPort -Port 5173 -Deadline $deadline
+        Wait-TcpPort -Port 5173 -Deadline ((Get-Date).AddSeconds($TimeoutSeconds))
     }
 
     $tauriArgumentList = @()
@@ -1070,6 +1126,7 @@ try {
         $tauriEnvironment["EXPORTDOCMANAGER_RUNTIME_CONFIG_ROOT"] = $runtimeConfigRoot
     }
 
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     $tauri = Start-LoggedProcess `
         -FileName $tauriExe `
         -ArgumentList $tauriArgumentList `

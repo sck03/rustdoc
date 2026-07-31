@@ -115,9 +115,9 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
           ? <RefreshCw size={20} aria-hidden="true" />
           : isDesktopStation ? <HardDrive size={20} aria-hidden="true" /> : <Server size={20} aria-hidden="true" />}
         <div>
-          <strong>{isDesktopStationResolving ? "正在识别桌面运行模式" : isDesktopStation ? "持卡机本地模式" : "办公室归档模式"}</strong>
+          <strong>{isDesktopStationResolving ? "正在确认当前设备" : isDesktopStation ? "持卡机本地模式" : "办公室归档模式"}</strong>
           <span>{isDesktopStationResolving
-            ? "正在核对 Windows 桌面能力和 SQLite 单机数据库，确认前不会显示持卡机或办公室专属操作。"
+            ? "正在确认当前设备可用的操作功能。"
             : isDesktopStation
               ? "选择当前公司与操作卡档案，导入对应待办包，把申报文件送入官方客户端交接目录，再由操作员确认导入和提交。"
               : "生成业务提交包并导入持卡机返回的回执包；办公室端不显示持卡机本地目录。"}</span>
@@ -126,7 +126,7 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
 
       {isUnsupportedDesktopStation ? (
         <InlineNotice tone="warning" title="当前桌面环境不能作为持卡机">
-          持卡机操作要求 Windows 桌面版和 SQLite 单机数据库。当前环境仍可作为办公室端制作或归档交接包，但不会显示实体卡和官方客户端目录操作。
+          当前设备不支持持卡机操作，仍可制作或归档交接包；实体卡和官方客户端目录相关操作已隐藏。
         </InlineNotice>
       ) : null}
 
@@ -252,7 +252,7 @@ function OfficeReceiptPackageImportPanel({ client, canOperate }: { client: Expor
         <div><h2>导入持卡机回执包</h2><span>只接受能精确绑定原提交批次、公司抬头和原包摘要的 .swpkg</span></div>
         <button className="command-button" type="button" disabled={!canOperate || mutation.isPending || !file} onClick={() => mutation.mutate()}><Upload size={17} aria-hidden="true" /><span>导入回执包</span></button>
       </div>
-      <label className="form-field"><span className="form-field-label"><span>回执包文件</span></span><input type="file" accept=".swpkg" disabled={!canOperate || mutation.isPending} onChange={(event) => { setFile(event.target.files?.[0] ?? null); setMessage(null); }} /></label>
+      <label className="form-field"><span className="form-field-label"><span>回执包文件</span></span><input type="file" accept=".swpkg" disabled={!canOperate || mutation.isPending} onChange={(event) => { const nextFile = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; setFile(nextFile); setMessage(null); }} /></label>
       {message ? <InlineNotice tone={mutation.isError ? "error" : "success"}>{message}</InlineNotice> : null}
     </section>
   );

@@ -141,6 +141,10 @@ jobs:
         shell: pwsh
         run: cargo build --manifest-path tools/excel-analyzer-rs/Cargo.toml --release --locked --target ${{ inputs.rust_target }}
 
+      - name: Generate audited third-party notices and SBOM
+        shell: pwsh
+        run: node scripts/generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository
+
       - name: Assemble browser server package
         shell: pwsh
         run: |
@@ -166,6 +170,16 @@ jobs:
           $analyzerName = if ('${{ inputs.platform }}' -eq 'windows') { 'exportdoc-excel-analyzer.exe' } else { 'exportdoc-excel-analyzer' }
           Copy-Item -LiteralPath (Join-Path $env:CARGO_TARGET_DIR "${{ inputs.rust_target }}/release/$analyzerName") -Destination (Join-Path $toolsRoot $analyzerName) -Force
           Copy-Item -LiteralPath "tools/excel-analyzer-rs/THIRD_PARTY_NOTICES.md" -Destination (Join-Path $toolsRoot "EXCEL_ANALYZER_NOTICES.md") -Force
+          $legalRoot = Join-Path $packageRoot "Legal"
+          New-Item -ItemType Directory -Path $legalRoot -Force | Out-Null
+          foreach ($legalFile in @(
+            "THIRD_PARTY_NOTICES.md",
+            "THIRD_PARTY_DEPENDENCIES.md",
+            "exportdocmanager.spdx.json",
+            "exportdocmanager.cyclonedx.json"
+          )) {
+            Copy-Item -LiteralPath (Join-Path "artifacts/dependency-governance" $legalFile) -Destination (Join-Path $legalRoot $legalFile) -Force
+          }
 
           $browser = Get-ChildItem -LiteralPath (Join-Path $packageRoot "Browsers") -File -Recurse |
             Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome-headless-shell", "chrome") } |
@@ -263,9 +277,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "v${{ steps.version.outputs.value }}"
+          $tag = "exportdocmanager-server-v${{ steps.version.outputs.value }}"
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --title "ExportDocManager ${{ steps.version.outputs.value }}" --notes "testing"
+            gh release create $tag --title "ExportDocManager Server ${{ steps.version.outputs.value }}" --notes "ExportDocManager 浏览器团队版服务器交付包。"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-          gh release upload $tag "${{ steps.archive.outputs.path }}" --clobber
+          $assetName = Split-Path -Leaf "${{ steps.archive.outputs.path }}"
+          $existing = @(gh release view $tag --json assets --jq '.assets[].name')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($existing -contains $assetName) {
+            throw "不可覆盖的服务器 Release 已包含资产 $assetName；请显式删除错误 Release 后重发。"
+          }
+          gh release upload $tag "${{ steps.archive.outputs.path }}"

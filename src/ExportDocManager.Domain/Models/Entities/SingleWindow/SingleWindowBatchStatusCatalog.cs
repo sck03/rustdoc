@@ -7,6 +7,8 @@ namespace ExportDocManager.Models.Entities
         public const string Preparing = "Preparing";
         public const string SubmitPackageExported = "SubmitPackageExported";
         public const string SubmitPackageImported = "SubmitPackageImported";
+        public const string ClientDispatching = "ClientDispatching";
+        public const string ClientDispatchFailed = "ClientDispatchFailed";
         public const string ReceiptPackageExported = "ReceiptPackageExported";
         public const string ReceiptImported = "ReceiptImported";
         public const string QueuedToClient = "QueuedToClient";
@@ -23,6 +25,8 @@ namespace ExportDocManager.Models.Entities
                 [Preparing] = "正在生成提交包",
                 [SubmitPackageExported] = "已导出提交包",
                 [SubmitPackageImported] = "已导入提交包",
+                [ClientDispatching] = "正在送入客户端",
+                [ClientDispatchFailed] = "客户端派发失败",
                 [ReceiptPackageExported] = "已导出回执包",
                 [ReceiptImported] = "已导入回执包",
                 [QueuedToClient] = "已送入导入目录",

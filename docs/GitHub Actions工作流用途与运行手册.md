@@ -1,10 +1,10 @@
 # GitHub Actions 工作流用途与运行手册
 
-> 更新日期：2026-07-27
+> 更新日期：2026-07-30
 > 适用仓库：`sck03/rustdoc`
 > 工作流目录：[`../.github/workflows`](../.github/workflows)
 
-本文是仓库当前 14 个 GitHub Actions 工作流的入口说明。它回答三个问题：每个工作流验证或发布什么、什么时候会运行、失败后应该从哪里排查。工作流只负责一次性的代码门禁、构建、Artifact、GHCR 镜像和 GitHub Release，不是 PostgreSQL/API 的长期运行服务器，也不能替代目标公司服务器上的备份、权限、并发和真机验收。
+本文是仓库当前 15 个 GitHub Actions 工作流的入口说明。它回答三个问题：每个工作流验证或发布什么、什么时候会运行、失败后应该从哪里排查。工作流只负责一次性的代码门禁、构建、Artifact、GHCR 镜像和 GitHub Release，不是 PostgreSQL/API 的长期运行服务器，也不能替代目标公司服务器上的备份、权限、并发和真机验收。
 
 ## 1. 总体分类与建议顺序
 
@@ -12,6 +12,7 @@
 | --- | --- | --- | --- |
 | 公开源码与供应链门禁 | [`public-source-guard.yml`](../.github/workflows/public-source-guard.yml)、[`dependency-governance.yml`](../.github/workflows/dependency-governance.yml) | 手工；依赖治理另有每周定时和依赖文件变更触发 | 阻止私有密钥/大文件进入公开仓库，审计 npm/NuGet/Cargo，生成 SBOM |
 | 前端、字体与报表 | [`cross-platform-typography.yml`](../.github/workflows/cross-platform-typography.yml) | `main` 相关路径 push、PR、手工 | Windows/macOS/Linux 字体、缩放、浏览器会话和 PDF 分页证据 |
+| Firefox/WebKit 多端验收 | [`browser-compatibility.yml`](../.github/workflows/browser-compatibility.yml) | Web/API 相关路径 push、PR、手工 | 真实 Firefox/WebKit 桌面与手机视口、axe 严重问题、横向溢出、页面异常和 HTTP 500 |
 | 原生多平台契约 | [`cross-platform-validation.yml`](../.github/workflows/cross-platform-validation.yml) | 手工 | Windows/Linux/macOS 的 x64/ARM64 编译、Tauri/Rust 合同 |
 | 真实共享数据库 | [`postgresql-integration-validation.yml`](../.github/workflows/postgresql-integration-validation.yml) | `main` 相关路径 push、PR、手工 | PostgreSQL 18 初始化、索引、容量、并发、岗位权限和 SQL 安全 |
 | 容器运行时 | [`container-runtime-validation.yml`](../.github/workflows/container-runtime-validation.yml) | `main` 相关路径 push、PR、手工 | HTTP/HTTPS Compose、镜像、探针、volume 持久化和备份恢复 |
@@ -190,9 +191,19 @@
 - **发布：** 默认不发布；发布模式使用自动 token 上传 Release。该服务器包不需要 Nginx，但目标机仍需 PostgreSQL 和适当的进程/防火墙管理。
 - **常见失败：** ARM64 runner、Chromium ARM64、Linux 执行权限、ONNX/OCR 运行库、服务器包 payload 检查。
 
+### 2.15 Browser compatibility acceptance
+
+文件：[`browser-compatibility.yml`](../.github/workflows/browser-compatibility.yml)
+显示名称：`Browser compatibility acceptance`
+
+- **触发：** Web/API、跨浏览器 smoke 或本工作流变化时的 `main` push、Pull Request，也可手工运行。
+- **平台与做法：** `ubuntu-latest`；安装 Firefox 与 WebKit Playwright runtime，构建 Web/API，然后使用仓库 `artifacts/playwright-browsers` 运行真实浏览器。
+- **验收内容：** 桌面 `1440×1000` 与手机 `390×844`；登录、工作区标题、desktop/phone 模式、移动端导航、横向溢出、页面异常、HTTP 500 和 `critical/serious` axe 问题均为硬门禁。该工作流只验证 Web/API，不冒充 Tauri 原生 WebView 或官方单一窗口客户端验收。
+- **运行数据边界：** Playwright 浏览器、临时 API DataRoot 和日志只写 runner 的 `artifacts/`，不上传业务数据库、密钥或浏览器缓存。
+
 ## 3. Node、Action 和 Artifact 版本政策
 
-截至 2026-07-27，仓库的 14 个工作流已通过静态版本门禁：
+截至 2026-07-30，仓库的 15 个工作流已通过静态版本门禁：
 
 - 显式构建工具统一使用 `actions/setup-node@v5` 并指定 Node.js `24`；客户运行的 Web、Tauri、API 和容器不需要安装 Node.js。
 - `actions/checkout@v5`、`actions/setup-dotnet@v5`、`actions/setup-python@v6` 使用当前仓库允许的 Node 24 runtime 主版本。

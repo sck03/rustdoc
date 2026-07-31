@@ -17,7 +17,10 @@ namespace ExportDocManager.Api.Hosting
             ApiRuntimeOptions runtimeOptions,
             DatabaseConnectionSettings databaseSettings)
         {
-            endpoints.MapGet("/", () => Results.Redirect("/swagger"));
+            string frontendIndexPath = Path.Combine(runtimeOptions.AppRoot, "wwwroot", "index.html");
+            endpoints.MapGet("/", () => File.Exists(frontendIndexPath)
+                ? Results.File(frontendIndexPath, "text/html; charset=utf-8")
+                : Results.Redirect("/swagger"));
 
             endpoints.MapGet("/healthz", async (
                 HttpContext context,
@@ -132,7 +135,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("退出维护只能由 Tauri 桌面端通过 desktop token 触发。");
+                    return WriteForbidden("退出维护只能由受信任的桌面版执行。");
                 }
 
                 try

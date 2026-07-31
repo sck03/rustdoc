@@ -496,7 +496,7 @@ function PostgreSqlMaintenancePanel({
       {!status?.postgreSqlSelected ? <InlineNotice tone="info">当前为 SQLite 单机模式，PostgreSQL 团队库维护保持停用。</InlineNotice> : null}
       {status?.postgreSqlSelected && !status.postgreSqlConfigured ? <InlineNotice tone="info">PostgreSQL 团队库连接信息尚未完整配置。</InlineNotice> : null}
       {status?.postgreSqlConfigured && !status.toolsReady ? (
-        <InlineNotice tone="info">未发现完整 PostgreSQL 客户端工具。请把 pg_dump、pg_restore、psql 放入程序根 Tools/PostgreSQL/bin。</InlineNotice>
+        <InlineNotice tone="info">团队数据库维护组件未安装完整，请联系系统管理员或软件服务商处理。</InlineNotice>
       ) : null}
       {message ? <InlineNotice tone="error" title="数据库维护失败">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}

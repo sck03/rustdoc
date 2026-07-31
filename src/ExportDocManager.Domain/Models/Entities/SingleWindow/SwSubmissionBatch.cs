@@ -105,6 +105,9 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(120)]
         public string AssignedCardIdentifier { get; set; } = string.Empty;
 
+        [MaxLength(512)]
+        public string ProtectedAssignmentSecret { get; set; } = string.Empty;
+
         public List<SwReceiptLog> ReceiptLogs { get; set; } = [];
 
         public List<SwHandoffPackageRecord> PackageRecords { get; set; } = [];

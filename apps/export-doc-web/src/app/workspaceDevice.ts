@@ -45,9 +45,10 @@ export function resolveWorkspaceDeviceMode(
   isDesktopWidth: boolean,
   hasFinePointer: boolean,
 ): WorkspaceDeviceMode {
-  if (isPhoneWidth && !hasFinePointer) return "phone";
-  if (hasFinePointer) return "desktop";
-  return isDesktopWidth ? "desktop" : "tablet";
+  void hasFinePointer;
+  if (isPhoneWidth) return "phone";
+  if (isDesktopWidth) return "desktop";
+  return "tablet";
 }
 
 export function getWorkspaceDeviceCapabilities(mode: WorkspaceDeviceMode) {

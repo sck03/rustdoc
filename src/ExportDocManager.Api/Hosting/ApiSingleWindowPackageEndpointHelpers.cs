@@ -27,6 +27,7 @@ namespace ExportDocManager.Api.Hosting
                 var result = await handoffPackageService.ExportSubmitPackageAsync(
                     businessType,
                     invoiceId,
+                    request?.StationAssignmentCode ?? string.Empty,
                     packagePath,
                     cancellationToken);
                 return Results.Ok(ApiSingleWindowDtoFactory.FromHandoffPackageResult(
@@ -60,6 +61,7 @@ namespace ExportDocManager.Api.Hosting
             IAppPathProvider pathProvider,
             SingleWindowBusinessType businessType,
             int invoiceId,
+            ApiSingleWindowSubmitPackageRequest request,
             CancellationToken cancellationToken)
         {
             if (invoiceId <= 0)
@@ -80,6 +82,7 @@ namespace ExportDocManager.Api.Hosting
                 var result = await handoffPackageService.ExportSubmitPackageAsync(
                     businessType,
                     invoiceId,
+                    request?.StationAssignmentCode ?? string.Empty,
                     packagePath,
                     cancellationToken);
                 var response = StreamTemporaryFile(
@@ -250,13 +253,13 @@ namespace ExportDocManager.Api.Hosting
         {
             if ((context.Request.ContentLength ?? 0) == 0)
             {
-                return new ApiSingleWindowSubmitPackageRequest(string.Empty);
+                return new ApiSingleWindowSubmitPackageRequest(string.Empty, string.Empty);
             }
 
             try
             {
                 return await context.Request.ReadFromJsonAsync<ApiSingleWindowSubmitPackageRequest>(
-                    cancellationToken: cancellationToken) ?? new ApiSingleWindowSubmitPackageRequest(string.Empty);
+                    cancellationToken: cancellationToken) ?? new ApiSingleWindowSubmitPackageRequest(string.Empty, string.Empty);
             }
             catch (System.Text.Json.JsonException ex)
             {

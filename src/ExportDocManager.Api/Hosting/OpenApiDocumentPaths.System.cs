@@ -220,6 +220,23 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
+                    ["/api/auth/renew"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Renew the current authenticated session",
+                            operationId = "renewSession",
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "A replacement bearer token was issued and the previous token was revoked.",
+                                    content = JsonContent("ApiLoginResponse")
+                                },
+                                ["401"] = new { description = "Missing, invalid, or already expired bearer token." }
+                            }
+                        }
+                    },
                     ["/api/users"] = new
                     {
                         get = new
@@ -514,6 +531,74 @@ namespace ExportDocManager.Api.Hosting
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot manage database backups." },
                                 ["409"] = new { description = "The database could not be restored." }
+                            }
+                        }
+                    },
+                    ["/api/backup/disaster-recovery/status"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Get holding-station disaster recovery status",
+                            operationId = "getDisasterRecoveryStatus",
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "SQLite holding-station disaster recovery availability and storage policy.",
+                                    content = JsonContent("ApiDisasterRecoveryStatusResponse")
+                                },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "The current user cannot manage disaster recovery." }
+                            }
+                        }
+                    },
+                    ["/api/backup/disaster-recovery/create"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Create encrypted holding-station disaster recovery package",
+                            operationId = "createDisasterRecoveryPackage",
+                            requestBody = new
+                            {
+                                required = true,
+                                content = JsonContent("ApiDisasterRecoveryCreateRequest")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "An encrypted recovery package was created under Backups/DisasterRecovery.",
+                                    content = JsonContent("ApiDisasterRecoveryPackageResponse")
+                                },
+                                ["400"] = new { description = "Missing package password." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Administrator or trusted desktop access is missing." },
+                                ["409"] = new { description = "Recovery is unsupported, prerequisites are missing, or package creation failed." }
+                            }
+                        }
+                    },
+                    ["/api/backup/disaster-recovery/restore"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Schedule encrypted holding-station disaster recovery",
+                            operationId = "restoreDisasterRecoveryPackage",
+                            requestBody = new
+                            {
+                                required = true,
+                                content = JsonContent("ApiDisasterRecoveryRestoreRequest")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "The verified recovery payload was staged for offline restore before database settings are loaded on next start.",
+                                    content = JsonContent("ApiDisasterRecoveryRestoreResponse")
+                                },
+                                ["400"] = new { description = "Missing fields or confirmation text is not RECOVER." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Administrator or trusted desktop access is missing." },
+                                ["409"] = new { description = "The password/package is invalid, another restore is pending, or staging failed." }
                             }
                         }
                     },

@@ -70,7 +70,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器路径导出仅允许可信 Tauri 桌面端；浏览器请使用下载 Excel。");
+                    return WriteForbidden("该本机导出操作仅支持桌面版；浏览器版请直接下载 Excel。");
                 }
 
                 if (request == null)

@@ -90,25 +90,12 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
       operatorUserId = operator.userId;
       const operatorLogin = await loginScopedSmokeUser(options, operator.username, operator.password);
       invoice = await createSmokeInvoice(options, operatorLogin.accessToken, operatorLogin.tokenType);
-      const submitPackage = await definition.exportSubmitPackage(
-        options,
-        operatorLogin.accessToken,
-        operatorLogin.tokenType,
-        invoice.id,
-        submitPackagePath,
-      );
-      const batchId = submitPackage.trackingBatchId;
-      const batchReference = submitPackage.manifest?.batchReference ?? "";
-      if (!batchId || !batchReference) {
-        throw new Error(`Single Window submit package response did not include trackingBatchId/batchReference: ${JSON.stringify(submitPackage)}`);
-      }
-
       const profileResponse = await saveStationProfile(
         options,
         accessToken,
         tokenType,
         definition,
-        submitPackage.manifest?.companyScope ?? "",
+        companyScope,
         clientRoot,
         timestamp,
       );
@@ -120,6 +107,24 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
           !activeProfile ||
           !singleWindowProfileContainsPath(activeProfile, clientRoot)) {
         throw new Error(`Single Window station profile was not saved for ${clientRoot}: ${JSON.stringify(profileResponse)}`);
+      }
+      const stationAssignmentCode = String(activeProfile.stationAssignmentCode ?? "").trim();
+      if (!stationAssignmentCode.startsWith("SWAC1.")) {
+        throw new Error(`Single Window station profile did not return a valid assignment code: ${JSON.stringify(activeProfile)}`);
+      }
+
+      const submitPackage = await definition.exportSubmitPackage(
+        options,
+        operatorLogin.accessToken,
+        operatorLogin.tokenType,
+        invoice.id,
+        submitPackagePath,
+        stationAssignmentCode,
+      );
+      const batchId = submitPackage.trackingBatchId;
+      const batchReference = submitPackage.manifest?.batchReference ?? "";
+      if (!batchId || !batchReference) {
+        throw new Error(`Single Window submit package response did not include trackingBatchId/batchReference: ${JSON.stringify(submitPackage)}`);
       }
 
       const checkUrl = buildSingleWindowOperationCenterCheckUrl(options.webUrl, timestamp);
@@ -215,11 +220,11 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
           const section = document.querySelector('[aria-label="选中批次快捷操作"]');
           const text = section?.innerText || '';
           const dispatchButton = section
-            ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('写入交接 OutBox'))
+            ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('送入官方客户端待办目录'))
             : null;
           return Boolean(section &&
             text.includes(${JSON.stringify(batchReference)}) &&
-            text.includes('写入交接 OutBox') &&
+            text.includes('送入官方客户端待办目录') &&
             text.includes('收集并导出回执') &&
             text.includes(${JSON.stringify(activeProfile.cardIdentifier)}) &&
             dispatchButton &&
@@ -233,7 +238,7 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
         page,
         `(() => {
           const section = document.querySelector('[aria-label="选中批次快捷操作"]');
-          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('写入交接 OutBox')) : null;
+          const button = section ? Array.from(section.querySelectorAll('button')).find((element) => (element.innerText || '').includes('送入官方客户端待办目录')) : null;
           if (!button || button.disabled) throw new Error('Dispatch button is unavailable.');
           button.click();
           return true;
@@ -246,7 +251,7 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
         `(() => {
           const section = document.querySelector('[aria-label="选中批次快捷操作"]');
           const text = section?.innerText || '';
-          return Boolean(text.includes('这不代表官方客户端已导入') && text.includes('已写入文件'));
+          return Boolean(text.includes('这不代表官方客户端已经导入') && text.includes('已写入文件'));
         })()`,
         timeoutMs,
         "Timed out waiting for the dispatch result.",
@@ -505,19 +510,19 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
     return response.json();
   }
 
-  async function exportSmokeCustomsCooSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath) {
-    return exportSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath, "coo");
+  async function exportSmokeCustomsCooSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath, stationAssignmentCode) {
+    return exportSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath, stationAssignmentCode, "coo");
   }
 
-  async function exportSmokeAgentConsignmentSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath) {
-    return exportSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath, "acd");
+  async function exportSmokeAgentConsignmentSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath, stationAssignmentCode) {
+    return exportSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath, stationAssignmentCode, "acd");
   }
 
-  async function exportSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath, route) {
+  async function exportSubmitPackage(options, accessToken, tokenType, invoiceId, packagePath, stationAssignmentCode, route) {
     const response = await fetch(new URL(`/api/single-window/${route}/${encodeURIComponent(String(invoiceId))}/submit-package/save-to-path`, ensureTrailingSlash(options.apiBaseUrl)), {
       method: "POST",
       headers: authorizedJsonHeaders(options, accessToken, tokenType),
-      body: JSON.stringify({ packagePath }),
+      body: JSON.stringify({ packagePath, stationAssignmentCode }),
     });
     if (!response.ok) {
       throw new Error(`Single Window ${route.toUpperCase()} submit package export failed with HTTP ${response.status}: ${await response.text()}`);

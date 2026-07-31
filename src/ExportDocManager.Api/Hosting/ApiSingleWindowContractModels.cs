@@ -81,7 +81,8 @@ namespace ExportDocManager.Api.Hosting
         string Message);
 
     public sealed record ApiSingleWindowSubmitPackageRequest(
-        string PackagePath);
+        string PackagePath,
+        string StationAssignmentCode);
 
     public sealed record ApiSingleWindowImportPackageRequest(
         string PackagePath,
@@ -97,10 +98,12 @@ namespace ExportDocManager.Api.Hosting
 
     public sealed record ApiSingleWindowClientProfileDto(
         int Id,
+        string StationKey,
         string ProfileKey,
         string ProfileName,
         string CompanyScope,
         string CardIdentifier,
+        string StationAssignmentCode,
         string CustomsCooClientRootPath,
         string AgentConsignmentClientRootPath,
         bool CanSubmitCustomsCoo,

@@ -24,7 +24,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("单一窗口本机客户端档案仅允许受控 Tauri 操作机访问。");
+                    return WriteForbidden("单一窗口本机客户端档案只能由受控操作机访问。");
                 }
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
@@ -53,7 +53,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("单一窗口本机客户端档案仅允许受控 Tauri 操作机修改。");
+                    return WriteForbidden("单一窗口本机客户端档案只能由受控操作机修改。");
                 }
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
@@ -84,7 +84,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("单一窗口本机操作档案仅允许受控 Tauri 操作机切换。");
+                    return WriteForbidden("单一窗口本机操作档案只能由受控操作机切换。");
                 }
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
@@ -115,7 +115,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("写入本机交接 OutBox 只允许受控 Tauri 持卡机执行。");
+                    return WriteForbidden("写入本机交接目录只能由受控持卡机执行。");
                 }
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
@@ -146,7 +146,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("收集官方客户端回执只允许受控 Tauri 操作机执行。");
+                    return WriteForbidden("收集官方客户端回执只能由受控操作机执行。");
                 }
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))

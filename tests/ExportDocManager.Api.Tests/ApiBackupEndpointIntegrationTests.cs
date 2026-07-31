@@ -5,10 +5,12 @@ using System.Globalization;
 using System.Text;
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.Models;
+using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ExportDocManager.Api.Tests
 {
@@ -175,6 +177,96 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public async Task DisasterRecoveryEndpoints_ShouldRequireAdministratorAndTrustedDesktopAccess()
+        {
+            const string desktopToken = "recovery-desktop-token-2026";
+            var recoveryService = new RecordingDisasterRecoveryService();
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-disaster-recovery",
+                "api-disaster-recovery.db",
+                desktopAccessToken: desktopToken,
+                configureServices: services =>
+                    services.AddSingleton<ISingleWindowDisasterRecoveryService>(recoveryService));
+
+            using var untrustedAnonymousClient = harness.CreateClient();
+            var missingDesktopTokenResponse = await untrustedAnonymousClient.GetAsync(
+                "/api/backup/disaster-recovery/status");
+            Assert.Equal(HttpStatusCode.Forbidden, missingDesktopTokenResponse.StatusCode);
+
+            using var trustedAnonymousClient = harness.CreateClient(desktopAccessToken: desktopToken);
+            var anonymousStatusResponse = await trustedAnonymousClient.GetAsync(
+                "/api/backup/disaster-recovery/status");
+            Assert.Equal(HttpStatusCode.Unauthorized, anonymousStatusResponse.StatusCode);
+
+            var adminLogin = await harness.LoginAsync(trustedAnonymousClient, "admin", string.Empty);
+            using var trustedAdminClient = harness.CreateClient(adminLogin.AccessToken, desktopToken);
+            using var untrustedAdminClient = harness.CreateClient(adminLogin.AccessToken);
+
+            var createOperatorResponse = await trustedAdminClient.PostAsJsonAsync("/api/users", new
+            {
+                username = "recovery-operator",
+                fullName = "Recovery Operator",
+                role = UserRoleCatalog.User,
+                departmentId = string.Empty,
+                companyScope = string.Empty,
+                isActive = true,
+                resetPassword = "recovery-pass"
+            });
+            Assert.Equal(HttpStatusCode.OK, createOperatorResponse.StatusCode);
+
+            var operatorLogin = await harness.LoginAsync(
+                trustedAnonymousClient,
+                "recovery-operator",
+                "recovery-pass");
+            using var trustedOperatorClient = harness.CreateClient(operatorLogin.AccessToken, desktopToken);
+
+            var operatorStatusResponse = await trustedOperatorClient.GetAsync(
+                "/api/backup/disaster-recovery/status");
+            Assert.Equal(HttpStatusCode.Forbidden, operatorStatusResponse.StatusCode);
+
+            var adminStatusResponse = await trustedAdminClient.GetAsync(
+                "/api/backup/disaster-recovery/status");
+            Assert.Equal(HttpStatusCode.OK, adminStatusResponse.StatusCode);
+
+            var untrustedCreateResponse = await untrustedAdminClient.PostAsJsonAsync(
+                "/api/backup/disaster-recovery/create",
+                new { password = "strong-recovery-password" });
+            Assert.Equal(HttpStatusCode.Forbidden, untrustedCreateResponse.StatusCode);
+
+            var operatorCreateResponse = await trustedOperatorClient.PostAsJsonAsync(
+                "/api/backup/disaster-recovery/create",
+                new { password = "strong-recovery-password" });
+            Assert.Equal(HttpStatusCode.Forbidden, operatorCreateResponse.StatusCode);
+
+            var createResponse = await trustedAdminClient.PostAsJsonAsync(
+                "/api/backup/disaster-recovery/create",
+                new { password = "strong-recovery-password" });
+            Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+            Assert.Equal(1, recoveryService.CreateCalls);
+
+            var unconfirmedRestoreResponse = await trustedAdminClient.PostAsJsonAsync(
+                "/api/backup/disaster-recovery/restore",
+                new
+                {
+                    packagePath = "E:\\Recovery\\holding-station.edmrecovery",
+                    password = "strong-recovery-password",
+                    confirmationText = "recover"
+                });
+            Assert.Equal(HttpStatusCode.BadRequest, unconfirmedRestoreResponse.StatusCode);
+
+            var restoreResponse = await trustedAdminClient.PostAsJsonAsync(
+                "/api/backup/disaster-recovery/restore",
+                new
+                {
+                    packagePath = "E:\\Recovery\\holding-station.edmrecovery",
+                    password = "strong-recovery-password",
+                    confirmationText = "RECOVER"
+                });
+            Assert.Equal(HttpStatusCode.OK, restoreResponse.StatusCode);
+            Assert.Equal(1, recoveryService.RestoreCalls);
+        }
+
+        [Fact]
         public async Task CloudBackupEndpoints_ShouldUploadLatestRuntimeBackupToSavedWebDavEndpoint()
         {
             await using var webDavServer = await FakeWebDavServer.StartAsync();
@@ -314,6 +406,50 @@ namespace ExportDocManager.Api.Tests
                 settings,
                 new AppSettings(),
                 updateSecrets: true);
+        }
+
+        private sealed class RecordingDisasterRecoveryService : ISingleWindowDisasterRecoveryService
+        {
+            public int CreateCalls { get; private set; }
+
+            public int RestoreCalls { get; private set; }
+
+            public SingleWindowDisasterRecoveryStatus GetStatus() => new(
+                Supported: true,
+                UsesSqlite: true,
+                PendingRestore: false,
+                RecoveryRoot: "E:\\RuntimeData\\Backups\\DisasterRecovery",
+                Message: "ready",
+                StoragePolicy: "runtime-data-root-only");
+
+            public Task<SingleWindowDisasterRecoveryPackageResult> CreatePackageAsync(
+                string password,
+                CancellationToken cancellationToken = default)
+            {
+                CreateCalls++;
+                return Task.FromResult(new SingleWindowDisasterRecoveryPackageResult(
+                    Success: true,
+                    Message: "created",
+                    FileName: "holding-station.edmrecovery",
+                    FilePath: "E:\\RuntimeData\\Backups\\DisasterRecovery\\holding-station.edmrecovery",
+                    SizeBytes: 128,
+                    StoragePolicy: "runtime-data-root-only"));
+            }
+
+            public Task<SingleWindowDisasterRecoveryRestoreResult> ScheduleRestoreAsync(
+                string packagePath,
+                string password,
+                CancellationToken cancellationToken = default)
+            {
+                RestoreCalls++;
+                return Task.FromResult(new SingleWindowDisasterRecoveryRestoreResult(
+                    Success: true,
+                    RestartRequired: true,
+                    Message: "scheduled",
+                    PackageFileName: Path.GetFileName(packagePath),
+                    SafetyBackupRoot: "E:\\RuntimeData\\Backups\\DisasterRecovery\\Safety",
+                    StoragePolicy: "runtime-data-root-only"));
+            }
         }
 
         private sealed class FakeWebDavServer : IAsyncDisposable

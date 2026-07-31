@@ -71,6 +71,7 @@ COPY --from=ocr-build /src/target/release/exportdoc-ocr ./sidecar/ocr/exportdoc-
 COPY --from=excel-analyzer-build /src/target/release/exportdoc-excel-analyzer ./Tools/exportdoc-excel-analyzer
 COPY tools/excel-analyzer-rs/THIRD_PARTY_NOTICES.md ./Tools/EXCEL_ANALYZER_NOTICES.md
 COPY apps/exportdoc-ocr-rs/README.md ./sidecar/ocr/README.md
+COPY THIRD_PARTY_NOTICES.md THIRD_PARTY_DEPENDENCIES.md ./Legal/
 ARG TARGETARCH
 ENV ASPNETCORE_URLS=http://0.0.0.0:5188 \
     EXPORTDOCMANAGER_DATA_ROOT=/runtime-data \

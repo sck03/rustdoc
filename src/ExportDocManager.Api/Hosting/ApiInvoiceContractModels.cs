@@ -210,8 +210,6 @@ namespace ExportDocManager.Api.Hosting
         public string ConflictAction { get; init; } = "NewInvoiceNo";
 
         public string NewInvoiceNo { get; init; } = string.Empty;
-
-        public bool AllowInvalidChecksum { get; init; }
     }
 
     public sealed record ApiInvoiceTransferPreviewDto(

@@ -24,7 +24,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
-                    return WriteForbidden("服务器路径保存仅允许可信 Tauri 桌面端；浏览器请使用 Excel 下载任务。");
+                    return WriteForbidden("该本机保存操作仅支持桌面版；浏览器版请使用 Excel 下载任务。");
                 }
 
                 var validation = ValidateExcelDestinationPath(

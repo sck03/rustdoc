@@ -305,6 +305,7 @@ export function getRequiredRouteAccessLevel(pathname: string): "view" | "operate
 export function isAdminOnlyRoute(pathname: string) {
   return pathname.startsWith("/settings") ||
     pathname.startsWith("/system/access-control") ||
+    pathname.startsWith("/system/license") ||
     pathname.startsWith("/system/update") ||
     pathname.startsWith("/audit-logs");
 }

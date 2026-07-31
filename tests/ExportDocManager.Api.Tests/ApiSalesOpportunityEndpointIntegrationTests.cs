@@ -30,7 +30,7 @@ namespace ExportDocManager.Api.Tests
 
             var createResponse = await client.PostAsJsonAsync("/api/crm/opportunities", new ApiSalesOpportunitySaveRequest(
                 0, customer.Id, productId, "秋季订单", "已报价", "QT-OPP-001", 12500m, "USD", 60,
-                DateTimeOffset.UtcNow.AddDays(30), "确认样品", "只做销售跟踪", "首次报价"));
+                DateOnly.FromDateTime(DateTime.Today.AddDays(30)), "确认样品", "只做销售跟踪", "首次报价"));
             Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
             var opportunity = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSalesOpportunityDto>(createResponse);
             Assert.Equal("OPP-001", opportunity.ProductCode);
@@ -41,7 +41,7 @@ namespace ExportDocManager.Api.Tests
 
             var updateResponse = await client.PutAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}",
                 new ApiSalesOpportunitySaveRequest(opportunity.Id, customer.Id, productId, "秋季订单", "谈判中", "QT-OPP-001",
-                    13000m, "USD", 75, opportunity.ExpectedCloseAt, "确认付款条件", "报价仍不是正式发票",
+                    13000m, "USD", 75, opportunity.ExpectedCloseDate, "确认付款条件", "报价仍不是正式发票",
                     "客户要求调整付款条件", opportunity.VersionNumber));
             Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
             var updatedOpportunity = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSalesOpportunityDto>(updateResponse);
@@ -49,13 +49,13 @@ namespace ExportDocManager.Api.Tests
             var staleResponse = await client.PutAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}",
                 new ApiSalesOpportunitySaveRequest(opportunity.Id, customer.Id, productId, "过期修改", "已报价",
                     opportunity.QuotationNo, opportunity.EstimatedAmount, opportunity.Currency,
-                    opportunity.ProbabilityPercent, opportunity.ExpectedCloseAt, opportunity.NextAction,
+                    opportunity.ProbabilityPercent, opportunity.ExpectedCloseDate, opportunity.NextAction,
                     opportunity.Notes, "过期版本", opportunity.VersionNumber));
             Assert.Equal(HttpStatusCode.Conflict, staleResponse.StatusCode);
             var noteResponse = await client.PutAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}",
                 new ApiSalesOpportunitySaveRequest(opportunity.Id, customer.Id, productId, updatedOpportunity.Title,
                     updatedOpportunity.Stage, updatedOpportunity.QuotationNo, updatedOpportunity.EstimatedAmount,
-                    updatedOpportunity.Currency, updatedOpportunity.ProbabilityPercent, updatedOpportunity.ExpectedCloseAt,
+                    updatedOpportunity.Currency, updatedOpportunity.ProbabilityPercent, updatedOpportunity.ExpectedCloseDate,
                     updatedOpportunity.NextAction, updatedOpportunity.Notes, "补充客户会议记录",
                     updatedOpportunity.VersionNumber));
             Assert.Equal(HttpStatusCode.OK, noteResponse.StatusCode);

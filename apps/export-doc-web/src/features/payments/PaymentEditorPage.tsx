@@ -17,7 +17,7 @@ import {
 } from "../custom-options/customOptionModel.ts";
 import { PaymentAmountsPanel, PaymentBasicInfoPanel, PaymentBusinessInfoPanel } from "./PaymentFormPanels.tsx";
 import { PaymentReportPreviewPanel } from "./PaymentReportPreviewPanel.tsx";
-import { createEmptyPayment, normalizePaymentForSave } from "./paymentModel.ts";
+import { createEmptyPayment, normalizePaymentForSave, validatePaymentDraft } from "./paymentModel.ts";
 
 export function PaymentEditorPage({
   client,
@@ -234,6 +234,11 @@ export function PaymentEditorPage({
 
     setMessage(null);
     setSuccessMessage(null);
+    const validationMessage = validatePaymentDraft(payment);
+    if (validationMessage) {
+      setMessage(validationMessage);
+      return;
+    }
     savePaymentMutation.mutate(normalizePaymentForSave(payment, isNew ? 0 : parsedPaymentId));
   }
 

@@ -106,6 +106,7 @@ foreach ($edition in @("Document", "Sales", "Full")) {
         (Join-Path $editionRoot "ExportDocManager.exe"),
         (Join-Path $editionRoot "sidecar\ExportDocManager.Api.exe"),
         (Join-Path $editionRoot "runtime-layout.json"),
+        (Join-Path $editionRoot "portable-runtime.json"),
         $editionManifestPath,
         (Join-Path $editionRoot "Tools\exportdoc-excel-analyzer.exe")
     )
