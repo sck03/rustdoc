@@ -35,6 +35,37 @@ public sealed class ChromiumArm64PackagingContractTests
         Assert.Contains("verify-bundled-browser-pdf.ps1", reusableServer);
     }
 
+    [Fact]
+    public void LinuxDesktopPackaging_ShouldAvoidLegacyLinuxdeployStripAndKeepVerboseDiagnostics()
+    {
+        string root = FindRepositoryRoot();
+        string desktop = File.ReadAllText(Path.Combine(root, ".github", "workflows", "linux-desktop-package.yml"));
+        string workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "desktop-package-reusable.yml"))
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        const string compatibilityStep = """
+      - name: Configure Linux AppImage compatibility
+        if: inputs.platform == 'linux' && contains(inputs.bundle_targets, 'appimage')
+        shell: bash
+        run: echo "NO_STRIP=1" >> "$GITHUB_ENV"
+""";
+
+        int compatibilityStepIndex = workflow.IndexOf(compatibilityStep, StringComparison.Ordinal);
+        int desktopBuildIndex = workflow.IndexOf("      - name: Build unsigned desktop package", StringComparison.Ordinal);
+        int verboseBuildCount = workflow.Split(
+            "npm --prefix apps/export-doc-tauri run build -- --verbose",
+            StringSplitOptions.None).Length - 1;
+
+        Assert.Contains("bundle_targets: deb,appimage", desktop);
+        Assert.Contains("sudo apt-get install -y file xdg-utils", workflow);
+        Assert.DoesNotContain("libfuse2", workflow);
+        Assert.True(compatibilityStepIndex >= 0, "Linux AppImage packaging must disable linuxdeploy's legacy strip pass.");
+        Assert.True(
+            compatibilityStepIndex < desktopBuildIndex,
+            "Linux AppImage compatibility must be configured before Tauri starts bundling.");
+        Assert.Equal(2, verboseBuildCount);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

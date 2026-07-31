@@ -41,7 +41,7 @@ pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
 - `browser-compatibility.yml`：Web/API 相关 push、PR 或手工运行；在真实 Firefox、WebKit 的桌面和手机视口检查登录、响应式分类、横向溢出、页面异常、HTTP 500 和严重无障碍问题。
 - `container-images.yml`：只手工运行；启动时填写版本号并选择是否更新 `latest`，随后构建 `linux/amd64`、`linux/arm64` 的 API/Web 镜像并发布到 GHCR。
 - `windows-desktop-package.yml`：只手工运行；选择版本和 Document/Sales/Full，构建 Windows x64 NSIS 安装包。
-- `linux-desktop-package.yml`：只手工运行；选择版本和产品版本，构建 Linux x64 deb/AppImage。
+- `linux-desktop-package.yml`：只手工运行；选择版本、产品版本和 x64/ARM64 架构，构建对应 deb/AppImage。
 - `macos-desktop-package.yml`：只手工运行；选择版本、Apple Silicon ARM64/Intel x64 和产品版本，构建 macOS dmg；两种架构都内置 Chrome for Testing 官方 Headless Shell。
 - `desktop-package-reusable.yml`：上述三个桌面入口共用的内部编排，不会单独出现在手工运行列表中。
 - `windows-browser-server-package.yml`：只手工运行；生成无需 Docker 的 Windows x64 浏览器服务器 ZIP。

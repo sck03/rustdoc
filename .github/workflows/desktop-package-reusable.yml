@@ -94,8 +94,7 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-          sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64
+          sudo apt-get install -y file xdg-utils libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
@@ -195,10 +194,15 @@ jobs:
         shell: pwsh
         run: ./scripts/verify-bundled-browser-pdf.ps1 -BrowserRoot ./Browsers
 
+      - name: Configure Linux AppImage compatibility
+        if: inputs.platform == 'linux' && contains(inputs.bundle_targets, 'appimage')
+        shell: bash
+        run: echo "NO_STRIP=1" >> "$GITHUB_ENV"
+
       - name: Build unsigned desktop package
         if: ${{ !inputs.publish_release }}
         shell: pwsh
-        run: npm --prefix apps/export-doc-tauri run build -- --target ${{ inputs.rust_target }} --bundles ${{ inputs.bundle_targets }} --no-sign
+        run: npm --prefix apps/export-doc-tauri run build -- --verbose --target ${{ inputs.rust_target }} --bundles ${{ inputs.bundle_targets }} --no-sign
 
       - name: Build signed updater package
         if: inputs.publish_release
@@ -210,7 +214,7 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_UPDATER_ENDPOINT)) {
             Write-Host "未配置自定义更新地址；构建器将按产品版自动使用对应的 GitHub Release 更新通道。"
           }
-          npm --prefix apps/export-doc-tauri run build -- --target ${{ inputs.rust_target }} --bundles ${{ inputs.bundle_targets }}
+          npm --prefix apps/export-doc-tauri run build -- --verbose --target ${{ inputs.rust_target }} --bundles ${{ inputs.bundle_targets }}
           exit $LASTEXITCODE
 
       - name: Verify bundled Chrome Headless Shell resource
