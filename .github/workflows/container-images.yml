@@ -71,7 +71,7 @@ jobs:
         if: matrix.component == 'api'
         shell: bash
         run: |
-          for path in /usr/local/lib/android /opt/ghc /usr/local/.ghcup /usr/share/swift; do
+          for path in /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift; do
             if [[ -e "$path" ]]; then
               sudo rm -rf -- "$path"
             fi

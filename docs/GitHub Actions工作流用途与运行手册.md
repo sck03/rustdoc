@@ -112,7 +112,7 @@
 - **做什么：** 校验版本并同步 runner 工作区版本，构建带 provenance/SBOM 的多架构镜像，写入版本、`latest`（可选）和 SHA 标签。
 - **输出：** 推送到 `ghcr.io/<仓库所有者>/export-doc-manager-api` 和 `...-web`；不上传普通 Artifact、不创建 GitHub Release。
 - **Secrets/Variables：** 使用 GitHub 自动 `GITHUB_TOKEN`，工作流权限为 `packages: write`；不需要额外私钥。
-- **常见失败：** GHCR 权限/包可见性、版本格式错误、QEMU 或 Buildx 构建失败、Dockerfile 公开源码边界检查失败。API 镜像会先回收一次性 Ubuntu runner 上明确无关的 Android/GHC/Swift 工具空间，NuGet/Cargo 使用 BuildKit cache mount，GHA cache 使用 `mode=min`；若仍出现 `No space left on device`，先确认这些步骤实际执行并查看 `df -h /`，不要通过关闭 provenance/SBOM 或删除随包 OCR/字体绕过交付契约。工作流只在手工确认后推送，不能把测试分支镜像误当生产版本。
+- **常见失败：** GHCR 权限/包可见性、版本格式错误、QEMU 或 Buildx 构建失败、Dockerfile 公开源码边界检查失败。API 镜像会先回收一次性 Ubuntu runner 上明确无关的 Android、宿主 .NET SDK、GHC/Haskell 和 Swift 工具空间；该 job 的 .NET 发布在 Docker SDK 镜像内完成。NuGet/Cargo 使用 BuildKit cache mount，GHA cache 使用 `mode=min`；若仍出现 `No space left on device`，先确认这些步骤实际执行并查看 `df -h /`，不要通过关闭 provenance/SBOM 或删除随包 OCR/字体绕过交付契约。工作流只在手工确认后推送，不能把测试分支镜像误当生产版本。
 - **耗时：** 多架构 API/Web 通常 10—30 分钟，首次无缓存时可能更久。
 
 ### 2.8 Reusable desktop package build
