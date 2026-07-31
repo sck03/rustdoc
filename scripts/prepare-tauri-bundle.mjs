@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -87,7 +87,6 @@ const args = [
 
 console.log(`Publishing API sidecar for Tauri bundle (${rid}, self-contained=${selfContained})...`);
 run("dotnet", args, env);
-await ensureMacOsX64OnnxRuntime(env);
 await buildRustOcrSidecar(env);
 await buildRustExcelAnalyzer(env);
 
@@ -178,44 +177,6 @@ async function buildRustExcelAnalyzer(buildEnv) {
   const manifest = path.join(repoRoot, "tools", "excel-analyzer-rs", "Cargo.toml");
   console.log(`Building Rust Excel analyzer for ${target}...`);
   run("cargo", ["build", "--manifest-path", manifest, "--release", "--locked", "--target", target], buildEnv);
-}
-
-async function ensureMacOsX64OnnxRuntime(buildEnv) {
-  if (rid !== "osx-x64") return;
-  const nativeLibrary = path.join(publishRoot, "libonnxruntime.dylib");
-  if (await tryStat(nativeLibrary)) return;
-
-  const version = "1.27.1";
-  const archiveRoot = path.join(localRuntimeRoot, "onnxruntime", `osx-x64-${version}`);
-  const archive = path.join(archiveRoot, `onnxruntime-osx-x86_64-${version}.tgz`);
-  const archiveDownload = `${archive}.download`;
-  const extracted = path.join(archiveRoot, `onnxruntime-osx-x86_64-${version}`);
-  await mkdir(archiveRoot, { recursive: true });
-  if (!(await tryStat(archive))) {
-    await rm(archiveDownload, { force: true });
-    try {
-      run("curl", ["-fL", "--retry", "3", "-o", archiveDownload, `https://github.com/microsoft/onnxruntime/releases/download/v${version}/onnxruntime-osx-x86_64-${version}.tgz`], buildEnv);
-      await rename(archiveDownload, archive);
-    } finally {
-      await rm(archiveDownload, { force: true });
-    }
-  }
-  const libRoot = path.join(extracted, "lib");
-  const source = path.join(libRoot, "libonnxruntime.dylib");
-  if (!(await tryStat(source))) {
-    await rm(extracted, { recursive: true, force: true });
-    try {
-      run("tar", ["-xzf", archive, "-C", archiveRoot], buildEnv);
-      if (!(await tryStat(source))) {
-        throw new Error(`ONNX Runtime macOS x64 native library was not found after extracting ${archive}.`);
-      }
-    } catch (error) {
-      await rm(extracted, { recursive: true, force: true });
-      await rm(archive, { force: true });
-      throw error;
-    }
-  }
-  await cp(source, nativeLibrary, { force: true, dereference: true });
 }
 
 async function createProductEditionManifest() {

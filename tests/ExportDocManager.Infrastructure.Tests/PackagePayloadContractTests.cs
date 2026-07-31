@@ -72,19 +72,24 @@ public sealed class PackagePayloadContractTests
     }
 
     [Fact]
-    public void DesktopBundle_ShouldUseCompatibleLocalRustHostAndExplicitCiTarget()
+    public void DesktopBundle_ShouldUseCompatibleRustAndOnnxRuntimeAcrossDeclaredTargets()
     {
         string root = FindWorkspaceRoot();
         string bundleScript = File.ReadAllText(Path.Combine(root, "scripts", "prepare-tauri-bundle.mjs"));
         string desktopWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "desktop-package-reusable.yml"));
+        string packageVersions = File.ReadAllText(Path.Combine(root, "Directory.Packages.props"));
+        string ocrManifest = File.ReadAllText(Path.Combine(root, "apps", "exportdoc-ocr-rs", "Cargo.toml"));
 
         Assert.Contains("resolveRustTargetTriple(rid)", bundleScript, StringComparison.Ordinal);
         Assert.Contains("resolveLocalBuildPath(\"CARGO_TARGET_DIR\", \"cargo-target-tauri\")", bundleScript, StringComparison.Ordinal);
         Assert.Contains("x86_64-pc-windows-gnu", bundleScript, StringComparison.Ordinal);
         Assert.Contains("x86_64-pc-windows-msvc", bundleScript, StringComparison.Ordinal);
         Assert.Contains("const target = rustTarget;", bundleScript, StringComparison.Ordinal);
-        Assert.Contains("const archiveDownload = `${archive}.download`;", bundleScript, StringComparison.Ordinal);
-        Assert.Contains("await rm(extracted, { recursive: true, force: true });", bundleScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("ensureMacOsX64OnnxRuntime", bundleScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("onnxruntime-osx-x86_64", bundleScript, StringComparison.Ordinal);
+        Assert.Contains("Microsoft.ML.OnnxRuntime\" Version=\"1.23.2\"", packageVersions, StringComparison.Ordinal);
+        Assert.Contains("\"api-23\"", ocrManifest, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"api-24\"", ocrManifest, StringComparison.Ordinal);
         Assert.Contains("EXPORTDOCMANAGER_RUST_TARGET: ${{ inputs.rust_target }}", desktopWorkflow, StringComparison.Ordinal);
     }
 

@@ -223,8 +223,8 @@ Generated from committed npm/Cargo lock files, Cargo package metadata, restored 
 | Microsoft.Extensions.Options | 8.0.2 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Microsoft.Extensions.Primitives | 8.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Microsoft.IO.RecyclableMemoryStream | 3.0.1 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
-| Microsoft.ML.OnnxRuntime | 1.27.1 | MIT | ExportDocManager.Infrastructure.csproj |
-| Microsoft.ML.OnnxRuntime.Managed | 1.27.1 | MIT | ExportDocManager.Infrastructure.csproj |
+| Microsoft.ML.OnnxRuntime | 1.23.2 | MIT | ExportDocManager.Infrastructure.csproj |
+| Microsoft.ML.OnnxRuntime.Managed | 1.23.2 | MIT | ExportDocManager.Infrastructure.csproj |
 | Microsoft.NET.Test.Sdk | 17.12.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | Microsoft.Playwright | 1.61.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Microsoft.TestPlatform.ObjectModel | 17.12.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |

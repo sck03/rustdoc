@@ -785,8 +785,8 @@ This file is the unified redistribution notice for package-manager dependencies 
 | nuget | Microsoft.Extensions.Options | 8.0.2 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | Microsoft.Extensions.Primitives | 8.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | Microsoft.IO.RecyclableMemoryStream | 3.0.1 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
-| nuget | Microsoft.ML.OnnxRuntime | 1.27.1 | MIT | ExportDocManager.Infrastructure.csproj |
-| nuget | Microsoft.ML.OnnxRuntime.Managed | 1.27.1 | MIT | ExportDocManager.Infrastructure.csproj |
+| nuget | Microsoft.ML.OnnxRuntime | 1.23.2 | MIT | ExportDocManager.Infrastructure.csproj |
+| nuget | Microsoft.ML.OnnxRuntime.Managed | 1.23.2 | MIT | ExportDocManager.Infrastructure.csproj |
 | nuget | Microsoft.NET.Test.Sdk | 17.12.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | nuget | Microsoft.Playwright | 1.61.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | Microsoft.TestPlatform.ObjectModel | 17.12.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |

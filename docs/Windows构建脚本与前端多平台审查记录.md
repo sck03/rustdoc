@@ -117,6 +117,6 @@ pwsh -NoProfile -File ./scripts/verify-script-suite.ps1
 - 复审范围从三个 Windows edition 目录扩展到所有发布、供给和验证脚本。单版便携构建现在也自动运行 package payload verifier；稳定资源与浏览器目标在复制前整体删除，不再依赖逐文件覆盖。
 - 三版未请求注册机时清理旧 `KEY`；安装器按请求 edition 清理旧版本 setup/manifest，并在每版 NSIS 复制到交付目录前执行 Desktop 载荷审计；客户载荷明确拒绝注册机、Playwright 开发 UI、未知字体、重复 ONNX 和错误浏览器平台。
 - 浏览器 PDF 验证工作目录从系统 TEMP 迁入 `.codex-runtime/browser-pdf-check/<guid>` 并自动回收。本机真实 PDF 输出通过，检查结束后无工作区 `chrome-headless-shell` 进程。
-- Linux ARM64 Chromium 只有在 manifest、架构、Playwright 版本、相对可执行路径和实际启动全部有效时才复用；否则清理 destination/build/cache 后重新供给，并要求本次 cache 中只有一个目标 Chromium。macOS x64 ONNX Runtime 下载使用 `.download` 原子替换，解压失败会清理损坏压缩包和半成品目录。
+- Linux ARM64 Chromium 只有在 manifest、架构、Playwright 版本、相对可执行路径和实际启动全部有效时才复用；否则清理 destination/build/cache 后重新供给，并要求本次 cache 中只有一个目标 Chromium。当时增加的 macOS x64 ONNX Runtime `.download` 分支已由 2026-07-31 修复删除，当前六种 RID 统一从官方 NuGet `1.23.2` 获取唯一原生库。
 - 本机个人注册机构建入口受既有私有文件忽略规则保护，不是公开仓库组成部分；独立首次/增量构建均已通过，输出位于 `artifacts/license-keygen/KEY`。公开脚本门禁在当前工作区检查 `24` 个 PS1、`6` 个 CMD、`64` 个 MJS，其中多出的 1 个 PS1/1 个 CMD 即本机忽略的私有入口；GitHub 提交候选仍不包含它们。
 - 最终本机验证：脚本语法/入口/系统路径总门禁通过；相关契约 `16/16`；全解决方案 `569/569`；真实浏览器 PDF 通过。三版便携在预置旧 Linux 浏览器、错误嵌套 Browsers、Playwright dashboard 字体、废弃模板和旧 `KEY` 后完成真实覆盖，最终每版 `778` 文件、3 个批准字体、唯一 `win64` 浏览器，全部探针和 `KEY` 清零。三版 NSIS 在预置 `0.0.0` 伪旧 setup/manifest 后完成真实构建，最终只保留三份 `0.1.1` 安装器，大小约 `310 MB/份`，应用标识与 SHA-256 均独立。验证结束后无工作区 `chrome-headless-shell` 进程。macOS/Linux 对应 runner 仍待执行。

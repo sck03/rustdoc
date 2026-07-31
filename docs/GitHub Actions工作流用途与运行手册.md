@@ -169,7 +169,7 @@
 - **触发：** 仅 `workflow_dispatch`；输入版本、产品版、ARM64/x64 和是否发布 Release。
 - **平台/产物：** `macos-15` 或 `macos-15-intel`，输出 dmg；按架构内置对应官方 Chrome Headless Shell。
 - **发布：** 默认只生成 Artifact；发布模式要求同一套 updater Variables/Secrets。签名、公证和真机启动仍需单独验收，工作流成功不等于 Apple 发布合规完成。
-- **常见失败：** macOS runner 架构选择、浏览器执行权限、Tauri bundle、签名/公证材料或 Release 权限。
+- **常见失败：** macOS runner 架构选择、浏览器执行权限、Tauri bundle、签名/公证材料或 Release 权限。Intel x64 必须使用最新 `main` 中统一锁定的 `Microsoft.ML.OnnxRuntime 1.23.2`：这是上游最后一个同时提供 `osx-x64`、`osx-arm64`、Windows 和 Linux x64/ARM64 原生资产的官方版本；Rust OCR 使用向后兼容的 C API 23。若日志仍尝试下载 `onnxruntime-osx-x86_64-1.27.1.tgz` 并返回 404，说明运行的是旧提交，不能用失败 job 的 Re-run 获取修复。
 
 ### 2.13 Build Windows browser server package
 
