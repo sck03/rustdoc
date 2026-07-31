@@ -29,6 +29,10 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("RemoveReleaseNativeDebugSymbols", apiProject, StringComparison.Ordinal);
         Assert.Contains("RemovePlaywrightDeveloperUiPayload", apiProject, StringComparison.Ordinal);
         Assert.Contains(".playwright/package/lib/vite/traceViewer", apiProject, StringComparison.Ordinal);
+        Assert.Contains("sidecarExcludedFileNames", desktopScript, StringComparison.Ordinal);
+        Assert.Contains("libcoreclrtraceptprovider.so", desktopScript, StringComparison.Ordinal);
+        Assert.Contains("sidecarExcludedFileNames.has(entry.name.toLowerCase())", desktopScript, StringComparison.Ordinal);
+        Assert.Contains("unavailable liblttng-ust.so.0", verifier, StringComparison.Ordinal);
         Assert.Contains("Expected exactly one shared", verifier, StringComparison.Ordinal);
         Assert.Contains("onnxruntime_providers_shared", verifier, StringComparison.Ordinal);
         Assert.Contains("Browser payload must contain only", verifier, StringComparison.Ordinal);
@@ -99,54 +103,92 @@ public sealed class PackagePayloadContractTests
 
         try
         {
-            using var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "pwsh",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                }
-            };
-            process.StartInfo.ArgumentList.Add("-NoProfile");
-            process.StartInfo.ArgumentList.Add("-ExecutionPolicy");
-            process.StartInfo.ArgumentList.Add("Bypass");
-            process.StartInfo.ArgumentList.Add("-File");
-            process.StartInfo.ArgumentList.Add(Path.Combine(root, "scripts", "verify-package-payload.ps1"));
-            process.StartInfo.ArgumentList.Add("-PackageRoot");
-            process.StartInfo.ArgumentList.Add(fixtureRoot);
-            process.StartInfo.ArgumentList.Add("-Profile");
-            process.StartInfo.ArgumentList.Add("Desktop");
-            process.StartInfo.ArgumentList.Add("-RuntimeIdentifier");
-            process.StartInfo.ArgumentList.Add("win-x64");
+            (int exitCode, string output) = await RunPayloadVerifierAsync(root, fixtureRoot, "Desktop", "win-x64");
 
-            Assert.True(process.Start());
-            Task<string> standardOutputTask = process.StandardOutput.ReadToEndAsync();
-            Task<string> standardErrorTask = process.StandardError.ReadToEndAsync();
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            try
-            {
-                await process.WaitForExitAsync(timeout.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                process.Kill(entireProcessTree: true);
-                Assert.Fail("Package payload verifier timed out.");
-            }
-            string standardOutput = await standardOutputTask;
-            string standardError = await standardErrorTask;
-            Assert.NotEqual(0, process.ExitCode);
+            Assert.NotEqual(0, exitCode);
             Assert.Contains(
                 "Release payload contains runtime data",
-                standardOutput + standardError,
+                output,
                 StringComparison.OrdinalIgnoreCase);
         }
         finally
         {
             Directory.Delete(fixtureRoot, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task DesktopPayloadVerifier_ShouldRejectLegacyCoreClrLttngProvider()
+    {
+        string root = FindWorkspaceRoot();
+        string fixtureRoot = Path.Combine(
+            root,
+            ".codex-runtime",
+            "package-payload-tests",
+            Guid.NewGuid().ToString("N"));
+        string sidecarRoot = Path.Combine(fixtureRoot, "sidecar");
+        Directory.CreateDirectory(sidecarRoot);
+        File.WriteAllText(Path.Combine(sidecarRoot, "libcoreclrtraceptprovider.so"), "optional-lttng-provider");
+
+        try
+        {
+            (int exitCode, string output) = await RunPayloadVerifierAsync(root, fixtureRoot, "Desktop", "linux-arm64");
+
+            Assert.NotEqual(0, exitCode);
+            Assert.Contains("unavailable liblttng-ust.so.0", output, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Directory.Delete(fixtureRoot, recursive: true);
+        }
+    }
+
+    private static async Task<(int ExitCode, string Output)> RunPayloadVerifierAsync(
+        string root,
+        string packageRoot,
+        string profile,
+        string runtimeIdentifier)
+    {
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "pwsh",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            }
+        };
+        process.StartInfo.ArgumentList.Add("-NoProfile");
+        process.StartInfo.ArgumentList.Add("-ExecutionPolicy");
+        process.StartInfo.ArgumentList.Add("Bypass");
+        process.StartInfo.ArgumentList.Add("-File");
+        process.StartInfo.ArgumentList.Add(Path.Combine(root, "scripts", "verify-package-payload.ps1"));
+        process.StartInfo.ArgumentList.Add("-PackageRoot");
+        process.StartInfo.ArgumentList.Add(packageRoot);
+        process.StartInfo.ArgumentList.Add("-Profile");
+        process.StartInfo.ArgumentList.Add(profile);
+        process.StartInfo.ArgumentList.Add("-RuntimeIdentifier");
+        process.StartInfo.ArgumentList.Add(runtimeIdentifier);
+
+        Assert.True(process.Start());
+        Task<string> standardOutputTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> standardErrorTask = process.StandardError.ReadToEndAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            process.Kill(entireProcessTree: true);
+            Assert.Fail("Package payload verifier timed out.");
+        }
+
+        string standardOutput = await standardOutputTask;
+        string standardError = await standardErrorTask;
+        return (process.ExitCode, standardOutput + standardError);
     }
 
     private static string FindWorkspaceRoot()

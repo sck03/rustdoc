@@ -49,6 +49,15 @@ if ($sensitiveEntries.Count) {
     throw "Release payload contains runtime data, credentials, database files, restore staging, or logs: $($relativeSensitiveEntries -join '; ')"
 }
 
+if ($Profile -eq "Desktop" -and $RuntimeIdentifier.StartsWith("linux-", [StringComparison]::OrdinalIgnoreCase)) {
+    $legacyLttngProviders = @($allEntries | Where-Object {
+        -not $_.PSIsContainer -and $_.Name -eq "libcoreclrtraceptprovider.so"
+    })
+    if ($legacyLttngProviders.Count) {
+        throw "Linux desktop payload contains the optional CoreCLR LTTng provider that requires unavailable liblttng-ust.so.0: $($legacyLttngProviders.FullName -join '; ')"
+    }
+}
+
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $fontManifestPath = Join-Path $repositoryRoot "Resources/Fonts/OpenSource/font-manifest.json"
 if (-not (Test-Path -LiteralPath $fontManifestPath -PathType Leaf)) { throw "Approved font manifest is missing: $fontManifestPath" }

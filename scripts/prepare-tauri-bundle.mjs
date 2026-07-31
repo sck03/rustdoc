@@ -20,6 +20,9 @@ const productEditionManifestFileName = "product-edition.json";
 
 const stableResourceDirs = new Set(["Templates", "OcrModels", "Resources", "Browsers", "Legal"]);
 const sidecarExcludedExtensions = new Set([".pdb", ".xml"]);
+// CoreCLR loads this LTTng provider opportunistically and tolerates its absence.
+// The .NET 8 binary requires liblttng-ust.so.0, which current Ubuntu releases no longer provide.
+const sidecarExcludedFileNames = new Set(["libcoreclrtraceptprovider.so"]);
 const rootConfigFiles = [];
 const runtimeDataDirectories = ["Database", "Templates", "Files", "Exports", "SingleWindow", "Backups", "Cache", "Config", "Security", "WebView", "Logs"];
 
@@ -100,7 +103,10 @@ for (const entry of entries) {
     continue;
   }
 
-  if (entry.isFile() && sidecarExcludedExtensions.has(path.extname(entry.name).toLowerCase())) {
+  if (entry.isFile() && (
+    sidecarExcludedExtensions.has(path.extname(entry.name).toLowerCase()) ||
+    sidecarExcludedFileNames.has(entry.name.toLowerCase())
+  )) {
     continue;
   }
 

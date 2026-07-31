@@ -125,7 +125,7 @@
 - **做什么：** 安装 .NET 8/Node 24/Rust，准备开源字体和 Chrome Headless Shell（Linux ARM64 使用明确的 Chromium ARM64 路径），构建 API/Web/Tauri、OCR 资源并验证精简 payload。`publish_release=false` 生成未签名验收包；`true` 才启用 updater 签名、上传安装包并合并 `latest.json`。
 - **输出：** `export-doc-manager-<platform>-<arch>-<edition>-<version>` Artifact，通常保留 14 天；发布模式另上传 GitHub Release 资产。
 - **Secrets/Variables：** 测试模式不需要签名材料；发布模式必须配置仓库 Variable `EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY`，以及带密码的 Secrets `TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。`EXPORTDOCMANAGER_UPDATER_ENDPOINT` 改为可选：留空时安装包只内置公钥，由管理员安装后在系统设置中配置 GitHub、自建服务器或公司内网地址。若构建时就要内置 HTTP 默认地址，还必须显式配置 `EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT=true`；公网默认地址仍应使用 HTTPS。调用方使用 `secrets: inherit`，不应把私钥写入仓库或日志。
-- **常见失败：** 版本格式、浏览器资源缺失/执行权限、OCR 运行时缺库、公钥或私钥缺失、未显式放行却尝试内置 HTTP endpoint、Release tag 已被其它版本占用。依赖清单校验不再因表单版本与仓库当前版本不同而失败；若提示 stale，错误会指出首个真实差异行，应重新生成并审查依赖，而不是删除 `--verify-repository`。Linux AppImage 使用 Tauri 自带的无 FUSE 解压运行模式，不需要额外安装 `libfuse2`；工作流显式安装 `file`、`xdg-utils`，并设置 `NO_STRIP=1`，避免 `linuxdeploy` 内置旧版 `strip` 重复处理 Ubuntu 24.04 新 ELF 段时退出。桌面构建统一带 `--verbose`，后续 `linuxdeploy`、签名或公证失败会保留真实子进程输出。桌面摘要固定使用 PowerShell 字面量 here-string，避免 Markdown 行尾反引号被解释为续行；治理门禁会拒绝重新引入该 ParserError。
+- **常见失败：** 版本格式、浏览器资源缺失/执行权限、OCR 运行时缺库、公钥或私钥缺失、未显式放行却尝试内置 HTTP endpoint、Release tag 已被其它版本占用。依赖清单校验不再因表单版本与仓库当前版本不同而失败；若提示 stale，错误会指出首个真实差异行，应重新生成并审查依赖，而不是删除 `--verify-repository`。Linux AppImage 使用 Tauri 自带的无 FUSE 解压运行模式，不需要额外安装 `libfuse2`；工作流显式安装 `file`、`xdg-utils`，并设置 `NO_STRIP=1`，避免 `linuxdeploy` 内置旧版 `strip` 重复处理 Ubuntu 24.04 新 ELF 段时退出。桌面 sidecar 会排除 CoreCLR 可选的 `libcoreclrtraceptprovider.so`，因为 .NET 8 的该诊断二进制仍声明旧 ABI `liblttng-ust.so.0`，而 Ubuntu 24.04 只有 `.so.1`；不要安装新 ABI 后伪造 `.so.0` 软链接。桌面构建统一带 `--verbose`，后续 `linuxdeploy`、签名或公证失败会保留真实子进程输出。桌面摘要固定使用 PowerShell 字面量 here-string，避免 Markdown 行尾反引号被解释为续行；治理门禁会拒绝重新引入该 ParserError。
 - **耗时：** 15—40 分钟，首次下载浏览器和 Rust 依赖时更久。
 
 ### 2.9 Reusable browser server package
@@ -159,7 +159,7 @@
 - **触发：** 仅 `workflow_dispatch`；输入版本、产品版、x64/ARM64 和是否发布 Release。
 - **平台/产物：** x64 使用 `ubuntu-latest`，ARM64 使用 `ubuntu-24.04-arm`；输出 deb/AppImage。Linux ARM64 当前是应用编译合同，浏览器资源使用明确的 Chromium ARM64 供给路径，必须以工作流实际结果为准。
 - **发布：** 规则与 Windows 桌面入口相同，默认不签名、不发布。
-- **常见失败：** GTK/WebKit、`file`/`xdg-utils`、AppImage 打包、执行权限、ARM64 runner 可用性和签名配置。若日志停在 `failed to run linuxdeploy`，应查看同一步骤前面的 verbose stderr；磁盘不足会有明确的 `No space left on device`，不需要把清理大量 runner 预装软件作为本工作流的固定前置步骤。
+- **常见失败：** GTK/WebKit、`file`/`xdg-utils`、AppImage 打包、执行权限、ARM64 runner 可用性和签名配置。若日志停在 `failed to run linuxdeploy`，应查看同一步骤前面的 verbose stderr；若出现 `Could not find dependency: liblttng-ust.so.0`，先确认构建使用了已排除 `libcoreclrtraceptprovider.so` 的最新 `main`，不要 Re-run 旧提交，也不要用 `.so.1` 伪造旧 ABI 软链接。磁盘不足会有明确的 `No space left on device`，不需要把清理大量 runner 预装软件作为本工作流的固定前置步骤。
 
 ### 2.12 Build macOS desktop package
 
