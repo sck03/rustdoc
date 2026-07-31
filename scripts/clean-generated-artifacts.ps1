@@ -2,6 +2,7 @@
 param(
     [switch]$IncludeNodeModules,
     [switch]$IncludePackageCaches,
+    [switch]$IncludeCodexRuntimeWorkspaces,
     [switch]$IncludeCodexRuntime,
     [switch]$IncludeLegacyRuntimeAssets,
     [switch]$IncludeReleaseOutputs,
@@ -59,6 +60,46 @@ function Get-DirectorySizeBytes {
     return [long]$sum.Sum
 }
 
+function Grant-CurrentUserGeneratedPathAccess {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if ((-not $IsWindows -and $PSVersionTable.Platform -ne "Win32NT") -or
+        -not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    $currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $entries = @((Get-Item -LiteralPath $Path -Force)) +
+        @(Get-ChildItem -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue)
+
+    foreach ($entry in $entries) {
+        try {
+            $acl = Get-Acl -LiteralPath $entry.FullName
+            $inheritanceFlags = if ($entry.PSIsContainer) {
+                [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor
+                    [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+            }
+            else {
+                [System.Security.AccessControl.InheritanceFlags]::None
+            }
+            $rule = [System.Security.AccessControl.FileSystemAccessRule]::new(
+                $currentIdentity,
+                [System.Security.AccessControl.FileSystemRights]::FullControl,
+                $inheritanceFlags,
+                [System.Security.AccessControl.PropagationFlags]::None,
+                [System.Security.AccessControl.AccessControlType]::Allow)
+            $acl.SetAccessRule($rule)
+            Set-Acl -LiteralPath $entry.FullName -AclObject $acl
+        }
+        catch {
+            Write-Verbose "Could not normalize generated-path ACL for '$($entry.FullName)': $($_.Exception.Message)"
+        }
+    }
+}
+
 function Remove-DirectoryWithRetry {
     param(
         [Parameter(Mandatory = $true)]
@@ -84,6 +125,10 @@ function Remove-DirectoryWithRetry {
             return
         }
         catch {
+            if ($attempt -eq 1) {
+                Grant-CurrentUserGeneratedPathAccess -Path $Path
+            }
+
             try {
                 [System.GC]::Collect()
                 [System.GC]::WaitForPendingFinalizers()
@@ -125,6 +170,54 @@ function ConvertTo-ExtendedLengthPath {
     }
 
     return "\\?\$fullPath"
+}
+
+function Stop-RepositoryDotNetBuildServers {
+    $runtimeRoot = Join-Path $workspaceRoot ".codex-runtime"
+    if (-not (Test-Path -LiteralPath $runtimeRoot)) {
+        return
+    }
+
+    $dotnetFileName = if ($IsWindows -or $PSVersionTable.Platform -eq "Win32NT") {
+        "dotnet.exe"
+    }
+    else {
+        "dotnet"
+    }
+
+    $localDotnet = Get-ChildItem -LiteralPath $runtimeRoot -Directory -Filter "dotnet-sdk-*" -ErrorAction SilentlyContinue |
+        Sort-Object -Property LastWriteTime -Descending |
+        ForEach-Object { Join-Path $_.FullName $dotnetFileName } |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+        Select-Object -First 1
+
+    if ([string]::IsNullOrWhiteSpace($localDotnet)) {
+        return
+    }
+
+    Write-Host "Stopping repository-local .NET compiler build servers..."
+    $previousDotNetCliHome = $env:DOTNET_CLI_HOME
+    $previousDotNetTelemetryOptOut = $env:DOTNET_CLI_TELEMETRY_OPTOUT
+    $previousDotNetSkipFirstTimeExperience = $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE
+    $shutdownExitCode = 0
+    try {
+        $env:DOTNET_CLI_HOME = Join-Path $runtimeRoot "dotnet-cli"
+        $env:DOTNET_CLI_TELEMETRY_OPTOUT = "1"
+        $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = "1"
+        New-Item -ItemType Directory -Force -Path $env:DOTNET_CLI_HOME | Out-Null
+
+        & $localDotnet build-server shutdown
+        $shutdownExitCode = $LASTEXITCODE
+    }
+    finally {
+        $env:DOTNET_CLI_HOME = $previousDotNetCliHome
+        $env:DOTNET_CLI_TELEMETRY_OPTOUT = $previousDotNetTelemetryOptOut
+        $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = $previousDotNetSkipFirstTimeExperience
+    }
+
+    if ($shutdownExitCode -ne 0) {
+        Write-Warning "Repository-local .NET build-server shutdown returned exit code $shutdownExitCode; cleanup retries will still be attempted."
+    }
 }
 
 function New-CleanupTarget {
@@ -202,52 +295,95 @@ function Test-IsUnderPath {
 function Get-GeneratedArtifactCleanupPlan {
     $targets = [System.Collections.Generic.List[object]]::new()
     $artifactsRoot = Join-Path $workspaceRoot "artifacts"
-    $gitRoot = Join-Path $workspaceRoot ".git"
     $codexRuntimeRoot = Join-Path $workspaceRoot ".codex-runtime"
     $nodeModulesPattern = [System.IO.Path]::DirectorySeparatorChar + "node_modules" + [System.IO.Path]::DirectorySeparatorChar
 
-    # Keep customer-facing packages by default. Only compiler/bundler caches and
-    # explicitly disposable smoke outputs are cleaned in the safe default mode.
-    foreach ($name in @(
-        "cargo-target-exportdoc",
-        "cargo-target-license-keygen",
-        "cargo-target-excel-analyzer",
-        "tauri-bundle",
-        "dev-server",
-        "login-visual-check",
-        "windows-installer-config",
-        "windows-installer-smoke"
-    )) {
-        Add-Target -Targets $targets -Path (Join-Path $artifactsRoot $name) -Reason "reproducible build or smoke output"
-    }
+    # artifacts/ is reserved for generated development output. Preserve only
+    # named delivery outputs and reusable download caches unless their explicit
+    # cleanup switches are supplied. This prevents newly introduced test or
+    # screenshot directories from accumulating indefinitely.
+    $releaseOutputNames = @("windows-desktop-run", "windows-installers", "license-keygen")
+    $artifactCacheNames = @(
+        "cargo-audit",
+        "chrome-for-testing",
+        "playwright-browsers",
+        "rustsec-advisory-db",
+        "tool-downloads"
+    )
 
-    if ($IncludeReleaseOutputs) {
-        foreach ($name in @("windows-desktop-run", "windows-installers")) {
-            Add-Target -Targets $targets -Path (Join-Path $artifactsRoot $name) -Reason "explicitly requested release output cleanup"
+    if (Test-Path -LiteralPath $artifactsRoot) {
+        foreach ($artifactDirectory in Get-ChildItem -LiteralPath $artifactsRoot -Directory -Force -ErrorAction SilentlyContinue) {
+            if ($artifactDirectory.Name -in $releaseOutputNames) {
+                if ($IncludeReleaseOutputs) {
+                    Add-Target -Targets $targets -Path $artifactDirectory.FullName -Reason "explicitly requested release output cleanup"
+                }
+                continue
+            }
+
+            if ($artifactDirectory.Name -in $artifactCacheNames) {
+                if ($IncludePackageCaches) {
+                    Add-Target -Targets $targets -Path $artifactDirectory.FullName -Reason "explicitly requested reusable package or download cache cleanup"
+                }
+                continue
+            }
+
+            Add-Target -Targets $targets -Path $artifactDirectory.FullName -Reason "reproducible build, validation, screenshot, or test output"
         }
     }
+
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "TestResults") -Reason "test result output"
+    Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "tmp") -Reason "repository-local temporary output"
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".vs") -Reason "local Visual Studio workspace cache"
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".dotnet-cli") -Reason "repo-local dotnet CLI home cache"
 
     if ($IncludeCodexRuntime) {
         Add-Target -Targets $targets -Path $codexRuntimeRoot -Reason "local Codex/Playwright runtime cache"
     }
+    elseif ($IncludeCodexRuntimeWorkspaces -and (Test-Path -LiteralPath $codexRuntimeRoot)) {
+        $persistentRuntimeNames = @(
+            ".dotnet",
+            "cargo-audit",
+            "dotnet-cli",
+            "gh-cli",
+            "gh-config",
+            "npm-cache",
+            "nuget-http-cache",
+            "nuget-packages",
+            "tools"
+        )
 
-    Get-ChildItem -LiteralPath $workspaceRoot -Recurse -Directory -Force -ErrorAction SilentlyContinue |
+        foreach ($runtimeDirectory in Get-ChildItem -LiteralPath $codexRuntimeRoot -Directory -Force -ErrorAction SilentlyContinue) {
+            if ($runtimeDirectory.Name -in $persistentRuntimeNames -or
+                $runtimeDirectory.Name -like "dotnet-sdk-*") {
+                continue
+            }
+
+            Add-Target -Targets $targets -Path $runtimeDirectory.FullName -Reason "explicitly requested disposable local test workspace cleanup"
+        }
+    }
+
+    # Restrict recursive compiler-output discovery to source trees. Runtime
+    # data, release outputs, downloaded tools, stable resources and .git are
+    # never traversed by this generic rule.
+    $sourceTreeDirectories = @()
+    foreach ($sourceTreeName in @("apps", "src", "tests", "tools")) {
+        $sourceTreePath = Join-Path $workspaceRoot $sourceTreeName
+        if (Test-Path -LiteralPath $sourceTreePath) {
+            $sourceTreeDirectories += Get-ChildItem -LiteralPath $sourceTreePath -Recurse -Directory -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    $sourceTreeDirectories |
         Where-Object {
             $_.Name -in @("bin", "obj", ".vite", "dist", "target") -and
-            -not (Test-IsUnderPath -Path $_.FullName -Root $artifactsRoot) -and
-            -not (Test-IsUnderPath -Path $_.FullName -Root $gitRoot) -and
-            ($IncludeCodexRuntime -or -not (Test-IsUnderPath -Path $_.FullName -Root $codexRuntimeRoot)) -and
-            ($IncludeNodeModules -or (-not ($_.FullName.Contains($nodeModulesPattern))))
+            ($IncludeNodeModules -or -not $_.FullName.Contains($nodeModulesPattern))
         } |
         ForEach-Object {
             Add-Target -Targets $targets -Path $_.FullName -Reason "generated compiler or bundler output"
         }
 
     if ($IncludeNodeModules) {
-        Get-ChildItem -LiteralPath $workspaceRoot -Recurse -Directory -Force -ErrorAction SilentlyContinue |
+        $sourceTreeDirectories |
             Where-Object { $_.Name -eq "node_modules" } |
             ForEach-Object {
                 Add-Target -Targets $targets -Path $_.FullName -Reason "npm dependency cache"
@@ -257,15 +393,32 @@ function Get-GeneratedArtifactCleanupPlan {
     if ($IncludePackageCaches) {
         Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".nuget") -Reason "repo-local NuGet cache"
         Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".npm") -Reason "repo-local npm cache"
+        Add-Target -Targets $targets -Path (Join-Path $codexRuntimeRoot "nuget-packages") -Reason "repo-local NuGet package cache"
+        Add-Target -Targets $targets -Path (Join-Path $codexRuntimeRoot "nuget-http-cache") -Reason "repo-local NuGet HTTP cache"
+        Add-Target -Targets $targets -Path (Join-Path $codexRuntimeRoot "npm-cache") -Reason "repo-local npm download cache"
+        Add-Target -Targets $targets -Path (Join-Path $codexRuntimeRoot "cargo-audit") -Reason "repo-local cargo-audit tool cache"
     }
 
     if ($IncludeLegacyRuntimeAssets) {
         Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "Browsers\ChromeForTesting") -Reason "optional browser renderer asset copy"
     }
 
-    $targets |
-        Sort-Object -Property Path -Unique |
-        Sort-Object -Property SizeBytes -Descending
+    $topLevelTargets = [System.Collections.Generic.List[object]]::new()
+    foreach ($candidate in $targets | Sort-Object -Property @{ Expression = { $_.Path.Length } }, Path) {
+        $coveredByParent = $false
+        foreach ($existingTarget in $topLevelTargets) {
+            if (Test-IsUnderPath -Path $candidate.Path -Root $existingTarget.Path) {
+                $coveredByParent = $true
+                break
+            }
+        }
+
+        if (-not $coveredByParent) {
+            [void]$topLevelTargets.Add($candidate)
+        }
+    }
+
+    $topLevelTargets | Sort-Object -Property SizeBytes -Descending
 }
 
 $plan = @(Get-GeneratedArtifactCleanupPlan)
@@ -286,6 +439,10 @@ foreach ($target in $plan) {
 
 if ($ListOnly) {
     return
+}
+
+if ($plan.Count -gt 0) {
+    Stop-RepositoryDotNetBuildServers
 }
 
 foreach ($target in $plan) {

@@ -12,7 +12,16 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("SupportsShouldProcess", content, StringComparison.Ordinal);
             Assert.Contains("Remove-DirectoryWithRetry -Path $target.Path", content, StringComparison.Ordinal);
             Assert.Contains("Remove-Item -LiteralPath $Path -Recurse -Force", content, StringComparison.Ordinal);
-            Assert.Contains("$IncludeCodexRuntime -or -not (Test-IsUnderPath", content, StringComparison.Ordinal);
+            Assert.Contains("$IncludeCodexRuntimeWorkspaces", content, StringComparison.Ordinal);
+            Assert.Contains("Get-ChildItem -LiteralPath $artifactsRoot -Directory", content, StringComparison.Ordinal);
+            Assert.Contains("Join-Path $workspaceRoot \"tmp\"", content, StringComparison.Ordinal);
+            Assert.Contains("Stop-RepositoryDotNetBuildServers", content, StringComparison.Ordinal);
+            Assert.Contains("build-server shutdown", content, StringComparison.Ordinal);
+            Assert.Contains("$LASTEXITCODE", content, StringComparison.Ordinal);
+            Assert.Contains("$env:DOTNET_CLI_HOME = Join-Path $runtimeRoot", content, StringComparison.Ordinal);
+            Assert.Contains("if ($plan.Count -gt 0)", content, StringComparison.Ordinal);
+            Assert.Contains("Grant-CurrentUserGeneratedPathAccess -Path $Path", content, StringComparison.Ordinal);
+            Assert.Contains("Set-Acl -LiteralPath", content, StringComparison.Ordinal);
             Assert.DoesNotContain("Remove-Item $", content, StringComparison.Ordinal);
             Assert.DoesNotContain("cmd /c", content, StringComparison.OrdinalIgnoreCase);
         }
@@ -35,15 +44,34 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             string content = File.ReadAllText(ResolveWorkspacePath("scripts", "clean-generated-artifacts.ps1"));
             int switchIndex = content.IndexOf("$IncludeReleaseOutputs", StringComparison.Ordinal);
+            int releaseNamesIndex = content.IndexOf("$releaseOutputNames", StringComparison.Ordinal);
             int conditionalIndex = content.IndexOf("if ($IncludeReleaseOutputs)", StringComparison.Ordinal);
-            int portableOutputIndex = content.IndexOf("windows-desktop-run", conditionalIndex, StringComparison.Ordinal);
-            int installerOutputIndex = content.IndexOf("windows-installers", conditionalIndex, StringComparison.Ordinal);
+            int portableOutputIndex = content.IndexOf("windows-desktop-run", releaseNamesIndex, StringComparison.Ordinal);
+            int installerOutputIndex = content.IndexOf("windows-installers", releaseNamesIndex, StringComparison.Ordinal);
+            int licenseOutputIndex = content.IndexOf("license-keygen", releaseNamesIndex, StringComparison.Ordinal);
 
             Assert.True(switchIndex >= 0, "Cleanup script should expose IncludeReleaseOutputs.");
-            Assert.True(conditionalIndex > switchIndex, "Release output cleanup must use an explicit condition.");
-            Assert.True(portableOutputIndex > conditionalIndex, "Portable release output must stay behind IncludeReleaseOutputs.");
-            Assert.True(installerOutputIndex > conditionalIndex, "Installer output must stay behind IncludeReleaseOutputs.");
+            Assert.True(releaseNamesIndex > switchIndex, "Release outputs must use an explicit retained-name list.");
+            Assert.True(conditionalIndex > releaseNamesIndex, "Release output cleanup must use an explicit condition.");
+            Assert.InRange(portableOutputIndex, releaseNamesIndex + 1, conditionalIndex - 1);
+            Assert.InRange(installerOutputIndex, releaseNamesIndex + 1, conditionalIndex - 1);
+            Assert.InRange(licenseOutputIndex, releaseNamesIndex + 1, conditionalIndex - 1);
             Assert.DoesNotContain("Add-Target -Targets $targets -Path $artifactsRoot", content, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void CleanupScript_ShouldKeepReusableCachesAndSdkUnlessExplicitlyRequested()
+        {
+            string content = File.ReadAllText(ResolveWorkspacePath("scripts", "clean-generated-artifacts.ps1"));
+
+            Assert.Contains("$artifactCacheNames", content, StringComparison.Ordinal);
+            Assert.Contains("chrome-for-testing", content, StringComparison.Ordinal);
+            Assert.Contains("playwright-browsers", content, StringComparison.Ordinal);
+            Assert.Contains("if ($IncludePackageCaches)", content, StringComparison.Ordinal);
+            Assert.Contains("if ($IncludeCodexRuntime)", content, StringComparison.Ordinal);
+            Assert.Contains("elseif ($IncludeCodexRuntimeWorkspaces", content, StringComparison.Ordinal);
+            Assert.Contains("dotnet-sdk-*", content, StringComparison.Ordinal);
+            Assert.Contains("nuget-packages", content, StringComparison.Ordinal);
         }
 
         [Fact]

@@ -57,4 +57,20 @@ pwsh -NoProfile -File ./scripts/verify-script-suite.ps1
 
 该门禁递归检查全部 `.ps1`、`.cmd` 和 `.mjs`：PowerShell AST、Node 语法、CMD 薄入口/共享宿主、危险系统路径模式，以及原生命令退出码是否统一处理。`run-tests.cmd` 会自动先执行该门禁。
 
+## 工作区空间清理
+
+先只读查看计划，不删除任何内容：
+
+```powershell
+./scripts/clean-generated-artifacts.ps1 -ListOnly
+```
+
+日常整理建议同时清除 `.codex-runtime` 中的一次性测试、截图、诊断和回归工作区，但保留仓库内 .NET SDK、NuGet/npm 缓存和工具：
+
+```powershell
+./scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntimeWorkspaces
+```
+
+默认清理会保留 `artifacts/windows-desktop-run/`、`artifacts/windows-installers/`、`artifacts/license-keygen/`、浏览器/工具下载缓存、`node_modules` 和完整 `.codex-runtime` 依赖缓存。只有确认可重新下载或重新构建时才组合使用 `-IncludePackageCaches`、`-IncludeNodeModules`、`-IncludeCodexRuntime` 或 `-IncludeLegacyRuntimeAssets`；只有明确不再需要便携包、安装器和内部注册机输出时才使用 `-IncludeReleaseOutputs`。所有目标都必须解析到当前工作区内部，脚本不会扫描或删除 `App_Data`、数据库、Git、模板、OCR 模型、字体资源或仓库外目录。
+
 注意：`artifacts/windows-desktop-run/` 是一次性构建输出。正式便携构建不检测、不询问，也不保留旧运行数据，会直接删除目标版本目录中的 `App_Data/` 和 `logs/` 后覆盖。需要保留的开发数据请在运行构建脚本前自行备份；不要把真实业务数据库放在该构建目录中长期使用。
