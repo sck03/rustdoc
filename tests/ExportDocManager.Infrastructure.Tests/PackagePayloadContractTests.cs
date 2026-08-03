@@ -141,6 +141,10 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("--standalone", installer, StringComparison.Ordinal);
         Assert.Contains("-checkend 2592000", installer, StringComparison.Ordinal);
         Assert.Contains("restore_previous_deployment", installer, StringComparison.Ordinal);
+        Assert.Contains("chmod 1777 \"$RUNTIME_ROOT/postgres\"", installer, StringComparison.Ordinal);
+        Assert.Contains("chmod 0777 \"$RUNTIME_ROOT/api-data/Config\"", installer, StringComparison.Ordinal);
+        Assert.Contains("chmod 0644 \"$SETTINGS_FILE\"", installer, StringComparison.Ordinal);
+        Assert.Contains("logs --no-color --tail=120", installer, StringComparison.Ordinal);
         Assert.Contains("config --quiet", installer, StringComparison.Ordinal);
         Assert.Contains("pull", installer, StringComparison.Ordinal);
         Assert.Contains("up -d --remove-orphans", installer, StringComparison.Ordinal);

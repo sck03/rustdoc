@@ -339,7 +339,11 @@ POSTGRES_USERNAME=${POSTGRES_USERNAME:-exportdoc}
 [[ "$POSTGRES_USERNAME" =~ ^[A-Za-z0-9_]{1,63}$ ]] || fail "POSTGRES_USER must contain 1-63 letters, digits, or underscores."
 
 mkdir -p -- "$RUNTIME_ROOT/api-data/Config" "$RUNTIME_ROOT/postgres" "$RUNTIME_ROOT/letsencrypt" "$RUNTIME_ROOT/acme-webroot"
-chmod 700 "$RUNTIME_ROOT" "$RUNTIME_ROOT/api-data" "$RUNTIME_ROOT/api-data/Config"
+# Keep the host-visible root private. Direct bind-mount roots must remain
+# writable when Docker user namespaces map container root to an unprivileged UID.
+chmod 700 "$RUNTIME_ROOT"
+chmod 1777 "$RUNTIME_ROOT/postgres" "$RUNTIME_ROOT/api-data" "$RUNTIME_ROOT/letsencrypt" "$RUNTIME_ROOT/acme-webroot"
+chmod 0777 "$RUNTIME_ROOT/api-data/Config"
 if [[ ! -f "$SETTINGS_FILE" ]]; then
   cat > "$SETTINGS_FILE" <<EOF
 {
@@ -355,7 +359,6 @@ if [[ ! -f "$SETTINGS_FILE" ]]; then
   }
 }
 EOF
-  chmod 600 "$SETTINGS_FILE"
 fi
 
 MASTER_KEY=$(env_value EXPORTDOCMANAGER_MASTER_KEY)
@@ -386,7 +389,8 @@ set_env_value EXPORTDOCMANAGER_DEPLOYMENT_MODE "$MODE"
 set_env_value EXPORTDOCMANAGER_PUBLIC_DOMAIN "$PUBLIC_DOMAIN"
 set_env_value EXPORTDOCMANAGER_ACME_EMAIL "$ACME_EMAIL"
 set_env_value TZ Asia/Shanghai
-chmod 600 "$ENVIRONMENT_FILE" "$SETTINGS_FILE"
+chmod 600 "$ENVIRONMENT_FILE"
+chmod 0644 "$SETTINGS_FILE"
 
 if [[ -n ${GHCR_TOKEN:-} ]]; then
   [[ -n ${GHCR_USER:-} ]] || fail "GHCR_USER is required when GHCR_TOKEN is set."
@@ -482,7 +486,13 @@ if [[ "$MODE" == "https" ]]; then
   fi
 fi
 
-"${COMPOSE[@]}" up -d --remove-orphans
+if ! "${COMPOSE[@]}" up -d --remove-orphans; then
+  "${COMPOSE[@]}" ps --all >&2 || true
+  DIAGNOSTIC_SERVICES=(postgres api web)
+  [[ "$MODE" == "https" ]] && DIAGNOSTIC_SERVICES+=(certbot)
+  "${COMPOSE[@]}" logs --no-color --tail=120 "${DIAGNOSTIC_SERVICES[@]}" >&2 || true
+  fail "Container startup failed. Review the service logs above; existing runtime data was not deleted."
+fi
 
 if [[ "$MODE" == "https" ]]; then
   READINESS_URL="https://${PUBLIC_DOMAIN}/readyz"

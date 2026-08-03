@@ -146,6 +146,8 @@ Compose 固定使用 `postgres:18-bookworm`：锁定 PostgreSQL 18 大版本，�
 
 PostgreSQL 18 官方镜像把默认 `PGDATA` 改为版本化目录 `/var/lib/postgresql/18/docker`，因此 Compose 必须把宿主运行根 `postgres/` 挂载到容器 `/var/lib/postgresql`，不能沿用 17 及以下的 `/var/lib/postgresql/data`。当前项目尚未投产，开发期旧 16 数据目录应备份需要的样例后删除并重新初始化；若未来已有生产数据，跨大版本必须使用 `pg_upgrade` 或 dump/restore，不能直接复用旧数据目录。
 
+Linux 安装器把外层 `runtime/` 固定为 `root` 专用的 `700`，同时按官方 PostgreSQL 18 镜像的挂载边界把 `runtime/postgres/` 设为带 sticky bit 的 `1777`；真正的 `18/docker` 数据目录仍由 PostgreSQL 创建为 `700`。`api-data/`、证书和 ACME 的直接挂载根也只在这个不可穿透的外层目录内开放容器写入，`Config/appsettings.json` 使用 `644` 供 Docker user-namespace/rootless 映射后的 API 读取，数据库密码仍受外层 `runtime/ 700` 保护。不要把这些内部挂载目录单独移动到公共可遍历路径，否则必须重新设计宿主 ACL。
+
 ## 存储边界
 
 - PostgreSQL 数据：`runtime/postgres/`

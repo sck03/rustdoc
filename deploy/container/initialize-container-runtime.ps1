@@ -272,6 +272,19 @@ function Protect-RuntimeConfigurationFile {
     }
 }
 
+function Set-UnixRuntimeMode {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][System.IO.UnixFileMode]$Mode
+    )
+
+    if ($IsWindows) {
+        return
+    }
+
+    [System.IO.File]::SetUnixFileMode($Path, $Mode)
+}
+
 if ($PostgreSqlPassword.Length -lt 12 -or $PostgreSqlPassword -notmatch '^[A-Za-z0-9._~!@%+=:-]+$') {
     throw "PostgreSQL 密码至少 12 位，且只能使用字母、数字和 . _ ~ ! @ % + = : -，避免 .env 转义歧义。"
 }
@@ -353,8 +366,26 @@ $resolvedRuntimeRoot = [System.IO.Path]::GetFullPath($RuntimeRoot)
 $apiDataRoot = Join-Path $resolvedRuntimeRoot "api-data"
 $configRoot = Join-Path $apiDataRoot "Config"
 New-Item -ItemType Directory -Force -Path $configRoot | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $resolvedRuntimeRoot "postgres") | Out-Null
+$postgresRoot = Join-Path $resolvedRuntimeRoot "postgres"
+New-Item -ItemType Directory -Force -Path $postgresRoot | Out-Null
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $resolvedEnvironmentFile) | Out-Null
+
+if (-not $IsWindows) {
+    $ownerOnlyDirectory = [System.IO.UnixFileMode]::UserRead -bor
+        [System.IO.UnixFileMode]::UserWrite -bor
+        [System.IO.UnixFileMode]::UserExecute
+    $sharedDirectory = $ownerOnlyDirectory -bor
+        [System.IO.UnixFileMode]::GroupRead -bor
+        [System.IO.UnixFileMode]::GroupWrite -bor
+        [System.IO.UnixFileMode]::GroupExecute -bor
+        [System.IO.UnixFileMode]::OtherRead -bor
+        [System.IO.UnixFileMode]::OtherWrite -bor
+        [System.IO.UnixFileMode]::OtherExecute
+    Set-UnixRuntimeMode $resolvedRuntimeRoot $ownerOnlyDirectory
+    Set-UnixRuntimeMode $apiDataRoot ($sharedDirectory -bor [System.IO.UnixFileMode]::StickyBit)
+    Set-UnixRuntimeMode $configRoot $sharedDirectory
+    Set-UnixRuntimeMode $postgresRoot ($sharedDirectory -bor [System.IO.UnixFileMode]::StickyBit)
+}
 
 $settings = [ordered]@{
     System = [ordered]@{
@@ -389,7 +420,16 @@ $envLines = @(
     "TZ=Asia/Shanghai"
 )
 $envLines | Set-Content -LiteralPath $resolvedEnvironmentFile -Encoding UTF8
-Protect-RuntimeConfigurationFile $settingsPath
+if ($IsWindows) {
+    Protect-RuntimeConfigurationFile $settingsPath
+}
+else {
+    $containerReadable = [System.IO.UnixFileMode]::UserRead -bor
+        [System.IO.UnixFileMode]::UserWrite -bor
+        [System.IO.UnixFileMode]::GroupRead -bor
+        [System.IO.UnixFileMode]::OtherRead
+    Set-UnixRuntimeMode $settingsPath $containerReadable
+}
 Protect-RuntimeConfigurationFile $resolvedEnvironmentFile
 
 Write-Host "容器运行目录已初始化: $resolvedRuntimeRoot"
