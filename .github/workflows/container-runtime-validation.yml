@@ -54,7 +54,7 @@ jobs:
           bash -n deploy/container/install-container.sh
           bash deploy/container/install-container.sh --help >/dev/null
 
-          installer_root="${{ github.workspace }}/artifacts/container-installer-test"
+          installer_root="${{ runner.temp }}/container-installer-test"
           sudo env EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE="file://${{ github.workspace }}/deploy/container" \
             bash deploy/container/install-container.sh \
             --mode http \
