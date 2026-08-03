@@ -40,9 +40,11 @@ for (const requiredBuildContract of [
   'dangerousInsecureTransportProtocol: endpoint.startsWith("http:")',
   "endpoint ? [endpoint] : []",
   "releases/download",
+  'spawnSync(process.execPath, [tauriCliPath, "build"',
 ]) {
   assert.ok(buildWrapper.includes(requiredBuildContract), `release build wrapper is missing ${requiredBuildContract}`);
 }
+assert.ok(!buildWrapper.includes("npm.cmd"), "the build wrapper must not spawn a Windows command shim from Node");
 for (const requiredWorkflowContract of [
   "EXPORTDOCMANAGER_REQUIRE_SIGNED_UPDATER",
   "Build signed updater package",

@@ -30,6 +30,8 @@ Tauri 正式 updater 密钥不由仓库脚本或 CI 自动生成，也不需要�
 
 桌面资源准备会在 release 依赖治理扫描前自动还原完整 `ExportDocManager.sln`。因此运行空间清理删除所有项目 `bin/obj` 后，可以直接执行上述构建入口，不需要先手工运行测试或 `dotnet restore`；.NET CLI 和 NuGet 缓存仍由构建环境定向到仓库 `.codex-runtime/`，不会新增系统 C 盘默认缓存。
 
+Tauri 构建包装器直接使用当前 Node 启动 `apps/export-doc-tauri/node_modules/@tauri-apps/cli/tauri.js`，不再从 Node 子进程调用 Windows `npm.cmd`。这是 Node 24 在 Windows 上的进程启动兼容要求，不改变 Tauri 版本、构建参数或安装包内容。
+
 公开仓库不提交 Chromium 二进制。`run-tests.ps1` 找不到程序根 Chromium 或 `EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE` 时，会明确跳过两个真实 PDF 浏览器测试；正式发布验收使用 `-RequireBrowserPdfTests`，缺少渲染器即失败。测试默认执行 restore，只有确认依赖已还原时才使用 `-NoRestore`。
 
 当前不使用 `.github/dependabot.yml` 自动创建依赖更新 PR。NuGet、npm、Cargo、Docker 和 Actions 版本由维护者集中审查后人工升级，避免一次更新触发大量分支和云端构建。

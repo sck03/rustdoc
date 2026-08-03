@@ -111,6 +111,20 @@ public sealed class PackagePayloadContractTests
     }
 
     [Fact]
+    public void TauriBuildWrapper_ShouldLaunchLocalCliWithoutWindowsCommandShim()
+    {
+        string root = FindWorkspaceRoot();
+        string buildWrapper = File.ReadAllText(Path.Combine(root, "scripts", "run-tauri-build.mjs"));
+
+        Assert.Contains(
+            "path.join(tauriRoot, \"node_modules\", \"@tauri-apps\", \"cli\", \"tauri.js\")",
+            buildWrapper,
+            StringComparison.Ordinal);
+        Assert.Contains("spawnSync(process.execPath, [tauriCliPath, \"build\"", buildWrapper, StringComparison.Ordinal);
+        Assert.DoesNotContain("npm.cmd", buildWrapper, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ReleasePayloadVerifier_ShouldRejectRuntimeDatabaseAndSecretFixtures()
     {
         string root = FindWorkspaceRoot();

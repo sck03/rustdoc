@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tauriRoot = path.join(repositoryRoot, "apps", "export-doc-tauri");
 const generatedRoot = path.join(repositoryRoot, "artifacts", "tauri-updater-config");
+const tauriCliPath = path.join(tauriRoot, "node_modules", "@tauri-apps", "cli", "tauri.js");
 const editionCatalog = JSON.parse(
   readFileSync(path.join(repositoryRoot, "scripts", "product-editions.json"), "utf8"),
 );
@@ -108,8 +109,7 @@ if (publicKey) {
   buildArguments.push("--config", configPath);
 }
 
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const result = spawnSync(npmCommand, ["exec", "--", "tauri", "build", ...buildArguments], {
+const result = spawnSync(process.execPath, [tauriCliPath, "build", ...buildArguments], {
   cwd: tauriRoot,
   env: process.env,
   stdio: "inherit",
