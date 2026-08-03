@@ -10,6 +10,28 @@ namespace ExportDocManager.Api.Tests
     public class ApiPublicHealthProbeMiddlewareTests
     {
         [Fact]
+        public async Task ReadinessProbe_ShouldResolveAuthenticationServiceGraph()
+        {
+            int authenticationGraphResolutionCount = 0;
+            using var services = new ServiceCollection()
+                .AddSingleton<ApiCurrentUserResolver>(_ =>
+                {
+                    authenticationGraphResolutionCount++;
+                    return new ApiCurrentUserResolver(new InMemoryApiSessionTokenService());
+                })
+                .BuildServiceProvider();
+            var app = new ApplicationBuilder(services);
+            app.UseExportDocManagerReadiness();
+
+            var context = CreateContext(HttpMethods.Get, "/readyz");
+            context.RequestServices = services;
+            await app.Build()(context);
+
+            Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+            Assert.Equal(1, authenticationGraphResolutionCount);
+        }
+
+        [Fact]
         public async Task AnonymousHealthProbe_ShouldCompleteBeforeDownstreamPipeline()
         {
             using var services = new ServiceCollection().BuildServiceProvider();

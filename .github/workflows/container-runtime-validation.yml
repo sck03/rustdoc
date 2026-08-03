@@ -279,6 +279,19 @@ jobs:
             exit 1
           fi
 
+          login_status="$(curl --connect-timeout 2 --max-time 10 --silent --show-error \
+            --output ../../artifacts/container-runtime/evidence/login-validation.json \
+            --write-out '%{http_code}' \
+            --header 'Content-Type: application/json' \
+            --data '{"username":"","password":""}' \
+            "http://127.0.0.1:${EXPORTDOCMANAGER_WEB_PORT}/api/auth/login")"
+          if [ "$login_status" != "400" ]; then
+            echo "Anonymous login validation returned HTTP $login_status instead of 400." >&2
+            cat ../../artifacts/container-runtime/evidence/login-validation.json >&2 || true
+            show_diagnostics
+            exit 1
+          fi
+
       - name: Validate writable runtime configuration boundary
         working-directory: deploy/container
         shell: bash

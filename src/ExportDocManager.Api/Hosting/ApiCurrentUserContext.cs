@@ -8,14 +8,10 @@ namespace ExportDocManager.Api.Hosting
     {
         private static readonly AsyncLocal<User> BackgroundCurrentUser = new();
         private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly ApiCurrentUserResolver _currentUserResolver;
 
-        public ApiCurrentUserContext(
-            IHttpContextAccessor httpContextAccessor,
-            ApiCurrentUserResolver currentUserResolver)
+        public ApiCurrentUserContext(IHttpContextAccessor httpContextAccessor)
         {
             _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
-            _currentUserResolver = currentUserResolver ?? throw new ArgumentNullException(nameof(currentUserResolver));
         }
 
         public User CurrentUser
@@ -34,7 +30,7 @@ namespace ExportDocManager.Api.Hosting
                     return cachedUser;
                 }
 
-                return _currentUserResolver.ResolveCached(context);
+                return null;
             }
         }
 

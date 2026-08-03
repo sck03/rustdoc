@@ -33,6 +33,9 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (context.Request.Path.Equals(ReadinessPath, StringComparison.OrdinalIgnoreCase))
                 {
+                    // Readiness must cross the authentication service graph. This catches
+                    // dependency cycles that a process-only health response would hide.
+                    _ = context.RequestServices.GetService<ApiCurrentUserResolver>();
                     await WriteReadinessAsync(context).ConfigureAwait(false);
                     return;
                 }
