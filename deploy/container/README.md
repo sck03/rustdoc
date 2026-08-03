@@ -2,6 +2,57 @@
 
 该部署只发布 `Full` 产品，并通过 PostgreSQL 中的账号岗位、权限模板和数据归属控制实际能力。当前 Compose 方案使用一个 Web 容器承载 Nginx、一个 API 容器和一个 PostgreSQL 容器；它适合公司局域网，也支持在需要时叠加 TLS。HTTP、HTTPS 和 Nginx 的选择属于部署边界，不改变业务权限、数据库隔离或登录流程。
 
+## Linux VPS 一键安装已发布的 GHCR 镜像
+
+一键安装器不需要克隆仓库。它会下载当前部署清单、生成相互独立的 PostgreSQL 密码和首次启用令牌、选择不冲突的 Docker 私有 `/28`、把运行数据放入 `/opt/export-doc-manager/runtime/`，然后拉取 `ghcr.io/sck03/export-doc-manager-api` 与 `...-web`。重复执行时保留已有密码、配置和数据，只更新部署清单与所选镜像标签。
+
+内网 HTTP，默认从 `http://服务器IP:8080` 访问：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sck03/rustdoc/main/deploy/container/install-container.sh |
+  sudo bash -s -- --mode http --tag 0.1.2 --install-docker
+```
+
+公网 HTTPS，先把域名 A 记录指向 VPS，并开放 TCP `80/443`：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sck03/rustdoc/main/deploy/container/install-container.sh |
+  sudo bash -s -- --mode https --domain docs.example.com --email ops@example.com --tag 0.1.2 --install-docker
+```
+
+把示例版本 `0.1.2` 换成 GitHub Packages 中实际发布的版本；生产部署建议固定精确版本，而不是长期跟随 `latest`。`--install-docker` 只在宿主尚未安装 Docker 时调用 Docker 官方安装脚本；已经安装 Docker Engine 与 Compose v2 时可以省略。执行远程脚本前，可先下载并审查脚本内容再运行。
+
+公网模式没有增加第二层业务代理。Nginx 仍是唯一 Web 服务器和反向代理：正常运行时 `80` 只处理 ACME 验证并跳转 HTTPS，`443` 提供 React 和同源 API。首次签发或证书不足 30 天有效期时，安装器会暂时停止 Web，使用 Certbot standalone 独占 `80` 完成签发，再启动 Nginx；以后常驻的 Certbot 容器每 12 小时通过 Nginx 暴露的 webroot 检查续期，Nginx 每小时无中断 reload 新证书。Apache-2.0 许可的 Certbot 始终不接收业务请求，也不属于 API 可信代理链；签发失败时，安装器会尽力恢复原 HTTP/HTTPS 部署。
+
+安装成功会在终端显示首次启用令牌。之后也可在 VPS 上读取：
+
+```bash
+sudo sed -n 's/^EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=//p' /opt/export-doc-manager/.env
+```
+
+首次访问时展开登录页“高级连接选项”，填写该令牌，以 `admin` 登录并输入希望设置的应用管理员密码。数据库密码、首次启用令牌和管理员密码是三份不同凭据，不要复用。
+
+升级或切换到新的精确镜像版本：
+
+```bash
+sudo /opt/export-doc-manager/install-container.sh --mode http --tag 0.1.3
+```
+
+公网部署升级时继续传原域名和邮箱，或者直接省略，安装器会复用 `.env` 中的值：
+
+```bash
+sudo /opt/export-doc-manager/install-container.sh --mode https --tag 0.1.3
+```
+
+若 GHCR Package 被设为 Private，先创建只有 `read:packages` 权限的 GitHub token，再通过环境变量登录；令牌不写安装参数或 `.env`：
+
+```bash
+sudo env GHCR_USER='你的GitHub账号' GHCR_TOKEN='只读Packages令牌' \
+  /opt/export-doc-manager/install-container.sh --mode http --tag 0.1.3
+```
+
+安装器不会自动修改 UFW、云安全组、域名或 Docker Engine 的全局 `data-root`。内网 HTTP 应只向办公网/VPN 放行所选端口；公网 HTTPS 只放行 `80/443`。业务数据库、API 配置、日志、备份和 Let's Encrypt 证书都在安装目录 `runtime/`，但镜像层仍由 Docker Engine 的全局数据目录管理；需要放到独立数据盘时，应在首次部署前按 Docker 官方文档配置 Engine `data-root`。
+
 ## 先选择部署模式
 
 ### 公司内网 HTTP（正式支持）
@@ -16,7 +67,7 @@ docker compose -f .\docker-compose.yml --env-file .\.env up -d --build
 
 ### 公网或合规 HTTPS
 
-在公网、跨网段访问、零信任网络或企业合规要求下，准备可信证书和私钥后叠加 HTTPS overlay：
+公网域名优先使用上面的一键安装器和 `docker-compose.acme.yml`，由 Certbot 自动申请、续期，Nginx 保持唯一业务入口。企业已有证书、内网 CA 或统一证书平台时，可继续使用手工证书 overlay：
 
 ```powershell
 docker compose `
@@ -26,7 +77,7 @@ docker compose `
   up -d --build
 ```
 
-overlay 额外发布 HTTPS 端口 `8443`，启用 TLS 1.2/1.3、HSTS 和更严格的安全响应头。若要“只允许 HTTPS”，应在防火墙关闭或限制 `8080`，不要仅依赖浏览器重定向。也可以让企业负载均衡、网关或 CDN 在 Nginx 前终止 TLS；此时必须把其实际连接 Nginx 的固定 IP 配置为可信代理。
+手工证书 overlay 额外发布 HTTPS 端口 `8443`，启用 TLS 1.2/1.3、HSTS 和更严格的安全响应头。若要“只允许 HTTPS”，应在防火墙关闭或限制 `8080`，不要仅依赖浏览器重定向。一键公网模式则固定使用标准 `80/443`，HTTP 自动跳转 HTTPS。也可以让企业负载均衡、网关或 CDN 在 Nginx 前终止 TLS；此时必须把其实际连接 Nginx 的固定 IP 配置为可信代理。
 
 ### 非 Docker 浏览器服务器包
 
@@ -99,6 +150,7 @@ PostgreSQL 18 官方镜像把默认 `PGDATA` 改为版本化目录 `/var/lib/pos
 
 - PostgreSQL 数据：`runtime/postgres/`
 - API 数据、日志、授权镜像、缓存、备份和用户模板：`runtime/api-data/`
+- Let's Encrypt 证书、账户和续期状态：`runtime/letsencrypt/`；ACME HTTP-01 工作目录：`runtime/acme-webroot/`
 - 可编辑程序配置：`runtime/api-data/Config/appsettings.json`
 - 容器内报表 Chromium：Debian 官方 `chromium` 包，固定通过 `/usr/bin/chromium` 使用；不从宿主 C 盘或程序运行数据根复制浏览器二进制
 - 镜像层与 Docker 自身缓存由 Docker Engine 管理；Windows 上如要求系统 C 盘零占用，还必须把 Docker Desktop/Engine 的 data-root 或磁盘镜像迁到非系统盘。

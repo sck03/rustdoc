@@ -48,6 +48,57 @@ jobs:
         shell: pwsh
         run: ./scripts/github/verify-public-source.ps1
 
+      - name: Validate Linux one-command installer
+        shell: bash
+        run: |
+          bash -n deploy/container/install-container.sh
+          bash deploy/container/install-container.sh --help >/dev/null
+
+          installer_root="${{ github.workspace }}/artifacts/container-installer-test"
+          sudo env EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE="file://${{ github.workspace }}/deploy/container" \
+            bash deploy/container/install-container.sh \
+            --mode http \
+            --tag validation \
+            --web-port 18080 \
+            --install-dir "$installer_root" \
+            --no-start
+          first_password="$(sudo sed -n 's/^POSTGRES_PASSWORD=//p' "$installer_root/.env")"
+          first_token="$(sudo sed -n 's/^EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=//p' "$installer_root/.env")"
+
+          sudo env EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE="file://${{ github.workspace }}/deploy/container" \
+            bash "$installer_root/install-container.sh" \
+            --mode http \
+            --install-dir "$installer_root" \
+            --no-start
+          test "$first_password" = "$(sudo sed -n 's/^POSTGRES_PASSWORD=//p' "$installer_root/.env")"
+          test "$first_token" = "$(sudo sed -n 's/^EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=//p' "$installer_root/.env")"
+          test "$(sudo sed -n 's/^EXPORTDOCMANAGER_IMAGE_TAG=//p' "$installer_root/.env")" = "validation"
+          test "$(sudo sed -n 's/^EXPORTDOCMANAGER_WEB_PORT=//p' "$installer_root/.env")" = "18080"
+
+          sudo env EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE="file://${{ github.workspace }}/deploy/container" \
+            bash "$installer_root/install-container.sh" \
+            --mode https \
+            --domain docs.example.com \
+            --email ops@example.com \
+            --install-dir "$installer_root" \
+            --no-start
+          test "$(sudo sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' "$installer_root/.env")" = "https"
+          test "$(sudo sed -n 's/^EXPORTDOCMANAGER_WEB_PORT=//p' "$installer_root/.env")" = "80"
+
+          sudo env EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE="file://${{ github.workspace }}/deploy/container" \
+            bash "$installer_root/install-container.sh" \
+            --mode http \
+            --web-port 18080 \
+            --install-dir "$installer_root" \
+            --no-start
+          test "$first_password" = "$(sudo sed -n 's/^POSTGRES_PASSWORD=//p' "$installer_root/.env")"
+          test "$first_token" = "$(sudo sed -n 's/^EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=//p' "$installer_root/.env")"
+          test "$(sudo sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' "$installer_root/.env")" = "http"
+          test "$(sudo find "$installer_root" -maxdepth 1 -name '.env.previous.*' -print -quit)" = ""
+          sudo test -f "$installer_root/runtime/api-data/Config/appsettings.json"
+          test "$(sudo stat -c '%a' "$installer_root/.env")" = "600"
+          sudo chown -R "$(id -u):$(id -g)" "$installer_root"
+
       - name: Initialize isolated runtime directory
         shell: pwsh
         run: |
@@ -74,6 +125,27 @@ jobs:
         run: |
           docker compose config --quiet
           docker compose -f docker-compose.yml -f docker-compose.https.yml config --quiet
+          EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/sck03 \
+            EXPORTDOCMANAGER_IMAGE_TAG=validation \
+            docker compose -f docker-compose.ghcr.yml config --quiet
+          EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/sck03 \
+            EXPORTDOCMANAGER_IMAGE_TAG=validation \
+            docker compose -f docker-compose.ghcr.yml -f docker-compose.acme.yml config --quiet
+
+      - name: Validate automatic HTTPS Nginx configuration
+        working-directory: deploy/container
+        shell: bash
+        run: |
+          certificate_root="${{ github.workspace }}/artifacts/container-runtime/acme-config-test/letsencrypt"
+          mkdir -p "$certificate_root/live/exportdocmanager" "${{ github.workspace }}/artifacts/container-runtime/acme-config-test/webroot"
+          cp secrets/tls/server.crt "$certificate_root/live/exportdocmanager/fullchain.pem"
+          cp secrets/tls/server.key "$certificate_root/live/exportdocmanager/privkey.pem"
+          docker run --rm \
+            --add-host api:127.0.0.1 \
+            --volume "${{ github.workspace }}/deploy/container/nginx.acme.conf:/etc/nginx/conf.d/default.conf:ro" \
+            --volume "$certificate_root:/etc/letsencrypt:ro" \
+            --volume "${{ github.workspace }}/artifacts/container-runtime/acme-config-test/webroot:/var/www/certbot:ro" \
+            nginx:1.27-alpine nginx -t
 
       - name: Build HTTP images
         working-directory: deploy/container

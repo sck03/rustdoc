@@ -125,6 +125,44 @@ public sealed class PackagePayloadContractTests
     }
 
     [Fact]
+    public void ContainerInstaller_ShouldKeepNginxAsTheOnlyBusinessGateway()
+    {
+        string root = FindWorkspaceRoot();
+        string installer = File.ReadAllText(Path.Combine(root, "deploy", "container", "install-container.sh"));
+        string baseCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.ghcr.yml"));
+        string acmeCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.acme.yml"));
+        string nginxConfig = File.ReadAllText(Path.Combine(root, "deploy", "container", "nginx.acme.conf"));
+
+        Assert.Contains("set -Eeuo pipefail", installer, StringComparison.Ordinal);
+        Assert.Contains("select_available_subnet", installer, StringComparison.Ordinal);
+        Assert.Contains("docker-compose.ghcr.yml", installer, StringComparison.Ordinal);
+        Assert.Contains("docker-compose.acme.yml", installer, StringComparison.Ordinal);
+        Assert.Contains("certbot/certbot:v5.7.0", installer, StringComparison.Ordinal);
+        Assert.Contains("--standalone", installer, StringComparison.Ordinal);
+        Assert.Contains("-checkend 2592000", installer, StringComparison.Ordinal);
+        Assert.Contains("restore_previous_deployment", installer, StringComparison.Ordinal);
+        Assert.Contains("config --quiet", installer, StringComparison.Ordinal);
+        Assert.Contains("pull", installer, StringComparison.Ordinal);
+        Assert.Contains("up -d --remove-orphans", installer, StringComparison.Ordinal);
+        Assert.Contains("/readyz", installer, StringComparison.Ordinal);
+        Assert.DoesNotContain("--build", installer, StringComparison.Ordinal);
+        Assert.DoesNotContain("docker compose down", installer, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("caddy", installer, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Contains("export-doc-manager-api", baseCompose, StringComparison.Ordinal);
+        Assert.Contains("export-doc-manager-web", baseCompose, StringComparison.Ordinal);
+        Assert.Contains("expose:", baseCompose, StringComparison.Ordinal);
+        Assert.DoesNotContain("5188:5188", baseCompose, StringComparison.Ordinal);
+        Assert.Contains("certbot/certbot:v5.7.0", acmeCompose, StringComparison.Ordinal);
+        Assert.Contains("renew --webroot", acmeCompose, StringComparison.Ordinal);
+        Assert.DoesNotContain("proxy_pass", acmeCompose, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("listen 8443 ssl", nginxConfig, StringComparison.Ordinal);
+        Assert.Contains("proxy_pass http://api:5188", nginxConfig, StringComparison.Ordinal);
+        Assert.Contains("/.well-known/acme-challenge/", nginxConfig, StringComparison.Ordinal);
+        Assert.Contains("Strict-Transport-Security", nginxConfig, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ReleasePayloadVerifier_ShouldRejectRuntimeDatabaseAndSecretFixtures()
     {
         string root = FindWorkspaceRoot();
