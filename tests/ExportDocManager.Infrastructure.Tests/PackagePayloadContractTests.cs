@@ -94,6 +94,23 @@ public sealed class PackagePayloadContractTests
     }
 
     [Fact]
+    public void DesktopBundle_ShouldRestoreCompleteSolutionBeforeDependencyGovernance()
+    {
+        string root = FindWorkspaceRoot();
+        string bundleScript = File.ReadAllText(Path.Combine(root, "scripts", "prepare-tauri-bundle.mjs"));
+        const string solutionRestore = "run(\"dotnet\", [\"restore\", path.join(repoRoot, \"ExportDocManager.sln\")], buildEnv);";
+        const string governanceGenerator = "path.join(repoRoot, \"scripts\", \"generate-dependency-governance.mjs\")";
+
+        int restoreIndex = bundleScript.IndexOf(solutionRestore, StringComparison.Ordinal);
+        int governanceIndex = bundleScript.IndexOf(governanceGenerator, StringComparison.Ordinal);
+
+        Assert.True(restoreIndex >= 0, "Desktop bundle preparation must restore the complete solution.");
+        Assert.True(
+            governanceIndex > restoreIndex,
+            "The complete solution restore must run before dependency governance scans every project.");
+    }
+
+    [Fact]
     public async Task ReleasePayloadVerifier_ShouldRejectRuntimeDatabaseAndSecretFixtures()
     {
         string root = FindWorkspaceRoot();

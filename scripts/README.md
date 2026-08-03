@@ -28,6 +28,8 @@ Tauri 正式 updater 密钥不由仓库脚本或 CI 自动生成，也不需要�
 
 构建输出按“一次生成、完整替换”处理：单版和三版便携包会在复制前清理旧稳定资源及整个浏览器目标目录；未传 `-IncludeLicenseKeygen` 的三版构建会删除旧 `KEY/`；安装器只清理本次请求版本的旧安装包与版本 manifest，未请求版本继续保留。单版便携和每一版安装器在进入交付目录前都会自动执行 `verify-package-payload.ps1`，禁止夹带未知字体、Playwright 开发 UI、重复 ONNX Runtime 或内部注册机。
 
+桌面资源准备会在 release 依赖治理扫描前自动还原完整 `ExportDocManager.sln`。因此运行空间清理删除所有项目 `bin/obj` 后，可以直接执行上述构建入口，不需要先手工运行测试或 `dotnet restore`；.NET CLI 和 NuGet 缓存仍由构建环境定向到仓库 `.codex-runtime/`，不会新增系统 C 盘默认缓存。
+
 公开仓库不提交 Chromium 二进制。`run-tests.ps1` 找不到程序根 Chromium 或 `EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE` 时，会明确跳过两个真实 PDF 浏览器测试；正式发布验收使用 `-RequireBrowserPdfTests`，缺少渲染器即失败。测试默认执行 restore，只有确认依赖已还原时才使用 `-NoRestore`。
 
 当前不使用 `.github/dependabot.yml` 自动创建依赖更新 PR。NuGet、npm、Cargo、Docker 和 Actions 版本由维护者集中审查后人工升级，避免一次更新触发大量分支和云端构建。

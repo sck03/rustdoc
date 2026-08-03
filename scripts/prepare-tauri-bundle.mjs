@@ -206,6 +206,7 @@ function normalizeProductEdition(value) {
 }
 
 async function generateDependencyGovernance(buildEnv) {
+  run("dotnet", ["restore", path.join(repoRoot, "ExportDocManager.sln")], buildEnv);
   run(
     "node",
     [
