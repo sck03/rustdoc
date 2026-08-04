@@ -167,6 +167,20 @@ public sealed class PackagePayloadContractTests
     }
 
     [Fact]
+    public void ContainerApi_ShouldExplicitlyDisableChromiumSandboxForItsRootRuntime()
+    {
+        string root = FindWorkspaceRoot();
+        string dockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.api"));
+        string localCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.yml"));
+        string ghcrCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.ghcr.yml"));
+        const string setting = "EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX";
+
+        Assert.Contains($"{setting}=true", dockerfile, StringComparison.Ordinal);
+        Assert.Contains($"{setting}: \"true\"", localCompose, StringComparison.Ordinal);
+        Assert.Contains($"{setting}: \"true\"", ghcrCompose, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ReleasePayloadVerifier_ShouldRejectRuntimeDatabaseAndSecretFixtures()
     {
         string root = FindWorkspaceRoot();

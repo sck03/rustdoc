@@ -54,10 +54,24 @@ namespace ExportDocManager.Services.BrowserRuntime
             Func<IPage, CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default)
         {
+            TimeSpan timeout = TimeSpan.FromSeconds(ReadPositiveInt(TimeoutEnvironmentVariable, 30, 5, 180));
+            return await ExecuteAsync(
+                    BrowserWorkloadKind.WebAutomation,
+                    timeout,
+                    operation,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        internal async Task<T> ExecuteAsync<T>(
+            BrowserWorkloadKind workload,
+            TimeSpan timeout,
+            Func<IPage, CancellationToken, Task<T>> operation,
+            CancellationToken cancellationToken = default)
+        {
             ArgumentNullException.ThrowIfNull(operation);
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-            await using var workload = await _runtime.AcquireAsync(BrowserWorkloadKind.WebAutomation, cancellationToken).ConfigureAwait(false);
-            TimeSpan timeout = TimeSpan.FromSeconds(ReadPositiveInt(TimeoutEnvironmentVariable, 30, 5, 180));
+            await using var workloadLease = await _runtime.AcquireAsync(workload, cancellationToken).ConfigureAwait(false);
             using var timeoutCts = new CancellationTokenSource(timeout);
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
@@ -67,13 +81,13 @@ namespace ExportDocManager.Services.BrowserRuntime
             bool operationStarted = false;
             try
             {
-                IBrowser browser = await BeginOperationAsync(linkedCts.Token).ConfigureAwait(false);
+                IBrowser browser = await BeginOperationAsync(workload, linkedCts.Token).ConfigureAwait(false);
                 operationStarted = true;
                 context = await browser.NewContextAsync(new BrowserNewContextOptions
                 {
                     IgnoreHTTPSErrors = false,
                     Locale = "zh-CN",
-                    UserAgent = "Mozilla/5.0 AppleWebKit/537.36 Chrome/151.0 Safari/537.36 ExportDocManager-HsCode"
+                    UserAgent = "Mozilla/5.0 AppleWebKit/537.36 Chrome/151.0 Safari/537.36 ExportDocManager-BrowserRuntime"
                 }).ConfigureAwait(false);
                 page = await context.NewPageAsync().ConfigureAwait(false);
                 page.SetDefaultTimeout((float)timeout.TotalMilliseconds);
@@ -85,7 +99,8 @@ namespace ExportDocManager.Services.BrowserRuntime
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
             {
                 recycleBrowser = true;
-                throw new InvalidOperationException($"浏览器自动化超过 {Math.Ceiling(timeout.TotalSeconds)} 秒，已关闭本任务页面；受控浏览器将在其他并行页面结束后安全回收。");
+                string operationName = workload == BrowserWorkloadKind.PdfRendering ? "PDF 渲染" : "自动化";
+                throw new InvalidOperationException($"浏览器{operationName}超过 {Math.Ceiling(timeout.TotalSeconds)} 秒，已关闭本任务页面；受控浏览器将在其他并行页面结束后安全回收。");
             }
             catch
             {
@@ -104,7 +119,9 @@ namespace ExportDocManager.Services.BrowserRuntime
             }
         }
 
-        private async Task<IBrowser> BeginOperationAsync(CancellationToken cancellationToken)
+        private async Task<IBrowser> BeginOperationAsync(
+            BrowserWorkloadKind workload,
+            CancellationToken cancellationToken)
         {
             await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
@@ -118,7 +135,7 @@ namespace ExportDocManager.Services.BrowserRuntime
                 if (_browser == null || !_browser.IsConnected || _process == null || _process.HasExited)
                 {
                     await StopBrowserCoreAsync().ConfigureAwait(false);
-                    await StartBrowserCoreAsync(cancellationToken).ConfigureAwait(false);
+                    await StartBrowserCoreAsync(workload, cancellationToken).ConfigureAwait(false);
                 }
 
                 _activeOperations++;
@@ -154,7 +171,9 @@ namespace ExportDocManager.Services.BrowserRuntime
             }
         }
 
-        private async Task StartBrowserCoreAsync(CancellationToken cancellationToken)
+        private async Task StartBrowserCoreAsync(
+            BrowserWorkloadKind workload,
+            CancellationToken cancellationToken)
         {
             string executable = _resolver.Resolve();
             _profileRoot = Path.Combine(_pathProvider.CacheRoot, "BrowserRuntime", $"automation-{Environment.ProcessId}-{Guid.NewGuid():N}");
@@ -172,19 +191,24 @@ namespace ExportDocManager.Services.BrowserRuntime
                 },
                 EnableRaisingEvents = true
             };
-            AddBrowserArguments(process.StartInfo, _profileRoot);
+            foreach (string argument in BuildBrowserArguments(
+                         _profileRoot,
+                         ChromiumSandboxPolicy.ResolveNoSandboxSetting()))
+            {
+                process.StartInfo.ArgumentList.Add(argument);
+            }
             process.ErrorDataReceived += (_, args) =>
             {
                 const string marker = "DevTools listening on ";
                 int markerIndex = args.Data?.IndexOf(marker, StringComparison.OrdinalIgnoreCase) ?? -1;
                 if (markerIndex >= 0) endpointSource.TrySetResult(args.Data![(markerIndex + marker.Length)..].Trim());
             };
-            process.Exited += (_, _) => endpointSource.TrySetException(new InvalidOperationException("受控 Chromium 在建立自动化连接前退出。"));
-            if (!process.Start()) throw new InvalidOperationException("无法启动受控 Chromium 自动化进程。");
+            process.Exited += (_, _) => endpointSource.TrySetException(new InvalidOperationException("受控 Chromium 在建立连接前退出。"));
+            if (!process.Start()) throw new InvalidOperationException("无法启动受控 Chromium 进程。");
             process.BeginErrorReadLine();
             process.BeginOutputReadLine();
             _process = process;
-            _registration = _runtime.RegisterOwnedProcess(process, BrowserWorkloadKind.WebAutomation, "Playwright HS lookup");
+            _registration = _runtime.RegisterOwnedProcess(process, workload, "Managed Chromium browser");
             string endpoint = await endpointSource.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(false);
             _playwright = await Playwright.CreateAsync().ConfigureAwait(false);
             _browser = await _playwright.Chromium.ConnectOverCDPAsync(endpoint).ConfigureAwait(false);
@@ -192,22 +216,30 @@ namespace ExportDocManager.Services.BrowserRuntime
             _useCount = 0;
         }
 
-        private static void AddBrowserArguments(ProcessStartInfo startInfo, string profileRoot)
+        internal static IReadOnlyList<string> BuildBrowserArguments(string profileRoot, bool disableSandbox)
         {
-            startInfo.ArgumentList.Add("--headless=new");
-            startInfo.ArgumentList.Add("--remote-debugging-port=0");
-            startInfo.ArgumentList.Add($"--user-data-dir={profileRoot}");
-            startInfo.ArgumentList.Add("--disable-gpu");
-            startInfo.ArgumentList.Add("--disable-extensions");
-            startInfo.ArgumentList.Add("--disable-background-networking");
-            startInfo.ArgumentList.Add("--disable-dev-shm-usage");
-            startInfo.ArgumentList.Add("--disable-sync");
-            startInfo.ArgumentList.Add("--no-first-run");
-            startInfo.ArgumentList.Add("--no-default-browser-check");
-            startInfo.ArgumentList.Add("--disable-features=Translate,MediaRouter,OptimizationHints");
-            if (OperatingSystem.IsLinux() && string.Equals(Environment.UserName, "root", StringComparison.OrdinalIgnoreCase))
-                startInfo.ArgumentList.Add("--no-sandbox");
-            startInfo.ArgumentList.Add("about:blank");
+            var arguments = new List<string>
+            {
+                "--headless=new",
+                "--remote-debugging-port=0",
+                $"--user-data-dir={profileRoot}",
+                "--disable-gpu",
+                "--disable-extensions",
+                "--disable-background-networking",
+                "--disable-dev-shm-usage",
+                "--disable-sync",
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-features=Translate,MediaRouter,OptimizationHints",
+                "--allow-file-access-from-files",
+                "about:blank"
+            };
+            if (disableSandbox)
+            {
+                arguments.Insert(1, "--no-sandbox");
+            }
+
+            return arguments;
         }
 
         private bool ShouldRecycle()

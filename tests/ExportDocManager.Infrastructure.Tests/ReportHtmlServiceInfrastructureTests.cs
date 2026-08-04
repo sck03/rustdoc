@@ -3,6 +3,7 @@ using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
+using ExportDocManager.Services.BrowserRuntime;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Runtime.InteropServices;
@@ -643,30 +644,17 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public void ChromiumHtmlToPdfService_BuildArguments_ShouldOnlyDisableSandboxWhenExplicitlyRequested()
+        public void ManagedPlaywrightBrowserHost_BuildArguments_ShouldOnlyDisableSandboxWhenExplicitlyRequested()
         {
-            string htmlPath = Path.Combine(Path.GetTempPath(), "report-source.html");
-            string pdfPath = Path.Combine(Path.GetTempPath(), "report-output.pdf");
             string userDataPath = Path.Combine(Path.GetTempPath(), "report-user-data");
-            string diskCachePath = Path.Combine(Path.GetTempPath(), "report-disk-cache");
 
-            var sandboxed = ChromiumHtmlToPdfService.BuildChromiumArguments(
-                htmlPath,
-                pdfPath,
-                userDataPath,
-                diskCachePath,
-                disableSandbox: false);
-            var explicitlyUnsandboxed = ChromiumHtmlToPdfService.BuildChromiumArguments(
-                htmlPath,
-                pdfPath,
-                userDataPath,
-                diskCachePath,
-                disableSandbox: true);
+            var sandboxed = ManagedPlaywrightBrowserHost.BuildBrowserArguments(userDataPath, disableSandbox: false);
+            var explicitlyUnsandboxed = ManagedPlaywrightBrowserHost.BuildBrowserArguments(userDataPath, disableSandbox: true);
 
             Assert.DoesNotContain("--no-sandbox", sandboxed);
             Assert.Contains("--no-sandbox", explicitlyUnsandboxed);
-            Assert.Contains("--disable-javascript", sandboxed);
-            Assert.Contains("--disable-javascript", explicitlyUnsandboxed);
+            Assert.Contains("--allow-file-access-from-files", sandboxed);
+            Assert.Contains("--allow-file-access-from-files", explicitlyUnsandboxed);
             Assert.Equal(sandboxed.Count + 1, explicitlyUnsandboxed.Count);
         }
 

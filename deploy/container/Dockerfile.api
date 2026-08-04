@@ -94,6 +94,7 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:5188 \
     EXPORTDOCMANAGER_NETWORK_MODE=true \
     EXPORTDOCMANAGER_PRODUCT_EDITION=Full \
     EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
+    EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX=true \
     EXPORTDOCMANAGER_OCR_RUNTIME=enabled \
     TZ=Asia/Shanghai
 RUN chmod +x /app/sidecar/ocr/exportdoc-ocr /app/Tools/exportdoc-excel-analyzer

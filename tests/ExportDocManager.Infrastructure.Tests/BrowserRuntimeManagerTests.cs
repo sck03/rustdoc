@@ -4,6 +4,8 @@ using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Utils;
+using SkiaSharp;
+using UglyToad.PdfPig;
 
 namespace ExportDocManager.Infrastructure.Tests
 {
@@ -145,6 +147,38 @@ namespace ExportDocManager.Infrastructure.Tests
                 var snapshot = runtime.GetSnapshot();
                 Assert.Equal(0, snapshot.ActivePdfTasks);
                 Assert.Empty(snapshot.OwnedProcessIds);
+            }
+            finally
+            {
+                AtomicFileHelper.TryDeleteDirectory(dataRoot);
+            }
+        }
+
+        [Fact]
+        public async Task ChromiumPdfRenderer_ShouldDecodeDataImageBeforePrinting()
+        {
+            string root = FindRepositoryRoot();
+            string dataRoot = Path.Combine(root, ".codex-runtime", "BrowserRuntimeManagerTests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dataRoot);
+            var pathProvider = new RuntimeAppPathProvider(root, dataRoot);
+            await using var runtime = new BrowserRuntimeManager();
+            var renderer = new ChromiumHtmlToPdfService(pathProvider, runtime);
+            string destination = Path.Combine(dataRoot, "pdf", "image-ready.pdf");
+            try
+            {
+                using var bitmap = new SKBitmap(734, 424, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+                var random = new Random(20260804);
+                byte[] pixels = new byte[bitmap.ByteCount];
+                random.NextBytes(pixels);
+                System.Runtime.InteropServices.Marshal.Copy(pixels, 0, bitmap.GetPixels(), pixels.Length);
+                using var image = SKImage.FromBitmap(bitmap);
+                using var png = image.Encode(SKEncodedImageFormat.Png, 100);
+                string dataUri = $"data:image/png;base64,{Convert.ToBase64String(png.ToArray())}";
+
+                await renderer.RenderAsync($"<html><body><img src=\"{dataUri}\" style=\"width:220px;height:130px\"></body></html>", destination);
+
+                using var document = PdfDocument.Open(destination);
+                Assert.True(document.GetPage(1).NumberOfImages > 0, "Decoded report image must be embedded in the PDF.");
             }
             finally
             {
