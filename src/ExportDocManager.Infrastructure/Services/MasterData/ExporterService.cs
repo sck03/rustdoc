@@ -15,13 +15,16 @@ namespace ExportDocManager.Services.MasterData
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly IExporterReadRepository _exporterReadRepository;
+        private readonly IExporterSealService _exporterSealService;
 
         public ExporterService(
             IDbContextFactory<AppDbContext> contextFactory,
-            IExporterReadRepository exporterReadRepository)
+            IExporterReadRepository exporterReadRepository,
+            IExporterSealService exporterSealService = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _exporterReadRepository = exporterReadRepository ?? throw new ArgumentNullException(nameof(exporterReadRepository));
+            _exporterSealService = exporterSealService;
         }
 
         public async Task<int> SaveExporterAsync(Exporter exporter)
@@ -32,15 +35,33 @@ namespace ExportDocManager.Services.MasterData
                 MasterDataNormalization.NormalizeExporter(exporter);
 
                 using var context = await _contextFactory.CreateDbContextAsync();
+                string previousDocSealPath = null;
+                string previousCustomsSealPath = null;
                 if (exporter.Id == 0)
                 {
                     await context.Exporters.AddAsync(exporter);
                 }
                 else
                 {
+                    var previousPaths = await context.Exporters
+                        .AsNoTracking()
+                        .Where(item => item.Id == exporter.Id)
+                        .Select(item => new { item.DocSealPath, item.CustomsSealPath })
+                        .SingleOrDefaultAsync();
+                    previousDocSealPath = previousPaths?.DocSealPath;
+                    previousCustomsSealPath = previousPaths?.CustomsSealPath;
                     context.Exporters.Update(exporter);
                 }
+
                 await context.SaveChangesAsync();
+                _exporterSealService?.DeleteReplacedManagedSeal(
+                    exporter.Id,
+                    previousDocSealPath,
+                    exporter.DocSealPath);
+                _exporterSealService?.DeleteReplacedManagedSeal(
+                    exporter.Id,
+                    previousCustomsSealPath,
+                    exporter.CustomsSealPath);
                 return exporter.Id;
             }
             catch (DbUpdateConcurrencyException)
@@ -92,6 +113,7 @@ namespace ExportDocManager.Services.MasterData
 
                 context.Exporters.Remove(entity);
                 await context.SaveChangesAsync();
+                _exporterSealService?.DeleteAllManagedSeals(id);
                 return true;
             }
             catch (Exception ex)

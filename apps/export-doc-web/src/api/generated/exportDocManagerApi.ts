@@ -4565,6 +4565,13 @@ export interface UploadAndStartPdfMergeDownloadJobRequest {
   body: FormData;
 }
 
+export interface UploadExporterSealRequest {
+  id: number;
+  sealType: string;
+  fileName: string;
+  body: Blob;
+}
+
 export interface UploadHsCodesImportFileRequest {
   fileName?: string;
   body: Blob;
@@ -6923,6 +6930,17 @@ export class ExportDocManagerApiClient {
   public uploadAndStartPdfMergeDownloadJob(request: UploadAndStartPdfMergeDownloadJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/tools/pdf/merge/upload";
     return this.request<BackgroundJobSnapshot>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadExporterSeal(request: UploadExporterSealRequest, init?: RequestInit): Promise<ApiExporterDto> {
+    const path = `/api/master-data/exporters/${encodePath(request.id)}/seals/${encodePath(request.sealType)}/upload`;
+    return this.request<ApiExporterDto>("POST", path, {
+      query: {
+        "fileName": request.fileName,
+      },
       body: request.body,
       init,
     });

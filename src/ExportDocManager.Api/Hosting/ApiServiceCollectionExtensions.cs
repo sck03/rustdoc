@@ -120,6 +120,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IEmailTemplateService, EmailTemplateService>();
             services.AddScoped<ISalesOpportunityService, SalesOpportunityService>();
             services.AddScoped<IExporterService, ExporterService>();
+            services.AddScoped<IExporterSealService, ExporterSealService>();
             services.AddScoped<IPayeeService, PayeeService>();
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<IAuxiliaryService, AuxiliaryService>();

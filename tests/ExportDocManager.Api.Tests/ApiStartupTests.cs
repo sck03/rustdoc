@@ -758,6 +758,16 @@ namespace ExportDocManager.Api.Tests
                 PermissionModuleCatalog.DocumentMasterData,
                 ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/master-data/products", HttpMethods.Post));
             Assert.Equal(
+                PermissionModuleCatalog.DocumentMasterData,
+                ApiWorkspaceAccessMiddleware.GetRequiredModule(
+                    "/api/master-data/exporters/1/seals/document/upload",
+                    HttpMethods.Post));
+            Assert.Equal(
+                PermissionAccessLevel.Operate,
+                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
+                    "/api/master-data/exporters/1/seals/document/upload",
+                    HttpMethods.Post));
+            Assert.Equal(
                 PermissionModuleCatalog.DocumentInvoices,
                 ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/invoices/hs-knowledge/search", HttpMethods.Get));
             Assert.Equal(
@@ -2180,6 +2190,7 @@ namespace ExportDocManager.Api.Tests
 
             Assert.Contains("/api/master-data/customers", json, StringComparison.Ordinal);
             Assert.Contains("/api/master-data/exporters", json, StringComparison.Ordinal);
+            Assert.Contains("/api/master-data/exporters/{id}/seals/{sealType}/upload", json, StringComparison.Ordinal);
             Assert.Contains("/api/master-data/payees", json, StringComparison.Ordinal);
             Assert.Contains("/api/master-data/products", json, StringComparison.Ordinal);
             Assert.Contains("/api/master-data/ports", json, StringComparison.Ordinal);
@@ -2198,6 +2209,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("updateCustomer", json, StringComparison.Ordinal);
             Assert.Contains("deleteCustomer", json, StringComparison.Ordinal);
             Assert.Contains("createExporter", json, StringComparison.Ordinal);
+            Assert.Contains("uploadExporterSeal", json, StringComparison.Ordinal);
             Assert.Contains("updateExporter", json, StringComparison.Ordinal);
             Assert.Contains("deleteExporter", json, StringComparison.Ordinal);
             Assert.Contains("createPayee", json, StringComparison.Ordinal);

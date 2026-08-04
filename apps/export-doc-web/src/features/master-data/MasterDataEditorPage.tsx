@@ -2,9 +2,9 @@ import { useMutation,useQuery,useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft,Edit3,Eye,Save,Trash2 } from "lucide-react";
 import { FormEvent,useEffect,useMemo,useState } from "react";
 import { useLocation,useNavigate,useParams } from "react-router-dom";
-import { ExportDocManagerApiClient } from "../../api/index.ts";
+import { ApiExporterDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { selectExporterSealImageFile } from "../../desktop/desktopBridge.ts";
+import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
 import {
@@ -258,7 +258,35 @@ export function MasterDataEditorPage({
     },
   });
 
-  const isBusy = detailQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
+  const sealUploadMutation = useMutation({
+    mutationFn: ({ fieldName, file }: { fieldName: "docSealPath" | "customsSealPath"; file: File }) =>
+      client.uploadExporterSeal({
+        id: numberValue(record?.id),
+        sealType: fieldName === "docSealPath" ? "document" : "customs",
+        fileName: file.name,
+        body: file,
+      }),
+    onSuccess: async (saved: ApiExporterDto, variables) => {
+      const nextRecord = saved as unknown as MasterDataRecord;
+      const nextMessage = variables.fieldName === "docSealPath" ? "单证章已上传并保存。" : "报关章已上传并保存。";
+      setRecord(nextRecord);
+      setPersistedRecordSnapshot(buildMasterDataSnapshot(config, nextRecord, saved.id));
+      setMessage(null);
+      setSuccessMessage(nextMessage);
+      setHasConcurrencyConflict(false);
+      queryClient.setQueryData(queryKeys.masterDataRecord(config.key, config.routeId(nextRecord)), nextRecord);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot(config.key) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.invoiceParties() }),
+      ]);
+    },
+    onError: (error) => {
+      setMessage(readApiError(error));
+      setSuccessMessage(null);
+    },
+  });
+
+  const isBusy = detailQuery.isFetching || saveMutation.isPending || deleteMutation.isPending || sealUploadMutation.isPending;
   const customOptions = customOptionsQuery.data ?? {};
   const productInputAssistance = useMemo(
     () => buildProductInputAssistance(productUnitProductsQuery.data ?? [], productHsCodesQuery.data?.items ?? []),
@@ -289,6 +317,7 @@ export function MasterDataEditorPage({
       currentRecordSnapshot &&
       currentRecordSnapshot !== persistedRecordSnapshot,
   );
+  const browserSealUploadBlocked = !isDesktopBridgeAvailable() && (isNew || hasUnsavedRecordChanges);
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: hasUnsavedRecordChanges,
     message: `当前${config.label}有未保存的修改。`,
@@ -420,20 +449,21 @@ export function MasterDataEditorPage({
     saveCustomOptionMutation.mutate({ optionType, value: normalizedValue });
   }
 
-  async function selectMasterDataPath(field: MasterDataFieldDefinition) {
-    if (!canOperate || field.pathPicker !== "exporterSealImage") {
+  function uploadMasterDataSeal(field: MasterDataFieldDefinition, file: File) {
+    if (!canOperate || config.key !== "exporters" || field.pathPicker !== "exporterSealImage") return;
+    if (isNew || numberValue(record?.id) <= 0) {
+      setMessage("请先保存出口商基础资料，再上传印章图片。");
+      setSuccessMessage(null);
+      return;
+    }
+    if (hasUnsavedRecordChanges) {
+      setMessage("当前出口商还有未保存的修改，请先保存后再上传印章图片。");
+      setSuccessMessage(null);
       return;
     }
 
-    try {
-      const selectedPath = await selectExporterSealImageFile();
-      if (selectedPath) {
-        patchRecord(field.name, selectedPath);
-      }
-    } catch (error) {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    }
+    const fieldName = field.name === "docSealPath" ? "docSealPath" : "customsSealPath";
+    sealUploadMutation.mutate({ fieldName, file });
   }
 
   function handleDelete() {
@@ -521,7 +551,18 @@ export function MasterDataEditorPage({
                     onCommitCustomOption={commitMasterDataCustomOption}
                     onCommitProductAssistance={commitProductAssistanceField}
                     onCommitProductUnit={commitProductUnitField}
-                    onSelectPath={() => void selectMasterDataPath(field)}
+                    onSelectPath={(path) => patchRecord(field.name, path)}
+                    onUploadPath={(file) => uploadMasterDataSeal(field, file)}
+                    onPathError={(error) => {
+                      setMessage(readApiError(error));
+                      setSuccessMessage(null);
+                    }}
+                    pathActionDisabled={isBusy || browserSealUploadBlocked}
+                    pathActionTitle={browserSealUploadBlocked
+                      ? isNew
+                        ? "请先保存出口商后上传印章"
+                        : "请先保存当前修改后上传印章"
+                      : undefined}
                   />
                 ))}
               </div>

@@ -1,7 +1,4 @@
-import { FolderOpen } from "lucide-react";
-import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { EditableComboField,NumberField,TextAreaField,TextField } from "../../ui/FormFields.tsx";
-import { PathField } from "../../ui/PathField.tsx";
 import type { CustomOptionMap } from "../custom-options/customOptionModel.ts";
 import { getCustomOptions } from "../custom-options/customOptionModel.ts";
 import {
@@ -20,6 +17,7 @@ type ProductInputAssistance,
 type ProductUnitAssistance,
 type ProductUnitSourceField,
 } from "./masterDataTypes.ts";
+import { ExporterSealField } from "./ExporterSealField.tsx";
 
 export function MasterDataField({
   field,
@@ -33,6 +31,10 @@ export function MasterDataField({
   onCommitProductAssistance,
   onCommitProductUnit,
   onSelectPath,
+  onUploadPath,
+  onPathError,
+  pathActionDisabled,
+  pathActionTitle,
 }: {
   field: MasterDataFieldDefinition;
   isEdit: boolean;
@@ -44,7 +46,11 @@ export function MasterDataField({
   onCommitCustomOption: (optionType: string, value: string) => void;
   onCommitProductAssistance: (field: ProductAssistanceField, value: string) => void;
   onCommitProductUnit: (sourceField: ProductUnitSourceField) => void;
-  onSelectPath: () => void;
+  onSelectPath: (path: string) => void;
+  onUploadPath: (file: File) => void;
+  onPathError: (error: unknown) => void;
+  pathActionDisabled?: boolean;
+  pathActionTitle?: string;
 }) {
   const disabled = Boolean(field.readOnlyOnEdit && isEdit);
 
@@ -76,18 +82,16 @@ export function MasterDataField({
 
   if (field.pathPicker) {
     return (
-      <PathField
-        disabled={disabled}
+      <ExporterSealField
+        inputDisabled={disabled}
+        actionDisabled={disabled || pathActionDisabled}
+        actionTitle={pathActionTitle}
         label={field.label}
         value={readString(record, field.name)}
-        onChange={onChange}
-        actions={
-          isDesktopBridgeAvailable() ? (
-            <button className="icon-button compact-icon-button" type="button" title="选择图片" aria-label="选择图片" disabled={disabled} onClick={onSelectPath}>
-              <FolderOpen size={15} aria-hidden="true" />
-            </button>
-          ) : null
-        }
+        onPathChange={onChange}
+        onPathSelected={onSelectPath}
+        onUploadFile={onUploadPath}
+        onError={onPathError}
       />
     );
   }
@@ -151,4 +155,3 @@ export function MasterDataField({
     />
   );
 }
-

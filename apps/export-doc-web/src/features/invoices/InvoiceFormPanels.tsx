@@ -21,6 +21,7 @@ import { type EditableInvoiceItemField } from "./invoiceItemTableModel.ts";
 import { invoiceItemVolumeDisplayValue, invoiceItemWeightDisplayValue } from "./invoiceItemsEditorModel.ts";
 import { ShippingMarkEditorDialog } from "./ShippingMarkEditorDialog.tsx";
 import { getInvoiceStatusActionLabel, getInvoiceStatusLabel, invoiceTypeOptions, normalizeInvoiceType } from "./invoiceModel.ts";
+import { ExporterSealField, type ExporterSealType } from "../master-data/ExporterSealField.tsx";
 
 type InvoicePatch = Partial<ApiInvoiceDetailDto>;
 
@@ -219,8 +220,13 @@ export function InvoicePartiesPanel({
   isBusy,
   isEditable,
   message,
+  canManageExporterSeals,
+  sealBusy,
   onRefresh,
   onChange,
+  onSealPathSelected,
+  onSealUpload,
+  onSealError,
 }: {
   invoice: ApiInvoiceDetailDto;
   customers: ApiCustomerDto[];
@@ -228,8 +234,13 @@ export function InvoicePartiesPanel({
   isBusy: boolean;
   isEditable: boolean;
   message: string | null;
+  canManageExporterSeals: boolean;
+  sealBusy: boolean;
   onRefresh: () => void;
   onChange: (next: InvoicePatch) => void;
+  onSealPathSelected: (sealType: ExporterSealType, path: string) => void;
+  onSealUpload: (sealType: ExporterSealType, file: File) => void;
+  onSealError: (error: unknown) => void;
 }) {
   function applyCustomer(customerId: string) {
     if (!customerId) {
@@ -275,6 +286,14 @@ export function InvoicePartiesPanel({
       swiftCode: exporter.swiftCode ?? "",
     });
   }
+
+  const selectedExporter = exporters.find((item) => item.id === invoice.exporterId) ?? null;
+  const sealActionDisabled = !canManageExporterSeals || !selectedExporter || sealBusy;
+  const sealActionTitle = !selectedExporter
+    ? "请先选择出口商档案"
+    : !canManageExporterSeals
+      ? "当前权限不能维护出口商印章"
+      : undefined;
 
   return (
     <section className="form-section information-tier-required" aria-label="客户与出口商">
@@ -331,7 +350,7 @@ export function InvoicePartiesPanel({
         </section>
 
         <section className="invoice-party-group invoice-party-group-exporter" aria-label="出口商与收款信息">
-          <div className="invoice-party-group-heading"><strong>出口商与收款信息</strong><span>企业身份、地址、海关信息和银行资料集中维护</span></div>
+          <div className="invoice-party-group-heading"><strong>出口商与收款信息</strong><span>企业身份、银行与印章集中维护</span></div>
           <div className="field-grid">
           <SelectField
           label="出口商档案"
@@ -389,6 +408,26 @@ export function InvoicePartiesPanel({
         />
         <TextField label="SWIFT" value={invoice.swiftCode ?? ""} disabled={!isEditable} onChange={(value) => onChange({ swiftCode: value })} />
         <NumberField label="汇率" value={invoice.exchangeRate ?? 0} step="0.0001" disabled={!isEditable} onChange={(value) => onChange({ exchangeRate: value })} />
+        <ExporterSealField
+          label="单证章路径"
+          value={selectedExporter?.docSealPath ?? ""}
+          inputDisabled
+          actionDisabled={sealActionDisabled}
+          actionTitle={sealActionTitle}
+          onPathSelected={(path) => onSealPathSelected("document", path)}
+          onUploadFile={(file) => onSealUpload("document", file)}
+          onError={onSealError}
+        />
+        <ExporterSealField
+          label="报关章路径"
+          value={selectedExporter?.customsSealPath ?? ""}
+          inputDisabled
+          actionDisabled={sealActionDisabled}
+          actionTitle={sealActionTitle}
+          onPathSelected={(path) => onSealPathSelected("customs", path)}
+          onUploadFile={(file) => onSealUpload("customs", file)}
+          onError={onSealError}
+        />
           </div>
         </section>
       </div>

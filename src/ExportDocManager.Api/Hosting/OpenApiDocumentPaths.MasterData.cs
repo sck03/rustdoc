@@ -35,6 +35,34 @@ namespace ExportDocManager.Api.Hosting
                         "deleteExporter",
                         "ApiExporterDto",
                         "Exporter id."),
+                    ["/api/master-data/exporters/{id}/seals/{sealType}/upload"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Upload and save an exporter seal image",
+                            operationId = "uploadExporterSeal",
+                            parameters = new object[]
+                            {
+                                PathParameter("id", "integer", "int32", "Exporter id."),
+                                PathParameter("sealType", "string", null, "Seal type: document or customs."),
+                                QueryParameter("fileName", "string", null, "Original image file name.", required: true)
+                            },
+                            requestBody = new { required = true, content = BinaryContent() },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "Updated exporter. The managed seal is stored below runtime Files/Seals/Exporters and replaces only the selected seal field.",
+                                    content = JsonContent("ApiExporterDto")
+                                },
+                                ["400"] = new { description = "Invalid seal type, image name, content, or format." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["404"] = new { description = "Exporter was not found." },
+                                ["409"] = new { description = "Seal or exporter could not be updated." },
+                                ["413"] = new { description = "Seal image exceeds 5 MB." }
+                            }
+                        }
+                    },
                     ["/api/master-data/payees"] = MasterDataListPath(
                         "List payees",
                         "listPayees",

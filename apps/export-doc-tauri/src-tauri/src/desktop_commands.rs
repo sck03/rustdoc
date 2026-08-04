@@ -150,7 +150,7 @@ pub(crate) fn select_exporter_seal_image_file() -> Result<Option<String>, String
     Ok(pick_file(
         "选择出口商印章图片",
         &[
-            ("图片文件", &["png", "jpg", "jpeg", "bmp"]),
+            ("图片文件", &["png", "jpg", "jpeg", "gif", "webp"]),
             ("全部文件", &["*"]),
         ],
     ))

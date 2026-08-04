@@ -93,6 +93,147 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public async Task ExporterSealUpload_ShouldValidatePersistReplaceAndDeleteManagedImages()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-exporter-seals",
+                "api-exporter-seals.db");
+            using var anonymousClient = harness.CreateClient();
+            byte[] pngBytes = Convert.FromBase64String(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+
+            using (var anonymousContent = CreateImageContent(pngBytes, "image/png"))
+            {
+                var anonymousResponse = await anonymousClient.PostAsync(
+                    "/api/master-data/exporters/1/seals/document/upload?fileName=seal.png",
+                    anonymousContent);
+                Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
+            }
+
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+            var createResponse = await adminClient.PostAsJsonAsync(
+                "/api/master-data/exporters",
+                CreateExporter("Managed Seal Exporter"));
+            Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+            var created = await ApiIntegrationTestHarness.ReadJsonAsync<ApiExporterDto>(createResponse);
+
+            using (var invalidTypeContent = CreateImageContent(pngBytes, "image/png"))
+            {
+                var invalidTypeResponse = await adminClient.PostAsync(
+                    $"/api/master-data/exporters/{created.Id}/seals/unknown/upload?fileName=seal.png",
+                    invalidTypeContent);
+                Assert.Equal(HttpStatusCode.BadRequest, invalidTypeResponse.StatusCode);
+            }
+
+            using (var invalidImageContent = CreateImageContent(new byte[] { 1, 2, 3, 4 }, "image/png"))
+            {
+                var invalidImageResponse = await adminClient.PostAsync(
+                    $"/api/master-data/exporters/{created.Id}/seals/document/upload?fileName=seal.png",
+                    invalidImageContent);
+                Assert.Equal(HttpStatusCode.BadRequest, invalidImageResponse.StatusCode);
+            }
+
+            ApiExporterDto firstUpload;
+            using (var firstContent = CreateImageContent(pngBytes, "image/png"))
+            {
+                var firstResponse = await adminClient.PostAsync(
+                    $"/api/master-data/exporters/{created.Id}/seals/document/upload?fileName=..%2Fdocument-seal.png",
+                    firstContent);
+                Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+                firstUpload = await ApiIntegrationTestHarness.ReadJsonAsync<ApiExporterDto>(firstResponse);
+            }
+
+            string exporterSealRoot = Path.Combine(
+                harness.DataRoot,
+                "Files",
+                "Seals",
+                "Exporters",
+                created.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Assert.StartsWith(exporterSealRoot, firstUpload.DocSealPath, StringComparison.OrdinalIgnoreCase);
+            Assert.True(File.Exists(firstUpload.DocSealPath));
+            Assert.Empty(firstUpload.CustomsSealPath);
+
+            ApiExporterDto replacement;
+            using (var replacementContent = CreateImageContent(pngBytes, "image/png"))
+            {
+                var replacementResponse = await adminClient.PostAsync(
+                    $"/api/master-data/exporters/{created.Id}/seals/document/upload?fileName=replacement.png",
+                    replacementContent);
+                Assert.Equal(HttpStatusCode.OK, replacementResponse.StatusCode);
+                replacement = await ApiIntegrationTestHarness.ReadJsonAsync<ApiExporterDto>(replacementResponse);
+            }
+
+            Assert.NotEqual(firstUpload.DocSealPath, replacement.DocSealPath);
+            Assert.False(File.Exists(firstUpload.DocSealPath));
+            Assert.True(File.Exists(replacement.DocSealPath));
+
+            ApiExporterDto customsUpload;
+            using (var customsContent = CreateImageContent(pngBytes, "image/png"))
+            {
+                var customsResponse = await adminClient.PostAsync(
+                    $"/api/master-data/exporters/{created.Id}/seals/customs/upload?fileName=customs.png",
+                    customsContent);
+                Assert.Equal(HttpStatusCode.OK, customsResponse.StatusCode);
+                customsUpload = await ApiIntegrationTestHarness.ReadJsonAsync<ApiExporterDto>(customsResponse);
+            }
+
+            Assert.Equal(replacement.DocSealPath, customsUpload.DocSealPath);
+            Assert.True(File.Exists(customsUpload.CustomsSealPath));
+            Assert.Equal(2, Directory.GetFiles(exporterSealRoot).Length);
+
+            var clearDocumentSealResponse = await adminClient.PutAsJsonAsync(
+                $"/api/master-data/exporters/{created.Id}",
+                customsUpload with { DocSealPath = string.Empty });
+            Assert.Equal(HttpStatusCode.OK, clearDocumentSealResponse.StatusCode);
+            Assert.False(File.Exists(customsUpload.DocSealPath));
+            Assert.True(File.Exists(customsUpload.CustomsSealPath));
+            Assert.Single(Directory.GetFiles(exporterSealRoot));
+
+            using (var oversizedContent = CreateImageContent(
+                new byte[checked((int)ApiUploadLimits.ExporterSealImageBytes + 1)],
+                "image/png"))
+            {
+                var oversizedResponse = await adminClient.PostAsync(
+                    $"/api/master-data/exporters/{created.Id}/seals/document/upload?fileName=oversized.png",
+                    oversizedContent);
+                Assert.Equal(HttpStatusCode.RequestEntityTooLarge, oversizedResponse.StatusCode);
+            }
+
+            var deleteResponse = await adminClient.DeleteAsync($"/api/master-data/exporters/{created.Id}");
+            Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+            Assert.False(Directory.Exists(exporterSealRoot));
+        }
+
+        private static ApiExporterDto CreateExporter(string name)
+        {
+            return new ApiExporterDto(
+                0,
+                name,
+                "受管印章出口商",
+                "1 Exporter Road",
+                string.Empty,
+                "API Contact",
+                "91330000SEALTEST",
+                "CUSTOMS-SEAL",
+                "13800000000",
+                "API Bank",
+                "6222000000000000",
+                "APISEAL1",
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty);
+        }
+
+        private static ByteArrayContent CreateImageContent(byte[] bytes, string contentType)
+        {
+            var content = new ByteArrayContent(bytes);
+            content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+            return content;
+        }
+
+        [Fact]
         public async Task ProductEndpoint_ShouldRejectStaleConcurrentUpdate()
         {
             await using var harness = await ApiIntegrationTestHarness.StartAsync(

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Edit3, Minimize2, PackageSearch, Save, Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
+import type { ApiExporterDto, ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -54,6 +54,7 @@ import {
 } from "./invoiceEditorHelpers.ts";
 import { calculateInvoiceTotals } from "./invoiceItemsEditorModel.ts";
 import { useInvoiceItemsWorkspace } from "./useInvoiceItemsWorkspace.ts";
+import type { ExporterSealType } from "../master-data/ExporterSealField.tsx";
 
 export function InvoiceEditorPage({
   client,
@@ -148,6 +149,42 @@ export function InvoiceEditorPage({
       };
     },
     staleTime: 5 * 60 * 1000,
+  });
+
+  const exporterSealMutation = useMutation({
+    mutationFn: async ({ sealType, file, path }: { sealType: ExporterSealType; file?: File; path?: string }) => {
+      const exporterId = invoice?.exporterId ?? 0;
+      if (exporterId <= 0) throw new Error("请先选择出口商档案，再设置印章。");
+
+      if (file) {
+        return client.uploadExporterSeal({
+          id: exporterId,
+          sealType,
+          fileName: file.name,
+          body: file,
+        });
+      }
+
+      const selectedPath = path?.trim() ?? "";
+      if (!selectedPath) throw new Error("请选择有效的印章图片。");
+      const latest = await client.getExporter({ id: exporterId });
+      const body: ApiExporterDto = sealType === "document"
+        ? { ...latest, docSealPath: selectedPath }
+        : { ...latest, customsSealPath: selectedPath };
+      return client.updateExporter({ id: exporterId, body });
+    },
+    onSuccess: async (_saved, variables) => {
+      setMessage(null);
+      setSuccessMessage(variables.sealType === "document" ? "出口商单证章已保存。" : "出口商报关章已保存。");
+      await Promise.all([
+        partiesQuery.refetch(),
+        queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("exporters") }),
+      ]);
+    },
+    onError: (error) => {
+      setMessage(readApiError(error));
+      setSuccessMessage(null);
+    },
   });
 
   const unitsQuery = useQuery({
@@ -420,8 +457,9 @@ export function InvoiceEditorPage({
     statusTransitionMutation.isPending ||
     unverifyInvoiceMutation.isPending ||
     deleteInvoiceMutation.isPending ||
+    exporterSealMutation.isPending ||
     isLetterOfCreditBusy;
-  const isPartyBusy = partiesQuery.isFetching;
+  const isPartyBusy = partiesQuery.isFetching || exporterSealMutation.isPending;
   const partyMessage = partiesQuery.isError ? readApiError(partiesQuery.error) : null;
   const productMessage = itemsWorkspace.productLibraryMessage;
   const unitLookupMessage = unitsQuery.isError ? readApiError(unitsQuery.error) : null;
@@ -914,8 +952,16 @@ export function InvoiceEditorPage({
                   isEditable={isInvoiceEditable}
                   isBusy={isPartyBusy}
                   message={partyMessage}
+                  canManageExporterSeals={masterDataPermission.canOperate}
+                  sealBusy={exporterSealMutation.isPending}
                   onRefresh={() => void loadParties()}
                   onChange={patchInvoice}
+                  onSealPathSelected={(sealType, path) => exporterSealMutation.mutate({ sealType, path })}
+                  onSealUpload={(sealType, file) => exporterSealMutation.mutate({ sealType, file })}
+                  onSealError={(error) => {
+                    setMessage(readApiError(error));
+                    setSuccessMessage(null);
+                  }}
                 />
 
                 <InvoiceShippingTermsPanel
