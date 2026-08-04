@@ -66,6 +66,7 @@ namespace ExportDocManager.Services.Reporting
                 StrictVariables = false,
                 EnableRelaxedMemberAccess = true,
                 EnableRelaxedTargetAccess = true,
+                LimitToString = ReportTemplateContentPolicy.MaximumRenderedHtmlCharacters,
                 RegexTimeOut = TimeSpan.FromSeconds(1)
             };
             if (context.BuiltinObject["object"] is ScriptObject objectFunctions)

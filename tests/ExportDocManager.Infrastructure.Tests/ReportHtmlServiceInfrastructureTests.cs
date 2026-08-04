@@ -755,6 +755,22 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public void ScribanRenderer_ShouldPreserveManagedRasterImageLargerThanDefaultOneMiBLimit()
+        {
+            string imageData = "data:image/png;base64," + new string('A', 1_300_000);
+            var globals = new ScriptObject { ["value"] = imageData };
+
+            string rendered = ScribanReportTemplateRenderer.Render(
+                "<html><body><img src=\"{{ value }}\"><p>after-image</p></body></html>",
+                globals);
+
+            Assert.True(rendered.Length > 1_048_576);
+            Assert.Contains(imageData, rendered, StringComparison.Ordinal);
+            Assert.EndsWith("</html>", rendered, StringComparison.Ordinal);
+            Assert.Contains("after-image", rendered, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void ChromiumHtmlToPdfService_WhenHeadlessShellAndChromeExist_ShouldPreferHeadlessShell()
         {
             string appRoot = CreateTempDirectory("report-pdf-app");

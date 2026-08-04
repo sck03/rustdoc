@@ -14,7 +14,7 @@ namespace ExportDocManager.Services.Reporting;
 internal static class ReportTemplateContentPolicy
 {
     private const int MaximumTemplateCharacters = 2_000_000;
-    private const int MaximumRenderedHtmlCharacters = 32_000_000;
+    internal const int MaximumRenderedHtmlCharacters = 32_000_000;
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
 
     private static readonly HashSet<string> PaymentForbiddenRoots = new(StringComparer.OrdinalIgnoreCase)
