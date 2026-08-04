@@ -408,7 +408,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 var paymentPdfService = new ReportPdfRenderService(paymentHtmlService, new ChromiumHtmlToPdfService(pathProvider));
                 var paymentTemplates = new[]
                 {
-                    new BuiltInPdfCase("payment-voucher", ReportDocumentType.PaymentVoucher, Path.Combine(appRoot, "Templates", "Internal", "payment_voucher_template.html"), 1, "portrait", 20000),
+                    new BuiltInPdfCase("payment-voucher", ReportDocumentType.PaymentVoucher, Path.Combine(appRoot, "Templates", "Internal", "payment_voucher_template.html"), 1, "portrait", 20000, "portrait"),
                     new BuiltInPdfCase("expense-reimbursement", ReportDocumentType.PaymentVoucher, Path.Combine(appRoot, "Templates", "Internal", "expense_reimbursement_template.html"), 1, "portrait", 20000)
                 };
 
@@ -575,7 +575,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 });
                 AssertBuiltInPdfResult(
                     paymentResult,
-                    new BuiltInPdfCase("same-no-payment-voucher", ReportDocumentType.PaymentVoucher, paymentVoucherTemplatePath, 1, "portrait", 20000),
+                    new BuiltInPdfCase("same-no-payment-voucher", ReportDocumentType.PaymentVoucher, paymentVoucherTemplatePath, 1, "portrait", 20000, "portrait"),
                     appRoot,
                     dataRoot);
             }
