@@ -888,12 +888,14 @@ namespace ExportDocManager.Api.Tests
             string json = JsonSerializer.Serialize(document);
 
             Assert.Contains("/api/tools/excel/import-preview", json, StringComparison.Ordinal);
+            Assert.Contains("/api/tools/excel/import-preview-upload", json, StringComparison.Ordinal);
             Assert.Contains("/api/tools/excel/template/save-to-path", json, StringComparison.Ordinal);
             Assert.Contains("/api/tools/excel/template/download", json, StringComparison.Ordinal);
             Assert.Contains("/api/tools/excel/booking-sheet/blank/download", json, StringComparison.Ordinal);
             Assert.Contains("/api/tools/excel/booking-sheet/convert/upload", json, StringComparison.Ordinal);
             Assert.Contains("/api/tools/excel/booking-sheet/from-invoice/{invoiceId}/download", json, StringComparison.Ordinal);
             Assert.Contains("previewExcelImport", json, StringComparison.Ordinal);
+            Assert.Contains("previewUploadedExcelImport", json, StringComparison.Ordinal);
             Assert.Contains("startExcelTemplateDownloadJob", json, StringComparison.Ordinal);
             Assert.Contains("startBlankBookingSheetDownloadJob", json, StringComparison.Ordinal);
             Assert.Contains("uploadAndStartBookingSheetConvertDownloadJob", json, StringComparison.Ordinal);

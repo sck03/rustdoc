@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using ClosedXML.Excel;
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.Services.Infrastructure;
 using Microsoft.AspNetCore.Builder;
@@ -357,6 +358,86 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public async Task ExcelImportUpload_ShouldCreateDraftHideServerPathEnforceLimitAndCleanupCache()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-excel-import-upload",
+                "api-excel-import-upload.db");
+            using var anonymousClient = harness.CreateClient();
+            byte[] workbookBytes = CreateInvoiceImportWorkbook();
+
+            using (var anonymousContent = new ByteArrayContent(workbookBytes))
+            {
+                anonymousContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                var anonymousResponse = await anonymousClient.PostAsync(
+                    "/api/tools/excel/import-preview-upload?fileName=invoice.xlsx",
+                    anonymousContent);
+                Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
+            }
+
+            var login = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(login.AccessToken);
+
+            using (var invalidExtensionContent = new ByteArrayContent(workbookBytes))
+            {
+                invalidExtensionContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                var invalidExtensionResponse = await adminClient.PostAsync(
+                    "/api/tools/excel/import-preview-upload?fileName=invoice.txt",
+                    invalidExtensionContent);
+                Assert.Equal(HttpStatusCode.BadRequest, invalidExtensionResponse.StatusCode);
+            }
+
+            using (var emptyContent = new ByteArrayContent(Array.Empty<byte>()))
+            {
+                emptyContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                var emptyResponse = await adminClient.PostAsync(
+                    "/api/tools/excel/import-preview-upload?fileName=empty.xlsx",
+                    emptyContent);
+                Assert.Equal(HttpStatusCode.BadRequest, emptyResponse.StatusCode);
+            }
+
+            using (var content = new ByteArrayContent(workbookBytes))
+            {
+                content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                var response = await adminClient.PostAsync(
+                    "/api/tools/excel/import-preview-upload?fileName=..%2Fbrowser-invoice.xlsx",
+                    content);
+                string responseBody = await response.Content.ReadAsStringAsync();
+                Assert.True(response.StatusCode == HttpStatusCode.OK, responseBody);
+
+                var result = JsonSerializer.Deserialize<ApiExcelImportPreviewResponse>(
+                    responseBody,
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                Assert.NotNull(result);
+                Assert.Equal("browser-invoice.xlsx", result.SourcePath);
+                Assert.NotNull(result.Invoice);
+                Assert.Equal("INV-WEB-001", result.Invoice.InvoiceNo);
+                Assert.Equal("Browser Buyer Ltd", result.Customer.CustomerNameEN);
+                Assert.Contains("Cache/BrowserUploads/ExcelImport", result.StoragePolicy, StringComparison.Ordinal);
+                Assert.Contains("立即删除", result.StoragePolicy, StringComparison.Ordinal);
+                Assert.DoesNotContain(harness.DataRoot, result.SourcePath, StringComparison.OrdinalIgnoreCase);
+            }
+
+            using (var oversizedContent = new ByteArrayContent(new byte[checked((int)ApiUploadLimits.ExcelImportBytes + 1)]))
+            {
+                oversizedContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                var oversizedResponse = await adminClient.PostAsync(
+                    "/api/tools/excel/import-preview-upload?fileName=oversized.xlsx",
+                    oversizedContent);
+                Assert.Equal(HttpStatusCode.RequestEntityTooLarge, oversizedResponse.StatusCode);
+            }
+
+            string uploadCache = Path.Combine(
+                harness.DataRoot,
+                "Cache",
+                "BrowserUploads",
+                "ExcelImport");
+            Assert.False(
+                Directory.Exists(uploadCache) &&
+                Directory.EnumerateFileSystemEntries(uploadCache, "*", SearchOption.AllDirectories).Any());
+        }
+
+        [Fact]
         public async Task EmailAttachmentPaths_ShouldRemainAvailableOnlyToTrustedDesktopRequests()
         {
             const string desktopToken = "email-desktop-token";
@@ -387,6 +468,22 @@ namespace ExportDocManager.Api.Tests
             var content = new ByteArrayContent(Encoding.UTF8.GetBytes(text));
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             return content;
+        }
+
+        private static byte[] CreateInvoiceImportWorkbook()
+        {
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("明细单");
+            worksheet.Cell("B3").Value = "Browser Exporter Ltd";
+            worksheet.Cell("B8").Value = "Browser Buyer Ltd";
+            worksheet.Cell("O3").Value = "2026-08-04";
+            worksheet.Cell("O9").Value = "INV-WEB-001";
+            worksheet.Cell(20, 3).Value = "STYLE-WEB-1";
+            worksheet.Cell(20, 4).Value = "Jacket";
+            worksheet.Cell(20, 10).Value = 12;
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return stream.ToArray();
         }
 
         [Fact]

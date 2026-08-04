@@ -4120,6 +4120,11 @@ export interface PreviewSupplierImportRequest {
   body: Blob;
 }
 
+export interface PreviewUploadedExcelImportRequest {
+  fileName?: string;
+  body: Blob;
+}
+
 export interface PreviewUploadedInvoiceTransferPackageRequest {
   fileName?: string;
   body: Blob;
@@ -6093,6 +6098,17 @@ export class ExportDocManagerApiClient {
   public previewSupplierImport(request: PreviewSupplierImportRequest, init?: RequestInit): Promise<ApiSupplierImportPreviewDto> {
     const path = "/api/suppliers/import/preview";
     return this.request<ApiSupplierImportPreviewDto>("POST", path, {
+      query: {
+        "fileName": request.fileName,
+      },
+      body: request.body,
+      init,
+    });
+  }
+
+  public previewUploadedExcelImport(request: PreviewUploadedExcelImportRequest, init?: RequestInit): Promise<ApiExcelImportPreviewResponse> {
+    const path = "/api/tools/excel/import-preview-upload";
+    return this.request<ApiExcelImportPreviewResponse>("POST", path, {
       query: {
         "fileName": request.fileName,
       },

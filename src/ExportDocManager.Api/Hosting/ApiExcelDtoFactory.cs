@@ -5,7 +5,10 @@ namespace ExportDocManager.Api.Hosting
 {
     public static class ApiExcelDtoFactory
     {
-        public static ApiExcelImportPreviewResponse FromImportResult(string sourcePath, ImportResult result)
+        public static ApiExcelImportPreviewResponse FromImportResult(
+            string sourcePath,
+            ImportResult result,
+            string storagePolicy = null)
         {
             result ??= new ImportResult();
 
@@ -17,7 +20,7 @@ namespace ExportDocManager.Api.Hosting
                 FromExporter(result.Exporter),
                 FromAnalysisReport(result.AnalysisReport),
                 result.Errors ?? new List<string>(),
-                "Excel 导入只读取用户显式选择或输入的源文件路径，解析结果随响应返回；不会写入数据库，也不会创建系统 C 盘默认落点。内置导入模板仍随程序放在 Resources/ExcelTemplates/ 下。");
+                storagePolicy ?? "Excel 导入只读取用户显式选择或输入的源文件路径，解析结果随响应返回；不会写入数据库，也不会创建系统 C 盘默认落点。内置导入模板仍随程序放在 Resources/ExcelTemplates/ 下。");
         }
 
         private static ApiExcelImportAnalysisReportDto FromAnalysisReport(ExcelImportAnalysisReport report)

@@ -475,6 +475,31 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
+                    ["/api/tools/excel/import-preview-upload"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Upload Excel and preview invoice import",
+                            operationId = "previewUploadedExcelImport",
+                            parameters = new object[]
+                            {
+                                QueryParameter("fileName", "string", null, "Original Excel file name.")
+                            },
+                            requestBody = new { required = true, content = BinaryContent() },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "Parsed Excel invoice draft. The upload is staged below runtime Cache/BrowserUploads/ExcelImport and deleted after the request.",
+                                    content = JsonContent("ApiExcelImportPreviewResponse")
+                                },
+                                ["400"] = new { description = "Invalid or empty Excel upload." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["409"] = new { description = "Excel parsing failed." },
+                                ["413"] = new { description = "Excel upload exceeds 25 MB." }
+                            }
+                        }
+                    },
                     ["/api/tools/excel/template/save-to-path"] = new
                     {
                         post = new

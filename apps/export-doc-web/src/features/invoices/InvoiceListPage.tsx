@@ -1,4 +1,4 @@
-import { FormEvent, KeyboardEvent, useEffect, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, Download, FileArchive, FileCheck2, FileSpreadsheet, FolderOpen, Plus, RefreshCw, Search, Send, Upload, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -86,6 +86,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
   const [transferMessage, setTransferMessage] = useState<string | null>(null);
   const [transferSuccessMessage, setTransferSuccessMessage] = useState<string | null>(null);
   const [lastExportedPackagePath, setLastExportedPackagePath] = useState<string | null>(null);
+  const excelImportInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const routeSuccessMessage = readRouteSuccessMessage(location.state);
@@ -269,10 +270,10 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
   });
 
   const excelImportPreviewMutation = useMutation({
-    mutationFn: (filePath: string) =>
-      client.previewExcelImport({
-        body: { filePath },
-      }),
+    mutationFn: ({ filePath, uploadFile }: { filePath?: string; uploadFile?: File }) =>
+      uploadFile
+        ? client.previewUploadedExcelImport({ fileName: uploadFile.name, body: uploadFile })
+        : client.previewExcelImport({ body: { filePath: filePath ?? "" } }),
     onSuccess: (response) => {
       if (!response.invoice) {
         setTransferMessage("Excel 已解析，但没有生成可用的发票草稿。请检查模板内容。");
@@ -399,8 +400,9 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
     }
 
     if (!isDesktopBridgeAvailable()) {
-      setTransferMessage("当前环境不能打开本机文件选择器，请到 Excel 导入工具页输入模板路径。");
+      setTransferMessage(null);
       setTransferSuccessMessage(null);
+      excelImportInputRef.current?.click();
       return;
     }
 
@@ -416,7 +418,18 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
     setTransferMessage(null);
     setTransferSuccessMessage(null);
     setLastExportedPackagePath(null);
-    excelImportPreviewMutation.mutate(filePath);
+    excelImportPreviewMutation.mutate({ filePath });
+  }
+
+  function handleExcelImportUpload(file: File | undefined) {
+    if (!file || !invoicePermission.canOperate || !excelPermission.canOperate || excelImportPreviewMutation.isPending) {
+      return;
+    }
+
+    setTransferMessage(null);
+    setTransferSuccessMessage(null);
+    setLastExportedPackagePath(null);
+    excelImportPreviewMutation.mutate({ uploadFile: file });
   }
 
   function handlePreviewTransferPackage(packagePath: string) {
@@ -498,8 +511,8 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
       ) : null}
       <WorkspaceDeviceNotice
         mode={workspaceDeviceMode}
-        phone="可查看、搜索和打开已有发票进行简单回填；新建完整发票、Excel/单据包导入和批量输出请使用桌面端。"
-        tablet="可查看、搜索、新建基础草稿和进行轻量编辑；Excel/单据包导入和批量输出请使用桌面端。"
+        phone="可查看、搜索和打开已有发票进行简单回填；新建完整发票、Excel/单据包导入和批量输出请使用电脑浏览器或桌面端。"
+        tablet="可查看、搜索、新建基础草稿和进行轻量编辑；Excel/单据包导入和批量输出请使用电脑浏览器或桌面端。"
       />
       <div className="toolbar">
         <form className="search-form" onSubmit={handleSearch}>
@@ -530,6 +543,17 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
             <FileSpreadsheet size={17} aria-hidden="true" />
             <span>导入 Excel</span>
           </button> : null}
+          <input
+            ref={excelImportInputRef}
+            className="visually-hidden"
+            type="file"
+            accept=".xlsx,.xlsm,.xltx,.xltm,.xls"
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = "";
+              handleExcelImportUpload(file);
+            }}
+          />
           {workspaceDeviceCapabilities.canImportExport && invoicePermission.canOperate ? <button
             className="command-button secondary"
             type="button"
