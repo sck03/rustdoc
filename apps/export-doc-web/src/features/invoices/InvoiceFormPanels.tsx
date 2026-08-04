@@ -224,7 +224,6 @@ export function InvoicePartiesPanel({
   sealBusy,
   onRefresh,
   onChange,
-  onSealPathSelected,
   onSealUpload,
   onSealError,
 }: {
@@ -238,7 +237,6 @@ export function InvoicePartiesPanel({
   sealBusy: boolean;
   onRefresh: () => void;
   onChange: (next: InvoicePatch) => void;
-  onSealPathSelected: (sealType: ExporterSealType, path: string) => void;
   onSealUpload: (sealType: ExporterSealType, file: File) => void;
   onSealError: (error: unknown) => void;
 }) {
@@ -414,7 +412,6 @@ export function InvoicePartiesPanel({
           inputDisabled
           actionDisabled={sealActionDisabled}
           actionTitle={sealActionTitle}
-          onPathSelected={(path) => onSealPathSelected("document", path)}
           onUploadFile={(file) => onSealUpload("document", file)}
           onError={onSealError}
         />
@@ -424,7 +421,6 @@ export function InvoicePartiesPanel({
           inputDisabled
           actionDisabled={sealActionDisabled}
           actionTitle={sealActionTitle}
-          onPathSelected={(path) => onSealPathSelected("customs", path)}
           onUploadFile={(file) => onSealUpload("customs", file)}
           onError={onSealError}
         />

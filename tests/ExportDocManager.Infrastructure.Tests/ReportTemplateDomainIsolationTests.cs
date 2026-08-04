@@ -16,7 +16,7 @@ public sealed class ReportTemplateDomainIsolationTests
         string root = CreateTestRoot("export-seal-globals");
         string appRoot = Path.Combine(root, "app");
         string dataRoot = Path.Combine(root, "data");
-        string sealRoot = Path.Combine(dataRoot, "Files", "Seals");
+        string sealRoot = Path.Combine(dataRoot, "Files", "Seals", "Exporters", "42");
         string documentSealPath = Path.Combine(sealRoot, "document.png");
         string customsSealPath = Path.Combine(sealRoot, "customs.png");
         Directory.CreateDirectory(appRoot);
@@ -44,6 +44,39 @@ public sealed class ReportTemplateDomainIsolationTests
             Assert.StartsWith("data:image/png;base64,", Assert.IsType<string>(globals["customs_seal_path"]), StringComparison.Ordinal);
             Assert.False(globals.ContainsKey("Payment"));
             Assert.False(globals.ContainsKey("Payee"));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public void ExportGlobals_ShouldRejectSealImagesOutsideManagedRoots()
+    {
+        string root = CreateTestRoot("external-export-seal-globals");
+        string appRoot = Path.Combine(root, "app");
+        string dataRoot = Path.Combine(root, "data");
+        string externalSealPath = Path.Combine(root, "external-seals", "boen-baoguan.png");
+        Directory.CreateDirectory(appRoot);
+        Directory.CreateDirectory(Path.GetDirectoryName(externalSealPath)!);
+        File.WriteAllBytes(externalSealPath, OnePixelPng);
+
+        try
+        {
+            var globals = ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(
+                new Invoice(),
+                new Customer(),
+                new Exporter
+                {
+                    DocSealPath = externalSealPath,
+                    CustomsSealPath = externalSealPath
+                },
+                withSeal: true,
+                new RuntimeAppPathProvider(appRoot, dataRoot));
+
+            Assert.Equal(string.Empty, Assert.IsType<string>(globals["doc_seal_path"]));
+            Assert.Equal(string.Empty, Assert.IsType<string>(globals["customs_seal_path"]));
         }
         finally
         {

@@ -60,6 +60,7 @@ fn run_tauri_app() -> tauri::Result<()> {
             desktop_commands::select_letter_of_credit_file,
             desktop_commands::select_ocr_image_file,
             desktop_commands::select_exporter_seal_image_file,
+            desktop_commands::read_exporter_seal_image_file_as_data_url,
             desktop_commands::read_ocr_image_file_as_data_url,
             desktop_commands::select_excel_file,
             desktop_commands::select_directory,

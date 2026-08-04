@@ -4,7 +4,6 @@ import { FormEvent,useEffect,useMemo,useState } from "react";
 import { useLocation,useNavigate,useParams } from "react-router-dom";
 import { ApiExporterDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
 import {
@@ -317,7 +316,7 @@ export function MasterDataEditorPage({
       currentRecordSnapshot &&
       currentRecordSnapshot !== persistedRecordSnapshot,
   );
-  const browserSealUploadBlocked = !isDesktopBridgeAvailable() && (isNew || hasUnsavedRecordChanges);
+  const sealUploadBlocked = isNew || hasUnsavedRecordChanges;
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: hasUnsavedRecordChanges,
     message: `当前${config.label}有未保存的修改。`,
@@ -551,14 +550,13 @@ export function MasterDataEditorPage({
                     onCommitCustomOption={commitMasterDataCustomOption}
                     onCommitProductAssistance={commitProductAssistanceField}
                     onCommitProductUnit={commitProductUnitField}
-                    onSelectPath={(path) => patchRecord(field.name, path)}
                     onUploadPath={(file) => uploadMasterDataSeal(field, file)}
                     onPathError={(error) => {
                       setMessage(readApiError(error));
                       setSuccessMessage(null);
                     }}
-                    pathActionDisabled={isBusy || browserSealUploadBlocked}
-                    pathActionTitle={browserSealUploadBlocked
+                    pathActionDisabled={isBusy || sealUploadBlocked}
+                    pathActionTitle={sealUploadBlocked
                       ? isNew
                         ? "请先保存出口商后上传印章"
                         : "请先保存当前修改后上传印章"

@@ -30,7 +30,6 @@ export function MasterDataField({
   onCommitCustomOption,
   onCommitProductAssistance,
   onCommitProductUnit,
-  onSelectPath,
   onUploadPath,
   onPathError,
   pathActionDisabled,
@@ -46,7 +45,6 @@ export function MasterDataField({
   onCommitCustomOption: (optionType: string, value: string) => void;
   onCommitProductAssistance: (field: ProductAssistanceField, value: string) => void;
   onCommitProductUnit: (sourceField: ProductUnitSourceField) => void;
-  onSelectPath: (path: string) => void;
   onUploadPath: (file: File) => void;
   onPathError: (error: unknown) => void;
   pathActionDisabled?: boolean;
@@ -89,7 +87,6 @@ export function MasterDataField({
         label={field.label}
         value={readString(record, field.name)}
         onPathChange={onChange}
-        onPathSelected={onSelectPath}
         onUploadFile={onUploadPath}
         onError={onPathError}
       />

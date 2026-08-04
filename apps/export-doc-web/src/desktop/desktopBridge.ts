@@ -127,6 +127,15 @@ export async function selectExporterSealImageFile() {
   return invokeOptionalPath("select_exporter_seal_image_file");
 }
 
+export async function readExporterSealImageFileAsDataUrl(path: string) {
+  const invoke = getInvoke();
+  if (!invoke || !path.trim()) {
+    return null;
+  }
+
+  return invoke<string>("read_exporter_seal_image_file_as_data_url", { path });
+}
+
 export async function readOcrImageFileAsDataUrl(path: string) {
   const invoke = getInvoke();
   if (!invoke || !path.trim()) {

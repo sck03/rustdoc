@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Edit3, Minimize2, PackageSearch, Save, Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { ApiExporterDto, ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
+import type { ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -152,26 +152,16 @@ export function InvoiceEditorPage({
   });
 
   const exporterSealMutation = useMutation({
-    mutationFn: async ({ sealType, file, path }: { sealType: ExporterSealType; file?: File; path?: string }) => {
+    mutationFn: async ({ sealType, file }: { sealType: ExporterSealType; file: File }) => {
       const exporterId = invoice?.exporterId ?? 0;
       if (exporterId <= 0) throw new Error("请先选择出口商档案，再设置印章。");
 
-      if (file) {
-        return client.uploadExporterSeal({
-          id: exporterId,
-          sealType,
-          fileName: file.name,
-          body: file,
-        });
-      }
-
-      const selectedPath = path?.trim() ?? "";
-      if (!selectedPath) throw new Error("请选择有效的印章图片。");
-      const latest = await client.getExporter({ id: exporterId });
-      const body: ApiExporterDto = sealType === "document"
-        ? { ...latest, docSealPath: selectedPath }
-        : { ...latest, customsSealPath: selectedPath };
-      return client.updateExporter({ id: exporterId, body });
+      return client.uploadExporterSeal({
+        id: exporterId,
+        sealType,
+        fileName: file.name,
+        body: file,
+      });
     },
     onSuccess: async (_saved, variables) => {
       setMessage(null);
@@ -956,7 +946,6 @@ export function InvoiceEditorPage({
                   sealBusy={exporterSealMutation.isPending}
                   onRefresh={() => void loadParties()}
                   onChange={patchInvoice}
-                  onSealPathSelected={(sealType, path) => exporterSealMutation.mutate({ sealType, path })}
                   onSealUpload={(sealType, file) => exporterSealMutation.mutate({ sealType, file })}
                   onSealError={(error) => {
                     setMessage(readApiError(error));

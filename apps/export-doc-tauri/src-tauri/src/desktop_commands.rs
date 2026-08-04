@@ -13,6 +13,7 @@ use tauri::Manager;
 use crate::runtime_paths::{self, RuntimePaths};
 
 const MAX_OCR_PREVIEW_IMAGE_BYTES: u64 = 25 * 1024 * 1024;
+const MAX_EXPORTER_SEAL_IMAGE_BYTES: u64 = 5 * 1024 * 1024;
 const MAX_PDF_EXPORT_BYTES: usize = 25 * 1024 * 1024;
 const MAX_FRONTEND_LOG_FIELD_LENGTH: usize = 8 * 1024;
 const PDF_TEMP_FILE_CREATE_ATTEMPTS: usize = 16;
@@ -153,6 +154,32 @@ pub(crate) fn select_exporter_seal_image_file() -> Result<Option<String>, String
             ("图片文件", &["png", "jpg", "jpeg", "gif", "webp"]),
             ("全部文件", &["*"]),
         ],
+    ))
+}
+
+#[tauri::command]
+pub(crate) fn read_exporter_seal_image_file_as_data_url(path: String) -> Result<String, String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err("印章图片路径不能为空。".to_owned());
+    }
+
+    let input = PathBuf::from(trimmed);
+    let metadata = fs::metadata(&input)
+        .map_err(|error| format!("无法读取印章图片 '{}': {error}", input.display()))?;
+    if !metadata.is_file() {
+        return Err("印章图片必须是文件。".to_owned());
+    }
+    if metadata.len() == 0 || metadata.len() > MAX_EXPORTER_SEAL_IMAGE_BYTES {
+        return Err("印章图片不能为空且不能超过 5 MB。".to_owned());
+    }
+
+    let bytes = fs::read(&input)
+        .map_err(|error| format!("无法读取印章图片 '{}': {error}", input.display()))?;
+    let mime_type = exporter_seal_image_mime_type(&input, &bytes)?;
+    Ok(format!(
+        "data:{mime_type};base64,{}",
+        STANDARD.encode(bytes)
     ))
 }
 
@@ -667,6 +694,42 @@ fn ocr_image_mime_type(path: &Path) -> Option<&'static str> {
     }
 }
 
+fn exporter_seal_image_mime_type(path: &Path, bytes: &[u8]) -> Result<&'static str, String> {
+    let detected =
+        if bytes.len() >= 8 && bytes[..8] == [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] {
+            ("png", "image/png")
+        } else if bytes.len() >= 4
+            && bytes[..3] == [0xff, 0xd8, 0xff]
+            && bytes[bytes.len() - 2..] == [0xff, 0xd9]
+        {
+            ("jpeg", "image/jpeg")
+        } else if bytes.len() >= 6 && (&bytes[..6] == b"GIF87a" || &bytes[..6] == b"GIF89a") {
+            ("gif", "image/gif")
+        } else if bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+            ("webp", "image/webp")
+        } else {
+            return Err("印章图片格式无效；仅支持 PNG、JPEG、GIF 或 WebP。".to_owned());
+        };
+
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let extension_matches = match detected.0 {
+        "png" => extension == "png",
+        "jpeg" => extension == "jpg" || extension == "jpeg",
+        "gif" => extension == "gif",
+        "webp" => extension == "webp",
+        _ => false,
+    };
+    if !extension_matches {
+        return Err("印章图片扩展名与实际图片格式不一致。".to_owned());
+    }
+
+    Ok(detected.1)
+}
+
 #[cfg(windows)]
 fn open_existing_path(path: &Path, reveal_file: bool) -> Result<(), String> {
     spawn_open_command(build_open_command(path, reveal_file))
@@ -763,6 +826,57 @@ fn spawn_detached(mut command: Command, program_name: &str) -> Result<(), String
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exporter_seal_reader_accepts_managed_upload_formats() {
+        let data_root = fresh_desktop_command_test_dir("read-exporter-seal");
+        let png_path = data_root.join("boen-baoguan.png");
+        let png_bytes = STANDARD
+            .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgQIAQbT2ZQAAAABJRU5ErkJggg==")
+            .unwrap();
+        fs::write(&png_path, png_bytes).unwrap();
+
+        let data_url =
+            read_exporter_seal_image_file_as_data_url(png_path.to_string_lossy().into_owned())
+                .unwrap();
+
+        assert!(data_url.starts_with("data:image/png;base64,"));
+        let _ = fs::remove_dir_all(data_root);
+    }
+
+    #[test]
+    fn exporter_seal_reader_rejects_blank_oversized_and_mismatched_files() {
+        assert!(read_exporter_seal_image_file_as_data_url("   ".to_owned())
+            .unwrap_err()
+            .contains("路径不能为空"));
+
+        let data_root = fresh_desktop_command_test_dir("reject-exporter-seal");
+        let oversized_path = data_root.join("oversized.png");
+        fs::write(
+            &oversized_path,
+            vec![0_u8; MAX_EXPORTER_SEAL_IMAGE_BYTES as usize + 1],
+        )
+        .unwrap();
+        assert!(read_exporter_seal_image_file_as_data_url(
+            oversized_path.to_string_lossy().into_owned(),
+        )
+        .unwrap_err()
+        .contains("不能超过 5 MB"));
+
+        let mismatched_path = data_root.join("renamed.jpg");
+        fs::write(
+            &mismatched_path,
+            [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+        )
+        .unwrap();
+        assert!(read_exporter_seal_image_file_as_data_url(
+            mismatched_path.to_string_lossy().into_owned(),
+        )
+        .unwrap_err()
+        .contains("扩展名与实际图片格式不一致"));
+
+        let _ = fs::remove_dir_all(data_root);
+    }
 
     #[test]
     fn open_path_rejects_blank_input_before_spawning() {

@@ -1,6 +1,10 @@
 import { FolderOpen, Upload } from "lucide-react";
 import { useRef } from "react";
-import { isDesktopBridgeAvailable, selectExporterSealImageFile } from "../../desktop/desktopBridge.ts";
+import {
+  isDesktopBridgeAvailable,
+  readExporterSealImageFileAsDataUrl,
+  selectExporterSealImageFile,
+} from "../../desktop/desktopBridge.ts";
 import { PathField } from "../../ui/PathField.tsx";
 
 export type ExporterSealType = "document" | "customs";
@@ -12,7 +16,6 @@ export function ExporterSealField({
   actionDisabled,
   actionTitle,
   onPathChange,
-  onPathSelected,
   onUploadFile,
   onError,
 }: {
@@ -22,14 +25,13 @@ export function ExporterSealField({
   actionDisabled?: boolean;
   actionTitle?: string;
   onPathChange?: (value: string) => void;
-  onPathSelected: (path: string) => void;
   onUploadFile: (file: File) => void;
   onError: (error: unknown) => void;
 }) {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const desktopAvailable = isDesktopBridgeAvailable();
   const sealLabel = label.replace(/路径$/, "");
-  const title = actionTitle || (desktopAvailable ? `选择${sealLabel}图片路径` : `上传${sealLabel}图片`);
+  const title = actionTitle || (desktopAvailable ? `选择并上传${sealLabel}图片` : `上传${sealLabel}图片`);
 
   async function chooseSealImage() {
     if (actionDisabled) return;
@@ -41,7 +43,10 @@ export function ExporterSealField({
 
     try {
       const selectedPath = await selectExporterSealImageFile();
-      if (selectedPath) onPathSelected(selectedPath);
+      if (!selectedPath) return;
+
+      const dataUrl = await readExporterSealImageFileAsDataUrl(selectedPath);
+      if (dataUrl) onUploadFile(dataUrlToFile(dataUrl, selectedPath));
     } catch (error) {
       onError(error);
     }
@@ -81,4 +86,24 @@ export function ExporterSealField({
       />
     </>
   );
+}
+
+function dataUrlToFile(dataUrl: string, selectedPath: string) {
+  const match = /^data:(image\/(?:png|jpeg|gif|webp));base64,([a-zA-Z0-9+/=]+)$/.exec(dataUrl);
+  if (!match) {
+    throw new Error("印章图片内容无效，请重新选择。");
+  }
+
+  const binary = window.atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  const fileName = selectedPath.split(/[\\/]/).pop()?.trim();
+  if (!fileName) {
+    throw new Error("无法读取印章图片文件名，请重新选择。");
+  }
+
+  return new File([bytes], fileName, { type: match[1] });
 }
