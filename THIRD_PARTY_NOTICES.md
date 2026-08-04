@@ -116,7 +116,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | equivalent | 1.0.2 | Apache-2.0 OR MIT | excel-analyzer, tauri |
 | cargo | erased-serde | 0.4.10 | MIT OR Apache-2.0 | tauri |
 | cargo | errno | 0.3.14 | MIT OR Apache-2.0 | tauri |
-| cargo | event-listener | 5.4.1 | Apache-2.0 OR MIT | tauri |
+| cargo | event-listener | 5.4.2 | Apache-2.0 OR MIT | tauri |
 | cargo | event-listener-strategy | 0.5.4 | Apache-2.0 OR MIT | tauri |
 | cargo | fast-float2 | 0.2.3 | MIT OR Apache-2.0 | excel-analyzer |
 | cargo | fastrand | 2.4.1 | Apache-2.0 OR MIT | tauri |

@@ -390,7 +390,7 @@ Generated from committed npm/Cargo lock files, Cargo package metadata, restored 
 | equivalent | 1.0.2 | Apache-2.0 OR MIT | excel-analyzer, tauri |
 | erased-serde | 0.4.10 | MIT OR Apache-2.0 | tauri |
 | errno | 0.3.14 | MIT OR Apache-2.0 | tauri |
-| event-listener | 5.4.1 | Apache-2.0 OR MIT | tauri |
+| event-listener | 5.4.2 | Apache-2.0 OR MIT | tauri |
 | event-listener-strategy | 0.5.4 | Apache-2.0 OR MIT | tauri |
 | fast-float2 | 0.2.3 | MIT OR Apache-2.0 | excel-analyzer |
 | fastrand | 2.4.1 | Apache-2.0 OR MIT | tauri |
