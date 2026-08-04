@@ -1,5 +1,6 @@
 using System.Text;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Reporting
 {
@@ -61,7 +62,7 @@ namespace ExportDocManager.Services.Reporting
                 return;
             }
 
-            string uri = new Uri(Path.GetFullPath(fontPath)).AbsoluteUri;
+            string uri = LocalFileUriHelper.FromPath(fontPath);
             css.AppendLine("@font-face {");
             css.Append("  font-family: ").Append(CssQuote(family)).AppendLine(";");
             css.Append("  src: url(").Append(CssQuote(uri)).AppendLine(") format(\"opentype\");");

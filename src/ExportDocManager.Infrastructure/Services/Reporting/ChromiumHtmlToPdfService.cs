@@ -291,33 +291,7 @@ namespace ExportDocManager.Services.Reporting
 
         internal static string ToFileUri(string localPath)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
-
-            string fullPath = Path.GetFullPath(localPath.Trim());
-            if (OperatingSystem.IsWindows())
-            {
-                fullPath = RemoveWindowsExtendedPathPrefix(fullPath);
-            }
-
-            return new Uri(fullPath).AbsoluteUri;
-        }
-
-        private static string RemoveWindowsExtendedPathPrefix(string localPath)
-        {
-            const string extendedPathPrefix = @"\\?\";
-            const string extendedUncPrefix = @"\\?\UNC\";
-
-            if (localPath.StartsWith(extendedUncPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                return @"\\" + localPath[extendedUncPrefix.Length..];
-            }
-
-            if (localPath.StartsWith(extendedPathPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                return localPath[extendedPathPrefix.Length..];
-            }
-
-            return localPath;
+            return LocalFileUriHelper.FromPath(localPath);
         }
 
         private static async Task DeleteTemporaryDirectoryAsync(string path)

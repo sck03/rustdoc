@@ -644,6 +644,39 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public void ReportFontPolicy_BuildHtmlStyle_ShouldHandleWindowsExtendedProgramRoot()
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return;
+            }
+
+            string appRoot = CreateTempDirectory("report-font-uri-#-%-中文");
+            string dataRoot = CreateTempDirectory("report-font-uri-data");
+            try
+            {
+                string fontRoot = Path.Combine(appRoot, "Resources", "Fonts", "OpenSource");
+                Directory.CreateDirectory(fontRoot);
+                File.WriteAllBytes(Path.Combine(fontRoot, ReportFontPolicy.SansRegularFileName), [0]);
+                File.WriteAllBytes(Path.Combine(fontRoot, ReportFontPolicy.SansBoldFileName), [0]);
+                File.WriteAllBytes(Path.Combine(fontRoot, ReportFontPolicy.SerifRegularFileName), [0]);
+
+                var pathProvider = new RuntimeAppPathProvider(@"\\?\" + appRoot, @"\\?\" + dataRoot);
+                string style = ReportFontPolicy.BuildHtmlStyle(pathProvider);
+
+                Assert.Equal(3, Regex.Matches(style, "@font-face").Count);
+                Assert.Contains("file:///", style, StringComparison.Ordinal);
+                Assert.Contains("%23-%25-", style, StringComparison.Ordinal);
+                Assert.DoesNotContain(@"\\?\", style, StringComparison.Ordinal);
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        [Fact]
         public void ManagedPlaywrightBrowserHost_BuildArguments_ShouldOnlyDisableSandboxWhenExplicitlyRequested()
         {
             string userDataPath = Path.Combine(Path.GetTempPath(), "report-user-data");
