@@ -1,177 +1,508 @@
-# Full 局域网 / 容器版
+# ExportDocManager Full 容器版部署与运维
 
-该部署只发布 `Full` 产品，并通过 PostgreSQL 中的账号岗位、权限模板和数据归属控制实际能力。当前 Compose 方案使用一个 Web 容器承载 Nginx、一个 API 容器和一个 PostgreSQL 容器；它适合公司局域网，也支持在需要时叠加 TLS。HTTP、HTTPS 和 Nginx 的选择属于部署边界，不改变业务权限、数据库隔离或登录流程。
+正式容器拓扑为 `Nginx Web + ASP.NET Core API + PostgreSQL 18`；HTTPS 模式额外运行 Certbot 自动续期容器。SQLite 仅用于单机版。API `5188` 和 PostgreSQL `5432` 不发布到宿主机，用户只访问 Nginx。
 
-## Linux VPS 一键安装已发布的 GHCR 镜像
+本文以 Linux VPS 默认目录 `/opt/export-doc-manager` 为准。下文命令均假定当前为 `root`；普通账号先执行 `sudo -i`，不要直接对 `edm` Shell 函数使用 `sudo`。
 
-一键安装器不需要克隆仓库。它会下载当前部署清单、生成相互独立的 PostgreSQL 密码和首次启用令牌、选择不冲突的 Docker 私有 `/28`、把运行数据放入 `/opt/export-doc-manager/runtime/`，然后拉取 `ghcr.io/sck03/export-doc-manager-api` 与 `...-web`。重复执行时保留已有密码、配置和数据，只更新部署清单与所选镜像标签。
+## 1. 数据目录
 
-内网 HTTP，默认从 `http://服务器IP:8080` 访问：
+一键安装不需要提前创建目录。
+
+| 内容 | 宿主机路径 |
+| --- | --- |
+| 部署清单和安装器 | `/opt/export-doc-manager/` |
+| 密码、镜像版本和部署参数 | `/opt/export-doc-manager/.env` |
+| PostgreSQL 原始数据 | `/opt/export-doc-manager/runtime/postgres/` |
+| API 配置、印章、模板、日志、缓存和应用备份 | `/opt/export-doc-manager/runtime/api-data/` |
+| 本地主密钥 | `/opt/export-doc-manager/runtime/api-data/Security/local-master-key.bin` |
+| Let's Encrypt 证书 | `/opt/export-doc-manager/runtime/letsencrypt/` |
+| 本文创建的运维数据库备份 | `/opt/export-doc-manager/backups/postgresql/` |
+
+完整迁移必须同时保留数据库备份、`.env` 和 `runtime/api-data/`。缺少 `Security/local-master-key.bin`，或更换 `.env` 中显式配置的 `EXPORTDOCMANAGER_MASTER_KEY`，可能导致已有加密配置无法解密。
+
+Docker 镜像和构建缓存由 Docker Engine 的全局 `data-root` 管理，不属于应用目录。若需放到独立数据盘，应在首次安装前按 Docker 官方方法配置 Engine。
+
+## 2. 安装和首次登录
+
+### 内网 HTTP
+
+只应向办公网、VLAN 或 VPN 放行 `8080`：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sck03/rustdoc/main/deploy/container/install-container.sh |
   sudo bash -s -- --mode http --tag 0.1.2 --install-docker
 ```
 
-公网 HTTPS，先把域名 A 记录指向 VPS，并开放 TCP `80/443`：
+访问：`http://服务器IP:8080`。
+
+### 公网 HTTPS
+
+先把域名解析到 VPS，并开放 TCP `80/443`：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sck03/rustdoc/main/deploy/container/install-container.sh |
-  sudo bash -s -- --mode https --domain docs.example.com --email ops@example.com --tag 0.1.2 --install-docker
+  sudo bash -s -- \
+    --mode https \
+    --domain docs.example.com \
+    --email ops@example.com \
+    --tag 0.1.2 \
+    --install-docker
 ```
 
-把示例版本 `0.1.2` 换成 GitHub Packages 中实际发布的版本；生产部署建议固定精确版本，而不是长期跟随 `latest`。`--install-docker` 只在宿主尚未安装 Docker 时调用 Docker 官方安装脚本；已经安装 Docker Engine 与 Compose v2 时可以省略。执行远程脚本前，可先下载并审查脚本内容再运行。
+把 `0.1.2` 换成 GHCR 中实际发布的精确版本；生产环境不建议长期使用 `latest`。宿主已安装 Docker Engine 和 Compose v2 时可省略 `--install-docker`。
 
-公网模式没有增加第二层业务代理。Nginx 仍是唯一 Web 服务器和反向代理：正常运行时 `80` 只处理 ACME 验证并跳转 HTTPS，`443` 提供 React 和同源 API。首次签发或证书不足 30 天有效期时，安装器会暂时停止 Web，使用 Certbot standalone 独占 `80` 完成签发，再启动 Nginx；以后常驻的 Certbot 容器每 12 小时通过 Nginx 暴露的 webroot 检查续期，Nginx 每小时无中断 reload 新证书。Apache-2.0 许可的 Certbot 始终不接收业务请求，也不属于 API 可信代理链；签发失败时，安装器会尽力恢复原 HTTP/HTTPS 部署。
+安装器不会修改 UFW、云安全组、DNS 或 Docker Engine 全局配置。内网 HTTP 会明文传输登录和业务数据，不能直接暴露到公网。
 
-安装成功会在终端显示首次启用令牌。之后也可在 VPS 上读取：
+### 首次登录
+
+安装成功时会显示首次启用令牌。也可以重新读取：
 
 ```bash
-sudo sed -n 's/^EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=//p' /opt/export-doc-manager/.env
+sed -n 's/^EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=//p' \
+  /opt/export-doc-manager/.env
 ```
 
-首次访问时展开登录页“高级连接选项”，填写该令牌，以 `admin` 登录并输入希望设置的应用管理员密码。数据库密码、首次启用令牌和管理员密码是三份不同凭据，不要复用。
+在登录页展开“高级连接选项”，填写启用令牌，以 `admin` 登录，并输入要设置的应用管理员密码。数据库密码、启用令牌和应用管理员密码不能复用。
 
-升级或切换到新的精确镜像版本：
+Private GHCR Package 使用只有 `read:packages` 权限的 token：
 
 ```bash
-sudo /opt/export-doc-manager/install-container.sh --mode http --tag 0.1.3
+sudo env \
+  GHCR_USER='你的GitHub账号' \
+  GHCR_TOKEN='只读Packages令牌' \
+  /opt/export-doc-manager/install-container.sh \
+    --mode http \
+    --tag 0.1.3
 ```
 
-公网部署升级时继续传原域名和邮箱，或者直接省略，安装器会复用 `.env` 中的值：
+Token 只通过进程环境传入，不写入安装参数或 `.env`。
+
+## 3. 日常管理和升级
+
+每次 SSH 登录后先执行下面这段。它会自动选择 HTTP 或 HTTPS Compose 文件，并定义 `edm` 辅助函数：
 
 ```bash
-sudo /opt/export-doc-manager/install-container.sh --mode https --tag 0.1.3
+cd /opt/export-doc-manager
+umask 077
+
+MODE=$(sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' .env)
+EDM_COMPOSE=(-f docker-compose.ghcr.yml)
+if [ "$MODE" = "https" ]; then
+  EDM_COMPOSE+=(-f docker-compose.acme.yml)
+fi
+
+edm() {
+  docker compose "${EDM_COMPOSE[@]}" --env-file .env "$@"
+}
 ```
 
-若 GHCR Package 被设为 Private，先创建只有 `read:packages` 权限的 GitHub token，再通过环境变量登录；令牌不写安装参数或 `.env`：
+常用命令：
 
 ```bash
-sudo env GHCR_USER='你的GitHub账号' GHCR_TOKEN='只读Packages令牌' \
-  /opt/export-doc-manager/install-container.sh --mode http --tag 0.1.3
+edm ps -a
+edm logs --no-color --tail=200 postgres api web
+edm restart api web
+edm restart postgres api web
 ```
 
-安装器不会自动修改 UFW、云安全组、域名或 Docker Engine 的全局 `data-root`。内网 HTTP 应只向办公网/VPN 放行所选端口；公网 HTTPS 只放行 `80/443`。业务数据库、API 配置、日志、备份和 Let's Encrypt 证书都在安装目录 `runtime/`，但镜像层仍由 Docker Engine 的全局数据目录管理；需要放到独立数据盘时，应在首次部署前按 Docker 官方文档配置 Engine `data-root`。
+HTTPS 证书续期日志：
 
-## 先选择部署模式
-
-### 公司内网 HTTP（正式支持）
-
-如果服务器和浏览器都位于受控的公司内网、VLAN 或 VPN 内，通常不需要为了“形式上的严格”强制启用 HTTPS。基础 `docker-compose.yml` 就是 HTTP-only 模式：不读取证书，不挂载私钥，也不依赖 `docker-compose.https.yml`。
-
-```powershell
-docker compose -f .\docker-compose.yml --env-file .\.env up -d --build
+```bash
+[ "$MODE" = "https" ] && edm logs --no-color --tail=100 certbot
 ```
 
-默认从 `http://服务器地址:8080` 访问。应由网络管理员使用防火墙/交换机 ACL 只允许办公网段访问该端口，并避免把它转发到公网。HTTP 会明文传输登录凭据和业务数据，因此跨越不可信网络、公共 Wi-Fi、互联网或存在合规要求时，必须改用 HTTPS 或由可信 VPN/外部负载均衡终止 TLS；内网 HTTP 是有明确边界的部署模式，不是程序故障降级。
+升级前先创建数据库备份，然后执行：
 
-### 公网或合规 HTTPS
+```bash
+cd /opt/export-doc-manager
+MODE=$(sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' .env)
 
-公网域名优先使用上面的一键安装器和 `docker-compose.acme.yml`，由 Certbot 自动申请、续期，Nginx 保持唯一业务入口。企业已有证书、内网 CA 或统一证书平台时，可继续使用手工证书 overlay：
-
-```powershell
-docker compose `
-  -f .\docker-compose.yml `
-  -f .\docker-compose.https.yml `
-  --env-file .\.env `
-  up -d --build
+./install-container.sh --mode "$MODE" --tag 0.1.3
 ```
 
-手工证书 overlay 额外发布 HTTPS 端口 `8443`，启用 TLS 1.2/1.3、HSTS 和更严格的安全响应头。若要“只允许 HTTPS”，应在防火墙关闭或限制 `8080`，不要仅依赖浏览器重定向。一键公网模式则固定使用标准 `80/443`，HTTP 自动跳转 HTTPS。也可以让企业负载均衡、网关或 CDN 在 Nginx 前终止 TLS；此时必须把其实际连接 Nginx 的固定 IP 配置为可信代理。
+安装器会保留 `.env`、数据库、API DataRoot 和证书，只更新部署清单并拉取指定镜像。
 
-### 非 Docker 浏览器服务器包
+## 4. 数据库备份
 
-Windows/Linux 浏览器服务器包由单个 ASP.NET Core 进程同时托管 React 静态文件和 API，部署机连接原生 PostgreSQL，不需要 Nginx。该模式适合已有 IIS、Apache、企业网关，或不希望维护 Docker Web 容器的环境；是否增加外部反向代理由现场网络决定。
+PostgreSQL 容器自带与服务器同版本的 `pg_dump/pg_restore`，不要求宿主机或 API 容器安装数据库工具。当前 API 镜像没有内置 PostgreSQL 客户端，因此管理界面的“创建物理备份”可能提示维护组件缺失；VPS 容器部署应使用本节命令。
 
-## Nginx 在当前 Compose 中做什么
+备份可在线执行，但建议选择业务低峰期。必须再复制到另一台服务器、对象存储或离线介质；只放在同一 VPS 上不能防止磁盘或整机损坏。
 
-“内网不强制 HTTPS”不等于“当前 Nginx 必须删除”。Nginx 在 Compose 里仍承担三个实际职责：
+先初始化第 3 节的 `edm` 函数，再执行：
 
-- 提供 React 的静态文件和 SPA fallback，让浏览器可以直接打开 Web 页面；
-- 代理 `/api`、`/readyz`、`/healthz` 和 `/openapi`，让 Web/API 同源，并且 API `5188` 只在 Compose 内部可见；
-- 统一 CSP、禁止 iframe、MIME sniffing 防护等 HTTP 响应头，并向 API 传递经过配置的可信代理地址。
+```bash
+BACKUP_ROOT=/opt/export-doc-manager/backups/postgresql
+install -d -m 700 "$BACKUP_ROOT"
 
-因此，内网 HTTP 只是不启用 TLS 配置，不是把 Web 服务器和同源代理一并省略。若现场确实要移除 Nginx，必须同时提供等价的静态文件服务、SPA fallback、`/api` 反向代理、健康探针转发和安全响应头，并重新审查 `KnownProxies`/CORS/CSP；不能只删掉 Web 容器后把 API 端口直接暴露给所有客户端。单进程浏览器服务器包已经提供了不使用 Nginx 的正式替代路径。
+BACKUP_FILE="$BACKUP_ROOT/exportdoc_$(date +%Y%m%d_%H%M%S).dump"
 
-桌面版软件更新地址是另一条独立配置：桌面管理员可在系统设置中把 `latest.json` 指向 GitHub、自建 HTTPS 或受控内网 HTTP 更新服务器。它不要求把 updater 私钥放进容器；更新公钥固定在桌面安装包内，HTTP 更新也仍必须通过客户端签名校验。Web/容器本身不会执行 Tauri 桌面安装事务。
+if ! edm exec -T postgres sh -ec '
+  exec pg_dump \
+    -U "$POSTGRES_USER" \
+    -d "$POSTGRES_DB" \
+    --format=custom \
+    --blobs \
+    --no-owner \
+    --no-privileges
+' > "$BACKUP_FILE"; then
+  rm -f -- "$BACKUP_FILE"
+  echo "数据库备份失败"
+  exit 1
+fi
 
-## 初始化
+test -s "$BACKUP_FILE" || {
+  rm -f -- "$BACKUP_FILE"
+  echo "数据库备份失败：文件为空"
+  exit 1
+}
+chmod 600 "$BACKUP_FILE"
 
-在本目录执行：
+if ! edm exec -T postgres pg_restore --list \
+  < "$BACKUP_FILE" >/dev/null; then
+  rm -f -- "$BACKUP_FILE"
+  echo "数据库备份校验失败"
+  exit 1
+fi
 
-```powershell
-pwsh -File .\initialize-container-runtime.ps1 `
-  -PostgreSqlPassword "请替换为长随机数据库密码" `
-  -BootstrapToken "请替换为另一段至少24位的随机首次部署令牌"
-docker compose -f .\docker-compose.yml --env-file .\.env up -d --build
+BACKUP_NAME=$(basename -- "$BACKUP_FILE")
+(
+  cd "$BACKUP_ROOT"
+  sha256sum "$BACKUP_NAME" > "$BACKUP_NAME.sha256"
+)
+chmod 600 "$BACKUP_FILE.sha256"
+ls -lh "$BACKUP_FILE" "$BACKUP_FILE.sha256"
 ```
 
-初始化脚本会检查当前宿主机接口、路由表和已存在的 Docker 网络，从候选私有地址中自动选择不重叠的紧凑 `/28`，并把 Nginx 的可信代理地址一起写入 `.env`。仓库不再提供 `172.30.238.0/24` 这类固定默认值；新部署会按现场网络自动生成，已存在的 `.env` 默认保持稳定。需要重新探测时增加 `-RegenerateNetwork`。企业 VPN 使用大范围路由、或现场有特殊网络规划时，可以显式指定 `/24` 至 `/28` 网段和代理地址：
+复制到其它服务器：
 
-```powershell
-pwsh -File .\initialize-container-runtime.ps1 `
-  -PostgreSqlPassword "请替换为长随机数据库密码" `
-  -BootstrapToken "请替换为另一段至少24位的随机首次部署令牌" `
-  -ContainerSubnet "10.238.42.0/28" `
-  -ReverseProxyIp "10.238.42.10"
+```bash
+scp "$BACKUP_FILE" "$BACKUP_FILE.sha256" \
+  root@备份服务器:/data/exportdoc-backups/
 ```
 
-显式网段与已发现的本机/Docker 网络重叠时，脚本默认拒绝继续；只有网络管理员确认隔离且明确传入 `-AllowNetworkOverlap` 才会放行。Compose 不再在缺少这两个变量时静默回退到某个固定网段。`/28` 足够容纳当前 Web、API、PostgreSQL 以及后续少量副本；如果现场要扩展更多容器，可以显式改用 `/27` 或 `/24`（脚本会拒绝宽于 `/24` 的网络）。
+`pg_restore --list` 只证明归档结构可读取。正式环境仍应定期在独立测试数据库或新服务器上完成恢复演练。
 
-初始化脚本会把 HTTPS 端口和证书挂载路径写入 `.env`，方便以后启用 overlay；这不会把内网 HTTP 部署变成必需 TLS。首次使用 HSTS 前必须确认域名、证书续期和全部子域均已具备 HTTPS，不能用临时自签证书直接面向正式用户。
+查看超过 30 天的手工备份：
 
-如果镜像已由 GitHub Actions 发布到 GHCR，则在 `.env` 设置 `EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/你的账号`，改用：
-
-```powershell
-docker compose -f .\docker-compose.ghcr.yml --env-file .\.env up -d
+```bash
+BACKUP_ROOT=/opt/export-doc-manager/backups/postgresql
+find "$BACKUP_ROOT" -maxdepth 1 -type f \
+  \( -name '*.dump' -o -name '*.dump.sha256' \) \
+  -mtime +30 -print
 ```
 
-随后由部署管理员访问 `http://服务器地址:8080`，展开登录页“高级连接选项”，在“首次启用口令”中填写初始化命令使用的 `BootstrapToken`，再以用户名 `admin` 登录；这次输入的密码会成为首个应用管理员密码，至少需要 8 个字符。口令只随本次登录请求发送，登录成功后从页面内存清除，不写入浏览器存储。空数据库首次初始化只接受 `admin` 用户名，其他用户名不能先行创建或认领管理员。数据库连接密码来自运行目录 `runtime/api-data/Config/appsettings.json`，与应用管理员密码及首次启用口令相互独立。
+确认输出无误后再删除：
 
-API 启动时仍要求 `.env` 中保留至少 24 位的 `EXPORTDOCMANAGER_BOOTSTRAP_TOKEN`；数据库已有用户后，普通登录无需再次填写该令牌，可以按企业密钥轮换制度更换 `.env` 中的值并重启 API。不要把令牌复用为数据库密码或管理员密码。
+```bash
+find "$BACKUP_ROOT" -maxdepth 1 -type f \
+  \( -name '*.dump' -o -name '*.dump.sha256' \) \
+  -mtime +30 -delete
+```
 
-容器网段和 Nginx 地址由初始化脚本写入 `.env`，必须是专用、彼此匹配的 IPv4 `/24` 至 `/28` 与地址；它们只存在于 Docker 内部，不是公司局域网对外的服务器地址。公网 HTTPS/CDN 代理位于内置 Nginx 前方时，还应把它实际连接 Nginx 的明确来源 IP 写入 `EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES`；多个地址用分号分隔。API 会按已配置代理数量限制转发链，并逐跳核对可信地址，不接受任意长度的客户端伪造链。不要填写整个不受控网段。非 Compose 反向代理部署可通过 `EXPORTDOCMANAGER_TRUSTED_PROXIES` 配置一个或多个明确代理 IP（逗号或分号分隔，不接受主机名和 CIDR）。
+不要把备份、`.env`、TLS 私钥或主密钥提交到 Git 仓库。
 
-敏感配置默认由运行目录 `runtime/api-data/Security/local-master-key.bin` 中自动生成的本地主密钥保护，不写系统盘固定目录。也可以在 `.env` 设置 `EXPORTDOCMANAGER_MASTER_KEY`（32 字节 Base64 或 64 位十六进制）；一旦使用环境主密钥，必须长期安全备份并在迁移时一并提供，随意更换会导致既有密文无法解密。
+## 5. 在当前服务器恢复数据库
 
-系统默认关闭公开自注册。管理员登录后通过侧栏“系统维护 → 账号与权限”创建、停用、重置或删除账号；已有发票、付款等业务数据归属的账号只能停用，不能直接删除。
+警告：恢复会覆盖当前业务数据库。先创建一份新的当前库备份，并安排停机窗口。
 
-## PostgreSQL 版本
+先初始化第 3 节的 `edm` 函数，然后指定备份：
 
-Compose 固定使用 `postgres:18-bookworm`：锁定 PostgreSQL 18 大版本，允许拉取 18 系列内的安全和缺陷修复。该 Debian/glibc 变体同时提供 Linux amd64 与 arm64/v8 镜像，更适合作为长期运行的商业数据库默认值；Windows、macOS 和 Linux 客户端均通过 PostgreSQL 网络协议访问，不依赖容器内 libc。
+```bash
+BACKUP_FILE=/opt/export-doc-manager/backups/postgresql/exportdoc_具体时间.dump
 
-官方 `postgres:18-alpine` 同样支持 amd64/arm64，且 PostgreSQL 已启用 ICU，但官方文档明确提示 musl 可能影响依赖 libc 假设的软件。Alpine amd64 镜像相对 Bookworm 只节省约 35 MB，对数据库运行目录和业务数据体量意义有限，却会增加未来原生扩展、区域设置和排障差异，因此不作为本项目默认值。Docker 官方没有通用 `postgres:18-slim` 标签；如仅做资源受限测试，可手工改为 `18-alpine`，正式数据必须重新完成完整回归。
+test -s "$BACKUP_FILE" || {
+  echo "备份文件不存在或为空"
+  exit 1
+}
 
-首次初始化显式使用 PostgreSQL 18 内置 Unicode provider：`--locale-provider=builtin --builtin-locale=PG_UNICODE_FAST --encoding=UTF8`。文本排序、大小写映射和字符分类不依赖 glibc/musl locale，避免不同 Linux 基础镜像造成数据库默认排序差异；项目如未来需要中文拼音排序，应另建明确的 ICU `zh-CN` collation，而不是依赖操作系统默认 locale。
+(
+  cd "$(dirname -- "$BACKUP_FILE")"
+  sha256sum -c "$(basename -- "$BACKUP_FILE").sha256"
+)
+```
 
-PostgreSQL 18 官方镜像把默认 `PGDATA` 改为版本化目录 `/var/lib/postgresql/18/docker`，因此 Compose 必须把宿主运行根 `postgres/` 挂载到容器 `/var/lib/postgresql`，不能沿用 17 及以下的 `/var/lib/postgresql/data`。当前项目尚未投产，开发期旧 16 数据目录应备份需要的样例后删除并重新初始化；若未来已有生产数据，跨大版本必须使用 `pg_upgrade` 或 dump/restore，不能直接复用旧数据目录。
+停止 Web 和 API，执行恢复：
 
-Linux 安装器把外层 `runtime/` 固定为 `root` 专用的 `700`，同时按官方 PostgreSQL 18 镜像的挂载边界把 `runtime/postgres/` 设为带 sticky bit 的 `1777`；真正的 `18/docker` 数据目录仍由 PostgreSQL 创建为 `700`。`api-data/`、证书和 ACME 的直接挂载根也只在这个不可穿透的外层目录内开放容器写入，`Config/appsettings.json` 使用 `644` 供 Docker user-namespace/rootless 映射后的 API 读取，数据库密码仍受外层 `runtime/ 700` 保护。不要把这些内部挂载目录单独移动到公共可遍历路径，否则必须重新设计宿主 ACL。
+```bash
+edm stop web api
 
-## 存储边界
+edm exec -T postgres sh -ec '
+  exec pg_restore \
+    -U "$POSTGRES_USER" \
+    -d "$POSTGRES_DB" \
+    --clean \
+    --if-exists \
+    --exit-on-error \
+    --no-owner \
+    --no-privileges
+' < "$BACKUP_FILE"
+```
 
-- PostgreSQL 数据：`runtime/postgres/`
-- API 数据、日志、授权镜像、缓存、备份和用户模板：`runtime/api-data/`
-- Let's Encrypt 证书、账户和续期状态：`runtime/letsencrypt/`；ACME HTTP-01 工作目录：`runtime/acme-webroot/`
-- 可编辑程序配置：`runtime/api-data/Config/appsettings.json`
-- 容器内报表 Chromium：Debian 官方 `chromium` 包，固定通过 `/usr/bin/chromium` 使用；不从宿主 C 盘或程序运行数据根复制浏览器二进制
-- 镜像层与 Docker 自身缓存由 Docker Engine 管理；Windows 上如要求系统 C 盘零占用，还必须把 Docker Desktop/Engine 的 data-root 或磁盘镜像迁到非系统盘。
+仅在恢复成功后重新启动：
 
-API 容器只挂载整个 `runtime/api-data/` 到 `/runtime-data`，不再对配置文件增加嵌套只读挂载。管理员保存设置时需要在 `Config/` 同目录创建临时文件并原子替换正式文件，因此 `api-data/Config/` 必须保持可写；安装镜像内的 `/app` 仍保持只读使用。
+```bash
+edm up -d
+edm ps -a
+edm logs --no-color --tail=100 postgres api web
+```
 
-不要把 `runtime/`、`.env`、TLS 私钥或数据库密码提交到版本库。公网部署必须使用可信 HTTPS 和防火墙，可启用本目录 TLS overlay，也可在 Web 容器前使用成熟反向代理/CDN；不要直接公开 API 容器端口。
+人工核对登录、权限、发票、客户、出口商、印章、HS 查询、任务和审计记录。恢复失败时不要先开放 Web，应检查 PostgreSQL 日志和备份文件。
 
-## 生命周期、备份与恢复验收
+## 6. 停止、卸载和彻底清理
 
-仓库工作流 `Container runtime lifecycle validation` 会在 GitHub Ubuntu runner 上真实执行：
+先初始化第 3 节的 `edm` 函数。
 
-- HTTP/HTTPS Compose 解析和完整 API/Web 镜像构建；
-- `/readyz`、`/healthz`、CSP/HSTS 等响应头；
-- API `5188` 不对宿主机发布；
-- PostgreSQL 容器删除重建后的 bind volume 数据持久化；
-- `pg_dump -Fc` 备份、删除测试表后使用 `pg_restore --clean --if-exists --exit-on-error` 恢复；
-- 失败日志、探针响应和恢复包 Artifact 上传及最终容器清理。
+临时停止，保留容器和全部数据：
 
-该工作流使用固定的临时测试密码和自签证书，只服务一次性 runner，不应复制到生产环境。生产恢复演练必须使用独立的备份账号/介质、实际数据规模、加密备份和经过批准的停机窗口；恢复前停止 API 写入，恢复后检查应用登录、权限、发票、HS 查询、任务和审计记录。单纯看到备份文件存在不等于恢复可用。
+```bash
+edm stop
+```
 
-GitHub 只负责构建、生命周期验证和保存 GHCR/Artifact，不提供 PostgreSQL/API 的长期运行主机。真实部署仍需 Docker Engine；当前开发机没有 Docker CLI，因此本地只能完成 Dockerfile、Compose 和工作流静态验证。只有 GitHub 生命周期工作流或目标服务器演练实际成功后，才能把对应平台记录为容器验收通过。
+重新启动：
+
+```bash
+edm up -d
+```
+
+删除容器和项目网络，但保留数据库、印章、配置、证书和备份：
+
+```bash
+edm down --remove-orphans
+```
+
+以后可重新运行安装器恢复：
+
+```bash
+/opt/export-doc-manager/install-container.sh --mode "$MODE"
+```
+
+### 彻底删除整个容器版
+
+警告：以下操作会永久删除数据库、账号、发票、印章、模板、配置、证书、本地主密钥和本机备份。必须先把数据库备份和迁移归档复制到其它机器。
+
+记录镜像名称并删除容器：
+
+```bash
+IMAGE_NAMESPACE=$(sed -n 's/^EXPORTDOCMANAGER_IMAGE_NAMESPACE=//p' .env)
+IMAGE_TAG=$(sed -n 's/^EXPORTDOCMANAGER_IMAGE_TAG=//p' .env)
+
+edm down --remove-orphans
+```
+
+可选删除当前版本镜像：
+
+```bash
+docker image rm \
+  "$IMAGE_NAMESPACE/export-doc-manager-api:$IMAGE_TAG" \
+  "$IMAGE_NAMESPACE/export-doc-manager-web:$IMAGE_TAG" || true
+```
+
+最后校验固定路径并删除安装目录：
+
+```bash
+cd /opt
+
+test "$(readlink -f -- /opt/export-doc-manager)" = "/opt/export-doc-manager" || {
+  echo "目录校验失败，停止删除"
+  exit 1
+}
+
+rm -rf --one-file-system -- /opt/export-doc-manager
+```
+
+不要使用 `docker system prune -a --volumes` 清理本项目，它可能删除 VPS 上其它项目的镜像、缓存和数据卷。
+
+## 7. 完整迁移到新服务器
+
+使用“PostgreSQL 逻辑备份 + API DataRoot 归档”。不要复制 `runtime/postgres/18/docker` 原始目录；逻辑备份可以在 x64 与 ARM64 之间迁移，也避免容器 UID 和 PostgreSQL 小版本差异。
+
+迁移时旧服务器必须停止业务写入。新服务器验收前不要删除旧服务器，也不要让两套服务同时对外写入。
+
+### 7.1 旧服务器导出
+
+初始化第 3 节的 `edm` 函数，停止 Web 和 API：
+
+```bash
+edm stop web api
+```
+
+按第 4 节创建新的数据库备份，并记录最后输出的 `.dump` 完整路径。若已更换 SSH Shell，先重新设置 `BACKUP_FILE`，然后停止全部容器：
+
+```bash
+BACKUP_FILE=/opt/export-doc-manager/backups/postgresql/exportdoc_具体时间.dump
+edm stop
+```
+
+归档 `.env`、API DataRoot 和 HTTPS 状态。数据库 dump 位于独立的 `backups/postgresql`，不会重复进入归档：
+
+```bash
+MIGRATION_ROOT=/root/exportdoc-migration
+install -d -m 700 "$MIGRATION_ROOT"
+
+MIGRATION_FILE="$MIGRATION_ROOT/exportdoc_environment_$(date +%Y%m%d_%H%M%S).tar.gz"
+
+tar --xattrs --acls \
+  -C /opt/export-doc-manager \
+  -czf "$MIGRATION_FILE" \
+  .env \
+  runtime/api-data \
+  runtime/letsencrypt \
+  runtime/acme-webroot
+
+MIGRATION_NAME=$(basename -- "$MIGRATION_FILE")
+(
+  cd "$MIGRATION_ROOT"
+  sha256sum "$MIGRATION_NAME" > "$MIGRATION_NAME.sha256"
+)
+chmod 600 "$MIGRATION_FILE" "$MIGRATION_FILE.sha256"
+ls -lh "$MIGRATION_FILE" "$MIGRATION_FILE.sha256"
+```
+
+环境归档包含数据库密码、TLS 私钥和本地主密钥，只能通过 SSH 等加密通道传输：
+
+```bash
+scp \
+  "$MIGRATION_FILE" \
+  "$MIGRATION_FILE.sha256" \
+  "$BACKUP_FILE" \
+  "$BACKUP_FILE.sha256" \
+  root@新服务器IP:/root/
+```
+
+### 7.2 新服务器恢复环境
+
+校验文件：
+
+```bash
+cd /root
+sha256sum -c exportdoc_environment_具体时间.tar.gz.sha256
+sha256sum -c exportdoc_具体时间.dump.sha256
+```
+
+目标目录必须为空：
+
+```bash
+if [ -d /opt/export-doc-manager ] && \
+  [ -n "$(find /opt/export-doc-manager -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+  echo "/opt/export-doc-manager 已包含文件，停止迁移"
+  exit 1
+fi
+
+install -d -m 700 /opt/export-doc-manager
+tar --xattrs --acls \
+  -xzf /root/exportdoc_environment_具体时间.tar.gz \
+  -C /opt/export-doc-manager
+```
+
+删除旧服务器 Docker 私网值，让安装器重新探测：
+
+```bash
+sed -i \
+  -e '/^EXPORTDOCMANAGER_CONTAINER_SUBNET=/d' \
+  -e '/^EXPORTDOCMANAGER_REVERSE_PROXY_IP=/d' \
+  /opt/export-doc-manager/.env
+```
+
+读取原部署模式，下载部署清单并安装 Docker，但暂不启动业务容器：
+
+```bash
+MODE=$(sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' \
+  /opt/export-doc-manager/.env)
+
+curl -fsSL https://raw.githubusercontent.com/sck03/rustdoc/main/deploy/container/install-container.sh |
+  bash -s -- \
+    --mode "$MODE" \
+    --install-docker \
+    --no-start
+```
+
+若 GHCR Package 是 Private，新服务器不会继承旧服务器的 Docker 登录状态；正式启动前按第 2 节设置 `GHCR_USER` 和只读 `GHCR_TOKEN`。
+
+重新初始化第 3 节的 `edm` 函数，只启动空 PostgreSQL：
+
+```bash
+cd /opt/export-doc-manager
+edm pull postgres
+edm up -d postgres
+
+until edm exec -T postgres \
+  sh -ec 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+  >/dev/null; do
+  sleep 2
+done
+```
+
+### 7.3 新服务器恢复数据库并启动
+
+```bash
+BACKUP_FILE=/root/exportdoc_具体时间.dump
+
+edm exec -T postgres sh -ec '
+  exec pg_restore \
+    -U "$POSTGRES_USER" \
+    -d "$POSTGRES_DB" \
+    --clean \
+    --if-exists \
+    --exit-on-error \
+    --no-owner \
+    --no-privileges
+' < "$BACKUP_FILE"
+```
+
+HTTP 模式或继续使用原 HTTPS 域名：
+
+```bash
+/opt/export-doc-manager/install-container.sh --mode "$MODE"
+```
+
+HTTPS 改用新域名时，先完成 DNS 和防火墙设置：
+
+```bash
+/opt/export-doc-manager/install-container.sh \
+  --mode https \
+  --domain new-docs.example.com \
+  --email ops@example.com
+```
+
+检查服务：
+
+```bash
+edm ps -a
+edm logs --no-color --tail=100 postgres api web
+```
+
+原 HTTPS 域名尚未切换 DNS 时，可在新服务器本机验证：
+
+```bash
+DOMAIN=$(sed -n 's/^EXPORTDOCMANAGER_PUBLIC_DOMAIN=//p' .env)
+curl --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/readyz"
+```
+
+确认登录、权限、发票、客户、出口商、印章、HS 查询、PDF、任务和审计记录正常后再切换流量。旧服务器建议保持停止状态数天；确认无需回退后再彻底删除。迁移验收后应删除 `/root` 中的环境归档和数据库备份中转副本。
+
+## 8. HTTPS、Nginx 和 PostgreSQL 说明
+
+当前方案不需要 Caddy。Nginx 在 HTTP 和 HTTPS 模式都负责静态文件、SPA fallback、同源 `/api` 代理、安全响应头和隐藏 API 内部端口，因此不能删除。HTTPS 首次证书申请由安装器调用 Certbot standalone；以后 Certbot 容器每 12 小时检查续期，Nginx 每小时 reload 新证书。Certbot 不代理业务请求。
+
+企业网关或 CDN 在 Nginx 前终止 TLS 时，必须把其实际连接 Nginx 的固定 IP 加入 `EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES`，不要填写不受控网段，也不要直接公开 API `5188`。
+
+Compose 固定使用 `postgres:18-bookworm`，初始化参数为：
+
+```text
+--encoding=UTF8 --locale-provider=builtin --builtin-locale=PG_UNICODE_FAST
+```
+
+PostgreSQL 18 容器数据位于 `/var/lib/postgresql/18/docker`，因此宿主 `runtime/postgres/` 必须挂载到 `/var/lib/postgresql`，不能改成旧版常见的 `/var/lib/postgresql/data`。跨 PostgreSQL 大版本升级必须使用验证过的 dump/restore 或 `pg_upgrade`，不能直接复用旧版原始数据目录。
+
+外层 `runtime/` 使用 `root:root 700`。直接 bind mount 的内部目录只在该不可遍历父目录内为 Docker user namespace 提供写权限，不要单独移动到公共可遍历路径。
+
+## 9. 开发者附录
+
+- `docker-compose.ghcr.yml`：拉取已发布镜像，适合正式 VPS；
+- `docker-compose.yml`：从源码构建，只用于开发和 CI；
+- `docker-compose.acme.yml`：一键 HTTPS 和自动续期；
+- `docker-compose.https.yml`：手工证书 overlay；
+- `initialize-container-runtime.ps1`：克隆仓库后的 PowerShell 初始化工具；
+- `install-container.sh`：Linux VPS 正式安装、升级和恢复入口。
+
+GitHub 工作流 `Container runtime lifecycle validation` 会验证启动、健康探针、安全响应头、PostgreSQL bind mount 持久化和 `pg_dump/pg_restore`。CI 成功不能替代生产环境的异机备份和恢复演练。
