@@ -176,6 +176,8 @@ namespace ExportDocManager.Services.Infrastructure
             query ??= new QueryPageQuery();
             return query with
             {
+                StartDate = NormalizeDateFilter(query.StartDate),
+                EndDate = NormalizeDateFilter(query.EndDate),
                 Keyword = TextSearchHelper.NormalizeFilter(query.Keyword),
                 ContractNo = TextSearchHelper.NormalizeFilter(query.ContractNo),
                 InvoiceType = TextSearchHelper.NormalizeFilter(query.InvoiceType),
@@ -185,6 +187,13 @@ namespace ExportDocManager.Services.Infrastructure
                 PageNumber = NormalizePageNumber(query.PageNumber),
                 PageSize = NormalizePageSize(query.PageSize)
             };
+        }
+
+        private static DateTime? NormalizeDateFilter(DateTime? value)
+        {
+            return value.HasValue
+                ? DateTimeValueHelper.NormalizeUtcTimestamp(value.Value)
+                : null;
         }
 
         private static AuditLogPageQuery Normalize(AuditLogPageQuery query)

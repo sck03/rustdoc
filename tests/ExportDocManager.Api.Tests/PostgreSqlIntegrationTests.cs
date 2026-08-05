@@ -1,5 +1,6 @@
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Crm;
 using ExportDocManager.Services.Infrastructure;
@@ -109,6 +110,7 @@ namespace ExportDocManager.Api.Tests
                             Type = "报关数据",
                             Status = InvoiceStatusCatalog.Verified,
                             InvoiceDate = startOfMonth.AddDays(1),
+                            ShipmentDate = startOfMonth.AddDays(1),
                             TotalAmount = 40m,
                             TotalProfit = 4m,
                             TotalTaxRefundAmount = 2m
@@ -119,6 +121,7 @@ namespace ExportDocManager.Api.Tests
                             Type = "实际数据",
                             Status = InvoiceStatusCatalog.Shipped,
                             InvoiceDate = startOfMonth.AddDays(2),
+                            ShipmentDate = startOfMonth.AddDays(2),
                             TotalAmount = 100m,
                             TotalProfit = 10m,
                             TotalTaxRefundAmount = 5m
@@ -129,6 +132,7 @@ namespace ExportDocManager.Api.Tests
                             Type = "实际数据",
                             Status = InvoiceStatusCatalog.Draft,
                             InvoiceDate = startOfMonth.AddDays(3),
+                            ShipmentDate = startOfMonth.AddDays(3),
                             TotalAmount = 20m,
                             TotalProfit = 2m,
                             TotalTaxRefundAmount = 1m
@@ -139,6 +143,7 @@ namespace ExportDocManager.Api.Tests
                             Type = "实际数据",
                             Status = InvoiceStatusCatalog.Completed,
                             InvoiceDate = startOfMonth.AddDays(-1),
+                            ShipmentDate = startOfMonth.AddDays(-1),
                             TotalAmount = 50m,
                             TotalProfit = 5m,
                             TotalTaxRefundAmount = 2.5m
@@ -157,6 +162,20 @@ namespace ExportDocManager.Api.Tests
                 Assert.Equal(1, snapshot.ShippedCount);
                 Assert.Equal(1, snapshot.CompletedCount);
                 Assert.Equal(3, snapshot.TotalActiveCount);
+
+                var queryRepository = new LocalSharedReadRepository(
+                    factory,
+                    settings,
+                    new BusinessDataAccessScope(settings, new FixedCurrentUserContext(admin)));
+                var queryPage = await queryRepository.QueryPageAsync(new QueryPageQuery
+                {
+                    StartDate = DateTime.SpecifyKind(startOfMonth.AddDays(1), DateTimeKind.Unspecified),
+                    EndDate = DateTime.SpecifyKind(startOfMonth.AddDays(3), DateTimeKind.Unspecified),
+                    PageNumber = 1,
+                    PageSize = 10
+                });
+                Assert.Equal(3, queryPage.TotalCount);
+                Assert.DoesNotContain(queryPage.Items, invoice => invoice.InvoiceNo == "PG-DASH-PREVIOUS");
             }
             finally
             {
