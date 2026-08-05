@@ -175,14 +175,18 @@ namespace ExportDocManager.Services.Core
                         };
                     }
 
+                    var importCustomer = CloneCustomer(pkg.Customer);
+                    if (importCustomer != null) importCustomer.Id = 0;
                     var customerId = await _invoicePartyResolver.ResolveCustomerIdAsync(
                         context,
-                        CloneCustomer(pkg.Customer),
+                        importCustomer,
                         pkg.Invoice?.CustomerNameEN,
                         token);
+                    var importExporter = CloneExporter(pkg.Exporter);
+                    if (importExporter != null) importExporter.Id = 0;
                     var exporterId = await _invoicePartyResolver.ResolveExporterIdAsync(
                         context,
-                        CloneExporter(pkg.Exporter),
+                        importExporter,
                         pkg.Invoice?.ExporterNameEN,
                         pkg.Invoice?.ExporterNameCN,
                         token);
@@ -361,14 +365,18 @@ namespace ExportDocManager.Services.Core
 
             if (pkg.Customer != null)
             {
-                preview.CustomerExists = await context.Customers.AnyAsync(c =>
+                preview.CustomerExists = await _businessDataAccessScope
+                    .ApplyCustomerScope(context.Customers.AsNoTracking())
+                    .AnyAsync(c =>
                     c.CustomerNameEN == pkg.Customer.CustomerNameEN ||
                     (!string.IsNullOrWhiteSpace(pkg.Customer.TaxId) && c.TaxId == pkg.Customer.TaxId), cancellationToken);
             }
 
             if (pkg.Exporter != null)
             {
-                preview.ExporterExists = await context.Exporters.AnyAsync(e =>
+                preview.ExporterExists = await _businessDataAccessScope
+                    .ApplyExporterScope(context.Exporters.AsNoTracking())
+                    .AnyAsync(e =>
                     e.ExporterNameEN == pkg.Exporter.ExporterNameEN ||
                     e.ExporterNameCN == pkg.Exporter.ExporterNameCN ||
                     (!string.IsNullOrWhiteSpace(pkg.Exporter.CreditCode) && e.CreditCode == pkg.Exporter.CreditCode), cancellationToken);

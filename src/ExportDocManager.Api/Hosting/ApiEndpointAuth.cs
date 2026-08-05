@@ -255,6 +255,9 @@ namespace ExportDocManager.Api.Hosting
                 return PermissionModuleCatalog.DocumentPayments;
             if (path.StartsWithSegments("/api/jobs", StringComparison.OrdinalIgnoreCase))
                 return PermissionModuleCatalog.DocumentJobs;
+            if (path.StartsWithSegments("/api/master-data/hs-codes", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWithSegments("/api/master-data/hs-knowledge", StringComparison.OrdinalIgnoreCase))
+                return PermissionModuleCatalog.DocumentHsKnowledge;
             if ((path.StartsWithSegments("/api/master-data/customers", StringComparison.OrdinalIgnoreCase) ||
                  path.StartsWithSegments("/api/master-data/payees", StringComparison.OrdinalIgnoreCase) ||
                  path.StartsWithSegments("/api/master-data/exporters", StringComparison.OrdinalIgnoreCase) ||
@@ -323,14 +326,13 @@ namespace ExportDocManager.Api.Hosting
             // definitions are company-shared reference data.  Everyone may
             // query them, but only a data administrator should change the
             // shared catalogue or approve remote candidates.
-            if (path.Equals("/api/master-data/hs-knowledge/import", StringComparison.OrdinalIgnoreCase) ||
+            if ((path.StartsWithSegments("/api/master-data/hs-codes", StringComparison.OrdinalIgnoreCase) &&
+                 IsMutationMethod(method)) ||
+                path.Equals("/api/master-data/hs-knowledge/import", StringComparison.OrdinalIgnoreCase) ||
                 (path.StartsWithSegments("/api/master-data/hs-knowledge/examples", StringComparison.OrdinalIgnoreCase) &&
                  IsMutationMethod(method)) ||
                 (path.StartsWithSegments("/api/master-data/hs-knowledge/remote-candidates", StringComparison.OrdinalIgnoreCase) &&
                  IsMutationMethod(method)) ||
-                path.Equals("/api/master-data/hs-codes/import-commit", StringComparison.OrdinalIgnoreCase) ||
-                path.Equals("/api/master-data/hs-codes/import-path", StringComparison.OrdinalIgnoreCase) ||
-                path.Equals("/api/master-data/hs-codes/import-upload", StringComparison.OrdinalIgnoreCase) ||
                 (path.StartsWithSegments("/api/tools/container-packing/container-types", StringComparison.OrdinalIgnoreCase) &&
                  IsMutationMethod(method)))
             {

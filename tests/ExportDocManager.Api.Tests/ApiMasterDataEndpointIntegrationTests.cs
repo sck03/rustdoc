@@ -4,7 +4,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using ClosedXML.Excel;
 using ExportDocManager.Api.Hosting;
+using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ExportDocManager.Api.Tests
 {
@@ -91,6 +94,126 @@ namespace ExportDocManager.Api.Tests
                 id == 0 ? "Created from API test" : "Updated from API test",
                 rowVersion);
         }
+
+        [Fact]
+        public async Task CustomerAndExporterEndpoints_ShouldIsolateDocumentUsersByOwner()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-master-data-ownership",
+                "api-master-data-ownership.db",
+                configureServices: services => services.AddScoped(provider =>
+                    new BusinessDataAccessScope(
+                        new DatabaseConnectionSettings
+                        {
+                            Provider = DatabaseConnectionSettings.PostgreSqlProvider,
+                            PostgreSqlHost = "127.0.0.1",
+                            PostgreSqlDatabase = "ownership_test",
+                            PostgreSqlUsername = "ownership_test"
+                        },
+                        provider.GetRequiredService<ICurrentUserContext>())));
+            using var anonymousClient = harness.CreateClient();
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+
+            await CreateUserAsync(adminClient, "document-a", "document-a-pass");
+            await CreateUserAsync(adminClient, "document-b", "document-b-pass");
+            var userALogin = await harness.LoginAsync(anonymousClient, "document-a", "document-a-pass");
+            var userBLogin = await harness.LoginAsync(anonymousClient, "document-b", "document-b-pass");
+            using var userAClient = harness.CreateClient(userALogin.AccessToken);
+            using var userBClient = harness.CreateClient(userBLogin.AccessToken);
+
+            var customerResponse = await userAClient.PostAsJsonAsync(
+                "/api/master-data/customers",
+                CreateCustomer("Document A Customer"));
+            Assert.Equal(HttpStatusCode.Created, customerResponse.StatusCode);
+            var customer = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCustomerDto>(customerResponse);
+            var exporterResponse = await userAClient.PostAsJsonAsync(
+                "/api/master-data/exporters",
+                CreateExporter("Document A Exporter"));
+            Assert.Equal(HttpStatusCode.Created, exporterResponse.StatusCode);
+            var exporter = await ApiIntegrationTestHarness.ReadJsonAsync<ApiExporterDto>(exporterResponse);
+
+            Assert.Contains("Document A Customer", await (await userAClient.GetAsync("/api/master-data/customers")).Content.ReadAsStringAsync(), StringComparison.Ordinal);
+            Assert.Contains("Document A Exporter", await (await userAClient.GetAsync("/api/master-data/exporters")).Content.ReadAsStringAsync(), StringComparison.Ordinal);
+            Assert.DoesNotContain("Document A Customer", await (await userBClient.GetAsync("/api/master-data/customers")).Content.ReadAsStringAsync(), StringComparison.Ordinal);
+            Assert.DoesNotContain("Document A Exporter", await (await userBClient.GetAsync("/api/master-data/exporters")).Content.ReadAsStringAsync(), StringComparison.Ordinal);
+            Assert.Equal(HttpStatusCode.NotFound, (await userBClient.GetAsync($"/api/master-data/customers/{customer.Id}")).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await userBClient.GetAsync($"/api/master-data/exporters/{exporter.Id}")).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await userBClient.PutAsJsonAsync(
+                $"/api/master-data/customers/{customer.Id}",
+                CreateCustomer("Unauthorized Update", customer.Id, customer.RowVersion))).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await userBClient.PutAsJsonAsync(
+                $"/api/master-data/exporters/{exporter.Id}",
+                CreateExporter("Unauthorized Exporter Update") with
+                {
+                    Id = exporter.Id,
+                    RowVersion = exporter.RowVersion
+                })).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await userBClient.DeleteAsync(
+                $"/api/master-data/customers/{customer.Id}")).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await userBClient.DeleteAsync(
+                $"/api/master-data/exporters/{exporter.Id}")).StatusCode);
+
+            using var sealContent = CreateImageContent(
+                Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="),
+                "image/png");
+            Assert.Equal(HttpStatusCode.NotFound, (await userBClient.PostAsync(
+                $"/api/master-data/exporters/{exporter.Id}/seals/document/upload?fileName=foreign.png",
+                sealContent)).StatusCode);
+
+            var ownCustomerResponse = await userBClient.PostAsJsonAsync(
+                "/api/master-data/customers",
+                CreateCustomer("Document B Customer"));
+            Assert.Equal(HttpStatusCode.Created, ownCustomerResponse.StatusCode);
+            var ownCustomer = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCustomerDto>(ownCustomerResponse);
+            var ownExporterResponse = await userBClient.PostAsJsonAsync(
+                "/api/master-data/exporters",
+                CreateExporter("Document B Exporter"));
+            Assert.Equal(HttpStatusCode.Created, ownExporterResponse.StatusCode);
+            var ownExporter = await ApiIntegrationTestHarness.ReadJsonAsync<ApiExporterDto>(ownExporterResponse);
+
+            Assert.Equal(HttpStatusCode.Forbidden, (await userBClient.PostAsJsonAsync(
+                "/api/invoices",
+                CreateInvoice("FOREIGN-CUSTOMER", customer.Id, ownExporter.Id))).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await userBClient.PostAsJsonAsync(
+                "/api/invoices",
+                CreateInvoice("FOREIGN-EXPORTER", ownCustomer.Id, exporter.Id))).StatusCode);
+
+            Assert.Contains("Document A Customer", await (await adminClient.GetAsync("/api/master-data/customers")).Content.ReadAsStringAsync(), StringComparison.Ordinal);
+            Assert.Contains("Document A Exporter", await (await adminClient.GetAsync("/api/master-data/exporters")).Content.ReadAsStringAsync(), StringComparison.Ordinal);
+            Assert.Equal(HttpStatusCode.OK, (await userAClient.GetAsync($"/api/master-data/customers/{customer.Id}")).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await userAClient.GetAsync($"/api/master-data/exporters/{exporter.Id}")).StatusCode);
+        }
+
+        private static async Task CreateUserAsync(HttpClient adminClient, string username, string password)
+        {
+            var response = await adminClient.PostAsJsonAsync(
+                "/api/users",
+                new
+                {
+                    username,
+                    fullName = username,
+                    role = UserRoleCatalog.User,
+                    departmentId = string.Empty,
+                    companyScope = string.Empty,
+                    isActive = true,
+                    resetPassword = password
+                });
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        private static ApiInvoiceDetailDto CreateInvoice(string invoiceNo, int customerId, int exporterId) => new()
+        {
+            InvoiceNo = invoiceNo,
+            InvoiceDate = new DateTime(2026, 8, 5),
+            ShipmentDate = new DateTime(2026, 8, 5),
+            CustomerId = customerId,
+            ExporterId = exporterId,
+            CustomerNameEN = "Selected Customer",
+            ExporterNameEN = "Selected Exporter",
+            Currency = "USD",
+            Type = "实际数据"
+        };
 
         [Fact]
         public async Task ExporterSealUpload_ShouldValidatePersistReplaceAndDeleteManagedImages()
@@ -450,7 +573,7 @@ namespace ExportDocManager.Api.Tests
                     isActive = true,
                     modules = new[]
                     {
-                        new { moduleKey = PermissionModuleCatalog.DocumentMasterData, accessLevel = PermissionAccessLevel.Operate }
+                        new { moduleKey = PermissionModuleCatalog.DocumentHsKnowledge, accessLevel = PermissionAccessLevel.Operate }
                     }
                 });
             Assert.Equal(HttpStatusCode.OK, templateResponse.StatusCode);

@@ -150,6 +150,8 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<Item>().HasIndex(i => new { i.InvoiceId, i.HSCode });
 
             modelBuilder.Entity<Customer>().HasIndex(c => c.CustomerNameEN);
+            modelBuilder.Entity<Customer>().HasIndex(c => c.OwnerUserId);
+            modelBuilder.Entity<Customer>().HasIndex(c => new { c.CompanyScope, c.DepartmentId });
             modelBuilder.Entity<CrmCustomer>().HasIndex(item => item.Name);
             modelBuilder.Entity<CrmCustomer>().HasIndex(item => item.OwnerUserId);
             modelBuilder.Entity<CrmCustomer>().HasIndex(item => item.LinkedDocumentCustomerId);
@@ -267,6 +269,8 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<SalesOpportunityHistory>().HasOne(item => item.Opportunity).WithMany()
                 .HasForeignKey(item => item.SalesOpportunityId).OnDelete(DeleteBehavior.Cascade);
             modelBuilder.Entity<Exporter>().HasIndex(e => e.ExporterNameEN);
+            modelBuilder.Entity<Exporter>().HasIndex(e => e.OwnerUserId);
+            modelBuilder.Entity<Exporter>().HasIndex(e => new { e.CompanyScope, e.DepartmentId });
             
             modelBuilder.Entity<Product>().HasIndex(p => p.ProductCode);
             modelBuilder.Entity<Product>().HasIndex(p => p.NameEN);

@@ -100,7 +100,7 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     items: [
       { label: "单一窗口", to: "/single-window/operation-center", icon: Network, isActive: isSingleWindowOperationRoute, workspace: "document", moduleKey: "document.single-window" },
       { label: "申报词典", to: "/single-window/reference-catalog", icon: Database, isActive: isSingleWindowReferenceCatalogRoute, workspace: "document", moduleKey: "document.single-window" },
-      { label: "HS 编码知识", to: "/master-data/hs-knowledge/search", icon: BookOpen, isActive: isHsKnowledgeRoute, workspace: "document", moduleKey: "document.master-data" },
+      { label: "HS 编码知识", to: "/master-data/hs-knowledge/search", icon: BookOpen, isActive: isHsKnowledgeRoute, workspace: "document", moduleKey: "document.hs-knowledge" },
     ],
   },
   {
@@ -280,6 +280,7 @@ export function getRequiredModule(pathname: string): string | null {
   if (pathname.startsWith("/invoices")) return "document.invoices";
   if (pathname.startsWith("/query")) return "document.query";
   if (pathname.startsWith("/payments")) return "document.payments";
+  if (pathname.startsWith("/master-data/hs-knowledge") || pathname.startsWith("/master-data/hs-codes")) return "document.hs-knowledge";
   if (pathname.startsWith("/master-data")) return "document.master-data";
   if (pathname.startsWith("/single-window")) return "document.single-window";
   if (pathname.startsWith("/reports")) return "document.reports";

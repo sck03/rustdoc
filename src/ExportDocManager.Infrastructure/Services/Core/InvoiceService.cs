@@ -48,7 +48,14 @@ namespace ExportDocManager.Services.Core
                     _contextFactory,
                     async (context, _) =>
                     {
-                        if (customer != null)
+                        if (invoice.CustomerId > 0)
+                        {
+                            invoice.CustomerId = await _invoicePartyResolver.ResolveCustomerIdAsync(
+                                context,
+                                new Customer { Id = invoice.CustomerId },
+                                invoice.CustomerNameEN);
+                        }
+                        else if (customer != null)
                         {
                             var customerName = string.IsNullOrWhiteSpace(customer.CustomerNameEN)
                                 ? invoice.CustomerNameEN
@@ -66,7 +73,15 @@ namespace ExportDocManager.Services.Core
                             }
                         }
 
-                        if (exporter != null)
+                        if (invoice.ExporterId > 0)
+                        {
+                            invoice.ExporterId = await _invoicePartyResolver.ResolveExporterIdAsync(
+                                context,
+                                new Exporter { Id = invoice.ExporterId },
+                                invoice.ExporterNameEN,
+                                invoice.ExporterNameCN);
+                        }
+                        else if (exporter != null)
                         {
                             var exporterName = string.IsNullOrWhiteSpace(exporter.ExporterNameEN)
                                 ? invoice.ExporterNameEN

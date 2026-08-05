@@ -98,6 +98,28 @@ namespace ExportDocManager.Services.Security
                 : query.Where(_ => false);
         }
 
+        public IQueryable<Customer> ApplyCustomerScope(IQueryable<Customer> query, User user = null)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            user ??= _currentUserContext?.CurrentUser;
+            if (!ShouldFilterBusinessData(user)) return query;
+            int userId = user?.Id ?? 0;
+            return userId > 0
+                ? query.Where(item => item.OwnerUserId == userId)
+                : query.Where(_ => false);
+        }
+
+        public IQueryable<Exporter> ApplyExporterScope(IQueryable<Exporter> query, User user = null)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            user ??= _currentUserContext?.CurrentUser;
+            if (!ShouldFilterBusinessData(user)) return query;
+            int userId = user?.Id ?? 0;
+            return userId > 0
+                ? query.Where(item => item.OwnerUserId == userId)
+                : query.Where(_ => false);
+        }
+
         public IQueryable<CrmFollowUp> ApplyCrmFollowUpScope(IQueryable<CrmFollowUp> query, User user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
@@ -284,6 +306,26 @@ namespace ExportDocManager.Services.Security
             customer.OwnerUserId = user.Id;
             customer.DepartmentId = NormalizeScope(user.DepartmentId);
             customer.CompanyScope = NormalizeScope(user.CompanyScope);
+        }
+
+        public void ApplyOwner(Customer customer, User user = null)
+        {
+            ArgumentNullException.ThrowIfNull(customer);
+            user ??= _currentUserContext?.CurrentUser;
+            if (user == null || user.Id <= 0 || customer.OwnerUserId.HasValue) return;
+            customer.OwnerUserId = user.Id;
+            customer.DepartmentId = NormalizeScope(user.DepartmentId);
+            customer.CompanyScope = NormalizeScope(user.CompanyScope);
+        }
+
+        public void ApplyOwner(Exporter exporter, User user = null)
+        {
+            ArgumentNullException.ThrowIfNull(exporter);
+            user ??= _currentUserContext?.CurrentUser;
+            if (user == null || user.Id <= 0 || exporter.OwnerUserId.HasValue) return;
+            exporter.OwnerUserId = user.Id;
+            exporter.DepartmentId = NormalizeScope(user.DepartmentId);
+            exporter.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
         public void ApplyOwner(CrmFollowUp followUp, User user = null)

@@ -59,6 +59,7 @@ namespace ExportDocManager.Application.Tests
             Assert.Equal(PermissionAccessLevel.View, result[PermissionModuleCatalog.DocumentReferenceData]);
             Assert.Equal(PermissionAccessLevel.View, result[PermissionModuleCatalog.CommonProductReference]);
             Assert.Equal(expectedCustomOptionAccess, result[PermissionModuleCatalog.DocumentCustomOptions]);
+            Assert.DoesNotContain(PermissionModuleCatalog.DocumentHsKnowledge, result.Keys);
         }
 
         [Theory]
@@ -90,6 +91,18 @@ namespace ExportDocManager.Application.Tests
             Assert.Equal(PermissionAccessLevel.Manage, grants[PermissionModuleCatalog.DocumentPaymentReports]);
             Assert.Equal(PermissionAccessLevel.Operate, grants[PermissionModuleCatalog.DocumentCustomOptions]);
             Assert.Equal(PermissionAccessLevel.View, grants[PermissionModuleCatalog.DocumentReferenceData]);
+        }
+
+        [Fact]
+        public void DocumentTemplate_ShouldKeepHsKnowledgeReadOnlyAlongsideScopedMasterDataMaintenance()
+        {
+            var document = BuiltInPermissionTemplateCatalog.FindForRole(BuiltInPermissionTemplateCatalog.Document);
+            var grants = document.GetModuleAccess();
+
+            Assert.Equal(PermissionAccessLevel.View, grants[PermissionModuleCatalog.DocumentHsKnowledge]);
+            Assert.Equal(PermissionAccessLevel.Manage, grants[PermissionModuleCatalog.DocumentMasterData]);
+            Assert.Contains(PermissionModuleCatalog.DocumentHsKnowledge, document.ModuleKeys);
+            Assert.Contains(PermissionModuleCatalog.DocumentMasterData, document.ModuleKeys);
         }
     }
 }

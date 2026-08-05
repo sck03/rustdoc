@@ -7,6 +7,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.MasterData
@@ -16,15 +17,18 @@ namespace ExportDocManager.Services.MasterData
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly IExporterReadRepository _exporterReadRepository;
         private readonly IExporterSealService _exporterSealService;
+        private readonly BusinessDataAccessScope _accessScope;
 
         public ExporterService(
             IDbContextFactory<AppDbContext> contextFactory,
             IExporterReadRepository exporterReadRepository,
-            IExporterSealService exporterSealService = null)
+            IExporterSealService exporterSealService = null,
+            BusinessDataAccessScope accessScope = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _exporterReadRepository = exporterReadRepository ?? throw new ArgumentNullException(nameof(exporterReadRepository));
             _exporterSealService = exporterSealService;
+            _accessScope = accessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
         }
 
         public async Task<int> SaveExporterAsync(Exporter exporter)
@@ -39,17 +43,20 @@ namespace ExportDocManager.Services.MasterData
                 string previousCustomsSealPath = null;
                 if (exporter.Id == 0)
                 {
+                    _accessScope.ApplyOwner(exporter);
                     await context.Exporters.AddAsync(exporter);
                 }
                 else
                 {
-                    var previousPaths = await context.Exporters
+                    var existing = await _accessScope.ApplyExporterScope(context.Exporters)
                         .AsNoTracking()
-                        .Where(item => item.Id == exporter.Id)
-                        .Select(item => new { item.DocSealPath, item.CustomsSealPath })
-                        .SingleOrDefaultAsync();
-                    previousDocSealPath = previousPaths?.DocSealPath;
-                    previousCustomsSealPath = previousPaths?.CustomsSealPath;
+                        .SingleOrDefaultAsync(item => item.Id == exporter.Id);
+                    if (existing == null) throw new KeyNotFoundException("出口商不存在或不属于当前账号。");
+                    previousDocSealPath = existing.DocSealPath;
+                    previousCustomsSealPath = existing.CustomsSealPath;
+                    exporter.OwnerUserId = existing.OwnerUserId;
+                    exporter.DepartmentId = existing.DepartmentId;
+                    exporter.CompanyScope = existing.CompanyScope;
                     context.Exporters.Update(exporter);
                 }
 
@@ -92,7 +99,8 @@ namespace ExportDocManager.Services.MasterData
             try
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
-                return await context.Exporters.FirstOrDefaultAsync(x => x.Id == id);
+                return await _accessScope.ApplyExporterScope(context.Exporters)
+                    .FirstOrDefaultAsync(x => x.Id == id);
             }
             catch (Exception ex)
             {
@@ -105,7 +113,8 @@ namespace ExportDocManager.Services.MasterData
             try
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
-                var entity = await context.Exporters.FirstOrDefaultAsync(x => x.Id == id);
+                var entity = await _accessScope.ApplyExporterScope(context.Exporters)
+                    .FirstOrDefaultAsync(x => x.Id == id);
                 if (entity == null)
                 {
                     return false;
@@ -128,7 +137,8 @@ namespace ExportDocManager.Services.MasterData
             {
                 name = TextSearchHelper.NormalizeValue(name);
                 using var context = await _contextFactory.CreateDbContextAsync();
-                return await context.Exporters.FirstOrDefaultAsync(x => x.ExporterNameEN == name || x.ExporterNameCN == name);
+                return await _accessScope.ApplyExporterScope(context.Exporters)
+                    .FirstOrDefaultAsync(x => x.ExporterNameEN == name || x.ExporterNameCN == name);
             }
             catch (Exception ex)
             {

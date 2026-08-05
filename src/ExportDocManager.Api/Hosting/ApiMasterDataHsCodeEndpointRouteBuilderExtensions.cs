@@ -697,7 +697,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!authorizationService.CanUseModule(
                         user,
-                        PermissionModuleCatalog.DocumentMasterData,
+                        PermissionModuleCatalog.DocumentHsKnowledge,
                         PermissionAccessLevel.Manage))
                 {
                     return WriteForbidden("只有管理权限可以批量删除HS编码。");
@@ -845,7 +845,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null) return Results.Unauthorized();
-                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentMasterData, PermissionAccessLevel.Manage))
+                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentHsKnowledge, PermissionAccessLevel.Manage))
                     return WriteForbidden("只有管理权限可以批量删除申报实例。");
                 int deleted = await service.DeleteExamplesAsync(request?.Ids ?? [], cancellationToken);
                 return Results.Ok(new ApiCommandResponse(true, $"已删除 {deleted} 条申报实例。"));
@@ -939,7 +939,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null) return Results.Unauthorized();
-                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentMasterData, PermissionAccessLevel.Manage))
+                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentHsKnowledge, PermissionAccessLevel.Manage))
                     return WriteForbidden("只有管理权限可以导出共享 HS 知识包。");
                 byte[] package = await service.ExportPackageAsync(since, cancellationToken);
                 return Results.File(package, "application/vnd.exportdocmanager.hs-knowledge+zip", $"ExportDocManager-HsLibrary-{DateTime.Now:yyyyMMdd}.edmhs");

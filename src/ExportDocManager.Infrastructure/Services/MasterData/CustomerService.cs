@@ -7,6 +7,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.MasterData
@@ -15,13 +16,16 @@ namespace ExportDocManager.Services.MasterData
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly ICustomerReadRepository _customerReadRepository;
+        private readonly BusinessDataAccessScope _accessScope;
 
         public CustomerService(
             IDbContextFactory<AppDbContext> contextFactory,
-            ICustomerReadRepository customerReadRepository)
+            ICustomerReadRepository customerReadRepository,
+            BusinessDataAccessScope accessScope = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _customerReadRepository = customerReadRepository ?? throw new ArgumentNullException(nameof(customerReadRepository));
+            _accessScope = accessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
         }
 
         public async Task<int> SaveCustomerAsync(Customer customer)
@@ -34,10 +38,18 @@ namespace ExportDocManager.Services.MasterData
                 using var context = await _contextFactory.CreateDbContextAsync();
                 if (customer.Id == 0)
                 {
+                    _accessScope.ApplyOwner(customer);
                     await context.Customers.AddAsync(customer);
                 }
                 else
                 {
+                    var existing = await _accessScope.ApplyCustomerScope(context.Customers)
+                        .AsNoTracking()
+                        .SingleOrDefaultAsync(item => item.Id == customer.Id);
+                    if (existing == null) throw new KeyNotFoundException("客户不存在或不属于当前账号。");
+                    customer.OwnerUserId = existing.OwnerUserId;
+                    customer.DepartmentId = existing.DepartmentId;
+                    customer.CompanyScope = existing.CompanyScope;
                     context.Customers.Update(customer);
                 }
                 await context.SaveChangesAsync();
@@ -71,7 +83,8 @@ namespace ExportDocManager.Services.MasterData
             try
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
-                return await context.Customers.FirstOrDefaultAsync(x => x.Id == id);
+                return await _accessScope.ApplyCustomerScope(context.Customers)
+                    .FirstOrDefaultAsync(x => x.Id == id);
             }
             catch (Exception ex)
             {
@@ -84,7 +97,8 @@ namespace ExportDocManager.Services.MasterData
             try
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
-                var entity = await context.Customers.FirstOrDefaultAsync(x => x.Id == id);
+                var entity = await _accessScope.ApplyCustomerScope(context.Customers)
+                    .FirstOrDefaultAsync(x => x.Id == id);
                 if (entity == null)
                 {
                     return false;
@@ -106,7 +120,8 @@ namespace ExportDocManager.Services.MasterData
             {
                 name = TextSearchHelper.NormalizeValue(name);
                 using var context = await _contextFactory.CreateDbContextAsync();
-                return await context.Customers.FirstOrDefaultAsync(x => x.CustomerNameEN == name);
+                return await _accessScope.ApplyCustomerScope(context.Customers)
+                    .FirstOrDefaultAsync(x => x.CustomerNameEN == name);
             }
             catch (Exception ex)
             {

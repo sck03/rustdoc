@@ -21,6 +21,10 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, catalogResponse.StatusCode);
             var catalog = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPermissionTemplateCatalogResponse>(catalogResponse);
             var adminTemplate = Assert.Single(catalog.Templates, template => template.Code == BuiltInPermissionTemplateCatalog.Admin);
+            Assert.Contains(catalog.Modules, module =>
+                module.Key == PermissionModuleCatalog.DocumentHsKnowledge &&
+                module.Name == "HS 编码知识" &&
+                !module.IsTechnical);
 
             var immutableAdminResponse = await adminClient.PutAsJsonAsync(
                 $"/api/permission-templates/{adminTemplate.Id}",
@@ -190,6 +194,36 @@ namespace ExportDocManager.Api.Tests
                 var response = await financeClient.GetAsync(path);
                 Assert.True(response.StatusCode == HttpStatusCode.Forbidden, $"{path} returned {response.StatusCode}.");
             }
+        }
+
+        [Fact]
+        public async Task DocumentTemplate_ShouldKeepScopedMasterDataAndRejectHsMaintenanceWhileKeepingHsQueries()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-document-hs-permissions",
+                "api-document-hs-permissions.db");
+            using var anonymousClient = harness.CreateClient();
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+            var createUserResponse = await adminClient.PostAsJsonAsync(
+                "/api/users",
+                CreateSaveRequest("document-hs-user", UserRoleCatalog.User, "document-hs-pass"));
+            Assert.Equal(HttpStatusCode.OK, createUserResponse.StatusCode);
+
+            var documentLogin = await harness.LoginAsync(anonymousClient, "document-hs-user", "document-hs-pass");
+            using var documentClient = harness.CreateClient(documentLogin.AccessToken);
+            var hsGrant = Assert.Single(documentLogin.User.Capabilities.ModuleAccess, grant =>
+                grant.ModuleKey == PermissionModuleCatalog.DocumentHsKnowledge);
+
+            Assert.Equal(PermissionAccessLevel.View, hsGrant.AccessLevel);
+            Assert.Contains(PermissionModuleCatalog.DocumentMasterData, documentLogin.User.Capabilities.EnabledModules);
+            Assert.Equal(HttpStatusCode.OK, (await documentClient.GetAsync("/api/master-data/hs-codes?pageNumber=1&pageSize=10")).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await documentClient.GetAsync("/api/master-data/customers")).StatusCode);
+            Assert.Equal(HttpStatusCode.Created, (await documentClient.PostAsJsonAsync(
+                "/api/master-data/customers",
+                new { customerNameEN = "Document User Customer" })).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await documentClient.PostAsJsonAsync("/api/master-data/hs-codes", new { })).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await documentClient.GetAsync("/api/master-data/hs-knowledge/export")).StatusCode);
         }
 
         [Fact]

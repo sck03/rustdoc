@@ -618,6 +618,22 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public void DocumentPermissionTemplate_ShouldExposeHsReadOnlyWithoutMasterDataMaintenance()
+        {
+            var service = new ApiAuthorizationService(new ApiRuntimeOptions
+            {
+                ProductEdition = ProductEditionCatalog.Full
+            });
+
+            var capabilities = service.GetCapabilities(new User { Role = UserRoleCatalog.User });
+            var hsGrant = Assert.Single(capabilities.ModuleAccess, grant =>
+                grant.ModuleKey == PermissionModuleCatalog.DocumentHsKnowledge);
+
+            Assert.Equal(PermissionAccessLevel.View, hsGrant.AccessLevel);
+            Assert.Contains(PermissionModuleCatalog.DocumentMasterData, capabilities.EnabledModules);
+        }
+
+        [Fact]
         public void FinancePermissionTemplate_ShouldExposeOnlyFinanceNavigationModulesAndSupportingCapabilities()
         {
             var service = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full });
@@ -763,6 +779,14 @@ namespace ExportDocManager.Api.Tests
                     "/api/master-data/exporters/1/seals/document/upload",
                     HttpMethods.Post));
             Assert.Equal(
+                PermissionModuleCatalog.DocumentHsKnowledge,
+                ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/master-data/hs-codes", HttpMethods.Get));
+            Assert.Equal(
+                PermissionModuleCatalog.DocumentHsKnowledge,
+                ApiWorkspaceAccessMiddleware.GetRequiredModule(
+                    "/api/master-data/hs-knowledge/export",
+                    HttpMethods.Get));
+            Assert.Equal(
                 PermissionAccessLevel.Operate,
                 ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
                     "/api/master-data/exporters/1/seals/document/upload",
@@ -812,6 +836,11 @@ namespace ExportDocManager.Api.Tests
                 PermissionAccessLevel.Manage,
                 ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
                     "/api/master-data/hs-codes/import-upload",
+                    HttpMethods.Post));
+            Assert.Equal(
+                PermissionAccessLevel.Manage,
+                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
+                    "/api/master-data/hs-codes",
                     HttpMethods.Post));
             Assert.Equal(
                 PermissionAccessLevel.Manage,

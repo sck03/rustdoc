@@ -62,6 +62,7 @@ namespace ExportDocManager.Services.Security
         public const string DocumentPayments = "document.payments";
         public const string DocumentJobs = "document.jobs";
         public const string DocumentSingleWindow = "document.single-window";
+        public const string DocumentHsKnowledge = "document.hs-knowledge";
         public const string DocumentMasterData = "document.master-data";
         public const string DocumentReports = "document.reports";
         public const string DocumentInvoiceReports = "document.invoice-reports";
@@ -90,6 +91,7 @@ namespace ExportDocManager.Services.Security
             new(DocumentPayments, "付款报销", "单证业务", "document", 40),
             new(DocumentJobs, "任务中心", "单证业务", "document", 50),
             new(DocumentSingleWindow, "单一窗口", "单证业务", "document", 60),
+            new(DocumentHsKnowledge, "HS 编码知识", "申报与归类", "document", 65),
             new(DocumentMasterData, "主数据维护", "单证业务", "document", 70),
             new(DocumentReports, "报表设计", "单证工具", "document", 80),
             new(DocumentInvoiceReports, "发票单据输出", "单证基础能力", "document", 84, true),
@@ -204,12 +206,13 @@ namespace ExportDocManager.Services.Security
         [
             new(Admin, "系统管理员", "全部已实现业务模块；系统维护能力仍由管理员身份保护。",
                 PermissionModuleCatalog.Modules.Select(module => module.Key).ToArray()),
-            new(Document, "单证人员", "完整单证工作区和通用工具。", DocumentModules,
+            new(Document, "单证人员", "单证业务、本人客户与出口商资料、HS 编码查询和通用工具。", DocumentModules,
                 new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
                     // Ordinary document users may create and maintain their own templates.
                     // Global file-template lifecycle and administrator maintenance still require Manage.
-                    [PermissionModuleCatalog.DocumentReports] = PermissionAccessLevel.Operate
+                    [PermissionModuleCatalog.DocumentReports] = PermissionAccessLevel.Operate,
+                    [PermissionModuleCatalog.DocumentHsKnowledge] = PermissionAccessLevel.View
                 }),
             new(Sales, "业务人员", "销售、供应商和通用工具。", SalesModules),
             new(Finance, "财务人员", "付款报销、单据查询、报表设计、汇率、邮件、OCR 和关于。",

@@ -1,6 +1,8 @@
 using ExportDocManager.DataAccess;
+using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.MasterData;
+using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Core
@@ -23,6 +25,13 @@ namespace ExportDocManager.Services.Core
 
     public sealed class InvoicePartyResolver : IInvoicePartyResolver
     {
+        private readonly BusinessDataAccessScope _accessScope;
+
+        public InvoicePartyResolver(BusinessDataAccessScope accessScope = null)
+        {
+            _accessScope = accessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
+        }
+
         public async Task<int> ResolveCustomerIdAsync(
             AppDbContext context,
             Customer customer,
@@ -38,6 +47,11 @@ namespace ExportDocManager.Services.Core
 
             if (customer.Id > 0)
             {
+                if (!await _accessScope.ApplyCustomerScope(context.Customers.AsNoTracking())
+                    .AnyAsync(item => item.Id == customer.Id, cancellationToken))
+                {
+                    throw new UnauthorizedAccessException("客户不存在或不属于当前账号。");
+                }
                 return customer.Id;
             }
 
@@ -50,7 +64,7 @@ namespace ExportDocManager.Services.Core
                 return 0;
             }
 
-            var existingCustomer = await context.Customers.FirstOrDefaultAsync(
+            var existingCustomer = await _accessScope.ApplyCustomerScope(context.Customers).FirstOrDefaultAsync(
                 item => (!string.IsNullOrWhiteSpace(customer.CustomerNameEN) && item.CustomerNameEN == customer.CustomerNameEN) ||
                         (!string.IsNullOrWhiteSpace(customer.TaxId) && item.TaxId == customer.TaxId),
                 cancellationToken);
@@ -63,6 +77,7 @@ namespace ExportDocManager.Services.Core
 
             customer.Id = 0;
             customer.RowVersion = null;
+            _accessScope.ApplyOwner(customer);
             await context.Customers.AddAsync(customer, cancellationToken);
             await context.SaveChangesAsync(cancellationToken);
             return customer.Id;
@@ -84,6 +99,11 @@ namespace ExportDocManager.Services.Core
 
             if (exporter.Id > 0)
             {
+                if (!await _accessScope.ApplyExporterScope(context.Exporters.AsNoTracking())
+                    .AnyAsync(item => item.Id == exporter.Id, cancellationToken))
+                {
+                    throw new UnauthorizedAccessException("出口商不存在或不属于当前账号。");
+                }
                 return exporter.Id;
             }
 
@@ -98,7 +118,7 @@ namespace ExportDocManager.Services.Core
                 return 0;
             }
 
-            var existingExporter = await context.Exporters.FirstOrDefaultAsync(
+            var existingExporter = await _accessScope.ApplyExporterScope(context.Exporters).FirstOrDefaultAsync(
                 item => (!string.IsNullOrWhiteSpace(exporter.ExporterNameEN) && item.ExporterNameEN == exporter.ExporterNameEN) ||
                         (!string.IsNullOrWhiteSpace(exporter.ExporterNameCN) && item.ExporterNameCN == exporter.ExporterNameCN) ||
                         (!string.IsNullOrWhiteSpace(exporter.CreditCode) && item.CreditCode == exporter.CreditCode),
@@ -112,6 +132,7 @@ namespace ExportDocManager.Services.Core
 
             exporter.Id = 0;
             exporter.RowVersion = null;
+            _accessScope.ApplyOwner(exporter);
             await context.Exporters.AddAsync(exporter, cancellationToken);
             await context.SaveChangesAsync(cancellationToken);
             return exporter.Id;

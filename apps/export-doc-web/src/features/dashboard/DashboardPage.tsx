@@ -29,6 +29,7 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
   const invoicePermission = useModulePermission("document.invoices");
   const queryPermission = useModulePermission("document.query");
   const masterDataPermission = useModulePermission("document.master-data");
+  const hsKnowledgePermission = useModulePermission("document.hs-knowledge");
   const jobsPermission = useModulePermission("document.jobs");
   const dashboardQuery = useQuery({
     queryKey: queryKeys.dashboard(),
@@ -97,7 +98,7 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
   const quickActions = [
     { label: "新建发票", description: "录入贸易与商品明细", icon: FilePlus2, route: "/invoices/new", enabled: invoicePermission.canOperate },
     { label: "单据查询", description: "检索并导出业务数据", icon: Search, route: "/query/invoices", enabled: queryPermission.canView },
-    { label: "HS 查询", description: "查税则与申报经验", icon: BookOpen, route: "/master-data/hs-knowledge/search", enabled: masterDataPermission.canView },
+    { label: "HS 查询", description: "查税则与申报经验", icon: BookOpen, route: "/master-data/hs-knowledge/search", enabled: hsKnowledgePermission.canView },
     { label: "任务中心", description: "跟踪后台处理进度", icon: ListChecks, route: "/jobs", enabled: jobsPermission.canView },
   ].filter((action) => action.enabled);
 

@@ -71,6 +71,10 @@ const financeModules = [
   "system.about",
 ];
 const financeGroups = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: true, enabledModules: financeModules });
+const documentClerkRoutes = model.filterWorkspaceNavGroups({
+  canUseDocumentWorkspace: true,
+  enabledModules: ["document.invoices", "document.hs-knowledge", "document.master-data", "system.about"],
+}).flatMap((group) => group.items).map((item) => item.to);
 const noPermissionGroups = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: false, canUseSalesWorkspace: false, enabledModules: [] });
 const financeRoutes = financeGroups.flatMap((group) => group.items).map((item) => item.to);
 assert(!userGroups.flatMap((group) => group.items).some((item) => item.to === "/audit-logs"), "audit hidden for normal user");
@@ -101,9 +105,13 @@ assert(financeRoutes.includes("/tools/exchange-rates"), "finance exchange rate v
 assert(financeRoutes.includes("/tools/email"), "finance email visible");
 assert(financeRoutes.includes("/system/about"), "finance about visible");
 assert(!financeRoutes.some((route) => ["/dashboard", "/invoices", "/master-data", "/tools/excel", "/tools/container-packing", "/crm/dashboard"].includes(route)), "finance hidden modules stay hidden");
+assert(documentClerkRoutes.includes("/master-data/hs-knowledge/search"), "document clerk sees HS knowledge query");
+assert(documentClerkRoutes.includes("/master-data"), "document clerk sees scoped master-data maintenance");
 assert(noPermissionGroups.length === 0, "explicit empty permission template exposes no navigation");
 assert(model.getRequiredModule("/payments/8") === "document.payments", "payment route module guard");
 assert(model.getRequiredModule("/crm/follow-ups") === "sales.crm", "sales route module guard");
+assert(model.getRequiredModule("/master-data/hs-knowledge/search") === "document.hs-knowledge", "HS knowledge uses its own route guard");
+assert(model.getRequiredModule("/master-data/hs-codes") === "document.hs-knowledge", "HS catalogue uses its own route guard");
 assert(model.getRequiredRouteAccessLevel("/invoices/new") === "operate", "new invoice route requires operate");
 assert(model.getRequiredRouteAccessLevel("/master-data/products/new") === "operate", "new master-data route requires operate");
 assert(model.getRequiredRouteAccessLevel("/single-window/coo/8") === "operate", "COO editor route requires operate");

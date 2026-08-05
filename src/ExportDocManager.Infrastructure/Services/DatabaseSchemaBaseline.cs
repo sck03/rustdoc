@@ -13,7 +13,7 @@ namespace ExportDocManager.Services.Infrastructure
     /// </summary>
     internal static class DatabaseSchemaBaseline
     {
-        internal const int CurrentVersion = 5;
+        internal const int CurrentVersion = 6;
         internal const string MetadataTableName = "__ExportDocManagerSchema";
 
         public static async Task EnsureCurrentAsync(AppDbContext context, bool usesPostgreSql)
@@ -132,6 +132,14 @@ namespace ExportDocManager.Services.Infrastructure
                     ON "Invoices" ("OwnerUserId", "InvoiceDate", "Id");
                 CREATE INDEX IF NOT EXISTS "IX_Invoices_CompanyScope_DepartmentId_InvoiceDate_Id"
                     ON "Invoices" ("CompanyScope", "DepartmentId", "InvoiceDate", "Id");
+                CREATE INDEX IF NOT EXISTS "IX_Customers_OwnerUserId"
+                    ON "Customers" ("OwnerUserId");
+                CREATE INDEX IF NOT EXISTS "IX_Customers_CompanyScope_DepartmentId"
+                    ON "Customers" ("CompanyScope", "DepartmentId");
+                CREATE INDEX IF NOT EXISTS "IX_Exporters_OwnerUserId"
+                    ON "Exporters" ("OwnerUserId");
+                CREATE INDEX IF NOT EXISTS "IX_Exporters_CompanyScope_DepartmentId"
+                    ON "Exporters" ("CompanyScope", "DepartmentId");
                 CREATE INDEX IF NOT EXISTS "IX_Items_InvoiceId_StyleNo"
                     ON "Items" ("InvoiceId", "StyleNo");
                 CREATE INDEX IF NOT EXISTS "IX_Items_HSCode"

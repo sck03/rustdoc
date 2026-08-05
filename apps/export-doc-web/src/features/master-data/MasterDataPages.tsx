@@ -6,7 +6,8 @@ import { MasterDataEditorPage } from "./MasterDataEditorPage.tsx";
 import { MasterDataListPage } from "./MasterDataListPage.tsx";
 
 export function MasterDataRoute({ client }: { client: ExportDocManagerApiClient }) {
-  const permission = useModulePermission("document.master-data");
+  const masterDataPermission = useModulePermission("document.master-data");
+  const hsKnowledgePermission = useModulePermission("document.hs-knowledge");
   const { entityKey } = useParams();
   const config = getMasterDataConfig(entityKey);
 
@@ -18,12 +19,19 @@ export function MasterDataRoute({ client }: { client: ExportDocManagerApiClient 
     return <Navigate to="/master-data/customers" replace />;
   }
 
+  const permission = config.key === "hs-codes" ? hsKnowledgePermission : masterDataPermission;
+  if (!permission.canView) {
+    return <Navigate to="/access-denied" replace />;
+  }
+
   return (
     <MasterDataListPage
       client={client}
       config={config}
-      canOperate={permission.canOperate}
+      canOperate={config.key === "hs-codes" ? permission.canManage : permission.canOperate}
       canManage={permission.canManage}
+      canViewMasterData={masterDataPermission.canView}
+      canViewHsCodes={hsKnowledgePermission.canView}
     />
   );
 }
@@ -35,7 +43,8 @@ export function MasterDataEditorRoute({
   client: ExportDocManagerApiClient;
   mode: "new" | "edit";
 }) {
-  const permission = useModulePermission("document.master-data");
+  const masterDataPermission = useModulePermission("document.master-data");
+  const hsKnowledgePermission = useModulePermission("document.hs-knowledge");
   const { entityKey } = useParams();
   const config = getMasterDataConfig(entityKey);
 
@@ -43,7 +52,14 @@ export function MasterDataEditorRoute({
     return <Navigate to="/master-data/customers" replace />;
   }
 
-  if (mode === "new" && !permission.canOperate) {
+  const permission = config.key === "hs-codes" ? hsKnowledgePermission : masterDataPermission;
+  if (!permission.canView) {
+    return <Navigate to="/access-denied" replace />;
+  }
+
+  const canOperate = config.key === "hs-codes" ? permission.canManage : permission.canOperate;
+
+  if (mode === "new" && !canOperate) {
     return <Navigate to={`/master-data/${config.key}`} replace />;
   }
 
@@ -52,7 +68,7 @@ export function MasterDataEditorRoute({
       client={client}
       config={config}
       mode={mode}
-      canOperate={permission.canOperate}
+      canOperate={canOperate}
       canManage={permission.canManage}
     />
   );
@@ -74,4 +90,3 @@ export function getMasterDataTitle(pathname: string) {
 
   return config.label;
 }
-

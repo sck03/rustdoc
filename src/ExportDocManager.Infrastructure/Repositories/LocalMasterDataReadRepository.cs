@@ -2,6 +2,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,19 +19,23 @@ namespace ExportDocManager.Services.Infrastructure
     {
         private const int DatabaseIdBatchSize = 400;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
+        private readonly BusinessDataAccessScope _accessScope;
 
-        public LocalMasterDataReadRepository(IDbContextFactory<AppDbContext> contextFactory)
+        public LocalMasterDataReadRepository(
+            IDbContextFactory<AppDbContext> contextFactory,
+            BusinessDataAccessScope accessScope = null)
         {
             _contextFactory = contextFactory;
+            _accessScope = accessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
         }
 
         public async Task<IReadOnlyList<Customer>> QueryAsync(CustomerReadQuery query, CancellationToken cancellationToken = default)
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var keyword = TextSearchHelper.NormalizeFilter(query?.Keyword);
-            return await context.Customers
+            return await _accessScope.ApplyCustomerScope(context.Customers
                 .AsNoTracking()
-                .AsQueryable()
+                .AsQueryable())
                 .ApplyKeywordSearch(
                     keyword,
                     customer => customer.CustomerNameEN,
@@ -48,9 +53,9 @@ namespace ExportDocManager.Services.Infrastructure
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var keyword = TextSearchHelper.NormalizeFilter(query?.Keyword);
-            return await context.Exporters
+            return await _accessScope.ApplyExporterScope(context.Exporters
                 .AsNoTracking()
-                .AsQueryable()
+                .AsQueryable())
                 .ApplyKeywordSearch(
                     keyword,
                     exporter => exporter.ExporterNameEN,

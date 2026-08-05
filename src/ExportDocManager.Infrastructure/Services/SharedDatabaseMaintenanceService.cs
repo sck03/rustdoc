@@ -23,7 +23,7 @@ namespace ExportDocManager.Services.Infrastructure
             RegexOptions.Compiled | RegexOptions.CultureInvariant,
             TimeSpan.FromSeconds(1));
         private const string OwnershipStoragePolicy =
-            "共享库权限改派只更新发票、付款报销、CRM、供应商、商机、邮件/报表模板和装柜方案的 OwnerUserId、DepartmentId、CompanyScope 归属字段；关联子记录继续随所属业务聚合访问，不移动附件、不生成导出目录、不读取用户显式导出文件。";
+            "共享库权限改派只更新发票、付款报销、客户、出口商、CRM、供应商、商机、邮件/报表模板和装柜方案的 OwnerUserId、DepartmentId、CompanyScope 归属字段；关联子记录继续随所属业务聚合访问，不移动附件、不生成导出目录、不读取用户显式导出文件。";
         private const string SupportPackageStoragePolicy =
             "支持包默认写入运行数据根 SupportPackages/，只收集脱敏运行诊断、任务快照、设置摘要和运行数据根 Logs 最近文本日志；默认不打包数据库正文或样张文件，管理员显式勾选并确认后才包含最近数据库备份或样张索引；不会打包授权私钥、邮件密码、WebDAV 密码或 PostgreSQL 密码。";
         private const string PostgreSqlPhysicalBackupStoragePolicy =
@@ -219,6 +219,8 @@ namespace ExportDocManager.Services.Infrastructure
             var invoiceGroups = await LoadOwnerCountsAsync(context.Invoices.AsNoTracking(), cancellationToken).ConfigureAwait(false);
             var paymentGroups = await LoadOwnerCountsAsync(context.Payments.AsNoTracking(), cancellationToken).ConfigureAwait(false);
             var otherBusinessGroups = CombineOwnerCounts(
+                await LoadOwnerCountsAsync(context.Customers.AsNoTracking(), cancellationToken).ConfigureAwait(false),
+                await LoadOwnerCountsAsync(context.Exporters.AsNoTracking(), cancellationToken).ConfigureAwait(false),
                 await LoadOwnerCountsAsync(context.CrmCustomers.AsNoTracking(), cancellationToken).ConfigureAwait(false),
                 await LoadOwnerCountsAsync(context.CrmFollowUps.AsNoTracking(), cancellationToken).ConfigureAwait(false),
                 await LoadOwnerCountsAsync(context.SupplierCompanies.AsNoTracking(), cancellationToken).ConfigureAwait(false),
@@ -337,6 +339,34 @@ namespace ExportDocManager.Services.Infrastructure
 
                     if (request.IncludeOtherBusinessData)
                     {
+                        updatedOtherBusinessData += await TransferOwnedRowsAsync(
+                            context,
+                            context.Customers,
+                            request,
+                            (item, ownerUserId, department, company) =>
+                            {
+                                item.OwnerUserId = ownerUserId;
+                                item.DepartmentId = department;
+                                item.CompanyScope = company;
+                            },
+                            targetUser.Id,
+                            departmentId,
+                            companyScope,
+                            token).ConfigureAwait(false);
+                        updatedOtherBusinessData += await TransferOwnedRowsAsync(
+                            context,
+                            context.Exporters,
+                            request,
+                            (item, ownerUserId, department, company) =>
+                            {
+                                item.OwnerUserId = ownerUserId;
+                                item.DepartmentId = department;
+                                item.CompanyScope = company;
+                            },
+                            targetUser.Id,
+                            departmentId,
+                            companyScope,
+                            token).ConfigureAwait(false);
                         updatedOtherBusinessData += await TransferOwnedRowsAsync(
                             context,
                             context.CrmCustomers,

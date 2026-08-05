@@ -9,6 +9,9 @@ namespace ExportDocManager.Models.Entities
     public class Exporter
     {
         public int Id { get; set; }
+        public int? OwnerUserId { get; set; }
+        public string DepartmentId { get; set; } = string.Empty;
+        public string CompanyScope { get; set; } = string.Empty;
         public string ExporterNameEN { get; set; }
         public string ExporterNameCN { get; set; }
         public string AddressEN { get; set; }

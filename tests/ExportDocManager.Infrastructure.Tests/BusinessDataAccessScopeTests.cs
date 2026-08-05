@@ -78,6 +78,64 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task CustomerAndExporterScopes_WhenPostgreSqlRegularUser_ShouldFilterOwnedRows()
+        {
+            using var factory = new TestDbContextFactory();
+            using (var seedContext = factory.CreateDbContext())
+            {
+                seedContext.Customers.AddRange(
+                    new Customer { CustomerNameEN = "Own Customer", OwnerUserId = 7 },
+                    new Customer { CustomerNameEN = "Foreign Customer", OwnerUserId = 8 });
+                seedContext.Exporters.AddRange(
+                    new Exporter { ExporterNameEN = "Own Exporter", OwnerUserId = 7 },
+                    new Exporter { ExporterNameEN = "Foreign Exporter", OwnerUserId = 8 });
+                await seedContext.SaveChangesAsync();
+            }
+
+            var scope = new BusinessDataAccessScope(
+                CreatePostgreSqlModeSettings(),
+                new FixedCurrentUserContext(new User { Id = 7, Username = "document-a", Role = "User" }));
+            using var context = factory.CreateDbContext();
+
+            var customer = Assert.Single(await scope
+                .ApplyCustomerScope(context.Customers.AsNoTracking())
+                .ToListAsync());
+            var exporter = Assert.Single(await scope
+                .ApplyExporterScope(context.Exporters.AsNoTracking())
+                .ToListAsync());
+
+            Assert.Equal("Own Customer", customer.CustomerNameEN);
+            Assert.Equal("Own Exporter", exporter.ExporterNameEN);
+        }
+
+        [Fact]
+        public void ApplyOwner_ShouldAssignCustomerAndExporterOwnershipFromCurrentUser()
+        {
+            var scope = new BusinessDataAccessScope(
+                CreatePostgreSqlModeSettings(),
+                new FixedCurrentUserContext(new User
+                {
+                    Id = 9,
+                    Username = "document-owner",
+                    Role = "User",
+                    DepartmentId = "DOC",
+                    CompanyScope = "CN"
+                }));
+            var customer = new Customer { CustomerNameEN = "Customer" };
+            var exporter = new Exporter { ExporterNameEN = "Exporter" };
+
+            scope.ApplyOwner(customer);
+            scope.ApplyOwner(exporter);
+
+            Assert.Equal(9, customer.OwnerUserId);
+            Assert.Equal("DOC", customer.DepartmentId);
+            Assert.Equal("CN", customer.CompanyScope);
+            Assert.Equal(9, exporter.OwnerUserId);
+            Assert.Equal("DOC", exporter.DepartmentId);
+            Assert.Equal("CN", exporter.CompanyScope);
+        }
+
+        [Fact]
         public async Task EmailTemplateScopes_WhenPostgreSqlRegularUser_ShouldReadSharedButEditOwnedOnly()
         {
             using var factory = new TestDbContextFactory();

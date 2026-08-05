@@ -35,25 +35,26 @@ type KnowledgeFeedback = { tone: "success" | "error" | "warning"; message: strin
 
 export function HsCodeKnowledgePage({ client }: { client: ExportDocManagerApiClient }) {
   const { section = "search" } = useParams();
-  const permission = useModulePermission("document.master-data");
+  const permission = useModulePermission("document.hs-knowledge");
   const queryClient = useQueryClient();
   const workspaceDeviceMode = useWorkspaceDeviceMode();
   const workspaceDeviceCapabilities = getWorkspaceDeviceCapabilities(workspaceDeviceMode);
   const [maintenanceOpen, setMaintenanceOpen] = useState(() => maintenanceSections.some(([key]) => key === section));
   useEffect(() => { setMaintenanceOpen(maintenanceSections.some(([key]) => key === section)); }, [section]);
   if (!sections.some(([key]) => key === section)) return <Navigate to="/master-data/hs-knowledge/search" replace />;
+  if (!permission.canManage && maintenanceSections.some(([key]) => key === section)) return <Navigate to="/master-data/hs-knowledge/search" replace />;
   return <section className="work-surface hs-knowledge-surface">
     <HsKnowledgeWorkflow activeSection={section}/>
     <nav className="hs-knowledge-nav" aria-label="HS知识中心功能">
       {primarySections.map(([key, label, Icon]) => <Link key={key} className={section === key ? "active" : ""} to={`/master-data/hs-knowledge/${key}`}><Icon size={18}/><span>{label}</span></Link>)}
-      <details className="hs-knowledge-maintenance-nav" open={maintenanceOpen} onToggle={(event) => setMaintenanceOpen(event.currentTarget.open)}>
+      {permission.canManage ? <details className="hs-knowledge-maintenance-nav" open={maintenanceOpen} onToggle={(event) => setMaintenanceOpen(event.currentTarget.open)}>
         <summary><Database size={18}/><span>高级维护</span></summary>
         <div>
           {maintenanceSections.map(([key, label, Icon]) => <Link key={key} className={section === key ? "active" : ""} to={`/master-data/hs-knowledge/${key}`}><Icon size={18}/><span>{label}</span></Link>)}
         </div>
-      </details>
+      </details> : null}
     </nav>
-    {!permission.canManage ? <PermissionNotice>当前权限只允许查询和查看；共享知识库导入、确认和编辑需要资料管理权限。</PermissionNotice> : null}
+    {!permission.canManage ? <PermissionNotice>当前权限只允许查询和查看；共享知识库导入、确认和编辑需要 HS 编码管理权限。</PermissionNotice> : null}
     {section === "search" ? <KnowledgeSearch client={client} canOperate={permission.canOperate}/> : null}
     {section === "examples" ? <ExampleLibrary client={client} canOperate={permission.canManage && workspaceDeviceMode !== "phone"} canManage={permission.canManage && workspaceDeviceMode !== "phone"} canBatchManage={permission.canManage && workspaceDeviceCapabilities.canUseBatchOperations}/> : null}
     {section === "history" ? <HistoryLearning client={client} canOperate={permission.canManage}/> : null}

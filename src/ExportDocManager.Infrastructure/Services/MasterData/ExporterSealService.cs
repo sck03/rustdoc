@@ -2,6 +2,7 @@ using System.Globalization;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,13 +12,16 @@ namespace ExportDocManager.Services.MasterData
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly IAppPathProvider _pathProvider;
+        private readonly BusinessDataAccessScope _accessScope;
 
         public ExporterSealService(
             IDbContextFactory<AppDbContext> contextFactory,
-            IAppPathProvider pathProvider)
+            IAppPathProvider pathProvider,
+            BusinessDataAccessScope accessScope = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            _accessScope = accessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
         }
 
         public async Task<Exporter> SaveSealAsync(
@@ -41,7 +45,7 @@ namespace ExportDocManager.Services.MasterData
             ValidateOriginalExtension(originalFileName, imageExtension);
 
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            var exporter = await context.Exporters
+            var exporter = await _accessScope.ApplyExporterScope(context.Exporters)
                 .SingleOrDefaultAsync(item => item.Id == exporterId, cancellationToken);
             if (exporter == null)
             {

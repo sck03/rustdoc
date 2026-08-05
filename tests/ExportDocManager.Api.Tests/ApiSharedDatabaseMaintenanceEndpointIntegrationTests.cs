@@ -79,11 +79,11 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(1, summary.UnassignedInvoices);
             Assert.Equal(2, summary.TotalPayments);
             Assert.Equal(1, summary.UnassignedPayments);
-            Assert.Equal(515, summary.TotalOtherBusinessData);
-            Assert.Equal(508, summary.UnassignedOtherBusinessData);
+            Assert.Equal(519, summary.TotalOtherBusinessData);
+            Assert.Equal(510, summary.UnassignedOtherBusinessData);
             var operatorSummary = Assert.Single(summary.Owners, owner => owner.UserId == createdOperator.User.Id);
             Assert.True(operatorSummary.IsActive);
-            Assert.Equal(7, operatorSummary.OtherBusinessDataCount);
+            Assert.Equal(9, operatorSummary.OtherBusinessDataCount);
             Assert.False(Assert.Single(summary.Owners, owner => owner.UserId == createdInactive.User.Id).IsActive);
 
             var transferResponse = await adminClient.PostAsJsonAsync("/api/shared-database/ownership/transfer", new
@@ -102,7 +102,7 @@ namespace ExportDocManager.Api.Tests
             var transfer = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSharedDatabaseOwnershipTransferResponse>(transferResponse);
             Assert.Equal(1, transfer.UpdatedInvoices);
             Assert.Equal(1, transfer.UpdatedPayments);
-            Assert.Equal(508, transfer.UpdatedOtherBusinessData);
+            Assert.Equal(510, transfer.UpdatedOtherBusinessData);
 
             await AssertUnassignedRecordsTransferredAsync(harness.DatabasePath, createdTarget.User.Id);
 
@@ -212,6 +212,24 @@ namespace ExportDocManager.Api.Tests
             await context.Payments.AddRangeAsync(
                 CreatePayment("UNASSIGNED-1", null, "", ""),
                 CreatePayment("OWNED-1", ownerUserId, "OPS", "HQ"));
+            await context.Customers.AddRangeAsync(
+                new Customer { CustomerNameEN = "UNASSIGNED CUSTOMER" },
+                new Customer
+                {
+                    CustomerNameEN = "OWNED CUSTOMER",
+                    OwnerUserId = ownerUserId,
+                    DepartmentId = "OPS",
+                    CompanyScope = "HQ"
+                });
+            await context.Exporters.AddRangeAsync(
+                new Exporter { ExporterNameEN = "UNASSIGNED EXPORTER" },
+                new Exporter
+                {
+                    ExporterNameEN = "OWNED EXPORTER",
+                    OwnerUserId = ownerUserId,
+                    DepartmentId = "OPS",
+                    CompanyScope = "HQ"
+                });
             var unassignedCustomer = CreateCrmCustomer("UNASSIGNED CRM", null, "", "");
             var ownedCustomer = CreateCrmCustomer("OWNED CRM", ownerUserId, "OPS", "HQ");
             await context.CrmCustomers.AddRangeAsync(unassignedCustomer, ownedCustomer);
@@ -256,6 +274,8 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("DOC", transferredPayment.DepartmentId);
             Assert.Equal("CN", transferredPayment.CompanyScope);
 
+            AssertTransferred(await context.Customers.AsNoTracking().SingleAsync(item => item.CustomerNameEN == "UNASSIGNED CUSTOMER"), targetUserId);
+            AssertTransferred(await context.Exporters.AsNoTracking().SingleAsync(item => item.ExporterNameEN == "UNASSIGNED EXPORTER"), targetUserId);
             AssertTransferred(await context.CrmCustomers.AsNoTracking().SingleAsync(item => item.Name == "UNASSIGNED CRM"), targetUserId);
             AssertTransferred(await context.CrmFollowUps.AsNoTracking().SingleAsync(item => item.Summary == "UNASSIGNED FOLLOWUP"), targetUserId);
             AssertTransferred(await context.SupplierCompanies.AsNoTracking().SingleAsync(item => item.Name == "UNASSIGNED SUPPLIER"), targetUserId);
@@ -269,6 +289,22 @@ namespace ExportDocManager.Api.Tests
 
             Assert.Equal(targetUserId, (await context.CrmCustomers.AsNoTracking().SingleAsync(item => item.Name == "UNASSIGNED CRM")).OwnerUserId);
             Assert.NotEqual(targetUserId, (await context.CrmCustomers.AsNoTracking().SingleAsync(item => item.Name == "OWNED CRM")).OwnerUserId);
+            Assert.NotEqual(targetUserId, (await context.Customers.AsNoTracking().SingleAsync(item => item.CustomerNameEN == "OWNED CUSTOMER")).OwnerUserId);
+            Assert.NotEqual(targetUserId, (await context.Exporters.AsNoTracking().SingleAsync(item => item.ExporterNameEN == "OWNED EXPORTER")).OwnerUserId);
+        }
+
+        private static void AssertTransferred(Customer item, int targetUserId)
+        {
+            Assert.Equal(targetUserId, item.OwnerUserId);
+            Assert.Equal("DOC", item.DepartmentId);
+            Assert.Equal("CN", item.CompanyScope);
+        }
+
+        private static void AssertTransferred(Exporter item, int targetUserId)
+        {
+            Assert.Equal(targetUserId, item.OwnerUserId);
+            Assert.Equal("DOC", item.DepartmentId);
+            Assert.Equal("CN", item.CompanyScope);
         }
 
         private static void AssertTransferred(CrmCustomer item, int targetUserId)
