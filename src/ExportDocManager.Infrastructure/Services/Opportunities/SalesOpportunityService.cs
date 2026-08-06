@@ -185,26 +185,45 @@ namespace ExportDocManager.Services.Opportunities
             var stages = AllowedStages.Select(stage => new SalesOpportunityStageSummary(
                 stage, stageCounts.FirstOrDefault(item => item.Stage == stage)?.Count ?? 0)).ToArray();
 
-            var active = scoped.Where(item => item.Stage != "已成交" && item.Stage != "已失单")
-                .OrderByDescending(item => item.Id).Take(5000);
-            var rows = await (from opportunity in active
+            var active = scoped.Where(item => item.Stage != "已成交" && item.Stage != "已失单");
+            var currencyTotals = new Dictionary<string, (int Count, decimal EstimatedAmount, decimal WeightedAmount)>(
+                StringComparer.OrdinalIgnoreCase);
+            await foreach (var row in active
+                .Select(item => new { item.Currency, item.EstimatedAmount, item.ProbabilityPercent })
+                .AsAsyncEnumerable()
+                .WithCancellation(cancellationToken))
+            {
+                string currency = Clean(row.Currency).ToUpperInvariant();
+                currencyTotals.TryGetValue(currency, out var total);
+                total.Count++;
+                total.EstimatedAmount += row.EstimatedAmount;
+                total.WeightedAmount += row.EstimatedAmount * row.ProbabilityPercent / 100m;
+                currencyTotals[currency] = total;
+            }
+            var currencies = currencyTotals
+                .Select(item => new SalesOpportunityCurrencySummary(
+                    item.Key,
+                    item.Value.Count,
+                    item.Value.EstimatedAmount,
+                    item.Value.WeightedAmount))
+                .OrderBy(item => item.Currency).ToArray();
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var upcoming = await (from opportunity in active
+                where opportunity.ExpectedCloseDate.HasValue &&
+                    opportunity.ExpectedCloseDate.Value >= today &&
+                    opportunity.ExpectedCloseDate.Value <= today.AddDays(30)
                 join customer in context.CrmCustomers.AsNoTracking() on opportunity.CrmCustomerId equals customer.Id
                 join product in context.Products.AsNoTracking() on opportunity.ProductId equals product.Id into products
                 from product in products.DefaultIfEmpty()
+                orderby opportunity.ExpectedCloseDate, opportunity.ProbabilityPercent descending, opportunity.Id descending
                 select new SalesOpportunityRecord(opportunity.Id, opportunity.CrmCustomerId, customer.Name,
                     opportunity.ProductId, product != null ? product.ProductCode ?? string.Empty : string.Empty,
                     product != null ? (product.NameCN ?? product.NameEN ?? string.Empty) : string.Empty,
                     opportunity.Title, opportunity.Stage, opportunity.QuotationNo, opportunity.EstimatedAmount,
                     opportunity.Currency, opportunity.ProbabilityPercent, opportunity.ExpectedCloseDate,
-                    opportunity.NextAction, opportunity.Notes, opportunity.VersionNumber)).ToListAsync(cancellationToken);
-            var currencies = rows.GroupBy(item => item.Currency, StringComparer.OrdinalIgnoreCase)
-                .Select(group => new SalesOpportunityCurrencySummary(group.Key.ToUpperInvariant(), group.Count(),
-                    group.Sum(item => item.EstimatedAmount),
-                    group.Sum(item => item.EstimatedAmount * item.ProbabilityPercent / 100m)))
-                .OrderBy(item => item.Currency).ToArray();
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            var upcoming = rows.Where(item => item.ExpectedCloseDate.HasValue && item.ExpectedCloseDate.Value >= today && item.ExpectedCloseDate.Value <= today.AddDays(30))
-                .OrderBy(item => item.ExpectedCloseDate).ThenByDescending(item => item.ProbabilityPercent).Take(8).ToArray();
+                    opportunity.NextAction, opportunity.Notes, opportunity.VersionNumber))
+                .Take(8)
+                .ToArrayAsync(cancellationToken);
             return new SalesOpportunityDashboard(stages, currencies, upcoming);
         }
 

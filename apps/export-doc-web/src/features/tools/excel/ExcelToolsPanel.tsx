@@ -16,6 +16,7 @@ import { downloadJobResultWhenReady } from "../../../ui/downloadJobResult.ts";
 import { ViewJobButton } from "../../jobs/ViewJobButton.tsx";
 import { InlineNotice } from "../../../ui/PageState.tsx";
 import { readDefaultExportDirectory } from "../../settings/settingsPaths.ts";
+import { useAbortableOperation } from "../../../ui/useAbortableOperation.ts";
 
 const invoicePageSize = 50;
 
@@ -29,6 +30,7 @@ export function ExcelToolsPanel({
   canReadInvoices: boolean;
 }) {
   const queryClient = useQueryClient();
+  const runAbortableOperation = useAbortableOperation();
   const desktopAvailable = isDesktopBridgeAvailable();
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<"success" | "error">("success");
@@ -43,20 +45,20 @@ export function ExcelToolsPanel({
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
-    queryFn: () => client.getSettings(),
+    queryFn: ({ signal }) => client.getSettings({ signal }),
     staleTime: 5 * 60 * 1000,
   });
   const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
 
   const invoicesQuery = useQuery({
     queryKey: queryKeys.excelToolBookingInvoices(invoicePageSize),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       client.listInvoices({
         pageNumber: 1,
         pageSize: invoicePageSize,
         sortColumn: "InvoiceDate",
         ascending: false,
-      }),
+      }, { signal }),
     enabled: canOperate && canReadInvoices,
     staleTime: 60 * 1000,
   });
@@ -95,15 +97,15 @@ export function ExcelToolsPanel({
   }
 
   const templateExportMutation = useMutation({
-    mutationFn: async (destinationPath: string) => {
+    mutationFn: async (destinationPath: string) => runAbortableOperation(async (signal) => {
       const job = desktopAvailable
-        ? await client.startExcelTemplateSaveToPathJob({ body: { destinationPath } })
-        : await client.startExcelTemplateDownloadJob();
+        ? await client.startExcelTemplateSaveToPathJob({ body: { destinationPath } }, { signal })
+        : await client.startExcelTemplateDownloadJob({ signal });
       if (!desktopAvailable) {
-        await downloadJobResultWhenReady(client, job, "导入数据模板.xlsx");
+        await downloadJobResultWhenReady(client, job, "导入数据模板.xlsx", { signal });
       }
       return job;
-    },
+    }),
     onSuccess: async (job) => {
       await handleJobAccepted(job, desktopAvailable ? "Excel 模板导出" : "Excel 模板下载");
     },
@@ -111,15 +113,15 @@ export function ExcelToolsPanel({
   });
 
   const blankBookingExportMutation = useMutation({
-    mutationFn: async (destinationPath: string) => {
+    mutationFn: async (destinationPath: string) => runAbortableOperation(async (signal) => {
       const job = desktopAvailable
-        ? await client.startBlankBookingSheetSaveToPathJob({ body: { destinationPath } })
-        : await client.startBlankBookingSheetDownloadJob();
+        ? await client.startBlankBookingSheetSaveToPathJob({ body: { destinationPath } }, { signal })
+        : await client.startBlankBookingSheetDownloadJob({ signal });
       if (!desktopAvailable) {
-        await downloadJobResultWhenReady(client, job, "空白托单模板.xlsx");
+        await downloadJobResultWhenReady(client, job, "空白托单模板.xlsx", { signal });
       }
       return job;
-    },
+    }),
     onSuccess: async (job) => {
       await handleJobAccepted(job, "空白托单导出");
     },
@@ -127,19 +129,19 @@ export function ExcelToolsPanel({
   });
 
   const bookingConvertMutation = useMutation({
-    mutationFn: async ({ sourcePath, destinationPath, uploadFile }: { sourcePath: string; destinationPath: string; uploadFile?: File | null }) => {
+    mutationFn: async ({ sourcePath, destinationPath, uploadFile }: { sourcePath: string; destinationPath: string; uploadFile?: File | null }) => runAbortableOperation(async (signal) => {
       const job = desktopAvailable
-        ? await client.startBookingSheetConvertSaveToPathJob({ body: { sourcePath, destinationPath } })
+        ? await client.startBookingSheetConvertSaveToPathJob({ body: { sourcePath, destinationPath } }, { signal })
         : await client.uploadAndStartBookingSheetConvertDownloadJob({
             fileName: uploadFile?.name,
             body: uploadFile ?? new Blob(),
-          });
+          }, { signal });
       if (!desktopAvailable) {
         const baseName = (uploadFile?.name || "BookingSheet").replace(/\.[^.]+$/, "");
-        await downloadJobResultWhenReady(client, job, `${baseName}-BookingSheet.xlsx`);
+        await downloadJobResultWhenReady(client, job, `${baseName}-BookingSheet.xlsx`, { signal });
       }
       return job;
-    },
+    }),
     onSuccess: async (job) => {
       await handleJobAccepted(job, "托单转换");
     },
@@ -147,15 +149,15 @@ export function ExcelToolsPanel({
   });
 
   const invoiceBookingExportMutation = useMutation({
-    mutationFn: async ({ invoiceId, destinationPath }: { invoiceId: number; destinationPath: string }) => {
+    mutationFn: async ({ invoiceId, destinationPath }: { invoiceId: number; destinationPath: string }) => runAbortableOperation(async (signal) => {
       const job = desktopAvailable
-        ? await client.startInvoiceBookingSheetSaveToPathJob({ body: { invoiceId, destinationPath } })
-        : await client.startInvoiceBookingSheetDownloadJob({ invoiceId });
+        ? await client.startInvoiceBookingSheetSaveToPathJob({ body: { invoiceId, destinationPath } }, { signal })
+        : await client.startInvoiceBookingSheetDownloadJob({ invoiceId }, { signal });
       if (!desktopAvailable) {
-        await downloadJobResultWhenReady(client, job, buildInvoiceBookingSheetFileName(selectedInvoice));
+        await downloadJobResultWhenReady(client, job, buildInvoiceBookingSheetFileName(selectedInvoice), { signal });
       }
       return job;
-    },
+    }),
     onSuccess: async (job) => {
       await handleJobAccepted(job, "发票托单导出");
     },

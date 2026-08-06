@@ -30,7 +30,6 @@ import { formatAmount, formatDate, readApiError, readRouteSuccessMessage } from 
 import { listPageSizeOptions, loadListViewState, normalizeListPageSize, saveListViewState } from "../../ui/listViewState.ts";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
-import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 import { getInvoiceStatusLabel } from "./invoiceModel.ts";
 import { InvoiceCopyOptionsPanel } from "./InvoiceCopyOptionsPanel.tsx";
@@ -94,20 +93,20 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
 
   const invoicesQuery = useQuery({
     queryKey: queryKeys.invoices(pageNumber, pageSize, committedKeyword.trim()),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       client.listInvoices({
         pageNumber,
         pageSize,
         keyword: committedKeyword.trim() || undefined,
         sortColumn: "InvoiceDate",
         ascending: false,
-      }),
+      }, { signal }),
     placeholderData: keepPreviousData,
   });
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
-    queryFn: () => client.getSettings(),
+    queryFn: ({ signal }) => client.getSettings({ signal }),
     staleTime: 5 * 60 * 1000,
   });
 

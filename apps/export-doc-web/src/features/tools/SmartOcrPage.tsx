@@ -10,6 +10,7 @@ import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { getClipboardPasteInstruction, writeClipboardText } from "../../ui/clipboard.ts";
+import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 type OcrImageSource =
   | {
@@ -38,13 +39,15 @@ type PreviewDragState = {
 
 const MinZoom = 0.1;
 const MaxZoom = 10;
+const MaxOcrImageBytes = 25 * 1024 * 1024;
 
 export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) {
   const ocrPermission = useModulePermission("document.ocr");
   const desktopAvailable = isDesktopBridgeAvailable();
+  const runAbortableOperation = useAbortableOperation();
   const healthQuery = useQuery({
     queryKey: queryKeys.health(),
-    queryFn: () => client.getHealth(),
+    queryFn: ({ signal }) => client.getHealth({ signal }),
   });
   const ocrRuntime = healthQuery.data?.runtimeDependencies.find((item) => item.key === "ocr-runtime") ?? null;
   const ocrRuntimeReady = healthQuery.isSuccess && ocrRuntime?.status === "ready" && ocrRuntime.ready;
@@ -63,7 +66,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
   const [messageType, setMessageType] = useState<"success" | "error">("success");
 
   const recognizeMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: () => runAbortableOperation((signal) => {
       if (imageSource?.kind === "content") {
         return client.recognizeOcrImageContent({
           body: {
@@ -71,7 +74,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
             sourceName: imageSource.sourceName,
             sourceMimeType: imageSource.sourceMimeType,
           },
-        });
+        }, { signal });
       }
 
       const filePath = (imageSource?.kind === "path" ? imageSource.filePath : imagePath).trim();
@@ -79,8 +82,8 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
         body: {
           filePath,
         },
-      });
-    },
+      }, { signal });
+    }),
     onSuccess: (response) => {
       setResult(response);
       setMessage("OCR 识别完成。");
@@ -199,6 +202,10 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
   async function loadImageBlob(blob: Blob, sourceName: string) {
     if (!blob.type.startsWith("image/")) {
       showError("OCR 只支持图片内容。");
+      return;
+    }
+    if (blob.size > MaxOcrImageBytes) {
+      showError(`图片不能超过 ${Math.floor(MaxOcrImageBytes / 1024 / 1024)} MB。`);
       return;
     }
 

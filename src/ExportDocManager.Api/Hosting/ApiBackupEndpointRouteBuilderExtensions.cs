@@ -1,5 +1,6 @@
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -344,7 +345,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
-                ICloudSyncService cloudSyncService) =>
+                ICloudSyncService cloudSyncService,
+                CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -364,7 +366,7 @@ namespace ExportDocManager.Api.Hosting
                     return WriteConflict("WebDAV 尚未配置，请先保存服务器地址和用户名。");
                 }
 
-                bool success = await cloudSyncService.TestConnectionAsync(webDav);
+                bool success = await cloudSyncService.TestConnectionAsync(webDav, cancellationToken);
                 if (!success)
                 {
                     return WriteConflict("WebDAV 连接测试失败，请检查地址、账号、密码或目录权限。");
@@ -388,7 +390,8 @@ namespace ExportDocManager.Api.Hosting
                 ISettingsService settingsService,
                 IBackupService backupService,
                 ICloudSyncService cloudSyncService,
-                IAppPathProvider pathProvider) =>
+                IAppPathProvider pathProvider,
+                CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -421,7 +424,7 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    await cloudSyncService.UploadFileAsync(latestBackup.FullName, latestBackup.Name);
+                    await cloudSyncService.UploadFileAsync(latestBackup.FullName, latestBackup.Name, cancellationToken);
                     return Results.Ok(new ApiCloudBackupCommandResponse(
                         true,
                         $"已上传最新数据库备份：{latestBackup.Name}",
@@ -448,7 +451,8 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
                 ICloudSyncService cloudSyncService,
-                IAppPathProvider pathProvider) =>
+                IAppPathProvider pathProvider,
+                CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -475,7 +479,7 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    var remoteBackups = await cloudSyncService.ListBackupFilesAsync();
+                    var remoteBackups = await cloudSyncService.ListBackupFilesAsync(cancellationToken);
                     return Results.Ok(new ApiCloudBackupListResponse(
                         remoteBackups.Select(ToCloudBackupItemDto).ToArray(),
                         pathProvider.BackupRoot,
@@ -500,7 +504,8 @@ namespace ExportDocManager.Api.Hosting
                 ISettingsService settingsService,
                 ICloudSyncService cloudSyncService,
                 IAppPathProvider pathProvider,
-                ApiCloudBackupDownloadRequest request) =>
+                ApiCloudBackupDownloadRequest request,
+                CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -537,9 +542,9 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    var remoteBackups = await cloudSyncService.ListBackupFilesAsync();
+                    var remoteBackups = await cloudSyncService.ListBackupFilesAsync(cancellationToken);
                     var selectedBackup = remoteBackups.FirstOrDefault(backup =>
-                        string.Equals(backup.FileName, remoteFileName, StringComparison.OrdinalIgnoreCase));
+                        string.Equals(backup.FileName, remoteFileName, StringComparison.Ordinal));
                     if (selectedBackup == null)
                     {
                         return Results.BadRequest(new ApiErrorResponse("只能下载当前 WebDAV 云备份列表中的 ZIP 文件。"));
@@ -551,7 +556,7 @@ namespace ExportDocManager.Api.Hosting
                     }
 
                     string localBackupPath = BuildLocalBackupPath(pathProvider.BackupRoot, remoteFileName);
-                    await cloudSyncService.DownloadFileAsync(remoteFileName, localBackupPath);
+                    await cloudSyncService.DownloadFileAsync(remoteFileName, localBackupPath, cancellationToken);
                     var downloadedFile = new FileInfo(localBackupPath);
                     return Results.Ok(new ApiCloudBackupCommandResponse(
                         true,
@@ -620,7 +625,8 @@ namespace ExportDocManager.Api.Hosting
                 return false;
             }
 
-            if (fileName.IndexOfAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]) >= 0 ||
+            if (fileName.Contains('/') ||
+                fileName.Contains('\\') ||
                 !string.Equals(fileName, Path.GetFileName(fileName), StringComparison.Ordinal))
             {
                 errorMessage = "只能选择当前备份列表中的文件名，不能传入路径。";
@@ -628,7 +634,10 @@ namespace ExportDocManager.Api.Hosting
             }
 
             backupPath = (backupService.GetAvailableBackups() ?? [])
-                .FirstOrDefault(path => string.Equals(Path.GetFileName(path), fileName, StringComparison.OrdinalIgnoreCase)) ?? string.Empty;
+                .FirstOrDefault(path => string.Equals(
+                    Path.GetFileName(path),
+                    fileName,
+                    PathBoundaryHelper.PathComparison)) ?? string.Empty;
             if (string.IsNullOrWhiteSpace(backupPath))
             {
                 errorMessage = "未找到指定备份文件。";
@@ -667,7 +676,8 @@ namespace ExportDocManager.Api.Hosting
             }
 
             if (fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
-                fileName.IndexOfAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]) >= 0 ||
+                fileName.Contains('/') ||
+                fileName.Contains('\\') ||
                 !string.Equals(fileName, Path.GetFileName(fileName), StringComparison.Ordinal))
             {
                 errorMessage = "只能选择 WebDAV 云备份列表中的文件名，不能传入路径。";
@@ -688,8 +698,8 @@ namespace ExportDocManager.Api.Hosting
             string fullBackupRoot = Path.GetFullPath(backupRoot);
             Directory.CreateDirectory(fullBackupRoot);
             string targetPath = Path.GetFullPath(Path.Combine(fullBackupRoot, fileName));
-            string backupRootWithSeparator = fullBackupRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            if (!targetPath.StartsWith(backupRootWithSeparator, StringComparison.OrdinalIgnoreCase))
+            if (!PathBoundaryHelper.IsWithinRoot(targetPath, fullBackupRoot) ||
+                string.Equals(targetPath, fullBackupRoot, PathBoundaryHelper.PathComparison))
             {
                 throw new InvalidOperationException("云备份下载目标必须位于运行数据根 Backups 目录内。");
             }

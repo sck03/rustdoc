@@ -1,5 +1,6 @@
 import { isDesktopBridgeAvailable, savePdfFile, selectSavePdfPath } from "../../../desktop/desktopBridge.ts";
 import { downloadBlob } from "../../../ui/downloadBlob.ts";
+import { captureContainerPackingSceneSnapshot } from "./containerPackingSceneSnapshot.ts";
 
 type ContainerPackingPdfExportOptions = {
   root: HTMLElement;
@@ -17,13 +18,25 @@ export async function exportContainerPackingPdf(options: ContainerPackingPdfExpo
   ]);
   const generatedAt = new Date();
   const fileName = buildContainerPackingPdfFileName(options.projectName, generatedAt);
-  const exportRoot = buildPdfExportRoot(options.root, options.projectName, options.containerType, generatedAt);
+  const sceneSnapshotUrl = captureContainerPackingSceneSnapshot(options.root);
+  const exportRoot = buildPdfExportRoot(
+    options.root,
+    options.projectName,
+    options.containerType,
+    generatedAt,
+    sceneSnapshotUrl,
+  );
   let canvas: HTMLCanvasElement;
   try {
     document.body.append(exportRoot);
     await document.fonts?.ready;
     const captureWidth = Math.max(A4_CAPTURE_WIDTH_PX, Math.ceil(exportRoot.scrollWidth));
     exportRoot.style.width = `${captureWidth}px`;
+    await Promise.all(Array.from(exportRoot.querySelectorAll<HTMLImageElement>("img")).map(async (image) => {
+      if (typeof image.decode === "function") {
+        await image.decode().catch(() => undefined);
+      }
+    }));
     canvas = await html2canvas(exportRoot, {
       backgroundColor: "#ffffff",
       width: captureWidth,
@@ -96,7 +109,13 @@ function buildPdfHeading(documentClone: Document, projectName: string, container
   return heading;
 }
 
-function buildPdfExportRoot(sourceRoot: HTMLElement, projectName: string, containerType: string, generatedAt: Date) {
+function buildPdfExportRoot(
+  sourceRoot: HTMLElement,
+  projectName: string,
+  containerType: string,
+  generatedAt: Date,
+  sceneSnapshotUrl: string | null,
+) {
   const exportRoot = sourceRoot.cloneNode(true) as HTMLElement;
   exportRoot.classList.add("container-packing-pdf-export");
   exportRoot.style.position = "fixed";
@@ -106,6 +125,17 @@ function buildPdfExportRoot(sourceRoot: HTMLElement, projectName: string, contai
   exportRoot.style.maxWidth = "none";
   exportRoot.style.gridTemplateColumns = "minmax(0, 1fr)";
   exportRoot.style.pointerEvents = "none";
+  exportRoot.querySelector(".container-packing-3d-section")?.remove();
+  if (sceneSnapshotUrl) {
+    const pseudo3d = exportRoot.querySelector<SVGElement>(".container-packing-pseudo3d-svg");
+    if (pseudo3d) {
+      const image = document.createElement("img");
+      image.src = sceneSnapshotUrl;
+      image.alt = "装柜三维效果图";
+      image.className = "container-packing-pdf-scene-snapshot";
+      pseudo3d.replaceWith(image);
+    }
+  }
   exportRoot.prepend(buildPdfHeading(document, projectName, containerType, generatedAt));
   return exportRoot;
 }

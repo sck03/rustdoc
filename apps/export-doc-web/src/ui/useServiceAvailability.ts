@@ -30,6 +30,7 @@ export function useServiceAvailability({
     let disposed = false;
     let activeController: AbortController | null = null;
     let latestCheckId = 0;
+    let intervalId: number | null = null;
     setAvailability("checking");
 
     const checkService = async () => {
@@ -62,17 +63,24 @@ export function useServiceAvailability({
     const checkWhenVisible = () => {
       if (document.visibilityState === "visible") {
         void checkService();
+        if (intervalId == null) {
+          intervalId = window.setInterval(() => void checkService(), serviceCheckIntervalMs);
+        }
+      } else if (intervalId != null) {
+        window.clearInterval(intervalId);
+        intervalId = null;
       }
     };
 
-    void checkService();
-    const intervalId = window.setInterval(() => void checkService(), serviceCheckIntervalMs);
+    checkWhenVisible();
     window.addEventListener("online", checkWhenVisible);
     document.addEventListener("visibilitychange", checkWhenVisible);
     return () => {
       disposed = true;
       activeController?.abort();
-      window.clearInterval(intervalId);
+      if (intervalId != null) {
+        window.clearInterval(intervalId);
+      }
       window.removeEventListener("online", checkWhenVisible);
       document.removeEventListener("visibilitychange", checkWhenVisible);
     };

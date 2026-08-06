@@ -107,7 +107,7 @@ namespace ExportDocManager.Services.Tools
         {
             cancellationToken.ThrowIfCancellationRequested();
             await using var stream = File.OpenRead(filePath);
-            var result = await _ocrService.RecognizeAsync(stream);
+            var result = await _ocrService.RecognizeAsync(stream, cancellationToken);
             return GetOcrText(result);
         }
 
@@ -183,7 +183,7 @@ namespace ExportDocManager.Services.Tools
                 {
                     data.SaveTo(stream);
                     stream.Position = 0;
-                    var result = await _ocrService.RecognizeAsync(stream);
+                    var result = await _ocrService.RecognizeAsync(stream, cancellationToken);
                     string pageText = GetOcrText(result);
 
                     if (!string.IsNullOrWhiteSpace(pageText))

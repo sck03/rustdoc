@@ -30,7 +30,7 @@ Docker 镜像和构建缓存由 Docker Engine 的全局 `data-root` 管理，不
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sck03/rustdoc/main/deploy/container/install-container.sh |
-  sudo bash -s -- --mode http --tag 0.1.2 --install-docker
+  sudo bash -s -- --mode http --tag 0.1.2
 ```
 
 访问：`http://服务器IP:8080`。
@@ -45,11 +45,10 @@ curl -fsSL https://raw.githubusercontent.com/sck03/rustdoc/main/deploy/container
     --mode https \
     --domain docs.example.com \
     --email ops@example.com \
-    --tag 0.1.2 \
-    --install-docker
+    --tag 0.1.2
 ```
 
-把 `0.1.2` 换成 GHCR 中实际发布的精确版本；生产环境不建议长期使用 `latest`。宿主已安装 Docker Engine 和 Compose v2 时可省略 `--install-docker`。
+把 `0.1.2` 换成 GHCR 中实际发布的精确版本。安装器拒绝可变的 `latest` 标签，也不执行联网下载后直接运行的 Docker 安装脚本；请先通过 Linux 发行版或 Docker 官方签名软件源安装并启动 Docker Engine 与 Compose v2。
 
 安装器不会修改 UFW、云安全组、DNS 或 Docker Engine 全局配置。内网 HTTP 会明文传输登录和业务数据，不能直接暴露到公网。
 
@@ -411,7 +410,7 @@ sed -i \
   /opt/export-doc-manager/.env
 ```
 
-读取原部署模式，下载部署清单并安装 Docker，但暂不启动业务容器：
+先按目标 Linux 发行版或 Docker 官方签名软件源安装 Docker Engine 与 Compose v2，再读取原部署模式、下载部署清单，但暂不启动业务容器：
 
 ```bash
 MODE=$(sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' \
@@ -420,7 +419,6 @@ MODE=$(sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' \
 curl -fsSL https://raw.githubusercontent.com/sck03/rustdoc/main/deploy/container/install-container.sh |
   bash -s -- \
     --mode "$MODE" \
-    --install-docker \
     --no-start
 ```
 
@@ -502,7 +500,7 @@ Compose 固定使用 `postgres:18-bookworm`，初始化参数为：
 
 PostgreSQL 18 容器数据位于 `/var/lib/postgresql/18/docker`，因此宿主 `runtime/postgres/` 必须挂载到 `/var/lib/postgresql`，不能改成旧版常见的 `/var/lib/postgresql/data`。跨 PostgreSQL 大版本升级必须使用验证过的 dump/restore 或 `pg_upgrade`，不能直接复用旧版原始数据目录。
 
-外层 `runtime/` 使用 `root:root 700`。直接 bind mount 的内部目录只在该不可遍历父目录内为 Docker user namespace 提供写权限，不要单独移动到公共可遍历路径。
+外层 `runtime/` 使用 `root:root 700`。API 镜像以固定 `10001:10001` 非 root 身份运行，`runtime/api-data/` 由安装器设置为该身份可写的 `750`；PostgreSQL 目录由固定 `999:999` 身份持有并保持 `700`，应用配置文件为 `600`。这些 bind mount 不再依赖 `777/1777` 世界可写权限，也不要脱离不可遍历的父目录单独暴露。
 
 ## 9. 开发者附录
 
@@ -510,7 +508,7 @@ PostgreSQL 18 容器数据位于 `/var/lib/postgresql/18/docker`，因此宿主 
 - `docker-compose.yml`：从源码构建，只用于开发和 CI；
 - `docker-compose.acme.yml`：一键 HTTPS 和自动续期；
 - `docker-compose.https.yml`：手工证书 overlay；
-- `initialize-container-runtime.ps1`：克隆仓库后的 PowerShell 初始化工具；
+- `initialize-container-runtime.ps1`：克隆仓库后的 PowerShell 初始化工具；Windows 可直接运行，Linux/macOS 需使用 `sudo pwsh` 以设置固定容器 UID/GID；
 - `install-container.sh`：Linux VPS 正式安装、升级和恢复入口。
 
 GitHub 工作流 `Container runtime lifecycle validation` 会验证启动、健康探针、安全响应头、PostgreSQL bind mount 持久化和 `pg_dump/pg_restore`。CI 成功不能替代生产环境的异机备份和恢复演练。

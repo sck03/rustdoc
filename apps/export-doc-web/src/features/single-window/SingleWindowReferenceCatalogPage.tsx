@@ -85,7 +85,7 @@ export function SingleWindowReferenceCatalogPage({
 
   const catalogQuery = useQuery({
     queryKey: queryKeys.singleWindowReferenceCatalog(),
-    queryFn: () => client.getSingleWindowReferenceCatalog(),
+    queryFn: ({ signal }) => client.getSingleWindowReferenceCatalog({ signal }),
   });
 
   useEffect(() => {

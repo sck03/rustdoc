@@ -90,6 +90,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* /usr/share/postgresql-common/pgdg /etc/apt/sources.list.d/pgdg.list /usr/share/keyrings/postgresql.gpg
 
 WORKDIR /app
+RUN groupadd --system --gid 10001 exportdoc \
+    && useradd --system --uid 10001 --gid 10001 --home-dir /runtime-data --no-create-home exportdoc \
+    && install -d -o 10001 -g 10001 -m 0750 /runtime-data
 COPY --from=build /out/ ./
 COPY --from=ocr-build /out/exportdoc-ocr ./sidecar/ocr/exportdoc-ocr
 COPY --from=excel-analyzer-build /out/exportdoc-excel-analyzer ./Tools/exportdoc-excel-analyzer
@@ -98,16 +101,18 @@ COPY apps/exportdoc-ocr-rs/README.md ./sidecar/ocr/README.md
 COPY THIRD_PARTY_NOTICES.md THIRD_PARTY_DEPENDENCIES.md ./Legal/
 ARG TARGETARCH
 ENV ASPNETCORE_URLS=http://0.0.0.0:5188 \
+    HOME=/runtime-data \
     EXPORTDOCMANAGER_DATA_ROOT=/runtime-data \
     EXPORTDOCMANAGER_NETWORK_MODE=true \
     EXPORTDOCMANAGER_PRODUCT_EDITION=Full \
     EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
-    EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX=true \
+    EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX=false \
     EXPORTDOCMANAGER_OCR_RUNTIME=enabled \
     EXPORTDOCMANAGER_POSTGRES_BIN=/usr/lib/postgresql/18/bin \
     TZ=Asia/Shanghai
 RUN chmod +x /app/sidecar/ocr/exportdoc-ocr /app/Tools/exportdoc-excel-analyzer
 RUN dotnet ExportDocManager.Api.dll --app-root /app --data-root /tmp/exportdoc-ocr-check --verify-ocr-runtime \
     && rm -rf /tmp/exportdoc-ocr-check
+USER 10001:10001
 EXPOSE 5188
 ENTRYPOINT ["/usr/bin/tini", "--", "dotnet", "ExportDocManager.Api.dll"]

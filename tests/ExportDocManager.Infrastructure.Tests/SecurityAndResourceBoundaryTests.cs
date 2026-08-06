@@ -1,13 +1,25 @@
 using System.IO.Compression;
 using System.Text;
+using ExportDocManager.Services.Data;
+using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Tools;
 using ExportDocManager.Utils;
+using PdfSharp.Pdf;
 
 namespace ExportDocManager.Infrastructure.Tests;
 
 [Collection(LocalSecretProtectionCollection.Name)]
 public sealed class SecurityAndResourceBoundaryTests
 {
+    [Fact]
+    public void PathBoundaryComparer_ShouldMatchPlatformPathCaseSemantics()
+    {
+        Assert.Equal(
+            OperatingSystem.IsWindows(),
+            PathBoundaryHelper.PathComparer.Equals("managed/Root", "managed/root"));
+    }
+
     [Fact]
     public void LocalSecretProtector_ShouldUseRandomNonceAndRejectTampering()
     {
@@ -53,6 +65,27 @@ public sealed class SecurityAndResourceBoundaryTests
         await using var destination = new MemoryStream();
 
         Assert.Equal(0, await BoundedStreamHelper.CopyToAsync(source, destination, maximumBytes: 0));
+    }
+
+    [Fact]
+    public async Task BoundedTextLineReader_ShouldPreserveBufferedLinesAndTrimCarriageReturn()
+    {
+        using var reader = new BoundedTextLineReader(new StringReader("first\r\nsecond\n"));
+
+        Assert.Equal("first", await reader.ReadLineAsync(16));
+        Assert.Equal("second", await reader.ReadLineAsync(16));
+        Assert.Null(await reader.ReadLineAsync(16));
+    }
+
+    [Fact]
+    public async Task BoundedTextLineReader_ShouldRejectOversizedSidecarResponse()
+    {
+        using var reader = new BoundedTextLineReader(new StringReader("123456\n"));
+
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            reader.ReadLineAsync(maximumCharacters: 5));
+
+        Assert.Contains("5", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -106,11 +139,172 @@ public sealed class SecurityAndResourceBoundaryTests
         }
     }
 
+    [Fact]
+    public void ExcelWorkbookResourcePolicy_ShouldRestoreStreamPositionForValidPackage()
+    {
+        using var package = CreateZipStream(("[Content_Types].xml", "types"), ("xl/workbook.xml", "workbook"));
+        package.Position = 2;
+
+        ExcelWorkbookResourcePolicy.ValidateOpenXmlPackage(package);
+
+        Assert.Equal(2, package.Position);
+    }
+
+    [Fact]
+    public void ExcelWorkbookResourcePolicy_ShouldRejectExpandedEntryBeyondBudget()
+    {
+        using var package = CreateZipStream(("xl/worksheets/sheet1.xml", "123456789"));
+        var limits = new ExcelWorkbookResourceLimits(
+            MaximumPackageBytes: 1024,
+            MaximumEntries: 4,
+            MaximumEntryBytes: 8,
+            MaximumTotalExpandedBytes: 16,
+            MaximumCompressionRatio: 500);
+
+        var exception = Assert.Throws<InvalidDataException>(() =>
+            ExcelWorkbookResourcePolicy.ValidateOpenXmlPackage(package, limits));
+
+        Assert.Contains("条目展开后", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TextLogCleanup_ShouldApplyRetentionCountAcrossLogAndTxtFiles()
+    {
+        string root = CreateTempDirectory("text-log-retention");
+        try
+        {
+            string oldest = Path.Combine(root, "oldest.log");
+            string middle = Path.Combine(root, "middle.txt");
+            string newest = Path.Combine(root, "newest.log");
+            File.WriteAllText(oldest, "oldest");
+            File.WriteAllText(middle, "middle");
+            File.WriteAllText(newest, "newest");
+            File.SetLastWriteTimeUtc(oldest, DateTime.UtcNow.AddMinutes(-3));
+            File.SetLastWriteTimeUtc(middle, DateTime.UtcNow.AddMinutes(-2));
+            File.SetLastWriteTimeUtc(newest, DateTime.UtcNow.AddMinutes(-1));
+
+            TextLogCleanupSummary summary = TextLogCleanupHelper.Clean(
+                root,
+                retentionDays: 0,
+                retainedFileCount: 2);
+
+            Assert.Equal(1, summary.DeletedByCount);
+            Assert.False(File.Exists(oldest));
+            Assert.True(File.Exists(middle));
+            Assert.True(File.Exists(newest));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public void TextLogCleanup_ShouldKeepOnlyTheConfiguredTailOfOversizedFile()
+    {
+        string root = CreateTempDirectory("text-log-trim");
+        try
+        {
+            string logPath = Path.Combine(root, "oversized.log");
+            byte[] content = new byte[(1024 * 1024) + (64 * 1024)];
+            content.AsSpan(0, 64 * 1024).Fill(0x11);
+            content.AsSpan(64 * 1024).Fill(0x7a);
+            File.WriteAllBytes(logPath, content);
+
+            TextLogCleanupHelper.Clean(
+                root,
+                retentionDays: 0,
+                retainedFileCount: 0,
+                maxFileSizeMB: 1);
+
+            byte[] trimmed = File.ReadAllBytes(logPath);
+            Assert.Equal(1024 * 1024, trimmed.Length);
+            Assert.True(trimmed.All(value => value == 0x7a));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public void TextLogCleanup_ShouldTrimUppercaseLogExtensionsAcrossPlatforms()
+    {
+        string root = CreateTempDirectory("text-log-uppercase-trim");
+        try
+        {
+            string logPath = Path.Combine(root, "oversized.LOG");
+            using (var stream = File.Create(logPath))
+            {
+                stream.SetLength((1024 * 1024) + 1);
+            }
+
+            TextLogCleanupHelper.Clean(
+                root,
+                retentionDays: 0,
+                retainedFileCount: 0,
+                maxFileSizeMB: 1);
+
+            Assert.Equal(1024 * 1024, new FileInfo(logPath).Length);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public void PdfMergeService_ShouldRejectSinglePdfBeyondPageLimit()
+    {
+        string root = CreateTempDirectory("pdf-page-limit");
+        string sourcePath = Path.Combine(root, "oversized.pdf");
+        string destinationPath = Path.Combine(root, "merged.pdf");
+        try
+        {
+            using (var document = new PdfDocument())
+            {
+                for (int page = 0; page < 1001; page++)
+                {
+                    document.AddPage();
+                }
+                document.Save(sourcePath);
+            }
+
+            var service = new PdfMergeService();
+            var exception = Assert.Throws<InvalidDataException>(() =>
+                service.Merge([sourcePath], destinationPath));
+
+            Assert.Contains("1000", exception.Message, StringComparison.Ordinal);
+            Assert.False(File.Exists(destinationPath));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
     private static string CreateTempDirectory(string prefix)
     {
         string path = Path.Combine(Path.GetTempPath(), $"edm-{prefix}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(path);
         return path;
+    }
+
+    private static MemoryStream CreateZipStream(params (string Name, string Content)[] entries)
+    {
+        var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var entry in entries)
+            {
+                using var writer = new StreamWriter(
+                    archive.CreateEntry(entry.Name, CompressionLevel.Optimal).Open(),
+                    new UTF8Encoding(false));
+                writer.Write(entry.Content);
+            }
+        }
+        stream.Position = 0;
+        return stream;
     }
 
     private static void DeleteDirectory(string path)

@@ -3,7 +3,6 @@ use std::{
     fs,
     io::{Read, Write},
     net::{TcpListener, TcpStream},
-    path::Path,
     process::{Child, Command, Stdio},
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -75,8 +74,8 @@ pub(crate) fn start_sidecar(paths: &RuntimePaths) -> Result<SidecarLaunch, Box<d
     let desktop_access_token = resolve_desktop_access_token()?;
     let stdout_log_path = paths.log_root.join("api-sidecar.stdout.log");
     let stderr_log_path = paths.log_root.join("api-sidecar.stderr.log");
-    let mut stdout_log = open_append_log_file(&stdout_log_path)?;
-    let mut stderr_log = open_append_log_file(&stderr_log_path)?;
+    let mut stdout_log = crate::log_rotation::open_append_log_file(&stdout_log_path)?;
+    let mut stderr_log = crate::log_rotation::open_append_log_file(&stderr_log_path)?;
 
     write_sidecar_launch_marker(&mut stdout_log, &listen_url, paths)?;
     write_sidecar_launch_marker(&mut stderr_log, &listen_url, paths)?;
@@ -155,6 +154,35 @@ pub(crate) fn stop_sidecar(app: &tauri::AppHandle) {
     }
 }
 
+pub(crate) fn begin_graceful_shutdown(app: &tauri::AppHandle) -> bool {
+    let Some(state) = app.try_state::<SidecarState>() else {
+        app.exit(0);
+        return true;
+    };
+    if !state.try_begin_shutdown_maintenance() {
+        return false;
+    }
+
+    let context = state.runtime_context();
+    let app_handle = app.clone();
+    thread::spawn(move || {
+        if let Err(error) = post_shutdown_maintenance(&context, Duration::from_secs(30)) {
+            eprintln!("Shutdown maintenance skipped or failed: {error}");
+        }
+
+        stop_sidecar(&app_handle);
+        app_handle.exit(0);
+    });
+    true
+}
+
+/// Runs the shutdown maintenance synchronously for updater callbacks.
+///
+/// The normal window-close path uses [`begin_graceful_shutdown`] so the UI
+/// thread is never blocked. Tauri's updater callback, however, is invoked as
+/// part of the restart handshake and must finish the API cleanup before the
+/// process is replaced, so it keeps the small synchronous wrapper that the
+/// updater module can call.
 pub(crate) fn run_shutdown_maintenance(app: &tauri::AppHandle) {
     let Some(state) = app.try_state::<SidecarState>() else {
         return;
@@ -174,14 +202,6 @@ pub(crate) fn get_desktop_runtime_context(
     state: tauri::State<'_, SidecarState>,
 ) -> DesktopRuntimeContext {
     state.runtime_context()
-}
-
-fn open_append_log_file(path: &Path) -> Result<fs::File, Box<dyn Error>> {
-    fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .map_err(|error| format!("Failed to open sidecar log '{}': {error}", path.display()).into())
 }
 
 fn write_sidecar_launch_marker(

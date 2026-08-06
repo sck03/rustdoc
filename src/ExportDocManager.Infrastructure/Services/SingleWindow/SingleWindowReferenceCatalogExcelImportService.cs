@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using ExportDocManager.Models.DTOs.SingleWindow;
+using ExportDocManager.Services.Data;
 
 namespace ExportDocManager.Services.SingleWindow
 {
@@ -69,6 +70,7 @@ namespace ExportDocManager.Services.SingleWindow
                 throw new ArgumentException("参考词典分类无效。", nameof(options));
             }
 
+            ExcelWorkbookResourcePolicy.ValidateOpenXmlPackage(workbookStream);
             using var workbook = new XLWorkbook(workbookStream);
             var sheetNames = workbook.Worksheets
                 .Select(sheet => sheet.Name)

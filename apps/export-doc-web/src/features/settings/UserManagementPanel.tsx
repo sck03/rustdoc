@@ -45,7 +45,7 @@ export function UserManagementPanel({
 
   const usersQuery = useQuery({
     queryKey: queryKeys.users(),
-    queryFn: () => client.listUsers(),
+    queryFn: ({ signal }) => client.listUsers({ signal }),
     enabled: canManageUsers,
   });
 

@@ -91,13 +91,14 @@ namespace ExportDocManager.Services.Data
             }
 
             string normalizedTargetPath = Path.GetFullPath(targetFilePath);
-            if (string.Equals(normalizedSourcePath, normalizedTargetPath, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(normalizedSourcePath, normalizedTargetPath, PathBoundaryHelper.PathComparison))
             {
                 throw new IOException("订舱托单必须另存为新文件，不能覆盖源 Excel。");
             }
 
             PrepareTargetPath(normalizedTargetPath, overwrite);
 
+            ExcelWorkbookResourcePolicy.Validate(normalizedSourcePath);
             using var workbook = new XLWorkbook(normalizedSourcePath);
             var worksheet = workbook.Worksheet(1);
             ApplyBookingSheetLayout(worksheet);

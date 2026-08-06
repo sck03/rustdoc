@@ -135,7 +135,7 @@ export function OperationCenterListActionsPanel({
 
   const profileQuery = useQuery({
     queryKey: queryKeys.singleWindowClientProfiles(),
-    queryFn: () => client.getSingleWindowClientProfiles(),
+    queryFn: ({ signal }) => client.getSingleWindowClientProfiles({ signal }),
     enabled: isDesktopStation,
     staleTime: 60_000,
   });

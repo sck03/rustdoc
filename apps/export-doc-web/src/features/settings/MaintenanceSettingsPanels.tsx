@@ -16,6 +16,7 @@ import { RuntimeDiagnosticsSection } from "./RuntimeDiagnosticsSection.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 type MaintenanceSectionKey = "postgresql" | "ownership" | "invoice-cleanup" | "diagnostics" | "support";
 
@@ -399,6 +400,7 @@ function PostgreSqlMaintenancePanel({
   canManageSettings: boolean;
   onPathError: (message: string) => void;
 }) {
+  const runAbortableOperation = useAbortableOperation();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -422,13 +424,13 @@ function PostgreSqlMaintenancePanel({
 
   const postgreSqlQuery = useQuery({
     queryKey: queryKeys.postgreSqlMaintenanceBackups(),
-    queryFn: () => client.listPostgreSqlPhysicalBackups(),
+    queryFn: ({ signal }) => client.listPostgreSqlPhysicalBackups({ signal }),
     enabled: canManageSettings,
   });
 
   const migrationStatusQuery = useQuery({
     queryKey: queryKeys.serverMigrationStatus(),
-    queryFn: () => client.getServerMigrationStatus(),
+    queryFn: ({ signal }) => client.getServerMigrationStatus({ signal }),
     enabled: canManageSettings,
   });
 
@@ -492,21 +494,21 @@ function PostgreSqlMaintenancePanel({
   });
 
   const downloadMigrationMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async () => runAbortableOperation(async (signal) => {
       const job = await client.createServerMigrationPackage({
         body: {
           password: migrationPassword,
           adminPassword: migrationAdminPassword,
           confirmationText: migrationCreateConfirmation.trim(),
         },
-      });
+      }, { signal });
       return downloadJobResultWhenReady(
         client,
         job,
         `export-doc-manager-server-migration-${new Date().toISOString().slice(0, 10)}.edmmigration`,
-        60 * 60 * 1000,
+        { timeoutMs: 60 * 60 * 1000, signal },
       );
-    },
+    }),
     onSuccess: () => {
       setMigrationPassword("");
       setMigrationPasswordConfirmation("");
@@ -1091,7 +1093,7 @@ function SharedDatabaseOwnershipPanel({
 
   const ownershipQuery = useQuery({
     queryKey: queryKeys.sharedDatabaseOwnership(),
-    queryFn: () => client.getSharedDatabaseOwnershipSummary(),
+    queryFn: ({ signal }) => client.getSharedDatabaseOwnershipSummary({ signal }),
     enabled: canManageUsers,
   });
 

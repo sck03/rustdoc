@@ -1,5 +1,10 @@
 namespace ExportDocManager.Services.Tools
 {
+    public static class OcrInputLimits
+    {
+        public const int MaximumImageBytes = 25 * 1024 * 1024;
+    }
+
     public interface IOcrService
     {
         /// <summary>
@@ -8,6 +13,8 @@ namespace ExportDocManager.Services.Tools
         /// </summary>
         /// <param name="imageStream">The image stream.</param>
         /// <returns>OCR result containing text and structure.</returns>
-        Task<OcrResult> RecognizeAsync(Stream imageStream);
+        Task<OcrResult> RecognizeAsync(
+            Stream imageStream,
+            CancellationToken cancellationToken = default);
     }
 }

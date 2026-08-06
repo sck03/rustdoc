@@ -1,6 +1,7 @@
 using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Utils;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -13,6 +14,8 @@ namespace ExportDocManager.Services.Data
         public const string AnalyzerModeEnvironmentVariable = "EXPORTDOCMANAGER_EXCEL_ANALYZER_MODE";
 
         private static readonly TimeSpan AnalyzerTimeout = TimeSpan.FromSeconds(30);
+        private const long MaximumAnalyzerOutputBytes = 4L * 1024L * 1024L;
+        private const long MaximumAnalyzerErrorBytes = 64L * 1024L;
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             PropertyNameCaseInsensitive = true
@@ -122,12 +125,21 @@ namespace ExportDocManager.Services.Data
                 throw new InvalidOperationException("Rust Excel 分析器进程启动失败。");
             }
 
-            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
-            Task<string> stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
+            Task<string> stdoutTask = ReadProcessOutputAsync(
+                process.StandardOutput,
+                MaximumAnalyzerOutputBytes,
+                timeoutCts.Token);
+            Task<string> stderrTask = ReadProcessOutputAsync(
+                process.StandardError,
+                MaximumAnalyzerErrorBytes,
+                timeoutCts.Token);
 
             try
             {
-                await process.WaitForExitAsync(timeoutCts.Token).ConfigureAwait(false);
+                await Task.WhenAll(
+                    process.WaitForExitAsync(timeoutCts.Token),
+                    stdoutTask,
+                    stderrTask).ConfigureAwait(false);
             }
             catch
             {
@@ -150,6 +162,12 @@ namespace ExportDocManager.Services.Data
 
             return MapRustReport(rustReport, filePath);
         }
+
+        private static Task<string> ReadProcessOutputAsync(
+            StreamReader reader,
+            long maximumBytes,
+            CancellationToken cancellationToken) =>
+            BoundedStreamHelper.ReadUtf8TextAsync(reader.BaseStream, maximumBytes, cancellationToken);
 
         private string ResolveRustAnalyzerPath()
         {

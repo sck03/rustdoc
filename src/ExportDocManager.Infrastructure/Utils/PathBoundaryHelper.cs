@@ -2,13 +2,17 @@ namespace ExportDocManager.Utils
 {
     public static class PathBoundaryHelper
     {
-        // Windows and the default macOS filesystems are case-insensitive.
-        // Treat macOS conservatively as case-insensitive even when deployed on
-        // an optional case-sensitive volume, so differently-cased spellings
-        // cannot bypass managed-root or profile-directory isolation checks.
-        public static StringComparison PathComparison => OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+        // Windows path identity is case-insensitive. Unix and macOS can run on
+        // case-sensitive volumes, so use ordinal comparison there; accepting a
+        // differently-cased sibling as the same managed root would weaken the
+        // containment boundary on those volumes.
+        public static StringComparison PathComparison => OperatingSystem.IsWindows()
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
+
+        public static StringComparer PathComparer => OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
 
         public static bool IsWithinRoot(string path, string root)
         {

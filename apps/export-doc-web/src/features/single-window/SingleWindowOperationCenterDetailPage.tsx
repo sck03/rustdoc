@@ -33,7 +33,7 @@ export function SingleWindowOperationCenterDetailPage({
 
   const detailQuery = useQuery({
     queryKey: queryKeys.singleWindowOperationCenterDetail(parsedBatchId),
-    queryFn: () => client.getSingleWindowOperationCenterDetail({ batchId: parsedBatchId }),
+    queryFn: ({ signal }) => client.getSingleWindowOperationCenterDetail({ batchId: parsedBatchId }, { signal }),
     enabled: isBatchIdValid,
   });
 

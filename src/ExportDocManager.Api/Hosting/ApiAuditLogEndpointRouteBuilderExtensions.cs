@@ -1,6 +1,7 @@
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -9,7 +10,7 @@ namespace ExportDocManager.Api.Hosting
         private const int AuditLogDeleteMaxCount = 50000;
         private const int AuditLogCleanupMaxCount = 200000;
         private const string AuditLogStoragePolicy =
-            "审计日志管理只读写运行数据根数据库 AuditLogs 表；Tauri 桌面保存只写用户显式选择的 .xlsx 路径，浏览器下载在内存生成且不在服务器创建导出副本，不读取发票/报关或付款/报销业务表。";
+            "审计日志管理只读写运行数据根数据库 AuditLogs 表；Tauri 桌面保存只写用户显式选择的 .xlsx 路径，浏览器下载先生成到运行数据根缓存并以 Range 流式传输，不读取发票/报关或付款/报销业务表。";
 
         private static void MapAuditLogEndpoints(this IEndpointRouteBuilder endpoints)
         {
@@ -115,6 +116,7 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IAuditLogService auditLogService,
+                IAppPathProvider pathProvider,
                 ApiAuditLogFilterRequest request,
                 CancellationToken cancellationToken) =>
             {
@@ -134,15 +136,38 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("审计日志下载请求体不能为空。"));
                 }
 
-                byte[] content = await auditLogService.ExportToExcelBytesAsync(
-                    ToAuditLogCriteria(request),
-                    NormalizeMaxCount(request.MaxCount, AuditLogDeleteMaxCount),
-                    cancellationToken);
+                string exportDirectory = Path.Combine(
+                    pathProvider.CacheRoot,
+                    "AuditExports",
+                    Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(exportDirectory);
+                string fileName = $"AuditLogs_{DateTime.UtcNow:yyyyMMdd-HHmmss}.xlsx";
+                string outputPath = Path.Combine(exportDirectory, fileName);
+                try
+                {
+                    int exportedCount = await auditLogService.ExportToExcelAsync(
+                        ToAuditLogCriteria(request),
+                        outputPath,
+                        NormalizeMaxCount(request.MaxCount, AuditLogDeleteMaxCount),
+                        cancellationToken);
 
-                return Results.File(
-                    content,
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    $"AuditLogs_{DateTime.UtcNow:yyyyMMdd-HHmmss}.xlsx");
+                    if (!File.Exists(outputPath))
+                    {
+                        throw new IOException($"审计日志导出文件未生成（导出记录数：{exportedCount}）。");
+                    }
+
+                    return StreamTemporaryFile(
+                        context,
+                        outputPath,
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        fileName,
+                        exportDirectory);
+                }
+                catch
+                {
+                    AtomicFileHelper.TryDeleteDirectory(exportDirectory);
+                    throw;
+                }
             })
             .WithName("DownloadAuditLogs");
 

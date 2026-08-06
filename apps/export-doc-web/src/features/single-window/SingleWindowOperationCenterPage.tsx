@@ -45,7 +45,7 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
   });
   const healthQuery = useQuery({
     queryKey: queryKeys.health(),
-    queryFn: () => client.getHealth(),
+    queryFn: ({ signal }) => client.getHealth({ signal }),
     enabled: desktopBridgeAvailable,
     staleTime: 60_000,
   });
@@ -67,13 +67,13 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
 
   const operationCenterQuery = useQuery({
     queryKey: queryKeys.singleWindowOperationCenter(pageNumber, pageSize, committedKeyword.trim(), businessType, status),
-    queryFn: () => client.listSingleWindowOperationCenter({
+    queryFn: ({ signal }) => client.listSingleWindowOperationCenter({
       businessType: businessType || undefined,
       status: status || undefined,
       keyword: committedKeyword.trim() || undefined,
       pageNumber,
       pageSize,
-    }),
+    }, { signal }),
     placeholderData: keepPreviousData,
   });
 
@@ -189,7 +189,7 @@ function StationSubmitPackageImportPanel({ client, canOperate }: { client: Expor
 
   const profilesQuery = useQuery({
     queryKey: queryKeys.singleWindowClientProfiles(),
-    queryFn: () => client.getSingleWindowClientProfiles(),
+    queryFn: ({ signal }) => client.getSingleWindowClientProfiles({ signal }),
     staleTime: 60_000,
   });
   const activeProfile = profilesQuery.data?.profiles.find((profile) => profile.isActive) ?? null;

@@ -15,7 +15,8 @@ namespace ExportDocManager.Api.Hosting
             ".tiff"
         };
 
-        private const int MaxOcrImageContentBytes = 25 * 1024 * 1024;
+        private const int MaxOcrImageContentBytes = OcrInputLimits.MaximumImageBytes;
+        private const long MaxOcrImageFileBytes = MaxOcrImageContentBytes;
 
         private static void MapOcrToolEndpoints(this IEndpointRouteBuilder endpoints)
         {
@@ -67,13 +68,33 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     await using var stream = File.OpenRead(fullPath);
-                    var result = await ocrService.RecognizeAsync(stream);
-                    cancellationToken.ThrowIfCancellationRequested();
+                    if (stream.Length > MaxOcrImageFileBytes)
+                    {
+                        return WritePayloadTooLarge(MaxOcrImageFileBytes);
+                    }
+
+                    var result = await ocrService.RecognizeAsync(stream, cancellationToken);
 
                     return Results.Ok(ApiOcrDtoFactory.FromResult(
                         result,
                         fullPath,
                         ApiOcrDtoFactory.FilePathStoragePolicy));
+                }
+                catch (FileNotFoundException)
+                {
+                    return Results.NotFound(new ApiErrorResponse("OCR 图片不存在或已被移动。"));
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    return Results.NotFound(new ApiErrorResponse("OCR 图片目录不存在或已被移动。"));
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return WriteForbidden("没有权限读取所选 OCR 图片。请检查文件权限或重新选择图片。");
+                }
+                catch (IOException ex)
+                {
+                    return WriteConflict($"OCR 图片当前无法读取：{ex.Message}");
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -122,6 +143,14 @@ namespace ExportDocManager.Api.Hosting
                     imageContentBase64 = imageContentBase64[(dataUrlSeparatorIndex + 1)..].Trim();
                 }
 
+                // Reject oversized encoded payloads before allocating the decoded
+                // byte array.  Base64 expands the binary payload by roughly 4/3.
+                int maxEncodedLength = ((MaxOcrImageContentBytes + 2) / 3) * 4;
+                if (imageContentBase64.Length > maxEncodedLength)
+                {
+                    return WritePayloadTooLarge(MaxOcrImageContentBytes);
+                }
+
                 byte[] imageBytes;
                 try
                 {
@@ -139,7 +168,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (imageBytes.Length > MaxOcrImageContentBytes)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("OCR 图片内容超过 25 MB 限制。"));
+                    return WritePayloadTooLarge(MaxOcrImageContentBytes);
                 }
 
                 string sourceName = request?.SourceName?.Trim() ?? string.Empty;
@@ -151,8 +180,7 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     await using var stream = new MemoryStream(imageBytes, writable: false);
-                    var result = await ocrService.RecognizeAsync(stream);
-                    cancellationToken.ThrowIfCancellationRequested();
+                    var result = await ocrService.RecognizeAsync(stream, cancellationToken);
 
                     return Results.Ok(ApiOcrDtoFactory.FromResult(
                         result,

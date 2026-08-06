@@ -12,9 +12,18 @@ namespace ExportDocManager.Services.Infrastructure
 
     public interface ICloudSyncService
     {
-        Task UploadFileAsync(string localFilePath, string remoteFileName);
-        Task<IReadOnlyList<CloudBackupFileInfo>> ListBackupFilesAsync();
-        Task DownloadFileAsync(string remoteFileName, string localFilePath);
-        Task<bool> TestConnectionAsync(WebDavSettings settings);
+        Task UploadFileAsync(
+            string localFilePath,
+            string remoteFileName,
+            CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<CloudBackupFileInfo>> ListBackupFilesAsync(
+            CancellationToken cancellationToken = default);
+        Task DownloadFileAsync(
+            string remoteFileName,
+            string localFilePath,
+            CancellationToken cancellationToken = default);
+        Task<bool> TestConnectionAsync(
+            WebDavSettings settings,
+            CancellationToken cancellationToken = default);
     }
 }

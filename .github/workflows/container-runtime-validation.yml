@@ -98,10 +98,13 @@ jobs:
           sudo test -f "$installer_root/runtime/api-data/Config/appsettings.json"
           test "$(sudo stat -c '%a' "$installer_root/.env")" = "600"
           test "$(sudo stat -c '%a' "$installer_root/runtime")" = "700"
-          test "$(sudo stat -c '%a' "$installer_root/runtime/postgres")" = "1777"
-          test "$(sudo stat -c '%a' "$installer_root/runtime/api-data")" = "1777"
-          test "$(sudo stat -c '%a' "$installer_root/runtime/api-data/Config")" = "777"
-          test "$(sudo stat -c '%a' "$installer_root/runtime/api-data/Config/appsettings.json")" = "644"
+          test "$(sudo stat -c '%a' "$installer_root/runtime/postgres")" = "700"
+          test "$(sudo stat -c '%u:%g' "$installer_root/runtime/postgres")" = "999:999"
+          test "$(sudo stat -c '%a' "$installer_root/runtime/api-data")" = "750"
+          test "$(sudo stat -c '%u:%g' "$installer_root/runtime/api-data")" = "10001:10001"
+          test "$(sudo stat -c '%a' "$installer_root/runtime/api-data/Config")" = "750"
+          test "$(sudo stat -c '%a' "$installer_root/runtime/api-data/Config/appsettings.json")" = "600"
+          test "$(sudo stat -c '%u:%g' "$installer_root/runtime/api-data/Config/appsettings.json")" = "10001:10001"
 
           postgres_probe="exportdoc-installer-postgres-${{ github.run_id }}"
           cleanup_installer_probe() {
@@ -128,7 +131,7 @@ jobs:
           done
           sudo docker rm -f "$postgres_probe" >/dev/null
           sudo docker run --rm \
-            --user 42424:42424 \
+            --user 10001:10001 \
             --entrypoint sh \
             --volume "$installer_root/runtime/api-data:/runtime-data" \
             postgres:18-bookworm \
@@ -139,12 +142,14 @@ jobs:
       - name: Initialize isolated runtime directory
         shell: pwsh
         run: |
-          ./deploy/container/initialize-container-runtime.ps1 `
+          sudo pwsh -NoProfile -File ./deploy/container/initialize-container-runtime.ps1 `
             -RuntimeRoot "${{ github.workspace }}/artifacts/container-runtime/live" `
             -PostgreSqlPassword "container-validation-db-2026" `
             -BootstrapToken "container-validation-bootstrap-token-2026" `
             -WebPort $env:EXPORTDOCMANAGER_WEB_PORT `
             -HttpsPort $env:EXPORTDOCMANAGER_HTTPS_PORT
+          sudo chown "$(id -u):$(id -g)" ./deploy/container/.env "${{ github.workspace }}/artifacts/container-runtime"
+          chmod 600 ./deploy/container/.env
 
       - name: Create CI-only TLS certificate
         shell: bash
@@ -297,6 +302,7 @@ jobs:
         shell: bash
         run: |
           docker compose exec -T api sh -eu -c '
+            test "$(id -u):$(id -g)" = "10001:10001"
             test -d /runtime-data/Config
             test -f /runtime-data/Config/appsettings.json
             test -w /runtime-data/Config

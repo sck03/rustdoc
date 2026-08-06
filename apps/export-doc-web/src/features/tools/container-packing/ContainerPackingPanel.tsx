@@ -118,11 +118,11 @@ export function ContainerPackingPanel({
 
   const projectsQuery = useQuery({
     queryKey: queryKeys.containerPackingProjects(),
-    queryFn: () => client.listContainerPackingProjects({ limit: 100 }),
+    queryFn: ({ signal }) => client.listContainerPackingProjects({ limit: 100 }, { signal }),
   });
   const containerTypesQuery = useQuery({
     queryKey: queryKeys.containerPackingContainerTypes(),
-    queryFn: () => client.listContainerPackingContainerTypes(),
+    queryFn: ({ signal }) => client.listContainerPackingContainerTypes({ signal }),
   });
 
   const savedProjects = projectsQuery.data?.projects ?? [];

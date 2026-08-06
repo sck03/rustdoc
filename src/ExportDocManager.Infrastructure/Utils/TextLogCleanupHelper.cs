@@ -7,9 +7,31 @@ namespace ExportDocManager.Utils
 
     public static class TextLogCleanupHelper
     {
-        public static TextLogCleanupSummary Clean(string logsPath, int retentionDays, int retainedFileCount)
+        public static TextLogCleanupSummary Clean(
+            string logsPath,
+            int retentionDays,
+            int retainedFileCount,
+            int maxFileSizeMB = 20)
         {
-            return CleanFiles(logsPath, "*.txt", retentionDays, retainedFileCount);
+            long maxFileSizeBytes = Math.Clamp(maxFileSizeMB, 1, 1024) * 1024L * 1024L;
+            TrimOversizedFiles(logsPath, maxFileSizeBytes);
+
+            if (string.IsNullOrWhiteSpace(logsPath) || !Directory.Exists(logsPath))
+            {
+                return default;
+            }
+
+            var files = Directory.EnumerateFiles(logsPath, "*", SearchOption.TopDirectoryOnly)
+                .Where(path => IsTextLogExtension(Path.GetExtension(path)))
+                .Select(path => new FileInfo(path))
+                .OrderByDescending(file => file.LastWriteTime)
+                .ToList();
+            return CleanEntries(
+                files,
+                file => file.LastWriteTime,
+                file => TryDeleteFile(file.FullName),
+                retentionDays,
+                retainedFileCount);
         }
 
         public static TextLogCleanupSummary CleanFiles(string directoryPath, string searchPattern, int retentionDays, int retainedFileCount)
@@ -113,6 +135,71 @@ namespace ExportDocManager.Utils
             catch
             {
                 return false;
+            }
+        }
+
+        private static bool IsTextLogExtension(string extension) =>
+            string.Equals(extension, ".log", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(extension, ".txt", StringComparison.OrdinalIgnoreCase);
+
+        private static void TrimOversizedFiles(string directoryPath, long maxFileSizeBytes)
+        {
+            if (string.IsNullOrWhiteSpace(directoryPath) ||
+                !Directory.Exists(directoryPath) ||
+                maxFileSizeBytes <= 0)
+            {
+                return;
+            }
+
+            foreach (string path in Directory.EnumerateFiles(directoryPath, "*", SearchOption.TopDirectoryOnly)
+                .Where(path => IsTextLogExtension(Path.GetExtension(path))))
+            {
+                try
+                {
+                    using var stream = new FileStream(
+                        path,
+                        FileMode.Open,
+                        FileAccess.ReadWrite,
+                        FileShare.Read);
+                    if (stream.Length <= maxFileSizeBytes)
+                    {
+                        continue;
+                    }
+
+                    long targetLength = Math.Min(stream.Length, maxFileSizeBytes);
+                    long sourceOffset = stream.Length - targetLength;
+                    long destinationOffset = 0;
+                    byte[] buffer = new byte[1024 * 1024];
+                    while (destinationOffset < targetLength)
+                    {
+                        int requested = (int)Math.Min(buffer.Length, targetLength - destinationOffset);
+                        int read = RandomAccess.Read(
+                            stream.SafeFileHandle,
+                            buffer.AsSpan(0, requested),
+                            sourceOffset + destinationOffset);
+                        if (read == 0)
+                        {
+                            break;
+                        }
+
+                        RandomAccess.Write(
+                            stream.SafeFileHandle,
+                            buffer.AsSpan(0, read),
+                            destinationOffset);
+                        destinationOffset += read;
+                    }
+
+                    stream.SetLength(destinationOffset);
+                    stream.Flush(flushToDisk: true);
+                }
+                catch (IOException)
+                {
+                    // Log maintenance is best effort; an active writer may
+                    // temporarily prevent trimming on some platforms.
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
             }
         }
     }

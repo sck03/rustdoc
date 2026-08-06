@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using HtmlAgilityPack;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Utils;
 using Serilog;
 
 namespace ExportDocManager.Services.Data
@@ -15,6 +16,7 @@ namespace ExportDocManager.Services.Data
     {
         private const string DefaultUrl = "https://www.boc.cn/sourcedb/whpj/";
         private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
+        private const long MaximumResponseBytes = 5L * 1024L * 1024L;
 
         private readonly ISettingsService _settingsService;
         private readonly HttpClient _httpClient;
@@ -190,15 +192,30 @@ namespace ExportDocManager.Services.Data
 
         private async Task<HtmlNodeCollection> LoadRowsAsync(string url)
         {
+            using var operationCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.UserAgent.ParseAdd(UserAgent);
 
-            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            using var response = await _httpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                operationCancellation.Token);
             response.EnsureSuccessStatusCode();
+            if (response.Content.Headers.ContentLength is long contentLength && contentLength > MaximumResponseBytes)
+            {
+                throw new PayloadLimitExceededException(MaximumResponseBytes);
+            }
 
-            await using var stream = await response.Content.ReadAsStreamAsync();
+            await using var stream = await response.Content.ReadAsStreamAsync(operationCancellation.Token);
+            await using var buffer = new MemoryStream();
+            await BoundedStreamHelper.CopyToAsync(
+                stream,
+                buffer,
+                MaximumResponseBytes,
+                operationCancellation.Token);
+            buffer.Position = 0;
             var doc = new HtmlAgilityPack.HtmlDocument();
-            doc.Load(stream, true);
+            doc.Load(buffer, true);
             return doc.DocumentNode.SelectNodes("//table//tr") ?? doc.DocumentNode.SelectNodes("//tr");
         }
 

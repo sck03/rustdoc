@@ -73,23 +73,23 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
 
   const documentQuery = useQuery({
     queryKey: documentQueryKey,
-    queryFn: () => client.getAgentConsignmentDocument({ invoiceId: parsedInvoiceId }),
+    queryFn: ({ signal }) => client.getAgentConsignmentDocument({ invoiceId: parsedInvoiceId }, { signal }),
     enabled: isInvoiceIdValid,
   });
 
   const reviewQuery = useQuery({
     queryKey: reviewQueryKey,
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       client.getSingleWindowExportReview({
         businessType: agentConsignmentBusinessType,
         invoiceId: parsedInvoiceId,
-      }),
+      }, { signal }),
     enabled: isInvoiceIdValid,
   });
 
   const referenceCatalogQuery = useQuery({
     queryKey: queryKeys.singleWindowReferenceCatalog(),
-    queryFn: () => client.getSingleWindowReferenceCatalog(),
+    queryFn: ({ signal }) => client.getSingleWindowReferenceCatalog({ signal }),
     staleTime: 5 * 60 * 1000,
   });
 

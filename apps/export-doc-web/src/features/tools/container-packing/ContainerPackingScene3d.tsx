@@ -26,6 +26,10 @@ import {
 } from "three";
 import type { ApiContainerPackingAnalysisDto, ApiPackedCargoItemDto } from "../../../api/index.ts";
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
+import {
+  containerPackingSceneSnapshotEvent,
+  type ContainerPackingSceneSnapshotDetail,
+} from "./containerPackingSceneSnapshot.ts";
 
 type ContainerPackingSceneDimensions = {
   length: number;
@@ -52,6 +56,7 @@ type ContainerPackingRenderModeValue = "OutlineOnly" | "FullGrid";
 type ContainerPackingSceneControlApi = {
   resetView: () => void;
   setViewPreset: (preset: ContainerPackingViewPreset) => void;
+  setAutoRotate: (enabled: boolean) => void;
 };
 
 const initialViewPreset: ContainerPackingViewPreset = "isometric";
@@ -96,10 +101,13 @@ export function ContainerPackingScene3d({
     const renderer = new WebGLRenderer({
       antialias: true,
       alpha: false,
-      preserveDrawingBuffer: true,
+      // The export path requests a one-shot render before reading the
+      // canvas. Keeping the drawing buffer alive for every frame otherwise
+      // increases GPU memory use on low-power devices.
+      preserveDrawingBuffer: false,
     });
     renderer.setClearColor(0xf7fafc, 1);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.domElement.className = "container-packing-3d-canvas";
     renderer.domElement.dataset.packedItems = String(sceneData.boxes.length);
     renderer.domElement.dataset.sceneReady = "false";
@@ -144,6 +152,47 @@ export function ContainerPackingScene3d({
     let lastPointerX = 0;
     let lastPointerY = 0;
     let animationFrame = 0;
+    let isPageVisible = document.visibilityState === "visible";
+    let isInViewport = typeof IntersectionObserver === "undefined";
+    const isSceneVisible = () => isPageVisible && isInViewport;
+
+    const renderScene = () => {
+      root.rotation.x = rotationX;
+      root.rotation.y = rotationY;
+      renderer.render(scene, camera);
+      renderer.domElement.dataset.autoRotate = String(autoRotateRef.current);
+      renderer.domElement.dataset.viewPreset = viewPresetRef.current;
+      renderer.domElement.dataset.renderMode = renderMode;
+      renderer.domElement.dataset.sceneReady = "true";
+    };
+
+    const cancelAnimation = () => {
+      if (animationFrame !== 0) {
+        cancelAnimationFrame(animationFrame);
+        animationFrame = 0;
+      }
+    };
+
+    const animate = () => {
+      animationFrame = 0;
+      if (!isSceneVisible()) {
+        return;
+      }
+      if (!isDragging && autoRotateRef.current) {
+        rotationY += 0.0018;
+      }
+      renderScene();
+      if (autoRotateRef.current) {
+        animationFrame = requestAnimationFrame(animate);
+      }
+    };
+
+    const scheduleAnimation = () => {
+      renderScene();
+      if (isSceneVisible() && autoRotateRef.current && animationFrame === 0) {
+        animationFrame = requestAnimationFrame(animate);
+      }
+    };
 
     const applyViewPreset = (preset: ContainerPackingViewPreset) => {
       const angles = containerPackingViewAngles[preset];
@@ -153,12 +202,23 @@ export function ContainerPackingScene3d({
       root.rotation.x = rotationX;
       root.rotation.y = rotationY;
       renderer.domElement.dataset.viewPreset = preset;
-      renderer.render(scene, camera);
+      scheduleAnimation();
+    };
+
+    const setAutoRotate = (enabled: boolean) => {
+      autoRotateRef.current = enabled;
+      if (enabled) {
+        scheduleAnimation();
+      } else {
+        cancelAnimation();
+        renderScene();
+      }
     };
 
     controlApiRef.current = {
       resetView: () => applyViewPreset(initialViewPreset),
       setViewPreset: applyViewPreset,
+      setAutoRotate,
     };
 
     const resize = () => {
@@ -168,7 +228,7 @@ export function ContainerPackingScene3d({
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.render(scene, camera);
+      renderScene();
     };
 
     const resizeObserver = new ResizeObserver(resize);
@@ -177,6 +237,7 @@ export function ContainerPackingScene3d({
 
     const handlePointerDown = (event: PointerEvent) => {
       isDragging = true;
+      cancelAnimation();
       lastPointerX = event.clientX;
       lastPointerY = event.clientY;
       renderer.domElement.setPointerCapture(event.pointerId);
@@ -193,6 +254,7 @@ export function ContainerPackingScene3d({
       lastPointerY = event.clientY;
       rotationY += deltaX * 0.008;
       rotationX = clampNumber(rotationX + deltaY * 0.005, -0.72, 0.08);
+      renderScene();
     };
 
     const handlePointerUp = (event: PointerEvent) => {
@@ -202,39 +264,58 @@ export function ContainerPackingScene3d({
       } catch {
         // The pointer may already be released when the window loses focus.
       }
+      scheduleAnimation();
+    };
+
+    const handleVisibilityChange = () => {
+      isPageVisible = document.visibilityState === "visible";
+      if (isSceneVisible()) {
+        scheduleAnimation();
+      } else {
+        cancelAnimation();
+      }
+    };
+
+    const intersectionObserver = typeof IntersectionObserver === "undefined"
+      ? null
+      : new IntersectionObserver(([entry]) => {
+          isInViewport = Boolean(entry?.isIntersecting);
+          if (isSceneVisible()) {
+            scheduleAnimation();
+          } else {
+            cancelAnimation();
+          }
+        }, { threshold: 0.01 });
+
+    const handleSceneSnapshot = (event: Event) => {
+      const customEvent = event as CustomEvent<ContainerPackingSceneSnapshotDetail>;
+      renderScene();
+      customEvent.detail.dataUrl = renderer.domElement.toDataURL("image/png");
     };
 
     renderer.domElement.addEventListener("pointerdown", handlePointerDown);
     renderer.domElement.addEventListener("pointermove", handlePointerMove);
     renderer.domElement.addEventListener("pointerup", handlePointerUp);
     renderer.domElement.addEventListener("pointercancel", handlePointerUp);
+    renderer.domElement.addEventListener(containerPackingSceneSnapshotEvent, handleSceneSnapshot);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    intersectionObserver?.observe(mount);
     renderer.domElement.dataset.autoRotate = String(autoRotateRef.current);
     renderer.domElement.dataset.viewPreset = viewPresetRef.current;
     renderer.domElement.dataset.renderMode = renderMode;
 
-    const animate = () => {
-      if (!isDragging && autoRotateRef.current) {
-        rotationY += 0.0018;
-      }
-
-      root.rotation.x = rotationX;
-      root.rotation.y = rotationY;
-      renderer.render(scene, camera);
-      renderer.domElement.dataset.autoRotate = String(autoRotateRef.current);
-      renderer.domElement.dataset.viewPreset = viewPresetRef.current;
-      renderer.domElement.dataset.renderMode = renderMode;
-      renderer.domElement.dataset.sceneReady = "true";
-      animationFrame = requestAnimationFrame(animate);
-    };
-    animate();
+    scheduleAnimation();
 
     return () => {
-      cancelAnimationFrame(animationFrame);
+      cancelAnimation();
       resizeObserver.disconnect();
+      intersectionObserver?.disconnect();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
       renderer.domElement.removeEventListener("pointermove", handlePointerMove);
       renderer.domElement.removeEventListener("pointerup", handlePointerUp);
       renderer.domElement.removeEventListener("pointercancel", handlePointerUp);
+      renderer.domElement.removeEventListener(containerPackingSceneSnapshotEvent, handleSceneSnapshot);
       controlApiRef.current = null;
       scene.traverse((object) => {
         const mesh = object as Mesh;
@@ -263,6 +344,14 @@ export function ContainerPackingScene3d({
   function resetView() {
     setViewPreset(initialViewPreset);
     controlApiRef.current?.resetView();
+  }
+
+  function toggleAutoRotate() {
+    setAutoRotate((current) => {
+      const next = !current;
+      controlApiRef.current?.setAutoRotate(next);
+      return next;
+    });
   }
 
   return (
@@ -296,7 +385,7 @@ export function ContainerPackingScene3d({
             aria-label={autoRotate ? "暂停三维自动旋转" : "恢复三维自动旋转"}
             title={autoRotate ? "暂停自动旋转" : "恢复自动旋转"}
             aria-pressed={autoRotate}
-            onClick={() => setAutoRotate((current) => !current)}
+            onClick={toggleAutoRotate}
           >
             {autoRotate ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
           </button>

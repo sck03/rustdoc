@@ -10,6 +10,7 @@ use std::{
 use tauri::{Emitter, Manager};
 
 mod desktop_commands;
+mod log_rotation;
 mod runtime_layout;
 mod runtime_paths;
 mod sidecar;
@@ -40,7 +41,7 @@ fn main() {
 }
 
 fn run_tauri_app() -> tauri::Result<()> {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
@@ -114,11 +115,39 @@ fn run_tauri_app() -> tauri::Result<()> {
                     return;
                 }
 
-                sidecar::run_shutdown_maintenance(window.app_handle());
-                sidecar::stop_sidecar(window.app_handle());
+                api.prevent_close();
+                if sidecar::begin_graceful_shutdown(window.app_handle()) {
+                    let _ = window.hide();
+                }
             }
         })
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())?;
+
+    app.run(|app_handle, event| {
+        if let tauri::RunEvent::ExitRequested { api, .. } = event {
+            if !desktop_commands::is_app_exit_confirmed() {
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    api.prevent_exit();
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                    if let Err(error) = window.emit("exportdoc://exit-requested", ()) {
+                        let _ = write_tauri_error(&format!(
+                            "Failed to emit native exit request to frontend: {error}"
+                        ));
+                    }
+                    return;
+                }
+            }
+
+            if sidecar::begin_graceful_shutdown(app_handle) {
+                api.prevent_exit();
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
+        }
+    });
+    Ok(())
 }
 
 fn set_runtime_diagnostic_log_root(log_root: &Path) {
@@ -182,11 +211,8 @@ fn append_diagnostic_log_to_roots(
         }
 
         let log_path = log_root.join(file_name);
-        let write_result = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_path)
-            .and_then(|mut log| {
+        let write_result =
+            crate::log_rotation::open_append_log_file(&log_path).and_then(|mut log| {
                 writeln!(
                     log,
                     "\n=== {title} at {:?} ===\n{message}",

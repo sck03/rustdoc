@@ -6,6 +6,7 @@ import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { downloadCompletedJobResult, downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 type Options = {
   client: ExportDocManagerApiClient;
@@ -31,6 +32,7 @@ function fileNameFromPath(value: string) {
 
 export function useJobCenterOperations({ client, queryClient, canOperate, canManage, canCreateInvoiceReportZip, desktopAvailable, defaultExportDirectory, jobsCount, focusJob, clearFocusedJob }: Options) {
   const requestConfirmation = useConfirmation();
+  const runAbortableOperation = useAbortableOperation();
   const [message, setMessage] = useState<string | null>(null);
   const [messageTone, setMessageTone] = useState<"success" | "error">("success");
   const [pdfSources, setPdfSources] = useState("");
@@ -67,31 +69,31 @@ export function useJobCenterOperations({ client, queryClient, canOperate, canMan
     onError: (error) => showError(readApiError(error)),
   });
   const pdfMergeMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: () => runAbortableOperation(async (signal) => {
       if (!desktopAvailable) {
         const form = new FormData();
         pdfUploadFiles.forEach((file) => form.append("files", file, file.name));
-        const job = await client.uploadAndStartPdfMergeDownloadJob({ body: form });
-        await downloadJobResultWhenReady(client, job, "merged.pdf");
+        const job = await client.uploadAndStartPdfMergeDownloadJob({ body: form }, { signal });
+        await downloadJobResultWhenReady(client, job, "merged.pdf", { signal });
         return job;
       }
-      return client.startPdfMergeSaveToPathJob({ body: { sourceFiles: readPathLines(pdfSources), destinationPath: pdfDestination.trim() } });
-    },
+      return client.startPdfMergeSaveToPathJob({ body: { sourceFiles: readPathLines(pdfSources), destinationPath: pdfDestination.trim() } }, { signal });
+    }),
     onSuccess: async (job) => { focusJob(job.jobId, `已创建 PDF 合并任务：${job.jobId}`); setPdfDestination(""); setPdfUploadFiles([]); await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() }); },
     onError: (error) => showError(readApiError(error)),
   });
   const reportZipMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: () => runAbortableOperation(async (signal) => {
       const body = { invoiceIds: readPositiveIntegerTokens(reportInvoiceIds), reportType: "ExportDocument", templatePath: reportTemplatePath.trim(), withSeal: reportWithSeal, destinationPath: desktopAvailable ? reportZipDestination.trim() : "" };
-      const job = desktopAvailable ? await client.startInvoiceReportPdfZipSaveToPathJob({ body }) : await client.startInvoiceReportPdfZipDownloadJob({ body });
-      if (!desktopAvailable) await downloadJobResultWhenReady(client, job, "invoice-reports.zip");
+      const job = desktopAvailable ? await client.startInvoiceReportPdfZipSaveToPathJob({ body }, { signal }) : await client.startInvoiceReportPdfZipDownloadJob({ body }, { signal });
+      if (!desktopAvailable) await downloadJobResultWhenReady(client, job, "invoice-reports.zip", { signal });
       return job;
-    },
+    }),
     onSuccess: async (job) => { focusJob(job.jobId, `已创建批量报表 ZIP 任务：${job.jobId}`); setReportZipDestination(""); await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() }); },
     onError: (error) => showError(readApiError(error)),
   });
   const downloadMutation = useMutation({
-    mutationFn: (job: BackgroundJobSnapshot) => downloadCompletedJobResult(client, job, fileNameFromPath(job.outputPath) || `${job.kind || "download"}.bin`),
+    mutationFn: (job: BackgroundJobSnapshot) => runAbortableOperation((signal) => downloadCompletedJobResult(client, job, fileNameFromPath(job.outputPath) || `${job.kind || "download"}.bin`, signal)),
     onError: (error) => showError(readApiError(error)),
   });
 

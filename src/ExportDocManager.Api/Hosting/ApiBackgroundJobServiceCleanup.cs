@@ -1,3 +1,5 @@
+using ExportDocManager.Utils;
+
 namespace ExportDocManager.Api.Hosting
 {
     public sealed partial class ApiBackgroundJobService
@@ -12,18 +14,37 @@ namespace ExportDocManager.Api.Hosting
             try
             {
                 string fullPath = Path.GetFullPath(outputPath);
-                string root = Path.GetFullPath(Path.Combine(_pathProvider.ExportRoot, "Browser"))
-                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                    + Path.DirectorySeparatorChar;
-                if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                string root = Path.GetFullPath(Path.Combine(_pathProvider.ExportRoot, "Browser"));
+                if (!PathBoundaryHelper.IsWithinRoot(fullPath, root) ||
+                    string.Equals(fullPath, root, PathBoundaryHelper.PathComparison))
                 {
                     return;
                 }
 
                 string directory = Path.GetDirectoryName(fullPath) ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(directory) ||
+                    !PathBoundaryHelper.IsWithinRoot(directory, root) ||
+                    string.Equals(directory, root, PathBoundaryHelper.PathComparison))
+                {
+                    AtomicFileHelper.TryDeleteFile(fullPath);
+                    return;
+                }
+
+                string parentDirectory = Directory.GetParent(directory)?.FullName ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(parentDirectory) ||
+                    string.Equals(parentDirectory, root, PathBoundaryHelper.PathComparison))
+                {
+                    AtomicFileHelper.TryDeleteFile(fullPath);
+                    return;
+                }
+
                 if (Directory.Exists(directory))
                 {
                     Directory.Delete(directory, recursive: true);
+                }
+                else
+                {
+                    AtomicFileHelper.TryDeleteFile(fullPath);
                 }
             }
             catch
@@ -71,7 +92,7 @@ namespace ExportDocManager.Api.Hosting
                         catch { return string.Empty; }
                     })
                     .Where(path => !string.IsNullOrWhiteSpace(path))
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    .ToHashSet(PathBoundaryHelper.PathComparer);
                 DateTime cutoffUtc = DateTime.UtcNow.AddDays(-_retentionOptions.RetentionDays);
 
                 foreach (string kindDirectory in Directory.EnumerateDirectories(browserRoot))

@@ -240,8 +240,11 @@ export function createJobCenterSmokeScene(runtime) {
             createObjectURL: URL.createObjectURL,
             revokeObjectURL: URL.revokeObjectURL,
             anchorClick: HTMLAnchorElement.prototype.click,
+            canvasToDataURL: HTMLCanvasElement.prototype.toDataURL,
             downloads: [],
             savedPdf: null,
+            sceneSnapshotCalls: 0,
+            sceneSnapshotEmbedded: false,
           };
           if (!window.__containerPackingPdfSmoke.invoke) throw new Error('Mock Tauri invoke is unavailable.');
           window.__TAURI__.core.invoke = async (command, args) => {
@@ -268,6 +271,20 @@ export function createJobCenterSmokeScene(runtime) {
             const current = window.__containerPackingPdfSmoke.downloads.at(-1);
             if (current) current.fileName = this.download || '';
           };
+          HTMLCanvasElement.prototype.toDataURL = function (...args) {
+            if (this.classList?.contains('container-packing-3d-canvas')) {
+              window.__containerPackingPdfSmoke.sceneSnapshotCalls += 1;
+            }
+            return window.__containerPackingPdfSmoke.canvasToDataURL.apply(this, args);
+          };
+          window.__containerPackingPdfSmoke.observer = new MutationObserver(() => {
+            const exportRoot = document.querySelector('.container-packing-pdf-export');
+            if (exportRoot?.querySelector('img.container-packing-pdf-scene-snapshot') &&
+                !exportRoot.querySelector('.container-packing-3d-section')) {
+              window.__containerPackingPdfSmoke.sceneSnapshotEmbedded = true;
+            }
+          });
+          window.__containerPackingPdfSmoke.observer.observe(document.body, { childList: true });
           exportButton.click();
           return true;
         })()`,
@@ -287,6 +304,8 @@ export function createJobCenterSmokeScene(runtime) {
             savedPdf.size < 10 * 1024 * 1024 &&
             savedPdf.path.endsWith('.pdf') &&
             savedPdf.pageCount === 1 &&
+            smoke.sceneSnapshotCalls >= 1 &&
+            smoke.sceneSnapshotEmbedded === true &&
             smoke.downloads.length === 0 &&
             text.includes('PDF 已保存到'));
         })()`,
@@ -297,7 +316,15 @@ export function createJobCenterSmokeScene(runtime) {
         page,
         `(() => {
           const savedPdf = window.__containerPackingPdfSmoke?.savedPdf;
-          return savedPdf ? { type: savedPdf.type, size: savedPdf.size, fileName: savedPdf.path, pageCount: savedPdf.pageCount } : null;
+          const smoke = window.__containerPackingPdfSmoke;
+          return savedPdf ? {
+            type: savedPdf.type,
+            size: savedPdf.size,
+            fileName: savedPdf.path,
+            pageCount: savedPdf.pageCount,
+            sceneSnapshotCalls: smoke.sceneSnapshotCalls,
+            sceneSnapshotEmbedded: smoke.sceneSnapshotEmbedded,
+          } : null;
         })()`,
         true,
       );
@@ -312,6 +339,8 @@ export function createJobCenterSmokeScene(runtime) {
           URL.createObjectURL = smoke.createObjectURL;
           URL.revokeObjectURL = smoke.revokeObjectURL;
           HTMLAnchorElement.prototype.click = smoke.anchorClick;
+          HTMLCanvasElement.prototype.toDataURL = smoke.canvasToDataURL;
+          smoke.observer?.disconnect();
           delete window.__containerPackingPdfSmoke;
           return true;
         })()`,
@@ -2015,30 +2044,59 @@ export function createJobCenterSmokeScene(runtime) {
   }
 
   async function waitForContainerPacking3dCanvas(page, timeoutMs, viewportName) {
-    return waitForPageExpression(
-      page,
-      `(() => {
+    let latest = null;
+    await waitFor(async () => {
+      const result = await evaluate(
+        page,
+        `(async () => {
         const panel = document.querySelector('[aria-label="装箱分析"]');
         const visualization = panel ? panel.querySelector('[aria-label="装柜三维可视化"]') : null;
         const canvas = visualization ? visualization.querySelector('canvas[aria-label="装柜三维画布"]') : null;
         if (!canvas || canvas.dataset.sceneReady !== 'true' || Number(canvas.dataset.packedItems || '0') <= 0) {
-          return false;
+          return { passed: false, reason: 'scene-not-ready' };
         }
 
+        visualization.scrollIntoView({ block: 'center', inline: 'nearest' });
         const rect = canvas.getBoundingClientRect();
         if (rect.width < 240 || rect.height < 220 || canvas.width < 120 || canvas.height < 120) {
-          return false;
+          return {
+            passed: false,
+            reason: 'canvas-too-small',
+            rectWidth: rect.width,
+            rectHeight: rect.height,
+            width: canvas.width,
+            height: canvas.height,
+          };
         }
 
+        const snapshotEvent = new CustomEvent('exportdoc:capture-container-packing-scene', {
+          detail: { dataUrl: null },
+        });
+        canvas.dispatchEvent(snapshotEvent);
+        const dataUrl = snapshotEvent.detail.dataUrl;
+        if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/png;base64,')) {
+          return { passed: false, reason: 'snapshot-unavailable' };
+        }
+
+        const renderedImage = new Image();
+        renderedImage.src = dataUrl;
+        if (typeof renderedImage.decode === 'function') {
+          await renderedImage.decode();
+        } else {
+          await new Promise((resolve, reject) => {
+            renderedImage.onload = resolve;
+            renderedImage.onerror = () => reject(new Error('Container packing 3D snapshot could not be decoded.'));
+          });
+        }
         const snapshot = document.createElement('canvas');
         snapshot.width = 56;
         snapshot.height = 40;
         const context = snapshot.getContext('2d', { willReadFrequently: true });
         if (!context) {
-          return false;
+          return { passed: false, reason: 'missing-2d-context' };
         }
 
-        context.drawImage(canvas, 0, 0, snapshot.width, snapshot.height);
+        context.drawImage(renderedImage, 0, 0, snapshot.width, snapshot.height);
         const image = context.getImageData(0, 0, snapshot.width, snapshot.height).data;
         const colors = new Set();
         let nonTransparentPixels = 0;
@@ -2050,11 +2108,22 @@ export function createJobCenterSmokeScene(runtime) {
           }
         }
 
-        return nonTransparentPixels > 80 && colors.size >= 5;
+        return {
+          passed: nonTransparentPixels > 80 && colors.size >= 5,
+          nonTransparentPixels,
+          colorCount: colors.size,
+          snapshotLength: dataUrl.length,
+        };
       })()`,
-      timeoutMs,
+        true,
+      ).catch((error) => ({ value: { passed: false, reason: error.message } }));
+      latest = result.value ?? null;
+      return latest?.passed ? latest : null;
+    }, timeoutMs, () => [
       `Timed out waiting for the container packing 3D canvas (${viewportName}).`,
-    );
+      `Latest: ${JSON.stringify(latest)}`,
+    ].join("\n"));
+    return true;
   }
 
   async function verifyContainerPacking3dControls(page, timeoutMs) {

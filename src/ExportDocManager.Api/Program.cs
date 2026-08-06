@@ -10,6 +10,12 @@ var pathProvider = string.IsNullOrWhiteSpace(runtimeOptions.DataRoot)
     : new RuntimeAppPathProvider(runtimeOptions.AppRoot, runtimeOptions.DataRoot);
 
 DbHelper.ConfigurePathProvider(pathProvider);
+// ASP.NET Core form buffering otherwise falls back to the process/system temp
+// directory for multipart requests.  Keep that transient data under the same
+// runtime root as uploads, browser profiles and other disposable caches.
+string aspNetTempRoot = Path.Combine(pathProvider.CacheRoot, "AspNetTemp");
+Directory.CreateDirectory(aspNetTempRoot);
+Environment.SetEnvironmentVariable("ASPNETCORE_TEMP", aspNetTempRoot);
 if (args.Any(value => string.Equals(value, "--verify-ocr-runtime", StringComparison.OrdinalIgnoreCase)))
 {
     var verification = await OcrRuntimeVerifier.VerifyAsync(pathProvider);
@@ -27,7 +33,12 @@ builder.WebHost.UseUrls(runtimeOptions.ListenUrls);
 builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxRequestBodySize = ApiUploadLimits.MaximumRequestBodyBytes);
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
-    options.MultipartBodyLengthLimit = ApiUploadLimits.MaximumRequestBodyBytes);
+{
+    options.MultipartBodyLengthLimit = ApiUploadLimits.MaximumRequestBodyBytes;
+    options.MemoryBufferThreshold = 64 * 1024;
+    options.MultipartHeadersLengthLimit = 64 * 1024;
+    options.ValueCountLimit = 1000;
+});
 builder.Services.AddExportDocManagerApiServices(pathProvider, databaseSettings, runtimeOptions);
 
 var app = builder.Build();

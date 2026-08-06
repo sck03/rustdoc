@@ -74,25 +74,25 @@ export default function BackupManagementPanel({
 
   const backupQuery = useQuery({
     queryKey: queryKeys.backups(),
-    queryFn: () => client.listDatabaseBackups(),
+    queryFn: ({ signal }) => client.listDatabaseBackups({ signal }),
     enabled: canManageSettings,
   });
 
   const cloudStatusQuery = useQuery({
     queryKey: queryKeys.cloudBackupStatus(),
-    queryFn: () => client.getCloudBackupStatus(),
+    queryFn: ({ signal }) => client.getCloudBackupStatus({ signal }),
     enabled: canManageSettings,
   });
 
   const cloudBackupsQuery = useQuery({
     queryKey: queryKeys.cloudBackupBackups(),
-    queryFn: () => client.listCloudDatabaseBackups(),
+    queryFn: ({ signal }) => client.listCloudDatabaseBackups({ signal }),
     enabled: canManageSettings && Boolean(cloudStatusQuery.data?.enabled) && Boolean(cloudStatusQuery.data?.isConfigured),
   });
 
   const disasterRecoveryQuery = useQuery({
     queryKey: queryKeys.disasterRecoveryStatus(),
-    queryFn: () => client.getDisasterRecoveryStatus(),
+    queryFn: ({ signal }) => client.getDisasterRecoveryStatus({ signal }),
     enabled: canManageSettings && desktopBridgeAvailable,
   });
 

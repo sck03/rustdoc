@@ -868,7 +868,7 @@ export function ReportTemplateDesignerPage({
             onApplyTemplateContent={handleApplyNewReportDesignerContent}
             onSaveTemplateContent={handleSaveNewReportDesignerContent}
             onDesignerDraftContentChange={setDesignerDraftContent}
-            onOpenSource={() => setDesignerMode("source")}
+            onOpenSource={() => handleDesignerModeChange("source")}
             onFormatSource={handleFormatSource}
             onSourceContentChange={(nextContent) => {
               setContent(nextContent);

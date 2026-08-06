@@ -42,7 +42,8 @@ namespace ExportDocManager.Services.Infrastructure
             var textLogSummary = TextLogCleanupHelper.Clean(
                 _pathProvider.LogRoot,
                 systemSettings.LogRetentionDays,
-                retainedFileCount);
+                retainedFileCount,
+                systemSettings.LogFileSizeLimitMB);
 
             return new SystemLogCleanupResult
             {

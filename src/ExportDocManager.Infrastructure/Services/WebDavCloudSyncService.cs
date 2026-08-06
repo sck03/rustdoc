@@ -17,6 +17,8 @@ namespace ExportDocManager.Services.Infrastructure
     public class WebDavCloudSyncService : ICloudSyncService
     {
         public const long MaximumDownloadBytes = 4L * 1024L * 1024L * 1024L;
+        private const long MaximumPropFindResponseBytes = 2L * 1024L * 1024L;
+        private const long MaximumErrorResponseBytes = 64L * 1024L;
         private readonly ISettingsService _settingsService;
         private readonly ILogger<WebDavCloudSyncService> _logger;
 
@@ -28,8 +30,15 @@ namespace ExportDocManager.Services.Infrastructure
 
         private WebDavSettings Config => _settingsService.Settings?.WebDav ?? new WebDavSettings();
 
-        public async Task UploadFileAsync(string localFilePath, string remoteFileName)
+        public async Task UploadFileAsync(
+            string localFilePath,
+            string remoteFileName,
+            CancellationToken cancellationToken = default)
         {
+            using var operationCancellation = CreateOperationCancellation(
+                TimeSpan.FromMinutes(10),
+                cancellationToken);
+            CancellationToken operationToken = operationCancellation.Token;
             var config = Config;
             string baseUrl = NormalizeConfiguredBaseUrl(config, out string userName);
 
@@ -41,20 +50,31 @@ namespace ExportDocManager.Services.Infrastructure
             var uploadUri = BuildUri($"{baseUrl}/{encodedFileName}");
 
             using var client = CreateClient(config, userName, TimeSpan.FromMinutes(10));
-            using var content = new StreamContent(File.OpenRead(localFilePath));
-            using var response = await client.PutAsync(uploadUri, content);
+            using var request = new HttpRequestMessage(HttpMethod.Put, uploadUri)
+            {
+                Content = new StreamContent(File.OpenRead(localFilePath))
+            };
+            using var response = await client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                operationToken);
 
             if (!response.IsSuccessStatusCode)
             {
-                string error = await response.Content.ReadAsStringAsync();
+                string error = await ReadBoundedTextAsync(response.Content, MaximumErrorResponseBytes, operationToken);
                 throw new HttpRequestException($"Upload failed: {response.StatusCode} - {error}");
             }
 
             _logger.LogInformation("Successfully uploaded {LocalFilePath} to {UploadUri}", localFilePath, uploadUri);
         }
 
-        public async Task<IReadOnlyList<CloudBackupFileInfo>> ListBackupFilesAsync()
+        public async Task<IReadOnlyList<CloudBackupFileInfo>> ListBackupFilesAsync(
+            CancellationToken cancellationToken = default)
         {
+            using var operationCancellation = CreateOperationCancellation(
+                TimeSpan.FromSeconds(30),
+                cancellationToken);
+            CancellationToken operationToken = operationCancellation.Token;
             var config = Config;
             string baseUrl = NormalizeConfiguredBaseUrl(config, out string userName);
             var url = BuildUri(baseUrl);
@@ -67,29 +87,36 @@ namespace ExportDocManager.Services.Infrastructure
                 Encoding.UTF8,
                 "application/xml");
 
-            using var response = await client.SendAsync(request);
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, operationToken);
             if (!response.IsSuccessStatusCode)
             {
-                string error = await response.Content.ReadAsStringAsync();
+                string error = await ReadBoundedTextAsync(response.Content, MaximumErrorResponseBytes, operationToken);
                 throw new HttpRequestException($"List failed: {response.StatusCode} - {error}");
             }
 
-            string xml = await response.Content.ReadAsStringAsync();
+            string xml = await ReadBoundedTextAsync(response.Content, MaximumPropFindResponseBytes, operationToken);
             return ParsePropFindBackupFiles(xml);
         }
 
-        public async Task DownloadFileAsync(string remoteFileName, string localFilePath)
+        public async Task DownloadFileAsync(
+            string remoteFileName,
+            string localFilePath,
+            CancellationToken cancellationToken = default)
         {
+            using var operationCancellation = CreateOperationCancellation(
+                TimeSpan.FromMinutes(10),
+                cancellationToken);
+            CancellationToken operationToken = operationCancellation.Token;
             var config = Config;
             string baseUrl = NormalizeConfiguredBaseUrl(config, out string userName);
             string normalizedRemoteFileName = NormalizeRemoteFileName(remoteFileName);
             var downloadUri = BuildUri($"{baseUrl}/{Uri.EscapeDataString(normalizedRemoteFileName)}");
 
             using var client = CreateClient(config, userName, TimeSpan.FromMinutes(10));
-            using var response = await client.GetAsync(downloadUri, HttpCompletionOption.ResponseHeadersRead);
+            using var response = await client.GetAsync(downloadUri, HttpCompletionOption.ResponseHeadersRead, operationToken);
             if (!response.IsSuccessStatusCode)
             {
-                string error = await response.Content.ReadAsStringAsync();
+                string error = await ReadBoundedTextAsync(response.Content, MaximumErrorResponseBytes, operationToken);
                 throw new HttpRequestException($"Download failed: {response.StatusCode} - {error}");
             }
 
@@ -100,9 +127,9 @@ namespace ExportDocManager.Services.Infrastructure
 
             await AtomicFileHelper.WriteFileAtomicAsync(
                 localFilePath,
-                async (tempPath, cancellationToken) =>
+                async (tempPath, token) =>
                 {
-                    await using var sourceStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    await using var sourceStream = await response.Content.ReadAsStreamAsync(token);
                     await using var targetStream = new FileStream(
                         tempPath,
                         FileMode.Create,
@@ -114,14 +141,21 @@ namespace ExportDocManager.Services.Infrastructure
                         sourceStream,
                         targetStream,
                         MaximumDownloadBytes,
-                        cancellationToken);
-                });
+                        token);
+                },
+                operationToken);
 
             _logger.LogInformation("Successfully downloaded {RemoteFileName} from WebDAV to {LocalFilePath}", normalizedRemoteFileName, localFilePath);
         }
 
-        public async Task<bool> TestConnectionAsync(WebDavSettings settings)
+        public async Task<bool> TestConnectionAsync(
+            WebDavSettings settings,
+            CancellationToken cancellationToken = default)
         {
+            using var operationCancellation = CreateOperationCancellation(
+                TimeSpan.FromSeconds(15),
+                cancellationToken);
+            CancellationToken operationToken = operationCancellation.Token;
             settings ??= new WebDavSettings();
             bool urlValid = WebDavEndpointPolicy.TryNormalize(settings.Url, out string baseUrl, out _);
             string userName = settings.UserName?.Trim() ?? string.Empty;
@@ -143,7 +177,7 @@ namespace ExportDocManager.Services.Infrastructure
                 using var client = CreateClient(settings, userName, TimeSpan.FromSeconds(15));
 
                 using var request = new HttpRequestMessage(HttpMethod.Options, url);
-                using var response = await client.SendAsync(request);
+                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, operationToken);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -152,8 +186,12 @@ namespace ExportDocManager.Services.Infrastructure
 
                 using var propfindRequest = new HttpRequestMessage(new HttpMethod("PROPFIND"), url);
                 propfindRequest.Headers.TryAddWithoutValidation("Depth", "0");
-                using var propfindResponse = await client.SendAsync(propfindRequest);
+                using var propfindResponse = await client.SendAsync(propfindRequest, HttpCompletionOption.ResponseHeadersRead, operationToken);
                 return propfindResponse.IsSuccessStatusCode;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -197,7 +235,8 @@ namespace ExportDocManager.Services.Infrastructure
                 throw new ArgumentException("Remote file name cannot be empty.", nameof(remoteFileName));
             }
 
-            if (fileName.IndexOfAny(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }) >= 0 ||
+            if (fileName.Contains('/') ||
+                fileName.Contains('\\') ||
                 !string.Equals(fileName, Path.GetFileName(fileName), StringComparison.Ordinal))
             {
                 throw new ArgumentException("Remote file name cannot contain a path.", nameof(remoteFileName));
@@ -279,6 +318,29 @@ namespace ExportDocManager.Services.Infrastructure
             }
 
             return uri;
+        }
+
+        private static async Task<string> ReadBoundedTextAsync(
+            HttpContent content,
+            long maximumBytes,
+            CancellationToken cancellationToken)
+        {
+            if (content.Headers.ContentLength is long contentLength && contentLength > maximumBytes)
+            {
+                throw new PayloadLimitExceededException(maximumBytes);
+            }
+
+            await using var stream = await content.ReadAsStreamAsync(cancellationToken);
+            return await BoundedStreamHelper.ReadUtf8TextAsync(stream, maximumBytes, cancellationToken);
+        }
+
+        private static CancellationTokenSource CreateOperationCancellation(
+            TimeSpan timeout,
+            CancellationToken cancellationToken)
+        {
+            var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            source.CancelAfter(timeout);
+            return source;
         }
     }
 }

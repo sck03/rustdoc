@@ -16,6 +16,7 @@ import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { formatAmount, formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
+import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 const defaultPageSize = 50;
 const pageSizeOptions = [20, 50, 100, 200] as const;
@@ -38,6 +39,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
   const keywordInputRef = useRef<HTMLInputElement | null>(null);
   const isDesktop = isDesktopBridgeAvailable();
+  const runAbortableOperation = useAbortableOperation();
   const [initialViewState] = useState(() => loadQueryViewState());
   const [filters, setFilters] = useState<QueryFilters>(() => initialViewState.filters);
   const [committedFilters, setCommittedFilters] = useState<QueryFilters>(() => initialViewState.filters);
@@ -49,10 +51,10 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
 
   const partiesQuery = useQuery({
     queryKey: queryKeys.invoiceParties(),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const [customers, exporters] = await Promise.all([
-        client.listCustomers({}),
-        client.listExporters({}),
+        client.listCustomers({}, { signal }),
+        client.listExporters({}, { signal }),
       ]);
       return { customers, exporters };
     },
@@ -61,18 +63,18 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
-    queryFn: () => client.getSettings(),
+    queryFn: ({ signal }) => client.getSettings({ signal }),
     staleTime: 5 * 60 * 1000,
   });
 
   const invoiceQuery = useQuery({
     queryKey: queryKeys.queryInvoices(pageNumber, pageSize, committedFilters),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       client.listQueriedInvoices({
         ...toApiFilters(committedFilters),
         pageNumber,
         pageSize,
-      }),
+      }, { signal }),
     placeholderData: keepPreviousData,
   });
 
@@ -107,25 +109,25 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
   }, [invoiceQuery]);
 
   const exportMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async () => runAbortableOperation(async (signal) => {
       if (isDesktop) {
         const job = await client.saveQueriedInvoicesToPath({
           body: {
             ...toApiFilters(committedFilters),
             destinationPath: exportPath.trim(),
           },
-        });
+        }, { signal });
         setLastCreatedJobId(job.jobId);
         return { mode: "desktop" as const, job };
       }
 
       const job = await client.downloadQueriedInvoices({
         body: toApiFilters(committedFilters),
-      });
+      }, { signal });
       setLastCreatedJobId(job.jobId);
-      await downloadJobResultWhenReady(client, job, buildQueryExportFileName());
+      await downloadJobResultWhenReady(client, job, buildQueryExportFileName(), { signal });
       return { mode: "browser" as const, job };
-    },
+    }),
     onSuccess: (result) => {
       if (result.mode === "browser") {
         setActionMessage({ kind: "success", text: "查询结果 Excel 已生成并交给浏览器下载。" });

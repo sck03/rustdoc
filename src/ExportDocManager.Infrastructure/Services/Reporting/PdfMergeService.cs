@@ -9,6 +9,9 @@ namespace ExportDocManager.Services.Reporting
 {
     public class PdfMergeService : IPdfMergeService
     {
+        private const int MaxPagesPerFile = 1000;
+        private const int MaxTotalPages = 5000;
+
         public void Merge(
             IReadOnlyCollection<string> sourceFiles,
             string destinationPath,
@@ -38,6 +41,7 @@ namespace ExportDocManager.Services.Reporting
             CancellationToken cancellationToken)
         {
             using var outputDocument = new PdfDocument();
+            int totalPages = 0;
 
             foreach (string file in sourceFiles)
             {
@@ -45,6 +49,17 @@ namespace ExportDocManager.Services.Reporting
 
                 using var inputDocument = PdfReader.Open(file, PdfDocumentOpenMode.Import);
                 int pageCount = inputDocument.PageCount;
+                if (pageCount > MaxPagesPerFile)
+                {
+                    throw new InvalidDataException($"PDF 文件页数超过 {MaxPagesPerFile} 页限制：{Path.GetFileName(file)}。");
+                }
+
+                totalPages += pageCount;
+                if (totalPages > MaxTotalPages)
+                {
+                    throw new InvalidDataException($"合并后的 PDF 总页数超过 {MaxTotalPages} 页限制。");
+                }
+
                 for (int index = 0; index < pageCount; index++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();

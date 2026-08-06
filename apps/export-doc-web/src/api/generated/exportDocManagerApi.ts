@@ -3027,6 +3027,7 @@ export interface BackgroundJobSnapshot {
   status: string;
   statusText: string;
   title: string;
+  updatedAt: string;
 }
 
 export interface HsCodeHistoryCandidatePage {

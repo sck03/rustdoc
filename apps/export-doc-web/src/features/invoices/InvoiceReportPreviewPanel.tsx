@@ -63,13 +63,13 @@ export function InvoiceReportPreviewPanel({
 
   const templatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates("ExportDocument"),
-    queryFn: () => client.listReportTemplates({ reportType: "ExportDocument" }),
+    queryFn: ({ signal }) => client.listReportTemplates({ reportType: "ExportDocument" }, { signal }),
     enabled: hasPreviewSource && reportOutputPermission.canView,
     staleTime: 5 * 60 * 1000,
   });
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
-    queryFn: () => client.getSettings(),
+    queryFn: ({ signal }) => client.getSettings({ signal }),
     enabled: hasPreviewSource && (reportOutputPermission.canOperate || canManageSettings),
     staleTime: 5 * 60 * 1000,
   });

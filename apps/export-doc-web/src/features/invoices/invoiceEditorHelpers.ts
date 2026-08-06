@@ -3,10 +3,6 @@ import { readNumber } from "../../ui/formUtils.ts";
 import { calculateInvoiceTotals, createEmptyInvoiceItem } from "./InvoiceItemsEditor.tsx";
 import { normalizeInvoiceForSave, type RouteInvoiceImportAction } from "./invoiceModel.ts";
 
-export function cloneInvoiceItems(items: ApiInvoiceItemDto[]) {
-  return items.map((item) => ({ ...item }));
-}
-
 export function mergeRouteInvoiceImportDraft(
   existing: ApiInvoiceDetailDto,
   importedDraft: ApiInvoiceDetailDto,
@@ -69,7 +65,28 @@ export function areInvoiceItemValuesEqual(left: unknown, right: unknown) {
 }
 
 export function areInvoiceItemsEqual(left: ApiInvoiceItemDto[], right: ApiInvoiceItemDto[]) {
-  return left === right || JSON.stringify(left) === JSON.stringify(right);
+  if (left === right) {
+    return true;
+  }
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftItem = left[index];
+    const rightItem = right[index];
+    if (leftItem === rightItem) {
+      continue;
+    }
+
+    const keys = Object.keys(leftItem) as Array<keyof ApiInvoiceItemDto>;
+    if (keys.length !== Object.keys(rightItem).length || keys.some((key) =>
+      !Object.prototype.hasOwnProperty.call(rightItem, key) || leftItem[key] !== rightItem[key])) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function readInvoiceItemTableNumber(value: string) {

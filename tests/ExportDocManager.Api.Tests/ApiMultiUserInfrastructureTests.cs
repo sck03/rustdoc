@@ -140,6 +140,118 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public void DatabaseJobStore_ShouldRejectStaleOrEqualTimestampSnapshots()
+        {
+            using var database = TestDatabase.Create("job-store-stale-write");
+            var pathProvider = new RuntimeAppPathProvider(database.Root, database.Root);
+            var settings = new DatabaseConnectionSettings
+            {
+                Provider = DatabaseConnectionSettings.PostgreSqlProvider
+            };
+            var first = new ApiBackgroundJobService(pathProvider, settings, database.Factory);
+            var second = new ApiBackgroundJobService(pathProvider, settings, database.Factory);
+            var updatedAt = DateTimeOffset.UtcNow;
+
+            first.Upsert(new BackgroundJobSnapshot
+            {
+                JobId = "shared-job",
+                Kind = "Test",
+                Title = "newer",
+                Status = BackgroundJobStatusCatalog.Succeeded,
+                ProgressPercent = 100,
+                CreatedAt = updatedAt.AddMinutes(-1),
+                CompletedAt = updatedAt,
+                UpdatedAt = updatedAt
+            });
+            second.Upsert(new BackgroundJobSnapshot
+            {
+                JobId = "shared-job",
+                Kind = "Test",
+                Title = "stale",
+                Status = BackgroundJobStatusCatalog.Failed,
+                CreatedAt = updatedAt.AddMinutes(-1),
+                CompletedAt = updatedAt,
+                UpdatedAt = updatedAt
+            });
+
+            using var verificationContext = database.Factory.CreateDbContext();
+            var persisted = Assert.Single(verificationContext.ApiBackgroundJobs);
+            Assert.Equal("newer", persisted.Title);
+            Assert.Equal(BackgroundJobStatusCatalog.Succeeded, persisted.Status);
+            Assert.Equal(updatedAt, persisted.UpdatedAt);
+        }
+
+        [Fact]
+        public void DatabaseJobStore_ShouldPersistTerminalNormalizationWithNewerTimestamp()
+        {
+            using var database = TestDatabase.Create("job-store-terminal-normalization");
+            var pathProvider = new RuntimeAppPathProvider(database.Root, database.Root);
+            var settings = new DatabaseConnectionSettings
+            {
+                Provider = DatabaseConnectionSettings.PostgreSqlProvider
+            };
+            var originalUpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+            using (var context = database.Factory.CreateDbContext())
+            {
+                context.ApiBackgroundJobs.Add(new ApiBackgroundJobRecord
+                {
+                    JobId = "terminal-job",
+                    Kind = "Test",
+                    Title = "terminal-job",
+                    Status = BackgroundJobStatusCatalog.Succeeded,
+                    ProgressPercent = 100,
+                    RequestedBy = "alice",
+                    CreatedAt = originalUpdatedAt.AddMinutes(-1),
+                    CompletedAt = originalUpdatedAt,
+                    CanCancel = true,
+                    CanRetry = true,
+                    UpdatedAt = originalUpdatedAt
+                });
+                context.SaveChanges();
+            }
+
+            _ = new ApiBackgroundJobService(pathProvider, settings, database.Factory);
+
+            using var verificationContext = database.Factory.CreateDbContext();
+            var persisted = Assert.Single(verificationContext.ApiBackgroundJobs.AsNoTracking());
+            Assert.False(persisted.CanCancel);
+            Assert.False(persisted.CanRetry);
+            Assert.True(persisted.UpdatedAt > originalUpdatedAt);
+        }
+
+        [Fact]
+        public void BackgroundJobCleanup_ShouldNeverRecursivelyDeleteBrowserRootOrKindDirectory()
+        {
+            using var database = TestDatabase.Create("job-output-cleanup-boundary");
+            var pathProvider = new RuntimeAppPathProvider(database.Root, database.Root);
+            var settings = new DatabaseConnectionSettings
+            {
+                Provider = DatabaseConnectionSettings.PostgreSqlProvider
+            };
+            var service = new ApiBackgroundJobService(pathProvider, settings, database.Factory);
+            string browserRoot = Path.Combine(pathProvider.ExportRoot, "Browser");
+            string kindRoot = Path.Combine(browserRoot, "InvoicePdf");
+            string sentinelPath = Path.Combine(kindRoot, "keep.txt");
+            Directory.CreateDirectory(kindRoot);
+            File.WriteAllText(sentinelPath, "keep");
+
+            service.CleanupControlledOutputPath(browserRoot);
+            service.CleanupControlledOutputPath(kindRoot);
+
+            Assert.True(File.Exists(sentinelPath));
+
+            string jobRoot = Path.Combine(kindRoot, Guid.NewGuid().ToString("N"));
+            string outputPath = Path.Combine(jobRoot, "invoice.pdf");
+            Directory.CreateDirectory(jobRoot);
+            File.WriteAllText(outputPath, "pdf");
+
+            service.CleanupControlledOutputPath(outputPath);
+
+            Assert.False(Directory.Exists(jobRoot));
+            Assert.True(File.Exists(sentinelPath));
+        }
+
+        [Fact]
         public async Task BackgroundJobRunner_ShouldEnforcePerUserLimit()
         {
             await AssertConcurrencyLimitAsync(

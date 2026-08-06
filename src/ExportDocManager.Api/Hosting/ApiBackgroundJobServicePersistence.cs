@@ -106,29 +106,32 @@ namespace ExportDocManager.Api.Hosting
 
         private void PersistJobs()
         {
-            if (_useDatabaseStore)
-            {
-                foreach (var job in _jobs.Values)
-                {
-                    PersistDatabaseJob(job);
-                }
-
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(_storePath))
-            {
-                return;
-            }
-
-            var jobs = _jobs.Values
-                .OrderByDescending(job => job.CreatedAt)
-                .ThenByDescending(job => job.JobId, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            string json = JsonSerializer.Serialize(jobs, PersistenceJsonOptions);
-
             lock (_persistenceLock)
             {
+                // Capture and write while holding the same lock.  Otherwise an
+                // older dictionary snapshot can finish serialization after a
+                // newer update and overwrite the newer durable state.
+                var jobs = _jobs.Values
+                    .OrderByDescending(job => job.CreatedAt)
+                    .ThenByDescending(job => job.JobId, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (_useDatabaseStore)
+                {
+                    foreach (var job in jobs)
+                    {
+                        PersistDatabaseJobLocked(job);
+                    }
+
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(_storePath))
+                {
+                    return;
+                }
+
+                string json = JsonSerializer.Serialize(jobs, PersistenceJsonOptions);
                 AtomicFileHelper.WriteAllTextAtomic(_storePath, json);
                 long persistedAt = DateTimeOffset.UtcNow.UtcTicks;
                 foreach (var job in jobs)
@@ -168,18 +171,30 @@ namespace ExportDocManager.Api.Hosting
 
             lock (_persistenceLock)
             {
-                using var context = _contextFactory.CreateDbContext();
-                var record = context.ApiBackgroundJobs.Find(snapshot.JobId);
-                if (record == null)
-                {
-                    record = new ApiBackgroundJobRecord { JobId = snapshot.JobId };
-                    context.ApiBackgroundJobs.Add(record);
-                }
-
-                ApplySnapshot(record, snapshot);
-                context.SaveChanges();
-                _lastPersistedUtcTicks[snapshot.JobId] = DateTimeOffset.UtcNow.UtcTicks;
+                PersistDatabaseJobLocked(snapshot);
             }
+        }
+
+        private void PersistDatabaseJobLocked(BackgroundJobSnapshot snapshot)
+        {
+            using var context = _contextFactory.CreateDbContext();
+            var record = context.ApiBackgroundJobs.Find(snapshot.JobId);
+            if (record != null && record.UpdatedAt >= snapshot.UpdatedAt)
+            {
+                // Another writer has already committed a newer state.  Do not
+                // let a delayed snapshot roll the job back.
+                return;
+            }
+
+            if (record == null)
+            {
+                record = new ApiBackgroundJobRecord { JobId = snapshot.JobId };
+                context.ApiBackgroundJobs.Add(record);
+            }
+
+            ApplySnapshot(record, snapshot);
+            context.SaveChanges();
+            _lastPersistedUtcTicks[snapshot.JobId] = DateTimeOffset.UtcNow.UtcTicks;
         }
 
         private void DeleteDatabaseJobs(IReadOnlyCollection<string> jobIds)
@@ -214,6 +229,7 @@ namespace ExportDocManager.Api.Hosting
             CreatedAt = record.CreatedAt,
             StartedAt = record.StartedAt,
             CompletedAt = record.CompletedAt,
+            UpdatedAt = record.UpdatedAt,
             OutputPath = record.OutputPath,
             ErrorMessage = record.ErrorMessage,
             CanCancel = record.CanCancel,
@@ -235,13 +251,15 @@ namespace ExportDocManager.Api.Hosting
             record.CreatedAt = snapshot.CreatedAt;
             record.StartedAt = snapshot.StartedAt;
             record.CompletedAt = snapshot.CompletedAt;
+            record.UpdatedAt = snapshot.UpdatedAt == default
+                ? DateTimeOffset.UtcNow
+                : snapshot.UpdatedAt;
             record.OutputPath = snapshot.OutputPath ?? string.Empty;
             record.ErrorMessage = snapshot.ErrorMessage ?? string.Empty;
             record.CanCancel = snapshot.CanCancel;
             record.CanRetry = snapshot.CanRetry;
             record.RetryOperation = snapshot.RetryOperation ?? string.Empty;
             record.RetryRequestJson = snapshot.RetryRequestJson ?? string.Empty;
-            record.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
         private static BackgroundJobSnapshot NormalizeRestoredJob(
@@ -260,7 +278,8 @@ namespace ExportDocManager.Api.Hosting
             bool isTerminal = BackgroundJobStatusCatalog.IsTerminal(normalized.Status);
             if (isTerminal)
             {
-                changed = normalized.CanCancel;
+                bool canRetry = normalized.CanRetry && HasRetryDescriptor(normalized);
+                changed = normalized.CanCancel || canRetry != normalized.CanRetry;
                 return new BackgroundJobSnapshot
                 {
                     JobId = normalized.JobId,
@@ -275,10 +294,13 @@ namespace ExportDocManager.Api.Hosting
                     CreatedAt = normalized.CreatedAt,
                     StartedAt = normalized.StartedAt,
                     CompletedAt = normalized.CompletedAt,
+                    UpdatedAt = changed
+                        ? ApiBackgroundJobService.NextUpdatedAt(normalized.UpdatedAt, restartTime)
+                        : normalized.UpdatedAt,
                     OutputPath = normalized.OutputPath,
                     ErrorMessage = normalized.ErrorMessage,
                     CanCancel = false,
-                    CanRetry = normalized.CanRetry && HasRetryDescriptor(normalized),
+                    CanRetry = canRetry,
                     RetryOperation = normalized.RetryOperation,
                     RetryRequestJson = normalized.RetryRequestJson
                 };
@@ -301,6 +323,7 @@ namespace ExportDocManager.Api.Hosting
                 CreatedAt = normalized.CreatedAt,
                 StartedAt = normalized.StartedAt,
                 CompletedAt = restartTime,
+                UpdatedAt = ApiBackgroundJobService.NextUpdatedAt(normalized.UpdatedAt, restartTime),
                 OutputPath = normalized.OutputPath,
                 ErrorMessage = "API sidecar 重启前任务未正常结束，请重新提交任务。",
                 CanCancel = false,
@@ -342,6 +365,7 @@ namespace ExportDocManager.Api.Hosting
                 CreatedAt = job.CreatedAt,
                 StartedAt = job.StartedAt,
                 CompletedAt = job.CompletedAt,
+                UpdatedAt = ApiBackgroundJobService.NextUpdatedAt(job.UpdatedAt, DateTimeOffset.UtcNow),
                 OutputPath = string.Empty,
                 ErrorMessage = job.ErrorMessage,
                 CanCancel = job.CanCancel,

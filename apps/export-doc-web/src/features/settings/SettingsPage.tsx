@@ -125,32 +125,32 @@ export function SettingsPage({
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
-    queryFn: () => client.getSettings(),
+    queryFn: ({ signal }) => client.getSettings({ signal }),
   });
 
   const healthQuery = useQuery({
     queryKey: queryKeys.health(),
-    queryFn: () => client.getHealth(),
+    queryFn: ({ signal }) => client.getHealth({ signal }),
     enabled: activeCategory === "maintenance",
   });
 
   const exportTemplatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates("ExportDocument"),
-    queryFn: () => client.listReportTemplates({ reportType: "ExportDocument" }),
+    queryFn: ({ signal }) => client.listReportTemplates({ reportType: "ExportDocument" }, { signal }),
     enabled: activeCategory === "document-templates",
     staleTime: 5 * 60 * 1000,
   });
 
   const paymentTemplatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates("PaymentVoucher"),
-    queryFn: () => client.listReportTemplates({ reportType: "PaymentVoucher" }),
+    queryFn: ({ signal }) => client.listReportTemplates({ reportType: "PaymentVoucher" }, { signal }),
     enabled: activeCategory === "document-templates",
     staleTime: 5 * 60 * 1000,
   });
 
   const issuingAuthoritiesQuery = useQuery({
     queryKey: queryKeys.singleWindowCustomsCooIssuingAuthorities(),
-    queryFn: () => client.getCustomsCooIssuingAuthorities(),
+    queryFn: ({ signal }) => client.getCustomsCooIssuingAuthorities({ signal }),
     enabled: activeCategory === "single-window",
     staleTime: 10 * 60 * 1000,
   });

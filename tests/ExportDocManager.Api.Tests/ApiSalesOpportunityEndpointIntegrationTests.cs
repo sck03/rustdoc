@@ -86,6 +86,33 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync($"/api/crm/customers/{customer.Id}")).StatusCode);
         }
 
+        [Fact]
+        public async Task SalesOpportunityDashboard_ShouldPreserveDecimalFinancialPrecision()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "sales-opportunity-decimal-dashboard",
+                "sales-opportunity-decimal-dashboard.db");
+            using var anonymous = harness.CreateClient();
+            var login = await harness.LoginAsync(anonymous, "admin", string.Empty);
+            using var client = harness.CreateClient(login.AccessToken);
+
+            var customerResponse = await client.PostAsJsonAsync("/api/crm/customers", new ApiCrmCustomerSaveRequest(
+                0, "Precision Customer", "CN", string.Empty, "跟进中", "测试", string.Empty, null));
+            var customer = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCrmCustomerDto>(customerResponse);
+            const decimal estimatedAmount = 99999999999999.1234m;
+            const int probabilityPercent = 37;
+            var createResponse = await client.PostAsJsonAsync("/api/crm/opportunities", new ApiSalesOpportunitySaveRequest(
+                0, customer.Id, null, "高精度金额商机", "谈判中", "QT-PRECISION-001", estimatedAmount,
+                "usd", probabilityPercent, null, string.Empty, string.Empty, "验证金额精度"));
+            Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+            var dashboard = await client.GetFromJsonAsync<ApiCrmDashboardDto>("/api/crm/dashboard");
+            var usd = Assert.Single(dashboard!.OpportunityCurrencies);
+            Assert.Equal("USD", usd.Currency);
+            Assert.Equal(estimatedAmount, usd.EstimatedAmount);
+            Assert.Equal(estimatedAmount * probabilityPercent / 100m, usd.WeightedAmount);
+        }
+
         private static AppDbContext CreateContext(string databasePath) => new(
             new DbContextOptionsBuilder<AppDbContext>().UseSqlite($"Data Source={databasePath}").Options);
     }

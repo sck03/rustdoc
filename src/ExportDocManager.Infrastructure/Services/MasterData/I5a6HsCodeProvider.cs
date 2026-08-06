@@ -8,6 +8,7 @@ namespace ExportDocManager.Services.MasterData
     public sealed class I5a6HsCodeProvider : IHsCodeRemoteProvider, IDisposable
     {
         private const string BaseUrl = "https://www.i5a6.com";
+        private const long MaximumStaticPageBytes = 4L * 1024L * 1024L;
         private readonly HttpClient _httpClient;
         private readonly ManagedPlaywrightBrowserHost _browserHost;
 
@@ -207,10 +208,25 @@ namespace ExportDocManager.Services.MasterData
             {
                 try
                 {
+                    using var operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    operationCancellation.CancelAfter(TimeSpan.FromSeconds(30));
                     using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                    using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseContentRead, cancellationToken).ConfigureAwait(false);
+                    using var response = await _httpClient.SendAsync(
+                        request,
+                        HttpCompletionOption.ResponseHeadersRead,
+                        operationCancellation.Token).ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
-                    return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    if (response.Content.Headers.ContentLength is long contentLength && contentLength > MaximumStaticPageBytes)
+                    {
+                        throw new PayloadLimitExceededException(MaximumStaticPageBytes);
+                    }
+
+                    await using var stream = await response.Content
+                        .ReadAsStreamAsync(operationCancellation.Token)
+                        .ConfigureAwait(false);
+                    return await BoundedStreamHelper
+                        .ReadUtf8TextAsync(stream, MaximumStaticPageBytes, operationCancellation.Token)
+                        .ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {

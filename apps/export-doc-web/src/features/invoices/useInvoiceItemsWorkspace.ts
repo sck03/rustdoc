@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -15,13 +15,16 @@ import { createInvoiceItemFromProduct, createProductDraftFromInvoiceItem, hasSam
 import {
   areInvoiceItemsEqual,
   areInvoiceItemValuesEqual,
-  cloneInvoiceItems,
   readInvoiceItemTableNumber,
 } from "./invoiceEditorHelpers.ts";
 
-const maxInvoiceItemHistoryDepth = 50;
+const maxInvoiceItemHistoryDepth = 30;
 type InvoiceItemEditHistory = { redo: ApiInvoiceItemDto[][]; undo: ApiInvoiceItemDto[][] };
 const emptyInvoiceItemEditHistory: InvoiceItemEditHistory = { redo: [], undo: [] };
+
+function readInvoiceItemHistoryDepth(currentItems: ApiInvoiceItemDto[]) {
+  return currentItems.length > 500 ? 10 : currentItems.length > 150 ? 20 : maxInvoiceItemHistoryDepth;
+}
 
 type Options = {
   client: ExportDocManagerApiClient;
@@ -42,20 +45,35 @@ export function useInvoiceItemsWorkspace({
 }: Options) {
   const requestConfirmation = useConfirmation();
   const queryClient = useQueryClient();
-  const [editHistory, setEditHistory] = useState<InvoiceItemEditHistory>(emptyInvoiceItemEditHistory);
+  const [editHistory, setEditHistoryState] = useState<InvoiceItemEditHistory>(emptyInvoiceItemEditHistory);
   const [productLibraryKeyword, setProductLibraryKeyword] = useState("");
   const [productLibraryMessage, setProductLibraryMessage] = useState<string | null>(null);
   const [productLibraryEnabled, setProductLibraryEnabled] = useState(false);
   const [productLibraryPageNumber, setProductLibraryPageNumber] = useState(1);
   const [productLibraryPageSize, setProductLibraryPageSize] = useState(30);
+  const latestInvoiceItemsRef = useRef(invoice?.items ?? []);
+  const latestEditHistoryRef = useRef(editHistory);
+
+  useEffect(() => {
+    latestInvoiceItemsRef.current = invoice?.items ?? [];
+  }, [invoice?.id, invoice?.items]);
+
+  function replaceEditHistory(nextHistory: InvoiceItemEditHistory) {
+    latestEditHistoryRef.current = nextHistory;
+    setEditHistoryState(nextHistory);
+  }
+
+  function updateEditHistory(buildHistory: (history: InvoiceItemEditHistory) => InvoiceItemEditHistory) {
+    replaceEditHistory(buildHistory(latestEditHistoryRef.current));
+  }
 
   const productsQuery = useQuery({
     queryKey: queryKeys.masterDataList("products", productLibraryPageNumber, productLibraryPageSize, productLibraryKeyword),
-    queryFn: () => client.listProducts({
+    queryFn: ({ signal }) => client.listProducts({
       keyword: productLibraryKeyword || undefined,
       pageNumber: productLibraryPageNumber,
       pageSize: productLibraryPageSize,
-    }),
+    }, { signal }),
     enabled: productLibraryEnabled,
     placeholderData: keepPreviousData,
     staleTime: 5 * 60 * 1000,
@@ -96,7 +114,7 @@ export function useInvoiceItemsWorkspace({
   });
 
   function resetEditHistory() {
-    setEditHistory(emptyInvoiceItemEditHistory);
+    replaceEditHistory(emptyInvoiceItemEditHistory);
   }
 
   function reset() {
@@ -135,25 +153,31 @@ export function useInvoiceItemsWorkspace({
     buildItems: (items: ApiInvoiceItemDto[], invoiceId: number) => ApiInvoiceItemDto[],
     options: { trackHistory?: boolean } = { trackHistory: true },
   ) {
-    setInvoice((current) => {
-      if (!isEditable || !current) return current;
-      const currentItems = current.items ?? [];
-      const nextItems = buildItems(currentItems, current.id);
-      if (areInvoiceItemsEqual(currentItems, nextItems)) return current;
+    if (!isEditable || !invoice) return;
+    const invoiceId = invoice.id;
+    const currentItems = latestInvoiceItemsRef.current;
+    const nextItems = buildItems(currentItems, invoice.id);
+    if (areInvoiceItemsEqual(currentItems, nextItems)) return;
+    latestInvoiceItemsRef.current = nextItems;
 
-      if (options.trackHistory !== false) {
-        const previousItems = cloneInvoiceItems(currentItems);
-        setEditHistory((history) => ({
-          undo: [...history.undo, previousItems].slice(-maxInvoiceItemHistoryDepth),
-          redo: [],
-        }));
-      }
-      return {
-        ...current,
-        items: nextItems,
-        ...calculateInvoiceTotals(nextItems, current.exchangeRate, current.currency),
-      };
-    });
+    if (options.trackHistory !== false) {
+      // Invoice item rows are treated as immutable by this workspace. Keep
+      // the existing array as the history snapshot so every keystroke does
+      // not clone the whole table; subsequent edits always allocate a new
+      // array before changing a row.
+      const historyDepth = readInvoiceItemHistoryDepth(currentItems);
+      updateEditHistory((history) => ({
+        undo: [...history.undo, currentItems].slice(-historyDepth),
+        redo: [],
+      }));
+    }
+    setInvoice((current) => current && current.id === invoiceId
+      ? {
+          ...current,
+          items: nextItems,
+          ...calculateInvoiceTotals(nextItems, current.exchangeRate, current.currency),
+        }
+      : current);
     setSuccessMessage(null);
   }
 
@@ -346,27 +370,35 @@ export function useInvoiceItemsWorkspace({
     setInvoiceItems((items) => items.filter((_, itemIndex) => itemIndex !== index));
   }
   function applyItemsSnapshot(items: ApiInvoiceItemDto[]) {
-    setInvoiceItems(() => cloneInvoiceItems(items), { trackHistory: false });
+    setInvoiceItems(() => items, { trackHistory: false });
   }
   function undoItemEdit() {
-    if (!invoice || editHistory.undo.length === 0) return;
-    const previousItems = editHistory.undo[editHistory.undo.length - 1];
-    const currentItems = cloneInvoiceItems(invoice.items ?? []);
+    const history = latestEditHistoryRef.current;
+    if (!invoice || history.undo.length === 0) return;
+    const previousItems = history.undo[history.undo.length - 1];
+    const currentItems = latestInvoiceItemsRef.current;
     applyItemsSnapshot(previousItems);
-    setEditHistory({
-      undo: editHistory.undo.slice(0, -1),
-      redo: [...editHistory.redo, currentItems].slice(-maxInvoiceItemHistoryDepth),
+    const historyDepth = readInvoiceItemHistoryDepth(
+      currentItems.length >= previousItems.length ? currentItems : previousItems,
+    );
+    replaceEditHistory({
+      undo: history.undo.slice(0, -1),
+      redo: [...history.redo, currentItems].slice(-historyDepth),
     });
     setSuccessMessage(null);
   }
   function redoItemEdit() {
-    if (!invoice || editHistory.redo.length === 0) return;
-    const nextItems = editHistory.redo[editHistory.redo.length - 1];
-    const currentItems = cloneInvoiceItems(invoice.items ?? []);
+    const history = latestEditHistoryRef.current;
+    if (!invoice || history.redo.length === 0) return;
+    const nextItems = history.redo[history.redo.length - 1];
+    const currentItems = latestInvoiceItemsRef.current;
     applyItemsSnapshot(nextItems);
-    setEditHistory({
-      undo: [...editHistory.undo, currentItems].slice(-maxInvoiceItemHistoryDepth),
-      redo: editHistory.redo.slice(0, -1),
+    const historyDepth = readInvoiceItemHistoryDepth(
+      currentItems.length >= nextItems.length ? currentItems : nextItems,
+    );
+    replaceEditHistory({
+      undo: [...history.undo, currentItems].slice(-historyDepth),
+      redo: history.redo.slice(0, -1),
     });
     setSuccessMessage(null);
   }

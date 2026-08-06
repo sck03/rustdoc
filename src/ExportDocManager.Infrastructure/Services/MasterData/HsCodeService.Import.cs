@@ -1,6 +1,7 @@
 using ClosedXML.Excel;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Data;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -48,6 +49,7 @@ namespace ExportDocManager.Services.MasterData
                 throw new FileNotFoundException("HS编码导入文件不存在。", filePath);
             }
 
+            ExcelWorkbookResourcePolicy.Validate(filePath);
             using var workbook = new XLWorkbook(filePath);
             var detected = DetectBestImportLayout(workbook);
             if (detected == null || detected.Layout.CodeColumn <= 0)

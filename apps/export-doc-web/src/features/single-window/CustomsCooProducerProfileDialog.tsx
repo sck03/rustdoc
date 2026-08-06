@@ -44,10 +44,10 @@ export function CustomsCooProducerProfileDialog({
 
   const profilesQuery = useQuery({
     queryKey: queryKeys.singleWindowCustomsCooProducerProfiles(committedKeyword.trim()),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       client.listCustomsCooProducerProfiles({
         keyword: committedKeyword.trim() || undefined,
-      }),
+      }, { signal }),
   });
 
   const saveMutation = useMutation({

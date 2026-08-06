@@ -17,7 +17,6 @@ PUBLIC_DOMAIN=""
 ACME_EMAIL=""
 REPOSITORY_REF="main"
 CONTAINER_SUBNET=""
-INSTALL_DOCKER=0
 ALLOW_NETWORK_OVERLAP=0
 NO_START=0
 
@@ -31,7 +30,7 @@ Usage:
 
 Options:
   --mode http|https          Internal HTTP or public Nginx + automatic HTTPS
-  --tag TAG                  GHCR image tag, preferably an exact version (default: latest)
+  --tag TAG                  Required exact GHCR image tag (latest is rejected)
   --image-namespace VALUE    Image namespace (default: ghcr.io/sck03)
   --install-dir PATH         Deployment and runtime root (default: /opt/export-doc-manager)
   --web-port PORT            Internal HTTP host port (default: 8080)
@@ -40,7 +39,6 @@ Options:
   --repo-ref REF             Git ref used to download deployment assets (default: main)
   --subnet CIDR              Explicit private /24 to /28 Docker subnet
   --allow-network-overlap    Accept an explicitly configured overlapping subnet
-  --install-docker           Install Docker with Docker's official convenience script if absent
   --no-start                 Generate and validate files without pulling or starting containers
   -h, --help                 Show this help
 
@@ -71,7 +69,6 @@ while (($# > 0)); do
     --repo-ref) REPOSITORY_REF=${2:?Missing value for --repo-ref}; shift 2 ;;
     --subnet) CONTAINER_SUBNET=${2:?Missing value for --subnet}; shift 2 ;;
     --allow-network-overlap) ALLOW_NETWORK_OVERLAP=1; shift ;;
-    --install-docker) INSTALL_DOCKER=1; shift ;;
     --no-start) NO_START=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) fail "Unknown argument: $1" ;;
@@ -88,28 +85,12 @@ case "$(uname -m)" in
   *) fail "Only Linux x64 and ARM64 hosts are supported by the published images." ;;
 esac
 
-for command_name in curl awk sed chmod cp mkdir mktemp mv openssl rm; do
+for command_name in curl awk sed chmod chown cp mkdir mktemp mv openssl rm; do
   command -v "$command_name" >/dev/null 2>&1 || fail "Required command is missing: $command_name"
 done
 
-install_docker_if_needed() {
-  if command -v docker >/dev/null 2>&1; then
-    return
-  fi
-  ((INSTALL_DOCKER == 1)) || fail "Docker is not installed. Install Docker Engine and Compose v2, or rerun with --install-docker."
-
-  local installer
-  installer=$(mktemp)
-  note "Installing Docker Engine with Docker's official convenience script..."
-  if ! curl --fail --silent --show-error --location --retry 3 https://get.docker.com --output "$installer" ||
-    ! sh "$installer"; then
-    rm -f -- "$installer"
-    fail "Docker's official installation script failed."
-  fi
-  rm -f -- "$installer"
-}
-
-install_docker_if_needed
+command -v docker >/dev/null 2>&1 ||
+  fail "Docker is not installed. Install Docker Engine and Compose v2 from your Linux distribution or Docker's signed package repository first."
 if ! docker info >/dev/null 2>&1; then
   if command -v systemctl >/dev/null 2>&1; then
     systemctl enable --now docker
@@ -183,7 +164,7 @@ MODE=${MODE:-http}
 IMAGE_NAMESPACE=${IMAGE_NAMESPACE:-$(env_value EXPORTDOCMANAGER_IMAGE_NAMESPACE)}
 IMAGE_NAMESPACE=${IMAGE_NAMESPACE:-ghcr.io/sck03}
 IMAGE_TAG=${IMAGE_TAG:-$(env_value EXPORTDOCMANAGER_IMAGE_TAG)}
-IMAGE_TAG=${IMAGE_TAG:-latest}
+[[ -n "$IMAGE_TAG" ]] || fail "First installation requires --tag with an exact published image version."
 if [[ -z "$WEB_PORT" && "$MODE" == "http" && "$EXISTING_MODE" == "http" ]]; then
   EXISTING_WEB_PORT=$(env_value EXPORTDOCMANAGER_WEB_PORT)
   [[ "$EXISTING_WEB_PORT" =~ ^[0-9]+$ ]] && WEB_PORT=$EXISTING_WEB_PORT
@@ -194,6 +175,7 @@ WEB_PORT=${WEB_PORT:-8080}
 [[ "$IMAGE_NAMESPACE" =~ ^ghcr\.io/[a-z0-9][a-z0-9._-]*$ ]] ||
   fail "--image-namespace must look like ghcr.io/account."
 [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || fail "Invalid container image tag."
+[[ "$IMAGE_TAG" != "latest" ]] || fail "The mutable latest tag is not accepted; use an exact published image version."
 
 RUNTIME_ROOT=$(env_value EXPORTDOCMANAGER_RUNTIME_ROOT)
 RUNTIME_ROOT=${RUNTIME_ROOT:-$INSTALL_DIR/runtime}
@@ -339,11 +321,17 @@ POSTGRES_USERNAME=${POSTGRES_USERNAME:-exportdoc}
 [[ "$POSTGRES_USERNAME" =~ ^[A-Za-z0-9_]{1,63}$ ]] || fail "POSTGRES_USER must contain 1-63 letters, digits, or underscores."
 
 mkdir -p -- "$RUNTIME_ROOT/api-data/Config" "$RUNTIME_ROOT/postgres" "$RUNTIME_ROOT/letsencrypt" "$RUNTIME_ROOT/acme-webroot"
-# Keep the host-visible root private. Direct bind-mount roots must remain
-# writable when Docker user namespaces map container root to an unprivileged UID.
+# The API image runs as the fixed, unprivileged uid/gid 10001. PostgreSQL's
+# Debian image runs as uid/gid 999. Bind-mount ownership is prepared up front
+# so neither service needs a world-writable host directory.
+chown -R 10001:10001 "$RUNTIME_ROOT/api-data"
+chown -R 999:999 "$RUNTIME_ROOT/postgres"
+chown root:root "$RUNTIME_ROOT" "$RUNTIME_ROOT/letsencrypt" "$RUNTIME_ROOT/acme-webroot"
 chmod 700 "$RUNTIME_ROOT"
-chmod 1777 "$RUNTIME_ROOT/postgres" "$RUNTIME_ROOT/api-data" "$RUNTIME_ROOT/letsencrypt" "$RUNTIME_ROOT/acme-webroot"
-chmod 0777 "$RUNTIME_ROOT/api-data/Config"
+chmod 0700 "$RUNTIME_ROOT/postgres"
+chmod 0750 "$RUNTIME_ROOT/api-data" "$RUNTIME_ROOT/api-data/Config"
+chmod 0700 "$RUNTIME_ROOT/letsencrypt"
+chmod 0755 "$RUNTIME_ROOT/acme-webroot"
 if [[ ! -f "$SETTINGS_FILE" ]]; then
   cat > "$SETTINGS_FILE" <<EOF
 {
@@ -390,7 +378,8 @@ set_env_value EXPORTDOCMANAGER_PUBLIC_DOMAIN "$PUBLIC_DOMAIN"
 set_env_value EXPORTDOCMANAGER_ACME_EMAIL "$ACME_EMAIL"
 set_env_value TZ Asia/Shanghai
 chmod 600 "$ENVIRONMENT_FILE"
-chmod 0644 "$SETTINGS_FILE"
+chown 10001:10001 "$SETTINGS_FILE"
+chmod 0600 "$SETTINGS_FILE"
 
 if [[ -n ${GHCR_TOKEN:-} ]]; then
   [[ -n ${GHCR_USER:-} ]] || fail "GHCR_USER is required when GHCR_TOKEN is set."

@@ -102,7 +102,7 @@ namespace ExportDocManager.Api.Hosting
                     return destinationValidation;
                 }
 
-                if (string.Equals(sourcePath, destinationPath, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(sourcePath, destinationPath, PathBoundaryHelper.PathComparison))
                 {
                     return Results.BadRequest(new ApiErrorResponse("订舱托单必须另存为新文件，不能覆盖源 Excel。"));
                 }

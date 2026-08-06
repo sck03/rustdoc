@@ -16,6 +16,13 @@ const DET_BOX_THRESHOLD: f32 = 0.45;
 const DET_UNCLIP_RATIO: f32 = 1.40;
 const REC_HEIGHT: u32 = 48;
 const REC_MAX_WIDTH: u32 = 3200;
+const MAX_IMAGE_BYTES: u64 = 25 * 1024 * 1024;
+const MAX_IMAGE_SIDE: u32 = 16_384;
+const MAX_IMAGE_PIXELS: u64 = 40_000_000;
+const MAX_DETECTED_BOXES: usize = 2_000;
+const MAX_MERGED_LINES: usize = 1_000;
+const MAX_FALLBACK_RECOGNITION_PIXELS: u64 = 4_000_000;
+const MAX_RECOGNITION_CANDIDATE_PIXELS: u64 = 4_000_000;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -178,6 +185,14 @@ impl Engine {
     }
 
     fn recognize_path(&mut self, path: &Path) -> Result<Vec<OcrLine>> {
+        let metadata =
+            fs::metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
+        if metadata.len() == 0 || metadata.len() > MAX_IMAGE_BYTES {
+            bail!("image must be non-empty and no larger than 25 MB")
+        }
+        let (width, height) = image::image_dimensions(path)
+            .with_context(|| format!("cannot inspect image dimensions for {}", path.display()))?;
+        validate_image_dimensions(width, height)?;
         let encoded =
             std::fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
         let image = image::load_from_memory(&encoded)
@@ -185,6 +200,9 @@ impl Engine {
             .to_rgb8();
         let mut rects = self.detect(&image)?;
         if rects.is_empty() {
+            if pixel_count(image.width(), image.height()) > MAX_FALLBACK_RECOGNITION_PIXELS {
+                bail!("no text regions detected; the image is too large for full-frame recognition")
+            }
             rects.push(Rect {
                 x: 0,
                 y: 0,
@@ -193,6 +211,9 @@ impl Engine {
             });
         }
         rects = merge_lines(rects);
+        if rects.len() > MAX_MERGED_LINES {
+            bail!("too many text lines were detected in the image")
+        }
         let mut lines = Vec::new();
         for rect in rects {
             let padded = pad_rect(rect, image.width(), image.height(), 10);
@@ -235,7 +256,7 @@ impl Engine {
         let h = shape[shape.len() - 2];
         let w = shape[shape.len() - 1];
         let map: Vec<f32> = output.iter().copied().collect();
-        Ok(component_rects(&map, w, h)
+        let rects = component_rects(&map, w, h)
             .into_iter()
             .filter_map(|r| {
                 let score = box_score(&map, w, r);
@@ -252,7 +273,12 @@ impl Engine {
                     expand_ratio(mapped, image.width(), image.height(), DET_UNCLIP_RATIO);
                 (expanded.width >= 3 && expanded.height >= 3).then_some(expanded)
             })
-            .collect())
+            .take(MAX_DETECTED_BOXES + 1)
+            .collect::<Vec<_>>();
+        if rects.len() > MAX_DETECTED_BOXES {
+            bail!("too many text regions were detected in the image")
+        }
+        Ok(rects)
     }
 
     fn recognize_image(&mut self, image: &RgbImage) -> Result<(String, f32)> {
@@ -413,16 +439,18 @@ fn merge_lines(mut rs: Vec<Rect>) -> Vec<Rect> {
     out
 }
 fn recognition_candidates(img: &RgbImage) -> Vec<RgbImage> {
-    let mut out = vec![
-        img.clone(),
-        imageops::resize(
-            img,
-            img.width() * 2,
-            img.height() * 2,
+    let base = resize_to_pixel_limit(img, MAX_RECOGNITION_CANDIDATE_PIXELS);
+    let base_pixels = pixel_count(base.width(), base.height());
+    let mut out = vec![base.clone()];
+    if base_pixels <= MAX_RECOGNITION_CANDIDATE_PIXELS / 4 {
+        out.push(imageops::resize(
+            &base,
+            base.width() * 2,
+            base.height() * 2,
             imageops::FilterType::CatmullRom,
-        ),
-    ];
-    let gray = DynamicImage::ImageRgb8(img.clone()).to_luma8();
+        ));
+    }
+    let gray = DynamicImage::ImageRgb8(base).to_luma8();
     let t = otsu(&gray);
     let binary = RgbImage::from_fn(gray.width(), gray.height(), |x, y| {
         let v = if gray.get_pixel(x, y)[0] > t { 255 } else { 0 };
@@ -430,6 +458,35 @@ fn recognition_candidates(img: &RgbImage) -> Vec<RgbImage> {
     });
     out.push(binary);
     out
+}
+
+fn validate_image_dimensions(width: u32, height: u32) -> Result<()> {
+    if width == 0 || height == 0 {
+        bail!("image dimensions must be non-zero")
+    }
+    if width > MAX_IMAGE_SIDE || height > MAX_IMAGE_SIDE {
+        bail!("image width and height must not exceed {MAX_IMAGE_SIDE} pixels")
+    }
+    if pixel_count(width, height) > MAX_IMAGE_PIXELS {
+        bail!("image must not exceed {MAX_IMAGE_PIXELS} pixels")
+    }
+    Ok(())
+}
+
+fn resize_to_pixel_limit(img: &RgbImage, maximum_pixels: u64) -> RgbImage {
+    let pixels = pixel_count(img.width(), img.height());
+    if pixels <= maximum_pixels || maximum_pixels == 0 {
+        return img.clone();
+    }
+
+    let scale = (maximum_pixels as f64 / pixels as f64).sqrt();
+    let width = ((img.width() as f64 * scale).floor() as u32).max(1);
+    let height = ((img.height() as f64 * scale).floor() as u32).max(1);
+    imageops::resize(img, width, height, imageops::FilterType::Triangle)
+}
+
+fn pixel_count(width: u32, height: u32) -> u64 {
+    u64::from(width) * u64::from(height)
 }
 fn otsu(g: &GrayImage) -> u8 {
     let mut hist = [0u64; 256];
@@ -642,6 +699,23 @@ mod tests {
         }
         let threshold = otsu(&image);
         assert!((10..=240).contains(&threshold));
+    }
+
+    #[test]
+    fn image_dimensions_reject_decompression_bomb_boundaries() {
+        assert!(validate_image_dimensions(0, 100).is_err());
+        assert!(validate_image_dimensions(MAX_IMAGE_SIDE + 1, 1).is_err());
+        assert!(validate_image_dimensions(10_000, 5_000).is_err());
+        assert!(validate_image_dimensions(5_000, 7_000).is_ok());
+    }
+
+    #[test]
+    fn recognition_preprocessing_respects_pixel_limit() {
+        let image = RgbImage::new(100, 100);
+        let resized = resize_to_pixel_limit(&image, 2_500);
+
+        assert!(pixel_count(resized.width(), resized.height()) <= 2_500);
+        assert_eq!((resized.width(), resized.height()), (50, 50));
     }
 }
 fn write_response(w: &mut impl Write, r: Response) -> Result<()> {

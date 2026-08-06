@@ -66,7 +66,7 @@ for (const file of walk(root)) {
   }
 
   if (sourceRelativePath === "features/invoices/useInvoiceItemsWorkspace.ts") {
-    for (const workspaceContract of ["maxInvoiceItemHistoryDepth = 50", "recalculateInvoiceItem", "masterDataRoot(\"products\")", "productLibraryEnabled", "productLibraryPageSize", "placeholderData: keepPreviousData"]) {
+    for (const workspaceContract of ["maxInvoiceItemHistoryDepth = 30", "currentItems.length > 500 ? 10", "currentItems.length > 150 ? 20", "readInvoiceItemHistoryDepth", "latestInvoiceItemsRef", "setInvoice((current)", "recalculateInvoiceItem", "masterDataRoot(\"products\")", "productLibraryEnabled", "productLibraryPageSize", "placeholderData: keepPreviousData"]) {
       if (!sourceText.includes(workspaceContract)) {
         failures.push(`${sourceRelativePath}: 发票明细工作区缺少历史、重算或商品库闭环：${workspaceContract}`);
       }
@@ -150,6 +150,14 @@ for (const file of walk(root)) {
   if (sourceRelativePath === "features/tools/container-packing/ContainerPackingWorkspace.tsx"
     && !sourceText.includes("useContainerPackingPdfExport")) {
     failures.push(`${sourceRelativePath}: PDF 导出状态与异步路径选择不得重新回流装柜展示组件`);
+  }
+
+  if (sourceRelativePath === "features/tools/container-packing/containerPackingPdfExport.ts") {
+    for (const pdfSnapshotContract of ["captureContainerPackingSceneSnapshot", "container-packing-pseudo3d-svg", "container-packing-pdf-scene-snapshot", 'querySelector(".container-packing-3d-section")?.remove()']) {
+      if (!sourceText.includes(pdfSnapshotContract)) {
+        failures.push(`${sourceRelativePath}: 装柜 PDF 必须嵌入真实三维截帧并移除隐藏交互画布：${pdfSnapshotContract}`);
+      }
+    }
   }
 
   const coordinatorContracts = {

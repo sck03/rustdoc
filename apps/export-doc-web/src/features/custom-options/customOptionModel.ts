@@ -18,10 +18,11 @@ export const masterDataCustomOptionTypes = ["PayeeCategory"] as const;
 export async function loadCustomOptionMap(
   client: ExportDocManagerApiClient,
   optionTypes: readonly string[],
+  signal?: AbortSignal,
 ): Promise<CustomOptionMap> {
   const entries = await Promise.all(
     optionTypes.map(async (optionType) => {
-      const response = await client.listCustomOptions({ optionType });
+      const response = await client.listCustomOptions({ optionType }, { signal });
       return [response.optionType || optionType, response.options ?? []] as const;
     }),
   );

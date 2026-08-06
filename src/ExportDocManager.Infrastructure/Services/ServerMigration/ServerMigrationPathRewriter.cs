@@ -31,7 +31,11 @@ namespace ExportDocManager.Services.Infrastructure
             }
             sourceRoot = sourceRoot.TrimEnd('/', '\\');
             targetRoot = targetRoot.TrimEnd('/', '\\');
-            if (string.Equals(sourceRoot, targetRoot, StringComparison.Ordinal))
+            bool sourcePathCaseSensitive = IsSourcePathCaseSensitive(sourceRoot);
+            StringComparison sourceComparison = sourcePathCaseSensitive
+                ? StringComparison.Ordinal
+                : StringComparison.OrdinalIgnoreCase;
+            if (string.Equals(sourceRoot, targetRoot, sourceComparison))
             {
                 return;
             }
@@ -51,6 +55,9 @@ namespace ExportDocManager.Services.Infrastructure
                     string identifier = QuoteIdentifier(column);
                     string remainder = $"substring({identifier} from char_length(@source) + 1)";
                     string relative = $"ltrim({remainder}, '/' || chr(92))";
+                    string sourcePrefixPredicate = sourcePathCaseSensitive
+                        ? $"left({identifier}, char_length(@source)) = @source"
+                        : $"lower(left({identifier}, char_length(@source))) = lower(@source)";
                     update.CommandText = $"""
 UPDATE {QuoteIdentifier(table)}
 SET {identifier} = @target ||
@@ -59,7 +66,7 @@ SET {identifier} = @target ||
       ELSE @separator || replace(replace({relative}, chr(92), @separator), '/', @separator)
     END
 WHERE {identifier} IS NOT NULL
-  AND lower(left({identifier}, char_length(@source))) = lower(@source)
+  AND {sourcePrefixPredicate}
   AND (
     char_length({identifier}) = char_length(@source)
     OR substring({identifier} from char_length(@source) + 1 for 1) = '/'
@@ -95,7 +102,10 @@ WHERE {identifier} IS NOT NULL
 
             string normalizedSource = NormalizeSeparators(sourceRoot).TrimEnd('/');
             string normalizedValue = NormalizeSeparators(value);
-            if (!normalizedValue.StartsWith(normalizedSource, StringComparison.OrdinalIgnoreCase) ||
+            StringComparison sourceComparison = IsSourcePathCaseSensitive(normalizedSource)
+                ? StringComparison.Ordinal
+                : StringComparison.OrdinalIgnoreCase;
+            if (!normalizedValue.StartsWith(normalizedSource, sourceComparison) ||
                 normalizedValue.Length > normalizedSource.Length &&
                 normalizedValue[normalizedSource.Length] != '/')
             {
@@ -112,6 +122,17 @@ WHERE {identifier} IS NOT NULL
 
         private static string NormalizeSeparators(string value) =>
             value.Replace('\\', '/');
+
+        private static bool IsSourcePathCaseSensitive(string sourceRoot)
+        {
+            string normalized = NormalizeSeparators(sourceRoot ?? string.Empty);
+            bool isWindowsDrivePath = normalized.Length >= 3 &&
+                char.IsAsciiLetter(normalized[0]) &&
+                normalized[1] == ':' &&
+                normalized[2] == '/';
+            bool isWindowsUncPath = normalized.StartsWith("//", StringComparison.Ordinal);
+            return !isWindowsDrivePath && !isWindowsUncPath;
+        }
 
         private static string QuoteIdentifier(string value) =>
             $"\"{value.Replace("\"", "\"\"")}\"";

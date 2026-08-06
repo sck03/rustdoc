@@ -285,6 +285,35 @@ function Set-UnixRuntimeMode {
     [System.IO.File]::SetUnixFileMode($Path, $Mode)
 }
 
+function Set-UnixRuntimeOwner {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][int]$UserId,
+        [Parameter(Mandatory = $true)][int]$GroupId,
+        [switch]$Recursive
+    )
+
+    if ($IsWindows) {
+        return
+    }
+
+    $chown = Get-Command chown -ErrorAction SilentlyContinue
+    if ($null -eq $chown) {
+        throw "缺少 chown，无法为非 root 容器准备运行目录所有权。"
+    }
+
+    $arguments = @()
+    if ($Recursive) {
+        $arguments += "-R"
+    }
+    $arguments += "$UserId`:$GroupId"
+    $arguments += $Path
+    & $chown.Source @arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "无法把运行目录所有权设置为 $UserId`:$GroupId：$Path"
+    }
+}
+
 if ($PostgreSqlPassword.Length -lt 12 -or $PostgreSqlPassword -notmatch '^[A-Za-z0-9._~!@%+=:-]+$') {
     throw "PostgreSQL 密码至少 12 位，且只能使用字母、数字和 . _ ~ ! @ % + = : -，避免 .env 转义歧义。"
 }
@@ -368,23 +397,41 @@ $configRoot = Join-Path $apiDataRoot "Config"
 New-Item -ItemType Directory -Force -Path $configRoot | Out-Null
 $postgresRoot = Join-Path $resolvedRuntimeRoot "postgres"
 New-Item -ItemType Directory -Force -Path $postgresRoot | Out-Null
+$letsencryptRoot = Join-Path $resolvedRuntimeRoot "letsencrypt"
+$acmeWebRoot = Join-Path $resolvedRuntimeRoot "acme-webroot"
+New-Item -ItemType Directory -Force -Path $letsencryptRoot | Out-Null
+New-Item -ItemType Directory -Force -Path $acmeWebRoot | Out-Null
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $resolvedEnvironmentFile) | Out-Null
 
 if (-not $IsWindows) {
+    $id = Get-Command id -ErrorAction SilentlyContinue
+    if ($null -eq $id -or [int](& $id.Source -u) -ne 0) {
+        throw "Linux/macOS 容器初始化必须以 root 运行（例如 sudo pwsh ./initialize-container-runtime.ps1），以便为固定容器 UID 安全设置目录所有权。"
+    }
+
     $ownerOnlyDirectory = [System.IO.UnixFileMode]::UserRead -bor
         [System.IO.UnixFileMode]::UserWrite -bor
         [System.IO.UnixFileMode]::UserExecute
-    $sharedDirectory = $ownerOnlyDirectory -bor
+    $containerDirectory = $ownerOnlyDirectory -bor
         [System.IO.UnixFileMode]::GroupRead -bor
-        [System.IO.UnixFileMode]::GroupWrite -bor
+        [System.IO.UnixFileMode]::GroupExecute
+    $publicReadDirectory = $ownerOnlyDirectory -bor
+        [System.IO.UnixFileMode]::GroupRead -bor
         [System.IO.UnixFileMode]::GroupExecute -bor
         [System.IO.UnixFileMode]::OtherRead -bor
-        [System.IO.UnixFileMode]::OtherWrite -bor
         [System.IO.UnixFileMode]::OtherExecute
+
+    Set-UnixRuntimeOwner $resolvedRuntimeRoot 0 0
+    Set-UnixRuntimeOwner $apiDataRoot 10001 10001 -Recursive
+    Set-UnixRuntimeOwner $postgresRoot 999 999 -Recursive
+    Set-UnixRuntimeOwner $letsencryptRoot 0 0 -Recursive
+    Set-UnixRuntimeOwner $acmeWebRoot 0 0 -Recursive
     Set-UnixRuntimeMode $resolvedRuntimeRoot $ownerOnlyDirectory
-    Set-UnixRuntimeMode $apiDataRoot ($sharedDirectory -bor [System.IO.UnixFileMode]::StickyBit)
-    Set-UnixRuntimeMode $configRoot $sharedDirectory
-    Set-UnixRuntimeMode $postgresRoot ($sharedDirectory -bor [System.IO.UnixFileMode]::StickyBit)
+    Set-UnixRuntimeMode $apiDataRoot $containerDirectory
+    Set-UnixRuntimeMode $configRoot $containerDirectory
+    Set-UnixRuntimeMode $postgresRoot $ownerOnlyDirectory
+    Set-UnixRuntimeMode $letsencryptRoot $ownerOnlyDirectory
+    Set-UnixRuntimeMode $acmeWebRoot $publicReadDirectory
 }
 
 $settings = [ordered]@{
@@ -424,11 +471,10 @@ if ($IsWindows) {
     Protect-RuntimeConfigurationFile $settingsPath
 }
 else {
-    $containerReadable = [System.IO.UnixFileMode]::UserRead -bor
-        [System.IO.UnixFileMode]::UserWrite -bor
-        [System.IO.UnixFileMode]::GroupRead -bor
-        [System.IO.UnixFileMode]::OtherRead
-    Set-UnixRuntimeMode $settingsPath $containerReadable
+    Set-UnixRuntimeOwner $settingsPath 10001 10001
+    $containerOwnerOnly = [System.IO.UnixFileMode]::UserRead -bor
+        [System.IO.UnixFileMode]::UserWrite
+    Set-UnixRuntimeMode $settingsPath $containerOwnerOnly
 }
 Protect-RuntimeConfigurationFile $resolvedEnvironmentFile
 

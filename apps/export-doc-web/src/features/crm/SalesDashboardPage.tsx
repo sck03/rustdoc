@@ -12,7 +12,7 @@ import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 
 export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
-  const query = useQuery({ queryKey: queryKeys.crmDashboard(), queryFn: () => client.getCrmDashboard() });
+  const query = useQuery({ queryKey: queryKeys.crmDashboard(), queryFn: ({ signal }) => client.getCrmDashboard({ signal }) });
   const dashboard = query.data;
   const openOpportunityCount = (dashboard?.opportunityStages ?? [])
     .filter((item) => item.stage !== "已成交" && item.stage !== "已失单")

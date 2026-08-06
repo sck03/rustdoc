@@ -58,6 +58,11 @@ namespace ExportDocManager.Services.Infrastructure
 
         public DateTimeOffset? CompletedAt { get; init; }
 
+        /// <summary>
+        /// Monotonic state timestamp used by persistence stores to reject stale snapshots.
+        /// </summary>
+        public DateTimeOffset UpdatedAt { get; init; }
+
         public string OutputPath { get; init; } = string.Empty;
 
         public string ErrorMessage { get; init; } = string.Empty;

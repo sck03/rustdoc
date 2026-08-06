@@ -83,7 +83,11 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 deletedTextLogs = TextLogCleanupHelper
-                    .Clean(_pathProvider.LogRoot, systemSettings.LogRetentionDays, retainedFileCount: 0)
+                    .Clean(
+                        _pathProvider.LogRoot,
+                        systemSettings.LogRetentionDays,
+                        retainedFileCount: 0,
+                        maxFileSizeMB: systemSettings.LogFileSizeLimitMB)
                     .TotalDeleted;
             }
 
@@ -131,7 +135,7 @@ namespace ExportDocManager.Services.Infrastructure
                 throw new InvalidDataException("新创建的数据库备份文件名无效，已停止云端上传。");
             }
 
-            await _cloudSyncService.UploadFileAsync(resolvedBackupPath, fileName).ConfigureAwait(false);
+            await _cloudSyncService.UploadFileAsync(resolvedBackupPath, fileName, cancellationToken).ConfigureAwait(false);
             return fileName;
         }
 

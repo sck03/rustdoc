@@ -24,10 +24,22 @@ namespace ExportDocManager.Api.Hosting
         DateTimeOffset ExpiresAt,
         User User);
 
-    public sealed class InMemoryApiSessionTokenService : IApiSessionTokenService
+    public sealed class InMemoryApiSessionTokenService : IApiSessionTokenService, IDisposable
     {
         private static readonly TimeSpan DefaultLifetime = TimeSpan.FromHours(8);
+        private static readonly TimeSpan CleanupInterval = TimeSpan.FromMinutes(15);
+        private const int MaximumTokenCount = 10_000;
         private readonly ConcurrentDictionary<string, ApiSessionToken> _tokens = new(StringComparer.Ordinal);
+        private readonly Timer _cleanupTimer;
+
+        public InMemoryApiSessionTokenService()
+        {
+            _cleanupTimer = new Timer(
+                static state => ((InMemoryApiSessionTokenService)state).CleanupExpiredTokens(),
+                this,
+                CleanupInterval,
+                CleanupInterval);
+        }
 
         public ApiSessionToken Issue(User user, TimeSpan? lifetime = null)
         {
@@ -40,6 +52,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiUserDtoFactory.ToUserSnapshot(user));
 
             _tokens[token] = issued;
+            CleanupExpiredTokens();
             return issued;
         }
 
@@ -114,6 +127,35 @@ namespace ExportDocManager.Api.Hosting
                 .TrimEnd('=')
                 .Replace('+', '-')
                 .Replace('/', '_');
+        }
+
+        private void CleanupExpiredTokens()
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            foreach (var pair in _tokens.ToArray())
+            {
+                if (pair.Value.ExpiresAt <= now)
+                {
+                    _tokens.TryRemove(pair.Key, out _);
+                }
+            }
+
+            if (_tokens.Count <= MaximumTokenCount)
+            {
+                return;
+            }
+
+            foreach (var pair in _tokens
+                .OrderBy(item => item.Value.ExpiresAt)
+                .Take(Math.Max(0, _tokens.Count - MaximumTokenCount)))
+            {
+                _tokens.TryRemove(pair.Key, out _);
+            }
+        }
+
+        public void Dispose()
+        {
+            _cleanupTimer.Dispose();
         }
     }
 

@@ -96,6 +96,7 @@ namespace ExportDocManager.Api.Hosting
                     CreatedAt = job.CreatedAt,
                     StartedAt = job.StartedAt,
                     CompletedAt = job.CompletedAt,
+                    UpdatedAt = NextUpdatedAt(job.UpdatedAt, default),
                     OutputPath = job.OutputPath,
                     ErrorMessage = job.ErrorMessage,
                     CanCancel = false,
@@ -194,29 +195,10 @@ namespace ExportDocManager.Api.Hosting
             }
 
             string key = job.JobId.Trim();
-            var normalized = new BackgroundJobSnapshot
-            {
-                JobId = key,
-                Kind = job.Kind ?? string.Empty,
-                Title = job.Title ?? string.Empty,
-                Status = string.IsNullOrWhiteSpace(job.Status) ? BackgroundJobStatusCatalog.Queued : job.Status,
-                ProgressPercent = job.ProgressPercent,
-                StatusText = job.StatusText ?? string.Empty,
-                DetailText = job.DetailText ?? string.Empty,
-                RequestedBy = job.RequestedBy ?? string.Empty,
-                RequestedByUserId = job.RequestedByUserId,
-                CreatedAt = job.CreatedAt == default ? DateTimeOffset.UtcNow : job.CreatedAt,
-                StartedAt = job.StartedAt,
-                CompletedAt = job.CompletedAt,
-                OutputPath = job.OutputPath ?? string.Empty,
-                ErrorMessage = job.ErrorMessage ?? string.Empty,
-                CanCancel = job.CanCancel,
-                CanRetry = job.CanRetry,
-                RetryOperation = job.RetryOperation ?? string.Empty,
-                RetryRequestJson = job.RetryRequestJson ?? string.Empty
-            };
-
-            _jobs.AddOrUpdate(key, normalized, (_, _) => normalized);
+            var normalized = _jobs.AddOrUpdate(
+                key,
+                _ => NormalizeNewJob(job, key),
+                (_, current) => Normalize(job, current));
             PersistJob(normalized);
             if (BackgroundJobStatusCatalog.IsTerminal(normalized.Status))
             {
@@ -375,6 +357,7 @@ namespace ExportDocManager.Api.Hosting
                 CreatedAt = job.CreatedAt == default ? fallback.CreatedAt : job.CreatedAt,
                 StartedAt = job.StartedAt,
                 CompletedAt = job.CompletedAt,
+                UpdatedAt = NextUpdatedAt(fallback.UpdatedAt, job.UpdatedAt),
                 OutputPath = job.OutputPath ?? string.Empty,
                 ErrorMessage = job.ErrorMessage ?? string.Empty,
                 CanCancel = job.CanCancel,
@@ -382,6 +365,43 @@ namespace ExportDocManager.Api.Hosting
                 RetryOperation = CoalesceRetryValue(job.RetryOperation, fallback.RetryOperation),
                 RetryRequestJson = CoalesceRetryValue(job.RetryRequestJson, fallback.RetryRequestJson)
             };
+        }
+
+        private static BackgroundJobSnapshot NormalizeNewJob(BackgroundJobSnapshot job, string jobId)
+        {
+            return new BackgroundJobSnapshot
+            {
+                JobId = jobId,
+                Kind = job.Kind ?? string.Empty,
+                Title = job.Title ?? string.Empty,
+                Status = string.IsNullOrWhiteSpace(job.Status) ? BackgroundJobStatusCatalog.Queued : job.Status,
+                ProgressPercent = job.ProgressPercent,
+                StatusText = job.StatusText ?? string.Empty,
+                DetailText = job.DetailText ?? string.Empty,
+                RequestedBy = job.RequestedBy ?? string.Empty,
+                RequestedByUserId = job.RequestedByUserId,
+                CreatedAt = job.CreatedAt == default ? DateTimeOffset.UtcNow : job.CreatedAt,
+                StartedAt = job.StartedAt,
+                CompletedAt = job.CompletedAt,
+                UpdatedAt = NextUpdatedAt(default, job.UpdatedAt),
+                OutputPath = job.OutputPath ?? string.Empty,
+                ErrorMessage = job.ErrorMessage ?? string.Empty,
+                CanCancel = job.CanCancel,
+                CanRetry = job.CanRetry,
+                RetryOperation = job.RetryOperation ?? string.Empty,
+                RetryRequestJson = job.RetryRequestJson ?? string.Empty
+            };
+        }
+
+        private static DateTimeOffset NextUpdatedAt(DateTimeOffset previous, DateTimeOffset requested)
+        {
+            DateTimeOffset candidate = requested == default ? DateTimeOffset.UtcNow : requested;
+            if (previous != default && candidate <= previous)
+            {
+                candidate = previous.AddTicks(1);
+            }
+
+            return candidate;
         }
 
         private static string CoalesceRetryValue(string value, string fallback)

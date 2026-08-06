@@ -4222,10 +4222,20 @@ tbody tr:hover {
 }
 
 .container-packing-pdf-export .container-packing-pseudo3d-svg,
+.container-packing-pdf-export .container-packing-pdf-scene-snapshot,
 .container-packing-pdf-export .container-packing-svg {
   width: 100%;
   min-width: 0;
   max-width: 100%;
+}
+
+.container-packing-pdf-export .container-packing-pdf-scene-snapshot {
+  display: block;
+  min-height: 260px;
+  aspect-ratio: 49 / 18;
+  object-fit: cover;
+  background: #fbfcfd;
+  border: 1px solid #e1e8ee;
 }
 
 .container-packing-pdf-cargo h2 {

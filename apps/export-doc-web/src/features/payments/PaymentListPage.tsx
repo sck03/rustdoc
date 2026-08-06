@@ -26,12 +26,12 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
 
   const paymentsQuery = useQuery({
     queryKey: queryKeys.payments(pageNumber, pageSize, committedKeyword.trim()),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       client.listPayments({
         pageNumber,
         pageSize,
         keyword: committedKeyword.trim() || undefined,
-      }),
+      }, { signal }),
     placeholderData: keepPreviousData,
   });
 

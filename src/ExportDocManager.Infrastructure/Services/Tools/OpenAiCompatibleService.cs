@@ -7,11 +7,15 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Tools
 {
     public class OpenAiCompatibleService : IAIService
     {
+        private const long MaximumResponseBytes = 4L * 1024L * 1024L;
+        private const long MaximumErrorResponseBytes = 64L * 1024L;
+        private static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(2);
         private readonly HttpClient _httpClient;
         private readonly ISettingsService _settingsService;
 
@@ -23,6 +27,9 @@ namespace ExportDocManager.Services.Tools
 
         public async Task<string> AnalyzeComplianceAsync(string prompt, string content, CancellationToken cancellationToken = default)
         {
+            using var operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            operationCancellation.CancelAfter(OperationTimeout);
+            CancellationToken operationToken = operationCancellation.Token;
             var aiSettings = _settingsService.Settings?.AI ?? new AISettings();
             var endpoint = BuildEndpointUri(string.IsNullOrWhiteSpace(aiSettings.ApiEndpoint)
                 ? "https://api.deepseek.com/v1/chat/completions"
@@ -68,15 +75,18 @@ namespace ExportDocManager.Services.Tools
 
             using var response = await _httpClient.SendAsync(
                 requestMessage,
-                HttpCompletionOption.ResponseContentRead,
-                cancellationToken);
+                HttpCompletionOption.ResponseHeadersRead,
+                operationToken);
             if (!response.IsSuccessStatusCode)
             {
-                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                var errorBody = await ReadBoundedTextAsync(
+                    response.Content,
+                    MaximumErrorResponseBytes,
+                    operationToken);
                 throw new HttpRequestException($"AI request failed with status {response.StatusCode}: {ExtractErrorMessage(errorBody)}");
             }
 
-            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            var responseBody = await ReadBoundedTextAsync(response.Content, MaximumResponseBytes, operationToken);
             using var document = JsonDocument.Parse(responseBody);
             var root = document.RootElement;
             if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
@@ -164,6 +174,20 @@ namespace ExportDocManager.Services.Tools
             }
 
             return string.Empty;
+        }
+
+        private static async Task<string> ReadBoundedTextAsync(
+            HttpContent content,
+            long maximumBytes,
+            CancellationToken cancellationToken)
+        {
+            if (content.Headers.ContentLength is long contentLength && contentLength > maximumBytes)
+            {
+                throw new PayloadLimitExceededException(maximumBytes);
+            }
+
+            await using var stream = await content.ReadAsStreamAsync(cancellationToken);
+            return await BoundedStreamHelper.ReadUtf8TextAsync(stream, maximumBytes, cancellationToken);
         }
     }
 }

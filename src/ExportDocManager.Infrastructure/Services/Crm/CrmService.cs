@@ -263,9 +263,14 @@ namespace ExportDocManager.Services.Crm
             var query = _accessScope.ApplyCrmFollowUpScope(context.CrmFollowUps.AsNoTracking());
             if (crmCustomerId is > 0) query = query.Where(item => item.CrmCustomerId == crmCustomerId.Value);
             if (!includeCompleted) query = query.Where(item => !item.IsCompleted);
+            limit = Math.Clamp(limit, 1, 200);
             var rows = await query
-                .OrderByDescending(item => item.Id)
-                .Take(1000)
+                .OrderBy(item => item.IsCompleted)
+                .ThenBy(item => item.NextFollowUpAt == null)
+                .ThenBy(item => item.NextFollowUpAt)
+                .ThenByDescending(item => item.FollowedUpAt)
+                .ThenByDescending(item => item.Id)
+                .Take(limit)
                 .Select(item => new CrmFollowUpRecord(
                     item.Id, item.CrmCustomerId,
                     context.CrmCustomers.Where(customer => customer.Id == item.CrmCustomerId).Select(customer => customer.Name).FirstOrDefault() ?? string.Empty,
@@ -274,12 +279,7 @@ namespace ExportDocManager.Services.Crm
                     item.Type, item.Summary, item.NextAction, item.FollowedUpAt, item.NextFollowUpAt,
                     item.IsCompleted, item.CreatedAt, item.UpdatedAt, item.VersionNumber))
                 .ToListAsync(cancellationToken);
-            return rows
-                .OrderBy(item => item.IsCompleted)
-                .ThenBy(item => item.NextFollowUpAt ?? DateTimeOffset.MaxValue)
-                .ThenByDescending(item => item.FollowedUpAt)
-                .Take(Math.Clamp(limit, 1, 200))
-                .ToArray();
+            return rows.ToArray();
         }
 
         public async Task<PagedResult<CrmFollowUpRecord>> QueryFollowUpsAsync(

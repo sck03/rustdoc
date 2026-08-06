@@ -46,19 +46,19 @@ export function PaymentEditorPage({
 
   const paymentQuery = useQuery({
     queryKey: queryKeys.payment(parsedPaymentId),
-    queryFn: () => client.getPayment({ id: parsedPaymentId }),
+    queryFn: ({ signal }) => client.getPayment({ id: parsedPaymentId }, { signal }),
     enabled: !isNew && isPaymentIdValid,
   });
 
   const customOptionsQuery = useQuery({
     queryKey: queryKeys.customOptionsGroup("payment-editor"),
-    queryFn: () => loadCustomOptionMap(client, paymentCustomOptionTypes),
+    queryFn: ({ signal }) => loadCustomOptionMap(client, paymentCustomOptionTypes, signal),
     staleTime: 5 * 60 * 1000,
   });
 
   const payeesQuery = useQuery({
     queryKey: queryKeys.masterDataRoot("payees"),
-    queryFn: () => client.listPayees({}),
+    queryFn: ({ signal }) => client.listPayees({}, { signal }),
     staleTime: 5 * 60 * 1000,
   });
 

@@ -415,8 +415,9 @@ namespace ExportDocManager.Infrastructure.Tests
 
             public string UploadedRemoteFileName { get; private set; } = string.Empty;
 
-            public Task UploadFileAsync(string localFilePath, string remoteFileName)
+            public Task UploadFileAsync(string localFilePath, string remoteFileName, CancellationToken cancellationToken = default)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (UploadException != null)
                 {
                     throw UploadException;
@@ -427,18 +428,21 @@ namespace ExportDocManager.Infrastructure.Tests
                 return Task.CompletedTask;
             }
 
-            public Task<IReadOnlyList<CloudBackupFileInfo>> ListBackupFilesAsync()
+            public Task<IReadOnlyList<CloudBackupFileInfo>> ListBackupFilesAsync(CancellationToken cancellationToken = default)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 return Task.FromResult<IReadOnlyList<CloudBackupFileInfo>>([]);
             }
 
-            public Task DownloadFileAsync(string remoteFileName, string localFilePath)
+            public Task DownloadFileAsync(string remoteFileName, string localFilePath, CancellationToken cancellationToken = default)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 return Task.CompletedTask;
             }
 
-            public Task<bool> TestConnectionAsync(WebDavSettings settings)
+            public Task<bool> TestConnectionAsync(WebDavSettings settings, CancellationToken cancellationToken = default)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 return Task.FromResult(true);
             }
         }

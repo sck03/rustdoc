@@ -19,6 +19,7 @@ namespace ExportDocManager.Services.Data
 
         private static IReadOnlyList<IReadOnlyList<string>> ReadWorkbook(Stream input, int maximumRows)
         {
+            ExcelWorkbookResourcePolicy.ValidateOpenXmlPackage(input);
             using var workbook = new XLWorkbook(input);
             var sheet = workbook.Worksheets.FirstOrDefault() ?? throw new InvalidDataException("Excel 工作簿没有可读取的工作表。");
             var range = sheet.RangeUsed() ?? throw new InvalidDataException("Excel 工作表为空。");

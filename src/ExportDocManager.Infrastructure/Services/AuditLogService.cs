@@ -64,11 +64,6 @@ namespace ExportDocManager.Services.Infrastructure
                 Math.Max(1, maxCount),
                 cancellationToken);
 
-            if (rows.Count == 0)
-            {
-                return 0;
-            }
-
             await AtomicFileHelper.WriteFileAtomicAsync(
                 destinationPath,
                 (tempFilePath, ct) => Task.Run(

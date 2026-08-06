@@ -6,6 +6,7 @@ import { selectSaveExcelPath, selectSavePdfPath } from "../../desktop/desktopBri
 import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { buildReportPdfDefaultFileName } from "../reports/reportFileNames.ts";
 import { buildInvoiceBookingSheetDefaultFileName } from "./invoiceReportPreviewModel.ts";
 
@@ -40,6 +41,7 @@ export function useInvoiceFileExportOperations(options: Options) {
     feedback,
   } = options;
   const queryClient = useQueryClient();
+  const runAbortableOperation = useAbortableOperation();
   const [pdfDestinationPath, setPdfDestinationPath] = useState("");
   const [bookingSheetDestinationPath, setBookingSheetDestinationPath] = useState("");
 
@@ -52,7 +54,7 @@ export function useInvoiceFileExportOperations(options: Options) {
   const bookingSheetDefaultFileName = buildInvoiceBookingSheetDefaultFileName(invoiceNo, invoiceId);
 
   const pdfMutation = useMutation({
-    mutationFn: async (destinationPath?: string) => {
+    mutationFn: async (destinationPath?: string) => runAbortableOperation(async (signal) => {
       const job = desktopAvailable
         ? await client.startInvoiceReportPdfSaveToPathJob({
             invoiceId,
@@ -62,16 +64,16 @@ export function useInvoiceFileExportOperations(options: Options) {
               withSeal,
               destinationPath: (destinationPath ?? pdfDestinationPath).trim(),
             },
-          })
+          }, { signal })
         : await client.startInvoiceReportPdfDownloadJob({
             invoiceId,
             body: { reportType: "ExportDocument", templatePath: selectedTemplatePath, withSeal, destinationPath: "" },
-          });
+          }, { signal });
       if (!desktopAvailable) {
-        await downloadJobResultWhenReady(client, job, pdfDefaultFileName);
+        await downloadJobResultWhenReady(client, job, pdfDefaultFileName, { signal });
       }
       return job;
-    },
+    }),
     onSuccess: async (job) => {
       feedback.showJob(desktopAvailable ? `已创建报表 PDF 任务：${job.jobId}` : "PDF 已交给浏览器下载。", job.jobId);
       await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
@@ -80,17 +82,17 @@ export function useInvoiceFileExportOperations(options: Options) {
   });
 
   const bookingSheetMutation = useMutation({
-    mutationFn: async (destinationPath?: string) => {
+    mutationFn: async (destinationPath?: string) => runAbortableOperation(async (signal) => {
       const job = desktopAvailable
         ? await client.startInvoiceBookingSheetSaveToPathJob({
             body: { invoiceId, destinationPath: (destinationPath ?? bookingSheetDestinationPath).trim() },
-          })
-        : await client.startInvoiceBookingSheetDownloadJob({ invoiceId });
+          }, { signal })
+        : await client.startInvoiceBookingSheetDownloadJob({ invoiceId }, { signal });
       if (!desktopAvailable) {
-        await downloadJobResultWhenReady(client, job, bookingSheetDefaultFileName);
+        await downloadJobResultWhenReady(client, job, bookingSheetDefaultFileName, { signal });
       }
       return job;
-    },
+    }),
     onSuccess: async (job) => {
       feedback.showJob(desktopAvailable ? `已创建发票托单任务：${job.jobId}` : "托单 Excel 已交给浏览器下载。", job.jobId);
       await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });

@@ -573,10 +573,7 @@ pub(crate) fn log_frontend_error(
     fs::create_dir_all(&paths.log_root)
         .map_err(|error| format!("无法创建前端错误日志目录：{error}"))?;
     let log_path = paths.log_root.join("frontend-errors.log");
-    fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
+    crate::log_rotation::open_append_log_file(&log_path)
         .and_then(|mut log| {
             writeln!(
                 log,
@@ -613,7 +610,7 @@ fn resolve_open_path_target(input: &Path) -> Result<(PathBuf, bool), String> {
 
 #[tauri::command]
 pub(crate) fn request_app_exit(app_handle: tauri::AppHandle) -> Result<(), String> {
-    EXIT_CONFIRMED.store(true, Ordering::SeqCst);
+    confirm_app_exit();
     if let Some(window) = app_handle.get_webview_window("main") {
         if let Err(error) = window.close() {
             EXIT_CONFIRMED.store(false, Ordering::SeqCst);
@@ -628,6 +625,10 @@ pub(crate) fn request_app_exit(app_handle: tauri::AppHandle) -> Result<(), Strin
 
 pub(crate) fn is_app_exit_confirmed() -> bool {
     EXIT_CONFIRMED.load(Ordering::SeqCst)
+}
+
+pub(crate) fn confirm_app_exit() {
+    EXIT_CONFIRMED.store(true, Ordering::SeqCst);
 }
 
 fn pick_file(title: &str, filters: &[(&str, &[&str])]) -> Option<String> {

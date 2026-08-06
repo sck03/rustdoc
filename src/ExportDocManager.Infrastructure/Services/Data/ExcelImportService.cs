@@ -52,6 +52,7 @@ namespace ExportDocManager.Services.Data
         public async Task<ImportResult> ImportFromExcelAsync(string filePath, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ExcelWorkbookResourcePolicy.Validate(filePath);
 
             ExcelImportAnalysisReport analysisReport = null;
             var settings = _settingsService.Settings.ExcelImport ?? new ExcelImportSettings();

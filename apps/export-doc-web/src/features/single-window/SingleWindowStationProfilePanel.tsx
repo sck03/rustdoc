@@ -37,7 +37,7 @@ export function SingleWindowStationProfilePanel({
 
   const profilesQuery = useQuery({
     queryKey: queryKeys.singleWindowClientProfiles(),
-    queryFn: () => client.getSingleWindowClientProfiles(),
+    queryFn: ({ signal }) => client.getSingleWindowClientProfiles({ signal }),
     staleTime: 60_000,
   });
 

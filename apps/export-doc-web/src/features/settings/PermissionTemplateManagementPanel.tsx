@@ -51,7 +51,7 @@ export function PermissionTemplateManagementPanel({
 
   const catalogQuery = useQuery({
     queryKey: queryKeys.permissionTemplates(),
-    queryFn: () => client.listPermissionTemplates(),
+    queryFn: ({ signal }) => client.listPermissionTemplates({ signal }),
     enabled: canManageUsers,
   });
   const templates = catalogQuery.data?.templates ?? [];

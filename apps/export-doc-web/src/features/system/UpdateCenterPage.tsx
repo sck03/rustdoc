@@ -24,7 +24,7 @@ export function UpdateCenterPage({ client }: { client: ExportDocManagerApiClient
   const isDesktop = isDesktopBridgeAvailable();
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
-    queryFn: () => client.getSettings(),
+    queryFn: ({ signal }) => client.getSettings({ signal }),
     enabled: isDesktop,
   });
   const updaterEndpoint = readUpdaterEndpoint(settingsQuery.data?.settings);

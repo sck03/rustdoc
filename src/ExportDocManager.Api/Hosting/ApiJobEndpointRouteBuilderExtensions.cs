@@ -352,6 +352,7 @@ namespace ExportDocManager.Api.Hosting
                 CreatedAt = job.CreatedAt,
                 StartedAt = job.StartedAt,
                 CompletedAt = job.CompletedAt,
+                UpdatedAt = job.UpdatedAt,
                 OutputPath = Path.GetFileName(job.OutputPath),
                 ErrorMessage = job.ErrorMessage,
                 CanCancel = job.CanCancel,

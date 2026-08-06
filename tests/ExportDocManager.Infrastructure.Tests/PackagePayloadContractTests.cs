@@ -129,6 +129,7 @@ public sealed class PackagePayloadContractTests
     {
         string root = FindWorkspaceRoot();
         string installer = File.ReadAllText(Path.Combine(root, "deploy", "container", "install-container.sh"));
+        string initializer = File.ReadAllText(Path.Combine(root, "deploy", "container", "initialize-container-runtime.ps1"));
         string baseCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.ghcr.yml"));
         string acmeCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.acme.yml"));
         string nginxConfig = File.ReadAllText(Path.Combine(root, "deploy", "container", "nginx.acme.conf"));
@@ -141,9 +142,14 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("--standalone", installer, StringComparison.Ordinal);
         Assert.Contains("-checkend 2592000", installer, StringComparison.Ordinal);
         Assert.Contains("restore_previous_deployment", installer, StringComparison.Ordinal);
-        Assert.Contains("chmod 1777 \"$RUNTIME_ROOT/postgres\"", installer, StringComparison.Ordinal);
-        Assert.Contains("chmod 0777 \"$RUNTIME_ROOT/api-data/Config\"", installer, StringComparison.Ordinal);
-        Assert.Contains("chmod 0644 \"$SETTINGS_FILE\"", installer, StringComparison.Ordinal);
+        Assert.Contains("chown -R 10001:10001 \"$RUNTIME_ROOT/api-data\"", installer, StringComparison.Ordinal);
+        Assert.Contains("chown -R 999:999 \"$RUNTIME_ROOT/postgres\"", installer, StringComparison.Ordinal);
+        Assert.Contains("chmod 0700 \"$RUNTIME_ROOT/postgres\"", installer, StringComparison.Ordinal);
+        Assert.Contains("chmod 0750 \"$RUNTIME_ROOT/api-data\" \"$RUNTIME_ROOT/api-data/Config\"", installer, StringComparison.Ordinal);
+        Assert.Contains("chmod 0600 \"$SETTINGS_FILE\"", installer, StringComparison.Ordinal);
+        Assert.DoesNotContain("[System.IO.UnixFileMode]::GroupWrite", initializer, StringComparison.Ordinal);
+        Assert.DoesNotContain("https://get.docker.com", installer, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("latest tag is not accepted", installer, StringComparison.Ordinal);
         Assert.Contains("logs --no-color --tail=120", installer, StringComparison.Ordinal);
         Assert.Contains("config --quiet", installer, StringComparison.Ordinal);
         Assert.Contains("pull", installer, StringComparison.Ordinal);
@@ -188,7 +194,7 @@ public sealed class PackagePayloadContractTests
     }
 
     [Fact]
-    public void ContainerApi_ShouldExplicitlyDisableChromiumSandboxForItsRootRuntime()
+    public void ContainerApi_ShouldRunAsUnprivilegedUserWithChromiumSandboxEnabled()
     {
         string root = FindWorkspaceRoot();
         string dockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.api"));
@@ -196,9 +202,10 @@ public sealed class PackagePayloadContractTests
         string ghcrCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.ghcr.yml"));
         const string setting = "EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX";
 
-        Assert.Contains($"{setting}=true", dockerfile, StringComparison.Ordinal);
-        Assert.Contains($"{setting}: \"true\"", localCompose, StringComparison.Ordinal);
-        Assert.Contains($"{setting}: \"true\"", ghcrCompose, StringComparison.Ordinal);
+        Assert.Contains("USER 10001:10001", dockerfile, StringComparison.Ordinal);
+        Assert.Contains($"{setting}=false", dockerfile, StringComparison.Ordinal);
+        Assert.Contains($"{setting}: \"false\"", localCompose, StringComparison.Ordinal);
+        Assert.Contains($"{setting}: \"false\"", ghcrCompose, StringComparison.Ordinal);
     }
 
     [Fact]

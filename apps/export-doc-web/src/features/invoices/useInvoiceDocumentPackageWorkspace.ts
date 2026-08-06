@@ -11,6 +11,7 @@ import { selectDirectory, selectSaveZipPath } from "../../desktop/desktopBridge.
 import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import {
   buildBatchExportConfigDraft,
   buildDocumentEmailBody,
@@ -63,6 +64,7 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     onPreviewGenerated,
   } = options;
   const queryClient = useQueryClient();
+  const runAbortableOperation = useAbortableOperation();
   const [preview, setPreview] = useState<ApiInvoiceDocumentPackagePreviewResponse | null>(null);
   const [destinationPath, setDestinationPath] = useState("");
   const [createZip, setCreateZip] = useState(true);
@@ -149,7 +151,8 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
   const defaultFileName = buildDocumentPackageDefaultFileName(configDraft, invoiceNo, customerName, invoiceId);
 
   const previewMutation = useMutation({
-    mutationFn: () => client.previewInvoiceDocumentPackageHtml({ invoiceId, body: { items: selectedItems } }),
+    mutationFn: () => runAbortableOperation((signal) =>
+      client.previewInvoiceDocumentPackageHtml({ invoiceId, body: { items: selectedItems } }, { signal })),
     onSuccess: (response) => {
       setPreview(response);
       onPreviewGenerated();
@@ -158,22 +161,22 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     onError: (error) => feedback.showError(readApiError(error)),
   });
   const packageMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async () => runAbortableOperation(async (signal) => {
       const job = desktopAvailable
         ? await client.startInvoiceDocumentPackageSaveToPathJob({
             invoiceId,
             body: { items: selectedItems, includeMergedPdf, createZip, destinationPath: destinationPath.trim() },
-          })
+          }, { signal })
         : await client.startInvoiceDocumentPackageDownloadJob({
             invoiceId,
             body: { items: selectedItems, includeMergedPdf, createZip: true, destinationPath: "" },
-          });
+          }, { signal });
       if (!desktopAvailable) {
         const downloadName = defaultFileName.toLowerCase().endsWith(".zip") ? defaultFileName : `${defaultFileName}.zip`;
-        await downloadJobResultWhenReady(client, job, downloadName);
+        await downloadJobResultWhenReady(client, job, downloadName, { signal });
       }
       return job;
-    },
+    }),
     onSuccess: async (job) => {
       feedback.showJob(
         desktopAvailable
@@ -186,7 +189,7 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     onError: (error) => feedback.showError(readApiError(error)),
   });
   const emailMutation = useMutation({
-    mutationFn: () => client.startInvoiceDocumentEmailJob({
+    mutationFn: () => runAbortableOperation((signal) => client.startInvoiceDocumentEmailJob({
       invoiceId,
       body: {
         items: selectedItems,
@@ -195,7 +198,7 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
         subject: emailSubject.trim(),
         body: emailBody,
       },
-    }),
+    }, { signal })),
     onSuccess: async (job) => {
       feedback.showJob(`已创建单据邮件任务：${job.jobId}`, job.jobId);
       await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
@@ -203,9 +206,9 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     onError: (error) => feedback.showError(readApiError(error)),
   });
   const saveConfigMutation = useMutation({
-    mutationFn: (draft: BatchExportConfigDraft) => client.updateSettings({
+    mutationFn: (draft: BatchExportConfigDraft) => runAbortableOperation((signal) => client.updateSettings({
       body: { settings: buildSettingsWithBatchExportConfig(settingsResponse?.settings ?? {}, draft), updateSecrets: false },
-    }),
+    }, { signal })),
     onSuccess: async (response) => {
       const nextDraft = buildBatchExportConfigDraft(response.settings, templates);
       setConfigDraft(nextDraft);

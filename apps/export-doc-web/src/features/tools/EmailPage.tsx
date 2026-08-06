@@ -48,7 +48,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
 
   const statusQuery = useQuery({
     queryKey: queryKeys.emailStatus(),
-    queryFn: () => client.getEmailToolStatus(),
+    queryFn: ({ signal }) => client.getEmailToolStatus({ signal }),
   });
 
   useEffect(() => {

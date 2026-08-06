@@ -121,7 +121,7 @@ namespace ExportDocManager.Services.Reporting
                 reportType,
                 newTemplatePath,
                 Path.GetFileName(current.TemplatePath));
-            if (string.Equals(current.TemplatePath, resolvedNewPath, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(current.TemplatePath, resolvedNewPath, PathBoundaryHelper.PathComparison))
             {
                 string unchangedContent = await File.ReadAllTextAsync(current.TemplatePath, Encoding.UTF8, cancellationToken)
                     .ConfigureAwait(false);
@@ -244,7 +244,7 @@ namespace ExportDocManager.Services.Reporting
 
             var configs = await _catalogLoader.LoadResolvedConfigsAsync(cancellationToken).ConfigureAwait(false);
             var matched = configs.FirstOrDefault(config =>
-                string.Equals(Path.GetFullPath(config.FileName), resolvedPath, StringComparison.OrdinalIgnoreCase));
+                string.Equals(Path.GetFullPath(config.FileName), resolvedPath, PathBoundaryHelper.PathComparison));
 
             bool withinManagedTemplateRoots = _pathResolver.IsBuiltInTemplatePath(resolvedPath) ||
                                               _pathResolver.IsUserTemplatePath(resolvedPath);

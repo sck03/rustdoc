@@ -18,7 +18,7 @@ export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
 
   const statusQuery = useQuery({
     queryKey: queryKeys.licenseStatus(),
-    queryFn: () => client.getLicenseStatus(),
+    queryFn: ({ signal }) => client.getLicenseStatus({ signal }),
   });
 
   useEffect(() => {

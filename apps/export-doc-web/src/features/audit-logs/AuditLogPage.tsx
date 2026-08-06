@@ -143,7 +143,7 @@ export function AuditLogPage({
 
   const logsQuery = useQuery({
     queryKey: queryKeys.auditLogs(pageNumber, pageSize, committedFilters),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       client.listAuditLogs({
         pageNumber,
         pageSize,
@@ -154,13 +154,13 @@ export function AuditLogPage({
         keyword: committedFilters.keyword || undefined,
         startTime: committedFilters.startTime || undefined,
         endTime: committedFilters.endTime || undefined,
-      }),
+      }, { signal }),
     placeholderData: keepPreviousData,
   });
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
-    queryFn: () => client.getSettings(),
+    queryFn: ({ signal }) => client.getSettings({ signal }),
     enabled: canManageAuditLogs,
     staleTime: 5 * 60 * 1000,
   });

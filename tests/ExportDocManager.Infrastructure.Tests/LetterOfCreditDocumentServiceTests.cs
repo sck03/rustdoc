@@ -152,8 +152,9 @@ public sealed class LetterOfCreditDocumentServiceTests
     {
         public int CallCount { get; private set; }
 
-        public Task<OcrResult> RecognizeAsync(Stream imageStream)
+        public Task<OcrResult> RecognizeAsync(Stream imageStream, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             CallCount++;
             Assert.True(imageStream.Length > 0);
             return Task.FromResult(new OcrResult { FullText = text });

@@ -1,10 +1,14 @@
 use calamine::{open_workbook_auto, Data, Reader};
 use serde::Serialize;
-use std::{env, panic, path::PathBuf, process};
+use std::{env, fs, panic, path::PathBuf, process};
 
 const SCHEMA_VERSION: &str = "excel-analysis-rs/0.2";
 const MAX_PROFILE_ROWS: usize = 120;
 const MAX_PROFILE_COLUMNS: usize = 48;
+const MAX_WORKBOOK_BYTES: u64 = 25 * 1024 * 1024;
+const MAX_WORKSHEETS: usize = 64;
+const MAX_CELL_CHARACTERS: usize = 4_096;
+const MAX_PROFILE_TEXT_CHARACTERS: usize = 1_000_000;
 
 fn main() {
     let mut args = env::args().skip(1);
@@ -36,16 +40,26 @@ fn main() {
 }
 
 fn analyze_workbook(path: PathBuf) -> Result<AnalysisReport, String> {
+    let metadata = fs::metadata(&path)
+        .map_err(|error| format!("无法读取 Excel 文件 '{}': {error}", path.display()))?;
+    if !metadata.is_file() || metadata.len() == 0 || metadata.len() > MAX_WORKBOOK_BYTES {
+        return Err("Excel 文件必须存在、不能为空且不能超过 25 MB。".to_string());
+    }
     let mut workbook = open_workbook_auto(&path)
         .map_err(|error| format!("无法打开 Excel 文件 '{}': {error}", path.display()))?;
 
+    let sheet_names = workbook.sheet_names().to_owned();
+    if sheet_names.len() > MAX_WORKSHEETS {
+        return Err(format!("Excel 工作表数量不能超过 {MAX_WORKSHEETS} 个。"));
+    }
     let mut sheets = Vec::new();
-    for sheet_name in workbook.sheet_names().to_owned() {
+    let mut remaining_text_characters = MAX_PROFILE_TEXT_CHARACTERS;
+    for sheet_name in sheet_names {
         let Ok(range) = workbook.worksheet_range(&sheet_name) else {
             continue;
         };
 
-        let cells = collect_cells(&range);
+        let cells = collect_cells(&range, &mut remaining_text_characters)?;
         let used_range = detect_used_range(&cells);
         let fields = detect_document_fields(&cells, &sheet_name);
         let table = detect_table(&cells);
@@ -88,17 +102,27 @@ fn analyze_workbook(path: PathBuf) -> Result<AnalysisReport, String> {
     })
 }
 
-fn collect_cells(range: &calamine::Range<Data>) -> Vec<Vec<String>> {
-    range
-        .rows()
-        .take(MAX_PROFILE_ROWS)
-        .map(|row| {
-            row.iter()
-                .take(MAX_PROFILE_COLUMNS)
-                .map(cell_to_string)
-                .collect::<Vec<_>>()
-        })
-        .collect()
+fn collect_cells(
+    range: &calamine::Range<Data>,
+    remaining_text_characters: &mut usize,
+) -> Result<Vec<Vec<String>>, String> {
+    let mut rows = Vec::new();
+    for row in range.rows().take(MAX_PROFILE_ROWS) {
+        let mut values = Vec::new();
+        for cell in row.iter().take(MAX_PROFILE_COLUMNS) {
+            let value = cell_to_string(cell);
+            let character_count = value.chars().count();
+            if character_count > *remaining_text_characters {
+                return Err(format!(
+                    "Excel 分析文本超过 {MAX_PROFILE_TEXT_CHARACTERS} 个字符，请精简工作簿后重试。"
+                ));
+            }
+            *remaining_text_characters -= character_count;
+            values.push(value);
+        }
+        rows.push(values);
+    }
+    Ok(rows)
 }
 
 fn detect_used_range(cells: &[Vec<String>]) -> UsedRange {
@@ -2082,15 +2106,19 @@ fn get_cell(cells: &[Vec<String>], row: usize, column: usize) -> &str {
 fn cell_to_string(cell: &Data) -> String {
     match cell {
         Data::Empty => String::new(),
-        Data::String(value) => value.trim().to_string(),
+        Data::String(value) => bounded_cell_text(value),
         Data::Float(value) => trim_number(*value),
         Data::Int(value) => value.to_string(),
         Data::Bool(value) => value.to_string(),
         Data::DateTime(value) => trim_number(value.as_f64()),
-        Data::DateTimeIso(value) => value.clone(),
-        Data::DurationIso(value) => value.clone(),
+        Data::DateTimeIso(value) => bounded_cell_text(value),
+        Data::DurationIso(value) => bounded_cell_text(value),
         Data::Error(value) => format!("{value:?}"),
     }
+}
+
+fn bounded_cell_text(value: &str) -> String {
+    value.trim().chars().take(MAX_CELL_CHARACTERS).collect()
 }
 
 fn trim_number(value: f64) -> String {

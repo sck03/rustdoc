@@ -2,7 +2,7 @@ use serde::Serialize;
 use tauri_plugin_updater::{Updater, UpdaterExt};
 use url::Url;
 
-use crate::sidecar;
+use crate::{desktop_commands, sidecar};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -97,6 +97,7 @@ pub(crate) async fn install_tauri_update(
         .await
         .map_err(describe_updater_error)?;
 
+    desktop_commands::confirm_app_exit();
     sidecar::run_shutdown_maintenance(&app);
     sidecar::stop_sidecar(&app);
     app.request_restart();
@@ -123,6 +124,7 @@ fn build_tauri_updater(
 
     let app_for_exit = app.clone();
     builder = builder.on_before_exit(move || {
+        desktop_commands::confirm_app_exit();
         sidecar::run_shutdown_maintenance(&app_for_exit);
         sidecar::stop_sidecar(&app_for_exit);
     });

@@ -125,23 +125,23 @@ export function InvoiceEditorPage({
 
   const invoiceQuery = useQuery({
     queryKey: queryKeys.invoice(parsedInvoiceId),
-    queryFn: () => client.getInvoice({ id: parsedInvoiceId }),
+    queryFn: ({ signal }) => client.getInvoice({ id: parsedInvoiceId }, { signal }),
     enabled: !isNew && isInvoiceIdValid,
   });
 
   const statusHistoryQuery = useQuery({
     queryKey: queryKeys.invoiceStatusHistory(parsedInvoiceId),
-    queryFn: () => client.listInvoiceStatusHistory({ id: parsedInvoiceId }),
+    queryFn: ({ signal }) => client.listInvoiceStatusHistory({ id: parsedInvoiceId }, { signal }),
     enabled: !isNew && isInvoiceIdValid,
     staleTime: 30 * 1000,
   });
 
   const partiesQuery = useQuery({
     queryKey: queryKeys.invoiceParties(),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const [nextCustomers, nextExporters] = await Promise.all([
-        client.listCustomers({}),
-        client.listExporters({}),
+        client.listCustomers({}, { signal }),
+        client.listExporters({}, { signal }),
       ]);
       return {
         customers: nextCustomers,
@@ -179,19 +179,19 @@ export function InvoiceEditorPage({
 
   const unitsQuery = useQuery({
     queryKey: queryKeys.masterDataRoot("units"),
-    queryFn: () => client.listUnits({}),
+    queryFn: ({ signal }) => client.listUnits({}, { signal }),
     staleTime: 5 * 60 * 1000,
   });
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
-    queryFn: () => client.getSettings(),
+    queryFn: ({ signal }) => client.getSettings({ signal }),
     staleTime: 5 * 60 * 1000,
   });
 
   const customOptionsQuery = useQuery({
     queryKey: queryKeys.customOptionsGroup("invoice-editor"),
-    queryFn: () => loadCustomOptionMap(client, invoiceCustomOptionTypes),
+    queryFn: ({ signal }) => loadCustomOptionMap(client, invoiceCustomOptionTypes, signal),
     staleTime: 5 * 60 * 1000,
   });
 

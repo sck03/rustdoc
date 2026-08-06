@@ -14,7 +14,7 @@ export function AboutPage({
 }) {
   const healthQuery = useQuery({
     queryKey: queryKeys.health(),
-    queryFn: () => client.getHealth(),
+    queryFn: ({ signal }) => client.getHealth({ signal }),
   });
   const health = healthQuery.data ?? null;
   const isDesktopRuntime = isDesktopBridgeAvailable();

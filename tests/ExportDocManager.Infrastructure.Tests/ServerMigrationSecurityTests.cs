@@ -82,6 +82,27 @@ public sealed class ServerMigrationSecurityTests
     }
 
     [Fact]
+    public void RewriteManagedPath_ShouldRespectSourcePlatformCaseSemantics()
+    {
+        Assert.Equal(
+            @"D:\ExportDoc\App_Data\Marks\mark.png",
+            ServerMigrationPathRewriter.RewriteManagedPath(
+                @"c:\SOURCE\App_Data\Marks\mark.png",
+                @"C:\source\App_Data",
+                @"D:\ExportDoc\App_Data",
+                '\\'));
+
+        const string unixValue = "/srv/exportdoc/app_data/Marks/mark.png";
+        Assert.Equal(
+            unixValue,
+            ServerMigrationPathRewriter.RewriteManagedPath(
+                unixValue,
+                "/srv/exportdoc/App_Data",
+                @"D:\ExportDoc\App_Data",
+                '\\'));
+    }
+
+    [Fact]
     public void ManagedDataPathResolver_ShouldPersistPortableRelativePathsAndRejectEscape()
     {
         string root = CreateTestRoot("managed-paths");

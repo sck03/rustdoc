@@ -54,8 +54,8 @@ export type MasterDataEntityConfig = {
   sections: MasterDataSectionDefinition[];
   emptyRecord: () => MasterDataRecord;
   normalizeRecord: (record: MasterDataRecord, id: number) => MasterDataRecord;
-  list: (client: ExportDocManagerApiClient, request: { keyword: string; pageNumber: number; pageSize: number }) => Promise<MasterDataListResult>;
-  get: (client: ExportDocManagerApiClient, recordKey: string) => Promise<MasterDataRecord>;
+  list: (client: ExportDocManagerApiClient, request: { keyword: string; pageNumber: number; pageSize: number }, signal?: AbortSignal) => Promise<MasterDataListResult>;
+  get: (client: ExportDocManagerApiClient, recordKey: string, signal?: AbortSignal) => Promise<MasterDataRecord>;
   create: (client: ExportDocManagerApiClient, record: MasterDataRecord) => Promise<MasterDataRecord>;
   update: (client: ExportDocManagerApiClient, recordKey: string, record: MasterDataRecord) => Promise<MasterDataRecord>;
   delete: (client: ExportDocManagerApiClient, record: MasterDataRecord, recordKey: string) => Promise<ApiCommandResponse>;

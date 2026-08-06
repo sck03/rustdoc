@@ -89,12 +89,12 @@ export function MasterDataListPage({
 
   const masterDataQuery = useQuery({
     queryKey: queryKeys.masterDataList(config.key, pageNumber, pageSize, committedKeyword.trim()),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       config.list(client, {
         keyword: committedKeyword.trim(),
         pageNumber,
         pageSize,
-      }),
+      }, signal),
     placeholderData: keepPreviousData,
   });
 

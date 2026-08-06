@@ -61,26 +61,26 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
 
   const jobsQuery = useQuery({
     queryKey: queryKeys.jobs(pageNumber, pageSize, committedKeyword.trim(), status),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       client.listJobs({
         status: status || undefined,
         keyword: committedKeyword.trim() || undefined,
         pageNumber,
         pageSize,
-      }),
+      }, { signal }),
     placeholderData: keepPreviousData,
   });
 
   const reportTemplatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates(invoiceReportType),
-    queryFn: () => client.listReportTemplates({ reportType: invoiceReportType }),
+    queryFn: ({ signal }) => client.listReportTemplates({ reportType: invoiceReportType }, { signal }),
     enabled: canCreateInvoiceReportZip,
     staleTime: 5 * 60 * 1000,
   });
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
-    queryFn: () => client.getSettings(),
+    queryFn: ({ signal }) => client.getSettings({ signal }),
     enabled: jobPermission.canOperate && workspaceDeviceCapabilities.canImportExport,
     staleTime: 5 * 60 * 1000,
   });

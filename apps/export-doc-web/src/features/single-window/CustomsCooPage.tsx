@@ -116,31 +116,31 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
 
   const documentQuery = useQuery({
     queryKey: documentQueryKey,
-    queryFn: () => client.getCustomsCooDocument({ invoiceId: parsedInvoiceId }),
+    queryFn: ({ signal }) => client.getCustomsCooDocument({ invoiceId: parsedInvoiceId }, { signal }),
     enabled: isInvoiceIdValid,
   });
 
   const editorOptionsQuery = useQuery({
     queryKey: queryKeys.singleWindowCustomsCooEditorOptions(),
-    queryFn: () => client.getCustomsCooEditorOptions(),
+    queryFn: ({ signal }) => client.getCustomsCooEditorOptions({ signal }),
     enabled: isInvoiceIdValid,
     staleTime: 10 * 60 * 1000,
   });
 
   const issuingAuthoritiesQuery = useQuery({
     queryKey: queryKeys.singleWindowCustomsCooIssuingAuthorities(),
-    queryFn: () => client.getCustomsCooIssuingAuthorities(),
+    queryFn: ({ signal }) => client.getCustomsCooIssuingAuthorities({ signal }),
     enabled: isInvoiceIdValid,
     staleTime: 10 * 60 * 1000,
   });
 
   const reviewQuery = useQuery({
     queryKey: reviewQueryKey,
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       client.getSingleWindowExportReview({
         businessType: customsCooBusinessType,
         invoiceId: parsedInvoiceId,
-      }),
+      }, { signal }),
     enabled: isInvoiceIdValid,
   });
 

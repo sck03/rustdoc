@@ -6,6 +6,7 @@ import { isDesktopBridgeAvailable, openPath } from "../../desktop/desktopBridge.
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import type { SingleWindowActionDraft } from "./SingleWindowActionsPanel.tsx";
 import { readPathDialogError, requestExcelSavePath, requestSingleWindowPackageOpenPath, requestSingleWindowPackageSavePath } from "./invoiceListDesktopPaths.ts";
 import { buildBookingSheetDefaultFileName, buildSingleWindowPackageDefaultFileName, type SingleWindowBusinessType } from "./invoiceListFileNames.ts";
@@ -23,43 +24,50 @@ export function useInvoiceListSingleWindowOperations({ client, queryClient, defa
   const [reviewBusinessType, setReviewBusinessType] = useState<SingleWindowBusinessType | null>(null);
   const [reviewInvoiceId, setReviewInvoiceId] = useState<number | null>(null);
   const [stationAssignmentCode, setStationAssignmentCode] = useState("");
+  const runAbortableOperation = useAbortableOperation();
   const clearResult = () => { setMessage(null); setJobId(null); setPackagePath(null); };
 
   const bookingSheetMutation = useMutation({
-    mutationFn: async ({ invoice, destinationPath }: { invoice: ApiInvoiceListItemDto; destinationPath: string }) => {
-      const job = isDesktopBridgeAvailable() ? await client.startInvoiceBookingSheetSaveToPathJob({ body: { invoiceId: invoice.id, destinationPath } }) : await client.startInvoiceBookingSheetDownloadJob({ invoiceId: invoice.id });
-      if (!isDesktopBridgeAvailable()) await downloadJobResultWhenReady(client, job, buildBookingSheetDefaultFileName(invoice));
+    mutationFn: async ({ invoice, destinationPath }: { invoice: ApiInvoiceListItemDto; destinationPath: string }) => runAbortableOperation(async (signal) => {
+      const job = isDesktopBridgeAvailable()
+        ? await client.startInvoiceBookingSheetSaveToPathJob({ body: { invoiceId: invoice.id, destinationPath } }, { signal })
+        : await client.startInvoiceBookingSheetDownloadJob({ invoiceId: invoice.id }, { signal });
+      if (!isDesktopBridgeAvailable()) await downloadJobResultWhenReady(client, job, buildBookingSheetDefaultFileName(invoice), { signal });
       return job;
-    },
+    }),
     onSuccess: async (job) => { setMessage(`已创建托单导出任务：${job.jobId}`); setMessageType("success"); setJobId(job.jobId); setPackagePath(null); await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() }); },
     onError: (error) => { setMessage(readApiError(error)); setMessageType("error"); setJobId(null); setPackagePath(null); },
   });
   const submitMutation = useMutation({
-    mutationFn: async ({ invoice, businessType, packagePath: targetPath, assignmentCode }: { invoice: ApiInvoiceListItemDto; businessType: SingleWindowBusinessType; packagePath: string; assignmentCode: string }) => {
+    mutationFn: async ({ invoice, businessType, packagePath: targetPath, assignmentCode }: { invoice: ApiInvoiceListItemDto; businessType: SingleWindowBusinessType; packagePath: string; assignmentCode: string }) => runAbortableOperation(async (signal) => {
       if (isDesktopBridgeAvailable()) {
-        const response = businessType === "CustomsCoo" ? await client.saveCustomsCooSubmitPackageToPath({ invoiceId: invoice.id, body: { packagePath: targetPath, stationAssignmentCode: assignmentCode } }) : await client.saveAgentConsignmentSubmitPackageToPath({ invoiceId: invoice.id, body: { packagePath: targetPath, stationAssignmentCode: assignmentCode } });
+        const response = businessType === "CustomsCoo"
+          ? await client.saveCustomsCooSubmitPackageToPath({ invoiceId: invoice.id, body: { packagePath: targetPath, stationAssignmentCode: assignmentCode } }, { signal })
+          : await client.saveAgentConsignmentSubmitPackageToPath({ invoiceId: invoice.id, body: { packagePath: targetPath, stationAssignmentCode: assignmentCode } }, { signal });
         return { mode: "desktop" as const, response };
       }
       const body = { stationAssignmentCode: assignmentCode };
-      const blob = businessType === "CustomsCoo" ? await client.downloadCustomsCooSubmitPackage({ invoiceId: invoice.id, body }) : await client.downloadAgentConsignmentSubmitPackage({ invoiceId: invoice.id, body });
+      const blob = businessType === "CustomsCoo"
+        ? await client.downloadCustomsCooSubmitPackage({ invoiceId: invoice.id, body }, { signal })
+        : await client.downloadAgentConsignmentSubmitPackage({ invoiceId: invoice.id, body }, { signal });
       downloadBlob(blob, buildSingleWindowPackageDefaultFileName(invoice, businessType));
       return { mode: "browser" as const };
-    },
+    }),
     onSuccess: async (result) => { setMessage(result.mode === "desktop" ? result.response.message || "单一窗口提交包已导出。" : "单一窗口提交包已交给浏览器下载。"); setMessageType("success"); setJobId(null); setPackagePath(result.mode === "desktop" ? result.response.packagePath || null : null); await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() }); },
     onError: (error) => { setMessage(readApiError(error)); setMessageType("error"); setJobId(null); setPackagePath(null); },
   });
   const reviewMutation = useMutation({
-    mutationFn: async ({ invoice, businessType }: { invoice: ApiInvoiceListItemDto; businessType: SingleWindowBusinessType }) => ({ invoice, businessType, review: await client.getSingleWindowExportReview({ businessType, invoiceId: invoice.id }) }),
+    mutationFn: async ({ invoice, businessType }: { invoice: ApiInvoiceListItemDto; businessType: SingleWindowBusinessType }) => runAbortableOperation(async (signal) => ({ invoice, businessType, review: await client.getSingleWindowExportReview({ businessType, invoiceId: invoice.id }, { signal }) })),
     onSuccess: ({ invoice, businessType, review: nextReview }) => { setDraft({ invoice }); setReview(nextReview); setReviewBusinessType(businessType); setReviewInvoiceId(invoice.id); setPackagePath(null); setJobId(null); setMessage(buildSingleWindowReviewMessage(nextReview, businessType)); setMessageType(nextReview.totalErrorCount > 0 ? "error" : "success"); },
     onError: (error) => { setMessage(readApiError(error)); setMessageType("error"); setJobId(null); setReview(null); setReviewBusinessType(null); setReviewInvoiceId(null); },
   });
   const repairMutation = useMutation({
-    mutationFn: async ({ invoice, businessType, groupKeys }: { invoice: ApiInvoiceListItemDto; businessType: SingleWindowBusinessType; groupKeys: string[] }) => ({ invoice, businessType, response: await client.repairSingleWindowExportReviewGroups({ businessType, invoiceId: invoice.id, body: { groupKeys } }) }),
+    mutationFn: async ({ invoice, businessType, groupKeys }: { invoice: ApiInvoiceListItemDto; businessType: SingleWindowBusinessType; groupKeys: string[] }) => runAbortableOperation(async (signal) => ({ invoice, businessType, response: await client.repairSingleWindowExportReviewGroups({ businessType, invoiceId: invoice.id, body: { groupKeys } }, { signal }) })),
     onSuccess: ({ invoice, businessType, response }) => { setDraft({ invoice }); setReview(response.review); setReviewBusinessType(businessType); setReviewInvoiceId(invoice.id); setPackagePath(null); setJobId(null); setMessage(response.message || buildSingleWindowReviewMessage(response.review, businessType)); setMessageType(response.review.totalErrorCount > 0 ? "error" : "success"); void queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() }); },
     onError: (error) => { setMessage(readApiError(error)); setMessageType("error"); setJobId(null); },
   });
   const receiptMutation = useMutation({
-    mutationFn: (targetPath: string) => client.importSingleWindowReceiptPackage({ body: { packagePath: targetPath, keepWorkingDirectory: false } }),
+    mutationFn: (targetPath: string) => runAbortableOperation((signal) => client.importSingleWindowReceiptPackage({ body: { packagePath: targetPath, keepWorkingDirectory: false } }, { signal })),
     onSuccess: async (response: ApiSingleWindowImportedPackageResponse) => { const receiptText = response.persistedReceiptCount > 0 ? `新增回执 ${response.persistedReceiptCount} 条。` : "没有新增回执。"; setMessage(`${response.message || "单一窗口回执包已导入。"} ${receiptText}`); setMessageType("success"); setJobId(null); setPackagePath(response.packagePath || null); await Promise.all([queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }), queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }), queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() }), queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() })]); },
     onError: (error) => { setMessage(readApiError(error)); setMessageType("error"); setJobId(null); setPackagePath(null); },
   });

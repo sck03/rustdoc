@@ -100,27 +100,27 @@ export function MasterDataEditorPage({
 
   const detailQuery = useQuery({
     queryKey: queryKeys.masterDataRecord(config.key, effectiveRecordKey),
-    queryFn: () => config.get(client, effectiveRecordKey),
+    queryFn: ({ signal }) => config.get(client, effectiveRecordKey, signal),
     enabled: !isNew && isRecordKeyValid,
   });
 
   const customOptionsQuery = useQuery({
     queryKey: queryKeys.customOptionsGroup(`master-data-${config.key}`),
-    queryFn: () => loadCustomOptionMap(client, customOptionTypes),
+    queryFn: ({ signal }) => loadCustomOptionMap(client, customOptionTypes, signal),
     enabled: customOptionTypes.length > 0,
     staleTime: 5 * 60 * 1000,
   });
 
   const productUnitProductsQuery = useQuery({
     queryKey: queryKeys.masterDataList("products", 1, productHsCodeLookupPageSize, ""),
-    queryFn: () => client.listProducts({ pageNumber: 1, pageSize: productHsCodeLookupPageSize }).then(result => result.items),
+    queryFn: ({ signal }) => client.listProducts({ pageNumber: 1, pageSize: productHsCodeLookupPageSize }, { signal }).then(result => result.items),
     enabled: config.key === "products",
     staleTime: 5 * 60 * 1000,
   });
 
   const productUnitUnitsQuery = useQuery({
     queryKey: queryKeys.masterDataList("units", 1, productHsCodeLookupPageSize, ""),
-    queryFn: () => client.listUnits({}),
+    queryFn: ({ signal }) => client.listUnits({}, { signal }),
     enabled: config.key === "products",
     staleTime: 5 * 60 * 1000,
   });
@@ -134,7 +134,7 @@ export function MasterDataEditorPage({
 
   const productHsCodesQuery = useQuery({
     queryKey: queryKeys.masterDataList("hs-codes", 1, 20, productHsCodeKeyword),
-    queryFn: () => client.listHsCodes({ pageNumber: 1, pageSize: 20, keyword: productHsCodeKeyword }),
+    queryFn: ({ signal }) => client.listHsCodes({ pageNumber: 1, pageSize: 20, keyword: productHsCodeKeyword }, { signal }),
     enabled: config.key === "products" && productHsCodeKeyword.length >= 4,
     staleTime: 60 * 1000,
   });

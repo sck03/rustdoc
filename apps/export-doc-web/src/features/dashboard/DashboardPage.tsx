@@ -33,7 +33,7 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
   const jobsPermission = useModulePermission("document.jobs");
   const dashboardQuery = useQuery({
     queryKey: queryKeys.dashboard(),
-    queryFn: () => client.getDashboard(),
+    queryFn: ({ signal }) => client.getDashboard({ signal }),
   });
 
   const dashboard = dashboardQuery.data;

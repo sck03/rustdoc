@@ -16,6 +16,7 @@ import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
 import { buildReportPdfDefaultFileName } from "../reports/reportFileNames.ts";
 import { printReportPreviewHtml } from "../reports/printReportPreview.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
+import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 export function PaymentReportPreviewPanel({
   client,
@@ -32,6 +33,7 @@ export function PaymentReportPreviewPanel({
   const reportDesignPermission = useModulePermission("document.reports");
   const { canManageSettings } = usePermissionCapabilities();
   const queryClient = useQueryClient();
+  const runAbortableOperation = useAbortableOperation();
   const navigate = useNavigate();
   const reportType = "PaymentVoucher";
   const [selectedTemplatePath, setSelectedTemplatePath] = useState("");
@@ -49,14 +51,14 @@ export function PaymentReportPreviewPanel({
 
   const templatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates(reportType),
-    queryFn: () => client.listReportTemplates({ reportType }),
+    queryFn: ({ signal }) => client.listReportTemplates({ reportType }, { signal }),
     enabled: hasPreviewSource && reportOutputPermission.canView,
     staleTime: 5 * 60 * 1000,
   });
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
-    queryFn: () => client.getSettings(),
+    queryFn: ({ signal }) => client.getSettings({ signal }),
     enabled: hasPreviewSource,
     staleTime: 5 * 60 * 1000,
   });
@@ -92,7 +94,7 @@ export function PaymentReportPreviewPanel({
   }, [paymentDraftPreviewKey]);
 
   const previewMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: () => runAbortableOperation((signal) => {
       const body = {
         templatePath: selectedTemplatePath,
       };
@@ -103,12 +105,12 @@ export function PaymentReportPreviewPanel({
               ...body,
               payment: paymentDraft,
             },
-          })
+          }, { signal })
         : client.previewPaymentVoucherHtml({
             paymentId,
             body,
-          });
-    },
+          }, { signal });
+    }),
     onSuccess: (response) => {
       setPreview(response);
       setStatusMessage(null);
@@ -122,24 +124,24 @@ export function PaymentReportPreviewPanel({
   });
 
   const pdfMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: () => runAbortableOperation(async (signal) => {
       const job = desktopAvailable
         ? await client.startPaymentVoucherPdfSaveToPathJob({
-        paymentId,
-        body: {
-          templatePath: selectedTemplatePath,
-          destinationPath: pdfDestinationPath.trim(),
-        },
-      })
+            paymentId,
+            body: {
+              templatePath: selectedTemplatePath,
+              destinationPath: pdfDestinationPath.trim(),
+            },
+          }, { signal })
         : await client.startPaymentVoucherPdfDownloadJob({
             paymentId,
             body: { templatePath: selectedTemplatePath, destinationPath: "" },
-          });
+          }, { signal });
       if (!desktopAvailable) {
-        await downloadJobResultWhenReady(client, job, buildPaymentReportPdfDefaultFileName());
+        await downloadJobResultWhenReady(client, job, buildPaymentReportPdfDefaultFileName(), { signal });
       }
       return job;
-    },
+    }),
     onSuccess: async (job) => {
       setStatusMessage(desktopAvailable ? `已创建付款/报销 PDF 任务：${job.jobId}` : "PDF 已交给浏览器下载。");
       setLastCreatedJobId(job.jobId);

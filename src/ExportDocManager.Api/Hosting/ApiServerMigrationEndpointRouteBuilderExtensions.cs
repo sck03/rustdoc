@@ -308,7 +308,7 @@ namespace ExportDocManager.Api.Hosting
                         finally
                         {
                             if (result != null &&
-                                !string.Equals(result.FullPath, outputPath, StringComparison.OrdinalIgnoreCase))
+                                !string.Equals(result.FullPath, outputPath, PathBoundaryHelper.PathComparison))
                             {
                                 AtomicFileHelper.TryDeleteFile(result.FullPath);
                             }

@@ -1,5 +1,6 @@
 using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -82,7 +83,7 @@ namespace ExportDocManager.Api.Hosting
                 return convertDestinationValidation;
             }
 
-            if (string.Equals(convertSourcePath, convertDestinationPath, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(convertSourcePath, convertDestinationPath, PathBoundaryHelper.PathComparison))
             {
                 return Results.BadRequest(new ApiErrorResponse("订舱托单必须另存为新文件，不能覆盖源 Excel。"));
             }

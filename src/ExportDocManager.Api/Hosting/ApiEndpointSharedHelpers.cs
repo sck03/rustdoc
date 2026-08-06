@@ -119,10 +119,8 @@ namespace ExportDocManager.Api.Hosting
                 return false;
             }
 
-            string root = Path.GetFullPath(Path.Combine(pathProvider.ExportRoot, "Browser"))
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                + Path.DirectorySeparatorChar;
-            return candidate.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+            string root = Path.GetFullPath(Path.Combine(pathProvider.ExportRoot, "Browser"));
+            return PathBoundaryHelper.IsWithinRoot(candidate, root);
         }
 
         internal static IResult StreamTemporaryFile(

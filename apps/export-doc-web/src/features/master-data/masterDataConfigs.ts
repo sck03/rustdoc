@@ -80,14 +80,14 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       rowVersion: "",
     }),
     normalizeRecord: (record, id) => normalizeTextFields(record, id, customerTextFields),
-    list: async (client, request) =>
+    list: async (client, request, signal) =>
       normalizeArrayPage(
-        (await client.listCustomers({ keyword: request.keyword || undefined })) as unknown as MasterDataRecord[],
+        (await client.listCustomers({ keyword: request.keyword || undefined }, { signal })) as unknown as MasterDataRecord[],
         request.pageNumber,
         request.pageSize,
       ),
-    get: async (client, recordKey) =>
-      (await client.getCustomer({ id: parseNumericRouteKey(recordKey) })) as unknown as MasterDataRecord,
+    get: async (client, recordKey, signal) =>
+      (await client.getCustomer({ id: parseNumericRouteKey(recordKey) }, { signal })) as unknown as MasterDataRecord,
     create: async (client, record) => (await client.createCustomer({ body: record as unknown as ApiCustomerDto })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record) =>
       (await client.updateCustomer({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiCustomerDto })) as unknown as MasterDataRecord,
@@ -160,14 +160,14 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       rowVersion: "",
     }),
     normalizeRecord: (record, id) => normalizeTextFields(record, id, exporterTextFields),
-    list: async (client, request) =>
+    list: async (client, request, signal) =>
       normalizeArrayPage(
-        (await client.listExporters({ keyword: request.keyword || undefined })) as unknown as MasterDataRecord[],
+        (await client.listExporters({ keyword: request.keyword || undefined }, { signal })) as unknown as MasterDataRecord[],
         request.pageNumber,
         request.pageSize,
       ),
-    get: async (client, recordKey) =>
-      (await client.getExporter({ id: parseNumericRouteKey(recordKey) })) as unknown as MasterDataRecord,
+    get: async (client, recordKey, signal) =>
+      (await client.getExporter({ id: parseNumericRouteKey(recordKey) }, { signal })) as unknown as MasterDataRecord,
     create: async (client, record) => (await client.createExporter({ body: record as unknown as ApiExporterDto })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record) =>
       (await client.updateExporter({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiExporterDto })) as unknown as MasterDataRecord,
@@ -223,14 +223,14 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       rowVersion: "",
     }),
     normalizeRecord: (record, id) => normalizeTextFields(record, id, payeeTextFields),
-    list: async (client, request) =>
+    list: async (client, request, signal) =>
       normalizeArrayPage(
-        (await client.listPayees({ keyword: request.keyword || undefined })) as unknown as MasterDataRecord[],
+        (await client.listPayees({ keyword: request.keyword || undefined }, { signal })) as unknown as MasterDataRecord[],
         request.pageNumber,
         request.pageSize,
       ),
-    get: async (client, recordKey) =>
-      (await client.getPayee({ id: parseNumericRouteKey(recordKey) })) as unknown as MasterDataRecord,
+    get: async (client, recordKey, signal) =>
+      (await client.getPayee({ id: parseNumericRouteKey(recordKey) }, { signal })) as unknown as MasterDataRecord,
     create: async (client, record) => (await client.createPayee({ body: record as unknown as ApiPayeeDto })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record) =>
       (await client.updatePayee({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiPayeeDto })) as unknown as MasterDataRecord,
@@ -322,13 +322,13 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       rowVersion: "",
     }),
     normalizeRecord: normalizeProductRecord,
-    list: async (client, request) =>
+    list: async (client, request, signal) =>
       {
         const result = await client.listProducts({
           keyword: request.keyword || undefined,
           pageNumber: request.pageNumber,
           pageSize: request.pageSize,
-        });
+        }, { signal });
         return {
           items: result.items as unknown as MasterDataRecord[],
           pageNumber: result.pageNumber,
@@ -339,8 +339,8 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
           hasNextPage: result.hasNextPage,
         };
       },
-    get: async (client, recordKey) =>
-      (await client.getProduct({ id: parseNumericRouteKey(recordKey) })) as unknown as MasterDataRecord,
+    get: async (client, recordKey, signal) =>
+      (await client.getProduct({ id: parseNumericRouteKey(recordKey) }, { signal })) as unknown as MasterDataRecord,
     create: async (client, record) => (await client.createProduct({ body: record as unknown as ApiProductDto })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record) =>
       (await client.updateProduct({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiProductDto })) as unknown as MasterDataRecord,
@@ -374,14 +374,14 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
     ],
     emptyRecord: () => ({ id: 0, nameEN: "", nameCN: "", country: "", code: "", rowVersion: "" }),
     normalizeRecord: (record, id) => normalizeTextFields(record, id, portTextFields),
-    list: async (client, request) =>
+    list: async (client, request, signal) =>
       normalizeArrayPage(
-        (await client.listPorts({ keyword: request.keyword || undefined })) as unknown as MasterDataRecord[],
+        (await client.listPorts({ keyword: request.keyword || undefined }, { signal })) as unknown as MasterDataRecord[],
         request.pageNumber,
         request.pageSize,
       ),
-    get: async (client, recordKey) =>
-      (await client.getPort({ id: parseNumericRouteKey(recordKey) })) as unknown as MasterDataRecord,
+    get: async (client, recordKey, signal) =>
+      (await client.getPort({ id: parseNumericRouteKey(recordKey) }, { signal })) as unknown as MasterDataRecord,
     create: async (client, record) => (await client.createPort({ body: record as unknown as ApiPortDto })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record) =>
       (await client.updatePort({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiPortDto })) as unknown as MasterDataRecord,
@@ -413,14 +413,14 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
     ],
     emptyRecord: () => ({ id: 0, nameEN: "", nameCN: "", code: "", rowVersion: "" }),
     normalizeRecord: (record, id) => normalizeTextFields(record, id, unitTextFields),
-    list: async (client, request) =>
+    list: async (client, request, signal) =>
       normalizeArrayPage(
-        (await client.listUnits({ keyword: request.keyword || undefined })) as unknown as MasterDataRecord[],
+        (await client.listUnits({ keyword: request.keyword || undefined }, { signal })) as unknown as MasterDataRecord[],
         request.pageNumber,
         request.pageSize,
       ),
-    get: async (client, recordKey) =>
-      (await client.getUnit({ id: parseNumericRouteKey(recordKey) })) as unknown as MasterDataRecord,
+    get: async (client, recordKey, signal) =>
+      (await client.getUnit({ id: parseNumericRouteKey(recordKey) }, { signal })) as unknown as MasterDataRecord,
     create: async (client, record) => (await client.createUnit({ body: record as unknown as ApiUnitDto })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record) =>
       (await client.updateUnit({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiUnitDto })) as unknown as MasterDataRecord,
@@ -511,12 +511,12 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       rowVersion: "",
     }),
     normalizeRecord: normalizeHsCodeRecord,
-    list: async (client, request) => {
+    list: async (client, request, signal) => {
       const result = await client.listHsCodes({
         pageNumber: request.pageNumber,
         pageSize: request.pageSize,
         keyword: request.keyword || undefined,
-      });
+      }, { signal });
 
       return {
         hasNextPage: result.hasNextPage,
@@ -528,8 +528,8 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
         totalPages: result.totalPages,
       };
     },
-    get: async (client, recordKey) =>
-      (await client.getHsCode({ code: decodeURIComponent(recordKey) })) as unknown as MasterDataRecord,
+    get: async (client, recordKey, signal) =>
+      (await client.getHsCode({ code: decodeURIComponent(recordKey) }, { signal })) as unknown as MasterDataRecord,
     create: async (client, record) => (await client.createHsCode({ body: record as unknown as ApiHsCodeDto })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record) =>
       (await client.updateHsCode({ code: decodeURIComponent(recordKey), body: record as unknown as ApiHsCodeDto })) as unknown as MasterDataRecord,

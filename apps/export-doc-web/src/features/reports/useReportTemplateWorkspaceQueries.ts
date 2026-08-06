@@ -18,61 +18,61 @@ export function useReportTemplateWorkspaceQueries({
 }) {
   const templatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates(reportType),
-    queryFn: () => client.listReportTemplates({ reportType }),
+    queryFn: ({ signal }) => client.listReportTemplates({ reportType }, { signal }),
     enabled,
     staleTime: 5 * 60 * 1000,
   });
 
   const userTemplatesQuery = useQuery({
     queryKey: queryKeys.userReportTemplates(reportType),
-    queryFn: () => client.listUserReportTemplates({ reportType, includeInactive: true }),
+    queryFn: ({ signal }) => client.listUserReportTemplates({ reportType, includeInactive: true }, { signal }),
     enabled,
     staleTime: 60 * 1000,
   });
 
   const userTemplateVersionsQuery = useQuery({
     queryKey: queryKeys.userReportTemplateVersions(selectedUserTemplateId),
-    queryFn: () => client.listUserReportTemplateVersions({ id: selectedUserTemplateId }),
+    queryFn: ({ signal }) => client.listUserReportTemplateVersions({ id: selectedUserTemplateId }, { signal }),
     enabled: enabled && selectedUserTemplateId > 0,
     staleTime: 30 * 1000,
   });
 
   const fieldCatalogQuery = useQuery({
     queryKey: queryKeys.reportTemplateFields(reportType),
-    queryFn: () => client.getReportTemplateFieldCatalog({ reportType }),
+    queryFn: ({ signal }) => client.getReportTemplateFieldCatalog({ reportType }, { signal }),
     enabled,
     staleTime: 60 * 60 * 1000,
   });
 
   const previewInvoicesQuery = useQuery({
     queryKey: queryKeys.reportTemplatePreviewInvoices(previewSourcePageSize),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       client.listInvoices({
         pageNumber: 1,
         pageSize: previewSourcePageSize,
         sortColumn: "InvoiceDate",
         ascending: false,
-      }),
+      }, { signal }),
     enabled: enabled && reportType === "ExportDocument",
     staleTime: 60 * 1000,
   });
 
   const previewPaymentsQuery = useQuery({
     queryKey: queryKeys.reportTemplatePreviewPayments(previewSourcePageSize),
-    queryFn: () => client.listPayments({ pageNumber: 1, pageSize: previewSourcePageSize }),
+    queryFn: ({ signal }) => client.listPayments({ pageNumber: 1, pageSize: previewSourcePageSize }, { signal }),
     enabled: enabled && reportType === "PaymentVoucher",
     staleTime: 60 * 1000,
   });
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
-    queryFn: () => client.getSettings(),
+    queryFn: ({ signal }) => client.getSettings({ signal }),
     staleTime: 5 * 60 * 1000,
   });
 
   const templateContentQuery = useQuery({
     queryKey: queryKeys.reportTemplateContent(reportType, selectedTemplatePath),
-    queryFn: () => client.getReportTemplateContent({ reportType, templatePath: selectedTemplatePath }),
+    queryFn: ({ signal }) => client.getReportTemplateContent({ reportType, templatePath: selectedTemplatePath }, { signal }),
     enabled: enabled && Boolean(selectedTemplatePath) && selectedUserTemplateId <= 0,
   });
 
