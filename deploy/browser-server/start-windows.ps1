@@ -5,11 +5,66 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
+
+function Assert-SafeDataRoot {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $volumeRoot = [System.IO.Path]::GetPathRoot($fullPath)
+    if ([string]::Equals(
+        [System.IO.Path]::TrimEndingDirectorySeparator($fullPath),
+        [System.IO.Path]::TrimEndingDirectorySeparator($volumeRoot),
+        [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "数据根不能直接使用磁盘、卷或共享根目录：$fullPath"
+    }
+
+    $candidate = $fullPath
+    while (-not [string]::IsNullOrWhiteSpace($candidate)) {
+        if (Test-Path -LiteralPath $candidate) {
+            $item = Get-Item -LiteralPath $candidate -Force
+            if (-not $item.PSIsContainer) {
+                throw "数据目录路径不能经过文件：$candidate"
+            }
+            if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "数据目录路径不能经过符号链接、联接点或其它重解析点：$candidate"
+            }
+        }
+
+        if ([string]::Equals(
+            [System.IO.Path]::TrimEndingDirectorySeparator($candidate),
+            [System.IO.Path]::TrimEndingDirectorySeparator($volumeRoot),
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+
+        $parent = [System.IO.Directory]::GetParent($candidate)
+        if ($null -eq $parent) { break }
+        $candidate = $parent.FullName
+    }
+
+    return $fullPath
+}
+
+function Assert-SafeManagedFilePath {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.PSIsContainer -or
+        ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "受管配置路径必须是普通文件且不能是符号链接或重解析点：$Path"
+    }
+}
+
 $runtimeEnvPath = Join-Path $root "App_Data\Security\browser-server.env"
 $runtimeEnvPointer = Join-Path $root "browser-server.env.path"
+Assert-SafeManagedFilePath $runtimeEnvPointer
 if (Test-Path -LiteralPath $runtimeEnvPointer -PathType Leaf) {
     $configuredPath = (Get-Content -LiteralPath $runtimeEnvPointer -Raw).Trim()
     if (-not [string]::IsNullOrWhiteSpace($configuredPath)) {
+        if ($configuredPath -match '[\x00-\x1F\x7F]') {
+            throw "browser-server.env.path 不能包含控制字符。"
+        }
         $runtimeEnvPath = if ([System.IO.Path]::IsPathRooted($configuredPath)) {
             [System.IO.Path]::GetFullPath($configuredPath)
         } else {
@@ -17,8 +72,14 @@ if (Test-Path -LiteralPath $runtimeEnvPointer -PathType Leaf) {
         }
     }
 }
+Assert-SafeManagedFilePath $runtimeEnvPath
+$runtimeEnvDirectory = [System.IO.Path]::GetDirectoryName($runtimeEnvPath)
+[void](Assert-SafeDataRoot $runtimeEnvDirectory)
 if (Test-Path -LiteralPath $runtimeEnvPath -PathType Leaf) {
     foreach ($line in Get-Content -LiteralPath $runtimeEnvPath) {
+        if ($line -match '[\x00-\x1F\x7F]') {
+            throw "browser-server.env 不能包含控制字符。"
+        }
         if ([string]::IsNullOrWhiteSpace($line) -or $line.TrimStart().StartsWith('#')) {
             continue
         }
@@ -34,7 +95,7 @@ if (Test-Path -LiteralPath $runtimeEnvPath -PathType Leaf) {
     }
 }
 
-$dataRoot = if (-not [string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_DATA_ROOT)) {
+$dataRootCandidate = if (-not [string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_DATA_ROOT)) {
     if ([System.IO.Path]::IsPathRooted($env:EXPORTDOCMANAGER_DATA_ROOT)) {
         [System.IO.Path]::GetFullPath($env:EXPORTDOCMANAGER_DATA_ROOT)
     } else {
@@ -43,9 +104,13 @@ $dataRoot = if (-not [string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_DATA_ROO
 } else {
     Join-Path $root "App_Data"
 }
+$dataRoot = Assert-SafeDataRoot $dataRootCandidate
 New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
+[void](Assert-SafeDataRoot $dataRoot)
 
-$configPath = Join-Path $dataRoot "Config\appsettings.json"
+$configRoot = Assert-SafeDataRoot (Join-Path $dataRoot "Config")
+$configPath = Join-Path $configRoot "appsettings.json"
+Assert-SafeManagedFilePath $configPath
 if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
     throw "appsettings.json was not found: $configPath"
 }
@@ -73,6 +138,9 @@ $effectiveUrls = if ($PSBoundParameters.ContainsKey('Urls')) {
     $env:EXPORTDOCMANAGER_URLS
 } else {
     "http://0.0.0.0:5188"
+}
+if ([string]::IsNullOrWhiteSpace($effectiveUrls) -or $effectiveUrls -match '[\x00-\x1F\x7F]') {
+    throw "监听地址不能为空或包含控制字符。"
 }
 
 $env:EXPORTDOCMANAGER_NETWORK_MODE = "true"

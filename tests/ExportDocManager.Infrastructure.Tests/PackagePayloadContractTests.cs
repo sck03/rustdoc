@@ -19,6 +19,9 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("ExportDocPackageProfile=Server", serverWorkflow, StringComparison.Ordinal);
         Assert.Contains("initialize-windows.ps1", serverWorkflow, StringComparison.Ordinal);
         Assert.Contains("initialize-linux.sh", serverWorkflow, StringComparison.Ordinal);
+        Assert.Contains("deploy/browser-server/README.md", serverWorkflow, StringComparison.Ordinal);
+        Assert.Contains("setup-windows.cmd", serverWorkflow, StringComparison.Ordinal);
+        Assert.Contains("version.json", serverWorkflow, StringComparison.Ordinal);
         Assert.Contains("ExportDocPackageProfile=Container", dockerfile, StringComparison.Ordinal);
         Assert.DoesNotContain("COPY Browsers/", dockerfile, StringComparison.Ordinal);
         Assert.Contains("AS report-fonts", dockerfile, StringComparison.Ordinal);
@@ -50,6 +53,9 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("requiredServerEntries", verifier, StringComparison.Ordinal);
         Assert.Contains("initialize-windows.ps1", verifier, StringComparison.Ordinal);
         Assert.Contains("initialize-linux.sh", verifier, StringComparison.Ordinal);
+        Assert.Contains("setup-windows.cmd", verifier, StringComparison.Ordinal);
+        Assert.Contains("README.md", verifier, StringComparison.Ordinal);
+        Assert.Contains("version.json", verifier, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -142,11 +148,65 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("--standalone", installer, StringComparison.Ordinal);
         Assert.Contains("-checkend 2592000", installer, StringComparison.Ordinal);
         Assert.Contains("restore_previous_deployment", installer, StringComparison.Ordinal);
-        Assert.Contains("chown -R 10001:10001 \"$RUNTIME_ROOT/api-data\"", installer, StringComparison.Ordinal);
-        Assert.Contains("chown -R 999:999 \"$RUNTIME_ROOT/postgres\"", installer, StringComparison.Ordinal);
-        Assert.Contains("chmod 0700 \"$RUNTIME_ROOT/postgres\"", installer, StringComparison.Ordinal);
-        Assert.Contains("chmod 0750 \"$RUNTIME_ROOT/api-data\" \"$RUNTIME_ROOT/api-data/Config\"", installer, StringComparison.Ordinal);
+        Assert.Contains("restore_deployment_assets", installer, StringComparison.Ordinal);
+        Assert.Contains("restore_certificate_state", installer, StringComparison.Ordinal);
+        Assert.Contains("up -d --remove-orphans --force-recreate", installer, StringComparison.Ordinal);
+        Assert.Contains(".letsencrypt.previous.", installer, StringComparison.Ordinal);
+        Assert.Contains(".letsencrypt.failed.XXXXXX", installer, StringComparison.Ordinal);
+        Assert.DoesNotContain(".letsencrypt.failed.$$", installer, StringComparison.Ordinal);
+        Assert.Contains(".deployment-assets.stage.", installer, StringComparison.Ordinal);
+        Assert.Contains("bash -n \"$ASSET_STAGE/install-container.sh\"", installer, StringComparison.Ordinal);
+        Assert.Contains("$ASSET_STAGE/.compose-validation.env", installer, StringComparison.Ordinal);
+        Assert.Contains("-f \"$ASSET_STAGE/docker-compose.acme.yml\"", installer, StringComparison.Ordinal);
+        Assert.Contains("ROLLBACK_REQUIRED", installer, StringComparison.Ordinal);
+        Assert.Contains("ENVIRON[\"ENV_VALUE\"]", installer, StringComparison.Ordinal);
+        Assert.Contains("assert_safe_directory_path", installer, StringComparison.Ordinal);
+        Assert.Contains("INSTALL_DIR=$(cd -- \"$INSTALL_DIR\" && pwd -P)", installer, StringComparison.Ordinal);
+        Assert.Contains("RUNTIME_ROOT=$(cd -- \"$RUNTIME_ROOT\" && pwd -P)", installer, StringComparison.Ordinal);
+        Assert.Contains("chmod 700 \"$INSTALL_DIR\"", installer, StringComparison.Ordinal);
+        Assert.Contains("EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY true", installer, StringComparison.Ordinal);
+        Assert.Contains("EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY false", installer, StringComparison.Ordinal);
+
+        int assetBackupIndex = installer.IndexOf(
+            "cp -p -- \"$INSTALL_DIR/$asset\" \"$ASSET_BACKUP/$asset\"",
+            StringComparison.Ordinal);
+        int stagedComposeValidationIndex = installer.IndexOf(
+            "-f \"$ASSET_STAGE/docker-compose.acme.yml\"",
+            StringComparison.Ordinal);
+        int environmentBackupIndex = installer.IndexOf(
+            "ENVIRONMENT_BACKUP=$(mktemp \"$INSTALL_DIR/.env.previous.XXXXXX\")",
+            StringComparison.Ordinal);
+        int rollbackArmedIndex = installer.IndexOf("ROLLBACK_REQUIRED=1", StringComparison.Ordinal);
+        int activationIndex = installer.IndexOf(
+            "ACTIVATION_FILE=$(mktemp \"$INSTALL_DIR/.$asset.activate.XXXXXX\")",
+            StringComparison.Ordinal);
+        Assert.True(assetBackupIndex >= 0, "Deployment assets must be backed up before activation.");
+        Assert.True(stagedComposeValidationIndex >= 0, "Both staged Compose modes must be validated before activation.");
+        Assert.True(assetBackupIndex > stagedComposeValidationIndex, "Staged Compose validation must finish before existing assets are backed up or replaced.");
+        Assert.True(environmentBackupIndex >= 0, "The previous environment must be backed up before activation.");
+        Assert.True(rollbackArmedIndex > assetBackupIndex, "Rollback must be armed after deployment assets are backed up.");
+        Assert.True(rollbackArmedIndex > environmentBackupIndex, "Rollback must be armed after the environment is backed up.");
+        Assert.True(activationIndex > rollbackArmedIndex, "Rollback must be armed before the first deployment asset is activated.");
+        Assert.Contains("ENVIRONMENT_TEMP_FILE=$(mktemp \"$INSTALL_DIR/.env.tmp.XXXXXX\")", installer, StringComparison.Ordinal);
+        Assert.Contains("Installer lock must not be a symbolic link", installer, StringComparison.Ordinal);
+        Assert.Contains("Activation marker must not be a symbolic link", installer, StringComparison.Ordinal);
+
+        int certificateBackupIndex = installer.IndexOf(
+            "CERTIFICATE_BACKUP=$(mktemp -d \"$RUNTIME_ROOT/.letsencrypt.previous.XXXXXX\")",
+            StringComparison.Ordinal);
+        int certificateRequestIndex = installer.IndexOf(
+            "docker run --rm --name exportdocmanager-certbot-bootstrap",
+            StringComparison.Ordinal);
+        Assert.True(certificateBackupIndex >= 0, "HTTPS certificate state must be backed up before replacement.");
+        Assert.True(certificateRequestIndex > certificateBackupIndex, "The certificate backup must complete before Certbot changes the active lineage.");
+
+        Assert.Contains("chown -R 10001:10001 \"$API_DATA_ROOT\"", installer, StringComparison.Ordinal);
+        Assert.Contains("chown -R 999:999 \"$POSTGRES_ROOT\"", installer, StringComparison.Ordinal);
+        Assert.Contains("chmod 0700 \"$POSTGRES_ROOT\"", installer, StringComparison.Ordinal);
+        Assert.Contains("chmod 0750 \"$API_DATA_ROOT\" \"$CONFIG_ROOT\"", installer, StringComparison.Ordinal);
         Assert.Contains("chmod 0600 \"$SETTINGS_FILE\"", installer, StringComparison.Ordinal);
+        Assert.Contains("Assert-SafeDirectoryPath", initializer, StringComparison.Ordinal);
+        Assert.Contains("ReparsePoint", initializer, StringComparison.Ordinal);
         Assert.DoesNotContain("[System.IO.UnixFileMode]::GroupWrite", initializer, StringComparison.Ordinal);
         Assert.DoesNotContain("https://get.docker.com", installer, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("latest tag is not accepted", installer, StringComparison.Ordinal);
@@ -161,6 +221,7 @@ public sealed class PackagePayloadContractTests
 
         Assert.Contains("export-doc-manager-api", baseCompose, StringComparison.Ordinal);
         Assert.Contains("export-doc-manager-web", baseCompose, StringComparison.Ordinal);
+        Assert.Contains("EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY", baseCompose, StringComparison.Ordinal);
         Assert.Contains("expose:", baseCompose, StringComparison.Ordinal);
         Assert.DoesNotContain("5188:5188", baseCompose, StringComparison.Ordinal);
         Assert.Contains("certbot/certbot:v5.7.0", acmeCompose, StringComparison.Ordinal);
@@ -180,7 +241,7 @@ public sealed class PackagePayloadContractTests
         {
             string config = File.ReadAllText(Path.Combine(root, "deploy", "container", fileName));
             Assert.Contains(
-                "server-migration/restore|postgresql-maintenance/backups/upload-restore",
+                "server-migration/restore|postgresql-maintenance/backups/(restore|upload-restore)",
                 config,
                 StringComparison.Ordinal);
             Assert.Contains("client_max_body_size 4224m", config, StringComparison.Ordinal);
@@ -188,9 +249,47 @@ public sealed class PackagePayloadContractTests
             Assert.Contains("proxy_read_timeout 3600s", config, StringComparison.Ordinal);
             Assert.Contains("proxy_send_timeout 3600s", config, StringComparison.Ordinal);
             Assert.Contains("location /downloads/jobs/", config, StringComparison.Ordinal);
+            Assert.Contains("location /downloads/postgresql-backups/", config, StringComparison.Ordinal);
             Assert.Contains("proxy_buffering off", config, StringComparison.Ordinal);
             Assert.Contains("client_max_body_size 128m", config, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public void BrowserServerScripts_ShouldUseRuntimeDataRootAndSafeInteractiveDefaults()
+    {
+        string root = FindWorkspaceRoot();
+        string windowsInitializer = File.ReadAllText(Path.Combine(root, "deploy", "browser-server", "initialize-windows.ps1"));
+        string windowsStarter = File.ReadAllText(Path.Combine(root, "deploy", "browser-server", "start-windows.ps1"));
+        string windowsSetupLauncher = File.ReadAllText(Path.Combine(root, "deploy", "browser-server", "setup-windows.cmd"));
+        string windowsStartLauncher = File.ReadAllText(Path.Combine(root, "deploy", "browser-server", "start-windows.cmd"));
+        string linuxInitializer = File.ReadAllText(Path.Combine(root, "deploy", "browser-server", "initialize-linux.sh"));
+        string linuxStarter = File.ReadAllText(Path.Combine(root, "deploy", "browser-server", "start-linux.sh"));
+
+        Assert.Contains("Read-Host $Prompt -AsSecureString", windowsInitializer, StringComparison.Ordinal);
+        Assert.Contains("RandomNumberGenerator", windowsInitializer, StringComparison.Ordinal);
+        Assert.Contains("AllowHttpDisasterRecovery", windowsInitializer, StringComparison.Ordinal);
+        Assert.Contains("$($currentIdentity):(M)", windowsInitializer, StringComparison.Ordinal);
+        Assert.Contains("$($currentIdentity):(OI)(CI)(M)", windowsInitializer, StringComparison.Ordinal);
+        Assert.Contains("ReparsePoint", windowsInitializer, StringComparison.Ordinal);
+        Assert.Contains("ReparsePoint", windowsStarter, StringComparison.Ordinal);
+        Assert.Contains("Directory]::GetParent", windowsInitializer, StringComparison.Ordinal);
+        Assert.Contains("Directory]::GetParent", windowsStarter, StringComparison.Ordinal);
+        Assert.Contains("PSVersionTable.PSVersion.Major -lt 7", windowsSetupLauncher, StringComparison.Ordinal);
+        Assert.Contains("PSVersionTable.PSVersion.Major -lt 7", windowsStartLauncher, StringComparison.Ordinal);
+        Assert.Contains("read_secret_from_tty", linuxInitializer, StringComparison.Ordinal);
+        Assert.Contains("generate_bootstrap_token", linuxInitializer, StringComparison.Ordinal);
+        Assert.Contains("contains_control_character", linuxInitializer, StringComparison.Ordinal);
+        Assert.Contains("mktemp \"$CONFIG_FILE.tmp.XXXXXX\"", linuxInitializer, StringComparison.Ordinal);
+        Assert.Contains("--allow-http-disaster-recovery", linuxInitializer, StringComparison.Ordinal);
+        Assert.Contains("数据根不能", linuxInitializer, StringComparison.Ordinal);
+        Assert.Contains("assert_safe_directory_path", linuxInitializer, StringComparison.Ordinal);
+        Assert.Contains("chmod 700 \"$DATA_ROOT\" \"$SECURITY_ROOT\" \"$CONFIG_ROOT\"", linuxInitializer, StringComparison.Ordinal);
+        Assert.Contains("assert_safe_directory_path", linuxStarter, StringComparison.Ordinal);
+        Assert.Contains("contains_control_character", linuxStarter, StringComparison.Ordinal);
+        Assert.Contains("RuntimeVerification", linuxStarter, StringComparison.Ordinal);
+        Assert.Contains("version.json", linuxStarter, StringComparison.Ordinal);
+        Assert.Contains("ocr-${PACKAGE_VERSION}-${RUNTIME_ARCH}.ok", linuxStarter, StringComparison.Ordinal);
     }
 
     [Fact]

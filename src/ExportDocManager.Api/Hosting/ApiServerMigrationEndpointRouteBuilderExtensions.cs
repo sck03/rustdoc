@@ -17,6 +17,8 @@ namespace ExportDocManager.Api.Hosting
         internal const string SensitiveOperationTicketHeader = "X-ExportDocManager-Sensitive-Operation-Ticket";
         private const string AllowInsecureDisasterRecoveryEnvironmentVariable =
             "EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY";
+        private const string PostgreSqlBackupDownloadPurpose = "postgresql-physical-backup";
+        private const string ServerMigrationPackageJobKind = "ServerMigrationPackage";
 
         private static void MapServerMigrationEndpoints(this IEndpointRouteBuilder endpoints)
         {
@@ -99,11 +101,13 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("AuthorizeServerMigrationOperation");
 
-            endpoints.MapGet("/api/postgresql-maintenance/backups/download", (
+            endpoints.MapPost("/api/postgresql-maintenance/backups/download-ticket", (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
-                ISharedDatabaseMaintenanceService maintenanceService) =>
+                ISharedDatabaseMaintenanceService maintenanceService,
+                IAppPathProvider pathProvider,
+                ApiDownloadTicketService ticketService) =>
             {
                 User user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null) return Results.Unauthorized();
@@ -117,15 +121,50 @@ namespace ExportDocManager.Api.Hosting
                         item.FileName,
                         fileName,
                         StringComparison.OrdinalIgnoreCase));
-                return backup == null
+                return backup == null ||
+                    !File.Exists(backup.FullPath) ||
+                    !IsManagedPostgreSqlBackupPath(pathProvider, backup.FullPath)
                     ? Results.NotFound(new ApiErrorResponse("未找到指定 PostgreSQL 备份。"))
+                    : Results.Ok(ticketService.Issue(
+                        PostgreSqlBackupDownloadPurpose,
+                        backup.FileName,
+                        "/downloads/postgresql-backups"));
+            })
+            .WithName("CreatePostgreSqlPhysicalBackupDownloadTicket");
+
+            endpoints.MapGet("/downloads/postgresql-backups/{token}", (
+                HttpContext context,
+                ApiDownloadTicketService ticketService,
+                ISharedDatabaseMaintenanceService maintenanceService,
+                IAppPathProvider pathProvider,
+                string token) =>
+            {
+                IResult transportError = RequireSecureDisasterRecoveryTransport(context);
+                if (transportError != null) return transportError;
+                if (!ticketService.TryResolve(
+                    token,
+                    PostgreSqlBackupDownloadPurpose,
+                    out string fileName))
+                {
+                    return Results.NotFound();
+                }
+
+                SharedDatabaseBackupItem backup = maintenanceService.ListPostgreSqlPhysicalBackups()
+                    .FirstOrDefault(item => string.Equals(
+                        item.FileName,
+                        fileName,
+                        StringComparison.OrdinalIgnoreCase));
+                return backup == null ||
+                    !File.Exists(backup.FullPath) ||
+                    !IsManagedPostgreSqlBackupPath(pathProvider, backup.FullPath)
+                    ? Results.NotFound()
                     : Results.File(
                         backup.FullPath,
                         "application/octet-stream",
                         backup.FileName,
                         enableRangeProcessing: true);
             })
-            .WithName("DownloadPostgreSqlPhysicalBackup");
+            .WithName("DownloadPostgreSqlPhysicalBackupWithTicket");
 
             endpoints.MapPost("/api/postgresql-maintenance/backups/restore", async (
                 HttpContext context,
@@ -281,7 +320,7 @@ namespace ExportDocManager.Api.Hosting
                 string packagePassword = request.Password ?? string.Empty;
                 ServerMigrationRequestContext requestContext = BuildRequestContext(context, user);
                 BackgroundJobSnapshot job = jobRunner.Enqueue(
-                    "ServerMigrationPackage",
+                    ServerMigrationPackageJobKind,
                     "创建服务器迁移包",
                     user.Username,
                     async (services, jobContext) =>
@@ -303,6 +342,7 @@ namespace ExportDocManager.Api.Hosting
                                 "server-migration",
                                 result.FileName);
                             File.Move(result.FullPath, outputPath, overwrite: false);
+                            jobContext.Report(99, "准备下载", "迁移包已进入受控下载目录。", outputPath);
                             return outputPath;
                         }
                         finally
@@ -314,7 +354,7 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     });
-                return Results.Accepted($"/api/jobs/{job.JobId}", job);
+                return AcceptedBackgroundJob(job);
             })
             .WithName("CreateServerMigrationPackage");
 
@@ -435,6 +475,45 @@ namespace ExportDocManager.Api.Hosting
             HttpContext context,
             User user) =>
             new(user?.Username ?? string.Empty, GetRemoteAddress(context));
+
+        private static bool IsManagedPostgreSqlBackupPath(
+            IAppPathProvider pathProvider,
+            string path)
+        {
+            if (pathProvider == null || string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            try
+            {
+                string fullPath = Path.GetFullPath(path);
+                string backupRoot = Path.GetFullPath(Path.Combine(
+                    pathProvider.DataRoot,
+                    "Backups",
+                    "PostgreSQL"));
+                if (!PathBoundaryHelper.IsWithinRoot(fullPath, backupRoot) ||
+                    string.Equals(fullPath, backupRoot, PathBoundaryHelper.PathComparison))
+                {
+                    return false;
+                }
+
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    fullPath,
+                    pathProvider.DataRoot,
+                    "PostgreSQL 备份下载路径无效。");
+                return true;
+            }
+            catch (Exception ex) when (
+                ex is IOException or
+                UnauthorizedAccessException or
+                ArgumentException or
+                NotSupportedException or
+                PathTooLongException)
+            {
+                return false;
+            }
+        }
 
         private static string GetRemoteAddress(HttpContext context) =>
             context.Connection.RemoteIpAddress?.ToString() ?? "loopback";

@@ -81,15 +81,6 @@ namespace ExportDocManager.Api.Hosting
         ApiPostgreSqlMaintenanceStatusResponse Status,
         IReadOnlyList<ApiSharedDatabaseBackupItemDto> Backups);
 
-    public sealed record ApiPostgreSqlPhysicalBackupResponse(
-        bool Success,
-        string Message,
-        string FileName,
-        string FullPath,
-        long SizeBytes,
-        string BackupRoot,
-        string StoragePolicy);
-
     public sealed record ApiPostgreSqlRestorePlanRequest(
         string BackupFileName,
         string TargetDatabase,

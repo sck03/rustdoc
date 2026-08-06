@@ -189,24 +189,24 @@
       }
     },
     "built-in-payment-voucher-template#1": {
-      "fingerprintHex": "f0000003ff0001fd007e00007fffff6393017fffe16393c37ffff37ffedf7fffff7fffe17f5fe17f1f017ffff1719f00001f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffff83",
-      "occupiedCells": 259,
+      "fingerprintHex": "e0000003ff0000fc007fffff7fd2017fffe17fffe37ffff37ffedf7fffff7fffe17f5fe17f1f017ffff1719f00001e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffff83",
+      "occupiedCells": 260,
       "paperBounds": {
         "left": 305,
         "top": 59,
         "width": 591,
-        "height": 765
+        "height": 836
       },
       "inkBounds": {
-        "left": 339,
-        "top": 74,
-        "width": 533,
-        "height": 734
+        "left": 328,
+        "top": 76,
+        "width": 544,
+        "height": 804
       }
     },
     "built-in-expense-reimbursement-template#1": {
-      "fingerprintHex": "f00f0001ff8001ff80007e007fc0007ffffc7ffffe7ffffe7ffffe5ff7fe5ffffe7ffffe7ffffe5ffffe5ffffe7ffffe54a54e74a54e74a54e7ffffe701f027ffffe7f807e7ffffe60e0e0000000000000000000000000000000000000ffffc3",
-      "occupiedCells": 431,
+      "fingerprintHex": "e00e0001ff8001ff80007e007fc0007ffffc7ffffe7ffffe7ffffe55a54a5ffffe5ffffe7ffffe5ffffe5ffffe57e5fa7ffffe74a54e74a54e54a54e7ffffe7ffffe78807a7f807e7ffffe6060c0000000000000000000000000000000ffffc3",
+      "occupiedCells": 434,
       "paperBounds": {
         "left": 305,
         "top": 59,

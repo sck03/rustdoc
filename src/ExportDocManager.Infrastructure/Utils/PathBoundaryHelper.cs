@@ -23,8 +23,18 @@ namespace ExportDocManager.Utils
 
             string normalizedPath = Normalize(path);
             string normalizedRoot = Normalize(root);
-            return string.Equals(normalizedPath, normalizedRoot, PathComparison) ||
-                   normalizedPath.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, PathComparison) ||
+            if (string.Equals(normalizedPath, normalizedRoot, PathComparison))
+            {
+                return true;
+            }
+
+            if (normalizedRoot.EndsWith(Path.DirectorySeparatorChar) ||
+                normalizedRoot.EndsWith(Path.AltDirectorySeparatorChar))
+            {
+                return normalizedPath.StartsWith(normalizedRoot, PathComparison);
+            }
+
+            return normalizedPath.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, PathComparison) ||
                    normalizedPath.StartsWith(normalizedRoot + Path.AltDirectorySeparatorChar, PathComparison);
         }
 
@@ -37,6 +47,55 @@ namespace ExportDocManager.Utils
             }
 
             return fullPath;
+        }
+
+        public static string EnsureNoReparsePointsWithinRoot(
+            string path,
+            string root,
+            string errorMessage)
+        {
+            string fullRoot = Normalize(root);
+            string fullPath = EnsureWithinRoot(path, fullRoot, errorMessage);
+            string current = fullPath;
+
+            while (true)
+            {
+                FileAttributes? attributes = null;
+                try
+                {
+                    attributes = File.GetAttributes(current);
+                }
+                catch (FileNotFoundException)
+                {
+                    // 尚未创建的叶节点由现存父目录决定边界。
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    // 尚未创建的叶节点由现存父目录决定边界。
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    throw new UnauthorizedAccessException(errorMessage, ex);
+                }
+
+                if (attributes.HasValue &&
+                    (attributes.Value & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new UnauthorizedAccessException(
+                        $"{errorMessage} 路径不能包含符号链接或重解析点：{current}");
+                }
+
+                if (string.Equals(current, fullRoot, PathComparison))
+                {
+                    return fullPath;
+                }
+
+                current = Path.GetDirectoryName(current);
+                if (string.IsNullOrWhiteSpace(current) || !IsWithinRoot(current, fullRoot))
+                {
+                    throw new UnauthorizedAccessException(errorMessage);
+                }
+            }
         }
 
         public static string ResolveProtocolRelativePath(string root, string relativePath, string errorMessage)
@@ -92,8 +151,11 @@ namespace ExportDocManager.Utils
 
         private static string Normalize(string path)
         {
-            return Path.GetFullPath(path)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string fullPath = Path.GetFullPath(path);
+            int rootLength = Path.GetPathRoot(fullPath)?.Length ?? 0;
+            return fullPath.Length > rootLength
+                ? fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                : fullPath;
         }
     }
 }

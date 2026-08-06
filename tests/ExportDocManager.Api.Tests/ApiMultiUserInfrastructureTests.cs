@@ -249,6 +249,38 @@ namespace ExportDocManager.Api.Tests
 
             Assert.False(Directory.Exists(jobRoot));
             Assert.True(File.Exists(sentinelPath));
+            Assert.Throws<ArgumentException>(() =>
+                ApiEndpointRouteBuilderExtensions.CreateBrowserDownloadPath(
+                    pathProvider,
+                    "..",
+                    "must-not-escape.pdf"));
+
+            string externalRoot = Path.Combine(database.Root, "external-browser-output");
+            string externalFile = Path.Combine(externalRoot, "must-not-delete.pdf");
+            string linkedJobRoot = Path.Combine(kindRoot, Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(externalRoot);
+            File.WriteAllText(externalFile, "external");
+            try
+            {
+                Directory.CreateSymbolicLink(linkedJobRoot, externalRoot);
+            }
+            catch (Exception ex) when (
+                ex is IOException or
+                UnauthorizedAccessException or
+                PlatformNotSupportedException)
+            {
+                return;
+            }
+
+            string linkedOutput = Path.Combine(linkedJobRoot, Path.GetFileName(externalFile));
+            Assert.False(ApiEndpointRouteBuilderExtensions.IsControlledBrowserDownloadPath(
+                pathProvider,
+                linkedOutput));
+
+            service.CleanupControlledOutputPath(linkedOutput);
+
+            Assert.True(File.Exists(externalFile));
+            Directory.Delete(linkedJobRoot);
         }
 
         [Fact]

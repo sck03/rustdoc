@@ -721,18 +721,19 @@ namespace ExportDocManager.Api.Hosting
                         },
                         post = new
                         {
-                            summary = "Create PostgreSQL physical backup",
+                            summary = "Queue PostgreSQL physical backup creation",
                             operationId = "createPostgreSqlPhysicalBackup",
                             responses = new Dictionary<string, object>
                             {
-                                ["200"] = new
+                                ["202"] = new
                                 {
-                                    description = "A PostgreSQL custom-format dump was created under the runtime data root.",
-                                    content = JsonContent("ApiPostgreSqlPhysicalBackupResponse")
+                                    description = "The PostgreSQL custom-format dump job was accepted.",
+                                    content = JsonContent("BackgroundJobSnapshot")
                                 },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot manage PostgreSQL maintenance." },
-                                ["409"] = new { description = "PostgreSQL is not configured, pg_dump is missing, or the backup failed." }
+                                ["409"] = new { description = "PostgreSQL is not configured, pg_dump is missing, or the backup failed." },
+                                ["429"] = new { description = "The background job queue is full." }
                             }
                         }
                     },
@@ -761,19 +762,20 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
-                    ["/api/postgresql-maintenance/backups/download"] = new
+                    ["/api/postgresql-maintenance/backups/download-ticket"] = new
                     {
-                        get = new
+                        post = new
                         {
-                            summary = "Download a managed PostgreSQL physical backup",
-                            operationId = "downloadPostgreSqlPhysicalBackup",
+                            summary = "Create a short-lived streaming download URL for a managed PostgreSQL physical backup",
+                            operationId = "createPostgreSqlPhysicalBackupDownloadTicket",
                             parameters = new object[] { QueryParameter("fileName", "string", null, "Managed .dump backup file name.", required: true) },
                             responses = new Dictionary<string, object>
                             {
-                                ["200"] = new { description = "PostgreSQL custom-format dump attachment.", content = BinaryContent() },
+                                ["200"] = new { description = "Short-lived same-origin streaming download URL.", content = JsonContent("ApiDownloadTicket") },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "Administrator settings permission is required." },
-                                ["404"] = new { description = "The selected backup does not exist." }
+                                ["404"] = new { description = "The selected backup does not exist." },
+                                ["426"] = new { description = "HTTPS or an explicitly trusted HTTP deployment is required." }
                             }
                         }
                     },
@@ -863,7 +865,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Explicit MIGRATE confirmation is required." },
                                 ["401"] = new { description = "Missing session or invalid current password." },
                                 ["403"] = new { description = "Disaster recovery management permission is required." },
-                                ["429"] = new { description = "Re-authentication attempts are temporarily rate limited." }
+                                ["429"] = new { description = "Re-authentication is rate limited or the background job queue is full." }
                             }
                         }
                     },
@@ -962,7 +964,7 @@ namespace ExportDocManager.Api.Hosting
                     {
                         post = new
                         {
-                            summary = "Download diagnostic support package",
+                            summary = "Queue diagnostic support package for native streaming download",
                             operationId = "downloadSupportPackage",
                             requestBody = new
                             {
@@ -971,14 +973,16 @@ namespace ExportDocManager.Api.Hosting
                             },
                             responses = new Dictionary<string, object>
                             {
-                                ["200"] = new
+                                ["202"] = new
                                 {
-                                    description = "A redacted diagnostic support ZIP attachment.",
-                                    content = BinaryContent()
+                                    description = "The redacted diagnostic support ZIP job was accepted.",
+                                    content = JsonContent("BackgroundJobSnapshot")
                                 },
                                 ["400"] = new { description = "Optional files require explicit confirmation text." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["403"] = new { description = "The current user cannot download support packages." }
+                                ["403"] = new { description = "The current user cannot download support packages." },
+                                ["426"] = new { description = "Support packages containing optional database backups or sample files require HTTPS or an explicitly trusted HTTP deployment." },
+                                ["429"] = new { description = "The background job queue is full." }
                             }
                         }
                     },
@@ -1231,7 +1235,8 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["400"] = new { description = "Invalid job id." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["404"] = new { description = "The job result is unavailable or is not a controlled browser download." }
+                                ["404"] = new { description = "The job result is unavailable or is not a controlled browser download." },
+                                ["426"] = new { description = "Sensitive migration or support output requires HTTPS or an explicitly trusted HTTP deployment." }
                             }
                         }
                     },
@@ -1247,9 +1252,10 @@ namespace ExportDocManager.Api.Hosting
                             },
                             responses = new Dictionary<string, object>
                             {
-                                ["200"] = new { description = "Short-lived download URL.", content = JsonContent("ApiJobDownloadTicket") },
+                                ["200"] = new { description = "Short-lived download URL.", content = JsonContent("ApiDownloadTicket") },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["404"] = new { description = "The job result is unavailable or unauthorized." }
+                                ["404"] = new { description = "The job result is unavailable or unauthorized." },
+                                ["426"] = new { description = "Sensitive migration or support output requires HTTPS or an explicitly trusted HTTP deployment." }
                             }
                         }
                     },

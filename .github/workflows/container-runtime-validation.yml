@@ -94,8 +94,78 @@ jobs:
           test "$first_password" = "$(sudo sed -n 's/^POSTGRES_PASSWORD=//p' "$installer_root/.env")"
           test "$first_token" = "$(sudo sed -n 's/^EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=//p' "$installer_root/.env")"
           test "$(sudo sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' "$installer_root/.env")" = "http"
+          test "$(sudo sed -n 's/^EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY=//p' "$installer_root/.env")" = "true"
           test "$(sudo find "$installer_root" -maxdepth 1 -name '.env.previous.*' -print -quit)" = ""
+
+          rollback_assets="${{ runner.temp }}/container-installer-rollback-assets"
+          rollback_root="${{ runner.temp }}/container-installer-rollback-root"
+          mkdir -p "$rollback_assets"
+          mkdir -p "$rollback_root"
+          cp deploy/container/docker-compose.ghcr.yml "$rollback_assets/"
+          cp deploy/container/docker-compose.acme.yml "$rollback_assets/"
+          cp deploy/container/nginx.acme.conf "$rollback_assets/"
+          cp deploy/container/install-container.sh "$rollback_assets/"
+          printf 'services: [\n' > "$rollback_assets/docker-compose.ghcr.yml"
+          printf '# previous environment\n' > "$rollback_root/.env"
+          printf '# previous compose\n' > "$rollback_root/docker-compose.ghcr.yml"
+          previous_env_hash="$(sha256sum "$rollback_root/.env" | awk '{print $1}')"
+          previous_compose_hash="$(sha256sum "$rollback_root/docker-compose.ghcr.yml" | awk '{print $1}')"
+          if sudo env EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE="file://$rollback_assets" \
+              bash deploy/container/install-container.sh \
+              --mode http \
+              --tag validation \
+              --install-dir "$rollback_root" \
+              --no-start; then
+            echo "Installer rollback probe unexpectedly succeeded." >&2
+            exit 1
+          fi
+          test "$previous_env_hash" = "$(sudo sha256sum "$rollback_root/.env" | awk '{print $1}')"
+          test "$previous_compose_hash" = "$(sudo sha256sum "$rollback_root/docker-compose.ghcr.yml" | awk '{print $1}')"
+          test "$(sudo find "$rollback_root" -maxdepth 1 \( -name '.deployment-assets.*' -o -name '.env.previous.*' \) -print -quit)" = ""
+
+          symlink_install_target="${{ runner.temp }}/container-installer-symlink-target"
+          symlink_install_path="${{ runner.temp }}/container-installer-symlink-root"
+          mkdir -p "$symlink_install_target"
+          ln -s "$symlink_install_target" "$symlink_install_path"
+          if sudo env EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE="file://${{ github.workspace }}/deploy/container" \
+              bash deploy/container/install-container.sh \
+              --mode http \
+              --tag validation \
+              --install-dir "$symlink_install_path" \
+              --no-start; then
+            echo "Installer unexpectedly accepted a symlink installation root." >&2
+            exit 1
+          fi
+          test "$(find "$symlink_install_target" -mindepth 1 -print -quit)" = ""
+
+          symlink_runtime_root="${{ runner.temp }}/container-installer-symlink-runtime-root"
+          symlink_runtime_target="${{ runner.temp }}/container-installer-symlink-runtime-target"
+          mkdir -p "$symlink_runtime_root" "$symlink_runtime_target"
+          ln -s "$symlink_runtime_target" "$symlink_runtime_root/runtime"
+          printf 'EXPORTDOCMANAGER_DEPLOYMENT_MODE=http\nEXPORTDOCMANAGER_RUNTIME_ROOT=%s/runtime\n' \
+            "$symlink_runtime_root" > "$symlink_runtime_root/.env"
+          printf '# previous compose marker\n' > "$symlink_runtime_root/docker-compose.ghcr.yml"
+          symlink_previous_env_hash="$(sha256sum "$symlink_runtime_root/.env" | awk '{print $1}')"
+          symlink_previous_compose_hash="$(sha256sum "$symlink_runtime_root/docker-compose.ghcr.yml" | awk '{print $1}')"
+          if sudo env EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE="file://${{ github.workspace }}/deploy/container" \
+              bash deploy/container/install-container.sh \
+              --mode http \
+              --tag validation \
+              --install-dir "$symlink_runtime_root" \
+              --no-start; then
+            echo "Installer unexpectedly accepted a symlink runtime root." >&2
+            exit 1
+          fi
+          test "$(find "$symlink_runtime_target" -mindepth 1 -print -quit)" = ""
+          test "$symlink_previous_env_hash" = "$(sudo sha256sum "$symlink_runtime_root/.env" | awk '{print $1}')"
+          test "$symlink_previous_compose_hash" = "$(sudo sha256sum "$symlink_runtime_root/docker-compose.ghcr.yml" | awk '{print $1}')"
+          sudo test ! -e "$symlink_runtime_root/docker-compose.acme.yml"
+          sudo test ! -e "$symlink_runtime_root/nginx.acme.conf"
+          sudo test ! -e "$symlink_runtime_root/install-container.sh"
+          test "$(sudo find "$symlink_runtime_root" -maxdepth 1 \( -name '.deployment-assets.*' -o -name '.env.previous.*' \) -print -quit)" = ""
+
           sudo test -f "$installer_root/runtime/api-data/Config/appsettings.json"
+          test "$(sudo stat -c '%a' "$installer_root")" = "700"
           test "$(sudo stat -c '%a' "$installer_root/.env")" = "600"
           test "$(sudo stat -c '%a' "$installer_root/runtime")" = "700"
           test "$(sudo stat -c '%a' "$installer_root/runtime/postgres")" = "700"

@@ -57,6 +57,23 @@ note() {
   printf '%s\n' "$*"
 }
 
+assert_safe_directory_path() {
+  local candidate=$1
+  local label=$2
+  local parent
+  [[ "$candidate" == /* ]] || fail "$label must be an absolute path."
+
+  while :; do
+    [[ ! -L "$candidate" ]] || fail "$label must not traverse a symbolic link: $candidate"
+    [[ ! -e "$candidate" || -d "$candidate" ]] || fail "$label must not traverse a regular file: $candidate"
+    [[ "$candidate" != "/" ]] || break
+    parent=${candidate%/*}
+    [[ -n "$parent" ]] || parent=/
+    [[ "$parent" != "$candidate" ]] || break
+    candidate=$parent
+  done
+}
+
 while (($# > 0)); do
   case "$1" in
     --mode) MODE=${2:?Missing value for --mode}; shift 2 ;;
@@ -79,6 +96,10 @@ done
 [[ "$INSTALL_DIR" == /* && "$INSTALL_DIR" != "/" && ! "$INSTALL_DIR" =~ [[:space:]] ]] ||
   fail "--install-dir must be an absolute non-root path without whitespace."
 [[ "$REPOSITORY_REF" =~ ^[A-Za-z0-9._/-]+$ && "$REPOSITORY_REF" != *..* ]] || fail "Invalid Git ref."
+while [[ "$INSTALL_DIR" != "/" && "$INSTALL_DIR" == */ ]]; do
+  INSTALL_DIR=${INSTALL_DIR%/}
+done
+assert_safe_directory_path "$INSTALL_DIR" "Installation directory"
 
 case "$(uname -m)" in
   x86_64|amd64|aarch64|arm64) ;;
@@ -100,38 +121,205 @@ docker info >/dev/null 2>&1 || fail "Docker Engine is not running."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is required (docker compose)."
 
 mkdir -p -- "$INSTALL_DIR"
+assert_safe_directory_path "$INSTALL_DIR" "Installation directory"
+INSTALL_DIR=$(cd -- "$INSTALL_DIR" && pwd -P)
+[[ "$INSTALL_DIR" != "/" ]] || fail "The resolved installation directory must not be the filesystem root."
+chown root:root "$INSTALL_DIR"
+chmod 700 "$INSTALL_DIR"
 if command -v flock >/dev/null 2>&1; then
-  exec 9>"$INSTALL_DIR/.install.lock"
+  INSTALL_LOCK="$INSTALL_DIR/.install.lock"
+  [[ ! -L "$INSTALL_LOCK" ]] || fail "Installer lock must not be a symbolic link: $INSTALL_LOCK"
+  [[ ! -e "$INSTALL_LOCK" || -f "$INSTALL_LOCK" ]] || fail "Installer lock must be a regular file: $INSTALL_LOCK"
+  exec 9>"$INSTALL_LOCK"
   flock -n 9 || fail "Another installer process is using $INSTALL_DIR."
 fi
 
 ASSET_BASE=${EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE:-"https://raw.githubusercontent.com/sck03/rustdoc/${REPOSITORY_REF}/deploy/container"}
-download_asset() {
-  local name=$1
-  local destination="$INSTALL_DIR/$name"
-  local temporary="$destination.download.$$"
-  curl --fail --silent --show-error --location --retry 3 "$ASSET_BASE/$name" --output "$temporary"
-  chmod 600 "$temporary"
-  mv -f -- "$temporary" "$destination"
+DEPLOYMENT_ASSETS=(docker-compose.ghcr.yml docker-compose.acme.yml nginx.acme.conf install-container.sh)
+ENVIRONMENT_FILE="$INSTALL_DIR/.env"
+for managed_file in "${DEPLOYMENT_ASSETS[@]}" .env; do
+  managed_path="$INSTALL_DIR/$managed_file"
+  [[ ! -L "$managed_path" ]] || fail "Managed deployment files must not be symbolic links: $managed_path"
+  [[ ! -e "$managed_path" || -f "$managed_path" ]] || fail "Managed deployment paths must be regular files: $managed_path"
+done
+ASSET_STAGE=$(mktemp -d "$INSTALL_DIR/.deployment-assets.stage.XXXXXX")
+ASSET_BACKUP=$(mktemp -d "$INSTALL_DIR/.deployment-assets.previous.XXXXXX")
+ENVIRONMENT_BACKUP=""
+ENVIRONMENT_FILE_WAS_PRESENT=0
+ACTIVATION_FILE=""
+ENVIRONMENT_TEMP_FILE=""
+CERTIFICATE_BACKUP=""
+CERTIFICATE_STATE_CAPTURED=0
+ROLLBACK_REQUIRED=0
+DEPLOYMENT_SUCCEEDED=0
+
+restore_deployment_assets() {
+  local asset
+  for asset in "${DEPLOYMENT_ASSETS[@]}"; do
+    if [[ -f "$ASSET_BACKUP/$asset" ]]; then
+      cp -p -- "$ASSET_BACKUP/$asset" "$INSTALL_DIR/$asset"
+    elif [[ -f "$ASSET_BACKUP/.missing-$asset" ]]; then
+      rm -f -- "$INSTALL_DIR/$asset"
+    fi
+  done
 }
 
-for asset in docker-compose.ghcr.yml docker-compose.acme.yml nginx.acme.conf install-container.sh; do
+restore_certificate_state() {
+  ((CERTIFICATE_STATE_CAPTURED == 1)) || return 0
+  [[ -n ${CERTIFICATE_ROOT:-} && -n "$CERTIFICATE_BACKUP" && -d "$CERTIFICATE_BACKUP" ]] || return 1
+
+  local failed_certificate_parent
+  local failed_certificate_root
+  local active_state_moved=0
+  failed_certificate_parent=$(mktemp -d "$RUNTIME_ROOT/.letsencrypt.failed.XXXXXX") || return 1
+  failed_certificate_root="$failed_certificate_parent/current"
+  if [[ -e "$CERTIFICATE_ROOT" ]]; then
+    if ! mv -- "$CERTIFICATE_ROOT" "$failed_certificate_root"; then
+      rmdir -- "$failed_certificate_parent" || true
+      return 1
+    fi
+    active_state_moved=1
+  fi
+  if mv -- "$CERTIFICATE_BACKUP" "$CERTIFICATE_ROOT"; then
+    CERTIFICATE_BACKUP=""
+    CERTIFICATE_STATE_CAPTURED=0
+    rm -rf -- "$failed_certificate_parent"
+    return 0
+  fi
+
+  if ((active_state_moved == 1)) &&
+      mv -- "$failed_certificate_root" "$CERTIFICATE_ROOT"; then
+    rmdir -- "$failed_certificate_parent" || true
+  elif ((active_state_moved == 0)); then
+    rmdir -- "$failed_certificate_parent" || true
+  else
+    note "WARNING: Failed certificate state was preserved at $failed_certificate_parent." >&2
+  fi
+  return 1
+}
+
+restore_previous_deployment() {
+  note "Installation failed; restoring the previous deployment files and environment..." >&2
+  if ! restore_certificate_state; then
+    note "WARNING: The previous certificate state could not be restored automatically; inspect $RUNTIME_ROOT before exposing HTTPS." >&2
+  fi
+  if [[ -n "$ENVIRONMENT_BACKUP" && -f "$ENVIRONMENT_BACKUP" ]]; then
+    if ((ENVIRONMENT_FILE_WAS_PRESENT == 1)); then
+      cp -- "$ENVIRONMENT_BACKUP" "$INSTALL_DIR/.env"
+      chmod 600 "$INSTALL_DIR/.env"
+    else
+      rm -f -- "$INSTALL_DIR/.env"
+    fi
+  fi
+  restore_deployment_assets
+
+  local previous_mode=${EXISTING_MODE:-}
+  [[ "$previous_mode" == "http" || "$previous_mode" == "https" ]] || return 0
+  local previous_compose=(docker compose -f "$INSTALL_DIR/docker-compose.ghcr.yml")
+  if [[ "$previous_mode" == "https" ]]; then
+    previous_compose+=(-f "$INSTALL_DIR/docker-compose.acme.yml")
+  fi
+  previous_compose+=(--env-file "$INSTALL_DIR/.env")
+  if "${previous_compose[@]}" config --quiet >/dev/null 2>&1 &&
+      "${previous_compose[@]}" up -d --remove-orphans --force-recreate >/dev/null 2>&1; then
+    note "The previous $previous_mode deployment was restored."
+  else
+    note "WARNING: The previous deployment files were restored, but its containers could not be restarted automatically; inspect Docker Compose state in $INSTALL_DIR." >&2
+  fi
+}
+
+cleanup() {
+  local exit_code=$?
+  trap - EXIT
+  if ((exit_code != 0 && ROLLBACK_REQUIRED == 1 && DEPLOYMENT_SUCCEEDED == 0)); then
+    restore_previous_deployment || true
+  fi
+  [[ -z "$ENVIRONMENT_BACKUP" ]] || rm -f -- "$ENVIRONMENT_BACKUP"
+  [[ -z "$ACTIVATION_FILE" ]] || rm -f -- "$ACTIVATION_FILE"
+  [[ -z "$ENVIRONMENT_TEMP_FILE" ]] || rm -f -- "$ENVIRONMENT_TEMP_FILE"
+  if [[ -n "$CERTIFICATE_BACKUP" ]]; then
+    if ((exit_code != 0 && CERTIFICATE_STATE_CAPTURED == 1)); then
+      note "WARNING: A certificate rollback backup was preserved for manual recovery: $CERTIFICATE_BACKUP" >&2
+    else
+      rm -rf -- "$CERTIFICATE_BACKUP"
+    fi
+  fi
+  rm -rf -- "$ASSET_STAGE" "$ASSET_BACKUP"
+  exit "$exit_code"
+}
+trap cleanup EXIT
+
+download_asset() {
+  local name=$1
+  local destination="$ASSET_STAGE/$name"
+  curl --fail --silent --show-error --location --retry 3 "$ASSET_BASE/$name" --output "$destination"
+  [[ -s "$destination" ]] || fail "Downloaded deployment asset is empty: $name"
+  chmod 600 "$destination"
+}
+
+for asset in "${DEPLOYMENT_ASSETS[@]}"; do
   download_asset "$asset"
+done
+bash -n "$ASSET_STAGE/install-container.sh"
+STAGED_VALIDATION_ENV="$ASSET_STAGE/.compose-validation.env"
+cat > "$STAGED_VALIDATION_ENV" <<EOF
+POSTGRES_DB=exportdoc
+POSTGRES_USER=exportdoc
+POSTGRES_PASSWORD=staged-compose-validation-password
+EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=staged-compose-validation-bootstrap-token
+EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/sck03
+EXPORTDOCMANAGER_IMAGE_TAG=validation
+EXPORTDOCMANAGER_RUNTIME_ROOT=$INSTALL_DIR/.compose-validation-runtime
+EXPORTDOCMANAGER_WEB_PORT=18080
+EXPORTDOCMANAGER_HTTPS_PORT=18443
+EXPORTDOCMANAGER_CONTAINER_SUBNET=172.31.255.0/28
+EXPORTDOCMANAGER_REVERSE_PROXY_IP=172.31.255.10
+EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY=false
+EOF
+chmod 600 "$STAGED_VALIDATION_ENV"
+docker compose \
+  -f "$ASSET_STAGE/docker-compose.ghcr.yml" \
+  --env-file "$STAGED_VALIDATION_ENV" \
+  config --quiet
+docker compose \
+  -f "$ASSET_STAGE/docker-compose.ghcr.yml" \
+  -f "$ASSET_STAGE/docker-compose.acme.yml" \
+  --env-file "$STAGED_VALIDATION_ENV" \
+  config --quiet
+
+for asset in "${DEPLOYMENT_ASSETS[@]}"; do
+  if [[ -f "$INSTALL_DIR/$asset" ]]; then
+    cp -p -- "$INSTALL_DIR/$asset" "$ASSET_BACKUP/$asset"
+  else
+    : > "$ASSET_BACKUP/.missing-$asset"
+  fi
+done
+
+if [[ -f "$ENVIRONMENT_FILE" ]]; then
+  ENVIRONMENT_FILE_WAS_PRESENT=1
+fi
+ENVIRONMENT_BACKUP=$(mktemp "$INSTALL_DIR/.env.previous.XXXXXX")
+if ((ENVIRONMENT_FILE_WAS_PRESENT == 1)); then
+  cp -- "$ENVIRONMENT_FILE" "$ENVIRONMENT_BACKUP"
+else
+  : > "$ENVIRONMENT_BACKUP"
+fi
+chmod 600 "$ENVIRONMENT_BACKUP"
+ROLLBACK_REQUIRED=1
+
+for asset in "${DEPLOYMENT_ASSETS[@]}"; do
+  ACTIVATION_FILE=$(mktemp "$INSTALL_DIR/.$asset.activate.XXXXXX")
+  cp -- "$ASSET_STAGE/$asset" "$ACTIVATION_FILE"
+  chmod 600 "$ACTIVATION_FILE"
+  mv -f -- "$ACTIVATION_FILE" "$INSTALL_DIR/$asset"
+  ACTIVATION_FILE=""
 done
 chmod 700 "$INSTALL_DIR/install-container.sh"
 
-ENVIRONMENT_FILE="$INSTALL_DIR/.env"
-if [[ ! -f "$ENVIRONMENT_FILE" ]]; then
+if ((ENVIRONMENT_FILE_WAS_PRESENT == 0)); then
   : > "$ENVIRONMENT_FILE"
   chmod 600 "$ENVIRONMENT_FILE"
 fi
-ENVIRONMENT_BACKUP=$(mktemp "$INSTALL_DIR/.env.previous.XXXXXX")
-cp -- "$ENVIRONMENT_FILE" "$ENVIRONMENT_BACKUP"
-chmod 600 "$ENVIRONMENT_BACKUP"
-cleanup() {
-  rm -f -- "$ENVIRONMENT_BACKUP"
-}
-trap cleanup EXIT
 
 env_value() {
   local key=$1
@@ -141,9 +329,9 @@ env_value() {
 set_env_value() {
   local key=$1
   local value=$2
-  local temporary="$ENVIRONMENT_FILE.tmp.$$"
-  awk -v key="$key" -v value="$value" '
-    BEGIN { replaced=0 }
+  ENVIRONMENT_TEMP_FILE=$(mktemp "$INSTALL_DIR/.env.tmp.XXXXXX")
+  ENV_VALUE="$value" awk -v key="$key" '
+    BEGIN { replaced=0; value=ENVIRON["ENV_VALUE"] }
     index($0, key "=") == 1 {
       if (!replaced) print key "=" value
       replaced=1
@@ -151,9 +339,10 @@ set_env_value() {
     }
     { print }
     END { if (!replaced) print key "=" value }
-  ' "$ENVIRONMENT_FILE" > "$temporary"
-  chmod 600 "$temporary"
-  mv -f -- "$temporary" "$ENVIRONMENT_FILE"
+  ' "$ENVIRONMENT_FILE" > "$ENVIRONMENT_TEMP_FILE"
+  chmod 600 "$ENVIRONMENT_TEMP_FILE"
+  mv -f -- "$ENVIRONMENT_TEMP_FILE" "$ENVIRONMENT_FILE"
+  ENVIRONMENT_TEMP_FILE=""
 }
 
 EXISTING_MODE=$(env_value EXPORTDOCMANAGER_DEPLOYMENT_MODE)
@@ -181,7 +370,10 @@ RUNTIME_ROOT=$(env_value EXPORTDOCMANAGER_RUNTIME_ROOT)
 RUNTIME_ROOT=${RUNTIME_ROOT:-$INSTALL_DIR/runtime}
 [[ "$RUNTIME_ROOT" == /* && "$RUNTIME_ROOT" != "/" && ! "$RUNTIME_ROOT" =~ [[:space:]] ]] ||
   fail "Existing EXPORTDOCMANAGER_RUNTIME_ROOT must be an absolute non-root path without whitespace."
-SETTINGS_FILE="$RUNTIME_ROOT/api-data/Config/appsettings.json"
+while [[ "$RUNTIME_ROOT" != "/" && "$RUNTIME_ROOT" == */ ]]; do
+  RUNTIME_ROOT=${RUNTIME_ROOT%/}
+done
+assert_safe_directory_path "$RUNTIME_ROOT" "Runtime data root"
 
 PUBLIC_DOMAIN=${PUBLIC_DOMAIN:-$(env_value EXPORTDOCMANAGER_PUBLIC_DOMAIN)}
 ACME_EMAIL=${ACME_EMAIL:-$(env_value EXPORTDOCMANAGER_ACME_EMAIL)}
@@ -320,18 +512,36 @@ POSTGRES_USERNAME=${POSTGRES_USERNAME:-exportdoc}
 [[ "$POSTGRES_DATABASE" =~ ^[A-Za-z0-9_]{1,63}$ ]] || fail "POSTGRES_DB must contain 1-63 letters, digits, or underscores."
 [[ "$POSTGRES_USERNAME" =~ ^[A-Za-z0-9_]{1,63}$ ]] || fail "POSTGRES_USER must contain 1-63 letters, digits, or underscores."
 
-mkdir -p -- "$RUNTIME_ROOT/api-data/Config" "$RUNTIME_ROOT/postgres" "$RUNTIME_ROOT/letsencrypt" "$RUNTIME_ROOT/acme-webroot"
+mkdir -p -- "$RUNTIME_ROOT"
+assert_safe_directory_path "$RUNTIME_ROOT" "Runtime data root"
+RUNTIME_ROOT=$(cd -- "$RUNTIME_ROOT" && pwd -P)
+[[ "$RUNTIME_ROOT" != "/" ]] || fail "The resolved runtime data root must not be the filesystem root."
+API_DATA_ROOT="$RUNTIME_ROOT/api-data"
+CONFIG_ROOT="$API_DATA_ROOT/Config"
+POSTGRES_ROOT="$RUNTIME_ROOT/postgres"
+LETSENCRYPT_ROOT="$RUNTIME_ROOT/letsencrypt"
+ACME_WEB_ROOT="$RUNTIME_ROOT/acme-webroot"
+for runtime_directory in "$API_DATA_ROOT" "$CONFIG_ROOT" "$POSTGRES_ROOT" "$LETSENCRYPT_ROOT" "$ACME_WEB_ROOT"; do
+  assert_safe_directory_path "$runtime_directory" "Managed runtime directory"
+done
+mkdir -p -- "$CONFIG_ROOT" "$POSTGRES_ROOT" "$LETSENCRYPT_ROOT" "$ACME_WEB_ROOT"
+for runtime_directory in "$API_DATA_ROOT" "$CONFIG_ROOT" "$POSTGRES_ROOT" "$LETSENCRYPT_ROOT" "$ACME_WEB_ROOT"; do
+  assert_safe_directory_path "$runtime_directory" "Managed runtime directory"
+done
+SETTINGS_FILE="$CONFIG_ROOT/appsettings.json"
+[[ ! -L "$SETTINGS_FILE" ]] || fail "Managed application settings must not be a symbolic link: $SETTINGS_FILE"
+[[ ! -e "$SETTINGS_FILE" || -f "$SETTINGS_FILE" ]] || fail "Managed application settings must be a regular file: $SETTINGS_FILE"
 # The API image runs as the fixed, unprivileged uid/gid 10001. PostgreSQL's
 # Debian image runs as uid/gid 999. Bind-mount ownership is prepared up front
 # so neither service needs a world-writable host directory.
-chown -R 10001:10001 "$RUNTIME_ROOT/api-data"
-chown -R 999:999 "$RUNTIME_ROOT/postgres"
-chown root:root "$RUNTIME_ROOT" "$RUNTIME_ROOT/letsencrypt" "$RUNTIME_ROOT/acme-webroot"
+chown -R 10001:10001 "$API_DATA_ROOT"
+chown -R 999:999 "$POSTGRES_ROOT"
+chown root:root "$RUNTIME_ROOT" "$LETSENCRYPT_ROOT" "$ACME_WEB_ROOT"
 chmod 700 "$RUNTIME_ROOT"
-chmod 0700 "$RUNTIME_ROOT/postgres"
-chmod 0750 "$RUNTIME_ROOT/api-data" "$RUNTIME_ROOT/api-data/Config"
-chmod 0700 "$RUNTIME_ROOT/letsencrypt"
-chmod 0755 "$RUNTIME_ROOT/acme-webroot"
+chmod 0700 "$POSTGRES_ROOT"
+chmod 0750 "$API_DATA_ROOT" "$CONFIG_ROOT"
+chmod 0700 "$LETSENCRYPT_ROOT"
+chmod 0755 "$ACME_WEB_ROOT"
 if [[ ! -f "$SETTINGS_FILE" ]]; then
   cat > "$SETTINGS_FILE" <<EOF
 {
@@ -360,9 +570,11 @@ set_env_value EXPORTDOCMANAGER_MASTER_KEY "$MASTER_KEY"
 if [[ "$MODE" == "https" ]]; then
   set_env_value EXPORTDOCMANAGER_WEB_PORT 80
   set_env_value EXPORTDOCMANAGER_HTTPS_PORT 443
+  set_env_value EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY false
 else
   set_env_value EXPORTDOCMANAGER_WEB_PORT "$WEB_PORT"
   set_env_value EXPORTDOCMANAGER_HTTPS_PORT 8443
+  set_env_value EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY true
 fi
 set_env_value EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES "$ADDITIONAL_TRUSTED_PROXIES"
 set_env_value EXPORTDOCMANAGER_TLS_CERTIFICATE ./secrets/tls/server.crt
@@ -393,29 +605,13 @@ fi
 COMPOSE+=(--env-file "$ENVIRONMENT_FILE")
 "${COMPOSE[@]}" config --quiet
 
-restore_previous_deployment() {
-  [[ "$EXISTING_MODE" == "http" || "$EXISTING_MODE" == "https" ]] || return 0
-
-  cp -- "$ENVIRONMENT_BACKUP" "$ENVIRONMENT_FILE"
-  chmod 600 "$ENVIRONMENT_FILE"
-  local previous_compose=(docker compose -f "$INSTALL_DIR/docker-compose.ghcr.yml")
-  if [[ "$EXISTING_MODE" == "https" ]]; then
-    previous_compose+=(-f "$INSTALL_DIR/docker-compose.acme.yml")
-  fi
-  previous_compose+=(--env-file "$ENVIRONMENT_FILE")
-  if "${previous_compose[@]}" up -d --remove-orphans >/dev/null 2>&1; then
-    note "The previous $EXISTING_MODE deployment was restored."
-  else
-    note "WARNING: The previous deployment could not be restarted automatically; inspect Docker Compose state in $INSTALL_DIR." >&2
-  fi
-}
-
 note "Deployment files prepared in $INSTALL_DIR"
 note "Runtime data root: $RUNTIME_ROOT"
 note "Image tag: $IMAGE_TAG"
 note "Container subnet: $CONTAINER_SUBNET"
 if ((NO_START == 1)); then
   note "--no-start selected; images were not pulled and containers were not changed."
+  DEPLOYMENT_SUCCEEDED=1
   exit 0
 fi
 
@@ -427,7 +623,6 @@ if [[ "$MODE" == "https" ]]; then
   CERTIFICATE_ROOT="$RUNTIME_ROOT/letsencrypt"
   CERTIFICATE_FILE="$CERTIFICATE_ROOT/live/exportdocmanager/fullchain.pem"
   CERTIFICATE_KEY="$CERTIFICATE_ROOT/live/exportdocmanager/privkey.pem"
-  CERTIFICATE_DOMAIN_FILE="$CERTIFICATE_ROOT/exportdocmanager-domain"
   certificate_is_usable() {
     local certificate_public_key private_public_key
     [[ -f "$CERTIFICATE_FILE" && -f "$CERTIFICATE_KEY" ]] || return 1
@@ -448,12 +643,13 @@ if [[ "$MODE" == "https" ]]; then
   CERTIFICATE_REQUIRED=1
   if certificate_is_usable; then
     CERTIFICATE_REQUIRED=0
-    printf '%s\n' "$PUBLIC_DOMAIN" > "$CERTIFICATE_DOMAIN_FILE"
-    chmod 600 "$CERTIFICATE_DOMAIN_FILE"
   fi
   if ((CERTIFICATE_REQUIRED == 1)); then
     note "Requesting the initial Let's Encrypt certificate for $PUBLIC_DOMAIN..."
     "${COMPOSE[@]}" stop web certbot >/dev/null 2>&1 || true
+    CERTIFICATE_BACKUP=$(mktemp -d "$RUNTIME_ROOT/.letsencrypt.previous.XXXXXX")
+    cp -a -- "$CERTIFICATE_ROOT/." "$CERTIFICATE_BACKUP/"
+    CERTIFICATE_STATE_CAPTURED=1
     if ! docker run --rm --name exportdocmanager-certbot-bootstrap \
         --publish 80:80 \
         --volume "$CERTIFICATE_ROOT:/etc/letsencrypt" \
@@ -467,11 +663,8 @@ if [[ "$MODE" == "https" ]]; then
         --cert-name exportdocmanager \
         --domain "$PUBLIC_DOMAIN" \
         --email "$ACME_EMAIL"; then
-      restore_previous_deployment
-      fail "Certificate request failed. Check DNS and inbound TCP 80; an existing deployment was restored when possible."
+      fail "Certificate request failed. Check DNS and inbound TCP 80; the installer will restore the previous deployment when possible."
     fi
-    printf '%s\n' "$PUBLIC_DOMAIN" > "$CERTIFICATE_DOMAIN_FILE"
-    chmod 600 "$CERTIFICATE_DOMAIN_FILE"
   fi
 fi
 
@@ -516,13 +709,18 @@ fi
 note ""
 note "ExportDocManager is ready: $ACCESS_URL"
 ACTIVATION_MARKER="$INSTALL_DIR/.activation-token-presented"
+[[ ! -L "$ACTIVATION_MARKER" ]] || fail "Activation marker must not be a symbolic link: $ACTIVATION_MARKER"
+[[ ! -e "$ACTIVATION_MARKER" || -f "$ACTIVATION_MARKER" ]] || fail "Activation marker must be a regular file: $ACTIVATION_MARKER"
 if [[ ! -f "$ACTIVATION_MARKER" ]]; then
   note "First activation token: $BOOTSTRAP_TOKEN"
   note "Open Advanced connection options, enter this token, and sign in as admin with the application password you want to set."
-  : > "$ACTIVATION_MARKER"
-  chmod 600 "$ACTIVATION_MARKER"
+  ACTIVATION_FILE=$(mktemp "$INSTALL_DIR/.activation-token-presented.activate.XXXXXX")
+  chmod 600 "$ACTIVATION_FILE"
+  mv -f -- "$ACTIVATION_FILE" "$ACTIVATION_MARKER"
+  ACTIVATION_FILE=""
 else
   note "Existing database password, activation token, configuration, and runtime data were preserved."
 fi
 note "Status: cd $INSTALL_DIR && sudo ${COMPOSE[*]} ps"
 note "The API port 5188 and PostgreSQL port are not published to the host."
+DEPLOYMENT_SUCCEEDED=1

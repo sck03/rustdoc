@@ -62,7 +62,10 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 throw new UnauthorizedAccessException("受管运行数据路径超出允许目录。");
             }
-            EnsureNoReparsePointBelowRoot(fullPath, dataRoot);
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                fullPath,
+                dataRoot,
+                "受管运行数据路径不能包含符号链接或重解析点。");
             return fullPath;
         }
 
@@ -81,35 +84,14 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 throw new UnauthorizedAccessException("文件不在允许的运行数据目录内。");
             }
-            EnsureNoReparsePointBelowRoot(candidate, dataRoot);
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                candidate,
+                dataRoot,
+                "受管运行数据路径不能包含符号链接或重解析点。");
             return NormalizeStoredPath(
                 Path.GetRelativePath(dataRoot, candidate).Replace('\\', '/'),
                 requiredTopLevelDirectory);
         }
 
-        private static void EnsureNoReparsePointBelowRoot(string path, string root)
-        {
-            string fullRoot = Path.GetFullPath(root)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            string current = Path.GetFullPath(path);
-            while (!string.Equals(current, fullRoot, PathBoundaryHelper.PathComparison))
-            {
-                if (!PathBoundaryHelper.IsWithinRoot(current, fullRoot))
-                {
-                    throw new UnauthorizedAccessException("受管运行数据路径超出运行数据根。");
-                }
-                if (File.Exists(current) || Directory.Exists(current))
-                {
-                    FileAttributes attributes = File.GetAttributes(current);
-                    if ((attributes & FileAttributes.ReparsePoint) != 0)
-                    {
-                        throw new UnauthorizedAccessException(
-                            $"受管运行数据路径不能包含符号链接或重解析点：{current}");
-                    }
-                }
-                current = Path.GetDirectoryName(current)
-                    ?? throw new UnauthorizedAccessException("受管运行数据路径无效。");
-            }
-        }
     }
 }

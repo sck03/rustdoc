@@ -20,6 +20,10 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return;
                 }
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    fullPath,
+                    _pathProvider.DataRoot,
+                    "受控浏览器任务输出路径无效。");
 
                 string directory = Path.GetDirectoryName(fullPath) ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(directory) ||
@@ -83,6 +87,10 @@ namespace ExportDocManager.Api.Hosting
 
             try
             {
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    browserRoot,
+                    _pathProvider.DataRoot,
+                    "受控浏览器任务输出根目录无效。");
                 var referencedDirectories = _jobs.Values
                     .Select(job => job.OutputPath)
                     .Where(path => !string.IsNullOrWhiteSpace(path))
@@ -97,8 +105,18 @@ namespace ExportDocManager.Api.Hosting
 
                 foreach (string kindDirectory in Directory.EnumerateDirectories(browserRoot))
                 {
+                    if (!IsReparsePointFreeBrowserPath(kindDirectory, browserRoot))
+                    {
+                        continue;
+                    }
+
                     foreach (string jobDirectory in Directory.EnumerateDirectories(kindDirectory))
                     {
+                        if (!IsReparsePointFreeBrowserPath(jobDirectory, browserRoot))
+                        {
+                            continue;
+                        }
+
                         string fullDirectory = Path.GetFullPath(jobDirectory);
                         if (referencedDirectories.Contains(fullDirectory) ||
                             Directory.GetLastWriteTimeUtc(fullDirectory) >= cutoffUtc)
@@ -118,6 +136,33 @@ namespace ExportDocManager.Api.Hosting
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is DirectoryNotFoundException)
             {
                 // 受管输出清理是尽力而为，不能因为文件占用阻止 API 启动。
+            }
+        }
+
+        private bool IsReparsePointFreeBrowserPath(string path, string browserRoot)
+        {
+            try
+            {
+                string fullPath = Path.GetFullPath(path);
+                if (!PathBoundaryHelper.IsWithinRoot(fullPath, browserRoot))
+                {
+                    return false;
+                }
+
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    fullPath,
+                    _pathProvider.DataRoot,
+                    "受控浏览器任务输出路径无效。");
+                return true;
+            }
+            catch (Exception ex) when (
+                ex is IOException or
+                UnauthorizedAccessException or
+                ArgumentException or
+                NotSupportedException or
+                PathTooLongException)
+            {
+                return false;
             }
         }
     }

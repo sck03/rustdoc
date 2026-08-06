@@ -528,21 +528,6 @@ namespace ExportDocManager.Api.Hosting
                                 }
                             }
                         },
-                        ["ApiPostgreSqlPhysicalBackupResponse"] = new
-                        {
-                            type = "object",
-                            required = new[] { "success", "message", "fileName", "fullPath", "sizeBytes", "backupRoot", "storagePolicy" },
-                            properties = new Dictionary<string, object>
-                            {
-                                ["success"] = new { type = "boolean" },
-                                ["message"] = StringProperty("PostgreSQL physical backup result message."),
-                                ["fileName"] = StringProperty("Custom-format dump file name."),
-                                ["fullPath"] = StringProperty("Full local dump file path."),
-                                ["sizeBytes"] = new { type = "integer", format = "int64" },
-                                ["backupRoot"] = StringProperty("Runtime data root Backups/PostgreSQL directory."),
-                                ["storagePolicy"] = StringProperty("Path and storage policy for PostgreSQL physical backups.")
-                            }
-                        },
                         ["ApiPostgreSqlRestorePlanRequest"] = new
                         {
                             type = "object",
@@ -1018,7 +1003,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["confirmed"] = new { type = "boolean", description = "Explicit confirmation from the retention cleanup dialog." }
                             }
                         },
-                        ["ApiJobDownloadTicket"] = new
+                        ["ApiDownloadTicket"] = new
                         {
                             type = "object",
                             required = new[] { "token", "downloadUrl", "expiresAtUtc" },

@@ -86,6 +86,13 @@ namespace ExportDocManager.Api.Hosting
             ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
 
             string safeKind = SanitizeFileNamePart(kind);
+            if (string.IsNullOrWhiteSpace(safeKind) ||
+                string.Equals(safeKind, ".", StringComparison.Ordinal) ||
+                string.Equals(safeKind, "..", StringComparison.Ordinal))
+            {
+                throw new ArgumentException("下载类型目录名无效。", nameof(kind));
+            }
+
             string safeFileName = Path.GetFileName(fileName.Trim());
             if (string.IsNullOrWhiteSpace(safeFileName) ||
                 string.Equals(safeFileName, ".", StringComparison.Ordinal) ||
@@ -94,9 +101,24 @@ namespace ExportDocManager.Api.Hosting
                 throw new ArgumentException("下载文件名无效。", nameof(fileName));
             }
 
-            string directory = Path.Combine(pathProvider.ExportRoot, "Browser", safeKind, Guid.NewGuid().ToString("N"));
+            string browserRoot = Path.GetFullPath(Path.Combine(pathProvider.ExportRoot, "Browser"));
+            string directory = PathBoundaryHelper.EnsureWithinRoot(
+                Path.Combine(browserRoot, safeKind, Guid.NewGuid().ToString("N")),
+                browserRoot,
+                "受控浏览器下载目录超出允许范围。");
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                directory,
+                pathProvider.DataRoot,
+                "受控浏览器下载目录无效。");
             Directory.CreateDirectory(directory);
-            return Path.Combine(directory, safeFileName);
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                directory,
+                pathProvider.DataRoot,
+                "受控浏览器下载目录无效。");
+            return PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                Path.Combine(directory, safeFileName),
+                pathProvider.DataRoot,
+                "受控浏览器下载文件路径无效。");
         }
 
         internal static bool IsControlledBrowserDownloadPath(
@@ -120,7 +142,23 @@ namespace ExportDocManager.Api.Hosting
             }
 
             string root = Path.GetFullPath(Path.Combine(pathProvider.ExportRoot, "Browser"));
-            return PathBoundaryHelper.IsWithinRoot(candidate, root);
+            if (!PathBoundaryHelper.IsWithinRoot(candidate, root))
+            {
+                return false;
+            }
+
+            try
+            {
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    candidate,
+                    pathProvider.DataRoot,
+                    "受控浏览器下载文件路径无效。");
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
         }
 
         internal static IResult StreamTemporaryFile(

@@ -58,7 +58,8 @@ namespace ExportDocManager.Services.Infrastructure
 
         public string SupportPackageRoot => EnsureDirectory(Path.Combine(_pathProvider.DataRoot, "SupportPackages"));
 
-        private string PostgreSqlBackupRoot => EnsureDirectory(Path.Combine(_pathProvider.BackupRoot, "PostgreSQL"));
+        private string PostgreSqlBackupRoot => EnsureDirectory(
+            Path.Combine(_pathProvider.DataRoot, "Backups", "PostgreSQL"));
 
         private string PostgreSqlRestorePlanRoot => EnsureDirectory(Path.Combine(PostgreSqlBackupRoot, "RestorePlans"));
 
@@ -83,7 +84,15 @@ namespace ExportDocManager.Services.Infrastructure
 
         public IReadOnlyList<SharedDatabaseBackupItem> ListPostgreSqlPhysicalBackups()
         {
-            var root = PostgreSqlBackupRoot;
+            string root;
+            try
+            {
+                root = PostgreSqlBackupRoot;
+            }
+            catch (InvalidOperationException)
+            {
+                return Array.Empty<SharedDatabaseBackupItem>();
+            }
             if (!Directory.Exists(root))
             {
                 return Array.Empty<SharedDatabaseBackupItem>();
@@ -91,10 +100,24 @@ namespace ExportDocManager.Services.Infrastructure
 
             return new DirectoryInfo(root)
                 .EnumerateFiles("*.dump", SearchOption.TopDirectoryOnly)
+                .Where(IsRegularPostgreSqlBackupFile)
                 .OrderByDescending(file => file.LastWriteTimeUtc)
                 .ThenByDescending(file => file.Name, StringComparer.OrdinalIgnoreCase)
                 .Select(ToBackupItem)
                 .ToArray();
+        }
+
+        private static bool IsRegularPostgreSqlBackupFile(FileInfo file)
+        {
+            try
+            {
+                return file.Exists &&
+                    (file.Attributes & FileAttributes.ReparsePoint) == 0;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
         }
 
         public async Task<PostgreSqlPhysicalBackupResult> CreatePostgreSqlPhysicalBackupAsync(CancellationToken cancellationToken = default)
@@ -1220,10 +1243,25 @@ ALTER DEFAULT PRIVILEGES FOR ROLE {QuoteIdentifier(appRole)} IN SCHEMA public GR
                 file.LastWriteTime);
         }
 
-        private static string EnsureDirectory(string path)
+        private string EnsureDirectory(string path)
         {
-            Directory.CreateDirectory(path);
-            return path;
+            try
+            {
+                string dataRoot = Path.GetFullPath(_pathProvider.DataRoot);
+                string fullPath = PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    path,
+                    dataRoot,
+                    "受管维护目录不能包含符号链接或重解析点。");
+                Directory.CreateDirectory(fullPath);
+                return PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    fullPath,
+                    dataRoot,
+                    "受管维护目录不能包含符号链接或重解析点。");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                throw new InvalidOperationException(ex.Message, ex);
+            }
         }
 
         private static string NormalizeFileToken(string value)

@@ -6,6 +6,7 @@ namespace ExportDocManager.Api.Hosting
     public static partial class ApiEndpointRouteBuilderExtensions
     {
         private const string OwnershipTransferConfirmationText = "TRANSFER OWNERSHIP";
+        private const string SensitiveSupportPackageJobKind = "SupportPackageWithOptionalFiles";
 
         private static void MapSharedDatabaseMaintenanceEndpoints(this IEndpointRouteBuilder endpoints)
         {
@@ -32,12 +33,12 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("ListPostgreSqlPhysicalBackups");
 
-            endpoints.MapPost("/api/postgresql-maintenance/backups", async (
+            endpoints.MapPost("/api/postgresql-maintenance/backups", (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISharedDatabaseMaintenanceService maintenanceService,
-                CancellationToken cancellationToken) =>
+                ApiBackgroundJobRunner jobRunner) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -50,15 +51,35 @@ namespace ExportDocManager.Api.Hosting
                     return WriteForbidden("只有管理员可以创建 PostgreSQL 团队库物理备份。");
                 }
 
-                try
+                PostgreSqlMaintenanceStatus status = maintenanceService.GetPostgreSqlMaintenanceStatus();
+                if (!status.PostgreSqlSelected || !status.PostgreSqlConfigured)
                 {
-                    var result = await maintenanceService.CreatePostgreSqlPhysicalBackupAsync(cancellationToken).ConfigureAwait(false);
-                    return Results.Ok(ToPostgreSqlPhysicalBackupResponse(result));
+                    return WriteConflict("当前未完整配置 PostgreSQL 团队数据库，不能创建物理备份。");
                 }
-                catch (InvalidOperationException ex)
+                if (!status.ToolsReady)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteConflict("PostgreSQL 客户端工具未就绪，不能创建物理备份。");
                 }
+
+                BackgroundJobSnapshot job = jobRunner.Enqueue(
+                    "PostgreSqlPhysicalBackup",
+                    "创建 PostgreSQL 物理备份",
+                    user.Username,
+                    async (services, jobContext) =>
+                    {
+                        ISharedDatabaseMaintenanceService scopedMaintenanceService =
+                            services.GetRequiredService<ISharedDatabaseMaintenanceService>();
+                        jobContext.Report(5, "准备数据库备份", "正在启动 pg_dump。可离开本页，任务会继续运行。");
+                        PostgreSqlPhysicalBackupResult result = await scopedMaintenanceService
+                            .CreatePostgreSqlPhysicalBackupAsync(jobContext.CancellationToken)
+                            .ConfigureAwait(false);
+                        jobContext.Report(
+                            95,
+                            "校验备份文件",
+                            $"{result.FileName} 已写入运行目录，正在完成任务记录。");
+                        return string.Empty;
+                    });
+                return AcceptedBackgroundJob(job);
             })
             .WithName("CreatePostgreSqlPhysicalBackup");
 
@@ -229,6 +250,11 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 var includeOptional = request?.IncludeLatestDatabaseBackup == true || request?.IncludeSampleFiles == true;
+                if (includeOptional)
+                {
+                    IResult transportError = RequireSecureDisasterRecoveryTransport(context);
+                    if (transportError != null) return transportError;
+                }
                 if (includeOptional &&
                     !string.Equals(request?.ConfirmationText?.Trim(), "INCLUDE OPTIONAL FILES", StringComparison.Ordinal))
                 {
@@ -253,11 +279,12 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("SaveSupportPackageToRuntime");
 
-            endpoints.MapPost("/api/support-package/download", async (
+            endpoints.MapPost("/api/support-package/download", (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
-                ISharedDatabaseMaintenanceService maintenanceService,
+                ApiBackgroundJobRunner jobRunner,
+                IAppPathProvider pathProvider,
                 ApiSupportPackageRequest request,
                 CancellationToken cancellationToken) =>
             {
@@ -273,37 +300,58 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 var includeOptional = request?.IncludeLatestDatabaseBackup == true || request?.IncludeSampleFiles == true;
+                if (includeOptional)
+                {
+                    IResult transportError = RequireSecureDisasterRecoveryTransport(context);
+                    if (transportError != null) return transportError;
+                }
                 if (includeOptional &&
                     !string.Equals(request?.ConfirmationText?.Trim(), "INCLUDE OPTIONAL FILES", StringComparison.Ordinal))
                 {
                     return Results.BadRequest(new ApiErrorResponse("包含数据库备份或样张文件前需要输入确认文本 INCLUDE OPTIONAL FILES。"));
                 }
 
-                var result = await maintenanceService.CreateSupportPackageAsync(
-                    new SupportPackageOptions
-                    {
-                        IncludeLatestDatabaseBackup = request?.IncludeLatestDatabaseBackup == true,
-                        IncludeSampleFiles = request?.IncludeSampleFiles == true
-                    },
-                    cancellationToken).ConfigureAwait(false);
-                bool cleanupRegistered = false;
-                try
+                cancellationToken.ThrowIfCancellationRequested();
+                var options = new SupportPackageOptions
                 {
-                    var response = StreamTemporaryFile(
-                        context,
-                        result.FullPath,
-                        "application/zip",
-                        result.FileName);
-                    cleanupRegistered = true;
-                    return response;
-                }
-                finally
-                {
-                    if (!cleanupRegistered)
+                    IncludeLatestDatabaseBackup = request?.IncludeLatestDatabaseBackup == true,
+                    IncludeSampleFiles = request?.IncludeSampleFiles == true
+                };
+                BackgroundJobSnapshot job = jobRunner.Enqueue(
+                    includeOptional ? SensitiveSupportPackageJobKind : "SupportPackage",
+                    "创建技术支持包",
+                    user.Username,
+                    async (services, jobContext) =>
                     {
-                        AtomicFileHelper.TryDeleteFile(result.FullPath);
-                    }
-                }
+                        ISharedDatabaseMaintenanceService maintenanceService =
+                            services.GetRequiredService<ISharedDatabaseMaintenanceService>();
+                        jobContext.Report(5, "收集诊断信息", "正在生成脱敏支持包。可离开本页，任务会继续运行。");
+                        SupportPackageResult result = null;
+                        string outputPath = string.Empty;
+                        try
+                        {
+                            result = await maintenanceService.CreateSupportPackageAsync(
+                                options,
+                                jobContext.CancellationToken).ConfigureAwait(false);
+                            jobContext.Report(95, "准备下载", "正在发布受控支持包下载文件。");
+                            outputPath = CreateBrowserDownloadPath(
+                                pathProvider,
+                                "support-packages",
+                                result.FileName);
+                            File.Move(result.FullPath, outputPath, overwrite: false);
+                            jobContext.Report(99, "准备下载", "支持包已进入受控下载目录。", outputPath);
+                            return outputPath;
+                        }
+                        finally
+                        {
+                            if (result != null &&
+                                !string.Equals(result.FullPath, outputPath, PathBoundaryHelper.PathComparison))
+                            {
+                                AtomicFileHelper.TryDeleteFile(result.FullPath);
+                            }
+                        }
+                    });
+                return AcceptedBackgroundJob(job);
             })
             .WithName("DownloadSupportPackage");
         }
@@ -325,19 +373,6 @@ namespace ExportDocManager.Api.Hosting
                 status.PsqlPath,
                 status.ToolsReady,
                 status.StoragePolicy);
-        }
-
-        private static ApiPostgreSqlPhysicalBackupResponse ToPostgreSqlPhysicalBackupResponse(
-            PostgreSqlPhysicalBackupResult result)
-        {
-            return new ApiPostgreSqlPhysicalBackupResponse(
-                result.Success,
-                result.Message,
-                result.FileName,
-                result.FullPath,
-                result.SizeBytes,
-                result.BackupRoot,
-                result.StoragePolicy);
         }
 
         private static ApiSharedDatabaseBackupItemDto ToSharedDatabaseBackupItemDto(SharedDatabaseBackupItem item)

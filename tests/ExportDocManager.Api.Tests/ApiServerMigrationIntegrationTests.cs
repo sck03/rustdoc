@@ -144,8 +144,8 @@ namespace ExportDocManager.Api.Tests
                 $"/api/jobs/{accepted.JobId}/download-ticket",
                 content: null);
             Assert.Equal(HttpStatusCode.OK, ticketResponse.StatusCode);
-            ApiJobDownloadTicket ticket =
-                await ApiIntegrationTestHarness.ReadJsonAsync<ApiJobDownloadTicket>(ticketResponse);
+            ApiDownloadTicket ticket =
+                await ApiIntegrationTestHarness.ReadJsonAsync<ApiDownloadTicket>(ticketResponse);
             Assert.StartsWith("/downloads/jobs/", ticket.DownloadUrl, StringComparison.Ordinal);
 
             using var rangeRequest = new HttpRequestMessage(HttpMethod.Get, ticket.DownloadUrl);
@@ -184,16 +184,21 @@ namespace ExportDocManager.Api.Tests
         public void JobDownloadTickets_ShouldExpireWithoutChangingJobBinding()
         {
             var time = new MutableTimeProvider();
-            var service = new ApiJobDownloadTicketService(time);
-            ApiJobDownloadTicket ticket = service.Issue("job-1");
+            var service = new ApiDownloadTicketService(time);
+            ApiDownloadTicket ticket = service.Issue("background-job", "job-1", "/downloads/jobs");
 
-            Assert.True(service.TryResolve(ticket.Token, out string firstJobId));
+            Assert.True(service.TryResolve(ticket.Token, "background-job", out string firstJobId));
             Assert.Equal("job-1", firstJobId);
-            Assert.True(service.TryResolve(ticket.Token, out string secondJobId));
+            Assert.True(service.TryResolve(ticket.Token, "background-job", out string secondJobId));
             Assert.Equal("job-1", secondJobId);
+            Assert.False(service.TryResolve(ticket.Token, "postgresql-physical-backup", out _));
+            Assert.Throws<ArgumentException>(() => service.Issue(
+                "background-job",
+                "job-2",
+                "//external.example/downloads"));
 
-            time.Advance(TimeSpan.FromMinutes(6));
-            Assert.False(service.TryResolve(ticket.Token, out _));
+            time.Advance(TimeSpan.FromMinutes(5));
+            Assert.False(service.TryResolve(ticket.Token, "background-job", out _));
         }
 
         private static async Task<ApiLoginResponse> SetAdminPasswordAndLoginAsync(

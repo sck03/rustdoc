@@ -857,6 +857,12 @@ export interface ApiDisasterRecoveryStatusResponse {
   usesSqlite: boolean;
 }
 
+export interface ApiDownloadTicket {
+  downloadUrl: string;
+  expiresAtUtc: string;
+  token: string;
+}
+
 export interface ApiEmailSendRequest {
   attachmentPaths: string[];
   body: string;
@@ -1646,12 +1652,6 @@ export interface ApiInvoiceUnverifyRequest {
   rowVersion: string;
 }
 
-export interface ApiJobDownloadTicket {
-  downloadUrl: string;
-  expiresAtUtc: string;
-  token: string;
-}
-
 export interface ApiLetterOfCreditImportRequest {
   filePath: string;
 }
@@ -2037,16 +2037,6 @@ export interface ApiPostgreSqlMaintenanceStatusResponse {
 export interface ApiPostgreSqlPhysicalBackupListResponse {
   backups: ApiSharedDatabaseBackupItemDto[];
   status: ApiPostgreSqlMaintenanceStatusResponse;
-}
-
-export interface ApiPostgreSqlPhysicalBackupResponse {
-  backupRoot: string;
-  fileName: string;
-  fullPath: string;
-  message: string;
-  sizeBytes: number;
-  storagePolicy: string;
-  success: boolean;
 }
 
 export interface ApiPostgreSqlRestorePlanRequest {
@@ -3545,6 +3535,10 @@ export interface CreatePortRequest {
   body: ApiPortDto;
 }
 
+export interface CreatePostgreSqlPhysicalBackupDownloadTicketRequest {
+  fileName: string;
+}
+
 export interface CreatePostgreSqlRestorePlanRequest {
   body: ApiPostgreSqlRestorePlanRequest;
 }
@@ -3755,10 +3749,6 @@ export interface DownloadInvoiceTransferPackageRequest {
 
 export interface DownloadJobResultRequest {
   jobId: string;
-}
-
-export interface DownloadPostgreSqlPhysicalBackupRequest {
-  fileName: string;
 }
 
 export interface DownloadQueriedInvoicesRequest {
@@ -4954,9 +4944,9 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createJobDownloadTicket(request: CreateJobDownloadTicketRequest, init?: RequestInit): Promise<ApiJobDownloadTicket> {
+  public createJobDownloadTicket(request: CreateJobDownloadTicketRequest, init?: RequestInit): Promise<ApiDownloadTicket> {
     const path = `/api/jobs/${encodePath(request.jobId)}/download-ticket`;
-    return this.request<ApiJobDownloadTicket>("POST", path, { init });
+    return this.request<ApiDownloadTicket>("POST", path, { init });
   }
 
   public createPayee(request: CreatePayeeRequest, init?: RequestInit): Promise<ApiPayeeDto> {
@@ -4991,9 +4981,19 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createPostgreSqlPhysicalBackup(init?: RequestInit): Promise<ApiPostgreSqlPhysicalBackupResponse> {
+  public createPostgreSqlPhysicalBackup(init?: RequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/postgresql-maintenance/backups";
-    return this.request<ApiPostgreSqlPhysicalBackupResponse>("POST", path, { init });
+    return this.request<BackgroundJobSnapshot>("POST", path, { init });
+  }
+
+  public createPostgreSqlPhysicalBackupDownloadTicket(request: CreatePostgreSqlPhysicalBackupDownloadTicketRequest, init?: RequestInit): Promise<ApiDownloadTicket> {
+    const path = "/api/postgresql-maintenance/backups/download-ticket";
+    return this.request<ApiDownloadTicket>("POST", path, {
+      query: {
+        "fileName": request.fileName,
+      },
+      init,
+    });
   }
 
   public createPostgreSqlRestorePlan(request: CreatePostgreSqlRestorePlanRequest, init?: RequestInit): Promise<ApiPostgreSqlRestorePlanResponse> {
@@ -5319,16 +5319,6 @@ export class ExportDocManagerApiClient {
     return this.request<Blob>("GET", path, { init });
   }
 
-  public downloadPostgreSqlPhysicalBackup(request: DownloadPostgreSqlPhysicalBackupRequest, init?: RequestInit): Promise<Blob> {
-    const path = "/api/postgresql-maintenance/backups/download";
-    return this.request<Blob>("GET", path, {
-      query: {
-        "fileName": request.fileName,
-      },
-      init,
-    });
-  }
-
   public downloadQueriedInvoices(request: DownloadQueriedInvoicesRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/query/invoices/download";
     return this.request<BackgroundJobSnapshot>("POST", path, {
@@ -5350,9 +5340,9 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public downloadSupportPackage(request: DownloadSupportPackageRequest, init?: RequestInit): Promise<Blob> {
+  public downloadSupportPackage(request: DownloadSupportPackageRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/support-package/download";
-    return this.request<Blob>("POST", path, {
+    return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
       init,
     });

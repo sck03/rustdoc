@@ -7,6 +7,8 @@ namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiEndpointRouteBuilderExtensions
     {
+        private const string BackgroundJobDownloadPurpose = "background-job";
+
         private static void MapJobEndpoints(this IEndpointRouteBuilder endpoints)
         {
             endpoints.MapGet("/api/jobs", async (
@@ -110,6 +112,9 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
+                IResult transportError = RequireSecureJobResultTransport(context, job);
+                if (transportError != null) return transportError;
+
                 string contentType = GetDownloadContentType(job.OutputPath);
                 return Results.File(
                     job.OutputPath,
@@ -125,7 +130,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 IBackgroundJobService jobService,
                 IAppPathProvider pathProvider,
-                ApiJobDownloadTicketService ticketService,
+                ApiDownloadTicketService ticketService,
                 string jobId,
                 CancellationToken cancellationToken) =>
             {
@@ -144,18 +149,25 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                return Results.Ok(ticketService.Issue(job.JobId));
+                IResult transportError = RequireSecureJobResultTransport(context, job);
+                if (transportError != null) return transportError;
+
+                return Results.Ok(ticketService.Issue(
+                    BackgroundJobDownloadPurpose,
+                    job.JobId,
+                    "/downloads/jobs"));
             })
             .WithName("CreateJobDownloadTicket");
 
             endpoints.MapGet("/downloads/jobs/{token}", async (
-                ApiJobDownloadTicketService ticketService,
+                HttpContext context,
+                ApiDownloadTicketService ticketService,
                 IBackgroundJobService jobService,
                 IAppPathProvider pathProvider,
                 string token,
                 CancellationToken cancellationToken) =>
             {
-                if (!ticketService.TryResolve(token, out string jobId))
+                if (!ticketService.TryResolve(token, BackgroundJobDownloadPurpose, out string jobId))
                 {
                     return Results.NotFound();
                 }
@@ -168,6 +180,9 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.NotFound();
                 }
+
+                IResult transportError = RequireSecureJobResultTransport(context, job);
+                if (transportError != null) return transportError;
 
                 return Results.File(
                     job.OutputPath,
@@ -302,6 +317,20 @@ namespace ExportDocManager.Api.Hosting
                     cancellationToken);
             })
             .WithName("RetryJob");
+        }
+
+        private static IResult RequireSecureJobResultTransport(
+            HttpContext context,
+            BackgroundJobSnapshot job)
+        {
+            if (job == null ||
+                (!string.Equals(job.Kind, ServerMigrationPackageJobKind, StringComparison.OrdinalIgnoreCase) &&
+                 !string.Equals(job.Kind, SensitiveSupportPackageJobKind, StringComparison.OrdinalIgnoreCase)))
+            {
+                return null;
+            }
+
+            return RequireSecureDisasterRecoveryTransport(context);
         }
 
         private static bool CanAccessJob(

@@ -13,7 +13,8 @@ param(
     [string]$ContainerSubnet,
     [string]$ReverseProxyIp,
     [switch]$RegenerateNetwork,
-    [switch]$AllowNetworkOverlap
+    [switch]$AllowNetworkOverlap,
+    [switch]$AllowHttpDisasterRecovery
 )
 
 $ErrorActionPreference = "Stop"
@@ -242,6 +243,62 @@ function Get-EnvironmentFileValue {
     return $line.Substring($prefix.Length).Trim()
 }
 
+function Assert-SafeDirectoryPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $volumeRoot = [System.IO.Path]::GetPathRoot($fullPath)
+    if ([string]::Equals(
+        [System.IO.Path]::TrimEndingDirectorySeparator($fullPath),
+        [System.IO.Path]::TrimEndingDirectorySeparator($volumeRoot),
+        [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "$Label 不能直接使用磁盘、卷、共享或文件系统根：$fullPath"
+    }
+
+    $candidate = $fullPath
+    while (-not [string]::IsNullOrWhiteSpace($candidate)) {
+        if (Test-Path -LiteralPath $candidate) {
+            $item = Get-Item -LiteralPath $candidate -Force
+            if (-not $item.PSIsContainer) {
+                throw "$Label 不能经过普通文件：$candidate"
+            }
+            if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "$Label 不能经过符号链接、联接点或其它重解析点：$candidate"
+            }
+        }
+
+        if ([string]::Equals(
+            [System.IO.Path]::TrimEndingDirectorySeparator($candidate),
+            [System.IO.Path]::TrimEndingDirectorySeparator($volumeRoot),
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+
+        $parent = [System.IO.Directory]::GetParent($candidate)
+        if ($null -eq $parent) { break }
+        $candidate = $parent.FullName
+    }
+
+    return $fullPath
+}
+
+function Assert-SafeManagedFilePath {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.PSIsContainer -or
+        ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "$Label 必须是普通文件且不能是符号链接或重解析点：$Path"
+    }
+}
+
 function Protect-RuntimeConfigurationFile {
     param([Parameter(Mandatory = $true)][string]$Path)
 
@@ -250,7 +307,7 @@ function Protect-RuntimeConfigurationFile {
             $icacls = Get-Command icacls.exe -ErrorAction Stop
             $currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
             & $icacls.Source $Path /inheritance:r `
-                /grant:r "$($currentIdentity):(R,W)" `
+                /grant:r "$($currentIdentity):(M)" `
                 /grant:r "*S-1-5-18:(F)" `
                 /grant:r "*S-1-5-32-544:(F)" | Out-Null
             if ($LASTEXITCODE -ne 0) {
@@ -327,6 +384,8 @@ if ($WebPort -lt 1 -or $WebPort -gt 65535 -or
 }
 
 $resolvedEnvironmentFile = [System.IO.Path]::GetFullPath($EnvironmentFile)
+$environmentRoot = Assert-SafeDirectoryPath (Split-Path -Parent $resolvedEnvironmentFile) "容器环境目录"
+Assert-SafeManagedFilePath $resolvedEnvironmentFile "容器环境文件"
 $containerSubnetWasProvided = -not [string]::IsNullOrWhiteSpace($ContainerSubnet)
 $reverseProxyIpWasProvided = -not [string]::IsNullOrWhiteSpace($ReverseProxyIp)
 $networkWasReused = $false
@@ -391,17 +450,20 @@ if ($containerSubnetWasProvided -and -not $AllowNetworkOverlap) {
     }
 }
 
-$resolvedRuntimeRoot = [System.IO.Path]::GetFullPath($RuntimeRoot)
-$apiDataRoot = Join-Path $resolvedRuntimeRoot "api-data"
-$configRoot = Join-Path $apiDataRoot "Config"
+$resolvedRuntimeRoot = Assert-SafeDirectoryPath $RuntimeRoot "容器运行数据根"
+$apiDataRoot = Assert-SafeDirectoryPath (Join-Path $resolvedRuntimeRoot "api-data") "API 数据目录"
+$configRoot = Assert-SafeDirectoryPath (Join-Path $apiDataRoot "Config") "API 配置目录"
 New-Item -ItemType Directory -Force -Path $configRoot | Out-Null
-$postgresRoot = Join-Path $resolvedRuntimeRoot "postgres"
+$postgresRoot = Assert-SafeDirectoryPath (Join-Path $resolvedRuntimeRoot "postgres") "PostgreSQL 数据目录"
 New-Item -ItemType Directory -Force -Path $postgresRoot | Out-Null
-$letsencryptRoot = Join-Path $resolvedRuntimeRoot "letsencrypt"
-$acmeWebRoot = Join-Path $resolvedRuntimeRoot "acme-webroot"
+$letsencryptRoot = Assert-SafeDirectoryPath (Join-Path $resolvedRuntimeRoot "letsencrypt") "证书目录"
+$acmeWebRoot = Assert-SafeDirectoryPath (Join-Path $resolvedRuntimeRoot "acme-webroot") "ACME WebRoot"
 New-Item -ItemType Directory -Force -Path $letsencryptRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $acmeWebRoot | Out-Null
-New-Item -ItemType Directory -Force -Path (Split-Path -Parent $resolvedEnvironmentFile) | Out-Null
+New-Item -ItemType Directory -Force -Path $environmentRoot | Out-Null
+foreach ($directoryPath in @($resolvedRuntimeRoot, $apiDataRoot, $configRoot, $postgresRoot, $letsencryptRoot, $acmeWebRoot, $environmentRoot)) {
+    [void](Assert-SafeDirectoryPath $directoryPath "受管容器目录")
+}
 
 if (-not $IsWindows) {
     $id = Get-Command id -ErrorAction SilentlyContinue
@@ -447,6 +509,7 @@ $settings = [ordered]@{
     }
 }
 $settingsPath = Join-Path $configRoot "appsettings.json"
+Assert-SafeManagedFilePath $settingsPath "应用配置文件"
 $settings | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $settingsPath -Encoding UTF8
 
 $relativeRuntimeRoot = [System.IO.Path]::GetRelativePath($PSScriptRoot, $resolvedRuntimeRoot).Replace("\", "/")
@@ -461,11 +524,13 @@ $envLines = @(
     "EXPORTDOCMANAGER_TLS_PRIVATE_KEY=./secrets/tls/server.key",
     "EXPORTDOCMANAGER_RUNTIME_ROOT=$relativeRuntimeRoot",
     "EXPORTDOCMANAGER_ALLOWED_ORIGINS=",
+    "EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY=$($AllowHttpDisasterRecovery.IsPresent.ToString().ToLowerInvariant())",
     "EXPORTDOCMANAGER_CONTAINER_SUBNET=$ContainerSubnet",
     "EXPORTDOCMANAGER_REVERSE_PROXY_IP=$ReverseProxyIp",
     "EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES=",
     "TZ=Asia/Shanghai"
 )
+Assert-SafeManagedFilePath $resolvedEnvironmentFile "容器环境文件"
 $envLines | Set-Content -LiteralPath $resolvedEnvironmentFile -Encoding UTF8
 if ($IsWindows) {
     Protect-RuntimeConfigurationFile $settingsPath
@@ -483,6 +548,9 @@ Write-Host "配置文件: $settingsPath"
 Write-Host "环境文件: $resolvedEnvironmentFile"
 Write-Host "容器网段: $ContainerSubnet"
 Write-Host "Nginx 可信代理地址: $ReverseProxyIp"
+if ($AllowHttpDisasterRecovery) {
+    Write-Warning "已允许纯 HTTP 网页备份恢复和完整迁移；只应在受防火墙保护的可信办公网/VPN 使用。"
+}
 $networkSource = if ($containerSubnetWasProvided) {
     "管理员显式指定"
 } elseif ($networkWasReused) {

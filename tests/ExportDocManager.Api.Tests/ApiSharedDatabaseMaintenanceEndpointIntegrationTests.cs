@@ -1,10 +1,12 @@
 using System.IO.Compression;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Api.Tests
@@ -164,8 +166,23 @@ namespace ExportDocManager.Api.Tests
                 includeSampleFiles = false,
                 confirmationText = ""
             });
-            Assert.Equal(HttpStatusCode.OK, supportResponse.StatusCode);
-            await using var supportStream = await supportResponse.Content.ReadAsStreamAsync();
+            Assert.Equal(HttpStatusCode.Accepted, supportResponse.StatusCode);
+            BackgroundJobSnapshot acceptedSupportJob =
+                await ApiIntegrationTestHarness.ReadJsonAsync<BackgroundJobSnapshot>(supportResponse);
+            BackgroundJobSnapshot completedSupportJob = await WaitForJobAsync(adminClient, acceptedSupportJob.JobId);
+            Assert.Equal(BackgroundJobStatusCatalog.Succeeded, completedSupportJob.Status);
+            Assert.EndsWith(".zip", completedSupportJob.OutputPath, StringComparison.OrdinalIgnoreCase);
+            Assert.False(Path.IsPathRooted(completedSupportJob.OutputPath));
+
+            var supportTicketResponse = await adminClient.PostAsync(
+                $"/api/jobs/{completedSupportJob.JobId}/download-ticket",
+                content: null);
+            Assert.Equal(HttpStatusCode.OK, supportTicketResponse.StatusCode);
+            ApiDownloadTicket supportTicket =
+                await ApiIntegrationTestHarness.ReadJsonAsync<ApiDownloadTicket>(supportTicketResponse);
+            using var supportDownloadResponse = await anonymousClient.GetAsync(supportTicket.DownloadUrl);
+            Assert.Equal(HttpStatusCode.OK, supportDownloadResponse.StatusCode);
+            await using var supportStream = await supportDownloadResponse.Content.ReadAsStreamAsync();
             using var archive = new ZipArchive(supportStream, ZipArchiveMode.Read);
             Assert.NotNull(archive.GetEntry("diagnostics/runtime.json"));
             Assert.NotNull(archive.GetEntry("diagnostics/settings-redacted.json"));
@@ -177,6 +194,30 @@ namespace ExportDocManager.Api.Tests
             Assert.DoesNotContain("secret-value", settingsJson, StringComparison.Ordinal);
             Assert.DoesNotContain("mail-secret", settingsJson, StringComparison.Ordinal);
             Assert.Contains("***", settingsJson, StringComparison.Ordinal);
+        }
+
+        private static async Task<BackgroundJobSnapshot> WaitForJobAsync(
+            HttpClient client,
+            string jobId)
+        {
+            for (int attempt = 0; attempt < 200; attempt++)
+            {
+                var response = await client.GetAsync($"/api/jobs/{jobId}");
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                BackgroundJobSnapshot job =
+                    await ApiIntegrationTestHarness.ReadJsonAsync<BackgroundJobSnapshot>(response);
+                if (job.Status is BackgroundJobStatusCatalog.Succeeded or
+                    BackgroundJobStatusCatalog.Failed or
+                    BackgroundJobStatusCatalog.Canceled)
+                {
+                    Assert.True(
+                        string.Equals(job.Status, BackgroundJobStatusCatalog.Succeeded, StringComparison.OrdinalIgnoreCase),
+                        string.IsNullOrWhiteSpace(job.ErrorMessage) ? job.DetailText : job.ErrorMessage);
+                    return job;
+                }
+                await Task.Delay(25);
+            }
+            throw new TimeoutException("后台维护任务未在测试时限内完成。");
         }
 
         [Fact]
@@ -201,6 +242,70 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.Conflict, createResponse.StatusCode);
             Assert.True(Directory.Exists(list.Status.BackupRoot));
             Assert.Empty(Directory.EnumerateFiles(list.Status.BackupRoot));
+        }
+
+        [Fact]
+        public async Task PostgreSqlBackupDownloadTicket_ShouldStreamRangesAndRevalidateManagedFile()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-postgresql-download-ticket",
+                "api-postgresql-download-ticket.db");
+            string backupRoot = Path.Combine(harness.DataRoot, "Backups", "PostgreSQL");
+            Directory.CreateDirectory(backupRoot);
+            string backupFileName = "download-ticket-test.dump";
+            string backupPath = Path.Combine(backupRoot, backupFileName);
+            await File.WriteAllBytesAsync(backupPath, [10, 20, 30, 40, 50, 60]);
+
+            using var anonymousClient = harness.CreateClient();
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+            var ticketResponse = await adminClient.PostAsync(
+                $"/api/postgresql-maintenance/backups/download-ticket?fileName={Uri.EscapeDataString(backupFileName)}",
+                content: null);
+            Assert.Equal(HttpStatusCode.OK, ticketResponse.StatusCode);
+            ApiDownloadTicket ticket =
+                await ApiIntegrationTestHarness.ReadJsonAsync<ApiDownloadTicket>(ticketResponse);
+            Assert.StartsWith("/downloads/postgresql-backups/", ticket.DownloadUrl, StringComparison.Ordinal);
+
+            using var rangeRequest = new HttpRequestMessage(HttpMethod.Get, ticket.DownloadUrl);
+            rangeRequest.Headers.Range = new RangeHeaderValue(1, 4);
+            var rangeResponse = await anonymousClient.SendAsync(rangeRequest);
+            Assert.Equal(HttpStatusCode.PartialContent, rangeResponse.StatusCode);
+            Assert.Equal(new byte[] { 20, 30, 40, 50 }, await rangeResponse.Content.ReadAsByteArrayAsync());
+
+            File.Delete(backupPath);
+            string linkedTargetRoot = Path.Combine(harness.DataRoot, "Security", "PostgreSqlTicketTarget");
+            Directory.CreateDirectory(linkedTargetRoot);
+            await File.WriteAllBytesAsync(
+                Path.Combine(linkedTargetRoot, backupFileName),
+                [70, 80, 90]);
+            bool linkedRootCreated = false;
+            try
+            {
+                Directory.Delete(backupRoot);
+                Directory.CreateSymbolicLink(backupRoot, linkedTargetRoot);
+                linkedRootCreated = true;
+            }
+            catch (Exception ex) when (
+                ex is IOException or
+                UnauthorizedAccessException or
+                PlatformNotSupportedException)
+            {
+                Directory.CreateDirectory(backupRoot);
+            }
+
+            try
+            {
+                var missingResponse = await anonymousClient.GetAsync(ticket.DownloadUrl);
+                Assert.Equal(HttpStatusCode.NotFound, missingResponse.StatusCode);
+            }
+            finally
+            {
+                if (linkedRootCreated)
+                {
+                    Directory.Delete(backupRoot);
+                }
+            }
         }
 
         private static async Task SeedOwnedBusinessDataAsync(string databasePath, int ownerUserId)

@@ -6,8 +6,7 @@ import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
-import { downloadBlob } from "../../ui/downloadBlob.ts";
-import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
+import { downloadJobResultWhenReady, startDownloadFromTicket, waitForJobCompletion } from "../../ui/downloadJobResult.ts";
 import { SelectField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { formatBytes, formatRuntimeDate } from "./settingsFormatters.ts";
@@ -460,10 +459,18 @@ function PostgreSqlMaintenancePanel({
   }, [postgreSqlQuery.error, postgreSqlQuery.isError]);
 
   const createMutation = useMutation({
-    mutationFn: () => client.createPostgreSqlPhysicalBackup(),
-    onSuccess: async (response) => {
+    mutationFn: () => runAbortableOperation(async (signal) => {
+      const job = await client.createPostgreSqlPhysicalBackup({ signal });
+      return waitForJobCompletion(client, job, {
+        timeoutMs: 60 * 60 * 1000,
+        pollIntervalMs: 2_000,
+        signal,
+        timeoutMessage: "数据库备份仍在后台运行，可稍后到任务中心查看，完成后刷新备份列表。",
+      });
+    }),
+    onSuccess: async () => {
       setMessage(null);
-      setSuccessMessage(response.message || "PostgreSQL 团队库物理备份已创建。");
+      setSuccessMessage("PostgreSQL 团队库物理备份已创建并校验完成。");
       await queryClient.invalidateQueries({ queryKey: queryKeys.postgreSqlMaintenanceBackups() });
     },
     onError: (error) => {
@@ -494,7 +501,7 @@ function PostgreSqlMaintenancePanel({
   });
 
   const downloadMigrationMutation = useMutation({
-    mutationFn: async () => runAbortableOperation(async (signal) => {
+    mutationFn: () => runAbortableOperation(async (signal) => {
       const job = await client.createServerMigrationPackage({
         body: {
           password: migrationPassword,
@@ -506,7 +513,7 @@ function PostgreSqlMaintenancePanel({
         client,
         job,
         `export-doc-manager-server-migration-${new Date().toISOString().slice(0, 10)}.edmmigration`,
-        { timeoutMs: 60 * 60 * 1000, signal },
+        { timeoutMs: 60 * 60 * 1000, pollIntervalMs: 2_000, signal },
       );
     }),
     onSuccess: () => {
@@ -525,16 +532,17 @@ function PostgreSqlMaintenancePanel({
   });
 
   const restoreMigrationMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: () => runAbortableOperation(async (signal) => {
       const authorization = await client.authorizeServerMigrationOperation({
         body: {
           action: "restore-server",
           adminPassword: migrationAdminPassword,
         },
-      });
+      }, { signal });
       return client.stageServerMigrationRestore(
         { body: migrationRestoreFile as File },
         {
+          signal,
           headers: {
             "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket,
             "X-ExportDocManager-Migration-Password": migrationRestorePassword,
@@ -543,7 +551,7 @@ function PostgreSqlMaintenancePanel({
           },
         },
       );
-    },
+    }),
     onSuccess: async (response) => {
       setMigrationAdminPassword("");
       setMigrationRestorePassword("");
@@ -561,13 +569,16 @@ function PostgreSqlMaintenancePanel({
   });
 
   const databaseRestoreMutation = useMutation({
-    mutationFn: () => client.restorePostgreSqlPhysicalBackup({
-      body: {
-        backupFileName: selectedBackup,
-        adminPassword: databaseAdminPassword,
-        confirmationText: databaseRestoreConfirmation.trim(),
+    mutationFn: () => runAbortableOperation((signal) => client.restorePostgreSqlPhysicalBackup(
+      {
+        body: {
+          backupFileName: selectedBackup,
+          adminPassword: databaseAdminPassword,
+          confirmationText: databaseRestoreConfirmation.trim(),
+        },
       },
-    }),
+      { signal },
+    )),
     onSuccess: async (response) => {
       setDatabaseAdminPassword("");
       setDatabaseRestoreConfirmation("");
@@ -583,9 +594,14 @@ function PostgreSqlMaintenancePanel({
   });
 
   const downloadDatabaseMutation = useMutation({
-    mutationFn: () => client.downloadPostgreSqlPhysicalBackup({ fileName: selectedBackup }),
-    onSuccess: (blob) => {
-      downloadBlob(blob, selectedBackup || "exportdoc-postgresql.dump");
+    mutationFn: () => runAbortableOperation(async (signal) => {
+      const ticket = await client.createPostgreSqlPhysicalBackupDownloadTicket(
+        { fileName: selectedBackup },
+        { signal },
+      );
+      startDownloadFromTicket(client, ticket, selectedBackup || "exportdoc-postgresql.dump");
+    }),
+    onSuccess: () => {
       setMessage(null);
       setSuccessMessage("PostgreSQL 备份已交给浏览器下载。");
     },
@@ -593,16 +609,17 @@ function PostgreSqlMaintenancePanel({
   });
 
   const uploadDatabaseRestoreMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: () => runAbortableOperation(async (signal) => {
       const authorization = await client.authorizeServerMigrationOperation({
         body: {
           action: "restore-database",
           adminPassword: databaseAdminPassword,
         },
-      });
+      }, { signal });
       return client.uploadAndRestorePostgreSqlPhysicalBackup(
         { body: databaseUploadFile as File },
         {
+          signal,
           headers: {
             "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket,
             "X-ExportDocManager-PostgreSql-Backup-File-Name": databaseUploadFile?.name ?? "database.dump",
@@ -610,7 +627,7 @@ function PostgreSqlMaintenancePanel({
           },
         },
       );
-    },
+    }),
     onSuccess: async (response) => {
       setDatabaseAdminPassword("");
       setDatabaseUploadFile(null);
@@ -678,7 +695,7 @@ function PostgreSqlMaintenancePanel({
             }}
           >
             <Archive size={17} aria-hidden="true" />
-            <span>创建物理备份</span>
+            <span>{createMutation.isPending ? "正在后台备份" : "创建物理备份"}</span>
           </button>
         </div>
       </div>
@@ -963,6 +980,7 @@ function SupportPackagePanel({
   canManageSettings: boolean;
   onPathError: (message: string) => void;
 }) {
+  const runAbortableOperation = useAbortableOperation();
   const requestConfirmation = useConfirmation();
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -973,21 +991,26 @@ function SupportPackagePanel({
   const isDesktop = isDesktopBridgeAvailable();
 
   const createMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: () => runAbortableOperation(async (signal) => {
       const body = {
-          includeLatestDatabaseBackup,
-          includeSampleFiles,
-          confirmationText: includeOptionalFiles ? "INCLUDE OPTIONAL FILES" : "",
+        includeLatestDatabaseBackup,
+        includeSampleFiles,
+        confirmationText: includeOptionalFiles ? "INCLUDE OPTIONAL FILES" : "",
       };
       if (isDesktop) {
-        const response = await client.saveSupportPackageToRuntime({ body });
+        const response = await client.saveSupportPackageToRuntime({ body }, { signal });
         return { mode: "desktop" as const, response };
       }
 
-      const blob = await client.downloadSupportPackage({ body });
-      downloadBlob(blob, `support-package-${new Date().toISOString().replace(/[:.]/g, "-")}.zip`);
+      const job = await client.downloadSupportPackage({ body }, { signal });
+      await downloadJobResultWhenReady(
+        client,
+        job,
+        `support-package-${new Date().toISOString().replace(/[:.]/g, "-")}.zip`,
+        { timeoutMs: 60 * 60 * 1000, pollIntervalMs: 2_000, signal },
+      );
       return { mode: "browser" as const };
-    },
+    }),
     onSuccess: (result) => {
       setLastPackage(result.mode === "desktop" ? result.response : null);
       setMessage(null);
@@ -1027,11 +1050,11 @@ function SupportPackagePanel({
             }}
           >
             <LifeBuoy size={17} aria-hidden="true" />
-            <span>导出支持包</span>
+            <span>{createMutation.isPending ? "正在生成支持包" : "导出支持包"}</span>
           </button>
         </div>
       </div>
-      {message ? <InlineNotice tone="error" title="数据归属维护失败">{message}</InlineNotice> : null}
+      {message ? <InlineNotice tone="error" title="支持包导出失败">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       <div className="backup-action-grid">
         <label className="settings-check">

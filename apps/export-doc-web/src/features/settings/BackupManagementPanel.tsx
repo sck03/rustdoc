@@ -97,8 +97,18 @@ export default function BackupManagementPanel({
   });
 
   useEffect(() => {
-    if (backupQuery.data?.backups.length && !restoreFileName) {
-      setRestoreFileName(backupQuery.data.backups[0].fileName);
+    const backups = backupQuery.data?.backups ?? [];
+    if (backups.length === 0) {
+      if (restoreFileName) {
+        setRestoreFileName("");
+        setRestoreConfirmation("");
+      }
+      return;
+    }
+
+    if (!restoreFileName || !backups.some((backup) => backup.fileName === restoreFileName)) {
+      setRestoreFileName(backups[0].fileName);
+      setRestoreConfirmation("");
     }
   }, [backupQuery.data, restoreFileName]);
 

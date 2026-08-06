@@ -136,9 +136,9 @@ foreach ($legalFile in $requiredLegalFiles) {
 
 if ($Profile -eq "Server") {
     $requiredServerEntries = if ($RuntimeIdentifier.StartsWith("win-", [StringComparison]::OrdinalIgnoreCase)) {
-        @("appsettings.example.json", "initialize-windows.ps1", "start-windows.ps1", "wwwroot/index.html")
+        @("README.md", "version.json", "appsettings.example.json", "initialize-windows.ps1", "start-windows.ps1", "setup-windows.cmd", "start-windows.cmd", "wwwroot/index.html")
     } else {
-        @("appsettings.example.json", "initialize-linux.sh", "start-linux.sh", "wwwroot/index.html")
+        @("README.md", "version.json", "appsettings.example.json", "initialize-linux.sh", "start-linux.sh", "wwwroot/index.html")
     }
     foreach ($relativeEntry in $requiredServerEntries) {
         $entryPath = Join-Path $root $relativeEntry

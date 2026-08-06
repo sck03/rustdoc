@@ -35,6 +35,8 @@ curl -fsSL https://raw.githubusercontent.com/sck03/rustdoc/main/deploy/container
 
 访问：`http://服务器IP:8080`。
 
+HTTP 模式安装器会显式写入 `EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY=true`，因此网页备份恢复和完整迁移可直接使用；这也是为什么 HTTP 模式只能放在受防火墙保护的可信办公网/VPN。HTTPS 模式始终写入 `false`，由 Nginx TLS 通道满足安全要求。不要把 HTTP 端口暴露到公网或访客网络。
+
 ### 公网 HTTPS
 
 先把域名解析到 VPS，并开放 TCP `80/443`：
@@ -119,7 +121,7 @@ MODE=$(sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' .env)
 ./install-container.sh --mode "$MODE" --tag 0.1.3
 ```
 
-安装器会保留 `.env`、数据库、API DataRoot 和证书，只更新部署清单并拉取指定镜像。
+安装器会保留 `.env`、数据库、API DataRoot 和证书。安装根、运行根和关键子目录必须是真实非根目录，不能经过符号链接；部署根会收紧为 root `700`。新部署清单会先完整下载到安装目录内的临时 staging，校验安装器语法及 HTTP/HTTPS Compose 双模式后才原子替换；锁文件、环境更新、资产激活和首次令牌标记均拒绝链接或使用 `mktemp`。Compose 校验、镜像拉取、证书申请、容器启动或就绪检查任一步失败时，会恢复旧 `.env`、旧部署文件和本次可能改写的 Let's Encrypt 状态，并用 `--force-recreate` 重新创建原 HTTP/HTTPS 容器，确保恢复后的证书目录和配置重新挂载。`--no-start` 成功时只保留已校验的新文件，不改变容器。
 
 ## 4. 数据库备份
 
@@ -202,7 +204,7 @@ find "$BACKUP_ROOT" -maxdepth 1 -type f \
 
 ### 4.1 网页端备份和恢复
 
-管理员登录后进入“系统设置 -> 维护 -> 团队库”。这里可以创建并下载 `.dump`，下载服务器已有备份，或上传 `.dump` 后输入 `RESTORE DATABASE` 排队恢复。容器会在响应完成后自动重启；恢复前会把当前数据库保存到 `runtime/api-data/Backups/ServerMigration/Safety/`。
+管理员登录后进入“系统设置 -> 维护 -> 团队库”。创建 `.dump` 已改为后台任务，不再让 `pg_dump` 占用长时间 HTTP 请求；页面关闭后任务仍会继续，可在任务中心查看或取消。服务器已有备份通过五分钟短期票据和 HTTP Range 流式下载，不会把数 GiB 文件先装入浏览器内存；票据签发和每次消费都会重新检查 HTTPS/显式可信 HTTP、备份目录边界及符号链接状态。也可以上传 `.dump` 后输入 `RESTORE DATABASE` 排队恢复。容器会在恢复响应完成后自动重启；恢复前会把当前数据库保存到 `runtime/api-data/Backups/ServerMigration/Safety/`。
 
 同一页面还可以输入强迁移密码创建加密 `.edmmigration` 完整迁移包，或上传迁移包并输入 `MIGRATE` 排队恢复。完整包包含数据库、应用运行配置、印章、唛头图片和其它业务文件、用户模板、单一窗口数据及本地主密钥；部署目录的 `.env` 不在 API 可见范围内，迁移时必须另外保留并按新服务器网络参数复核。完整包不包含日志、缓存、临时导出文件、历史备份、许可证、机器绑定试用数据，也不包含 `runtime/letsencrypt/` 中的 TLS/Certbot 证书。目标服务器若显式设置 `EXPORTDOCMANAGER_MASTER_KEY`，必须与源服务器一致，否则恢复会在覆盖数据库前中止。
 
@@ -508,7 +510,7 @@ PostgreSQL 18 容器数据位于 `/var/lib/postgresql/18/docker`，因此宿主 
 - `docker-compose.yml`：从源码构建，只用于开发和 CI；
 - `docker-compose.acme.yml`：一键 HTTPS 和自动续期；
 - `docker-compose.https.yml`：手工证书 overlay；
-- `initialize-container-runtime.ps1`：克隆仓库后的 PowerShell 初始化工具；Windows 可直接运行，Linux/macOS 需使用 `sudo pwsh` 以设置固定容器 UID/GID；
+- `initialize-container-runtime.ps1`：克隆仓库后的 PowerShell 初始化工具；Windows 可直接运行，Linux/macOS 需使用 `sudo pwsh` 以设置固定容器 UID/GID；可信 HTTP 开发环境需显式增加 `-AllowHttpDisasterRecovery`；
 - `install-container.sh`：Linux VPS 正式安装、升级和恢复入口。
 
 GitHub 工作流 `Container runtime lifecycle validation` 会验证启动、健康探针、安全响应头、PostgreSQL bind mount 持久化和 `pg_dump/pg_restore`。CI 成功不能替代生产环境的异机备份和恢复演练。

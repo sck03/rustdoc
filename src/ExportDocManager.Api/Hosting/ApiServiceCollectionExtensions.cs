@@ -61,7 +61,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddSingleton<ApiAuthorizationService>();
             services.AddSingleton<ApiLoginAttemptService>();
             services.AddSingleton<ApiSensitiveOperationTicketService>();
-            services.AddSingleton<ApiJobDownloadTicketService>();
+            services.AddSingleton<ApiDownloadTicketService>();
             services.AddSingleton(_ => ApiBackgroundJobConcurrencyOptions.FromEnvironment());
             services.AddSingleton(_ => ApiBackgroundJobRetentionOptions.FromEnvironment());
             services.AddSingleton<ApiBackgroundJobService>();

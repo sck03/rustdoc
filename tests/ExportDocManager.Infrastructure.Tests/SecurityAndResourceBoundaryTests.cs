@@ -18,6 +18,18 @@ public sealed class SecurityAndResourceBoundaryTests
         Assert.Equal(
             OperatingSystem.IsWindows(),
             PathBoundaryHelper.PathComparer.Equals("managed/Root", "managed/root"));
+
+        string volumeRoot = Path.GetPathRoot(Path.GetFullPath(Path.GetTempPath()))
+            ?? throw new InvalidOperationException("Temporary path does not have a volume root.");
+        string candidate = Path.Combine(volumeRoot, $"edm-root-boundary-{Guid.NewGuid():N}");
+
+        Assert.True(PathBoundaryHelper.IsWithinRoot(candidate, volumeRoot));
+        Assert.Equal(
+            Path.GetFullPath(candidate),
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                candidate,
+                volumeRoot,
+                "Root path boundary validation failed."));
     }
 
     [Fact]

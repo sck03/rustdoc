@@ -167,6 +167,39 @@ namespace ExportDocManager.Api.Tests
                         SqliteDatabaseFileName = Path.Combine(appRoot, "outside.db")
                     },
                     runtimeOptions));
+
+                string browserDownloadRoot = Path.Combine(pathProvider.ExportRoot, "Browser");
+                string externalDownloadRoot = Path.Combine(dataRoot, "ExternalBrowserTarget");
+                Directory.Delete(browserDownloadRoot, recursive: true);
+                Directory.CreateDirectory(externalDownloadRoot);
+                try
+                {
+                    Directory.CreateSymbolicLink(browserDownloadRoot, externalDownloadRoot);
+                }
+                catch (Exception ex) when (
+                    ex is IOException or
+                    UnauthorizedAccessException or
+                    PlatformNotSupportedException)
+                {
+                    return;
+                }
+
+                try
+                {
+                    Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.Validate(
+                        pathProvider,
+                        new DatabaseConnectionSettings
+                        {
+                            Provider = DatabaseConnectionSettings.SqliteProvider,
+                            SqliteDatabaseFileName = Path.Combine(pathProvider.DatabaseRoot, "inside.db")
+                        },
+                        runtimeOptions));
+                    Assert.Empty(Directory.EnumerateFileSystemEntries(externalDownloadRoot));
+                }
+                finally
+                {
+                    Directory.Delete(browserDownloadRoot);
+                }
             }
             finally
             {
@@ -554,7 +587,6 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("ApiBackupRestoreRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiPostgreSqlMaintenanceStatusResponse", json, StringComparison.Ordinal);
             Assert.Contains("ApiPostgreSqlPhysicalBackupListResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPostgreSqlPhysicalBackupResponse", json, StringComparison.Ordinal);
             Assert.Contains("ApiPostgreSqlRestorePlanRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiPostgreSqlRestorePlanResponse", json, StringComparison.Ordinal);
             Assert.Contains("ApiSharedDatabaseOwnershipSummaryResponse", json, StringComparison.Ordinal);
@@ -562,6 +594,22 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("ApiSupportPackageRequest", json, StringComparison.Ordinal);
             Assert.Contains("ApiSupportPackageResponse", json, StringComparison.Ordinal);
             Assert.Contains("runtime data root Backups", json, StringComparison.Ordinal);
+
+            using var jsonDocument = JsonDocument.Parse(json);
+            var paths = jsonDocument.RootElement.GetProperty("paths");
+            Assert.False(paths.TryGetProperty("/api/postgresql-maintenance/backups/download", out _));
+            Assert.True(paths
+                .GetProperty("/api/postgresql-maintenance/backups/download-ticket")
+                .GetProperty("post")
+                .GetProperty("responses")
+                .TryGetProperty("426", out _));
+            var supportResponses = paths
+                .GetProperty("/api/support-package/download")
+                .GetProperty("post")
+                .GetProperty("responses");
+            Assert.True(supportResponses.TryGetProperty("202", out _));
+            Assert.True(supportResponses.TryGetProperty("426", out _));
+            Assert.True(supportResponses.TryGetProperty("429", out _));
         }
 
         [Fact]
@@ -2024,6 +2072,44 @@ namespace ExportDocManager.Api.Tests
                 Assert.False(File.Exists(outputPath));
                 Assert.False(Directory.Exists(outputDirectory));
                 await Task.Delay(250);
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        [Fact]
+        public async Task ApiBackgroundJobRunner_ShouldDeleteProducedOutputWhenCancellationWinsCompletionRace()
+        {
+            string appRoot = CreateTempDirectory("edm-job-cancel-output-app");
+            string dataRoot = Path.Combine(Path.GetTempPath(), $"edm-job-cancel-output-data-{Guid.NewGuid():N}");
+            try
+            {
+                var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
+                var jobService = new ApiBackgroundJobService(pathProvider);
+                var services = new ServiceCollection();
+                using var provider = services.BuildServiceProvider();
+                var runner = new ApiBackgroundJobRunner(
+                    jobService,
+                    provider.GetRequiredService<IServiceScopeFactory>(),
+                    NullLogger<ApiBackgroundJobRunner>.Instance);
+                string outputDirectory = Path.Combine(pathProvider.ExportRoot, "Browser", "Test", Guid.NewGuid().ToString("N"));
+                string outputPath = Path.Combine(outputDirectory, "completed-before-cancel.pdf");
+
+                var job = runner.Enqueue("Test", "完成竞态清理", "admin", async (_, context) =>
+                {
+                    Directory.CreateDirectory(outputDirectory);
+                    await File.WriteAllTextAsync(outputPath, "completed", context.CancellationToken);
+                    Assert.True(await jobService.RequestCancelAsync(context.JobId));
+                    return outputPath;
+                });
+
+                var final = await WaitForJobStatusAsync(jobService, job.JobId, BackgroundJobStatusCatalog.Canceled);
+                Assert.Equal(string.Empty, final.OutputPath);
+                Assert.False(File.Exists(outputPath));
+                Assert.False(Directory.Exists(outputDirectory));
             }
             finally
             {

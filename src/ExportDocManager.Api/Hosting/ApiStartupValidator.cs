@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -112,12 +113,32 @@ namespace ExportDocManager.Api.Hosting
                 throw new InvalidOperationException($"程序运行目录不存在: {pathProvider.AppRoot}");
             }
 
-            EnsureNotReparsePoint(pathProvider.DataRoot, "业务数据目录");
-            EnsureWritableDirectory(pathProvider.DataRoot, "业务数据目录");
-            EnsureWritableDirectory(pathProvider.DatabaseRoot, "数据库目录");
-            EnsureWritableDirectory(pathProvider.SingleWindowRoot, "单一窗口数据目录");
-            EnsureWritableDirectory(pathProvider.CacheRoot, "缓存目录");
-            EnsureWritableDirectory(pathProvider.ConfigRoot, "配置目录");
+            string dataRoot = pathProvider.DataRoot;
+            var managedDirectories = new (string Path, string Description)[]
+            {
+                (dataRoot, "业务数据目录"),
+                (pathProvider.DatabaseRoot, "数据库目录"),
+                (pathProvider.UserTemplateRoot, "用户模板目录"),
+                (pathProvider.FileRoot, "业务文件目录"),
+                (pathProvider.ExportRoot, "导出目录"),
+                (Path.Combine(pathProvider.ExportRoot, "Browser"), "浏览器下载目录"),
+                (pathProvider.BackupRoot, "备份目录"),
+                (Path.Combine(pathProvider.BackupRoot, "PostgreSQL"), "PostgreSQL 备份目录"),
+                (pathProvider.SingleWindowRoot, "单一窗口数据目录"),
+                (pathProvider.LogRoot, "日志目录"),
+                (pathProvider.CacheRoot, "缓存目录"),
+                (Path.Combine(pathProvider.CacheRoot, "BackgroundJobs"), "后台任务缓存目录"),
+                (pathProvider.ConfigRoot, "配置目录"),
+                (pathProvider.SecurityRoot, "安全数据目录"),
+                (pathProvider.WebViewRoot, "WebView 数据目录"),
+                (Path.Combine(dataRoot, "Marks"), "唛头图片目录"),
+                (Path.Combine(dataRoot, "SupportPackages"), "技术支持包目录")
+            };
+
+            foreach ((string directory, string description) in managedDirectories)
+            {
+                EnsureWritableDirectory(directory, description, dataRoot);
+            }
         }
 
         private static void ValidateDatabasePath(
@@ -147,18 +168,38 @@ namespace ExportDocManager.Api.Hosting
                 throw new InvalidOperationException(exception.Message, exception);
             }
 
-            EnsureWritableDirectory(Path.GetDirectoryName(databasePath), "SQLite 数据库目录");
+            EnsureWritableDirectory(
+                Path.GetDirectoryName(databasePath),
+                "SQLite 数据库目录",
+                pathProvider.DataRoot);
         }
 
-        private static void EnsureWritableDirectory(string directory, string description)
+        private static void EnsureWritableDirectory(
+            string directory,
+            string description,
+            string dataRoot)
         {
             if (string.IsNullOrWhiteSpace(directory))
             {
                 throw new InvalidOperationException($"{description}不能为空。");
             }
 
-            Directory.CreateDirectory(directory);
-            EnsureNotReparsePoint(directory, description);
+            try
+            {
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    directory,
+                    dataRoot,
+                    $"{description}不能包含符号链接或 Windows 重解析点。");
+                Directory.CreateDirectory(directory);
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    directory,
+                    dataRoot,
+                    $"{description}不能包含符号链接或 Windows 重解析点。");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                throw new InvalidOperationException(ex.Message, ex);
+            }
 
             string probePath = Path.Combine(directory, $".write-check-{Guid.NewGuid():N}.tmp");
             try
@@ -171,26 +212,6 @@ namespace ExportDocManager.Api.Hosting
                 {
                     File.Delete(probePath);
                 }
-            }
-        }
-
-        private static void EnsureNotReparsePoint(string directory, string description)
-        {
-            try
-            {
-                if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
-                {
-                    throw new InvalidOperationException(
-                        $"{description}不能是符号链接或 Windows 重解析点: {directory}");
-                }
-            }
-            catch (FileNotFoundException ex)
-            {
-                throw new InvalidOperationException($"{description}不存在: {directory}", ex);
-            }
-            catch (DirectoryNotFoundException ex)
-            {
-                throw new InvalidOperationException($"{description}不存在: {directory}", ex);
             }
         }
 
