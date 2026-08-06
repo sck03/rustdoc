@@ -119,6 +119,64 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("DownloadJobResult");
 
+            endpoints.MapPost("/api/jobs/{jobId}/download-ticket", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                ApiAuthorizationService authorizationService,
+                IBackgroundJobService jobService,
+                IAppPathProvider pathProvider,
+                ApiJobDownloadTicketService ticketService,
+                string jobId,
+                CancellationToken cancellationToken) =>
+            {
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
+                if (user == null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                var job = await jobService.GetAsync(jobId, cancellationToken);
+                if (!CanAccessJob(job, user, authorizationService) ||
+                    !string.Equals(job.Status, BackgroundJobStatusCatalog.Succeeded, StringComparison.OrdinalIgnoreCase) ||
+                    !IsControlledBrowserDownloadPath(pathProvider, job.OutputPath) ||
+                    !File.Exists(job.OutputPath))
+                {
+                    return Results.NotFound();
+                }
+
+                return Results.Ok(ticketService.Issue(job.JobId));
+            })
+            .WithName("CreateJobDownloadTicket");
+
+            endpoints.MapGet("/downloads/jobs/{token}", async (
+                ApiJobDownloadTicketService ticketService,
+                IBackgroundJobService jobService,
+                IAppPathProvider pathProvider,
+                string token,
+                CancellationToken cancellationToken) =>
+            {
+                if (!ticketService.TryResolve(token, out string jobId))
+                {
+                    return Results.NotFound();
+                }
+
+                var job = await jobService.GetAsync(jobId, cancellationToken);
+                if (job == null ||
+                    !string.Equals(job.Status, BackgroundJobStatusCatalog.Succeeded, StringComparison.OrdinalIgnoreCase) ||
+                    !IsControlledBrowserDownloadPath(pathProvider, job.OutputPath) ||
+                    !File.Exists(job.OutputPath))
+                {
+                    return Results.NotFound();
+                }
+
+                return Results.File(
+                    job.OutputPath,
+                    GetDownloadContentType(job.OutputPath),
+                    Path.GetFileName(job.OutputPath),
+                    enableRangeProcessing: true);
+            })
+            .WithName("DownloadJobResultWithTicket");
+
             endpoints.MapPost("/api/jobs/{jobId}/cancel", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
@@ -269,6 +327,7 @@ namespace ExportDocManager.Api.Hosting
                 ".zip" => "application/zip",
                 ".edpkg" => "application/octet-stream",
                 ".swpkg" => "application/octet-stream",
+                ".edmmigration" => "application/octet-stream",
                 _ => "application/octet-stream"
             };
         }

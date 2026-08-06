@@ -75,6 +75,13 @@ namespace ExportDocManager.Services.Infrastructure
                 EnsureSettingsDefaults();
                 Settings.Email.Password = _secretProtector.UnprotectSettingsValue(Settings.Email.Password);
                 Settings.WebDav.Password = _secretProtector.UnprotectSettingsValue(Settings.WebDav.Password);
+                if (!string.IsNullOrEmpty(Settings.System.PostgreSqlPassword) &&
+                    !_secretProtector.IsProtectedPayload(Settings.System.PostgreSqlPassword))
+                {
+                    throw new InvalidDataException(
+                        $"PostgreSQL 密码不能以明文保存在 appsettings.json；请使用 {DbHelper.PostgreSqlPasswordEnvironmentVariable}、" +
+                        $"{DbHelper.PostgreSqlPasswordFileEnvironmentVariable}，或通过设置界面保存受保护载荷。");
+                }
                 Settings.System.PostgreSqlPassword = _secretProtector.UnprotectSettingsValue(Settings.System.PostgreSqlPassword);
                 Settings.AI.ApiKey = _secretProtector.UnprotectSettingsValue(Settings.AI.ApiKey);
             }

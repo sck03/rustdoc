@@ -62,6 +62,7 @@ RUN apt-get update \
         ca-certificates \
         chromium \
         curl \
+        gnupg \
         fonts-noto-cjk \
         libasound2 \
         libatk-bridge2.0-0 \
@@ -79,7 +80,14 @@ RUN apt-get update \
         libxrandr2 \
         tini \
         tzdata \
-    && rm -rf /var/lib/apt/lists/*
+    && install -d -m 0755 /usr/share/postgresql-common/pgdg \
+    && curl --fail --silent --show-error --location https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+        | gpg --dearmor -o /usr/share/keyrings/postgresql.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-18 \
+    && rm -rf /var/lib/apt/lists/* /usr/share/postgresql-common/pgdg /etc/apt/sources.list.d/pgdg.list /usr/share/keyrings/postgresql.gpg
 
 WORKDIR /app
 COPY --from=build /out/ ./
@@ -96,6 +104,7 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:5188 \
     EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
     EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX=true \
     EXPORTDOCMANAGER_OCR_RUNTIME=enabled \
+    EXPORTDOCMANAGER_POSTGRES_BIN=/usr/lib/postgresql/18/bin \
     TZ=Asia/Shanghai
 RUN chmod +x /app/sidecar/ocr/exportdoc-ocr /app/Tools/exportdoc-excel-analyzer
 RUN dotnet ExportDocManager.Api.dll --app-root /app --data-root /tmp/exportdoc-ocr-check --verify-ocr-runtime \

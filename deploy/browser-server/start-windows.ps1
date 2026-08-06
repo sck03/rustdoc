@@ -50,7 +50,11 @@ if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
     throw "appsettings.json was not found: $configPath"
 }
 if ((Get-Content -LiteralPath $configPath -Raw).Contains("CHANGE_ME_BEFORE_START")) {
-    throw "请先编辑 appsettings.json，填写 PostgreSQL 地址、账号和密码。"
+    throw "请先运行 initialize-windows.ps1 生成 PostgreSQL 连接配置。"
+}
+if ([string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_POSTGRES_PASSWORD) -and
+    [string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_POSTGRES_PASSWORD_FILE)) {
+    throw "请在受限的 browser-server.env 中设置 EXPORTDOCMANAGER_POSTGRES_PASSWORD 或 EXPORTDOCMANAGER_POSTGRES_PASSWORD_FILE。"
 }
 if ([string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_BOOTSTRAP_TOKEN) -or $env:EXPORTDOCMANAGER_BOOTSTRAP_TOKEN.Length -lt 24) {
     throw "请先设置至少 24 个字符的 EXPORTDOCMANAGER_BOOTSTRAP_TOKEN，用于首次 PostgreSQL 管理员初始化。"
@@ -74,6 +78,10 @@ $effectiveUrls = if ($PSBoundParameters.ContainsKey('Urls')) {
 $env:EXPORTDOCMANAGER_NETWORK_MODE = "true"
 $env:EXPORTDOCMANAGER_PRODUCT_EDITION = "Full"
 $env:EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE = $browser.FullName
+$postgresBin = Join-Path $root "Tools\PostgreSQL\bin"
+if (Test-Path -LiteralPath (Join-Path $postgresBin "pg_dump.exe") -PathType Leaf) {
+    $env:EXPORTDOCMANAGER_POSTGRES_BIN = $postgresBin
+}
 & (Join-Path $root "ExportDocManager.Api.exe") `
     --app-root $root `
     --data-root $dataRoot `

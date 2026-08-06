@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
@@ -173,6 +174,23 @@ namespace ExportDocManager.Services.Core
                 !string.Equals(invoice.ShippingMarksType, "Image", StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvoiceValidationException("唛头类型只能是文本或图片。");
+            }
+            if (string.Equals(invoice.ShippingMarksType, "Image", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    invoice.ShippingMarksImage = ManagedDataPathResolver.NormalizeStoredPath(
+                        invoice.ShippingMarksImage,
+                        "Marks");
+                }
+                catch (InvalidDataException ex)
+                {
+                    throw new InvoiceValidationException(ex.Message);
+                }
+            }
+            else
+            {
+                invoice.ShippingMarksImage = string.Empty;
             }
         }
 

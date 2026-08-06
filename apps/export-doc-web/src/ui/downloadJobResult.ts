@@ -1,5 +1,4 @@
 import { BackgroundJobSnapshot, ExportDocManagerApiClient } from "../api/index.ts";
-import { downloadBlob } from "./downloadBlob.ts";
 
 const terminalStatuses = new Set(["succeeded", "failed", "canceled"]);
 
@@ -25,9 +24,27 @@ export async function downloadJobResultWhenReady(
     throw new Error(job.errorMessage || job.detailText || "文件生成失败。");
   }
 
-  const blob = await client.downloadJobResult({ jobId: job.jobId });
-  downloadBlob(blob, fileName);
+  await downloadCompletedJobResult(client, job, fileName);
   return job;
+}
+
+export async function downloadCompletedJobResult(
+  client: ExportDocManagerApiClient,
+  job: BackgroundJobSnapshot,
+  fileName?: string,
+) {
+  const ticket = await client.createJobDownloadTicket({ jobId: job.jobId });
+  const anchor = document.createElement("a");
+  anchor.href = client.resolveUrl(ticket.downloadUrl);
+  anchor.rel = "noopener";
+  anchor.referrerPolicy = "no-referrer";
+  if (fileName?.trim()) {
+    anchor.download = fileName.trim();
+  }
+  anchor.hidden = true;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
 }
 
 function delay(milliseconds: number) {

@@ -108,6 +108,8 @@ export async function createPageSession(cdp) {
   const { targetId } = await cdp.send("Target.createTarget", { url: "about:blank" });
   const { sessionId } = await cdp.send("Target.attachToTarget", { targetId, flatten: true });
   const page = {
+    targetId,
+    sessionId,
     send: (method, params = {}) => cdp.send(method, params, sessionId),
   };
 

@@ -4,8 +4,7 @@ import type { ApiReportTemplateDto, BackgroundJobSnapshot, ExportDocManagerApiCl
 import { queryKeys } from "../../api/queryKeys.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
-import { downloadBlob } from "../../ui/downloadBlob.ts";
-import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
+import { downloadCompletedJobResult, downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 
 type Options = {
@@ -92,7 +91,7 @@ export function useJobCenterOperations({ client, queryClient, canOperate, canMan
     onError: (error) => showError(readApiError(error)),
   });
   const downloadMutation = useMutation({
-    mutationFn: async (job: BackgroundJobSnapshot) => { const blob = await client.downloadJobResult({ jobId: job.jobId }); downloadBlob(blob, fileNameFromPath(job.outputPath) || `${job.kind || "download"}.bin`); },
+    mutationFn: (job: BackgroundJobSnapshot) => downloadCompletedJobResult(client, job, fileNameFromPath(job.outputPath) || `${job.kind || "download"}.bin`),
     onError: (error) => showError(readApiError(error)),
   });
 

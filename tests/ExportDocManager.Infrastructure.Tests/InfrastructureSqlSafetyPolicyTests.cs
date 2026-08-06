@@ -18,7 +18,10 @@ public sealed class InfrastructureSqlSafetyPolicyTests
         {
             "Services/DatabaseInitializationService.cs",
             "Services/DatabaseSchemaBaseline.cs",
-            "Services/SqliteMaintenanceGateway.cs"
+            "Services/SqliteMaintenanceGateway.cs",
+            "Services/ServerMigration/ServerMigrationService.cs",
+            "Services/ServerMigration/ServerMigrationPathRewriter.cs",
+            "Services/ServerMigration/ServerMigrationPostgreSql.cs"
         };
         var violations = Directory
             .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)

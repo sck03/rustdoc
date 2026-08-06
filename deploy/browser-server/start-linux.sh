@@ -40,7 +40,11 @@ if [ ! -f "$CONFIG" ]; then
   exit 1
 fi
 if grep -q 'CHANGE_ME_BEFORE_START' "$CONFIG"; then
-  echo "请先编辑 appsettings.json，填写 PostgreSQL 地址、账号和密码。" >&2
+  echo "请先运行 initialize-linux.sh 生成 PostgreSQL 连接配置。" >&2
+  exit 1
+fi
+if [ -z "${EXPORTDOCMANAGER_POSTGRES_PASSWORD:-}" ] && [ -z "${EXPORTDOCMANAGER_POSTGRES_PASSWORD_FILE:-}" ]; then
+  echo "请在权限受限的 browser-server.env 中设置 EXPORTDOCMANAGER_POSTGRES_PASSWORD 或 EXPORTDOCMANAGER_POSTGRES_PASSWORD_FILE。" >&2
   exit 1
 fi
 if [ -z "${EXPORTDOCMANAGER_BOOTSTRAP_TOKEN:-}" ] || [ "${#EXPORTDOCMANAGER_BOOTSTRAP_TOKEN}" -lt 24 ]; then
@@ -58,6 +62,10 @@ chmod +x "$BROWSER" "$ROOT/ExportDocManager.Api"
 export EXPORTDOCMANAGER_NETWORK_MODE=true
 export EXPORTDOCMANAGER_PRODUCT_EDITION=Full
 export EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE="$BROWSER"
+if [ -x "$ROOT/Tools/PostgreSQL/bin/pg_dump" ]; then
+  export EXPORTDOCMANAGER_POSTGRES_BIN="$ROOT/Tools/PostgreSQL/bin"
+  export LD_LIBRARY_PATH="$ROOT/Tools/PostgreSQL/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
 case "$(uname -m)" in
   aarch64|arm64) DEFAULT_OCR_RUNTIME=disabled ;;
   *) DEFAULT_OCR_RUNTIME=enabled ;;

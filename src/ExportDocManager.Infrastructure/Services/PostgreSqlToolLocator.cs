@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text.RegularExpressions;
 using ExportDocManager.Services.Infrastructure;
 
 namespace ExportDocManager.Services
@@ -6,12 +8,11 @@ namespace ExportDocManager.Services
         string BinRoot,
         string PgDumpPath,
         string PgRestorePath,
-        string PsqlPath)
+        string PsqlPath,
+        bool VersionCompatible = false,
+        string Version = "")
     {
-        public bool ToolsReady =>
-            !string.IsNullOrWhiteSpace(PgDumpPath) &&
-            !string.IsNullOrWhiteSpace(PgRestorePath) &&
-            !string.IsNullOrWhiteSpace(PsqlPath);
+        public bool ToolsReady => AvailableToolCount == 3 && VersionCompatible;
 
         public int AvailableToolCount =>
             CountPath(PgDumpPath) + CountPath(PgRestorePath) + CountPath(PsqlPath);
@@ -19,9 +20,11 @@ namespace ExportDocManager.Services
         private static int CountPath(string path) => string.IsNullOrWhiteSpace(path) ? 0 : 1;
     }
 
-    internal static class PostgreSqlToolLocator
+    internal static partial class PostgreSqlToolLocator
     {
         public const string BinRootEnvironmentVariable = "EXPORTDOCMANAGER_POSTGRES_BIN";
+        public const string AllowPathEnvironmentVariable = "EXPORTDOCMANAGER_ALLOW_POSTGRES_PATH";
+        private const int MinimumSupportedMajorVersion = 18;
 
         public static PostgreSqlToolPaths Resolve(IAppPathProvider pathProvider)
         {
@@ -37,22 +40,112 @@ namespace ExportDocManager.Services
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Select(Path.GetFullPath)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+            .ToList();
 
-            foreach (string root in candidates)
+            if (IsPathFallbackEnabled())
             {
-                string pgDump = ResolveToolPath(root, "pg_dump");
-                string pgRestore = ResolveToolPath(root, "pg_restore");
-                string psql = ResolveToolPath(root, "psql");
-                if (!string.IsNullOrWhiteSpace(pgDump) ||
-                    !string.IsNullOrWhiteSpace(pgRestore) ||
-                    !string.IsNullOrWhiteSpace(psql))
+                string pathRoot = ResolveCommonPathRoot();
+                if (!string.IsNullOrWhiteSpace(pathRoot))
                 {
-                    return new PostgreSqlToolPaths(root, pgDump, pgRestore, psql);
+                    candidates.Add(pathRoot);
                 }
             }
 
-            return new PostgreSqlToolPaths(string.Empty, string.Empty, string.Empty, string.Empty);
+            var best = new PostgreSqlToolPaths(string.Empty, string.Empty, string.Empty, string.Empty);
+            foreach (string root in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                var candidate = ResolveCandidate(root);
+                if (candidate.AvailableToolCount > best.AvailableToolCount)
+                {
+                    best = candidate;
+                }
+                if (candidate.AvailableToolCount != 3)
+                {
+                    continue;
+                }
+
+                var version = ValidateVersions(candidate);
+                candidate = candidate with
+                {
+                    VersionCompatible = version.Compatible,
+                    Version = version.Version
+                };
+                if (candidate.ToolsReady)
+                {
+                    return candidate;
+                }
+                if (candidate.AvailableToolCount >= best.AvailableToolCount)
+                {
+                    best = candidate;
+                }
+            }
+
+            return best;
+        }
+
+        private static PostgreSqlToolPaths ResolveCandidate(string root)
+        {
+            return new PostgreSqlToolPaths(
+                root,
+                ResolveToolPath(root, "pg_dump"),
+                ResolveToolPath(root, "pg_restore"),
+                ResolveToolPath(root, "psql"));
+        }
+
+        private static (bool Compatible, string Version) ValidateVersions(PostgreSqlToolPaths tools)
+        {
+            try
+            {
+                int dumpMajor = ReadMajorVersion(tools.PgDumpPath, out string dumpVersion);
+                int restoreMajor = ReadMajorVersion(tools.PgRestorePath, out string restoreVersion);
+                int psqlMajor = ReadMajorVersion(tools.PsqlPath, out string psqlVersion);
+                bool compatible = dumpMajor >= MinimumSupportedMajorVersion &&
+                    restoreMajor == dumpMajor &&
+                    psqlMajor == dumpMajor;
+                string version = compatible
+                    ? dumpVersion
+                    : $"pg_dump={dumpVersion}; pg_restore={restoreVersion}; psql={psqlVersion}";
+                return (compatible, version);
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+            {
+                return (false, ex.Message);
+            }
+        }
+
+        private static int ReadMajorVersion(string executable, out string version)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = executable,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            startInfo.ArgumentList.Add("--version");
+            using var process = Process.Start(startInfo)
+                ?? throw new InvalidOperationException($"无法启动 PostgreSQL 客户端工具：{executable}");
+            if (!process.WaitForExit(5_000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                throw new InvalidOperationException($"PostgreSQL 客户端版本检查超时：{executable}");
+            }
+            string output = process.StandardOutput.ReadToEnd();
+            string error = process.StandardError.ReadToEnd();
+            if (process.ExitCode != 0)
+            {
+                throw new InvalidOperationException(
+                    $"PostgreSQL 客户端版本检查失败：{(string.IsNullOrWhiteSpace(error) ? output : error).Trim()}");
+            }
+
+            version = output.Trim();
+            Match match = PostgreSqlVersionRegex().Match(version);
+            if (!match.Success || !int.TryParse(match.Groups["major"].Value, out int major))
+            {
+                throw new InvalidOperationException($"无法识别 PostgreSQL 客户端版本：{version}");
+            }
+            return major;
         }
 
         private static string ResolveToolPath(string root, string toolName)
@@ -61,5 +154,33 @@ namespace ExportDocManager.Services
             string path = Path.Combine(root, toolName + extension);
             return File.Exists(path) ? Path.GetFullPath(path) : string.Empty;
         }
+
+        private static bool IsPathFallbackEnabled()
+        {
+            string value = Environment.GetEnvironmentVariable(AllowPathEnvironmentVariable) ?? string.Empty;
+            value = value.Trim();
+            return value == "1" ||
+                value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("enabled", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string ResolveCommonPathRoot()
+        {
+            string extension = OperatingSystem.IsWindows() ? ".exe" : string.Empty;
+            foreach (string directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (File.Exists(Path.Combine(directory, "pg_dump" + extension)) &&
+                    File.Exists(Path.Combine(directory, "pg_restore" + extension)) &&
+                    File.Exists(Path.Combine(directory, "psql" + extension)))
+                {
+                    return Path.GetFullPath(directory);
+                }
+            }
+            return string.Empty;
+        }
+
+        [GeneratedRegex(@"\(PostgreSQL\)\s+(?<major>\d+)(?:\.\d+)?", RegexOptions.CultureInvariant)]
+        private static partial Regex PostgreSqlVersionRegex();
     }
 }

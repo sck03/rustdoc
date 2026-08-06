@@ -60,6 +60,8 @@ namespace ExportDocManager.Api.Hosting
             services.AddSingleton<ApiCurrentUserResolver>();
             services.AddSingleton<ApiAuthorizationService>();
             services.AddSingleton<ApiLoginAttemptService>();
+            services.AddSingleton<ApiSensitiveOperationTicketService>();
+            services.AddSingleton<ApiJobDownloadTicketService>();
             services.AddSingleton(_ => ApiBackgroundJobConcurrencyOptions.FromEnvironment());
             services.AddSingleton(_ => ApiBackgroundJobRetentionOptions.FromEnvironment());
             services.AddSingleton<ApiBackgroundJobService>();
@@ -81,6 +83,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IBackupService>(_ => new BackupService(databaseSettings, pathProvider));
             services.AddScoped<ICloudSyncService, WebDavCloudSyncService>();
             services.AddScoped<ISharedDatabaseMaintenanceService, SharedDatabaseMaintenanceService>();
+            services.AddScoped<IServerMigrationService, ServerMigrationService>();
             services.AddScoped<IAuditLogService, AuditLogService>();
             services.AddScoped<IShutdownMaintenanceService, ShutdownMaintenanceService>();
             services.AddScoped<ISystemLogCleanupService, SystemLogCleanupService>();

@@ -217,6 +217,10 @@ internal static class TypeScriptClientGenerator
         builder.AppendLine("    }");
         builder.AppendLine("  }");
         builder.AppendLine();
+        builder.AppendLine("  public resolveUrl(path: string): string {");
+        builder.AppendLine("    return new URL(path, this.baseUrl).toString();");
+        builder.AppendLine("  }");
+        builder.AppendLine();
 
         foreach (var operation in operations)
         {

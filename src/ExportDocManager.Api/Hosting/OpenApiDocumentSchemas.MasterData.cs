@@ -258,8 +258,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["bankAccount"] = StringProperty("Bank account."),
                                 ["swiftCode"] = StringProperty("SWIFT code."),
                                 ["notes"] = StringProperty("Notes."),
-                                ["docSealPath"] = StringProperty("Document seal path."),
-                                ["customsSealPath"] = StringProperty("Customs seal path.")
+                                ["docSealPath"] = StringProperty("DataRoot-relative managed document seal path under Files/Seals/."),
+                                ["customsSealPath"] = StringProperty("DataRoot-relative managed customs seal path under Files/Seals/.")
                             }
                         },
                         ["ApiAuditLogPathExportRequest"] = new
@@ -312,8 +312,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["bankAccount"] = StringProperty("Bank account."),
                                 ["swiftCode"] = StringProperty("SWIFT code."),
                                 ["notes"] = StringProperty("Notes."),
-                                ["docSealPath"] = StringProperty("Document seal path."),
-                                ["customsSealPath"] = StringProperty("Customs seal path."),
+                                ["docSealPath"] = StringProperty("DataRoot-relative managed document seal path under Files/Seals/."),
+                                ["customsSealPath"] = StringProperty("DataRoot-relative managed customs seal path under Files/Seals/."),
                                 ["rowVersion"] = StringProperty("Concurrency row version encoded as base64.")
                             }
                         },

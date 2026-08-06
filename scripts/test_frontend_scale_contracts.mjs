@@ -60,47 +60,51 @@ try {
   await waitForHttp(`http://127.0.0.1:${port}/visual-baseline.html`);
   chrome = await startChrome({ browserExecutable, userDataDir: profileRoot, timeoutMs: 60000 });
   cdp = await CdpClient.connect(chrome.browserWebSocketUrl);
-  const page = await createPageSession(cdp);
 
   for (const profile of profiles) {
     process.stdout.write(`[scale] Starting profile ${profile.name}.\n`);
-    await page.send("Emulation.setDeviceMetricsOverride", {
-      width: profile.width,
-      height: profile.height,
-      deviceScaleFactor: profile.deviceScaleFactor,
-      mobile: profile.mobile,
-    });
-    await page.send("Emulation.setEmulatedMedia", {
-      media: "screen",
-      features: [{ name: "prefers-reduced-motion", value: "reduce" }],
-    });
+    const page = await createPageSession(cdp);
+    try {
+      await page.send("Emulation.setDeviceMetricsOverride", {
+        width: profile.width,
+        height: profile.height,
+        deviceScaleFactor: profile.deviceScaleFactor,
+        mobile: profile.mobile,
+      });
+      await page.send("Emulation.setEmulatedMedia", {
+        media: "screen",
+        features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+      });
 
-    for (const density of densities) {
-      for (const pageName of pages) {
-        const scene = `${profile.name}/${density}/${pageName}`;
-        process.stdout.write(`[scale] Running ${scene}.\n`);
-        const url = `http://127.0.0.1:${port}/visual-baseline.html?page=${pageName}&density=${density}`;
-        await page.send("Page.navigate", { url });
-        await waitForReady(page);
-        await evaluate(page, "document.fonts?.ready ?? Promise.resolve()", false);
-        const audit = await evaluate(page, buildAuditExpression(profile.mobile), true);
-        const value = audit.value;
-        const passed = !value.horizontalOverflow
-          && value.truncatedCriticalText.length === 0
-          && value.reportPanelOverlapCount === 0
-          && value.reportMinimumSelectionFieldWidth >= (profile.mobile ? 180 : 128)
-          && value.mobileInputFontFailures.length === 0
-          && value.mobileTouchTargetFailures.length === 0;
+      for (const density of densities) {
+        for (const pageName of pages) {
+          const scene = `${profile.name}/${density}/${pageName}`;
+          process.stdout.write(`[scale] Running ${scene}.\n`);
+          const url = `http://127.0.0.1:${port}/visual-baseline.html?page=${pageName}&density=${density}`;
+          await page.send("Page.navigate", { url });
+          await waitForReady(page);
+          await evaluate(page, "document.fonts?.ready ?? Promise.resolve()", false);
+          const audit = await evaluate(page, buildAuditExpression(profile.mobile), true);
+          const value = audit.value;
+          const passed = !value.horizontalOverflow
+            && value.truncatedCriticalText.length === 0
+            && value.reportPanelOverlapCount === 0
+            && value.reportMinimumSelectionFieldWidth >= (profile.mobile ? 180 : 128)
+            && value.mobileInputFontFailures.length === 0
+            && value.mobileTouchTargetFailures.length === 0;
 
-        let screenshotPath = null;
-        if (pageName === "dashboard" || pageName === "report") {
-          screenshotPath = path.join(outputRoot, `${pageName}-${profile.name}-${density}.png`);
-          await captureScreenshot(page, screenshotPath, { captureBeyondViewport: false });
+          let screenshotPath = null;
+          if (pageName === "dashboard" || pageName === "report") {
+            screenshotPath = path.join(outputRoot, `${pageName}-${profile.name}-${density}.png`);
+            await captureScreenshot(page, screenshotPath, { captureBeyondViewport: false });
+          }
+
+          results.push({ page: pageName, density, profile, url, screenshotPath, passed, ...value });
+          process.stdout.write(`[scale] ${passed ? "Passed" : "Failed"} ${scene}.\n`);
         }
-
-        results.push({ page: pageName, density, profile, url, screenshotPath, passed, ...value });
-        process.stdout.write(`[scale] ${passed ? "Passed" : "Failed"} ${scene}.\n`);
       }
+    } finally {
+      await cdp.send("Target.closeTarget", { targetId: page.targetId }).catch(() => {});
     }
   }
 

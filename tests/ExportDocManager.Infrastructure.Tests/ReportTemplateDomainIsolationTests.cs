@@ -31,8 +31,8 @@ public sealed class ReportTemplateDomainIsolationTests
                 new Customer(),
                 new Exporter
                 {
-                    DocSealPath = documentSealPath,
-                    CustomsSealPath = customsSealPath
+                    DocSealPath = "Files/Seals/Exporters/42/document.png",
+                    CustomsSealPath = "Files/Seals/Exporters/42/customs.png"
                 },
                 withSeal: true,
                 new RuntimeAppPathProvider(appRoot, dataRoot));

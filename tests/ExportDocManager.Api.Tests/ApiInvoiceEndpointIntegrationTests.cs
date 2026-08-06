@@ -227,15 +227,21 @@ namespace ExportDocManager.Api.Tests
             var saveResponse = await adminClient.PostAsJsonAsync(
                 "/api/invoices/shipping-marks/image",
                 new ApiShippingMarkImageSaveRequest { ImageDataUrl = pngDataUrl });
-            Assert.Equal(HttpStatusCode.OK, saveResponse.StatusCode);
+            Assert.True(
+                saveResponse.IsSuccessStatusCode,
+                await saveResponse.Content.ReadAsStringAsync());
             var saved = await ApiIntegrationTestHarness.ReadJsonAsync<ApiShippingMarkImageSaveResponse>(saveResponse);
 
             string expectedMarksRoot = Path.Combine(harness.DataRoot, "Marks");
             Assert.Equal("image/png", saved.ContentType);
             Assert.EndsWith(".png", saved.FileName, StringComparison.OrdinalIgnoreCase);
             Assert.True(saved.SizeBytes > 0);
-            Assert.StartsWith(expectedMarksRoot, Path.GetFullPath(saved.ImagePath), StringComparison.OrdinalIgnoreCase);
-            Assert.True(File.Exists(saved.ImagePath));
+            Assert.StartsWith("Marks/", saved.ImagePath, StringComparison.OrdinalIgnoreCase);
+            string savedImagePath = Path.GetFullPath(Path.Combine(
+                harness.DataRoot,
+                saved.ImagePath.Replace('/', Path.DirectorySeparatorChar)));
+            Assert.StartsWith(expectedMarksRoot, savedImagePath, StringComparison.OrdinalIgnoreCase);
+            Assert.True(File.Exists(savedImagePath));
             Assert.Contains("运行数据根 Marks", saved.StoragePolicy, StringComparison.Ordinal);
             Assert.Contains("不读取付款/报销单据", saved.StoragePolicy, StringComparison.Ordinal);
 
@@ -244,7 +250,7 @@ namespace ExportDocManager.Api.Tests
                 new ApiShippingMarkImagePreviewRequest { ImagePath = saved.ImagePath });
             Assert.Equal(HttpStatusCode.OK, previewResponse.StatusCode);
             var preview = await ApiIntegrationTestHarness.ReadJsonAsync<ApiShippingMarkImagePreviewResponse>(previewResponse);
-            Assert.Equal(Path.GetFullPath(saved.ImagePath), Path.GetFullPath(preview.ImagePath));
+            Assert.Equal(saved.ImagePath, preview.ImagePath);
             Assert.StartsWith("data:image/png;base64,", preview.DataUrl, StringComparison.Ordinal);
 
             string outsidePath = Path.Combine(harness.DataRoot, "outside-mark.png");

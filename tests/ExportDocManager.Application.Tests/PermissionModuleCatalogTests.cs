@@ -104,5 +104,43 @@ namespace ExportDocManager.Application.Tests
             Assert.Contains(PermissionModuleCatalog.DocumentHsKnowledge, document.ModuleKeys);
             Assert.Contains(PermissionModuleCatalog.DocumentMasterData, document.ModuleKeys);
         }
+
+        [Fact]
+        public void DocumentTemplate_ShouldExposeDeclarationDictionaryAsAnIndependentModule()
+        {
+            var document = BuiltInPermissionTemplateCatalog.FindForRole(BuiltInPermissionTemplateCatalog.Document);
+            var grants = document.GetModuleAccess();
+
+            Assert.Contains(PermissionModuleCatalog.DocumentDeclarationDictionary, document.ModuleKeys);
+            Assert.Equal(PermissionAccessLevel.Operate, grants[PermissionModuleCatalog.DocumentDeclarationDictionary]);
+            Assert.NotEqual(PermissionModuleCatalog.DocumentSingleWindow, PermissionModuleCatalog.DocumentDeclarationDictionary);
+        }
+
+        [Fact]
+        public void DisasterRecovery_ShouldRemainTechnicalAndAdminManaged()
+        {
+            var module = PermissionModuleCatalog.ByKey[PermissionModuleCatalog.SystemDisasterRecovery];
+            var admin = BuiltInPermissionTemplateCatalog.FindForRole(BuiltInPermissionTemplateCatalog.Admin);
+            var grants = admin.GetModuleAccess();
+
+            Assert.True(module.IsTechnical);
+            Assert.Equal("系统", module.Group);
+            Assert.Equal(PermissionAccessLevel.Manage, grants[PermissionModuleCatalog.SystemDisasterRecovery]);
+            Assert.Contains(PermissionModuleCatalog.SystemDisasterRecovery, admin.ModuleKeys);
+        }
+
+        [Fact]
+        public void ModuleCatalog_ShouldKeepUniqueKeysAndStableSortOrder()
+        {
+            Assert.Equal(
+                PermissionModuleCatalog.Modules.Count,
+                PermissionModuleCatalog.Modules
+                    .Select(module => module.Key)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count());
+            Assert.Equal(
+                PermissionModuleCatalog.Modules.Select(module => module.SortOrder).Order().ToArray(),
+                PermissionModuleCatalog.Modules.Select(module => module.SortOrder).ToArray());
+        }
     }
 }

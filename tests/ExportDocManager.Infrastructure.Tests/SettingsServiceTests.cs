@@ -10,7 +10,7 @@ namespace ExportDocManager.Infrastructure.Tests;
 public sealed class SettingsServiceTests
 {
     [Fact]
-    public async Task LoadAsync_ShouldAcceptPlaintextSecretsWithoutCreatingCiphertextAssumptions()
+    public async Task LoadAsync_ShouldRejectPlaintextPostgreSqlPasswordWithoutCreatingKeyFile()
     {
         await WithLocalKeyFileModeAsync(async () =>
         {
@@ -23,12 +23,10 @@ public sealed class SettingsServiceTests
                 await File.WriteAllTextAsync(settingsPath, JsonSerializer.Serialize(source));
 
                 var service = new SettingsService(paths);
-                await service.LoadAsync();
+                var error = await Assert.ThrowsAsync<InvalidDataException>(() => service.LoadAsync());
 
-                Assert.Equal("email-plain", service.Settings.Email.Password);
-                Assert.Equal("webdav-plain", service.Settings.WebDav.Password);
-                Assert.Equal("postgres-plain", service.Settings.System.PostgreSqlPassword);
-                Assert.Equal("ai-plain", service.Settings.AI.ApiKey);
+                Assert.Contains("不能以明文", error.Message, StringComparison.Ordinal);
+                Assert.Contains(DbHelper.PostgreSqlPasswordEnvironmentVariable, error.Message, StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(paths.SecurityRoot, LocalSecretProtector.MasterKeyFileName)));
             }
             finally

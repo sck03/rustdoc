@@ -1,4 +1,4 @@
-import { FolderOpen, Upload } from "lucide-react";
+import { FolderOpen, Trash2, Upload } from "lucide-react";
 import { useRef } from "react";
 import {
   isDesktopBridgeAvailable,
@@ -12,7 +12,7 @@ export type ExporterSealType = "document" | "customs";
 export function ExporterSealField({
   label,
   value,
-  inputDisabled,
+  inputReadOnly,
   actionDisabled,
   actionTitle,
   onPathChange,
@@ -21,7 +21,7 @@ export function ExporterSealField({
 }: {
   label: string;
   value: string;
-  inputDisabled?: boolean;
+  inputReadOnly?: boolean;
   actionDisabled?: boolean;
   actionTitle?: string;
   onPathChange?: (value: string) => void;
@@ -55,21 +55,35 @@ export function ExporterSealField({
   return (
     <>
       <PathField
-        disabled={inputDisabled}
+        readOnly={inputReadOnly}
         label={label}
         value={value}
         onChange={onPathChange ?? (() => undefined)}
         actions={
-          <button
-            className="icon-button compact-icon-button"
-            type="button"
-            title={title}
-            aria-label={title}
-            disabled={actionDisabled}
-            onClick={() => void chooseSealImage()}
-          >
-            {desktopAvailable ? <FolderOpen size={15} aria-hidden="true" /> : <Upload size={15} aria-hidden="true" />}
-          </button>
+          <>
+            <button
+              className="icon-button compact-icon-button"
+              type="button"
+              title={title}
+              aria-label={title}
+              disabled={actionDisabled}
+              onClick={() => void chooseSealImage()}
+            >
+              {desktopAvailable ? <FolderOpen size={15} aria-hidden="true" /> : <Upload size={15} aria-hidden="true" />}
+            </button>
+            {onPathChange ? (
+              <button
+                className="icon-button compact-icon-button"
+                type="button"
+                title={`清除${sealLabel}`}
+                aria-label={`清除${sealLabel}`}
+                disabled={actionDisabled || !value}
+                onClick={() => onPathChange("")}
+              >
+                <Trash2 size={15} aria-hidden="true" />
+              </button>
+            ) : null}
+          </>
         }
       />
       <input

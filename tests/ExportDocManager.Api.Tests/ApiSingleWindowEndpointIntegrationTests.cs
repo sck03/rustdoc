@@ -97,7 +97,7 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
-        public async Task SingleWindowReferenceCatalogEndpoints_ShouldSaveOverrideUnderRuntimeDataRootForAdminsOnly()
+        public async Task SingleWindowReferenceCatalogEndpoints_ShouldAllowOperateAndKeepResetAdminOnly()
         {
             await using var harness = await ApiIntegrationTestHarness.StartAsync(
                 "edm-api-single-window-reference-catalog",
@@ -130,7 +130,7 @@ namespace ExportDocManager.Api.Tests
             var operatorSaveResponse = await operatorClient.PutAsJsonAsync(
                 "/api/single-window/reference-catalog",
                 new ApiSingleWindowReferenceCatalogSaveRequest(catalog));
-            Assert.Equal(HttpStatusCode.Forbidden, operatorSaveResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, operatorSaveResponse.StatusCode);
 
             var invalidDuplicateCatalog = WithCountries(
                 BuildMinimalReferenceCatalog(catalogPayload.Catalog),
@@ -217,7 +217,7 @@ namespace ExportDocManager.Api.Tests
             var operatorImportResponse = await operatorClient.PostAsync(
                 "/api/single-window/reference-catalog/import-json",
                 new StringContent(json, Encoding.UTF8, "application/json"));
-            Assert.Equal(HttpStatusCode.Forbidden, operatorImportResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, operatorImportResponse.StatusCode);
 
             var importResponse = await adminClient.PostAsync(
                 "/api/single-window/reference-catalog/import-json",

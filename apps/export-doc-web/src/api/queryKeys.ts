@@ -54,6 +54,7 @@ export const queryKeys = {
   cloudBackupBackups: () => ["backups", "cloud", "backups"] as const,
   disasterRecoveryStatus: () => ["backups", "disaster-recovery", "status"] as const,
   postgreSqlMaintenanceBackups: () => ["postgresql-maintenance", "backups"] as const,
+  serverMigrationStatus: () => ["server-migration", "status"] as const,
   sharedDatabaseOwnership: () => ["shared-database", "ownership"] as const,
   masterDataList: (entityKey: string, pageNumber: number, pageSize: number, keyword: string) =>
     ["master-data", entityKey, "list", { pageNumber, pageSize, keyword }] as const,

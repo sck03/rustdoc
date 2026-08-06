@@ -354,7 +354,7 @@ if [[ ! -f "$SETTINGS_FILE" ]]; then
     "PostgreSqlPort": 5432,
     "PostgreSqlDatabase": "$POSTGRES_DATABASE",
     "PostgreSqlUsername": "$POSTGRES_USERNAME",
-    "PostgreSqlPassword": "$POSTGRES_PASSWORD",
+    "PostgreSqlPassword": "",
     "PostgreSqlAdditionalOptions": "Pooling=true;Maximum Pool Size=100;Timeout=15;Command Timeout=60"
   }
 }

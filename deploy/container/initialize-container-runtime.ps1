@@ -395,7 +395,7 @@ $settings = [ordered]@{
         PostgreSqlPort = 5432
         PostgreSqlDatabase = $PostgreSqlDatabase
         PostgreSqlUsername = $PostgreSqlUsername
-        PostgreSqlPassword = $PostgreSqlPassword
+        PostgreSqlPassword = ""
         PostgreSqlAdditionalOptions = "Pooling=true;Maximum Pool Size=100;Timeout=15;Command Timeout=60"
     }
 }

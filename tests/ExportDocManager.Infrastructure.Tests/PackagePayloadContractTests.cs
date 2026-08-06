@@ -167,6 +167,27 @@ public sealed class PackagePayloadContractTests
     }
 
     [Fact]
+    public void ContainerNginxConfigs_ShouldStreamLargeMigrationUploadsAndJobDownloads()
+    {
+        string root = FindWorkspaceRoot();
+        foreach (string fileName in new[] { "nginx.conf", "nginx.https.conf", "nginx.acme.conf" })
+        {
+            string config = File.ReadAllText(Path.Combine(root, "deploy", "container", fileName));
+            Assert.Contains(
+                "server-migration/restore|postgresql-maintenance/backups/upload-restore",
+                config,
+                StringComparison.Ordinal);
+            Assert.Contains("client_max_body_size 4224m", config, StringComparison.Ordinal);
+            Assert.Contains("proxy_request_buffering off", config, StringComparison.Ordinal);
+            Assert.Contains("proxy_read_timeout 3600s", config, StringComparison.Ordinal);
+            Assert.Contains("proxy_send_timeout 3600s", config, StringComparison.Ordinal);
+            Assert.Contains("location /downloads/jobs/", config, StringComparison.Ordinal);
+            Assert.Contains("proxy_buffering off", config, StringComparison.Ordinal);
+            Assert.Contains("client_max_body_size 128m", config, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void ContainerApi_ShouldExplicitlyDisableChromiumSandboxForItsRootRuntime()
     {
         string root = FindWorkspaceRoot();

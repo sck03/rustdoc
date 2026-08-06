@@ -271,6 +271,8 @@ namespace ExportDocManager.Api.Hosting
                 return PermissionModuleCatalog.DocumentMasterData;
             if (path.StartsWithSegments("/api/custom-options", StringComparison.OrdinalIgnoreCase))
                 return PermissionModuleCatalog.DocumentCustomOptions;
+            if (path.StartsWithSegments("/api/single-window/reference-catalog", StringComparison.OrdinalIgnoreCase))
+                return PermissionModuleCatalog.DocumentDeclarationDictionary;
             if (path.StartsWithSegments("/api/single-window", StringComparison.OrdinalIgnoreCase))
                 return PermissionModuleCatalog.DocumentSingleWindow;
             if (path.StartsWithSegments("/api/reports/payments", StringComparison.OrdinalIgnoreCase))

@@ -35,7 +35,6 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPut("/api/single-window/reference-catalog", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
-                ApiAuthorizationService authorizationService,
                 ISingleWindowReferenceCatalogService referenceCatalogService,
                 ApiSingleWindowReferenceCatalogSaveRequest request,
                 CancellationToken cancellationToken) =>
@@ -44,11 +43,6 @@ namespace ExportDocManager.Api.Hosting
                 if (user == null)
                 {
                     return Results.Unauthorized();
-                }
-
-                if (!authorizationService.CanManageSettings(user))
-                {
-                    return WriteForbidden("只有管理员可以保存单一窗口参考词典。");
                 }
 
                 if (request?.Catalog == null)
@@ -81,7 +75,6 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/single-window/reference-catalog/import-json", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
-                ApiAuthorizationService authorizationService,
                 ISingleWindowReferenceCatalogService referenceCatalogService,
                 CancellationToken cancellationToken) =>
             {
@@ -89,11 +82,6 @@ namespace ExportDocManager.Api.Hosting
                 if (user == null)
                 {
                     return Results.Unauthorized();
-                }
-
-                if (!authorizationService.CanManageSettings(user))
-                {
-                    return WriteForbidden("只有管理员可以导入单一窗口参考词典。");
                 }
 
                 try
@@ -134,7 +122,6 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/single-window/reference-catalog/excel/preview", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
-                ApiAuthorizationService authorizationService,
                 ISingleWindowReferenceCatalogExcelImportService excelImportService,
                 CancellationToken cancellationToken) =>
             {
@@ -142,11 +129,6 @@ namespace ExportDocManager.Api.Hosting
                 if (user == null)
                 {
                     return Results.Unauthorized();
-                }
-
-                if (!authorizationService.CanManageSettings(user))
-                {
-                    return WriteForbidden("只有管理员可以导入单一窗口参考词典 Excel。");
                 }
 
                 string fileName = context.Request.Query["fileName"].ToString();
@@ -204,7 +186,6 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapDelete("/api/single-window/reference-catalog", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
-                ApiAuthorizationService authorizationService,
                 ISingleWindowReferenceCatalogService referenceCatalogService,
                 CancellationToken cancellationToken) =>
             {
@@ -212,11 +193,6 @@ namespace ExportDocManager.Api.Hosting
                 if (user == null)
                 {
                     return Results.Unauthorized();
-                }
-
-                if (!authorizationService.CanManageSettings(user))
-                {
-                    return WriteForbidden("只有管理员可以恢复单一窗口参考词典。");
                 }
 
                 try

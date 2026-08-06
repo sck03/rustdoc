@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, Archive, Database, FileWarning, LifeBuoy, RefreshCw, RotateCcw, ShieldCheck, Users } from "lucide-react";
+import { Activity, Archive, Database, Download, FileWarning, LifeBuoy, RefreshCw, RotateCcw, ShieldCheck, Upload, Users } from "lucide-react";
 import type { ApiHealthResponse, ApiInvoiceDataMaintenancePreviewResponse, ApiSupportPackageResponse } from "../../api/index.ts";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
+import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { SelectField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { formatBytes, formatRuntimeDate } from "./settingsFormatters.ts";
@@ -137,6 +138,29 @@ export default function MaintenanceSettingsPanels({
       </div>
     </div>
   );
+}
+
+function isStrongMigrationPassword(value: string) {
+  return value.length >= 12 &&
+    value.length <= 128 &&
+    /[A-Z]/.test(value) &&
+    /[a-z]/.test(value) &&
+    /\d/.test(value) &&
+    /[^A-Za-z0-9]/.test(value);
+}
+
+function formatRestorePhase(value: string) {
+  const labels: Record<string, string> = {
+    pending: "等待服务重启",
+    validating: "验证迁移包",
+    "safety-backup": "创建安全备份",
+    "applying-database": "恢复数据库",
+    "applying-files": "替换运行文件",
+    "rolling-back": "自动回滚",
+    completed: "已完成",
+    failed: "失败",
+  };
+  return labels[value.trim().toLowerCase()] ?? value;
 }
 
 function DataOwnershipUnavailablePanel() {
@@ -383,10 +407,28 @@ function PostgreSqlMaintenancePanel({
   const [applicationRole, setApplicationRole] = useState("");
   const [oldOwnerRoles, setOldOwnerRoles] = useState("");
   const [lastRestorePlanPath, setLastRestorePlanPath] = useState("");
+  const [databaseAdminPassword, setDatabaseAdminPassword] = useState("");
+  const [migrationPassword, setMigrationPassword] = useState("");
+  const [migrationPasswordConfirmation, setMigrationPasswordConfirmation] = useState("");
+  const [migrationAdminPassword, setMigrationAdminPassword] = useState("");
+  const [migrationCreateConfirmation, setMigrationCreateConfirmation] = useState("");
+  const [migrationRestoreFile, setMigrationRestoreFile] = useState<File | null>(null);
+  const [migrationRestorePassword, setMigrationRestorePassword] = useState("");
+  const [migrationRestoreConfirmation, setMigrationRestoreConfirmation] = useState("");
+  const migrationRestoreInputRef = useRef<HTMLInputElement | null>(null);
+  const [databaseRestoreConfirmation, setDatabaseRestoreConfirmation] = useState("");
+  const [databaseUploadFile, setDatabaseUploadFile] = useState<File | null>(null);
+  const databaseUploadInputRef = useRef<HTMLInputElement | null>(null);
 
   const postgreSqlQuery = useQuery({
     queryKey: queryKeys.postgreSqlMaintenanceBackups(),
     queryFn: () => client.listPostgreSqlPhysicalBackups(),
+    enabled: canManageSettings,
+  });
+
+  const migrationStatusQuery = useQuery({
+    queryKey: queryKeys.serverMigrationStatus(),
+    queryFn: () => client.getServerMigrationStatus(),
     enabled: canManageSettings,
   });
 
@@ -449,9 +491,144 @@ function PostgreSqlMaintenancePanel({
     },
   });
 
+  const downloadMigrationMutation = useMutation({
+    mutationFn: async () => {
+      const job = await client.createServerMigrationPackage({
+        body: {
+          password: migrationPassword,
+          adminPassword: migrationAdminPassword,
+          confirmationText: migrationCreateConfirmation.trim(),
+        },
+      });
+      return downloadJobResultWhenReady(
+        client,
+        job,
+        `export-doc-manager-server-migration-${new Date().toISOString().slice(0, 10)}.edmmigration`,
+        60 * 60 * 1000,
+      );
+    },
+    onSuccess: () => {
+      setMigrationPassword("");
+      setMigrationPasswordConfirmation("");
+      setMigrationAdminPassword("");
+      setMigrationCreateConfirmation("");
+      setMessage(null);
+      setSuccessMessage("完整服务器迁移包已交给浏览器下载，请将密码单独保管。");
+    },
+    onError: (error) => {
+      setMigrationAdminPassword("");
+      setMessage(readApiError(error));
+      setSuccessMessage(null);
+    },
+  });
+
+  const restoreMigrationMutation = useMutation({
+    mutationFn: async () => {
+      const authorization = await client.authorizeServerMigrationOperation({
+        body: {
+          action: "restore-server",
+          adminPassword: migrationAdminPassword,
+        },
+      });
+      return client.stageServerMigrationRestore(
+        { body: migrationRestoreFile as File },
+        {
+          headers: {
+            "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket,
+            "X-ExportDocManager-Migration-Password": migrationRestorePassword,
+            "X-ExportDocManager-Migration-File-Name": migrationRestoreFile?.name ?? "migration.edmmigration",
+            "X-ExportDocManager-Restore-Confirmation": migrationRestoreConfirmation.trim(),
+          },
+        },
+      );
+    },
+    onSuccess: async (response) => {
+      setMigrationAdminPassword("");
+      setMigrationRestorePassword("");
+      setMigrationRestoreConfirmation("");
+      setMigrationRestoreFile(null);
+      setMessage(null);
+      setSuccessMessage(response.message || "服务器迁移已排队，请重启服务完成恢复。");
+      await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() });
+    },
+    onError: (error) => {
+      setMigrationAdminPassword("");
+      setMessage(readApiError(error));
+      setSuccessMessage(null);
+    },
+  });
+
+  const databaseRestoreMutation = useMutation({
+    mutationFn: () => client.restorePostgreSqlPhysicalBackup({
+      body: {
+        backupFileName: selectedBackup,
+        adminPassword: databaseAdminPassword,
+        confirmationText: databaseRestoreConfirmation.trim(),
+      },
+    }),
+    onSuccess: async (response) => {
+      setDatabaseAdminPassword("");
+      setDatabaseRestoreConfirmation("");
+      setMessage(null);
+      setSuccessMessage(response.message || "PostgreSQL 数据库恢复已排队，请重启服务完成恢复。");
+      await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() });
+    },
+    onError: (error) => {
+      setDatabaseAdminPassword("");
+      setMessage(readApiError(error));
+      setSuccessMessage(null);
+    },
+  });
+
+  const downloadDatabaseMutation = useMutation({
+    mutationFn: () => client.downloadPostgreSqlPhysicalBackup({ fileName: selectedBackup }),
+    onSuccess: (blob) => {
+      downloadBlob(blob, selectedBackup || "exportdoc-postgresql.dump");
+      setMessage(null);
+      setSuccessMessage("PostgreSQL 备份已交给浏览器下载。");
+    },
+    onError: (error) => { setMessage(readApiError(error)); setSuccessMessage(null); },
+  });
+
+  const uploadDatabaseRestoreMutation = useMutation({
+    mutationFn: async () => {
+      const authorization = await client.authorizeServerMigrationOperation({
+        body: {
+          action: "restore-database",
+          adminPassword: databaseAdminPassword,
+        },
+      });
+      return client.uploadAndRestorePostgreSqlPhysicalBackup(
+        { body: databaseUploadFile as File },
+        {
+          headers: {
+            "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket,
+            "X-ExportDocManager-PostgreSql-Backup-File-Name": databaseUploadFile?.name ?? "database.dump",
+            "X-ExportDocManager-Restore-Confirmation": databaseRestoreConfirmation.trim(),
+          },
+        },
+      );
+    },
+    onSuccess: async (response) => {
+      setDatabaseAdminPassword("");
+      setDatabaseUploadFile(null);
+      setDatabaseRestoreConfirmation("");
+      setMessage(null);
+      setSuccessMessage(response.message || "上传的 PostgreSQL 数据库恢复已排队，请重启服务完成恢复。");
+      await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() });
+    },
+    onError: (error) => {
+      setDatabaseAdminPassword("");
+      setMessage(readApiError(error));
+      setSuccessMessage(null);
+    },
+  });
+
   const status = postgreSqlQuery.data?.status;
   const backups = postgreSqlQuery.data?.backups ?? [];
-  const isBusy = postgreSqlQuery.isFetching || createMutation.isPending || restorePlanMutation.isPending;
+  const isBusy = postgreSqlQuery.isFetching || migrationStatusQuery.isFetching || createMutation.isPending || restorePlanMutation.isPending ||
+    downloadMigrationMutation.isPending || restoreMigrationMutation.isPending || databaseRestoreMutation.isPending ||
+    downloadDatabaseMutation.isPending || uploadDatabaseRestoreMutation.isPending;
   const canCreate = canManageSettings && Boolean(status?.postgreSqlConfigured) && Boolean(status?.toolsReady) && !isBusy;
   const canCreatePlan =
     canManageSettings &&
@@ -459,6 +636,16 @@ function PostgreSqlMaintenancePanel({
     Boolean(targetDatabase.trim()) &&
     Boolean(applicationRole.trim()) &&
     !isBusy;
+  const migrationStatus = migrationStatusQuery.data;
+  const canCreateMigration = canManageSettings && Boolean(migrationStatus?.supported) && Boolean(migrationStatus?.toolsReady) &&
+    Boolean(migrationAdminPassword) && migrationCreateConfirmation.trim() === "MIGRATE" &&
+    isStrongMigrationPassword(migrationPassword) && migrationPassword === migrationPasswordConfirmation && !isBusy;
+  const canRestoreMigration = canManageSettings && Boolean(migrationRestoreFile) && isStrongMigrationPassword(migrationRestorePassword) &&
+    Boolean(migrationAdminPassword) && migrationRestoreConfirmation.trim() === "MIGRATE" && !isBusy;
+  const canRestoreDatabase = canManageSettings && Boolean(selectedBackup) && Boolean(databaseAdminPassword) &&
+    databaseRestoreConfirmation.trim() === "RESTORE DATABASE" && !isBusy;
+  const canUploadDatabase = canManageSettings && Boolean(databaseUploadFile) && Boolean(databaseAdminPassword) &&
+    databaseRestoreConfirmation.trim() === "RESTORE DATABASE" && !isBusy;
 
   return (
     <section className="form-section backup-management-section" aria-label="PostgreSQL 团队库维护">
@@ -570,6 +757,146 @@ function PostgreSqlMaintenancePanel({
           <span>生成还原脚本</span>
         </button>
       </div>
+      <section className="backup-recovery-card" aria-label="网页端 PostgreSQL 备份恢复">
+        <div className="section-header">
+          <div>
+            <h3>网页端备份与恢复</h3>
+            <p className="section-description">备份文件保存在运行目录，可直接下载；恢复会先保留安全备份，再在服务启动前恢复数据库。</p>
+          </div>
+          <Database size={22} aria-hidden="true" />
+        </div>
+        <div className="backup-action-grid">
+          <label>
+            <span>管理员当前密码</span>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={databaseAdminPassword}
+              disabled={!canManageSettings || isBusy}
+              onChange={(event) => setDatabaseAdminPassword(event.target.value)}
+            />
+            <small>恢复前必须重新验证当前登录管理员身份。</small>
+          </label>
+          <button
+            className="command-button secondary"
+            type="button"
+            disabled={!canManageSettings || !selectedBackup || isBusy}
+            onClick={() => downloadDatabaseMutation.mutate()}
+          >
+            <Download size={17} aria-hidden="true" />
+            <span>下载所选备份</span>
+          </button>
+          <label>
+            <span>恢复确认文本</span>
+            <input
+              value={databaseRestoreConfirmation}
+              disabled={!canManageSettings || isBusy}
+              placeholder="RESTORE DATABASE"
+              onChange={(event) => setDatabaseRestoreConfirmation(event.target.value)}
+            />
+          </label>
+          <button
+            className="command-button danger-command"
+            type="button"
+            disabled={!canRestoreDatabase}
+            onClick={() => databaseRestoreMutation.mutate()}
+          >
+            <RotateCcw size={17} aria-hidden="true" />
+            <span>恢复所选备份</span>
+          </button>
+          <label>
+            <span>上传 .dump 恢复</span>
+            <input
+              ref={databaseUploadInputRef}
+              hidden
+              type="file"
+              accept=".dump"
+              onChange={(event) => {
+                setDatabaseUploadFile(event.currentTarget.files?.[0] ?? null);
+                event.currentTarget.value = "";
+              }}
+            />
+            <button className="command-button secondary" type="button" disabled={!canManageSettings || isBusy} onClick={() => databaseUploadInputRef.current?.click()}>
+              <Upload size={17} aria-hidden="true" />
+              <span>{databaseUploadFile?.name || "选择 .dump 文件"}</span>
+            </button>
+          </label>
+          <button
+            className="command-button danger-command"
+            type="button"
+            disabled={!canUploadDatabase}
+            onClick={() => uploadDatabaseRestoreMutation.mutate()}
+          >
+            <RotateCcw size={17} aria-hidden="true" />
+            <span>恢复上传文件</span>
+          </button>
+        </div>
+      </section>
+      <section className="backup-recovery-card" aria-label="完整服务器迁移">
+        <div className="section-header">
+          <div>
+            <h3>完整服务器迁移</h3>
+            <p className="section-description">包含数据库、印章、唛头图片、用户模板、配置、主密钥和单一窗口运行数据；不包含日志、缓存、许可证或 TLS/Certbot 证书。</p>
+          </div>
+          <ShieldCheck size={22} aria-hidden="true" />
+        </div>
+        {migrationStatus ? <InlineNotice tone={migrationStatus.pendingRestore ? "warning" : migrationStatus.supported && migrationStatus.toolsReady ? "info" : "warning"}>
+          {migrationStatus.message}
+          {migrationStatus.restorePhase ? ` 当前阶段：${formatRestorePhase(migrationStatus.restorePhase)}。` : ""}
+          {migrationStatus.restoreDetail ? ` ${migrationStatus.restoreDetail}` : ""}
+          {migrationStatus.restoreUpdatedAtUtc ? ` 更新时间：${formatRuntimeDate(migrationStatus.restoreUpdatedAtUtc)}。` : ""}
+        </InlineNotice> : null}
+        <div className="backup-action-grid">
+          <label>
+            <span>管理员当前密码</span>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={migrationAdminPassword}
+              disabled={!canManageSettings || isBusy}
+              onChange={(event) => setMigrationAdminPassword(event.target.value)}
+            />
+            <small>创建或恢复完整迁移包前都需要重新认证。</small>
+          </label>
+          <label>
+            <span>新迁移包密码</span>
+            <input type="password" autoComplete="new-password" value={migrationPassword} disabled={!canManageSettings || isBusy} placeholder="至少12位，含大小写、数字和符号" onChange={(event) => setMigrationPassword(event.target.value)} />
+          </label>
+          <label>
+            <span>再次输入密码</span>
+            <input type="password" autoComplete="new-password" value={migrationPasswordConfirmation} disabled={!canManageSettings || isBusy} onChange={(event) => setMigrationPasswordConfirmation(event.target.value)} />
+          </label>
+          <label>
+            <span>创建确认文本</span>
+            <input value={migrationCreateConfirmation} disabled={!canManageSettings || isBusy} placeholder="MIGRATE" onChange={(event) => setMigrationCreateConfirmation(event.target.value)} />
+          </label>
+          <button className="command-button" type="button" disabled={!canCreateMigration} onClick={() => downloadMigrationMutation.mutate()}>
+            <Download size={17} aria-hidden="true" />
+            <span>{downloadMigrationMutation.isPending ? "正在创建迁移包" : "创建并下载迁移包"}</span>
+          </button>
+          <label>
+            <span>待恢复迁移包</span>
+            <input ref={migrationRestoreInputRef} hidden type="file" accept=".edmmigration" onChange={(event) => { setMigrationRestoreFile(event.currentTarget.files?.[0] ?? null); event.currentTarget.value = ""; }} />
+            <button className="command-button secondary" type="button" disabled={!canManageSettings || isBusy} onClick={() => migrationRestoreInputRef.current?.click()}>
+              <Upload size={17} aria-hidden="true" />
+              <span>{migrationRestoreFile?.name || "选择 .edmmigration 文件"}</span>
+            </button>
+          </label>
+          <label>
+            <span>迁移包密码</span>
+            <input type="password" autoComplete="current-password" value={migrationRestorePassword} disabled={!canManageSettings || isBusy || !migrationRestoreFile} onChange={(event) => setMigrationRestorePassword(event.target.value)} />
+          </label>
+          <label>
+            <span>恢复确认文本</span>
+            <input value={migrationRestoreConfirmation} disabled={!canManageSettings || isBusy || !migrationRestoreFile} placeholder="MIGRATE" onChange={(event) => setMigrationRestoreConfirmation(event.target.value)} />
+          </label>
+          <button className="command-button danger-command" type="button" disabled={!canRestoreMigration} onClick={() => restoreMigrationMutation.mutate()}>
+            <RotateCcw size={17} aria-hidden="true" />
+            <span>安排完整迁移</span>
+          </button>
+        </div>
+        <p className="settings-helper-text">{migrationStatus?.storagePolicy}</p>
+      </section>
       <details className="maintenance-advanced-details">
         <summary>高级还原选项</summary>
         <label className="textarea-field settings-textarea-field">

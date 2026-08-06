@@ -409,7 +409,7 @@ export function InvoicePartiesPanel({
         <ExporterSealField
           label="单证章路径"
           value={selectedExporter?.docSealPath ?? ""}
-          inputDisabled
+          inputReadOnly
           actionDisabled={sealActionDisabled}
           actionTitle={sealActionTitle}
           onUploadFile={(file) => onSealUpload("document", file)}
@@ -418,7 +418,7 @@ export function InvoicePartiesPanel({
         <ExporterSealField
           label="报关章路径"
           value={selectedExporter?.customsSealPath ?? ""}
-          inputDisabled
+          inputReadOnly
           actionDisabled={sealActionDisabled}
           actionTitle={sealActionTitle}
           onUploadFile={(file) => onSealUpload("customs", file)}

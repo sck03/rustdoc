@@ -761,6 +761,136 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
+                    ["/api/postgresql-maintenance/backups/download"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Download a managed PostgreSQL physical backup",
+                            operationId = "downloadPostgreSqlPhysicalBackup",
+                            parameters = new object[] { QueryParameter("fileName", "string", null, "Managed .dump backup file name.", required: true) },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "PostgreSQL custom-format dump attachment.", content = BinaryContent() },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Administrator settings permission is required." },
+                                ["404"] = new { description = "The selected backup does not exist." }
+                            }
+                        }
+                    },
+                    ["/api/postgresql-maintenance/backups/restore"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Stage restore of a managed PostgreSQL physical backup",
+                            operationId = "restorePostgreSqlPhysicalBackup",
+                            requestBody = new { required = true, content = JsonContent("ApiPostgreSqlDatabaseRestoreRequest") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Database restore staged for the next service start.", content = JsonContent("ApiServerMigrationRestoreResponse") },
+                                ["400"] = new { description = "Explicit RESTORE DATABASE confirmation is required." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Administrator settings permission is required." },
+                                ["404"] = new { description = "The selected backup does not exist." },
+                                ["409"] = new { description = "The database restore could not be staged." }
+                            }
+                        }
+                    },
+                    ["/api/postgresql-maintenance/backups/upload-restore"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Upload and stage restore of a PostgreSQL physical backup",
+                            operationId = "uploadAndRestorePostgreSqlPhysicalBackup",
+                            parameters = new object[]
+                            {
+                                new { name = ApiEndpointRouteBuilderExtensions.PostgreSqlBackupFileNameHeader, @in = "header", required = true, schema = new { type = "string" } },
+                                new { name = ApiEndpointRouteBuilderExtensions.RestoreConfirmationHeader, @in = "header", required = true, schema = new { type = "string" } },
+                                new { name = ApiEndpointRouteBuilderExtensions.SensitiveOperationTicketHeader, @in = "header", required = true, schema = new { type = "string" } }
+                            },
+                            requestBody = new { required = true, content = BinaryContent() },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Uploaded database restore staged for the next service start.", content = JsonContent("ApiServerMigrationRestoreResponse") },
+                                ["400"] = new { description = "Explicit RESTORE DATABASE confirmation is required." },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Administrator settings permission is required." },
+                                ["409"] = new { description = "The uploaded dump is invalid or restore could not be staged." },
+                                ["413"] = new { description = "The database backup exceeds the upload limit." }
+                            }
+                        }
+                    },
+                    ["/api/server-migration/status"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Get encrypted server migration status",
+                            operationId = "getServerMigrationStatus",
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "PostgreSQL tools and restore state.", content = JsonContent("ApiServerMigrationStatusResponse") },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Administrator settings permission is required." }
+                            }
+                        }
+                    },
+                    ["/api/server-migration/authorization"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Re-authenticate and issue a one-time restore upload ticket",
+                            operationId = "authorizeServerMigrationOperation",
+                            requestBody = new { required = true, content = JsonContent("ApiSensitiveOperationAuthorizationRequest") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Five-minute one-time upload ticket.", content = JsonContent("ApiSensitiveOperationAuthorizationResponse") },
+                                ["400"] = new { description = "Unknown sensitive operation." },
+                                ["401"] = new { description = "Missing session or invalid current password." },
+                                ["403"] = new { description = "Disaster recovery management permission is required." },
+                                ["429"] = new { description = "Re-authentication attempts are temporarily rate limited." }
+                            }
+                        }
+                    },
+                    ["/api/server-migration/packages"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Start an encrypted server migration package background job",
+                            operationId = "createServerMigrationPackage",
+                            requestBody = new { required = true, content = JsonContent("ApiServerMigrationCreateRequest") },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["202"] = new { description = "Migration package job accepted.", content = JsonContent("BackgroundJobSnapshot") },
+                                ["400"] = new { description = "Explicit MIGRATE confirmation is required." },
+                                ["401"] = new { description = "Missing session or invalid current password." },
+                                ["403"] = new { description = "Disaster recovery management permission is required." },
+                                ["429"] = new { description = "Re-authentication attempts are temporarily rate limited." }
+                            }
+                        }
+                    },
+                    ["/api/server-migration/restore"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Upload and stage an encrypted server migration restore",
+                            operationId = "stageServerMigrationRestore",
+                            parameters = new object[]
+                            {
+                                new { name = ApiEndpointRouteBuilderExtensions.ServerMigrationFileNameHeader, @in = "header", required = true, schema = new { type = "string" } },
+                                new { name = ApiEndpointRouteBuilderExtensions.ServerMigrationPasswordHeader, @in = "header", required = true, schema = new { type = "string", format = "password" } },
+                                new { name = ApiEndpointRouteBuilderExtensions.RestoreConfirmationHeader, @in = "header", required = true, schema = new { type = "string" } },
+                                new { name = ApiEndpointRouteBuilderExtensions.SensitiveOperationTicketHeader, @in = "header", required = true, schema = new { type = "string" } }
+                            },
+                            requestBody = new { required = true, content = BinaryContent() },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Migration restore was staged for the next service start.", content = JsonContent("ApiServerMigrationRestoreResponse") },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["403"] = new { description = "Administrator settings permission is required." },
+                                ["409"] = new { description = "The package, password, or current deployment state is invalid." },
+                                ["413"] = new { description = "The migration package exceeds the upload limit." }
+                            }
+                        }
+                    },
                     ["/api/shared-database/ownership"] = new
                     {
                         get = new
@@ -1102,6 +1232,24 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Invalid job id." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "The job result is unavailable or is not a controlled browser download." }
+                            }
+                        }
+                    },
+                    ["/api/jobs/{jobId}/download-ticket"] = new
+                    {
+                        post = new
+                        {
+                            summary = "Create a short-lived native download URL for a completed job",
+                            operationId = "createJobDownloadTicket",
+                            parameters = new object[]
+                            {
+                                PathParameter("jobId", "string", null, "Background job id.")
+                            },
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new { description = "Short-lived download URL.", content = JsonContent("ApiJobDownloadTicket") },
+                                ["401"] = new { description = "Missing or invalid bearer token." },
+                                ["404"] = new { description = "The job result is unavailable or unauthorized." }
                             }
                         }
                     },

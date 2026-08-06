@@ -570,6 +570,82 @@ namespace ExportDocManager.Api.Hosting
                                 ["storagePolicy"] = StringProperty("Path and review policy for PostgreSQL restore plans.")
                             }
                         },
+                        ["ApiPostgreSqlDatabaseRestoreRequest"] = new
+                        {
+                            type = "object",
+                            required = new[] { "backupFileName", "adminPassword", "confirmationText" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["backupFileName"] = StringProperty("Managed PostgreSQL .dump backup file name."),
+                                ["adminPassword"] = new { type = "string", format = "password" },
+                                ["confirmationText"] = StringProperty("Must equal RESTORE DATABASE.")
+                            }
+                        },
+                        ["ApiServerMigrationStatusResponse"] = new
+                        {
+                            type = "object",
+                            required = new[] { "supported", "postgreSqlConfigured", "toolsReady", "pendingRestore", "packageRoot", "message", "storagePolicy", "restorePhase", "restoreDetail" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["supported"] = new { type = "boolean" },
+                                ["postgreSqlConfigured"] = new { type = "boolean" },
+                                ["toolsReady"] = new { type = "boolean" },
+                                ["pendingRestore"] = new { type = "boolean" },
+                                ["packageRoot"] = StringProperty("Runtime data root for encrypted server migration packages."),
+                                ["message"] = StringProperty("Current migration readiness message."),
+                                ["storagePolicy"] = StringProperty("Encrypted server migration package boundary."),
+                                ["restorePhase"] = StringProperty("Last restore phase."),
+                                ["restoreDetail"] = StringProperty("Last restore result or progress detail."),
+                                ["restoreUpdatedAtUtc"] = new { type = "string", format = "date-time", nullable = true }
+                            }
+                        },
+                        ["ApiServerMigrationCreateRequest"] = new
+                        {
+                            type = "object",
+                            required = new[] { "password", "adminPassword", "confirmationText" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["password"] = StringProperty("Strong package password, 12-128 characters with upper, lower, digit, and symbol."),
+                                ["adminPassword"] = new { type = "string", format = "password" },
+                                ["confirmationText"] = StringProperty("Must equal MIGRATE.")
+                            }
+                        },
+                        ["ApiSensitiveOperationAuthorizationRequest"] = new
+                        {
+                            type = "object",
+                            required = new[] { "action", "adminPassword" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["action"] = StringProperty("restore-database or restore-server."),
+                                ["adminPassword"] = new { type = "string", format = "password" }
+                            }
+                        },
+                        ["ApiSensitiveOperationAuthorizationResponse"] = new
+                        {
+                            type = "object",
+                            required = new[] { "action", "ticket", "expiresAtUtc" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["action"] = StringProperty("Authorized sensitive operation."),
+                                ["ticket"] = StringProperty("Single-use five-minute upload authorization ticket."),
+                                ["expiresAtUtc"] = new { type = "string", format = "date-time" }
+                            }
+                        },
+                        ["ApiServerMigrationRestoreResponse"] = new
+                        {
+                            type = "object",
+                            required = new[] { "success", "restartRequired", "automaticRestartScheduled", "message", "packageFileName", "safetyBackupRoot", "storagePolicy" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["success"] = new { type = "boolean" },
+                                ["restartRequired"] = new { type = "boolean" },
+                                ["automaticRestartScheduled"] = new { type = "boolean" },
+                                ["message"] = StringProperty("Restore scheduling result message."),
+                                ["packageFileName"] = StringProperty("Uploaded .edmmigration file name."),
+                                ["safetyBackupRoot"] = StringProperty("Recovery-time safety backup directory."),
+                                ["storagePolicy"] = StringProperty("Encrypted server migration package boundary.")
+                            }
+                        },
                         ["ApiSharedDatabaseOwnershipSummaryResponse"] = new
                         {
                             type = "object",
@@ -938,6 +1014,17 @@ namespace ExportDocManager.Api.Hosting
                                 ["daysToKeep"] = new { type = "integer", format = "int32" },
                                 ["maxCount"] = new { type = "integer", format = "int32" },
                                 ["confirmed"] = new { type = "boolean", description = "Explicit confirmation from the retention cleanup dialog." }
+                            }
+                        },
+                        ["ApiJobDownloadTicket"] = new
+                        {
+                            type = "object",
+                            required = new[] { "token", "downloadUrl", "expiresAtUtc" },
+                            properties = new Dictionary<string, object>
+                            {
+                                ["token"] = StringProperty("Random short-lived download token."),
+                                ["downloadUrl"] = StringProperty("Same-origin native streaming download URL."),
+                                ["expiresAtUtc"] = new { type = "string", format = "date-time" }
                             }
                         },
                         ["ApiAuditLogCommandResponse"] = new

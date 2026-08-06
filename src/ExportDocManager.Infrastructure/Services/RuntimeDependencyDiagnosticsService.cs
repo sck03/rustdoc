@@ -144,14 +144,17 @@ namespace ExportDocManager.Services.Infrastructure
 
             if (tools.AvailableToolCount > 0)
             {
+                bool completeButIncompatible = tools.AvailableToolCount == 3;
                 return new RuntimeDependencyDiagnostic(
                     "postgresql-tools",
                     "PostgreSQL 维护工具",
                     "optional",
-                    "incomplete",
+                    completeButIncompatible ? "incompatible" : "incomplete",
                     false,
                     Path.GetFullPath(resolvedPath),
-                    $"PostgreSQL 客户端工具不完整，仅找到 {tools.AvailableToolCount}/3 个文件。");
+                    completeButIncompatible
+                        ? $"PostgreSQL 客户端工具版本不兼容；要求三个工具均为 PostgreSQL 18 或更高且主版本一致。{tools.Version}"
+                        : $"PostgreSQL 客户端工具不完整，仅找到 {tools.AvailableToolCount}/3 个文件。");
             }
 
             return new RuntimeDependencyDiagnostic(

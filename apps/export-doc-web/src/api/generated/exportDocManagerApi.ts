@@ -1646,6 +1646,12 @@ export interface ApiInvoiceUnverifyRequest {
   rowVersion: string;
 }
 
+export interface ApiJobDownloadTicket {
+  downloadUrl: string;
+  expiresAtUtc: string;
+  token: string;
+}
+
 export interface ApiLetterOfCreditImportRequest {
   filePath: string;
 }
@@ -2006,6 +2012,12 @@ export interface ApiPortDto {
   rowVersion?: string;
 }
 
+export interface ApiPostgreSqlDatabaseRestoreRequest {
+  adminPassword: string;
+  backupFileName: string;
+  confirmationText: string;
+}
+
 export interface ApiPostgreSqlMaintenanceStatusResponse {
   backupRoot: string;
   database: string;
@@ -2324,6 +2336,46 @@ export interface ApiSalesOpportunitySaveRequest {
 export interface ApiSalesOpportunityStageSummaryDto {
   count: number;
   stage: string;
+}
+
+export interface ApiSensitiveOperationAuthorizationRequest {
+  action: string;
+  adminPassword: string;
+}
+
+export interface ApiSensitiveOperationAuthorizationResponse {
+  action: string;
+  expiresAtUtc: string;
+  ticket: string;
+}
+
+export interface ApiServerMigrationCreateRequest {
+  adminPassword: string;
+  confirmationText: string;
+  password: string;
+}
+
+export interface ApiServerMigrationRestoreResponse {
+  automaticRestartScheduled: boolean;
+  message: string;
+  packageFileName: string;
+  restartRequired: boolean;
+  safetyBackupRoot: string;
+  storagePolicy: string;
+  success: boolean;
+}
+
+export interface ApiServerMigrationStatusResponse {
+  message: string;
+  packageRoot: string;
+  pendingRestore: boolean;
+  postgreSqlConfigured: boolean;
+  restoreDetail: string;
+  restorePhase: string;
+  restoreUpdatedAtUtc?: string;
+  storagePolicy: string;
+  supported: boolean;
+  toolsReady: boolean;
 }
 
 export interface ApiSettingsResponse {
@@ -3373,6 +3425,10 @@ export interface AnalyzeInvoiceProfitRequest {
   body: ApiInvoiceProfitAnalysisRequest;
 }
 
+export interface AuthorizeServerMigrationOperationRequest {
+  body: ApiSensitiveOperationAuthorizationRequest;
+}
+
 export interface BuildAgentConsignmentDefaultsRequest {
   invoiceId: number;
 }
@@ -3468,6 +3524,10 @@ export interface CreateInvoiceRequest {
   body: ApiInvoiceDetailDto;
 }
 
+export interface CreateJobDownloadTicketRequest {
+  jobId: string;
+}
+
 export interface CreatePayeeRequest {
   body: ApiPayeeDto;
 }
@@ -3498,6 +3558,10 @@ export interface CreateReportTemplateRequest {
 
 export interface CreateSalesOpportunityRequest {
   body: ApiSalesOpportunitySaveRequest;
+}
+
+export interface CreateServerMigrationPackageRequest {
+  body: ApiServerMigrationCreateRequest;
 }
 
 export interface CreateSupplierRequest {
@@ -3690,6 +3754,10 @@ export interface DownloadInvoiceTransferPackageRequest {
 
 export interface DownloadJobResultRequest {
   jobId: string;
+}
+
+export interface DownloadPostgreSqlPhysicalBackupRequest {
+  fileName: string;
 }
 
 export interface DownloadQueriedInvoicesRequest {
@@ -4214,6 +4282,10 @@ export interface RestoreEmailTemplateVersionRequest {
   versionNumber: number;
 }
 
+export interface RestorePostgreSqlPhysicalBackupRequest {
+  body: ApiPostgreSqlDatabaseRestoreRequest;
+}
+
 export interface RestoreUserReportTemplateVersionRequest {
   id: number;
   versionNumber: number;
@@ -4329,6 +4401,10 @@ export interface SearchSupplierProductOptionsRequest {
 
 export interface SendEmailRequest {
   body: ApiEmailSendRequest;
+}
+
+export interface StageServerMigrationRestoreRequest {
+  body: Blob;
 }
 
 export interface StartBlankBookingSheetSaveToPathJobRequest {
@@ -4556,6 +4632,10 @@ export interface UpdateUserReportTemplateRequest {
   body: ApiUserReportTemplateSaveRequest;
 }
 
+export interface UploadAndRestorePostgreSqlPhysicalBackupRequest {
+  body: Blob;
+}
+
 export interface UploadAndStartBookingSheetConvertDownloadJobRequest {
   fileName?: string;
   body: Blob;
@@ -4651,6 +4731,10 @@ export class ExportDocManagerApiClient {
     }
   }
 
+  public resolveUrl(path: string): string {
+    return new URL(path, this.baseUrl).toString();
+  }
+
   public activateSingleWindowClientProfile(request: ActivateSingleWindowClientProfileRequest, init?: RequestInit): Promise<ApiSingleWindowClientProfilesResponse> {
     const path = `/api/single-window/client-profiles/${encodePath(request.profileKey)}/activate`;
     return this.request<ApiSingleWindowClientProfilesResponse>("POST", path, { init });
@@ -4667,6 +4751,14 @@ export class ExportDocManagerApiClient {
   public analyzeInvoiceProfit(request: AnalyzeInvoiceProfitRequest, init?: RequestInit): Promise<ApiInvoiceProfitAnalysisResponse> {
     const path = "/api/invoices/profit-analysis";
     return this.request<ApiInvoiceProfitAnalysisResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public authorizeServerMigrationOperation(request: AuthorizeServerMigrationOperationRequest, init?: RequestInit): Promise<ApiSensitiveOperationAuthorizationResponse> {
+    const path = "/api/server-migration/authorization";
+    return this.request<ApiSensitiveOperationAuthorizationResponse>("POST", path, {
       body: request.body,
       init,
     });
@@ -4861,6 +4953,11 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public createJobDownloadTicket(request: CreateJobDownloadTicketRequest, init?: RequestInit): Promise<ApiJobDownloadTicket> {
+    const path = `/api/jobs/${encodePath(request.jobId)}/download-ticket`;
+    return this.request<ApiJobDownloadTicket>("POST", path, { init });
+  }
+
   public createPayee(request: CreatePayeeRequest, init?: RequestInit): Promise<ApiPayeeDto> {
     const path = "/api/master-data/payees";
     return this.request<ApiPayeeDto>("POST", path, {
@@ -4925,6 +5022,14 @@ export class ExportDocManagerApiClient {
   public createSalesOpportunity(request: CreateSalesOpportunityRequest, init?: RequestInit): Promise<ApiSalesOpportunityDto> {
     const path = "/api/crm/opportunities";
     return this.request<ApiSalesOpportunityDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public createServerMigrationPackage(request: CreateServerMigrationPackageRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+    const path = "/api/server-migration/packages";
+    return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
       init,
     });
@@ -5213,6 +5318,16 @@ export class ExportDocManagerApiClient {
     return this.request<Blob>("GET", path, { init });
   }
 
+  public downloadPostgreSqlPhysicalBackup(request: DownloadPostgreSqlPhysicalBackupRequest, init?: RequestInit): Promise<Blob> {
+    const path = "/api/postgresql-maintenance/backups/download";
+    return this.request<Blob>("GET", path, {
+      query: {
+        "fileName": request.fileName,
+      },
+      init,
+    });
+  }
+
   public downloadQueriedInvoices(request: DownloadQueriedInvoicesRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/query/invoices/download";
     return this.request<BackgroundJobSnapshot>("POST", path, {
@@ -5456,6 +5571,11 @@ export class ExportDocManagerApiClient {
       },
       init,
     });
+  }
+
+  public getServerMigrationStatus(init?: RequestInit): Promise<ApiServerMigrationStatusResponse> {
+    const path = "/api/server-migration/status";
+    return this.request<ApiServerMigrationStatusResponse>("GET", path, { init });
   }
 
   public getSettings(init?: RequestInit): Promise<ApiSettingsResponse> {
@@ -6298,6 +6418,14 @@ export class ExportDocManagerApiClient {
     return this.request<ApiEmailTemplateDto>("POST", path, { init });
   }
 
+  public restorePostgreSqlPhysicalBackup(request: RestorePostgreSqlPhysicalBackupRequest, init?: RequestInit): Promise<ApiServerMigrationRestoreResponse> {
+    const path = "/api/postgresql-maintenance/backups/restore";
+    return this.request<ApiServerMigrationRestoreResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public restoreUserReportTemplateVersion(request: RestoreUserReportTemplateVersionRequest, init?: RequestInit): Promise<ApiUserReportTemplateDto> {
     const path = `/api/reports/user-templates/${encodePath(request.id)}/versions/${encodePath(request.versionNumber)}/restore`;
     return this.request<ApiUserReportTemplateDto>("POST", path, { init });
@@ -6518,6 +6646,14 @@ export class ExportDocManagerApiClient {
   public sendEmail(request: SendEmailRequest, init?: RequestInit): Promise<ApiEmailSendResponse> {
     const path = "/api/tools/email/send";
     return this.request<ApiEmailSendResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public stageServerMigrationRestore(request: StageServerMigrationRestoreRequest, init?: RequestInit): Promise<ApiServerMigrationRestoreResponse> {
+    const path = "/api/server-migration/restore";
+    return this.request<ApiServerMigrationRestoreResponse>("POST", path, {
       body: request.body,
       init,
     });
@@ -6911,6 +7047,14 @@ export class ExportDocManagerApiClient {
   public updateUserReportTemplate(request: UpdateUserReportTemplateRequest, init?: RequestInit): Promise<ApiUserReportTemplateDto> {
     const path = `/api/reports/user-templates/${encodePath(request.id)}`;
     return this.request<ApiUserReportTemplateDto>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadAndRestorePostgreSqlPhysicalBackup(request: UploadAndRestorePostgreSqlPhysicalBackupRequest, init?: RequestInit): Promise<ApiServerMigrationRestoreResponse> {
+    const path = "/api/postgresql-maintenance/backups/upload-restore";
+    return this.request<ApiServerMigrationRestoreResponse>("POST", path, {
       body: request.body,
       init,
     });

@@ -30,6 +30,14 @@ namespace ExportDocManager.Api.Hosting
                    string.Equals(_productEdition, ProductEditionCatalog.Full, StringComparison.OrdinalIgnoreCase);
         }
 
+        public bool CanManageDisasterRecovery(User user)
+        {
+            return CanUseModule(
+                user,
+                PermissionModuleCatalog.SystemDisasterRecovery,
+                PermissionAccessLevel.Manage);
+        }
+
         public bool CanViewAllBusinessData(User user)
         {
             return BusinessDataAccessScope.CanViewAllBusinessData(user);

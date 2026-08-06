@@ -145,6 +145,13 @@ jobs:
         shell: pwsh
         run: node scripts/generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository
 
+      - name: Provision PostgreSQL 18 client tools
+        shell: pwsh
+        run: >-
+          ./scripts/provision-postgresql-client.ps1
+          -Platform ${{ inputs.platform }}
+          -Destination artifacts/browser-server/package/Tools/PostgreSQL
+
       - name: Assemble browser server package
         shell: pwsh
         run: |

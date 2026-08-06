@@ -66,6 +66,8 @@ apps/license-keygen-tauri/
 *.db
 *.db-shm
 *.db-wal
+*.dump
+*.edmmigration
 **/HsKnowledgeImports/
 **/HsCodeImports/
 **/hs-import-probe/

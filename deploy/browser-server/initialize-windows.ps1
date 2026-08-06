@@ -95,13 +95,14 @@ $settings = [ordered]@{
         PostgreSqlPort = $PostgreSqlPort
         PostgreSqlDatabase = $PostgreSqlDatabase
         PostgreSqlUsername = $PostgreSqlUsername
-        PostgreSqlPassword = $PostgreSqlPassword
+        PostgreSqlPassword = ""
         PostgreSqlAdditionalOptions = "Pooling=true;Maximum Pool Size=100;Timeout=15;Command Timeout=60"
     }
 }
 $settings | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $configPath -Encoding UTF8
 
 $environmentLines = @(
+    "EXPORTDOCMANAGER_POSTGRES_PASSWORD=$PostgreSqlPassword",
     "EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=$BootstrapToken",
     "EXPORTDOCMANAGER_URLS=$Urls",
     "EXPORTDOCMANAGER_DATA_ROOT=$resolvedDataRoot",
@@ -141,7 +142,7 @@ foreach ($configurationFile in @($configPath, $environmentPath)) {
 
 Write-Host "浏览器服务器配置已完成。"
 Write-Host "数据库配置: $configPath"
-Write-Host "运行环境（含首次部署令牌）: $environmentPath"
+Write-Host "运行环境（含数据库密码和首次部署令牌）: $environmentPath"
 Write-Host "数据根: $resolvedDataRoot"
 Write-Host "监听: $Urls"
 Write-Host "该脚本不会安装 PostgreSQL、修改防火墙或注册 Windows 服务。"

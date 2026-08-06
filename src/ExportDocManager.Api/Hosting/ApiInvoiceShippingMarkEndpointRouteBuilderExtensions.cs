@@ -81,6 +81,10 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
+                catch (InvalidDataException ex)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                }
                 catch (UnauthorizedAccessException ex)
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));

@@ -88,10 +88,25 @@ namespace ExportDocManager.Services.Reporting
 
         public static string GetShippingMarkDataUri(string path, IAppPathProvider pathProvider)
         {
-            string marksRoot = pathProvider == null
-                ? string.Empty
-                : Path.Combine(pathProvider.DataRoot, "Marks");
-            return GetDataUri(path, string.IsNullOrWhiteSpace(marksRoot) ? [] : [marksRoot]);
+            if (pathProvider == null)
+            {
+                return string.Empty;
+            }
+            string marksRoot = Path.Combine(pathProvider.DataRoot, "Marks");
+            try
+            {
+                string resolved = ManagedDataPathResolver.ResolveStoredPath(
+                    pathProvider,
+                    path,
+                    marksRoot,
+                    "Marks");
+                return GetDataUri(resolved, [marksRoot]);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Blocked invalid shipping mark image path: {Path}", path);
+                return string.Empty;
+            }
         }
 
         public static string GetSealDataUri(string path, IAppPathProvider pathProvider)
@@ -101,14 +116,28 @@ namespace ExportDocManager.Services.Reporting
                 return string.Empty;
             }
 
-            return GetDataUri(
-                path,
-                [Path.Combine(pathProvider.FileRoot, "Seals"), pathProvider.ResourceRoot]);
+            string sealRoot = Path.Combine(pathProvider.FileRoot, "Seals");
+            try
+            {
+                string resolved = Path.IsPathRooted(path)
+                    ? Path.GetFullPath(path)
+                    : ManagedDataPathResolver.ResolveStoredPath(
+                        pathProvider,
+                        path,
+                        sealRoot,
+                        "Files");
+                return GetDataUri(resolved, [sealRoot, pathProvider.ResourceRoot]);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Blocked invalid seal image path: {Path}", path);
+                return string.Empty;
+            }
         }
 
         private static string GetDataUri(string path, IReadOnlyList<string> allowedRoots)
         {
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            if (string.IsNullOrWhiteSpace(path))
             {
                 return string.Empty;
             }
@@ -116,9 +145,11 @@ namespace ExportDocManager.Services.Reporting
             try
             {
                 string fullPath = Path.GetFullPath(path);
-                if (allowedRoots == null ||
-                    allowedRoots.Count == 0 ||
-                    !allowedRoots.Any(root => PathBoundaryHelper.IsWithinRoot(fullPath, root)))
+                string allowedRoot = allowedRoots?.FirstOrDefault(root =>
+                    PathBoundaryHelper.IsWithinRoot(fullPath, root));
+                if (string.IsNullOrWhiteSpace(allowedRoot) ||
+                    !File.Exists(fullPath) ||
+                    HasReparsePointBelowRoot(fullPath, allowedRoot))
                 {
                     Log.Warning("Blocked report image outside managed roots: {Path}", fullPath);
                     return string.Empty;
@@ -141,6 +172,30 @@ namespace ExportDocManager.Services.Reporting
                 Log.Error(ex, "Failed to load report image: {Path}", path);
                 return string.Empty;
             }
+        }
+
+        private static bool HasReparsePointBelowRoot(string path, string root)
+        {
+            string fullRoot = Path.GetFullPath(root)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string current = Path.GetFullPath(path);
+            while (!string.Equals(current, fullRoot, PathBoundaryHelper.PathComparison))
+            {
+                if (!PathBoundaryHelper.IsWithinRoot(current, fullRoot))
+                {
+                    return true;
+                }
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                {
+                    return true;
+                }
+                current = Path.GetDirectoryName(current);
+                if (string.IsNullOrWhiteSpace(current))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static string DetectImageMimeType(byte[] bytes)

@@ -1,5 +1,6 @@
 using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Core
@@ -26,10 +27,19 @@ namespace ExportDocManager.Services.Core
             string fileName = $"Mark_{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.png";
             string imagePath = Path.Combine(marksRoot, fileName);
 
-            await File.WriteAllBytesAsync(imagePath, bytes, cancellationToken);
+            await AtomicFileHelper.WriteFileAtomicAsync(
+                imagePath,
+                (tempPath, token) => File.WriteAllBytesAsync(tempPath, bytes, token),
+                cancellationToken);
+            RuntimeFilePermissionHelper.RestrictFile(imagePath);
+            string storedPath = ManagedDataPathResolver.ToStoredPath(
+                _pathProvider,
+                imagePath,
+                marksRoot,
+                "Marks");
 
             return new ShippingMarkImageSaveResult(
-                imagePath,
+                storedPath,
                 fileName,
                 "image/png",
                 bytes.LongLength,
@@ -55,9 +65,14 @@ namespace ExportDocManager.Services.Core
             byte[] bytes = await File.ReadAllBytesAsync(fullPath, cancellationToken);
             string contentType = DetectImageContentType(bytes, fullPath);
             string dataUrl = $"data:{contentType};base64,{Convert.ToBase64String(bytes)}";
+            string storedPath = ManagedDataPathResolver.ToStoredPath(
+                _pathProvider,
+                fullPath,
+                GetMarksRoot(),
+                "Marks");
 
             return new ShippingMarkImagePreviewResult(
-                fullPath,
+                storedPath,
                 Path.GetFileName(fullPath),
                 contentType,
                 bytes.LongLength,
@@ -70,6 +85,7 @@ namespace ExportDocManager.Services.Core
             string root = Path.GetFullPath(Path.Combine(_pathProvider.DataRoot, "Marks"))
                 .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             Directory.CreateDirectory(root);
+            RuntimeFilePermissionHelper.RestrictDirectory(root);
             return root;
         }
 
@@ -81,13 +97,11 @@ namespace ExportDocManager.Services.Core
             }
 
             string marksRoot = GetMarksRoot();
-            string fullPath = Path.GetFullPath(imagePath.Trim());
-            if (!PathBoundaryHelper.IsWithinRoot(fullPath, marksRoot))
-            {
-                throw new UnauthorizedAccessException("只能读取运行数据根 Marks 目录下的唛头图片。");
-            }
-
-            return fullPath;
+            return ManagedDataPathResolver.ResolveStoredPath(
+                _pathProvider,
+                imagePath,
+                marksRoot,
+                "Marks");
         }
 
         private static byte[] DecodePngDataUrl(string imageDataUrl)

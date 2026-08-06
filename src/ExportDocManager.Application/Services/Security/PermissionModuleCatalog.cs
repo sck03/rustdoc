@@ -62,6 +62,7 @@ namespace ExportDocManager.Services.Security
         public const string DocumentPayments = "document.payments";
         public const string DocumentJobs = "document.jobs";
         public const string DocumentSingleWindow = "document.single-window";
+        public const string DocumentDeclarationDictionary = "document.declaration-dictionary";
         public const string DocumentHsKnowledge = "document.hs-knowledge";
         public const string DocumentMasterData = "document.master-data";
         public const string DocumentReports = "document.reports";
@@ -80,6 +81,7 @@ namespace ExportDocManager.Services.Security
         public const string CommonProductReference = "common.product-reference";
         public const string CommonExchangeRates = "common.exchange-rates";
         public const string CommonEmail = "common.email";
+        public const string SystemDisasterRecovery = "system.disaster-recovery";
         public const string SystemAbout = "system.about";
         public const string FinanceDashboard = "finance.dashboard";
 
@@ -91,6 +93,7 @@ namespace ExportDocManager.Services.Security
             new(DocumentPayments, "付款报销", "单证业务", "document", 40),
             new(DocumentJobs, "任务中心", "单证业务", "document", 50),
             new(DocumentSingleWindow, "单一窗口", "单证业务", "document", 60),
+            new(DocumentDeclarationDictionary, "申报词典", "申报与归类", "document", 62),
             new(DocumentHsKnowledge, "HS 编码知识", "申报与归类", "document", 65),
             new(DocumentMasterData, "主数据维护", "单证业务", "document", 70),
             new(DocumentReports, "报表设计", "单证工具", "document", 80),
@@ -109,6 +112,7 @@ namespace ExportDocManager.Services.Security
             new(CommonProductReference, "商品资料读取", "通用基础能力", "common", 290, true),
             new(CommonExchangeRates, "今日汇率", "通用工具", "common", 300),
             new(CommonEmail, "邮件发送", "通用工具", "common", 310),
+            new(SystemDisasterRecovery, "灾难恢复", "系统", "common", 315, true),
             new(SystemAbout, "关于系统", "系统", "common", 320)
         ];
 
@@ -212,7 +216,8 @@ namespace ExportDocManager.Services.Security
                     // Ordinary document users may create and maintain their own templates.
                     // Global file-template lifecycle and administrator maintenance still require Manage.
                     [PermissionModuleCatalog.DocumentReports] = PermissionAccessLevel.Operate,
-                    [PermissionModuleCatalog.DocumentHsKnowledge] = PermissionAccessLevel.View
+                    [PermissionModuleCatalog.DocumentHsKnowledge] = PermissionAccessLevel.View,
+                    [PermissionModuleCatalog.DocumentDeclarationDictionary] = PermissionAccessLevel.Operate
                 }),
             new(Sales, "业务人员", "销售、供应商和通用工具。", SalesModules),
             new(Finance, "财务人员", "付款报销、单据查询、报表设计、汇率、邮件、OCR 和关于。",

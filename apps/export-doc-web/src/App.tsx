@@ -678,7 +678,6 @@ function App() {
                 element={
                   <SingleWindowReferenceCatalogPage
                     client={client}
-                    canManageReferenceCatalog={session.user.capabilities?.canManageSettings === true}
                   />
                 }
               />

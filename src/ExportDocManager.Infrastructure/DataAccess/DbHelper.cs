@@ -13,6 +13,8 @@ namespace ExportDocManager.DataAccess
     public static class DbHelper
     {
         public const string PostgreSqlMaximumPoolSizeEnvironmentVariable = "EXPORTDOCMANAGER_DB_MAX_POOL_SIZE";
+        public const string PostgreSqlPasswordEnvironmentVariable = PostgreSqlPasswordResolver.PasswordEnvironmentVariable;
+        public const string PostgreSqlPasswordFileEnvironmentVariable = PostgreSqlPasswordResolver.PasswordFileEnvironmentVariable;
         private static IAppPathProvider _pathProvider = new RuntimeAppPathProvider();
 
         public static void ConfigurePathProvider(IAppPathProvider pathProvider)
@@ -306,13 +308,7 @@ namespace ExportDocManager.DataAccess
 
         public static string NormalizePostgreSqlPassword(string value)
         {
-            if (string.IsNullOrEmpty(value))
-            {
-                return string.Empty;
-            }
-
-            var decrypted = SecurityHelper.Decrypt(value);
-            return decrypted ?? value;
+            return PostgreSqlPasswordResolver.Resolve(value, _pathProvider);
         }
 
         private static string ResolveFromConfigRoot(string path)

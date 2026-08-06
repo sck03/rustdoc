@@ -55,6 +55,11 @@ namespace ExportDocManager.Services.MasterData
             string sealRoot = GetExporterSealRoot(exporterId, createDirectory: true);
             string prefix = sealKind == ExporterSealKind.Document ? "document" : "customs";
             string managedPath = Path.Combine(sealRoot, $"{prefix}-{Guid.NewGuid():N}{imageExtension}");
+            string storedPath = ManagedDataPathResolver.ToStoredPath(
+                _pathProvider,
+                managedPath,
+                Path.Combine(_pathProvider.FileRoot, "Seals"),
+                "Files");
             string previousPath = sealKind == ExporterSealKind.Document
                 ? exporter.DocSealPath
                 : exporter.CustomsSealPath;
@@ -65,18 +70,19 @@ namespace ExportDocManager.Services.MasterData
                     managedPath,
                     (tempPath, token) => File.WriteAllBytesAsync(tempPath, content.ToArray(), token),
                     cancellationToken);
+                RuntimeFilePermissionHelper.RestrictFile(managedPath);
 
                 if (sealKind == ExporterSealKind.Document)
                 {
-                    exporter.DocSealPath = managedPath;
+                    exporter.DocSealPath = storedPath;
                 }
                 else
                 {
-                    exporter.CustomsSealPath = managedPath;
+                    exporter.CustomsSealPath = storedPath;
                 }
 
                 await context.SaveChangesAsync(cancellationToken);
-                DeleteReplacedManagedSeal(exporterId, previousPath, managedPath);
+                DeleteReplacedManagedSeal(exporterId, previousPath, storedPath);
 
                 return exporter;
             }
@@ -105,10 +111,18 @@ namespace ExportDocManager.Services.MasterData
             try
             {
                 string sealRoot = GetExporterSealRoot(exporterId, createDirectory: false);
-                string fullPreviousPath = Path.GetFullPath(previousPath);
+                string fullPreviousPath = ManagedDataPathResolver.ResolveStoredPath(
+                    _pathProvider,
+                    previousPath,
+                    sealRoot,
+                    "Files");
                 string fullCurrentPath = string.IsNullOrWhiteSpace(currentPath)
                     ? string.Empty
-                    : Path.GetFullPath(currentPath);
+                    : ManagedDataPathResolver.ResolveStoredPath(
+                        _pathProvider,
+                        currentPath,
+                        sealRoot,
+                        "Files");
                 if (!string.Equals(fullPreviousPath, fullCurrentPath, PathBoundaryHelper.PathComparison) &&
                     PathBoundaryHelper.IsWithinRoot(fullPreviousPath, sealRoot))
                 {
@@ -141,6 +155,7 @@ namespace ExportDocManager.Services.MasterData
             if (createDirectory)
             {
                 Directory.CreateDirectory(root);
+                RuntimeFilePermissionHelper.RestrictDirectory(root);
             }
 
             return root;

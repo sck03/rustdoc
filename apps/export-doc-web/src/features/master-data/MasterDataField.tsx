@@ -81,7 +81,7 @@ export function MasterDataField({
   if (field.pathPicker) {
     return (
       <ExporterSealField
-        inputDisabled={disabled}
+        inputReadOnly
         actionDisabled={disabled || pathActionDisabled}
         actionTitle={pathActionTitle}
         label={field.label}

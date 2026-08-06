@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Infrastructure.Tests
 {
+    [Collection(LocalSecretProtectionCollection.Name)]
     public class DbHelperInfrastructureTests
     {
         [Fact]
@@ -77,6 +78,106 @@ namespace ExportDocManager.Infrastructure.Tests
             }
             finally
             {
+                DbHelper.ConfigurePathProvider(previousProvider);
+                DeleteDirectory(appRoot);
+            }
+        }
+
+        [Fact]
+        public void LoadDatabaseSettings_ShouldPreferRuntimePasswordEnvironmentVariable()
+        {
+            var appRoot = CreateTempDirectory();
+            var previousProvider = new RuntimeAppPathProvider();
+            string previousPassword = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable);
+            string previousFile = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable);
+            try
+            {
+                var provider = new RuntimeAppPathProvider(appRoot);
+                DbHelper.ConfigurePathProvider(provider);
+                Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable, null);
+                Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable, "environment-secret");
+                File.WriteAllText(
+                    Path.Combine(provider.ConfigRoot, "appsettings.json"),
+                    """
+                    {
+                      "System": {
+                        "DatabaseProvider": "PostgreSQL",
+                        "PostgreSqlHost": "127.0.0.1",
+                        "PostgreSqlDatabase": "exportdoc",
+                        "PostgreSqlUsername": "exportdoc",
+                        "PostgreSqlPassword": ""
+                      }
+                    }
+                    """);
+
+                Assert.Equal("environment-secret", DbHelper.LoadDatabaseSettings().PostgreSqlPassword);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable, previousPassword);
+                Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable, previousFile);
+                DbHelper.ConfigurePathProvider(previousProvider);
+                DeleteDirectory(appRoot);
+            }
+        }
+
+        [Fact]
+        public void LoadDatabaseSettings_ShouldReadRelativePasswordFileFromSecurityRoot()
+        {
+            var appRoot = CreateTempDirectory();
+            var previousProvider = new RuntimeAppPathProvider();
+            string previousPassword = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable);
+            string previousFile = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable);
+            try
+            {
+                var provider = new RuntimeAppPathProvider(appRoot);
+                DbHelper.ConfigurePathProvider(provider);
+                Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable, "lower-priority-secret");
+                Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable, "postgres.password");
+                File.WriteAllText(Path.Combine(provider.SecurityRoot, "postgres.password"), "file-secret\r\n");
+                File.WriteAllText(
+                    Path.Combine(provider.ConfigRoot, "appsettings.json"),
+                    """
+                    { "System": { "DatabaseProvider": "PostgreSQL", "PostgreSqlPassword": "" } }
+                    """);
+
+                Assert.Equal("file-secret", DbHelper.LoadDatabaseSettings().PostgreSqlPassword);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable, previousPassword);
+                Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable, previousFile);
+                DbHelper.ConfigurePathProvider(previousProvider);
+                DeleteDirectory(appRoot);
+            }
+        }
+
+        [Fact]
+        public void LoadDatabaseSettings_ShouldRejectPlaintextConfiguredPassword()
+        {
+            var appRoot = CreateTempDirectory();
+            var previousProvider = new RuntimeAppPathProvider();
+            string previousPassword = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable);
+            string previousFile = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable);
+            try
+            {
+                var provider = new RuntimeAppPathProvider(appRoot);
+                DbHelper.ConfigurePathProvider(provider);
+                Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable, null);
+                Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable, null);
+                File.WriteAllText(
+                    Path.Combine(provider.ConfigRoot, "appsettings.json"),
+                    """
+                    { "System": { "DatabaseProvider": "PostgreSQL", "PostgreSqlPassword": "plain-secret" } }
+                    """);
+
+                var error = Assert.Throws<InvalidOperationException>(() => DbHelper.LoadDatabaseSettings());
+                Assert.Contains("不能以明文", error.Message, StringComparison.Ordinal);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable, previousPassword);
+                Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable, previousFile);
                 DbHelper.ConfigurePathProvider(previousProvider);
                 DeleteDirectory(appRoot);
             }

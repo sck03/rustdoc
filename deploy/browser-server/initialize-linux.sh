@@ -118,7 +118,7 @@ cat > "$CONFIG_FILE" <<EOF
     "PostgreSqlPort": $POSTGRES_PORT,
     "PostgreSqlDatabase": "$POSTGRES_DB",
     "PostgreSqlUsername": "$POSTGRES_USER",
-    "PostgreSqlPassword": "$POSTGRES_PASSWORD",
+    "PostgreSqlPassword": "",
     "PostgreSqlAdditionalOptions": "Pooling=true;Maximum Pool Size=100;Timeout=15;Command Timeout=60"
   }
 }
@@ -127,6 +127,7 @@ chmod 600 "$CONFIG_FILE"
 
 ENV_FILE="$DATA_ROOT/Security/browser-server.env"
 {
+  printf 'EXPORTDOCMANAGER_POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
   printf 'EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=%s\n' "$BOOTSTRAP_TOKEN"
   printf 'EXPORTDOCMANAGER_URLS=%s\n' "$URLS"
   printf 'EXPORTDOCMANAGER_DATA_ROOT=%s\n' "$DATA_ROOT"
@@ -141,7 +142,7 @@ printf '%s\n' "$ENV_FILE" > "$ROOT/browser-server.env.path"
 
 echo "浏览器服务器配置已完成。"
 echo "数据库配置: $CONFIG_FILE"
-echo "运行环境（含首次部署令牌）: $ENV_FILE"
+echo "运行环境（含数据库密码和首次部署令牌）: $ENV_FILE"
 echo "数据根: $DATA_ROOT"
 echo "监听: $URLS"
 echo "该脚本不会安装 PostgreSQL、修改防火墙或注册 systemd 服务。"

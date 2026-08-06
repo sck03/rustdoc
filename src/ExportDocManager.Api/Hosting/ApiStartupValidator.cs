@@ -112,6 +112,7 @@ namespace ExportDocManager.Api.Hosting
                 throw new InvalidOperationException($"程序运行目录不存在: {pathProvider.AppRoot}");
             }
 
+            EnsureNotReparsePoint(pathProvider.DataRoot, "业务数据目录");
             EnsureWritableDirectory(pathProvider.DataRoot, "业务数据目录");
             EnsureWritableDirectory(pathProvider.DatabaseRoot, "数据库目录");
             EnsureWritableDirectory(pathProvider.SingleWindowRoot, "单一窗口数据目录");
@@ -157,6 +158,7 @@ namespace ExportDocManager.Api.Hosting
             }
 
             Directory.CreateDirectory(directory);
+            EnsureNotReparsePoint(directory, description);
 
             string probePath = Path.Combine(directory, $".write-check-{Guid.NewGuid():N}.tmp");
             try
@@ -169,6 +171,26 @@ namespace ExportDocManager.Api.Hosting
                 {
                     File.Delete(probePath);
                 }
+            }
+        }
+
+        private static void EnsureNotReparsePoint(string directory, string description)
+        {
+            try
+            {
+                if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new InvalidOperationException(
+                        $"{description}不能是符号链接或 Windows 重解析点: {directory}");
+                }
+            }
+            catch (FileNotFoundException ex)
+            {
+                throw new InvalidOperationException($"{description}不存在: {directory}", ex);
+            }
+            catch (DirectoryNotFoundException ex)
+            {
+                throw new InvalidOperationException($"{description}不存在: {directory}", ex);
             }
         }
 

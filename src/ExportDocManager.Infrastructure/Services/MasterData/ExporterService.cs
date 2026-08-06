@@ -43,6 +43,11 @@ namespace ExportDocManager.Services.MasterData
                 string previousCustomsSealPath = null;
                 if (exporter.Id == 0)
                 {
+                    if (!string.IsNullOrWhiteSpace(exporter.DocSealPath) ||
+                        !string.IsNullOrWhiteSpace(exporter.CustomsSealPath))
+                    {
+                        throw new InvalidOperationException("请先保存出口商基础资料，再通过受控上传保存印章图片。");
+                    }
                     _accessScope.ApplyOwner(exporter);
                     await context.Exporters.AddAsync(exporter);
                 }
@@ -52,6 +57,11 @@ namespace ExportDocManager.Services.MasterData
                         .AsNoTracking()
                         .SingleOrDefaultAsync(item => item.Id == exporter.Id);
                     if (existing == null) throw new KeyNotFoundException("出口商不存在或不属于当前账号。");
+                    if (!IsUnchangedOrCleared(exporter.DocSealPath, existing.DocSealPath) ||
+                        !IsUnchangedOrCleared(exporter.CustomsSealPath, existing.CustomsSealPath))
+                    {
+                        throw new InvalidOperationException("印章路径不能直接编辑，请使用印章上传按钮。");
+                    }
                     previousDocSealPath = existing.DocSealPath;
                     previousCustomsSealPath = existing.CustomsSealPath;
                     exporter.OwnerUserId = existing.OwnerUserId;
@@ -154,6 +164,10 @@ namespace ExportDocManager.Services.MasterData
             });
             return rows.ToList();
         }
+
+        private static bool IsUnchangedOrCleared(string requestedPath, string existingPath) =>
+            string.IsNullOrWhiteSpace(requestedPath) ||
+            string.Equals(requestedPath, existingPath, StringComparison.Ordinal);
 
     }
 }

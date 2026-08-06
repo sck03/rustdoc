@@ -131,7 +131,7 @@ namespace ExportDocManager.Services.SingleWindow
             await input.ReadExactlyAsync(magic, cancellationToken).ConfigureAwait(false);
             if (!CryptographicOperations.FixedTimeEquals(magic, Magic))
             {
-                throw new InvalidDataException("不是受支持的持卡机灾难恢复包。");
+                throw new InvalidDataException("不是受支持的灾难恢复包。");
             }
 
             int headerLength = await ReadInt32Async(input, cancellationToken).ConfigureAwait(false);

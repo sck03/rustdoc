@@ -20,6 +20,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapSettingsEndpoints();
             endpoints.MapBackupEndpoints();
             endpoints.MapSharedDatabaseMaintenanceEndpoints();
+            endpoints.MapServerMigrationEndpoints();
             endpoints.MapInvoiceDataMaintenanceEndpoints();
             endpoints.MapDashboardEndpoints();
             endpoints.MapInvoiceEndpoints();

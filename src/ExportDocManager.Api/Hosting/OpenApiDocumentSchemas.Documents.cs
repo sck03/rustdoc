@@ -731,7 +731,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["destinationCountry"] = StringProperty("Destination country."),
                                 ["shippingMarks"] = StringProperty("Shipping marks."),
                                 ["shippingMarksType"] = StringProperty("Shipping marks type."),
-                                ["shippingMarksImage"] = StringProperty("Shipping marks image path."),
+                                ["shippingMarksImage"] = StringProperty("DataRoot-relative managed shipping marks image path under Marks/."),
                                 ["tradeTerms"] = StringProperty("Trade terms."),
                                 ["transportMode"] = StringProperty("Transport mode."),
                                 ["shipmentDate"] = new { type = "string", format = "date-time", nullable = true },

@@ -263,7 +263,9 @@ namespace ExportDocManager.Api.Tests
                 var firstResponse = await adminClient.PostAsync(
                     $"/api/master-data/exporters/{created.Id}/seals/document/upload?fileName=..%2Fdocument-seal.png",
                     firstContent);
-                Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+                Assert.True(
+                    firstResponse.IsSuccessStatusCode,
+                    await firstResponse.Content.ReadAsStringAsync());
                 firstUpload = await ApiIntegrationTestHarness.ReadJsonAsync<ApiExporterDto>(firstResponse);
             }
 
@@ -273,8 +275,12 @@ namespace ExportDocManager.Api.Tests
                 "Seals",
                 "Exporters",
                 created.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            Assert.StartsWith(exporterSealRoot, firstUpload.DocSealPath, StringComparison.OrdinalIgnoreCase);
-            Assert.True(File.Exists(firstUpload.DocSealPath));
+            Assert.StartsWith(
+                $"Files/Seals/Exporters/{created.Id}/",
+                firstUpload.DocSealPath,
+                StringComparison.OrdinalIgnoreCase);
+            string firstUploadPath = ResolveManagedDataPath(harness.DataRoot, firstUpload.DocSealPath);
+            Assert.True(File.Exists(firstUploadPath));
             Assert.Empty(firstUpload.CustomsSealPath);
 
             ApiExporterDto replacement;
@@ -288,8 +294,9 @@ namespace ExportDocManager.Api.Tests
             }
 
             Assert.NotEqual(firstUpload.DocSealPath, replacement.DocSealPath);
-            Assert.False(File.Exists(firstUpload.DocSealPath));
-            Assert.True(File.Exists(replacement.DocSealPath));
+            string replacementPath = ResolveManagedDataPath(harness.DataRoot, replacement.DocSealPath);
+            Assert.False(File.Exists(firstUploadPath));
+            Assert.True(File.Exists(replacementPath));
 
             ApiExporterDto customsUpload;
             using (var customsContent = CreateImageContent(pngBytes, "image/png"))
@@ -302,15 +309,16 @@ namespace ExportDocManager.Api.Tests
             }
 
             Assert.Equal(replacement.DocSealPath, customsUpload.DocSealPath);
-            Assert.True(File.Exists(customsUpload.CustomsSealPath));
+            string customsUploadPath = ResolveManagedDataPath(harness.DataRoot, customsUpload.CustomsSealPath);
+            Assert.True(File.Exists(customsUploadPath));
             Assert.Equal(2, Directory.GetFiles(exporterSealRoot).Length);
 
             var clearDocumentSealResponse = await adminClient.PutAsJsonAsync(
                 $"/api/master-data/exporters/{created.Id}",
                 customsUpload with { DocSealPath = string.Empty });
             Assert.Equal(HttpStatusCode.OK, clearDocumentSealResponse.StatusCode);
-            Assert.False(File.Exists(customsUpload.DocSealPath));
-            Assert.True(File.Exists(customsUpload.CustomsSealPath));
+            Assert.False(File.Exists(replacementPath));
+            Assert.True(File.Exists(customsUploadPath));
             Assert.Single(Directory.GetFiles(exporterSealRoot));
 
             using (var oversizedContent = CreateImageContent(
@@ -327,6 +335,11 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
             Assert.False(Directory.Exists(exporterSealRoot));
         }
+
+        private static string ResolveManagedDataPath(string dataRoot, string storedPath) =>
+            Path.GetFullPath(Path.Combine(
+                dataRoot,
+                storedPath.Replace('/', Path.DirectorySeparatorChar)));
 
         private static ApiExporterDto CreateExporter(string name)
         {

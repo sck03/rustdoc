@@ -259,14 +259,9 @@ namespace ExportDocManager.Services.Security
 
         private static void RestrictKeyFilePermissions(string path)
         {
-            if (OperatingSystem.IsWindows())
-            {
-                return;
-            }
-
             try
             {
-                File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                RuntimeFilePermissionHelper.RestrictFile(path);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
             {

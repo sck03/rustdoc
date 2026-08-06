@@ -44,6 +44,7 @@ import {
 import { ReferenceCatalogSummary } from "./ReferenceCatalogSummary.tsx";
 import { SingleWindowTabs } from "./SingleWindowNavigation.tsx";
 import { useReferenceCatalogExcelWorkspace } from "./useReferenceCatalogExcelWorkspace.ts";
+import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 
 type CatalogContextMenuState = {
   x: number;
@@ -57,11 +58,13 @@ type AliasEditorState = CatalogCellPosition & {
 
 export function SingleWindowReferenceCatalogPage({
   client,
-  canManageReferenceCatalog,
 }: {
   client: ExportDocManagerApiClient;
-  canManageReferenceCatalog: boolean;
 }) {
+  const declarationPermission = useModulePermission("document.declaration-dictionary");
+  // Operate grants edit/import access; only Manage may reset the shared dictionary.
+  const canManageReferenceCatalog = declarationPermission.canOperate;
+  const canResetReferenceCatalog = declarationPermission.canManage;
   const requestConfirmation = useConfirmation();
   const queryClient = useQueryClient();
   const jsonImportInputRef = useRef<HTMLInputElement | null>(null);
@@ -467,7 +470,7 @@ export function SingleWindowReferenceCatalogPage({
   }
 
   async function handleReset() {
-    if (!canManageReferenceCatalog || isBusy) {
+    if (!canResetReferenceCatalog || isBusy) {
       return;
     }
 
@@ -545,7 +548,7 @@ export function SingleWindowReferenceCatalogPage({
         onChange={excelWorkspace.handleFile}
       />
 
-      {!canManageReferenceCatalog ? <InlineNotice tone="info">当前账号可查看参考词典，保存和恢复需要管理员权限。</InlineNotice> : null}
+      {!canManageReferenceCatalog ? <InlineNotice tone="info">当前账号只能查看申报词典，编辑和导入需要 Operate 权限。</InlineNotice> : null}
       {message ? <InlineNotice tone="error" title="参考词典操作失败">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {validationErrors.length > 0 ? <InlineNotice tone="warning" title="请检查待导入数据">{validationErrors.slice(0, 4).join("；")}</InlineNotice> : null}
@@ -601,7 +604,7 @@ export function SingleWindowReferenceCatalogPage({
             <Save size={17} aria-hidden="true" />
             <span>保存</span>
           </button>
-          <button className="command-button danger-command" type="button" disabled={!canManageReferenceCatalog || isBusy} onClick={handleReset}>
+          <button className="command-button danger-command" type="button" disabled={!canResetReferenceCatalog || isBusy} onClick={handleReset}>
             <RotateCcw size={17} aria-hidden="true" />
             <span>恢复内置</span>
           </button>

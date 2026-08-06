@@ -124,7 +124,7 @@ MODE=$(sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' .env)
 
 ## 4. 数据库备份
 
-PostgreSQL 容器自带与服务器同版本的 `pg_dump/pg_restore`，不要求宿主机或 API 容器安装数据库工具。当前 API 镜像没有内置 PostgreSQL 客户端，因此管理界面的“创建物理备份”可能提示维护组件缺失；VPS 容器部署应使用本节命令。
+PostgreSQL 容器和 API 镜像都自带 PostgreSQL 18 客户端；API 使用镜像内 `/usr/lib/postgresql/18/bin`，不要求宿主机安装客户端，也不会把工具放入系统 C 盘。命令行备份仍可使用本节方法，网页端操作见下文。
 
 备份可在线执行，但建议选择业务低峰期。必须再复制到另一台服务器、对象存储或离线介质；只放在同一 VPS 上不能防止磁盘或整机损坏。
 
@@ -200,6 +200,14 @@ find "$BACKUP_ROOT" -maxdepth 1 -type f \
 ```
 
 不要把备份、`.env`、TLS 私钥或主密钥提交到 Git 仓库。
+
+### 4.1 网页端备份和恢复
+
+管理员登录后进入“系统设置 -> 维护 -> 团队库”。这里可以创建并下载 `.dump`，下载服务器已有备份，或上传 `.dump` 后输入 `RESTORE DATABASE` 排队恢复。容器会在响应完成后自动重启；恢复前会把当前数据库保存到 `runtime/api-data/Backups/ServerMigration/Safety/`。
+
+同一页面还可以输入强迁移密码创建加密 `.edmmigration` 完整迁移包，或上传迁移包并输入 `MIGRATE` 排队恢复。完整包包含数据库、应用运行配置、印章、唛头图片和其它业务文件、用户模板、单一窗口数据及本地主密钥；部署目录的 `.env` 不在 API 可见范围内，迁移时必须另外保留并按新服务器网络参数复核。完整包不包含日志、缓存、临时导出文件、历史备份、许可证、机器绑定试用数据，也不包含 `runtime/letsencrypt/` 中的 TLS/Certbot 证书。目标服务器若显式设置 `EXPORTDOCMANAGER_MASTER_KEY`，必须与源服务器一致，否则恢复会在覆盖数据库前中止。
+
+网页恢复会创建临时验证数据库，因此 API 使用的 PostgreSQL 账号必须具备 `CREATEDB`；默认 Compose 初始化账号满足该要求。数据库密码解析优先级为密码文件、环境变量、程序生成的 AES-GCM 受保护配置；Compose 默认通过仅保存在部署目录权限受限 `.env` 中的 `POSTGRES_PASSWORD` 注入环境变量。迁移到新服务器后，让安装器重新探测容器网段并重新签发 TLS 证书；如需保留原证书，应由部署管理员在 API 迁移包之外单独安全处理 `runtime/letsencrypt/`。
 
 ## 5. 在当前服务器恢复数据库
 
