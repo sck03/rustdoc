@@ -1,3 +1,5 @@
+using ExportDocManager.Services.Errors;
+
 namespace ExportDocManager.Services.Reporting
 {
     public sealed record UserReportTemplateRecord(
@@ -36,7 +38,7 @@ namespace ExportDocManager.Services.Reporting
         DateTimeOffset CreatedAt,
         bool CanRestore);
 
-    public sealed class UserReportTemplateConcurrencyException : InvalidOperationException
+    public sealed class UserReportTemplateConcurrencyException : ServiceConcurrencyException
     {
         public UserReportTemplateConcurrencyException(string message) : base(message) { }
         public UserReportTemplateConcurrencyException(string message, Exception innerException)

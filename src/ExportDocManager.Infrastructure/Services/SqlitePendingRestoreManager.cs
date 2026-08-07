@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.Data.Sqlite;
 using Serilog;
@@ -80,7 +81,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
             {
-                throw new InvalidOperationException(
+                throw new InfrastructureServiceException(
                     $"无法读取 SQLite 待还原任务，请检查运行数据根 Database 目录：{ex.Message}",
                     ex);
             }
@@ -94,7 +95,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
             {
-                throw new InvalidOperationException("SQLite 待还原任务的路径格式无效。", ex);
+                throw new InfrastructureServiceException("SQLite 待还原任务的路径格式无效。", ex);
             }
 
             string databaseDirectory = Path.GetDirectoryName(databasePath) ?? pathProvider.DatabaseRoot;
@@ -102,7 +103,7 @@ namespace ExportDocManager.Services.Infrastructure
                 !PathBoundaryHelper.IsWithinRoot(stagedPath, databaseDirectory) ||
                 !string.Equals(stagedPath, GetStagedRestorePath(databasePath), PathComparison))
             {
-                throw new InvalidOperationException("SQLite 待还原任务的目标路径或暂存路径无效。" );
+                throw new InfrastructureServiceException("SQLite 待还原任务的目标路径或暂存路径无效。" );
             }
             if (!File.Exists(stagedPath))
             {
@@ -113,7 +114,7 @@ namespace ExportDocManager.Services.Infrastructure
             string actualHash = ComputeSha256(stagedPath);
             if (!string.Equals(actualHash, marker.StagedSha256, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException("SQLite 待还原数据库摘要不一致，已拒绝覆盖当前数据库。" );
+                throw new InfrastructureServiceException("SQLite 待还原数据库摘要不一致，已拒绝覆盖当前数据库。" );
             }
 
             ValidateSnapshot(stagedPath);
@@ -135,13 +136,13 @@ namespace ExportDocManager.Services.Infrastructure
         {
             if (!File.Exists(databasePath) || string.IsNullOrWhiteSpace(marker.StagedSha256))
             {
-                throw new InvalidOperationException("SQLite 待还原任务缺少暂存数据库文件。" );
+                throw new InfrastructureServiceException("SQLite 待还原任务缺少暂存数据库文件。" );
             }
 
             string targetHash = ComputeSha256(databasePath);
             if (!string.Equals(targetHash, marker.StagedSha256, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException("SQLite 待还原任务缺少暂存数据库文件，且当前数据库不是已排队的还原版本。" );
+                throw new InfrastructureServiceException("SQLite 待还原任务缺少暂存数据库文件，且当前数据库不是已排队的还原版本。" );
             }
 
             SqliteConnection.ClearAllPools();
@@ -183,7 +184,7 @@ namespace ExportDocManager.Services.Infrastructure
             string result = SqliteMaintenanceGateway.RunQuickCheck(connection);
             if (!string.Equals(result, "ok", StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException($"SQLite 待还原数据库一致性检查失败：{result}" );
+                throw new InfrastructureServiceException($"SQLite 待还原数据库一致性检查失败：{result}" );
             }
         }
     }

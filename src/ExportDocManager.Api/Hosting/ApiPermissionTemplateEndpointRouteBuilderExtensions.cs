@@ -50,7 +50,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             }).WithName("DeletePermissionTemplate");
         }
@@ -93,7 +93,7 @@ namespace ExportDocManager.Api.Hosting
             }
             catch (InvalidOperationException ex)
             {
-                return WriteConflict(ex.Message);
+                return WriteServiceException(ex);
             }
         }
 

@@ -66,7 +66,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("SaveInvoiceTransferPackageToPath");
@@ -117,7 +117,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 finally
                 {
@@ -176,7 +176,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("PreviewInvoiceTransferPackage");
@@ -246,7 +246,7 @@ namespace ExportDocManager.Api.Hosting
                     var preview = await transferService.PreviewAsync(read.Package, cancellationToken);
                     if (!read.ChecksumValid)
                     {
-                        return WriteConflict($"单据包校验失败：{read.ChecksumMessage}");
+                        return WriteValidation($"单据包校验失败：{read.ChecksumMessage}");
                     }
 
                     var result = await transferService.ImportAsync(
@@ -273,7 +273,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("ImportInvoiceTransferPackage");
@@ -308,7 +308,7 @@ namespace ExportDocManager.Api.Hosting
                         var preview = await transferService.PreviewAsync(read.Package, cancellationToken);
                         if (!read.ChecksumValid)
                         {
-                            return WriteConflict($"单据包校验失败：{read.ChecksumMessage}");
+                            return WriteValidation($"单据包校验失败：{read.ChecksumMessage}");
                         }
 
                         var result = await transferService.ImportAsync(
@@ -380,7 +380,7 @@ namespace ExportDocManager.Api.Hosting
             }
             catch (Exception ex)
             {
-                return WriteConflict(ex.Message);
+                return WriteServiceException(ex);
             }
             finally
             {

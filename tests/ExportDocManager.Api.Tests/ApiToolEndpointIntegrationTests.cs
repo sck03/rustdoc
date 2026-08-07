@@ -164,12 +164,12 @@ namespace ExportDocManager.Api.Tests
                     body = "Body",
                     attachmentPaths = Array.Empty<string>()
                 });
-            Assert.Equal(HttpStatusCode.Conflict, unconfiguredEmailResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, unconfiguredEmailResponse.StatusCode);
 
             var unconfiguredEmailTestResponse = await adminClient.PostAsync(
                 "/api/tools/email/test-connection",
                 content: null);
-            Assert.Equal(HttpStatusCode.Conflict, unconfiguredEmailTestResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, unconfiguredEmailTestResponse.StatusCode);
 
             var createOperatorResponse = await adminClient.PostAsJsonAsync(
                 "/api/users",

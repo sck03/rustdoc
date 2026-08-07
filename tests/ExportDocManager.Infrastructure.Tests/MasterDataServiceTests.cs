@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using Microsoft.Data.Sqlite;
@@ -56,7 +57,7 @@ namespace ExportDocManager.Infrastructure.Tests
             using var factory = new SqliteTestDbContextFactory();
             var service = new HsCodeService(factory, new LocalMasterDataReadRepository(factory));
 
-            await Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveAsync(new HsCode
+            await Assert.ThrowsAsync<ServiceValidationException>(() => service.SaveAsync(new HsCode
             {
                 Code = "6109100000",
                 Name = "手工编码",
@@ -70,7 +71,7 @@ namespace ExportDocManager.Infrastructure.Tests
             var saved = await service.GetByCodeAsync("6109100000");
             Assert.Equal("ReferenceOnly", saved.Status);
 
-            await Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveAsync(new HsCode
+            await Assert.ThrowsAsync<ServiceValidationException>(() => service.SaveAsync(new HsCode
             {
                 Id = saved.Id,
                 Code = saved.Code,
@@ -406,7 +407,7 @@ namespace ExportDocManager.Infrastructure.Tests
             productFirst.NameEN = "Product First";
             Assert.True(await productService.UpdateProductAsync(productFirst));
             productStale.NameEN = "Product Stale";
-            var productConflict = await Assert.ThrowsAsync<Exception>(() => productService.UpdateProductAsync(productStale));
+            var productConflict = await Assert.ThrowsAsync<ServiceConcurrencyException>(() => productService.UpdateProductAsync(productStale));
             Assert.Contains("其他用户", productConflict.Message);
 
             int payeeId = await payeeService.SavePayeeAsync(new Payee { Category = "Factory", Name = "Payee" });
@@ -415,7 +416,7 @@ namespace ExportDocManager.Infrastructure.Tests
             payeeFirst.Name = "Payee First";
             await payeeService.SavePayeeAsync(payeeFirst);
             payeeStale.Name = "Payee Stale";
-            var payeeConflict = await Assert.ThrowsAsync<Exception>(() => payeeService.SavePayeeAsync(payeeStale));
+            var payeeConflict = await Assert.ThrowsAsync<ServiceConcurrencyException>(() => payeeService.SavePayeeAsync(payeeStale));
             Assert.Contains("其他用户", payeeConflict.Message);
 
             var port = new Port { Code = "CNSHA", NameEN = "Shanghai" };
@@ -425,7 +426,7 @@ namespace ExportDocManager.Infrastructure.Tests
             portFirst.NameEN = "Shanghai First";
             await auxiliaryService.SavePortAsync(portFirst);
             portStale.NameEN = "Shanghai Stale";
-            var portConflict = await Assert.ThrowsAsync<InvalidOperationException>(() => auxiliaryService.SavePortAsync(portStale));
+            var portConflict = await Assert.ThrowsAsync<ServiceConcurrencyException>(() => auxiliaryService.SavePortAsync(portStale));
             Assert.Contains("其他用户", portConflict.Message);
 
             var unit = new Unit { Code = "PCS", NameEN = "Pieces" };
@@ -435,7 +436,7 @@ namespace ExportDocManager.Infrastructure.Tests
             unitFirst.NameEN = "Pieces First";
             await auxiliaryService.SaveUnitAsync(unitFirst);
             unitStale.NameEN = "Pieces Stale";
-            var unitConflict = await Assert.ThrowsAsync<InvalidOperationException>(() => auxiliaryService.SaveUnitAsync(unitStale));
+            var unitConflict = await Assert.ThrowsAsync<ServiceConcurrencyException>(() => auxiliaryService.SaveUnitAsync(unitStale));
             Assert.Contains("其他用户", unitConflict.Message);
 
             await hsCodeService.SaveAsync(new HsCode { Code = "6109100000", Name = "T-Shirts" });
@@ -444,7 +445,7 @@ namespace ExportDocManager.Infrastructure.Tests
             hsFirst.Name = "T-Shirts First";
             await hsCodeService.SaveAsync(hsFirst);
             hsStale.Name = "T-Shirts Stale";
-            var hsConflict = await Assert.ThrowsAsync<InvalidOperationException>(() => hsCodeService.SaveAsync(hsStale));
+            var hsConflict = await Assert.ThrowsAsync<ServiceConcurrencyException>(() => hsCodeService.SaveAsync(hsStale));
             Assert.Contains("其他用户", hsConflict.Message);
         }
 

@@ -1,0 +1,237 @@
+.smart-ocr-surface {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.smart-ocr-toolbar {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.smart-ocr-toolbar .path-field {
+  flex: 1;
+}
+
+.smart-ocr-action-bar {
+  align-self: end;
+}
+
+.smart-ocr-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.15fr) minmax(320px, 0.85fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.smart-ocr-preview-panel,
+.smart-ocr-result-panel {
+  min-width: 0;
+  min-height: 0;
+}
+
+.smart-ocr-preview-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.smart-ocr-preview-panel .section-header span,
+.smart-ocr-result-panel .section-header span {
+  display: block;
+  max-width: min(42vw, 640px);
+  margin-top: 4px;
+  overflow: hidden;
+  color: #69737d;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.smart-ocr-preview-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.smart-ocr-zoom-readout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  height: 32px;
+  color: #39424c;
+  background: #f1f4f6;
+  border: 1px solid #dde3e8;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.smart-ocr-preview-viewport {
+  position: relative;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  min-height: 420px;
+  overflow: auto;
+  background: #edf1f4;
+  border: 1px solid #cfd8df;
+  border-radius: 8px;
+  cursor: grab;
+}
+
+.smart-ocr-preview-viewport-dragging {
+  cursor: grabbing;
+}
+
+.smart-ocr-preview-canvas {
+  position: relative;
+  min-width: 1px;
+  min-height: 1px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 1px 6px rgba(32, 33, 36, 0.16);
+}
+
+.smart-ocr-preview-canvas img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.smart-ocr-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.smart-ocr-line-box {
+  position: absolute;
+  background: rgba(22, 163, 74, 0.14);
+  border: 2px solid #16a34a;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+.smart-ocr-preview-empty {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 420px;
+  color: #69737d;
+  font-size: 13px;
+}
+
+.smart-ocr-side-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.smart-ocr-result-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.smart-ocr-result-panel textarea {
+  width: 100%;
+  min-height: 420px;
+  resize: none;
+  padding: 12px;
+  color: #202124;
+  background: #fbfcfd;
+  border: 1px solid #dde3e8;
+  border-radius: 8px;
+  font-family: var(--edm-font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.exchange-rate-surface {
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+}
+
+.exchange-rate-toolbar {
+  align-items: center;
+}
+
+.toolbar-summary {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.toolbar-summary strong {
+  color: #202124;
+  font-size: 14px;
+}
+
+.toolbar-summary span {
+  max-width: 760px;
+  overflow: hidden;
+  color: #65717c;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exchange-rate-detail-grid {
+  grid-template-columns: minmax(220px, 2fr) minmax(120px, 0.75fr) minmax(180px, 1fr) minmax(220px, 2fr);
+}
+
+.exchange-rate-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.32fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.exchange-rate-table-section,
+.exchange-rate-currency-section {
+  min-width: 0;
+  min-height: 0;
+}
+
+.exchange-rate-table-frame {
+  min-height: 420px;
+}
+
+.exchange-rate-table {
+  min-width: 1080px;
+}
+
+.exchange-rate-table th:nth-child(n + 2):nth-child(-n + 6),
+.exchange-rate-table td:nth-child(n + 2):nth-child(-n + 6) {
+  width: 118px;
+  text-align: right;
+}
+
+.exchange-rate-table th:last-child,
+.exchange-rate-table td:last-child {
+  width: 180px;
+}
+
+.currency-chip-list {
+  display: flex;
+  align-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 420px;
+  padding: 4px;
+  overflow: auto;
+}
+
+.currency-chip-list span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 9px;
+  color: #1f3d37;
+  background: #eef7f4;
+  border: 1px solid #d2e5df;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.2;
+}

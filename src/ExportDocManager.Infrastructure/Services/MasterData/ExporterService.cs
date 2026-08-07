@@ -7,6 +7,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
@@ -46,7 +47,7 @@ namespace ExportDocManager.Services.MasterData
                     if (!string.IsNullOrWhiteSpace(exporter.DocSealPath) ||
                         !string.IsNullOrWhiteSpace(exporter.CustomsSealPath))
                     {
-                        throw new InvalidOperationException("请先保存出口商基础资料，再通过受控上传保存印章图片。");
+                        throw new ServiceValidationException("请先保存出口商基础资料，再通过受控上传保存印章图片。");
                     }
                     _accessScope.ApplyOwner(exporter);
                     await context.Exporters.AddAsync(exporter);
@@ -56,11 +57,11 @@ namespace ExportDocManager.Services.MasterData
                     var existing = await _accessScope.ApplyExporterScope(context.Exporters)
                         .AsNoTracking()
                         .SingleOrDefaultAsync(item => item.Id == exporter.Id);
-                    if (existing == null) throw new KeyNotFoundException("出口商不存在或不属于当前账号。");
+                    if (existing == null) throw new ResourceNotFoundException("出口商不存在或不属于当前账号。");
                     if (!IsUnchangedOrCleared(exporter.DocSealPath, existing.DocSealPath) ||
                         !IsUnchangedOrCleared(exporter.CustomsSealPath, existing.CustomsSealPath))
                     {
-                        throw new InvalidOperationException("印章路径不能直接编辑，请使用印章上传按钮。");
+                        throw new ServiceValidationException("印章路径不能直接编辑，请使用印章上传按钮。");
                     }
                     previousDocSealPath = existing.DocSealPath;
                     previousCustomsSealPath = existing.CustomsSealPath;
@@ -81,13 +82,21 @@ namespace ExportDocManager.Services.MasterData
                     exporter.CustomsSealPath);
                 return exporter.Id;
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
-                throw new Exception("该出口商数据已被其他用户修改，请刷新后重试。");
+                throw new ServiceConcurrencyException("该出口商数据已被其他用户修改，请刷新后重试。", ex);
             }
-            catch (Exception ex)
+            catch (ArgumentException ex)
             {
-                throw new Exception($"保存出口商信息失败: {ex.Message}", ex);
+                throw new ServiceValidationException(ex.Message, ex);
+            }
+            catch (ServiceException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new InfrastructureServiceException("出口商数据保存服务暂时不可用，请稍后重试。", ex);
             }
         }
 
@@ -98,9 +107,13 @@ namespace ExportDocManager.Services.MasterData
                 var rows = await _exporterReadRepository.QueryAsync(new ExporterReadQuery());
                 return rows.ToList();
             }
-            catch (Exception ex)
+            catch (ServiceException)
             {
-                throw new Exception($"获取出口商列表失败: {ex.Message}", ex);
+                throw;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new InfrastructureServiceException("出口商列表服务暂时不可用，请稍后重试。", ex);
             }
         }
 
@@ -112,9 +125,13 @@ namespace ExportDocManager.Services.MasterData
                 return await _accessScope.ApplyExporterScope(context.Exporters)
                     .FirstOrDefaultAsync(x => x.Id == id);
             }
-            catch (Exception ex)
+            catch (ServiceException)
             {
-                throw new Exception($"根据ID获取出口商失败: {ex.Message}", ex);
+                throw;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new InfrastructureServiceException("出口商查询服务暂时不可用，请稍后重试。", ex);
             }
         }
 
@@ -135,9 +152,17 @@ namespace ExportDocManager.Services.MasterData
                 _exporterSealService?.DeleteAllManagedSeals(id);
                 return true;
             }
-            catch (Exception ex)
+            catch (DbUpdateConcurrencyException ex)
             {
-                throw new Exception($"删除出口商失败: {ex.Message}", ex);
+                throw new ServiceConcurrencyException("该出口商数据已被其他用户修改，请刷新后重试。", ex);
+            }
+            catch (ServiceException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new InfrastructureServiceException("出口商删除服务暂时不可用，请稍后重试。", ex);
             }
         }
 
@@ -150,9 +175,17 @@ namespace ExportDocManager.Services.MasterData
                 return await _accessScope.ApplyExporterScope(context.Exporters)
                     .FirstOrDefaultAsync(x => x.ExporterNameEN == name || x.ExporterNameCN == name);
             }
-            catch (Exception ex)
+            catch (ServiceException)
             {
-                throw new Exception($"根据名称获取出口商失败: {ex.Message}", ex);
+                throw;
+            }
+            catch (ArgumentException ex)
+            {
+                throw new ServiceValidationException(ex.Message, ex);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new InfrastructureServiceException("出口商名称查询服务暂时不可用，请稍后重试。", ex);
             }
         }
 

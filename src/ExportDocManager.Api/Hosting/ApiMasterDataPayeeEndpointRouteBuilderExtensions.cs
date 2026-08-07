@@ -99,7 +99,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("CreatePayee");
@@ -157,7 +157,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("UpdatePayee");
@@ -192,7 +192,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("DeletePayee");

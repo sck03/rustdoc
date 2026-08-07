@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
@@ -268,7 +269,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
             using var context = new AppDbContext(options);
 
-            var exception = Assert.Throws<InvalidOperationException>(() =>
+            var exception = Assert.Throws<ServiceValidationException>(() =>
                 DbSeeder.SeedAuxiliaryData(
                     context,
                     new DatabaseConnectionSettings

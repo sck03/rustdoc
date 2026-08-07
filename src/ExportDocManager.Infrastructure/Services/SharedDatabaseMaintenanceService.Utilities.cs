@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -15,7 +16,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             if (!DatabaseModeHelper.UsesSharedDatabase(_databaseSettings))
             {
-                throw new InvalidOperationException("当前未启用 PostgreSQL 团队版业务数据库，无法执行 PostgreSQL 物理备份。");
+                throw new ServiceValidationException("当前未启用 PostgreSQL 团队版业务数据库，无法执行 PostgreSQL 物理备份。");
             }
         }
 
@@ -136,7 +137,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
             catch (UnauthorizedAccessException ex)
             {
-                throw new InvalidOperationException(ex.Message, ex);
+                throw new InfrastructureServiceException("受管维护目录不可写，请检查运行目录权限。", ex);
             }
         }
 

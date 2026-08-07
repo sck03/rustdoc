@@ -672,7 +672,7 @@ namespace ExportDocManager.Api.Tests
                     subject = "Documents",
                     body = "Please find the attached documents."
                 });
-            Assert.Equal(HttpStatusCode.Conflict, unconfiguredDocumentEmailResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, unconfiguredDocumentEmailResponse.StatusCode);
         }
 
         [Fact]

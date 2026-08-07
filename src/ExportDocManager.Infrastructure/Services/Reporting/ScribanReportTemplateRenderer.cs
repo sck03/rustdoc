@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using ExportDocManager.Services.Errors;
 using HtmlAgilityPack;
 using Scriban;
 using Scriban.Runtime;
@@ -81,7 +82,7 @@ namespace ExportDocManager.Services.Reporting
 
             if (template.HasErrors)
             {
-                throw new InvalidOperationException(string.Join(Environment.NewLine, template.Messages));
+                throw new ServiceValidationException(string.Join(Environment.NewLine, template.Messages));
             }
 
             string rendered = template.Render(context);

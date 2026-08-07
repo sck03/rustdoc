@@ -1,4 +1,5 @@
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 
 namespace ExportDocManager.Services.MasterData
 {
@@ -30,11 +31,11 @@ namespace ExportDocManager.Services.MasterData
             }
 
             if (string.IsNullOrWhiteSpace(item.SourceName))
-                throw new InvalidOperationException("有效 HS 编码必须填写可信数据来源。");
+                throw new ServiceValidationException("有效 HS 编码必须填写可信数据来源。");
             if (!IsValidEffectiveYear(item.EffectiveYear))
-                throw new InvalidOperationException("有效 HS 编码必须填写 2000—2100 之间的适用年度。");
+                throw new ServiceValidationException("有效 HS 编码必须填写 2000—2100 之间的适用年度。");
             if (!item.LastVerifiedAt.HasValue)
-                throw new InvalidOperationException("有效 HS 编码必须包含最近验证时间。");
+                throw new ServiceValidationException("有效 HS 编码必须包含最近验证时间。");
         }
     }
 }

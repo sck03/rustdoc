@@ -207,7 +207,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict($"日志清理失败：{ex.Message}");
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("CleanupSystemLogs");

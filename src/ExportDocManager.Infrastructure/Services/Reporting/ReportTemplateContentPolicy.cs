@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
+using ExportDocManager.Services.Errors;
 using Scriban;
 using Scriban.Syntax;
 
@@ -137,7 +138,7 @@ internal static class ReportTemplateContentPolicy
         string rendered = html ?? string.Empty;
         if (rendered.Length > MaximumRenderedHtmlCharacters)
         {
-            throw new InvalidOperationException("报表渲染结果超过允许长度，请减少明细行、图片或模板重复内容。");
+            throw new ServiceValidationException("报表渲染结果超过允许长度，请减少明细行、图片或模板重复内容。");
         }
 
         try
@@ -146,7 +147,7 @@ internal static class ReportTemplateContentPolicy
         }
         catch (ArgumentException ex)
         {
-            throw new InvalidOperationException($"报表渲染结果包含不安全内容：{ex.Message}", ex);
+            throw new ServiceValidationException($"报表渲染结果包含不安全内容：{ex.Message}", ex);
         }
     }
 

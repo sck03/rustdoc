@@ -120,7 +120,7 @@ namespace ExportDocManager.Api.Tests
                 companyScope = "",
                 confirmationText = "TRANSFER OWNERSHIP"
             });
-            Assert.Equal(HttpStatusCode.Conflict, sameUserResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, sameUserResponse.StatusCode);
 
             var inactiveTargetResponse = await adminClient.PostAsJsonAsync("/api/shared-database/ownership/transfer", new
             {
@@ -134,7 +134,7 @@ namespace ExportDocManager.Api.Tests
                 companyScope = "",
                 confirmationText = "TRANSFER OWNERSHIP"
             });
-            Assert.Equal(HttpStatusCode.Conflict, inactiveTargetResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, inactiveTargetResponse.StatusCode);
 
             var oversizedScopeResponse = await adminClient.PostAsJsonAsync("/api/shared-database/ownership/transfer", new
             {
@@ -148,7 +148,7 @@ namespace ExportDocManager.Api.Tests
                 companyScope = "",
                 confirmationText = "TRANSFER OWNERSHIP"
             });
-            Assert.Equal(HttpStatusCode.Conflict, oversizedScopeResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, oversizedScopeResponse.StatusCode);
 
             Directory.CreateDirectory(Path.Combine(harness.DataRoot, "Logs"));
             await File.WriteAllTextAsync(Path.Combine(harness.DataRoot, "Logs", "crash-test.log"), "sample crash diagnostic");
@@ -253,7 +253,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Empty(list.Backups);
 
             var createResponse = await adminClient.PostAsync("/api/postgresql-maintenance/backups", content: null);
-            Assert.Equal(HttpStatusCode.Conflict, createResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, createResponse.StatusCode);
             Assert.True(Directory.Exists(list.Status.BackupRoot));
             Assert.Empty(Directory.EnumerateFiles(list.Status.BackupRoot));
         }

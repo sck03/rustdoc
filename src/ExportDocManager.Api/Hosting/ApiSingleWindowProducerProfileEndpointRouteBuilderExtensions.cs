@@ -82,7 +82,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("CreateCustomsCooProducerProfile");
@@ -131,7 +131,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("UpdateCustomsCooProducerProfile");
@@ -162,7 +162,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("DeleteCustomsCooProducerProfile");

@@ -94,11 +94,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (IOException ex)
                 {
-                    return WriteConflict($"OCR 图片当前无法读取：{ex.Message}");
+                    return WriteServiceException(ex);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (NotSupportedException ex)
                 {
@@ -189,7 +189,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (NotSupportedException ex)
                 {

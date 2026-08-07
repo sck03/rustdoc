@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -86,7 +87,9 @@ namespace ExportDocManager.Services.Infrastructure
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
             {
-                return Array.Empty<SharedDatabaseBackupItem>();
+                throw new InfrastructureServiceException(
+                    "PostgreSQL 备份目录暂时不可用，请检查运行数据目录权限。",
+                    ex);
             }
             if (!Directory.Exists(root))
             {
@@ -105,7 +108,9 @@ namespace ExportDocManager.Services.Infrastructure
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                return Array.Empty<SharedDatabaseBackupItem>();
+                throw new InfrastructureServiceException(
+                    "PostgreSQL 备份目录暂时不可用，请检查运行数据目录权限。",
+                    ex);
             }
         }
 

@@ -9,6 +9,7 @@ using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Data;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Reporting;
@@ -135,7 +136,7 @@ namespace ExportDocManager.Api.Tests
                     },
                     runtimeOptions);
 
-                Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.Validate(
+                Assert.Throws<ServiceValidationException>(() => ApiStartupValidator.Validate(
                     pathProvider,
                     new DatabaseConnectionSettings
                     {
@@ -143,7 +144,7 @@ namespace ExportDocManager.Api.Tests
                         SqliteDatabaseFileName = "..\\outside.db"
                     },
                     runtimeOptions));
-                Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.Validate(
+                Assert.Throws<ServiceValidationException>(() => ApiStartupValidator.Validate(
                     pathProvider,
                     new DatabaseConnectionSettings
                     {
@@ -151,7 +152,7 @@ namespace ExportDocManager.Api.Tests
                         SqliteDatabaseFileName = "tenant/data.db"
                     },
                     runtimeOptions));
-                Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.Validate(
+                Assert.Throws<ServiceValidationException>(() => ApiStartupValidator.Validate(
                     pathProvider,
                     new DatabaseConnectionSettings
                     {
@@ -159,7 +160,7 @@ namespace ExportDocManager.Api.Tests
                         SqliteDatabaseFileName = "C:\\outside.db"
                     },
                     runtimeOptions));
-                Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.Validate(
+                Assert.Throws<ServiceValidationException>(() => ApiStartupValidator.Validate(
                     pathProvider,
                     new DatabaseConnectionSettings
                     {

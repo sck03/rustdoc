@@ -23,7 +23,7 @@ if (args.Any(value => string.Equals(value, "--verify-ocr-runtime", StringCompari
     return;
 }
 
-await ServerMigrationManager.ApplyPendingRestoreAsync(pathProvider);
+await ServerMigrationRecoveryStateMachine.ApplyAsync(pathProvider);
 SingleWindowDisasterRecoveryManager.ApplyPendingRestore(pathProvider);
 var databaseSettings = DbHelper.LoadDatabaseSettings();
 ApiStartupValidator.Validate(pathProvider, databaseSettings, runtimeOptions);

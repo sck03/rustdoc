@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.MasterData
@@ -236,7 +237,7 @@ namespace ExportDocManager.Services.MasterData
         }
     }
 
-    public sealed class HsCodeRemoteExpiredException : InvalidOperationException
+    public sealed class HsCodeRemoteExpiredException : ResourceConflictException
     {
         public HsCodeRemoteExpiredException(IEnumerable<string> recommendedKeywords = null)
             : base("该 HS 编码已作废")

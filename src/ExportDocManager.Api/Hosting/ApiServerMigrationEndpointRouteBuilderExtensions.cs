@@ -1,6 +1,8 @@
 using System.Net;
 using System.Security.Cryptography;
+using System.Data.Common;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
@@ -225,7 +227,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex) when (IsExpectedMigrationException(ex))
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("RestorePostgreSqlPhysicalBackup");
@@ -280,7 +282,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex) when (IsExpectedMigrationException(ex))
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("UploadAndRestorePostgreSqlPhysicalBackup");
@@ -419,7 +421,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex) when (IsExpectedMigrationException(ex))
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("StageServerMigrationRestore");
@@ -543,11 +545,15 @@ namespace ExportDocManager.Api.Hosting
         }
 
         private static bool IsExpectedMigrationException(Exception exception) => exception is
+            ServiceException or
             InvalidOperationException or
             InvalidDataException or
             NotSupportedException or
             ArgumentException or
             CryptographicException or
+            IOException or
+            HttpRequestException or
+            DbException or
             TimeoutException;
 
         private static void ConfigureLargeUpload(HttpContext context)

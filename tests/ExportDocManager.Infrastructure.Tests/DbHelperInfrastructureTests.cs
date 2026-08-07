@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
@@ -171,7 +172,7 @@ namespace ExportDocManager.Infrastructure.Tests
                     { "System": { "DatabaseProvider": "PostgreSQL", "PostgreSqlPassword": "plain-secret" } }
                     """);
 
-                var error = Assert.Throws<InvalidOperationException>(() => DbHelper.LoadDatabaseSettings());
+                var error = Assert.Throws<ServiceValidationException>(() => DbHelper.LoadDatabaseSettings());
                 Assert.Contains("不能以明文", error.Message, StringComparison.Ordinal);
             }
             finally
@@ -221,7 +222,7 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 var provider = new RuntimeAppPathProvider(Path.Combine(root, "app"), Path.Combine(root, "data"));
 
-                var error = Assert.Throws<InvalidOperationException>(() =>
+                var error = Assert.Throws<ServiceValidationException>(() =>
                     DbHelper.ResolveRuntimeSqliteDatabasePath(provider, outsidePath));
 
                 Assert.Contains("运行数据根 Database", error.Message, StringComparison.Ordinal);

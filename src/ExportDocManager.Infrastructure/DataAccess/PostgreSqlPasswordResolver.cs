@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
@@ -34,7 +35,7 @@ namespace ExportDocManager.DataAccess
             string decrypted = SecurityHelper.Decrypt(configuredValue);
             if (decrypted == null)
             {
-                throw new InvalidOperationException(
+                throw new ServiceValidationException(
                     $"PostgreSQL 密码不能以明文保存在 appsettings.json。请使用 {PasswordEnvironmentVariable}、" +
                     $"{PasswordFileEnvironmentVariable}，或由程序保存 AES-GCM 受保护载荷。");
             }
@@ -51,22 +52,22 @@ namespace ExportDocManager.DataAccess
 
             if (relative && !PathBoundaryHelper.IsWithinRoot(path, pathProvider.SecurityRoot))
             {
-                throw new InvalidOperationException(
+                throw new ServiceValidationException(
                     $"{PasswordFileEnvironmentVariable} 的相对路径必须位于运行数据 Security 目录内。");
             }
             if (!File.Exists(path))
             {
-                throw new InvalidOperationException($"PostgreSQL 密码文件不存在：{path}");
+                throw new ResourceNotFoundException($"PostgreSQL 密码文件不存在：{path}");
             }
 
             var info = new FileInfo(path);
             if (info.Length > MaximumSecretFileBytes)
             {
-                throw new InvalidOperationException("PostgreSQL 密码文件超过 16 KiB 安全上限。");
+                throw new ServiceValidationException("PostgreSQL 密码文件超过 16 KiB 安全上限。");
             }
             if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
             {
-                throw new InvalidOperationException("PostgreSQL 密码文件不能是符号链接或重解析点。");
+                throw new ServiceValidationException("PostgreSQL 密码文件不能是符号链接或重解析点。");
             }
 
             try
@@ -75,7 +76,7 @@ namespace ExportDocManager.DataAccess
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                throw new InvalidOperationException($"PostgreSQL 密码文件无法读取：{path}", ex);
+                throw new InfrastructureServiceException($"PostgreSQL 密码文件无法读取：{path}", ex);
             }
         }
     }

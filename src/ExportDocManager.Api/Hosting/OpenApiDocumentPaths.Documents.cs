@@ -714,9 +714,9 @@ namespace ExportDocManager.Api.Hosting
                                     description = "Single-invoice multi-template document email job was accepted. Temporary PDFs are generated under the runtime data cache, sent through SMTP, and cleaned after completion without creating a default attachment directory.",
                                     content = JsonContent("BackgroundJobSnapshot")
                                 },
-                                ["400"] = new { description = "Invalid invoice id, template list, report type, or recipient address." },
+                                ["400"] = new { description = "Invalid invoice id, template list, report type, recipient address, or SMTP configuration." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "SMTP settings are not configured." }
+                                ["503"] = new { description = "The configured SMTP service is unavailable or the background job failed." }
                             }
                         }
                     },
@@ -1176,10 +1176,10 @@ namespace ExportDocManager.Api.Hosting
                                     description = "Package checksum and invoice import preview. Preview checks existing invoices by company scope + InvoiceNo + Type and does not read payment/reimbursement data.",
                                     content = JsonContent("ApiInvoiceTransferPreviewResponse")
                                 },
-                                ["400"] = new { description = "Invalid package path or package format." },
+                                ["400"] = new { description = "Invalid package path, package format, or checksum." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "Package file was not found." },
-                                ["409"] = new { description = "Package could not be previewed." }
+                                ["503"] = new { description = "The package preview dependency failed." }
                             }
                         }
                     },
@@ -1197,9 +1197,9 @@ namespace ExportDocManager.Api.Hosting
                             responses = new Dictionary<string, object>
                             {
                                 ["200"] = new { description = "Uploaded package preview.", content = JsonContent("ApiInvoiceTransferPreviewResponse") },
-                                ["400"] = new { description = "Invalid or empty package upload." },
+                                ["400"] = new { description = "Invalid, empty, or checksum-invalid package upload." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "Package could not be previewed." }
+                                ["503"] = new { description = "The package preview dependency failed." }
                             }
                         }
                     },
@@ -1221,10 +1221,10 @@ namespace ExportDocManager.Api.Hosting
                                     description = "Package was imported into the runtime database according to the selected conflict action. Actual/customs records remain independent by company scope + InvoiceNo + Type.",
                                     content = JsonContent("ApiInvoiceTransferImportResponse")
                                 },
-                                ["400"] = new { description = "Invalid package path, package format, or conflict action." },
+                                ["400"] = new { description = "Invalid package path, package format, conflict action, or checksum." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "Package file was not found." },
-                                ["409"] = new { description = "Package checksum failed or import could not be completed." }
+                                ["503"] = new { description = "The database or package import dependency is unavailable." }
                             }
                         }
                     },
@@ -1323,9 +1323,9 @@ namespace ExportDocManager.Api.Hosting
                             responses = new Dictionary<string, object>
                             {
                                 ["200"] = new { description = "Uploaded package imported.", content = JsonContent("ApiInvoiceTransferImportResponse") },
-                                ["400"] = new { description = "Invalid package upload or conflict action." },
+                                ["400"] = new { description = "Invalid package upload, conflict action, or checksum." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "Checksum failed or package could not be imported." }
+                                ["503"] = new { description = "The database or package import dependency is unavailable." }
                             }
                         }
                     },

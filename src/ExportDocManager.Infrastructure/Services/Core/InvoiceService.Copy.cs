@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -49,11 +50,10 @@ namespace ExportDocManager.Services.Core
                         return newInvoice;
                     });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                var innerMsg = ex.InnerException?.Message ?? "";
-                Log.Error(ex, $"复制发票失败: {ex.Message} {innerMsg}");
-                throw new Exception($"复制发票失败: {ex.Message} \n详细错误: {innerMsg}", ex);
+                Log.Error(ex, "复制发票流程失败");
+                throw new InfrastructureServiceException("发票复制服务暂时不可用，请稍后重试。", ex);
             }
         }
 
@@ -121,11 +121,10 @@ namespace ExportDocManager.Services.Core
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                var innerMsg = ex.InnerException?.Message ?? "";
-                Log.Error(ex, $"生成另一发票类型失败: {ex.Message} {innerMsg}");
-                throw new Exception($"生成另一发票类型失败: {ex.Message} \n详细错误: {innerMsg}", ex);
+                Log.Error(ex, "生成另一发票类型流程失败");
+                throw new InfrastructureServiceException("发票类型转换服务暂时不可用，请稍后重试。", ex);
             }
         }
 

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 
@@ -108,7 +109,8 @@ namespace ExportDocManager.Services
                     : $"pg_dump={dumpVersion}; pg_restore={restoreVersion}; psql={psqlVersion}";
                 return (compatible, version);
             }
-            catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or
+                                       System.ComponentModel.Win32Exception or InfrastructureServiceException)
             {
                 return (false, ex.Message);
             }
@@ -126,7 +128,7 @@ namespace ExportDocManager.Services
             };
             startInfo.ArgumentList.Add("--version");
             using var process = Process.Start(startInfo)
-                ?? throw new InvalidOperationException($"无法启动 PostgreSQL 客户端工具：{executable}");
+                ?? throw new InfrastructureServiceException($"无法启动 PostgreSQL 客户端工具：{executable}");
             Task<string> outputTask = BoundedProcessOutput.ReadAsync(
                 process.StandardOutput,
                 truncationMessage: "[PostgreSQL 客户端版本输出过长，已截断]");
@@ -142,21 +144,22 @@ namespace ExportDocManager.Services
                 BoundedProcessOutput.ObserveAsync(TimeSpan.FromSeconds(5), outputTask, errorTask)
                     .GetAwaiter()
                     .GetResult();
-                throw new InvalidOperationException($"PostgreSQL 客户端版本检查超时：{executable}");
+                throw new InfrastructureServiceException($"PostgreSQL 客户端版本检查超时：{executable}");
             }
             string output = outputTask.GetAwaiter().GetResult();
             string error = errorTask.GetAwaiter().GetResult();
             if (process.ExitCode != 0)
             {
-                throw new InvalidOperationException(
-                    $"PostgreSQL 客户端版本检查失败：{(string.IsNullOrWhiteSpace(error) ? output : error).Trim()}");
+                throw new InfrastructureServiceException(
+                    "PostgreSQL 客户端版本检查失败。",
+                    new InvalidOperationException((string.IsNullOrWhiteSpace(error) ? output : error).Trim()));
             }
 
             version = output.Trim();
             Match match = PostgreSqlVersionRegex().Match(version);
             if (!match.Success || !int.TryParse(match.Groups["major"].Value, out int major))
             {
-                throw new InvalidOperationException($"无法识别 PostgreSQL 客户端版本：{version}");
+                throw new InfrastructureServiceException($"无法识别 PostgreSQL 客户端版本：{version}");
             }
             return major;
         }

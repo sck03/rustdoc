@@ -76,8 +76,12 @@ namespace ExportDocManager.Services.MasterData
 
         public async Task<List<HsCode>> SearchSmartAsync(string keyword)
         {
-            var localTask = SafeSearchAsync(() => SearchAsync(keyword), "本地 HS 搜索");
-            var remoteTask = SafeSearchAsync(() => SearchRemoteAsync(keyword), "远程 HS 搜索");
+            // A local database failure must remain observable to the API (503),
+            // otherwise an offline database is silently presented as an empty
+            // catalogue. Remote providers are optional and may still degrade
+            // to an empty result when an external source is unavailable.
+            var localTask = SearchAsync(keyword);
+            var remoteTask = SafeRemoteSearchAsync(() => SearchRemoteAsync(keyword));
 
             await Task.WhenAll(localTask, remoteTask);
 
@@ -138,7 +142,7 @@ namespace ExportDocManager.Services.MasterData
                 string.Join("；", results.Select(result => result.Message)));
         }
 
-        private async Task<List<HsCode>> SafeSearchAsync(Func<Task<List<HsCode>>> search, string searchName)
+        private async Task<List<HsCode>> SafeRemoteSearchAsync(Func<Task<List<HsCode>>> search)
         {
             try
             {
@@ -146,7 +150,7 @@ namespace ExportDocManager.Services.MasterData
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "{SearchName} 失败，已按降级结果继续。", searchName);
+                Log.Warning(ex, "远程 HS 搜索失败，已按降级结果继续。");
                 return [];
             }
         }

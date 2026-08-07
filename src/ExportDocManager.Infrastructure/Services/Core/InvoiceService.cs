@@ -6,6 +6,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.MasterData;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -139,11 +140,11 @@ namespace ExportDocManager.Services.Core
                 result.FailureKind = SaveFailureKind.Forbidden;
                 return result;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 Log.Error(ex, "保存发票流程失败");
                 result.ErrorMessage = $"保存失败: {ex.Message}";
-                result.FailureKind = SaveFailureKind.Unexpected;
+                result.FailureKind = SaveFailureKind.Infrastructure;
                 return result;
             }
         }
@@ -178,14 +179,21 @@ namespace ExportDocManager.Services.Core
                     });
                 return true;
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
-                throw new Exception("该发票数据已被其他用户修改，请刷新后重试。");
+                throw new BusinessConcurrencyException("该发票数据已被其他用户修改，请刷新后重试。", ex);
             }
-            catch (Exception ex)
+            catch (ServiceException)
             {
-                var innerMsg = ex.InnerException != null ? $"\n内部错误: {ex.InnerException.Message}" : "";
-                throw new Exception($"保存发票信息失败: {ex.Message}{innerMsg}", ex);
+                throw;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                throw new PermissionDeniedException("无权限保存该发票。", ex);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new InfrastructureServiceException("发票保存服务暂时不可用，请稍后重试。", ex);
             }
         }
     }

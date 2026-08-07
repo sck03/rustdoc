@@ -70,7 +70,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("PreviewInvoiceReportHtml");
@@ -134,7 +134,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("PreviewInvoiceReportDraftHtml");
@@ -207,7 +207,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("PreviewInvoiceDocumentPackageHtml");
@@ -262,7 +262,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("PreviewPaymentVoucherDraftHtml");
@@ -317,7 +317,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("PreviewPaymentVoucherHtml");

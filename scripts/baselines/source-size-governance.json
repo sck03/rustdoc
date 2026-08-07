@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-08-07",
+  "rules": [
+    {
+      "name": "HS knowledge partials",
+      "directory": "src/ExportDocManager.Infrastructure/Services/MasterData",
+      "filePattern": "^HsCodeKnowledgeService(?:\\..+)?\\.cs$",
+      "maximumLines": 560,
+      "maximumAggregateLines": 2300
+    },
+    {
+      "name": "shared database maintenance partials",
+      "directory": "src/ExportDocManager.Infrastructure/Services",
+      "filePattern": "^SharedDatabaseMaintenanceService(?:\\..+)?\\.cs$",
+      "maximumLines": 450,
+      "maximumAggregateLines": 2000
+    },
+    {
+      "name": "server migration components",
+      "directory": "src/ExportDocManager.Infrastructure/Services/ServerMigration",
+      "filePattern": "^ServerMigration.*\\.cs$",
+      "maximumLines": 700
+    },
+    {
+      "name": "maintenance settings panels",
+      "directory": "apps/export-doc-web/src/features/settings",
+      "filePattern": "^Maintenance.*\\.tsx$",
+      "maximumLines": 320
+    },
+    {
+      "name": "themed stylesheet modules",
+      "directory": "apps/export-doc-web/src/styles",
+      "filePattern": "^(?!foundation\\.css$|workspaces\\.css$|responsive\\.css$).+\\.css$",
+      "maximumLines": 800
+    }
+  ]
+}

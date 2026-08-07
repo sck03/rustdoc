@@ -96,7 +96,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("CreatePort");
@@ -154,7 +154,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("UpdatePort");
@@ -189,7 +189,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("DeletePort");

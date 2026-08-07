@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Utils;
+using ExportDocManager.Services.Errors;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Core
@@ -145,9 +146,17 @@ namespace ExportDocManager.Services.Core
                 await context.SaveChangesAsync();
                 return true;
             }
-            catch (Exception ex)
+            catch (DbUpdateConcurrencyException ex)
             {
-                throw new Exception($"保存商品明细失败: {ex.Message}", ex);
+                throw new ServiceConcurrencyException("商品明细已被其他用户修改，请刷新后重试。", ex);
+            }
+            catch (ServiceException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new InfrastructureServiceException("商品明细保存服务暂时不可用，请稍后重试。", ex);
             }
         }
 

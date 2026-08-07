@@ -7,6 +7,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.MasterData
@@ -84,9 +85,9 @@ namespace ExportDocManager.Services.MasterData
                 product.RowVersion = existing.RowVersion?.ToArray();
                 return true;
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
-                throw new Exception("该商品已被其他用户修改，请加载最新数据后再保存。");
+                throw new ServiceConcurrencyException("该商品已被其他用户修改，请加载最新数据后再保存。", ex);
             }
         }
 
@@ -98,7 +99,7 @@ namespace ExportDocManager.Services.MasterData
 
             if (await context.SupplierProductLinks.AsNoTracking().AnyAsync(link => link.ProductId == id))
             {
-                throw new InvalidOperationException("该商品仍有关联的供应商供货资料，请先解除供应商供货关联后再删除。");
+                throw new ResourceConflictException("该商品仍有关联的供应商供货资料，请先解除供应商供货关联后再删除。");
             }
 
             context.Products.Remove(product);

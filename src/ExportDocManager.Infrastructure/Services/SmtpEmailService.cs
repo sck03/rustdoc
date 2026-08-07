@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Mail;
 using System.Threading.Tasks;
 using ExportDocManager.Models;
+using ExportDocManager.Services.Errors;
 using Microsoft.Extensions.Logging;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -60,7 +61,7 @@ namespace ExportDocManager.Services.Infrastructure
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to send email to {Recipient}", recipientAddress);
-                        throw;
+                        throw MapSmtpInfrastructureFailure(ex);
                     }
                 }
             }
@@ -82,7 +83,14 @@ namespace ExportDocManager.Services.Infrastructure
                 message.Body = "This is a test email from ExportDocManager.";
                 message.IsBodyHtml = false;
 
-                await client.SendMailAsync(message);
+                try
+                {
+                    await client.SendMailAsync(message);
+                }
+                catch (Exception ex)
+                {
+                    throw MapSmtpInfrastructureFailure(ex);
+                }
             }
         }
 
@@ -122,10 +130,24 @@ namespace ExportDocManager.Services.Infrastructure
         {
             if (string.IsNullOrWhiteSpace(value))
             {
-                throw new InvalidOperationException(errorMessage);
+                throw new ServiceValidationException(errorMessage);
             }
 
             return value.Trim();
+        }
+
+        private static Exception MapSmtpInfrastructureFailure(Exception exception)
+        {
+            if (exception is OperationCanceledException)
+            {
+                return exception;
+            }
+
+            return exception is InfrastructureServiceException
+                ? exception
+                : new InfrastructureServiceException(
+                    "邮件服务暂时不可用，请检查 SMTP 地址、端口、TLS 和网络连接后重试。",
+                    exception);
         }
     }
 }

@@ -1,0 +1,170 @@
+.login-panel {
+  align-self: start;
+  width: min(460px, calc(100vw - 44px));
+  margin: 36px 22px;
+  padding: 22px;
+  background: #ffffff;
+  border: 1px solid #dde3e8;
+  border-radius: 8px;
+}
+
+.login-panel form {
+  display: grid;
+  gap: 16px;
+}
+
+.form-header {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: #4d5963;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.form-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.form-field-label > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form-field:focus-within .form-field-label {
+  color: #0f766e;
+}
+
+.form-field-disabled .form-field-label {
+  color: #7b858f;
+}
+
+.form-field-required-badge {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  color: #8a1f13;
+  background: #fff0ed;
+  border: 1px solid #f1b4aa;
+  border-radius: 999px;
+  font-size: var(--edm-font-size-xs);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.form-field-description {
+  color: #69737d;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+label input,
+label select {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  color: #202124;
+  background: #ffffff;
+  border: 1px solid #cfd8df;
+  border-radius: 8px;
+  outline: 0;
+}
+
+label input:disabled,
+label select:disabled,
+label textarea:disabled {
+  color: #69737d;
+  background: #f3f5f6;
+  border-color: #d8e0e6;
+}
+
+label input:focus,
+label select:focus,
+label textarea:focus,
+.search-form:focus-within {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+}
+
+label textarea {
+  width: 100%;
+  min-height: 94px;
+  padding: 9px 10px;
+  color: #202124;
+  background: #ffffff;
+  border: 1px solid #cfd8df;
+  border-radius: 8px;
+  outline: 0;
+  resize: vertical;
+}
+
+.path-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: #4d5963;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.path-field-label {
+  min-width: 0;
+}
+
+.path-field-control {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+
+.path-field-control input,
+.path-field-control textarea {
+  width: 100%;
+  min-width: 0;
+  color: #202124;
+  background: #ffffff;
+  border: 1px solid #cfd8df;
+  border-radius: 8px;
+  outline: 0;
+}
+
+.path-field-control input {
+  height: 38px;
+  padding: 0 10px;
+}
+
+.path-field-control textarea {
+  min-height: 94px;
+  padding: 9px 10px;
+  resize: vertical;
+}
+
+.path-field-control input:focus,
+.path-field-control textarea:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+}
+
+.path-field-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.path-field-actions .icon-button {
+  width: 38px;
+  height: 38px;
+}

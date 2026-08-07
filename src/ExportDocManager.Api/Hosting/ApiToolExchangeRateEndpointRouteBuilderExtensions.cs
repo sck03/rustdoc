@@ -66,7 +66,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict($"获取汇率失败：{ex.Message}");
+                    return WriteInfrastructureFailure("汇率查询服务暂时不可用，请稍后重试。", ex);
                 }
             })
             .WithName("ListExchangeRates");
@@ -110,7 +110,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict($"获取货币列表失败：{ex.Message}");
+                    return WriteInfrastructureFailure("货币列表服务暂时不可用，请稍后重试。", ex);
                 }
             })
             .WithName("ListAvailableExchangeRateCurrencies");

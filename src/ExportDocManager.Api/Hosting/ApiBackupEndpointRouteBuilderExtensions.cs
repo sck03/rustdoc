@@ -64,7 +64,9 @@ namespace ExportDocManager.Api.Hosting
                     list.StoragePolicy);
                 return backupResult.Success || backupResult.Skipped
                     ? Results.Ok(response)
-                    : WriteConflict(backupResult.Message);
+                    : WriteInfrastructureFailure(
+                        "数据库备份服务暂时不可用，请稍后重试。",
+                        new InvalidOperationException(backupResult.Message));
             })
             .WithName("CreateDatabaseBackup");
 
@@ -154,7 +156,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("RestoreDatabaseBackup");
@@ -236,7 +238,7 @@ namespace ExportDocManager.Api.Hosting
                 catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or
                                            InvalidDataException or IOException or NotSupportedException)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("CreateDisasterRecoveryPackage");
@@ -301,7 +303,7 @@ namespace ExportDocManager.Api.Hosting
                                            InvalidDataException or IOException or NotSupportedException or
                                            UnauthorizedAccessException)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("RestoreDisasterRecoveryPackage");
@@ -363,13 +365,15 @@ namespace ExportDocManager.Api.Hosting
                 var webDav = settingsService.Settings?.WebDav ?? new WebDavSettings();
                 if (!IsWebDavConfigured(webDav))
                 {
-                    return WriteConflict("WebDAV 尚未配置，请先保存服务器地址和用户名。");
+                    return WriteValidation("WebDAV 尚未配置，请先保存服务器地址和用户名。");
                 }
 
                 bool success = await cloudSyncService.TestConnectionAsync(webDav, cancellationToken);
                 if (!success)
                 {
-                    return WriteConflict("WebDAV 连接测试失败，请检查地址、账号、密码或目录权限。");
+                    return WriteInfrastructureFailure(
+                        "WebDAV 连接服务暂时不可用，请检查地址、账号、密码或目录权限后重试。",
+                        new HttpRequestException("WebDAV connection test failed."));
                 }
 
                 return Results.Ok(new ApiCloudBackupCommandResponse(
@@ -408,18 +412,18 @@ namespace ExportDocManager.Api.Hosting
                 var webDav = settingsService.Settings?.WebDav ?? new WebDavSettings();
                 if (!webDav.Enabled)
                 {
-                    return WriteConflict("WebDAV 云备份未启用，请先保存启用状态。");
+                    return WriteValidation("WebDAV 云备份未启用，请先保存启用状态。");
                 }
 
                 if (!IsWebDavConfigured(webDav))
                 {
-                    return WriteConflict("WebDAV 尚未配置，请先保存服务器地址和用户名。");
+                    return WriteValidation("WebDAV 尚未配置，请先保存服务器地址和用户名。");
                 }
 
                 var latestBackup = GetLatestBackupFile(backupService);
                 if (latestBackup == null)
                 {
-                    return WriteConflict("当前没有可上传的数据库备份，请先创建本地备份。");
+                    return WriteNotFound("当前没有可上传的数据库备份，请先创建本地备份。");
                 }
 
                 try
@@ -440,7 +444,7 @@ namespace ExportDocManager.Api.Hosting
                     ex is IOException ||
                     ex is HttpRequestException)
                 {
-                    return WriteConflict($"WebDAV 云备份上传失败：{ex.Message}");
+                    return WriteInfrastructureFailure("WebDAV 云备份上传服务暂时不可用，请稍后重试。", ex);
                 }
             })
             .WithName("UploadLatestDatabaseBackupToCloud");
@@ -469,12 +473,12 @@ namespace ExportDocManager.Api.Hosting
                 var webDav = settingsService.Settings?.WebDav ?? new WebDavSettings();
                 if (!webDav.Enabled)
                 {
-                    return WriteConflict("WebDAV 云备份未启用，请先保存启用状态。");
+                    return WriteValidation("WebDAV 云备份未启用，请先保存启用状态。");
                 }
 
                 if (!IsWebDavConfigured(webDav))
                 {
-                    return WriteConflict("WebDAV 尚未配置，请先保存服务器地址和用户名。");
+                    return WriteValidation("WebDAV 尚未配置，请先保存服务器地址和用户名。");
                 }
 
                 try
@@ -492,7 +496,7 @@ namespace ExportDocManager.Api.Hosting
                     ex is HttpRequestException ||
                     ex is System.Xml.XmlException)
                 {
-                    return WriteConflict($"WebDAV 云备份列表读取失败：{ex.Message}");
+                    return WriteInfrastructureFailure("WebDAV 云备份列表服务暂时不可用，请稍后重试。", ex);
                 }
             })
             .WithName("ListCloudDatabaseBackups");
@@ -532,12 +536,12 @@ namespace ExportDocManager.Api.Hosting
                 var webDav = settingsService.Settings?.WebDav ?? new WebDavSettings();
                 if (!webDav.Enabled)
                 {
-                    return WriteConflict("WebDAV 云备份未启用，请先保存启用状态。");
+                    return WriteValidation("WebDAV 云备份未启用，请先保存启用状态。");
                 }
 
                 if (!IsWebDavConfigured(webDav))
                 {
-                    return WriteConflict("WebDAV 尚未配置，请先保存服务器地址和用户名。");
+                    return WriteValidation("WebDAV 尚未配置，请先保存服务器地址和用户名。");
                 }
 
                 try
@@ -575,7 +579,7 @@ namespace ExportDocManager.Api.Hosting
                     ex is HttpRequestException ||
                     ex is System.Xml.XmlException)
                 {
-                    return WriteConflict($"WebDAV 云备份下载失败：{ex.Message}");
+                    return WriteInfrastructureFailure("WebDAV 云备份下载服务暂时不可用，请稍后重试。", ex);
                 }
             })
             .WithName("DownloadCloudDatabaseBackup");

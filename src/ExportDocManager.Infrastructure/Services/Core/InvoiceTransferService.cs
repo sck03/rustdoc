@@ -11,6 +11,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
@@ -323,7 +324,7 @@ namespace ExportDocManager.Services.Core
                 .FirstOrDefaultAsync(i => i.Id == invoiceId, cancellationToken);
             if (invoice == null)
             {
-                throw new Exception("未找到要导出的发票");
+                throw new ResourceNotFoundException("未找到要导出的发票。");
             }
 
             var items = await context.Items.AsNoTracking().Where(x => x.InvoiceId == invoiceId).ToListAsync(cancellationToken);

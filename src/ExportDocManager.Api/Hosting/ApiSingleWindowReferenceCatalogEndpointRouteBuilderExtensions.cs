@@ -67,7 +67,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("UpdateSingleWindowReferenceCatalog");
@@ -114,7 +114,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("ImportSingleWindowReferenceCatalogJson");
@@ -178,7 +178,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (IOException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("PreviewSingleWindowReferenceCatalogExcelImport");
@@ -205,7 +205,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("ResetSingleWindowReferenceCatalog");

@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 using Npgsql;
@@ -69,7 +70,7 @@ namespace ExportDocManager.DataAccess
                 var system = appSettings?.System;
                 if (system == null)
                 {
-                    throw new InvalidOperationException("数据库设置文件缺少 System 节点。");
+                    throw new ServiceValidationException("数据库设置文件缺少 System 节点。");
                 }
 
                 return new DatabaseConnectionSettings
@@ -84,10 +85,22 @@ namespace ExportDocManager.DataAccess
                     PostgreSqlAdditionalOptions = NormalizePostgreSqlAdditionalOptions(system.PostgreSqlAdditionalOptions)
                 };
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                throw new InvalidOperationException(
-                    $"数据库设置文件无法读取或格式无效: {resolvedSettingsPath}",
+                throw new InfrastructureServiceException(
+                    $"数据库设置文件无法读取：{resolvedSettingsPath}",
+                    ex);
+            }
+            catch (JsonException ex)
+            {
+                throw new ServiceValidationException(
+                    $"数据库设置文件 JSON 格式无效：{resolvedSettingsPath}",
+                    ex);
+            }
+            catch (ArgumentException ex)
+            {
+                throw new ServiceValidationException(
+                    $"数据库设置文件包含无效配置：{resolvedSettingsPath}",
                     ex);
             }
         }
@@ -116,7 +129,7 @@ namespace ExportDocManager.DataAccess
             var validationMessage = DatabaseModeHelper.Validate(databaseSettings);
             if (!string.IsNullOrWhiteSpace(validationMessage))
             {
-                throw new InvalidOperationException(validationMessage);
+                throw new ServiceValidationException(validationMessage);
             }
 
             if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
@@ -237,7 +250,7 @@ namespace ExportDocManager.DataAccess
 
             if (!PathBoundaryHelper.IsWithinRoot(databasePath, pathProvider.DatabaseRoot))
             {
-                throw new InvalidOperationException(
+                throw new ServiceValidationException(
                     $"SQLite 数据库必须位于运行数据根 Database 目录下: {databasePath}");
             }
 

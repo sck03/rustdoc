@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 
@@ -60,9 +61,9 @@ namespace ExportDocManager.Services.MasterData
                 }
                 await context.SaveChangesAsync();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
-                throw new InvalidOperationException("该港口已被其他用户修改，请加载最新数据后再保存。");
+                throw new ServiceConcurrencyException("该港口已被其他用户修改，请加载最新数据后再保存。", ex);
             }
         }
 
@@ -111,9 +112,9 @@ namespace ExportDocManager.Services.MasterData
                 }
                 await context.SaveChangesAsync();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
-                throw new InvalidOperationException("该单位已被其他用户修改，请加载最新数据后再保存。");
+                throw new ServiceConcurrencyException("该单位已被其他用户修改，请加载最新数据后再保存。", ex);
             }
         }
 

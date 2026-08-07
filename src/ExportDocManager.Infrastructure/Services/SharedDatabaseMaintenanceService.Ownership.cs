@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -62,22 +63,22 @@ namespace ExportDocManager.Services.Infrastructure
             ArgumentNullException.ThrowIfNull(request);
             if (!request.IncludeInvoices && !request.IncludePayments && !request.IncludeOtherBusinessData)
             {
-                throw new InvalidOperationException("请至少选择一种需要改派的业务数据。");
+                throw new ServiceValidationException("请至少选择一种需要改派的业务数据。");
             }
 
             if (request.ToUserId <= 0)
             {
-                throw new InvalidOperationException("请选择新的归属用户。");
+                throw new ServiceValidationException("请选择新的归属用户。");
             }
 
             if (!request.OnlyUnassigned && request.FromUserId is <= 0)
             {
-                throw new InvalidOperationException("来源用户无效。");
+                throw new ServiceValidationException("来源用户无效。");
             }
 
             if (!request.OnlyUnassigned && request.FromUserId == request.ToUserId)
             {
-                throw new InvalidOperationException("来源用户和目标用户不能相同。");
+                throw new ServiceValidationException("来源用户和目标用户不能相同。");
             }
 
             return await AppDbContextExecution.ExecuteInTransactionAsync(
@@ -88,7 +89,7 @@ namespace ExportDocManager.Services.Infrastructure
                         .AsNoTracking()
                         .FirstOrDefaultAsync(user => user.Id == request.ToUserId && user.IsActive, token)
                         .ConfigureAwait(false)
-                        ?? throw new InvalidOperationException("新的归属用户不存在或已停用。");
+                        ?? throw new ResourceNotFoundException("新的归属用户不存在或已停用。");
 
                     int updatedInvoices = 0;
                     int updatedPayments = 0;
@@ -290,7 +291,7 @@ namespace ExportDocManager.Services.Infrastructure
                 : requestedValue.Trim();
             if (normalized.Length > 50)
             {
-                throw new InvalidOperationException($"{fieldName}不能超过 50 个字符。");
+                throw new ServiceValidationException($"{fieldName}不能超过 50 个字符。");
             }
 
             return normalized;

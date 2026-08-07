@@ -83,11 +83,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (IOException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("CreateReportTemplate");
@@ -181,7 +181,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("GetReportTemplateContent");
@@ -238,11 +238,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (IOException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("SaveReportTemplateContent");
@@ -299,11 +299,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (IOException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("RenameReportTemplate");
@@ -355,11 +355,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (IOException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("DeleteReportTemplate");
@@ -408,11 +408,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (IOException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("SaveReportTemplatePackageToPath");
@@ -461,11 +461,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (IOException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 finally
                 {
@@ -541,11 +541,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (IOException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("ImportReportTemplatePackage");
@@ -624,11 +624,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (IOException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 finally
                 {
@@ -684,7 +684,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("PreviewReportTemplateContent");

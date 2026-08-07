@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 
@@ -112,7 +113,7 @@ public sealed class ServerMigrationSecurityTests
     [InlineData("0011")]
     public void ParseConfiguredMasterKey_ShouldRejectInvalidValues(string value)
     {
-        Assert.Throws<InvalidOperationException>(() => ServerMigrationService.ParseConfiguredMasterKey(value));
+        Assert.Throws<ServiceValidationException>(() => ServerMigrationService.ParseConfiguredMasterKey(value));
     }
 
     [Theory]
@@ -412,6 +413,81 @@ public sealed class ServerMigrationSecurityTests
     }
 
     [Fact]
+    public async Task ApplyPendingRestoreAsync_ShouldCleanInterruptedPreparationWithoutReplacingLiveFiles()
+    {
+        string root = CreateTestRoot("interrupted-file-preparation");
+        try
+        {
+            var paths = new RuntimeAppPathProvider(
+                Path.Combine(root, "app"),
+                Path.Combine(root, "data"));
+            string packageId = Guid.NewGuid().ToString("N");
+            string stagingDirectoryName = $"pending-{packageId}";
+            string stagingRoot = Path.Combine(
+                ServerMigrationManager.GetControlRoot(paths),
+                stagingDirectoryName);
+            Directory.CreateDirectory(stagingRoot);
+
+            string liveFile = Path.Combine(paths.FileRoot, "keep.txt");
+            WriteText(liveFile, "live-data");
+            string targetRoot = paths.FileRoot;
+            string parent = Path.GetDirectoryName(targetRoot)!;
+            string replacementRoot = Path.Combine(parent, $".Files.migration-new-{packageId}");
+            string oldSwapRoot = Path.Combine(parent, $".Files.migration-old-{packageId}");
+            string safetyRoot = ServerMigrationManager.GetSafetyBackupRoot(paths, packageId);
+            string snapshotRoot = Path.Combine(safetyRoot, "Data", "Files");
+            WriteText(Path.Combine(replacementRoot, "partial.txt"), "partial-replacement");
+            WriteText(Path.Combine(oldSwapRoot, "stale.txt"), "stale-swap");
+            WriteText(Path.Combine(snapshotRoot, "partial.txt"), "partial-snapshot");
+
+            var state = new ServerMigrationFileTransactionState
+            {
+                PackageId = packageId,
+                FullMigration = true,
+                Directories =
+                [
+                    new ServerMigrationDirectoryTransaction
+                    {
+                        TargetPath = targetRoot,
+                        ReplacementPath = replacementRoot,
+                        OldSwapPath = oldSwapRoot,
+                        SnapshotPath = snapshotRoot,
+                        OriginallyExisted = true
+                    }
+                ]
+            };
+            WriteText(
+                Path.Combine(safetyRoot, "file-transaction.json"),
+                JsonSerializer.Serialize(state, ServerMigrationService.JsonOptions));
+
+            PendingServerMigrationRestore marker = CreateMarker(
+                packageId,
+                stagingDirectoryName,
+                ServerMigrationRestorePhase.SafetyBackup);
+            string markerPath = ServerMigrationManager.GetPendingMarkerPath(paths);
+            WriteText(
+                markerPath,
+                JsonSerializer.Serialize(marker, ServerMigrationService.JsonOptions));
+
+            await ServerMigrationManager.ApplyPendingRestoreAsync(paths);
+
+            Assert.Equal("live-data", File.ReadAllText(liveFile));
+            Assert.False(Directory.Exists(replacementRoot));
+            Assert.False(Directory.Exists(oldSwapRoot));
+            Assert.False(Directory.Exists(snapshotRoot));
+            Assert.False(File.Exists(markerPath));
+            ServerMigrationRestoreStatusSnapshot status = ServerMigrationManager.ReadStatus(paths);
+            Assert.NotNull(status);
+            Assert.Equal(ServerMigrationRestorePhase.Failed, status.Phase);
+            Assert.Contains("已清理未应用的迁移准备数据", status.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task ApplyPendingRestoreAsync_ShouldQuarantineMarkerWithUnexpectedStagingDirectory()
     {
         string root = CreateTestRoot("invalid-marker-path");
@@ -448,13 +524,27 @@ public sealed class ServerMigrationSecurityTests
     public void MigrationSource_ShouldRejectLinksBeforeRecursionAndExcludeCertificates()
     {
         string repositoryRoot = FindRepositoryRoot();
-        string serviceSource = File.ReadAllText(Path.Combine(
+        string generatorSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "src",
             "ExportDocManager.Infrastructure",
             "Services",
             "ServerMigration",
-            "ServerMigrationService.cs"));
+            "ServerMigrationPackageGenerator.cs"));
+        string validatorSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "src",
+            "ExportDocManager.Infrastructure",
+            "Services",
+            "ServerMigration",
+            "ServerMigrationPackageValidator.cs"));
+        string certificateAdapterSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "src",
+            "ExportDocManager.Infrastructure",
+            "Services",
+            "ServerMigration",
+            "ServerMigrationDeploymentCertificateAdapter.cs"));
         string transactionSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "src",
@@ -463,11 +553,12 @@ public sealed class ServerMigrationSecurityTests
             "ServerMigration",
             "ServerMigrationFileTransaction.cs"));
 
-        Assert.Contains("DataEntry(\"Marks\"", serviceSource, StringComparison.Ordinal);
-        Assert.Contains("服务器迁移源目录不能包含符号链接或重解析点", serviceSource, StringComparison.Ordinal);
-        Assert.Contains("服务器迁移源目录不能是符号链接或重解析点", serviceSource, StringComparison.Ordinal);
-        Assert.Contains("服务器迁移源文件不能是符号链接或重解析点", serviceSource, StringComparison.Ordinal);
-        Assert.Contains("服务器迁移包包含清单之外的文件", serviceSource, StringComparison.Ordinal);
+        Assert.Contains("DataEntry(\"Marks\"", generatorSource, StringComparison.Ordinal);
+        Assert.Contains("服务器迁移源目录不能包含符号链接或重解析点", generatorSource, StringComparison.Ordinal);
+        Assert.Contains("服务器迁移源目录不能是符号链接或重解析点", generatorSource, StringComparison.Ordinal);
+        Assert.Contains("服务器迁移源文件不能是符号链接或重解析点", generatorSource, StringComparison.Ordinal);
+        Assert.Contains("服务器迁移包包含清单之外的文件", validatorSource, StringComparison.Ordinal);
+        Assert.Contains("TLS/Certbot 证书", certificateAdapterSource, StringComparison.Ordinal);
         Assert.DoesNotContain("SearchOption.AllDirectories", transactionSource, StringComparison.Ordinal);
         Assert.Contains("EnumerateFileSystemInfos", transactionSource, StringComparison.Ordinal);
         Assert.Contains("TLS/Certbot 证书", ServerMigrationLayout.StoragePolicy, StringComparison.Ordinal);

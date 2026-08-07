@@ -2,6 +2,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.BrowserRuntime;
 using Microsoft.EntityFrameworkCore;
@@ -80,7 +81,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
                 var service = new ReportHtmlService(factory, new StubSettingsService(), pathProvider);
 
-                var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                var error = await Assert.ThrowsAsync<ServiceValidationException>(() =>
                     service.RenderPaymentVoucherAsync(paymentId));
 
                 Assert.Contains("付款报销模板不能使用另一业务域字段", error.Message, StringComparison.Ordinal);
@@ -115,7 +116,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
                 var service = new ReportHtmlService(factory, new StubSettingsService(), pathProvider);
 
-                var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                var error = await Assert.ThrowsAsync<ServiceValidationException>(() =>
                     service.RenderInvoiceReportAsync(
                         invoiceId,
                         ReportDocumentType.ExportDocument,
@@ -756,7 +757,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             var globals = new ScriptObject { ["value"] = value };
 
-            var error = Assert.Throws<InvalidOperationException>(() =>
+            var error = Assert.Throws<ServiceValidationException>(() =>
                 ScribanReportTemplateRenderer.Render(template, globals));
 
             Assert.Contains("不安全内容", error.Message, StringComparison.Ordinal);

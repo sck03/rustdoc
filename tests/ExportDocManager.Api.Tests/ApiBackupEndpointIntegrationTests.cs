@@ -299,9 +299,9 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("不读取付款/报销业务表", initialStatus.StoragePolicy, StringComparison.Ordinal);
 
             var uploadBeforeConfigResponse = await adminClient.PostAsync("/api/backup/cloud/upload-latest", content: null);
-            Assert.Equal(HttpStatusCode.Conflict, uploadBeforeConfigResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, uploadBeforeConfigResponse.StatusCode);
             var listBeforeConfigResponse = await adminClient.GetAsync("/api/backup/cloud/backups");
-            Assert.Equal(HttpStatusCode.Conflict, listBeforeConfigResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, listBeforeConfigResponse.StatusCode);
 
             var settingsResponse = await adminClient.GetAsync("/api/settings");
             Assert.Equal(HttpStatusCode.OK, settingsResponse.StatusCode);

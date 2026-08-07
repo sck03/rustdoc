@@ -46,7 +46,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex) when (ex is ArgumentException or InvalidDataException or IOException or InvalidOperationException)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             }).WithName("PreviewHsCodesImportFromPath");
 
@@ -87,7 +87,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex) when (ex is ArgumentException or InvalidDataException or IOException or InvalidOperationException)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 finally
                 {
@@ -126,7 +126,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex) when (ex is InvalidDataException or IOException or InvalidOperationException)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 finally
                 {
@@ -221,11 +221,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (IOException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("ImportHsCodesFromPath");
@@ -280,11 +280,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (IOException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 finally
                 {
@@ -337,7 +337,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("SearchRemoteHsCodes");
@@ -389,7 +389,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("CaptureRemoteHsCodes");
@@ -433,11 +433,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("FetchRemoteHsCodeDetail");
@@ -480,11 +480,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("ResolveRemoteHsCodeDetail");
@@ -539,7 +539,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("CreateHsCode");
@@ -640,7 +640,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("UpdateHsCode");
@@ -675,7 +675,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("DeleteHsCode");
@@ -733,7 +733,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("DeleteHsCodesBatch");
@@ -783,7 +783,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("ClearAllHsCodes");

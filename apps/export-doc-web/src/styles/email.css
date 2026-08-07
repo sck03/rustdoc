@@ -1,0 +1,166 @@
+.email-tool-surface {
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+}
+
+.email-tool-toolbar {
+  align-items: center;
+}
+
+.email-status-detail-grid {
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+}
+
+.email-tool-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1.1fr);
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.email-compose-section,
+.email-attachment-section {
+  align-content: start;
+  min-width: 0;
+  min-height: 0;
+}
+
+.email-body-field .email-rich-text-surface {
+  min-height: 260px;
+}
+
+.email-rich-text-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.email-rich-text-field-label {
+  color: var(--edm-ink-800);
+  font-size: var(--edm-font-size-sm);
+  font-weight: 750;
+}
+
+.email-rich-text-editor {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line-strong);
+  border-radius: 10px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.email-rich-text-editor:focus-within {
+  border-color: var(--edm-primary-500);
+  outline: 3px solid var(--edm-primary-100);
+}
+
+.email-rich-text-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 8px;
+  background: var(--edm-surface-muted);
+  border-bottom: 1px solid var(--edm-line);
+}
+
+.email-rich-text-link-tools {
+  display: flex;
+  flex: 1 1 260px;
+  gap: 6px;
+  min-width: min(260px, 100%);
+  margin-left: 4px;
+}
+
+.email-rich-text-link-tools input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.email-rich-text-surface {
+  min-height: 220px;
+  max-height: 520px;
+  overflow: auto;
+  padding: 14px 16px;
+  color: var(--edm-ink-800);
+  background: var(--edm-surface);
+  font-size: var(--edm-font-size-md);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  outline: none;
+}
+
+.email-rich-text-surface:empty::before {
+  color: var(--edm-ink-500);
+  content: "输入邮件正文…";
+  pointer-events: none;
+}
+
+.email-rich-text-surface p,
+.email-rich-text-surface ul,
+.email-rich-text-surface ol,
+.email-rich-text-surface blockquote {
+  margin: 0 0 10px;
+}
+
+.email-rich-text-surface blockquote {
+  padding: 8px 12px;
+  background: var(--edm-primary-50);
+  border-left: 3px solid var(--edm-primary-500);
+}
+
+.email-rich-text-editor-readonly .email-rich-text-surface {
+  color: var(--edm-ink-600);
+  background: var(--edm-surface-muted);
+}
+
+.email-html-advanced {
+  min-width: 0;
+  padding: 9px 11px;
+  background: var(--edm-surface-muted);
+  border: 1px solid var(--edm-line);
+  border-radius: 9px;
+}
+
+.email-html-advanced summary {
+  color: var(--edm-ink-600);
+  cursor: pointer;
+  font-size: var(--edm-font-size-xs);
+  font-weight: 750;
+}
+
+.email-html-advanced textarea {
+  width: 100%;
+  min-height: 120px;
+  margin-top: 9px;
+  box-sizing: border-box;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: var(--edm-font-size-xs);
+  line-height: 1.55;
+}
+
+.email-html-preview-frame {
+  width: 100%;
+  min-height: 320px;
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line);
+  border-radius: 10px;
+}
+
+.email-attachment-section .path-textarea-field textarea {
+  min-height: 132px;
+}
+
+.email-attachment-table-frame {
+  min-height: 240px;
+}
+
+.email-attachment-table {
+  min-width: 640px;
+}
+
+.email-attachment-table th:last-child,
+.email-attachment-table td:last-child {
+  width: 120px;
+}

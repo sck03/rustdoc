@@ -45,7 +45,7 @@ namespace ExportDocManager.Api.Hosting
                 if (string.IsNullOrWhiteSpace(email.SmtpHost) ||
                     string.IsNullOrWhiteSpace(ResolveEmailFromAddress(email)))
                 {
-                    return WriteConflict("邮件服务尚未配置，请先在设置中填写 SMTP 服务器和发件人。");
+                    return WriteValidation("邮件服务尚未配置，请先在设置中填写 SMTP 服务器和发件人。");
                 }
 
                 return AcceptedBackgroundJob(EnqueueInvoiceDocumentEmailJob(

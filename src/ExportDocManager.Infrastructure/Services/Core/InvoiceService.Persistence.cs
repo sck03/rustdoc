@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.MasterData;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -53,9 +54,9 @@ namespace ExportDocManager.Services.Core
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                throw new Exception($"删除发票失败: {ex.Message}", ex);
+                throw new InfrastructureServiceException("发票删除服务暂时不可用，请稍后重试。", ex);
             }
         }
 

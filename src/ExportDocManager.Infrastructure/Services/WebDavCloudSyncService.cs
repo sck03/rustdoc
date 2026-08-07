@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using ExportDocManager.Models;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.Extensions.Logging;
 
@@ -43,7 +44,7 @@ namespace ExportDocManager.Services.Infrastructure
             string baseUrl = NormalizeConfiguredBaseUrl(config, out string userName);
 
             if (!File.Exists(localFilePath))
-                throw new FileNotFoundException("Local file not found", localFilePath);
+                throw new ResourceNotFoundException("找不到要上传的本地备份文件。");
 
             string normalizedRemoteFileName = NormalizeRemoteFileName(remoteFileName);
             string encodedFileName = Uri.EscapeDataString(normalizedRemoteFileName);
@@ -205,11 +206,11 @@ namespace ExportDocManager.Services.Infrastructure
             config ??= new WebDavSettings();
             if (!WebDavEndpointPolicy.TryNormalize(config.Url, out string baseUrl, out string errorMessage))
             {
-                throw new InvalidOperationException(errorMessage);
+                throw new ServiceValidationException(errorMessage);
             }
             userName = config.UserName?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(userName))
-                throw new InvalidOperationException("WebDAV settings are not configured.");
+                throw new ServiceValidationException("WebDAV 尚未配置，请先保存服务器地址和用户名。");
 
             return baseUrl;
         }
@@ -232,14 +233,14 @@ namespace ExportDocManager.Services.Infrastructure
             string fileName = (remoteFileName ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(fileName))
             {
-                throw new ArgumentException("Remote file name cannot be empty.", nameof(remoteFileName));
+                throw new ServiceValidationException("远端备份文件名不能为空。", new ArgumentException("Remote file name cannot be empty.", nameof(remoteFileName)));
             }
 
             if (fileName.Contains('/') ||
                 fileName.Contains('\\') ||
                 !string.Equals(fileName, Path.GetFileName(fileName), StringComparison.Ordinal))
             {
-                throw new ArgumentException("Remote file name cannot contain a path.", nameof(remoteFileName));
+                throw new ServiceValidationException("远端备份文件名不能包含路径。", new ArgumentException("Remote file name cannot contain a path.", nameof(remoteFileName)));
             }
 
             return fileName;
@@ -314,7 +315,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             {
-                throw new InvalidOperationException($"Invalid WebDAV url: {url}");
+                throw new ServiceValidationException($"WebDAV 地址无效：{url}");
             }
 
             return uri;

@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
@@ -264,10 +265,33 @@ namespace ExportDocManager.Services.Reporting
                 var globals = ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(invoice, customer, exporter, withSeal, _pathProvider);
                 return ScribanReportTemplateRenderer.Render(templateContent, globals);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (ServiceException)
+            {
+                throw;
+            }
+            catch (ArgumentException ex)
+            {
+                Log.Warning(ex, "报表模板或内容校验失败, 类型 {ReportType}, 发票 {InvoiceId}", reportType, invoice?.Id);
+                throw new ServiceValidationException($"报表模板或内容无效：{ex.Message}", ex);
+            }
+            catch (Exception ex) when (ex is KeyNotFoundException or FileNotFoundException or
+                                       UnauthorizedAccessException)
+            {
+                throw;
+            }
+            catch (InvalidOperationException ex)
+            {
+                Log.Warning(ex, "报表模板或渲染内容校验失败, 类型 {ReportType}, 发票 {InvoiceId}", reportType, invoice?.Id);
+                throw new ServiceValidationException($"报表模板或内容无效：{ex.Message}", ex);
+            }
             catch (Exception ex)
             {
                 Log.Error(ex, "生成报表失败, 类型 {ReportType}, 发票 {InvoiceId}", reportType, invoice?.Id);
-                throw new InvalidOperationException($"Failed to generate report: {ex.Message}", ex);
+                throw new InfrastructureServiceException("报表生成服务暂时不可用，请稍后重试。", ex);
             }
         }
 
@@ -292,10 +316,33 @@ namespace ExportDocManager.Services.Reporting
                 var globals = ReportTemplateGlobalsBuilder.BuildPaymentVoucherGlobals(payment, payee);
                 return ScribanReportTemplateRenderer.Render(templateContent, globals);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (ServiceException)
+            {
+                throw;
+            }
+            catch (ArgumentException ex)
+            {
+                Log.Warning(ex, "付款单模板或渲染内容校验失败, 付款单 {PaymentId}", payment?.Id);
+                throw new ServiceValidationException($"付款单模板或内容无效：{ex.Message}", ex);
+            }
+            catch (Exception ex) when (ex is KeyNotFoundException or FileNotFoundException or
+                                       UnauthorizedAccessException)
+            {
+                throw;
+            }
+            catch (InvalidOperationException ex)
+            {
+                Log.Warning(ex, "付款单模板或渲染内容校验失败, 付款单 {PaymentId}", payment?.Id);
+                throw new ServiceValidationException($"付款单模板或内容无效：{ex.Message}", ex);
+            }
             catch (Exception ex)
             {
                 Log.Error(ex, "生成付款单失败, 付款单 {PaymentId}", payment?.Id);
-                throw new InvalidOperationException($"Failed to generate payment voucher: {ex.Message}", ex);
+                throw new InfrastructureServiceException("付款单生成服务暂时不可用，请稍后重试。", ex);
             }
         }
 

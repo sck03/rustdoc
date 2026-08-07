@@ -2,6 +2,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,7 +22,7 @@ namespace ExportDocManager.Services.MasterData
             string normalizedCode = HsCodeTextHelper.NormalizeCode(hsCode.Code);
             if (string.IsNullOrWhiteSpace(normalizedCode))
             {
-                throw new InvalidOperationException("HS 编码不能为空。");
+                throw new ServiceValidationException("HS 编码不能为空。");
             }
 
             hsCode.Code = normalizedCode;
@@ -36,12 +37,12 @@ namespace ExportDocManager.Services.MasterData
                 {
                     if (existing == null)
                     {
-                        throw new InvalidOperationException("手工新建的 HS 编码只能保存为“仅供参考”；当前有效编码请通过年度税则导入建立。");
+                        throw new ServiceValidationException("手工新建的 HS 编码只能保存为“仅供参考”；当前有效编码请通过年度税则导入建立。");
                     }
 
                     if (!string.Equals(existing.Status, HsCodeValidityPolicy.ActiveStatus, StringComparison.OrdinalIgnoreCase))
                     {
-                        throw new InvalidOperationException("不能通过普通编辑把参考或作废编码改为当前有效；请使用年度税则导入或知识库迁移。");
+                        throw new ServiceValidationException("不能通过普通编辑把参考或作废编码改为当前有效；请使用年度税则导入或知识库迁移。");
                     }
 
                     hsCode.SourceName = string.IsNullOrWhiteSpace(hsCode.SourceName) ? existing.SourceName : hsCode.SourceName;
@@ -81,9 +82,9 @@ namespace ExportDocManager.Services.MasterData
                     hsCode.RowVersion = existing.RowVersion?.ToArray();
                 }
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
-                throw new InvalidOperationException("该 HS 编码已被其他用户或年度税则导入任务修改，请加载最新数据后再保存。");
+                throw new ServiceConcurrencyException("该 HS 编码已被其他用户或年度税则导入任务修改，请加载最新数据后再保存。", ex);
             }
         }
 

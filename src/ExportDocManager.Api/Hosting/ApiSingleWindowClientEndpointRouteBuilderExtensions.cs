@@ -29,7 +29,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
                 {
-                    return WriteConflict("持卡操作机仅支持独立 SQLite 单机版。");
+                    return WriteValidation("持卡操作机仅支持独立 SQLite 单机版。");
                 }
 
                 var profiles = await profileService.ListAsync(cancellationToken);
@@ -58,7 +58,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
                 {
-                    return WriteConflict("持卡操作机仅支持独立 SQLite 单机版。");
+                    return WriteValidation("持卡操作机仅支持独立 SQLite 单机版。");
                 }
 
                 return await SaveSingleWindowClientProfileAsync(
@@ -89,7 +89,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
                 {
-                    return WriteConflict("持卡操作机仅支持独立 SQLite 单机版。");
+                    return WriteValidation("持卡操作机仅支持独立 SQLite 单机版。");
                 }
 
                 return await ActivateSingleWindowClientProfileAsync(
@@ -120,7 +120,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
                 {
-                    return WriteConflict("交接 OutBox 和官方单一窗口客户端只能由独立 SQLite 持卡机操作。");
+                    return WriteValidation("交接 OutBox 和官方单一窗口客户端只能由独立 SQLite 持卡机操作。");
                 }
 
                 return await DispatchSingleWindowBatchToClientAsync(
@@ -151,7 +151,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
                 {
-                    return WriteConflict("本机回执目录和官方单一窗口客户端只能由独立 SQLite 持卡机操作。");
+                    return WriteValidation("本机回执目录和官方单一窗口客户端只能由独立 SQLite 持卡机操作。");
                 }
 
                 return await CollectSingleWindowReceiptFilesAsync(

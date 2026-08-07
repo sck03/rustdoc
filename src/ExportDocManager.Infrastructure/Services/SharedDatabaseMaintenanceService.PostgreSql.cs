@@ -1,5 +1,6 @@
 using System.Text;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -12,7 +13,7 @@ namespace ExportDocManager.Services.Infrastructure
             var tools = PostgreSqlToolLocator.Resolve(_pathProvider);
             if (string.IsNullOrWhiteSpace(tools.PgDumpPath))
             {
-                throw new InvalidOperationException("未找到 pg_dump。请把 PostgreSQL 客户端工具放到程序根 Tools/PostgreSQL/bin，或用 EXPORTDOCMANAGER_POSTGRES_BIN 指向工具目录。");
+                throw new InfrastructureServiceException("未找到 pg_dump。请把 PostgreSQL 客户端工具放到程序根 Tools/PostgreSQL/bin，或用 EXPORTDOCMANAGER_POSTGRES_BIN 指向工具目录。");
             }
 
             await PostgreSqlBackupGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -47,7 +48,7 @@ namespace ExportDocManager.Services.Infrastructure
                         cancellationToken).ConfigureAwait(false);
                     if (!File.Exists(tempPath) || new FileInfo(tempPath).Length == 0)
                     {
-                        throw new InvalidOperationException("pg_dump 未生成有效的备份文件。");
+                        throw new InfrastructureServiceException("pg_dump 未生成有效的备份文件。");
                     }
 
                     AtomicFileHelper.ReplaceFile(tempPath, outputPath);
@@ -128,13 +129,13 @@ namespace ExportDocManager.Services.Infrastructure
             string normalized = (value ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(normalized))
             {
-                throw new InvalidOperationException($"{fieldName}不能为空。");
+                throw new ServiceValidationException($"{fieldName}不能为空。");
             }
 
             if (normalized.Any(char.IsControl) ||
                 Encoding.UTF8.GetByteCount(normalized) > MaximumPostgreSqlIdentifierBytes)
             {
-                throw new InvalidOperationException(
+                throw new ServiceValidationException(
                     $"{fieldName}不能包含控制字符，且 UTF-8 长度不能超过 {MaximumPostgreSqlIdentifierBytes} 字节。");
             }
 
@@ -150,7 +151,7 @@ namespace ExportDocManager.Services.Infrastructure
                 .ToArray();
             if (roles.Length > MaximumPostgreSqlOldOwnerRoleCount)
             {
-                throw new InvalidOperationException(
+                throw new ServiceValidationException(
                     $"原数据库所有者不能超过 {MaximumPostgreSqlOldOwnerRoleCount} 个。");
             }
 

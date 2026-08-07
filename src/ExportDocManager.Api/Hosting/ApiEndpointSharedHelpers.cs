@@ -3,6 +3,7 @@ using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Core;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
@@ -19,6 +20,18 @@ namespace ExportDocManager.Api.Hosting
                 statusCode: StatusCodes.Status409Conflict);
         }
 
+        private static IResult WriteServiceException(Exception exception) =>
+            ApiServiceExceptionMapper.ToResult(exception);
+
+        private static IResult WriteValidation(string message) =>
+            WriteServiceException(new ServiceValidationException(message));
+
+        private static IResult WriteNotFound(string message) =>
+            WriteServiceException(new ResourceNotFoundException(message));
+
+        private static IResult WriteInfrastructureFailure(string message, Exception exception) =>
+            WriteServiceException(new InfrastructureServiceException(message, exception));
+
         private static IResult WriteInvoiceSaveFailure(SaveResult result)
         {
             string message = string.IsNullOrWhiteSpace(result?.ErrorMessage) ? "保存发票失败。" : result.ErrorMessage;
@@ -27,6 +40,9 @@ namespace ExportDocManager.Api.Hosting
                 SaveFailureKind.Validation => Results.BadRequest(new ApiErrorResponse(message)),
                 SaveFailureKind.Forbidden => WriteForbidden(message),
                 SaveFailureKind.Conflict => WriteConflict(message),
+                SaveFailureKind.Infrastructure => WriteInfrastructureFailure(
+                    "发票保存服务暂时不可用，请稍后重试。",
+                    new InfrastructureServiceException(message)),
                 _ => Results.Json(new ApiErrorResponse("保存发票失败，请稍后重试。"), statusCode: StatusCodes.Status500InternalServerError)
             };
         }
@@ -55,7 +71,7 @@ namespace ExportDocManager.Api.Hosting
         {
             var users = await userService.GetUsersAsync(cancellationToken);
             return users.FirstOrDefault(user => user.Id == userId)
-                   ?? throw new InvalidOperationException("未找到已保存的用户。");
+                   ?? throw new ResourceNotFoundException("未找到已保存的用户。");
         }
 
         private static string SerializeBackgroundJobRetryRequest<TRequest>(TRequest request)

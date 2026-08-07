@@ -1,6 +1,7 @@
 using System.Globalization;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
@@ -49,7 +50,7 @@ namespace ExportDocManager.Services.MasterData
                 .SingleOrDefaultAsync(item => item.Id == exporterId, cancellationToken);
             if (exporter == null)
             {
-                throw new KeyNotFoundException("出口商不存在。");
+                throw new ResourceNotFoundException("出口商不存在。");
             }
 
             string sealRoot = GetExporterSealRoot(exporterId, createDirectory: true);
@@ -89,7 +90,7 @@ namespace ExportDocManager.Services.MasterData
             catch (DbUpdateConcurrencyException ex)
             {
                 AtomicFileHelper.TryDeleteFile(managedPath);
-                throw new InvalidOperationException("该出口商数据已被其他用户修改，请刷新后重试。", ex);
+                throw new ServiceConcurrencyException("该出口商数据已被其他用户修改，请刷新后重试。", ex);
             }
             catch
             {

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 using Npgsql;
@@ -176,7 +177,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
             catch (PostgresException ex) when (ex.SqlState == "42501")
             {
-                throw new InvalidOperationException(
+                throw new InfrastructureServiceException(
                     "PostgreSQL 恢复账号必须具备 CREATEDB 权限，才能在覆盖业务库前验证备份身份和架构版本。",
                     ex);
             }
@@ -256,7 +257,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
 
             using var process = Process.Start(startInfo)
-                ?? throw new InvalidOperationException("无法启动 PostgreSQL 客户端工具。");
+                ?? throw new InfrastructureServiceException("无法启动 PostgreSQL 客户端工具。");
             Task<string> standardOutput = ReadProcessOutputAsync(process.StandardOutput);
             Task<string> standardError = ReadProcessOutputAsync(process.StandardError);
             using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -281,8 +282,9 @@ namespace ExportDocManager.Services.Infrastructure
             string error = (await standardError.ConfigureAwait(false)).Trim();
             if (process.ExitCode != 0)
             {
-                throw new InvalidOperationException(
-                    $"PostgreSQL 客户端工具执行失败：{(string.IsNullOrWhiteSpace(error) ? output : error)}");
+                throw new InfrastructureServiceException(
+                    "PostgreSQL 客户端工具执行失败，请检查数据库连接和运行目录权限。",
+                    new InvalidOperationException((string.IsNullOrWhiteSpace(error) ? output : error).Trim()));
             }
         }
 
@@ -339,7 +341,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             if (tools == null || !tools.ToolsReady)
             {
-                throw new InvalidOperationException("PostgreSQL 18 客户端工具不完整或版本不兼容。");
+                throw new InfrastructureServiceException("PostgreSQL 18 客户端工具不完整或版本不兼容。");
             }
         }
 
@@ -350,7 +352,7 @@ namespace ExportDocManager.Services.Infrastructure
                 !value.StartsWith("edm_migration_verify_", StringComparison.Ordinal) ||
                 value.Any(character => !char.IsAsciiLetterOrDigit(character) && character != '_'))
             {
-                throw new InvalidOperationException("服务器迁移临时验证数据库名称无效。");
+                throw new ServiceValidationException("服务器迁移临时验证数据库名称无效。");
             }
         }
 

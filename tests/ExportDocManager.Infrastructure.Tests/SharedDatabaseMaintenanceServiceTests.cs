@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,7 +20,7 @@ public sealed class SharedDatabaseMaintenanceServiceTests
     [Fact]
     public void EnsurePgDumpVersionSupported_ShouldRejectOlderClientMajorVersion()
     {
-        var exception = Assert.Throws<InvalidOperationException>(() =>
+        var exception = Assert.Throws<InfrastructureServiceException>(() =>
             SharedDatabaseMaintenanceService.EnsurePgDumpVersionSupported(15, 16));
 
         Assert.Contains("低于", exception.Message, StringComparison.Ordinal);
@@ -56,7 +57,7 @@ public sealed class SharedDatabaseMaintenanceServiceTests
     [Fact]
     public void PostRestoreOwnershipSql_ShouldKeepCommentMetadataOnSingleCommentLines()
     {
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<ServiceValidationException>(() =>
             SharedDatabaseMaintenanceService.BuildPostRestoreOwnershipSql(
                 "team_db\r\nGRANT ALL ON DATABASE postgres TO public;",
                 "app_role\nDROP ROLE important_role;",
@@ -80,13 +81,13 @@ public sealed class SharedDatabaseMaintenanceServiceTests
     [Fact]
     public void BuildPostRestoreOwnershipSql_ShouldBoundPostgreSqlIdentifiersAndRoleCount()
     {
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<ServiceValidationException>(() =>
             SharedDatabaseMaintenanceService.BuildPostRestoreOwnershipSql(
                 new string('d', 64),
                 "app_role",
                 Array.Empty<string>()));
 
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<ServiceValidationException>(() =>
             SharedDatabaseMaintenanceService.BuildPostRestoreOwnershipSql(
                 "business_db",
                 "app_role",

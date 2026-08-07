@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Errors;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -74,7 +75,7 @@ namespace ExportDocManager.Api.Hosting
                 {
                     UserPasswordPolicy.EnsureValid(request.ResetPassword, "初始密码");
                 }
-                catch (InvalidOperationException ex)
+                catch (ServiceValidationException ex)
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
@@ -97,7 +98,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("CreateUser");
@@ -138,7 +139,7 @@ namespace ExportDocManager.Api.Hosting
                     {
                         UserPasswordPolicy.EnsureValid(request.ResetPassword, "重置密码");
                     }
-                    catch (InvalidOperationException ex)
+                    catch (ServiceValidationException ex)
                     {
                         return Results.BadRequest(new ApiErrorResponse(ex.Message));
                     }
@@ -163,7 +164,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("UpdateUser");
@@ -209,7 +210,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("DeleteUser");

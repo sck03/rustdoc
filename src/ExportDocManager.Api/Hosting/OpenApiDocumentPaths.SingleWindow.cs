@@ -263,6 +263,7 @@ namespace ExportDocManager.Api.Hosting
                                     description = "Operation profiles and the currently active card profile.",
                                     content = JsonContent("ApiSingleWindowClientProfilesResponse")
                                 },
+                                ["400"] = new { description = "Client profiles are only available on an independent SQLite station." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "Trusted desktop token required." }
                             }
@@ -283,7 +284,7 @@ namespace ExportDocManager.Api.Hosting
                                     description = "Operation profile saved and activated.",
                                     content = JsonContent("ApiSingleWindowClientProfilesResponse")
                                 },
-                                ["400"] = new { description = "Invalid directory profile payload." },
+                                ["400"] = new { description = "Invalid directory profile payload or the deployment is not an independent SQLite station." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "Trusted desktop token required." },
                                 ["409"] = new { description = "Client profile could not be saved." }
@@ -307,6 +308,7 @@ namespace ExportDocManager.Api.Hosting
                                     description = "The selected operation profile is now active.",
                                     content = JsonContent("ApiSingleWindowClientProfilesResponse")
                                 },
+                                ["400"] = new { description = "The deployment is not an independent SQLite station." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "Trusted desktop token required." },
                                 ["409"] = new { description = "Operation profile could not be activated." }
@@ -331,7 +333,7 @@ namespace ExportDocManager.Api.Hosting
                                     description = "Batch payload files copied to the client OutBox.",
                                     content = JsonContent("SingleWindowClientDispatchResult")
                                 },
-                                ["400"] = new { description = "Invalid batch id." },
+                                ["400"] = new { description = "Invalid batch id or the deployment is not an independent SQLite station." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot dispatch the batch." },
                                 ["404"] = new { description = "Single Window batch not found." },
@@ -357,7 +359,7 @@ namespace ExportDocManager.Api.Hosting
                                     description = "Receipt files matched for the batch.",
                                     content = JsonContent("SingleWindowReceiptCollectionResult")
                                 },
-                                ["400"] = new { description = "Invalid batch id." },
+                                ["400"] = new { description = "Invalid batch id or the deployment is not an independent SQLite station." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot collect receipts for the batch." },
                                 ["404"] = new { description = "Single Window batch not found." },

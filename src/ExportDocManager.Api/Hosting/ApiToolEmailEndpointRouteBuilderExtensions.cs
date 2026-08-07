@@ -108,7 +108,7 @@ namespace ExportDocManager.Api.Hosting
                 if (string.IsNullOrWhiteSpace(email.SmtpHost) ||
                     string.IsNullOrWhiteSpace(ResolveEmailFromAddress(email)))
                 {
-                    return WriteConflict("邮件服务尚未配置，请先在设置中填写 SMTP 服务器和发件人。");
+                    return WriteValidation("邮件服务尚未配置，请先在设置中填写 SMTP 服务器和发件人。");
                 }
 
                 try
@@ -135,11 +135,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (SmtpException ex)
                 {
-                    return WriteConflict($"邮件发送失败：{ex.Message}");
+                    return WriteInfrastructureFailure("邮件发送服务暂时不可用，请稍后重试。", ex);
                 }
             })
             .WithName("SendEmail");
@@ -168,7 +168,7 @@ namespace ExportDocManager.Api.Hosting
                 if (string.IsNullOrWhiteSpace(email.SmtpHost) ||
                     string.IsNullOrWhiteSpace(fromAddress))
                 {
-                    return WriteConflict("邮件服务尚未配置，请先保存 SMTP 服务器和发件人。");
+                    return WriteValidation("邮件服务尚未配置，请先保存 SMTP 服务器和发件人。");
                 }
 
                 try
@@ -190,11 +190,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (SmtpException ex)
                 {
-                    return WriteConflict($"邮件连接测试失败：{ex.Message}");
+                    return WriteInfrastructureFailure("邮件连接服务暂时不可用，请稍后重试。", ex);
                 }
             })
             .WithName("TestEmailConnection");

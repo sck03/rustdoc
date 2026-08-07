@@ -50,7 +50,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Invalid path or unsupported document type." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "Source file was not found." },
-                                ["409"] = new { description = "Text extraction failed or OCR runtime is not enabled." }
+                                ["503"] = new { description = "Text extraction/OCR dependency is unavailable or failed." }
                             }
                         }
                     },
@@ -78,7 +78,7 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["400"] = new { description = "Invalid file name, empty file, unsupported format, or document resource limit exceeded." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "Text extraction failed or OCR runtime is not enabled." },
+                                ["503"] = new { description = "Text extraction/OCR dependency is unavailable or failed." },
                                 ["413"] = new { description = "Uploaded file exceeds 25 MB." }
                             }
                         }
@@ -101,9 +101,9 @@ namespace ExportDocManager.Api.Hosting
                                     description = "AI compliance review report. The sidecar uses only the current invoice draft and returns the report in memory without writing business storage.",
                                     content = JsonContent("ApiLetterOfCreditReviewResponse")
                                 },
-                                ["400"] = new { description = "Missing invoice draft or letter-of-credit review context." },
+                                ["400"] = new { description = "Missing invoice draft, review context, or invalid AI endpoint configuration." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "AI service is not configured or the AI request failed." }
+                                ["503"] = new { description = "The configured AI service is unavailable or returned an invalid response." }
                             }
                         }
                     },
@@ -128,7 +128,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Invalid path or unsupported image type." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "Source image was not found." },
-                                ["409"] = new { description = "OCR runtime is not enabled or recognition failed." }
+                                ["503"] = new { description = "OCR runtime is not enabled or recognition failed." }
                             }
                         }
                     },
@@ -152,7 +152,7 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["400"] = new { description = "Invalid Base64 image content or unsupported MIME type." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "OCR runtime is not enabled or recognition failed." }
+                                ["503"] = new { description = "OCR runtime is not enabled or recognition failed." }
                             }
                         }
                     },
@@ -174,7 +174,7 @@ namespace ExportDocManager.Api.Hosting
                                     content = JsonContent("ApiExchangeRateListResponse")
                                 },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "Exchange-rate source failed." }
+                                ["503"] = new { description = "Exchange-rate source is unavailable or failed." }
                             }
                         }
                     },
@@ -192,7 +192,7 @@ namespace ExportDocManager.Api.Hosting
                                     content = JsonContent("ApiExchangeRateAvailableCurrenciesResponse")
                                 },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "Exchange-rate source failed." }
+                                ["503"] = new { description = "Exchange-rate source is unavailable or failed." }
                             }
                         }
                     },
@@ -254,10 +254,10 @@ namespace ExportDocManager.Api.Hosting
                                     description = "Email was sent through the configured SMTP server.",
                                     content = JsonContent("ApiEmailSendResponse")
                                 },
-                                ["400"] = new { description = "Invalid recipient address or attachment path." },
+                                ["400"] = new { description = "Invalid recipient address, attachment path, or SMTP configuration." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "An explicit attachment file path was not found." },
-                                ["409"] = new { description = "SMTP is not configured or sending failed." }
+                                ["503"] = new { description = "The configured SMTP service is unavailable or sending failed." }
                             }
                         }
                     },
@@ -274,9 +274,9 @@ namespace ExportDocManager.Api.Hosting
                                     description = "A test email was sent to the configured sender address using the saved appsettings.json SMTP configuration.",
                                     content = JsonContent("ApiEmailTestResponse")
                                 },
-                                ["400"] = new { description = "Configured sender address is invalid." },
+                                ["400"] = new { description = "Configured sender address is invalid or SMTP is not configured." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "SMTP is not configured or the test send failed." }
+                                ["503"] = new { description = "The configured SMTP service is unavailable or the test send failed." }
                             }
                         }
                     },

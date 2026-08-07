@@ -36,54 +36,70 @@ namespace ExportDocManager.Services.Infrastructure
 
             Directory.CreateDirectory(safetyRoot);
             RuntimeFilePermissionHelper.RestrictDirectory(safetyRoot);
-            foreach ((string prefix, string targetRoot, string safetyName) in new[]
-            {
-                ("Data/Files/", paths.FileRoot, "Files"),
-                ("Data/Templates/", paths.UserTemplateRoot, "Templates"),
-                ("Data/SingleWindow/", paths.SingleWindowRoot, "SingleWindow"),
-                ("Data/Marks/", Path.Combine(paths.DataRoot, "Marks"), "Marks")
-            })
-            {
-                state.Directories.Add(PrepareDirectory(
-                    stagingRoot,
-                    safetyRoot,
-                    marker,
-                    prefix,
-                    targetRoot,
-                    safetyName));
-            }
-
-            foreach (ServerMigrationFileManifest file in marker.Manifest.Files)
-            {
-                if (!file.RelativePath.StartsWith("Config/", StringComparison.OrdinalIgnoreCase) &&
-                    !file.RelativePath.StartsWith("Security/", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-                string targetRoot;
-                string relative;
-                if (file.RelativePath.StartsWith("Config/", StringComparison.OrdinalIgnoreCase))
-                {
-                    targetRoot = paths.ConfigRoot;
-                    relative = file.RelativePath["Config/".Length..];
-                }
-                else
-                {
-                    targetRoot = paths.SecurityRoot;
-                    relative = file.RelativePath["Security/".Length..];
-                }
-                state.Files.Add(PrepareFile(
-                    stagingRoot,
-                    safetyRoot,
-                    marker.PackageId,
-                    file.RelativePath,
-                    targetRoot,
-                    relative,
-                    databaseSettings));
-            }
-
             WriteState(safetyRoot, state);
-            return state;
+            try
+            {
+                foreach ((string prefix, string targetRoot, string safetyName) in new[]
+                {
+                    ("Data/Files/", paths.FileRoot, "Files"),
+                    ("Data/Templates/", paths.UserTemplateRoot, "Templates"),
+                    ("Data/SingleWindow/", paths.SingleWindowRoot, "SingleWindow"),
+                    ("Data/Marks/", Path.Combine(paths.DataRoot, "Marks"), "Marks")
+                })
+                {
+                    ServerMigrationDirectoryTransaction directory = CreateDirectoryTransaction(
+                        safetyRoot,
+                        marker,
+                        targetRoot,
+                        safetyName);
+                    state.Directories.Add(directory);
+                    WriteState(safetyRoot, state);
+                    PrepareDirectory(stagingRoot, marker, prefix, directory);
+                }
+
+                foreach (ServerMigrationFileManifest file in marker.Manifest.Files)
+                {
+                    if (!file.RelativePath.StartsWith("Config/", StringComparison.OrdinalIgnoreCase) &&
+                        !file.RelativePath.StartsWith("Security/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    string targetRoot;
+                    string relative;
+                    if (file.RelativePath.StartsWith("Config/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetRoot = paths.ConfigRoot;
+                        relative = file.RelativePath["Config/".Length..];
+                    }
+                    else
+                    {
+                        targetRoot = paths.SecurityRoot;
+                        relative = file.RelativePath["Security/".Length..];
+                    }
+                    ServerMigrationFileTransactionItem transaction = CreateFileTransaction(
+                        safetyRoot,
+                        marker.PackageId,
+                        targetRoot,
+                        relative,
+                        file.RelativePath);
+                    state.Files.Add(transaction);
+                    WriteState(safetyRoot, state);
+                    PrepareFile(
+                        stagingRoot,
+                        file.RelativePath,
+                        databaseSettings,
+                        transaction);
+                }
+
+                return state;
+            }
+            catch
+            {
+                CleanupPrepared(state);
+                CleanupSnapshots(state);
+                AtomicFileHelper.TryDeleteFile(Path.Combine(safetyRoot, StateFileName));
+                throw;
+            }
         }
 
         public static void Apply(ServerMigrationFileTransactionState state)
@@ -172,6 +188,19 @@ namespace ExportDocManager.Services.Infrastructure
             }
         }
 
+        internal static void CleanupSnapshots(ServerMigrationFileTransactionState state)
+        {
+            foreach (ServerMigrationDirectoryTransaction directory in state.Directories)
+            {
+                AtomicFileHelper.TryDeleteDirectory(directory.SnapshotPath);
+            }
+
+            foreach (ServerMigrationFileTransactionItem file in state.Files)
+            {
+                AtomicFileHelper.TryDeleteFile(file.SnapshotPath);
+            }
+        }
+
         public static ServerMigrationFileTransactionState ReadState(string safetyRoot)
         {
             string path = Path.Combine(safetyRoot, StateFileName);
@@ -184,11 +213,9 @@ namespace ExportDocManager.Services.Infrastructure
                 ServerMigrationService.JsonOptions);
         }
 
-        private static ServerMigrationDirectoryTransaction PrepareDirectory(
-            string stagingRoot,
+        private static ServerMigrationDirectoryTransaction CreateDirectoryTransaction(
             string safetyRoot,
             PendingServerMigrationRestore marker,
-            string entryPrefix,
             string targetRoot,
             string safetyName)
         {
@@ -200,84 +227,114 @@ namespace ExportDocManager.Services.Infrastructure
             string replacement = Path.Combine(parent, $".{leaf}.migration-new-{marker.PackageId}");
             string oldSwap = Path.Combine(parent, $".{leaf}.migration-old-{marker.PackageId}");
             string snapshot = Path.Combine(safetyRoot, "Data", safetyName);
-            AtomicFileHelper.TryDeleteDirectory(replacement);
-            AtomicFileHelper.TryDeleteDirectory(oldSwap);
-            AtomicFileHelper.TryDeleteDirectory(snapshot);
-
-            bool originallyExisted = Directory.Exists(fullTarget);
-            if (originallyExisted)
-            {
-                CopyDirectory(fullTarget, snapshot);
-            }
-            Directory.CreateDirectory(replacement);
-            RuntimeFilePermissionHelper.RestrictDirectory(replacement);
-            foreach (ServerMigrationFileManifest file in marker.Manifest.Files.Where(file =>
-                file.RelativePath.StartsWith(entryPrefix, StringComparison.OrdinalIgnoreCase)))
-            {
-                string relative = file.RelativePath[entryPrefix.Length..];
-                string source = ServerMigrationService.ResolvePath(stagingRoot, file.RelativePath);
-                string target = ResolveWithinRoot(replacement, relative);
-                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                File.Copy(source, target, overwrite: false);
-                RuntimeFilePermissionHelper.RestrictFile(target);
-            }
-
             return new ServerMigrationDirectoryTransaction
             {
                 TargetPath = fullTarget,
                 ReplacementPath = replacement,
                 OldSwapPath = oldSwap,
                 SnapshotPath = snapshot,
-                OriginallyExisted = originallyExisted
+                OriginallyExisted = Directory.Exists(fullTarget)
             };
         }
 
-        private static ServerMigrationFileTransactionItem PrepareFile(
+        private static void PrepareDirectory(
             string stagingRoot,
+            PendingServerMigrationRestore marker,
+            string entryPrefix,
+            ServerMigrationDirectoryTransaction transaction)
+        {
+            try
+            {
+                AtomicFileHelper.TryDeleteDirectory(transaction.ReplacementPath);
+                AtomicFileHelper.TryDeleteDirectory(transaction.OldSwapPath);
+                AtomicFileHelper.TryDeleteDirectory(transaction.SnapshotPath);
+
+                if (transaction.OriginallyExisted)
+                {
+                    CopyDirectory(transaction.TargetPath, transaction.SnapshotPath);
+                }
+                Directory.CreateDirectory(transaction.ReplacementPath);
+                RuntimeFilePermissionHelper.RestrictDirectory(transaction.ReplacementPath);
+                foreach (ServerMigrationFileManifest file in marker.Manifest.Files.Where(file =>
+                    file.RelativePath.StartsWith(entryPrefix, StringComparison.OrdinalIgnoreCase)))
+                {
+                    string relative = file.RelativePath[entryPrefix.Length..];
+                    string source = ServerMigrationService.ResolvePath(stagingRoot, file.RelativePath);
+                    string target = ResolveWithinRoot(transaction.ReplacementPath, relative);
+                    Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                    File.Copy(source, target, overwrite: false);
+                    RuntimeFilePermissionHelper.RestrictFile(target);
+                }
+            }
+            catch
+            {
+                AtomicFileHelper.TryDeleteDirectory(transaction.ReplacementPath);
+                AtomicFileHelper.TryDeleteDirectory(transaction.OldSwapPath);
+                AtomicFileHelper.TryDeleteDirectory(transaction.SnapshotPath);
+                throw;
+            }
+        }
+
+        private static ServerMigrationFileTransactionItem CreateFileTransaction(
             string safetyRoot,
             string packageId,
-            string entryName,
             string targetRoot,
             string relative,
-            DatabaseConnectionSettings databaseSettings)
+            string entryName)
         {
-            string source = ServerMigrationService.ResolvePath(stagingRoot, entryName);
             string target = ResolveWithinRoot(targetRoot, relative);
             EnsureNoReparsePoint(target);
             string snapshot = ResolveWithinRoot(
                 Path.Combine(safetyRoot, "RuntimeFiles"),
                 entryName);
-            bool originallyExisted = File.Exists(target);
-            if (originallyExisted)
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(snapshot)!);
-                File.Copy(target, snapshot, overwrite: true);
-                RuntimeFilePermissionHelper.RestrictFile(snapshot);
-            }
-
             string replacement = Path.Combine(
                 Path.GetDirectoryName(target)!,
                 $".{Path.GetFileName(target)}.migration-new-{packageId}");
-            Directory.CreateDirectory(Path.GetDirectoryName(replacement)!);
-            AtomicFileHelper.TryDeleteFile(replacement);
-            if (entryName.Equals(
-                ServerMigrationLayout.ConfigEntry("appsettings.json"),
-                StringComparison.OrdinalIgnoreCase))
-            {
-                WriteMergedAppSettings(source, replacement, databaseSettings);
-            }
-            else
-            {
-                File.Copy(source, replacement, overwrite: false);
-            }
-            RuntimeFilePermissionHelper.RestrictFile(replacement);
             return new ServerMigrationFileTransactionItem
             {
                 TargetPath = target,
                 ReplacementPath = replacement,
                 SnapshotPath = snapshot,
-                OriginallyExisted = originallyExisted
+                OriginallyExisted = File.Exists(target)
             };
+        }
+
+        private static void PrepareFile(
+            string stagingRoot,
+            string entryName,
+            DatabaseConnectionSettings databaseSettings,
+            ServerMigrationFileTransactionItem transaction)
+        {
+            string source = ServerMigrationService.ResolvePath(stagingRoot, entryName);
+            try
+            {
+                if (transaction.OriginallyExisted)
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(transaction.SnapshotPath)!);
+                    File.Copy(transaction.TargetPath, transaction.SnapshotPath, overwrite: true);
+                    RuntimeFilePermissionHelper.RestrictFile(transaction.SnapshotPath);
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(transaction.ReplacementPath)!);
+                AtomicFileHelper.TryDeleteFile(transaction.ReplacementPath);
+                if (entryName.Equals(
+                    ServerMigrationLayout.ConfigEntry("appsettings.json"),
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    WriteMergedAppSettings(source, transaction.ReplacementPath, databaseSettings);
+                }
+                else
+                {
+                    File.Copy(source, transaction.ReplacementPath, overwrite: false);
+                }
+                RuntimeFilePermissionHelper.RestrictFile(transaction.ReplacementPath);
+            }
+            catch
+            {
+                AtomicFileHelper.TryDeleteFile(transaction.ReplacementPath);
+                AtomicFileHelper.TryDeleteFile(transaction.SnapshotPath);
+                throw;
+            }
         }
 
         internal static void WriteMergedAppSettings(

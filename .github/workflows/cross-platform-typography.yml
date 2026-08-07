@@ -135,6 +135,9 @@ jobs:
       - name: Prevent new hard-coded CSS debt
         run: npm --prefix apps/export-doc-web run test:style-governance
 
+      - name: Prevent source responsibility files from regrowing
+        run: npm --prefix apps/export-doc-web run test:source-size-governance
+
       - name: Validate density, scaling and native font rendering
         timeout-minutes: 5
         env:

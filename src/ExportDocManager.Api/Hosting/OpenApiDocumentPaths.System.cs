@@ -530,7 +530,9 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Invalid restore payload or confirmation text." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot manage database backups." },
-                                ["409"] = new { description = "The database could not be restored." }
+                                ["404"] = new { description = "The selected backup file was not found." },
+                                ["409"] = new { description = "Another database restore is already pending." },
+                                ["503"] = new { description = "The database restore dependency is unavailable or failed." }
                             }
                         }
                     },
@@ -570,10 +572,10 @@ namespace ExportDocManager.Api.Hosting
                                     description = "An encrypted recovery package was created under Backups/DisasterRecovery.",
                                     content = JsonContent("ApiDisasterRecoveryPackageResponse")
                                 },
-                                ["400"] = new { description = "Missing package password." },
+                                ["400"] = new { description = "Missing/invalid package password, unsupported recovery mode, or invalid package request." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "Administrator or trusted desktop access is missing." },
-                                ["409"] = new { description = "Recovery is unsupported, prerequisites are missing, or package creation failed." }
+                                ["503"] = new { description = "Recovery prerequisites or the local filesystem are unavailable." }
                             }
                         }
                     },
@@ -595,10 +597,12 @@ namespace ExportDocManager.Api.Hosting
                                     description = "The verified recovery payload was staged for offline restore before database settings are loaded on next start.",
                                     content = JsonContent("ApiDisasterRecoveryRestoreResponse")
                                 },
-                                ["400"] = new { description = "Missing fields or confirmation text is not RECOVER." },
+                                ["400"] = new { description = "Missing fields, invalid password/package, or confirmation text is not RECOVER." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "Administrator or trusted desktop access is missing." },
-                                ["409"] = new { description = "The password/package is invalid, another restore is pending, or staging failed." }
+                                ["404"] = new { description = "The recovery package was not found." },
+                                ["409"] = new { description = "Another restore is already pending." },
+                                ["503"] = new { description = "Recovery staging or the local filesystem is unavailable." }
                             }
                         }
                     },
@@ -635,7 +639,8 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot manage database backups." },
-                                ["409"] = new { description = "WebDAV is not configured or the connection test failed." }
+                                ["400"] = new { description = "WebDAV is not configured." },
+                                ["503"] = new { description = "The WebDAV endpoint or connection test is unavailable." }
                             }
                         }
                     },
@@ -654,7 +659,9 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot manage database backups." },
-                                ["409"] = new { description = "WebDAV is disabled, not configured, no backup exists, or the upload failed." }
+                                ["400"] = new { description = "WebDAV is disabled or not configured." },
+                                ["404"] = new { description = "No local database backup is available." },
+                                ["503"] = new { description = "The WebDAV endpoint or upload is unavailable." }
                             }
                         }
                     },
@@ -673,7 +680,8 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot manage database backups." },
-                                ["409"] = new { description = "WebDAV is disabled, not configured, or the remote list failed." }
+                                ["400"] = new { description = "WebDAV is disabled or not configured." },
+                                ["503"] = new { description = "The WebDAV endpoint or remote list is unavailable." }
                             }
                         }
                     },
@@ -695,10 +703,10 @@ namespace ExportDocManager.Api.Hosting
                                     description = "The selected WebDAV ZIP backup was downloaded into the runtime data root Backups directory.",
                                     content = JsonContent("ApiCloudBackupCommandResponse")
                                 },
-                                ["400"] = new { description = "Invalid cloud backup download payload or file name." },
+                                ["400"] = new { description = "Invalid cloud backup payload/file name, disabled WebDAV, missing configuration, or invalid selected file." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot manage database backups." },
-                                ["409"] = new { description = "WebDAV is disabled, not configured, or the download failed." }
+                                ["503"] = new { description = "The WebDAV endpoint or download is unavailable." }
                             }
                         }
                     },
@@ -732,7 +740,8 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot manage PostgreSQL maintenance." },
-                                ["409"] = new { description = "PostgreSQL is not configured, pg_dump is missing, or the backup failed." },
+                                ["400"] = new { description = "PostgreSQL is not configured." },
+                                ["503"] = new { description = "pg_dump is missing or PostgreSQL backup failed." },
                                 ["429"] = new { description = "The background job queue is full." }
                             }
                         }
@@ -758,7 +767,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Invalid restore plan payload." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot manage PostgreSQL maintenance." },
-                                ["409"] = new { description = "The selected backup could not be found or the restore plan could not be generated." }
+                                ["404"] = new { description = "The selected backup could not be found." },
+                                ["503"] = new { description = "The restore plan dependency or filesystem is unavailable." }
                             }
                         }
                     },
@@ -789,11 +799,12 @@ namespace ExportDocManager.Api.Hosting
                             responses = new Dictionary<string, object>
                             {
                                 ["200"] = new { description = "Database restore staged for the next service start.", content = JsonContent("ApiServerMigrationRestoreResponse") },
-                                ["400"] = new { description = "Explicit RESTORE DATABASE confirmation is required." },
+                                ["400"] = new { description = "Explicit RESTORE DATABASE confirmation and a valid custom-format dump are required." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "Administrator settings permission is required." },
                                 ["404"] = new { description = "The selected backup does not exist." },
-                                ["409"] = new { description = "The database restore could not be staged." }
+                                ["409"] = new { description = "Another restore is already pending." },
+                                ["503"] = new { description = "The database restore dependency or staging filesystem is unavailable." }
                             }
                         }
                     },
@@ -813,10 +824,11 @@ namespace ExportDocManager.Api.Hosting
                             responses = new Dictionary<string, object>
                             {
                                 ["200"] = new { description = "Uploaded database restore staged for the next service start.", content = JsonContent("ApiServerMigrationRestoreResponse") },
-                                ["400"] = new { description = "Explicit RESTORE DATABASE confirmation is required." },
+                                ["400"] = new { description = "Explicit RESTORE DATABASE confirmation and a valid custom-format dump are required." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "Administrator settings permission is required." },
-                                ["409"] = new { description = "The uploaded dump is invalid or restore could not be staged." },
+                                ["409"] = new { description = "Another restore is already pending." },
+                                ["503"] = new { description = "The uploaded dump could not be staged or the restore dependency is unavailable." },
                                 ["413"] = new { description = "The database backup exceeds the upload limit." }
                             }
                         }
@@ -888,7 +900,9 @@ namespace ExportDocManager.Api.Hosting
                                 ["200"] = new { description = "Migration restore was staged for the next service start.", content = JsonContent("ApiServerMigrationRestoreResponse") },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "Administrator settings permission is required." },
-                                ["409"] = new { description = "The package, password, or current deployment state is invalid." },
+                                ["400"] = new { description = "The package, password, deployment mode, or confirmation is invalid." },
+                                ["409"] = new { description = "Another migration restore is already pending." },
+                                ["503"] = new { description = "Migration validation, PostgreSQL tools, or staging is unavailable." },
                                 ["413"] = new { description = "The migration package exceeds the upload limit." }
                             }
                         }
@@ -932,7 +946,9 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Invalid transfer payload or confirmation text." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "The current user cannot transfer shared database ownership." },
-                                ["409"] = new { description = "Ownership could not be transferred." }
+                                ["404"] = new { description = "The target user does not exist or is inactive." },
+                                ["409"] = new { description = "Ownership rows were changed concurrently." },
+                                ["503"] = new { description = "The shared database is unavailable." }
                             }
                         }
                     },
@@ -956,7 +972,8 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["400"] = new { description = "Optional database backups or sample files require explicit confirmation text." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["403"] = new { description = "The current user cannot create support packages or the desktop token is invalid." }
+                                ["403"] = new { description = "The current user cannot create support packages or the desktop token is invalid." },
+                                ["503"] = new { description = "The runtime filesystem or optional database backup is unavailable." }
                             }
                         }
                     },

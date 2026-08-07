@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Core
@@ -37,9 +38,9 @@ namespace ExportDocManager.Services.Core
                     .ThenByDescending(x => x.Id)
                     .FirstOrDefaultAsync();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                throw new Exception($"获取默认单证参数失败: {ex.Message}", ex);
+                throw new InfrastructureServiceException("发票默认参数服务暂时不可用，请稍后重试。", ex);
             }
         }
 
@@ -60,9 +61,9 @@ namespace ExportDocManager.Services.Core
                 await PopulateMissingInvoiceSnapshotsAsync(context, invoice);
                 return invoice;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                throw new Exception($"获取发票详情失败: {ex.Message}", ex);
+                throw new InfrastructureServiceException("发票详情服务暂时不可用，请稍后重试。", ex);
             }
         }
 
@@ -81,9 +82,9 @@ namespace ExportDocManager.Services.Core
                         x.InvoiceNo == normalizedInvoiceNo &&
                         x.Type == normalizedType);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                throw new Exception($"根据公司范围、发票号和类型获取发票失败: {ex.Message}", ex);
+                throw new InfrastructureServiceException("发票编号查询服务暂时不可用，请稍后重试。", ex);
             }
         }
 
@@ -100,9 +101,9 @@ namespace ExportDocManager.Services.Core
                         x.CompanyScope == normalizedCompanyScope &&
                         x.InvoiceNo == normalizedInvoiceNo);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                throw new Exception($"检查发票号是否存在失败: {ex.Message}", ex);
+                throw new InfrastructureServiceException("发票编号校验服务暂时不可用，请稍后重试。", ex);
             }
         }
 
@@ -126,9 +127,9 @@ namespace ExportDocManager.Services.Core
 
                 return invoice;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                throw new Exception($"获取最新发票失败: {ex.Message}", ex);
+                throw new InfrastructureServiceException("最新发票查询服务暂时不可用，请稍后重试。", ex);
             }
         }
     }

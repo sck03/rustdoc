@@ -1,0 +1,109 @@
+.update-center-toolbar {
+  align-items: center;
+}
+
+.update-center-detail-grid {
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+}
+
+.update-center-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(320px, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.update-release-section,
+.update-package-section {
+  min-width: 0;
+  min-height: 0;
+}
+
+.update-release-notes {
+  min-height: 220px;
+  padding: 10px 12px;
+  overflow: auto;
+  color: #2e3a43;
+  background: #f8fbfa;
+  border: 1px solid #e1e7eb;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.update-package-detail-grid {
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+}
+
+.update-install-plan-section {
+  min-width: 0;
+}
+
+.update-install-plan-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0 0 0 20px;
+  color: #39464f;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.startup-update-banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  color: #23423d;
+  background: #edf8f5;
+  border: 1px solid #c8e4dc;
+  border-radius: 8px;
+}
+
+.startup-update-banner > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.startup-update-banner strong,
+.startup-update-banner span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mandatory-update-gate {
+  align-content: start;
+  grid-template-rows: auto;
+}
+
+.mandatory-update-panel {
+  display: grid;
+  gap: 12px;
+  max-width: 960px;
+}
+
+.mandatory-update-detail-grid {
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+}
+
+.mandatory-update-notes {
+  max-height: 220px;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  color: #2e3a43;
+  background: #f8fbfa;
+  border: 1px solid #e1e7eb;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

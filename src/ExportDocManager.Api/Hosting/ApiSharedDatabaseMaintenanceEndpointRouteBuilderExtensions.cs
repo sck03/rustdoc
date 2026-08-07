@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -54,11 +55,13 @@ namespace ExportDocManager.Api.Hosting
                 PostgreSqlMaintenanceStatus status = maintenanceService.GetPostgreSqlMaintenanceStatus();
                 if (!status.PostgreSqlSelected || !status.PostgreSqlConfigured)
                 {
-                    return WriteConflict("当前未完整配置 PostgreSQL 团队数据库，不能创建物理备份。");
+                    return WriteValidation("当前未完整配置 PostgreSQL 团队数据库，不能创建物理备份。");
                 }
                 if (!status.ToolsReady)
                 {
-                    return WriteConflict("PostgreSQL 客户端工具未就绪，不能创建物理备份。");
+                    return WriteInfrastructureFailure(
+                        "PostgreSQL 客户端工具未就绪，不能创建物理备份。",
+                        new InvalidOperationException("PostgreSQL client tools are not ready."));
                 }
 
                 BackgroundJobSnapshot job = jobRunner.Enqueue(
@@ -127,9 +130,9 @@ namespace ExportDocManager.Api.Hosting
                         result.BackupFilePath,
                         result.StoragePolicy));
                 }
-                catch (InvalidOperationException ex)
+                catch (Exception ex) when (ex is ServiceException or InvalidOperationException)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("CreatePostgreSqlRestorePlan");
@@ -217,9 +220,9 @@ namespace ExportDocManager.Api.Hosting
                         result.UpdatedOtherBusinessData,
                         result.StoragePolicy));
                 }
-                catch (InvalidOperationException ex)
+                catch (Exception ex) when (ex is ServiceException or InvalidOperationException)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("TransferSharedDatabaseOwnership");
@@ -285,7 +288,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException)
                 {
-                    return WriteConflict($"支持包导出失败：{ex.Message}");
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("SaveSupportPackageToRuntime");

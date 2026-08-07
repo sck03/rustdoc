@@ -32,7 +32,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
                 {
-                    return WriteConflict("提交包只能导入独立 SQLite 持卡机。");
+                    return WriteValidation("提交包只能导入独立 SQLite 持卡机。");
                 }
 
                 return await ImportSingleWindowPackageAsync(
@@ -96,7 +96,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
                 {
-                    return WriteConflict("提交包只能导入独立 SQLite 持卡机。");
+                    return WriteValidation("提交包只能导入独立 SQLite 持卡机。");
                 }
 
                 return await ImportSingleWindowUploadedPackageAsync(

@@ -1,4 +1,5 @@
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 
@@ -163,9 +164,13 @@ namespace ExportDocManager.Api.Hosting
                     pathProvider,
                     databaseSettings.SqliteDatabaseFileName);
             }
+            catch (ServiceException)
+            {
+                throw;
+            }
             catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
             {
-                throw new InvalidOperationException(exception.Message, exception);
+                throw new ServiceValidationException(exception.Message, exception);
             }
 
             EnsureWritableDirectory(

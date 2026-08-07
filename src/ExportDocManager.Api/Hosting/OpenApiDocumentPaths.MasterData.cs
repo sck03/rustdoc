@@ -163,7 +163,8 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["400"] = new { description = "Invalid HS code payload." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "HS code could not be saved." }
+                                ["409"] = new { description = "HS code was changed concurrently or conflicts with current data." },
+                                ["503"] = new { description = "The HS code database is unavailable." }
                             }
                         }
                     },
@@ -188,7 +189,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Invalid import path or workbook format." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "Import workbook was not found." },
-                                ["409"] = new { description = "Workbook could not be imported." }
+                                ["409"] = new { description = "The import conflicts with current HS code data." },
+                                ["503"] = new { description = "The workbook filesystem or HS code database is unavailable." }
                             }
                         }
                     },
@@ -205,7 +207,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Invalid request." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "Workbook was not found." },
-                                ["409"] = new { description = "Workbook could not be analyzed." }
+                                ["503"] = new { description = "The workbook filesystem or analyzer is unavailable." }
                             }
                         }
                     },
@@ -228,7 +230,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["200"] = new { description = "Detected columns and import differences.", content = JsonContent("ApiHsCodeImportPreviewResponse") },
                                 ["400"] = new { description = "Invalid workbook." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "Workbook could not be analyzed." }
+                                ["503"] = new { description = "The workbook analyzer or temporary filesystem is unavailable." }
                             }
                         }
                     },
@@ -245,7 +247,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Invalid preview token." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "Preview expired." },
-                                ["409"] = new { description = "Import could not be committed." }
+                                ["409"] = new { description = "The import conflicts with current HS code data." },
+                                ["503"] = new { description = "The HS code database is unavailable." }
                             }
                         }
                     },
@@ -273,7 +276,8 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["400"] = new { description = "Invalid file name, empty body, or workbook format." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "Workbook could not be imported." }
+                                ["409"] = new { description = "The import conflicts with current HS code data." },
+                                ["503"] = new { description = "The workbook filesystem or HS code database is unavailable." }
                             }
                         }
                     },
@@ -296,7 +300,7 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["400"] = new { description = "Missing search keyword." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "Remote search failed." }
+                                ["503"] = new { description = "The configured remote HS code source is unavailable." }
                             }
                         }
                     },
@@ -329,7 +333,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["200"] = new { description = "Remote results returned and declaration evidence captured in the pending candidate pool.", content = JsonContent("ApiHsCodeSearchResponse") },
                                 ["400"] = new { description = "Missing search keyword." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "Remote search or capture failed." }
+                                ["503"] = new { description = "The remote HS code source or local evidence store is unavailable." }
                             }
                         }
                     },
@@ -353,7 +357,7 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["400"] = new { description = "Missing detail URL or invalid payload." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "Remote detail could not be fetched." }
+                                ["503"] = new { description = "The remote HS code detail source is unavailable." }
                             }
                         }
                     },
@@ -377,7 +381,8 @@ namespace ExportDocManager.Api.Hosting
                                 },
                                 ["400"] = new { description = "Missing detail URL or invalid payload." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["409"] = new { description = "Remote detail could not be resolved." }
+                                ["409"] = new { description = "The resolved HS code conflicts with current trusted data." },
+                                ["503"] = new { description = "The remote source or HS code database is unavailable." }
                             }
                         }
                     },
@@ -683,7 +688,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Invalid HS code payload." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "HS code not found." },
-                                ["409"] = new { description = "HS code could not be saved." }
+                                ["409"] = new { description = "HS code was changed concurrently or conflicts with current data." },
+                                ["503"] = new { description = "The HS code database is unavailable." }
                             }
                         }
                     },
@@ -707,7 +713,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Invalid HS code id." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "HS code not found." },
-                                ["409"] = new { description = "HS code could not be deleted." }
+                                ["409"] = new { description = "HS code could not be deleted because of a current data conflict." },
+                                ["503"] = new { description = "The HS code database is unavailable." }
                             }
                         }
                     },
@@ -732,7 +739,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "No valid HS code ids were selected." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["404"] = new { description = "No selected HS code exists." },
-                                ["409"] = new { description = "Selected HS codes could not be deleted." }
+                                ["409"] = new { description = "Selected HS codes could not be deleted because of a current data conflict." },
+                                ["503"] = new { description = "The HS code database is unavailable." }
                             }
                         }
                     },
@@ -757,7 +765,8 @@ namespace ExportDocManager.Api.Hosting
                                 ["400"] = new { description = "Missing confirmation text." },
                                 ["401"] = new { description = "Missing or invalid bearer token." },
                                 ["403"] = new { description = "Only administrators can clear the local HS code library." },
-                                ["409"] = new { description = "HS code library could not be cleared." }
+                                ["409"] = new { description = "The HS code library conflicts with another operation." },
+                                ["503"] = new { description = "The HS code database is unavailable." }
                             }
                         }
                     },

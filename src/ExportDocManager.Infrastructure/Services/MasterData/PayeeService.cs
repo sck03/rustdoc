@@ -4,6 +4,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -43,13 +44,21 @@ namespace ExportDocManager.Services.MasterData
                 await context.SaveChangesAsync();
                 return payee.Id;
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
-                throw new Exception("该收款对象已被其他用户修改，请加载最新数据后再保存。");
+                throw new ServiceConcurrencyException("该收款对象已被其他用户修改，请加载最新数据后再保存。", ex);
             }
-            catch (Exception ex)
+            catch (ArgumentException ex)
             {
-                throw new Exception($"保存支付对象信息失败: {ex.Message}", ex);
+                throw new ServiceValidationException(ex.Message, ex);
+            }
+            catch (ServiceException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new InfrastructureServiceException("收款对象保存服务暂时不可用，请稍后重试。", ex);
             }
         }
 
@@ -60,9 +69,13 @@ namespace ExportDocManager.Services.MasterData
                 var rows = await _payeeReadRepository.QueryAsync(new PayeeReadQuery());
                 return rows.ToList();
             }
-            catch (Exception ex)
+            catch (ServiceException)
             {
-                throw new Exception($"获取支付对象列表失败: {ex.Message}", ex);
+                throw;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new InfrastructureServiceException("收款对象列表服务暂时不可用，请稍后重试。", ex);
             }
         }
 
@@ -81,9 +94,17 @@ namespace ExportDocManager.Services.MasterData
                 await context.SaveChangesAsync();
                 return true;
             }
-            catch (Exception ex)
+            catch (DbUpdateConcurrencyException ex)
             {
-                throw new Exception($"删除支付对象失败: {ex.Message}", ex);
+                throw new ServiceConcurrencyException("该收款对象已被其他用户修改，请刷新后再试。", ex);
+            }
+            catch (ServiceException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new InfrastructureServiceException("收款对象删除服务暂时不可用，请稍后重试。", ex);
             }
         }
 
@@ -97,9 +118,13 @@ namespace ExportDocManager.Services.MasterData
                 });
                 return rows.ToList();
             }
-            catch (Exception ex)
+            catch (ServiceException)
             {
-                throw new Exception($"搜索支付对象失败: {ex.Message}", ex);
+                throw;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new InfrastructureServiceException("收款对象搜索服务暂时不可用，请稍后重试。", ex);
             }
         }
 

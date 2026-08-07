@@ -13,6 +13,7 @@ namespace ExportDocManager.Services.Core
         Validation,
         Conflict,
         Forbidden,
+        Infrastructure,
         Unexpected
     }
 

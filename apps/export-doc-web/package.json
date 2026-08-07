@@ -38,6 +38,7 @@
     "audit:production": "node ../../scripts/audit-npm-production.mjs . --allow-reviewed-react-router-rsc",
     "test:scale-contracts": "node ../../scripts/test_frontend_scale_contracts.mjs",
     "test:style-governance": "node ../../scripts/check_frontend_style_governance.mjs",
+    "test:source-size-governance": "node ../../scripts/check_source_size_governance.mjs",
     "test:audit-log-maintenance-model": "node ../../scripts/test_audit_log_maintenance_model.mjs",
     "test:report-template-workspace-model": "node ../../scripts/test_report_template_workspace_model.mjs",
     "test:supplier-assessment-analytics": "node ../../scripts/test_supplier_assessment_analytics_model.mjs",

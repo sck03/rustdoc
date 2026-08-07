@@ -461,7 +461,7 @@ namespace ExportDocManager.Api.Hosting
                             description = successDescription,
                             content = JsonContent("ApiSingleWindowImportedPackageResponse")
                         },
-                        ["400"] = new { description = "Invalid import package path or package type." },
+                        ["400"] = new { description = "Invalid import package path/type or the deployment is not an independent SQLite station." },
                         ["401"] = new { description = "Missing or invalid bearer token." },
                         ["403"] = new { description = "The current user cannot import the package for its source invoice." },
                         ["404"] = new { description = "Package file not found." },
@@ -491,7 +491,7 @@ namespace ExportDocManager.Api.Hosting
                     responses = new Dictionary<string, object>
                     {
                         ["200"] = new { description = "Uploaded package imported.", content = JsonContent("ApiSingleWindowImportedPackageResponse") },
-                        ["400"] = new { description = "Invalid or empty package upload." },
+                        ["400"] = new { description = "Invalid/empty package upload or the deployment is not an independent SQLite station." },
                         ["401"] = new { description = "Missing or invalid bearer token." },
                         ["404"] = new { description = "Package source data was not found." },
                         ["409"] = new { description = "Package could not be imported." }

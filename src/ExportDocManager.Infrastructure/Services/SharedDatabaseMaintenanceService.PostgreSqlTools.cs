@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -65,7 +66,7 @@ namespace ExportDocManager.Services.Infrastructure
 
             if (!process.Start())
             {
-                throw new InvalidOperationException("无法启动 PostgreSQL 客户端工具。");
+                throw new InfrastructureServiceException("无法启动 PostgreSQL 客户端工具。");
             }
 
             Task<string> standardOutputTask = ReadProcessOutputAsync(process.StandardOutput);
@@ -97,7 +98,7 @@ namespace ExportDocManager.Services.Infrastructure
                 string message = !string.IsNullOrWhiteSpace(standardError)
                     ? standardError.Trim()
                     : standardOutput.Trim();
-                throw new InvalidOperationException($"PostgreSQL 客户端工具执行失败：{message}");
+                throw new InfrastructureServiceException("PostgreSQL 客户端工具执行失败，请检查数据库连接和运行目录权限。", new InvalidOperationException(message));
             }
 
             return new PostgreSqlToolRunResult(standardOutput.Trim(), standardError.Trim());
@@ -133,14 +134,14 @@ namespace ExportDocManager.Services.Infrastructure
             }
             catch (RegexMatchTimeoutException exception)
             {
-                throw new InvalidOperationException($"无法解析 {sourceName} 版本。", exception);
+                throw new InfrastructureServiceException($"无法解析 {sourceName} 版本。", exception);
             }
 
             if (!match.Success ||
                 !int.TryParse(match.Groups["major"].Value, out int major) ||
                 major <= 0)
             {
-                throw new InvalidOperationException($"无法解析 {sourceName} 版本：{value}");
+                throw new InfrastructureServiceException($"无法解析 {sourceName} 版本：{value}");
             }
 
             return major;
@@ -150,7 +151,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             if (pgDumpMajor < serverMajor)
             {
-                throw new InvalidOperationException(
+                throw new InfrastructureServiceException(
                     $"pg_dump 主版本 {pgDumpMajor} 低于 PostgreSQL 服务器主版本 {serverMajor}。请把匹配或更新版本的客户端工具放入程序 Tools/PostgreSQL/bin。");
             }
         }
@@ -188,18 +189,18 @@ namespace ExportDocManager.Services.Infrastructure
             string fileName = (backupFileName ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(fileName))
             {
-                throw new InvalidOperationException("PostgreSQL 备份文件名不能为空。");
+                throw new ServiceValidationException("PostgreSQL 备份文件名不能为空。");
             }
 
             if (fileName.IndexOfAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]) >= 0 ||
                 !string.Equals(fileName, Path.GetFileName(fileName), StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("只能选择 PostgreSQL 备份列表中的文件名，不能传入路径。");
+                throw new ServiceValidationException("只能选择 PostgreSQL 备份列表中的文件名，不能传入路径。");
             }
 
             var item = ListPostgreSqlPhysicalBackups()
                 .FirstOrDefault(backup => string.Equals(backup.FileName, fileName, StringComparison.OrdinalIgnoreCase));
-            return item?.FullPath ?? throw new InvalidOperationException("未找到指定 PostgreSQL 物理备份。");
+            return item?.FullPath ?? throw new ResourceNotFoundException("未找到指定 PostgreSQL 物理备份。");
         }
 
         private string BuildRestoreScript(

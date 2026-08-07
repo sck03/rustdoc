@@ -74,7 +74,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("ImportLetterOfCreditDocument");
@@ -142,11 +142,11 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (IOException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 finally
                 {
@@ -196,15 +196,15 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return WriteConflict(ex.Message);
+                    return WriteServiceException(ex);
                 }
                 catch (HttpRequestException ex)
                 {
-                    return WriteConflict($"AI 审查请求失败：{ex.Message}");
+                    return WriteInfrastructureFailure("AI 审查服务暂时不可用，请稍后重试。", ex);
                 }
                 catch (JsonException ex)
                 {
-                    return WriteConflict($"AI 审查响应解析失败：{ex.Message}");
+                    return WriteInfrastructureFailure("AI 审查服务返回了无效响应，请稍后重试。", ex);
                 }
             })
             .WithName("ReviewLetterOfCreditCompliance");

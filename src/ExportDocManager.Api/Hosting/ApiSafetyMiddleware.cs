@@ -23,42 +23,57 @@ namespace ExportDocManager.Api.Hosting
             context.TraceIdentifier = correlationId;
             context.Response.Headers[CorrelationIdHeaderName] = correlationId;
 
-            try
+            using (ApiServiceExceptionMapper.PushCorrelationId(correlationId))
             {
-                await _next(context);
-            }
-            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
-            {
-                _logger.LogInformation("请求已由客户端取消。CorrelationId={CorrelationId}", correlationId);
-                if (!context.Response.HasStarted)
+                try
                 {
-                    context.Response.StatusCode = 499;
+                    await _next(context);
                 }
-            }
-            catch (PayloadLimitExceededException ex)
-            {
-                await WriteErrorAsync(
-                    context,
-                    StatusCodes.Status413PayloadTooLarge,
-                    ex.Message,
-                    correlationId);
-            }
-            catch (BadHttpRequestException ex) when (ex.StatusCode == StatusCodes.Status413PayloadTooLarge)
-            {
-                await WriteErrorAsync(
-                    context,
-                    StatusCodes.Status413PayloadTooLarge,
-                    "上传内容超过服务器允许的最大大小。",
-                    correlationId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "API 请求发生未处理异常。CorrelationId={CorrelationId}", correlationId);
-                await WriteErrorAsync(
-                    context,
-                    StatusCodes.Status500InternalServerError,
-                    $"服务器处理请求时发生错误，请联系管理员并提供关联编号 {correlationId}。",
-                    correlationId);
+                catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+                {
+                    _logger.LogInformation("请求已由客户端取消。CorrelationId={CorrelationId}", correlationId);
+                    if (!context.Response.HasStarted)
+                    {
+                        context.Response.StatusCode = 499;
+                    }
+                }
+                catch (PayloadLimitExceededException ex)
+                {
+                    await WriteErrorAsync(
+                        context,
+                        StatusCodes.Status413PayloadTooLarge,
+                        ex.Message,
+                        correlationId);
+                }
+                catch (BadHttpRequestException ex) when (ex.StatusCode == StatusCodes.Status413PayloadTooLarge)
+                {
+                    await WriteErrorAsync(
+                        context,
+                        StatusCodes.Status413PayloadTooLarge,
+                        "上传内容超过服务器允许的最大大小。",
+                        correlationId);
+                }
+                catch (BadHttpRequestException ex)
+                {
+                    int statusCode = ex.StatusCode is >= 400 and <= 499
+                        ? ex.StatusCode
+                        : StatusCodes.Status400BadRequest;
+                    await WriteErrorAsync(
+                        context,
+                        statusCode,
+                        "请求格式无效，请检查提交的数据后重试。",
+                        correlationId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "API 请求发生未处理异常。CorrelationId={CorrelationId}", correlationId);
+                    (int statusCode, string message) = ApiServiceExceptionMapper.Map(ex, correlationId);
+                    await WriteErrorAsync(
+                        context,
+                        statusCode,
+                        message,
+                        correlationId);
+                }
             }
         }
 

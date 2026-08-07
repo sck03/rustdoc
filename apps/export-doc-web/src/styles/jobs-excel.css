@@ -1,0 +1,597 @@
+.path-cell,
+.message-cell {
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.single-window-package-table,
+.single-window-receipt-table {
+  min-width: 1240px;
+}
+
+.single-window-board-surface {
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+}
+
+.single-window-board-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(360px, 1fr);
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.board-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.board-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+}
+
+.board-panel-header span {
+  color: #58616a;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.single-window-board-table {
+  min-height: 240px;
+}
+
+.single-window-ticket-table {
+  min-width: 1320px;
+}
+
+.job-table {
+  min-width: 1180px;
+}
+
+.job-row-focused {
+  background: #fff8db;
+  outline: 2px solid #e0a82e;
+  outline-offset: -2px;
+}
+
+.job-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.job-output-path-cell .icon-button {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+}
+
+.job-tool-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #dbe3ea;
+}
+
+.job-create-panel {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.job-create-panel details {
+  min-width: 0;
+  background: #ffffff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+}
+
+.job-create-panel summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.job-create-panel summary span {
+  min-width: 0;
+  overflow: hidden;
+  color: #20313d;
+  font-size: 14px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-create-panel summary small {
+  flex: 0 0 auto;
+  color: #69737d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.job-create-panel details[open] summary {
+  border-bottom: 1px solid #e1e7ec;
+}
+
+.job-create-panel .job-tool-panel {
+  padding: 12px;
+  border-bottom: 0;
+}
+
+.job-tool-submit-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.job-tool-submit-row > span {
+  color: #69737d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.job-tool-link-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.job-tool-link-card {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  min-height: 72px;
+  padding: 12px;
+  color: #202124;
+  background: #ffffff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  text-decoration: none;
+}
+
+.job-tool-link-card:hover {
+  color: #0f766e;
+  border-color: #0f766e;
+}
+
+.job-tool-link-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: #0f766e;
+  background: #e8f5f2;
+  border: 1px solid #c7e6df;
+  border-radius: 8px;
+}
+
+.job-tool-link-text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.job-tool-link-text strong,
+.job-tool-link-text small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-tool-link-text strong {
+  color: inherit;
+  font-size: 14px;
+}
+
+.job-tool-link-text small {
+  color: #69737d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tool-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tool-panel-heading h2 {
+  margin: 0;
+  color: #202124;
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.tool-panel-heading span {
+  display: block;
+  margin-top: 3px;
+  color: #69737d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tool-panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tool-panel-heading .command-button span,
+.tool-panel-heading .action-button span {
+  display: inline-flex;
+  margin-top: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 13px;
+  border-radius: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.action-button.solid {
+  color: #ffffff;
+  background: #0f766e;
+  border: 1px solid #0f766e;
+}
+
+.job-tool-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.1fr) minmax(260px, 0.9fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.job-report-zip-grid {
+  grid-template-columns: minmax(240px, 0.8fr) minmax(320px, 1.2fr);
+}
+
+.job-excel-grid {
+  grid-template-columns: repeat(2, minmax(300px, 1fr));
+}
+
+.job-excel-grid .job-tool-stack {
+  align-content: start;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+}
+
+.job-excel-grid .job-tool-stack > .command-button {
+  justify-content: center;
+  width: 100%;
+  min-height: 40px;
+}
+
+.excel-tools-surface {
+  grid-template-rows: auto;
+  overflow: auto;
+}
+
+.excel-tools-surface .job-tool-panel {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.job-tool-stack {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.job-tool-stack-primary {
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #b9d9d3;
+  border-radius: 8px;
+}
+
+.job-tool-stack-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: #20313d;
+}
+
+.job-tool-stack-title svg {
+  flex: 0 0 auto;
+  color: #0f766e;
+}
+
+.job-tool-stack-title strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-tool-advanced {
+  min-width: 0;
+  padding-top: 2px;
+  border-top: 1px dashed #d8e0e6;
+}
+
+.job-tool-advanced summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  color: #46525e;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.job-tool-advanced-content {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 8px;
+}
+
+.job-tool-advanced-content .command-button {
+  justify-content: center;
+  width: 100%;
+}
+
+.report-zip-options {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(86px, auto);
+  gap: 12px;
+  align-items: end;
+  min-width: 0;
+}
+
+.job-excel-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, auto) minmax(120px, auto);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 9px 10px;
+  background: #f8fafb;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+}
+
+.job-excel-preview strong,
+.job-excel-preview span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-excel-preview strong {
+  color: #202124;
+  font-size: 14px;
+}
+
+.job-excel-preview span {
+  color: #69737d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.job-excel-conflict {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  background: #fff8e6;
+  border: 1px solid #efc266;
+  border-radius: 8px;
+}
+
+.job-excel-conflict > div:first-child,
+.job-excel-conflict label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.job-excel-conflict strong,
+.job-excel-conflict span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-excel-conflict strong {
+  color: #202124;
+  font-size: 14px;
+}
+
+.job-excel-conflict span {
+  color: #69737d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.job-excel-conflict-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.job-excel-conflict-actions .command-button {
+  justify-content: center;
+  width: 100%;
+}
+
+.job-excel-analysis {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #cfdde8;
+  border-radius: 8px;
+  background: #f7fbfd;
+}
+
+.job-excel-analysis-head,
+.job-excel-analysis-meta,
+.job-excel-analysis-fields {
+  min-width: 0;
+}
+
+.job-excel-analysis-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(86px, auto);
+  gap: 8px;
+  align-items: center;
+}
+
+.job-excel-analysis-head strong {
+  color: #202124;
+  font-size: 14px;
+}
+
+.job-excel-analysis-head span,
+.job-excel-analysis-meta span,
+.job-excel-analysis-fields span,
+.job-excel-analysis-issues span {
+  color: #69737d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.job-excel-analysis-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.job-excel-analysis-meta span,
+.job-excel-analysis-fields strong,
+.job-excel-analysis-issues span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-excel-analysis-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.job-excel-analysis-fields > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.job-excel-analysis-fields strong {
+  color: #202124;
+  font-size: 13px;
+}
+
+.job-excel-analysis-issues {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.job-excel-imported-master-data {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.job-excel-imported-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(92px, auto);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.job-excel-imported-card > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.job-excel-imported-card span,
+.job-excel-imported-card small {
+  color: #69737d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.job-excel-imported-card strong,
+.job-excel-imported-card small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-excel-imported-card strong {
+  color: #202124;
+  font-size: 14px;
+}
+
+.job-excel-invoice-export label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.job-excel-invoice-export label span {
+  color: #58616a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.job-excel-invoice-export label input {
+  min-width: 0;
+}
