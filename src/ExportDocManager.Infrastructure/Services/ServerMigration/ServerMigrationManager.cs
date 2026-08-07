@@ -512,7 +512,9 @@ namespace ExportDocManager.Services.Infrastructure
                 !string.Equals(
                     marker.Manifest.PackageId,
                     marker.PackageId,
-                    StringComparison.Ordinal))
+                    StringComparison.Ordinal) ||
+                marker.Manifest.Files is null ||
+                marker.Manifest.Files.Any(file => file is null))
             {
                 throw new InvalidDataException("服务器迁移恢复标记无效。");
             }
@@ -522,8 +524,11 @@ namespace ExportDocManager.Services.Infrastructure
             string stagingRoot,
             ServerMigrationManifest manifest)
         {
-            if (manifest.SchemaVersion != ServerMigrationLayout.SchemaVersion ||
+            if (manifest is null ||
+                manifest.SchemaVersion != ServerMigrationLayout.SchemaVersion ||
+                manifest.Files is null ||
                 manifest.Files.Count == 0 ||
+                manifest.Files.Any(file => file is null) ||
                 !manifest.Files.Any(file => file.RelativePath.Equals(
                     ServerMigrationLayout.DatabaseEntry,
                     StringComparison.OrdinalIgnoreCase)))
@@ -546,6 +551,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
             foreach (ServerMigrationFileManifest file in manifest.Files)
             {
+                _ = ServerMigrationService.NormalizeRelativePath(file.RelativePath);
                 string path = ServerMigrationService.ResolvePath(stagingRoot, file.RelativePath);
                 if (!File.Exists(path) ||
                     new FileInfo(path).Length != file.SizeBytes ||
@@ -563,6 +569,10 @@ namespace ExportDocManager.Services.Infrastructure
             string stagingRoot,
             ServerMigrationManifest manifest)
         {
+            if (manifest?.Files is null || manifest.Files.Any(file => file is null))
+            {
+                throw new InvalidDataException("服务器迁移清单文件列表无效。");
+            }
             string masterKeyEntry = ServerMigrationLayout.SecurityEntry(
                 LocalSecretProtector.MasterKeyFileName);
             bool fullMigration = manifest.Files.Any(file =>

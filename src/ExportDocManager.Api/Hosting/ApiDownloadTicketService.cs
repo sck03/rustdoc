@@ -11,8 +11,10 @@ namespace ExportDocManager.Api.Hosting
     public sealed class ApiDownloadTicketService
     {
         private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(5);
+        private const int MaximumTicketCount = 4096;
         private readonly ConcurrentDictionary<string, TicketState> _tickets =
             new(StringComparer.Ordinal);
+        private readonly object _issueLock = new();
         private readonly TimeProvider _timeProvider;
 
         public ApiDownloadTicketService()
@@ -46,17 +48,21 @@ namespace ExportDocManager.Api.Hosting
                     nameof(downloadRoutePrefix));
             }
 
-            CleanupExpired();
-            string token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
-                .TrimEnd('=')
-                .Replace('+', '-')
-                .Replace('/', '_');
-            DateTimeOffset expiresAt = _timeProvider.GetUtcNow().Add(Lifetime);
-            _tickets[token] = new TicketState(purpose.Trim(), resourceId.Trim(), expiresAt);
-            return new ApiDownloadTicket(
-                token,
-                $"{normalizedRoute}/{Uri.EscapeDataString(token)}",
-                expiresAt);
+            lock (_issueLock)
+            {
+                CleanupExpired();
+                TrimToCapacity(MaximumTicketCount - 1);
+                string token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+                    .TrimEnd('=')
+                    .Replace('+', '-')
+                    .Replace('/', '_');
+                DateTimeOffset expiresAt = _timeProvider.GetUtcNow().Add(Lifetime);
+                _tickets[token] = new TicketState(purpose.Trim(), resourceId.Trim(), expiresAt);
+                return new ApiDownloadTicket(
+                    token,
+                    $"{normalizedRoute}/{Uri.EscapeDataString(token)}",
+                    expiresAt);
+            }
         }
 
         public bool TryResolve(
@@ -98,6 +104,23 @@ namespace ExportDocManager.Api.Hosting
                 {
                     _tickets.TryRemove(pair.Key, out _);
                 }
+            }
+        }
+
+        private void TrimToCapacity(int maximumCount)
+        {
+            int removeCount = _tickets.Count - Math.Max(0, maximumCount);
+            if (removeCount <= 0)
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<string, TicketState> pair in _tickets
+                .OrderBy(item => item.Value.ExpiresAtUtc)
+                .ThenBy(item => item.Key, StringComparer.Ordinal)
+                .Take(removeCount))
+            {
+                _tickets.TryRemove(pair.Key, out _);
             }
         }
 

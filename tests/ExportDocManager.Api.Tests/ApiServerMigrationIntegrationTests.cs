@@ -201,6 +201,32 @@ namespace ExportDocManager.Api.Tests
             Assert.False(service.TryResolve(ticket.Token, "background-job", out _));
         }
 
+        [Fact]
+        public void JobDownloadTickets_ShouldEvictOldestEntriesAtCapacity()
+        {
+            var time = new MutableTimeProvider();
+            var service = new ApiDownloadTicketService(time);
+            ApiDownloadTicket oldest = service.Issue(
+                "background-job",
+                "oldest-job",
+                "/downloads/jobs");
+            time.Advance(TimeSpan.FromMilliseconds(1));
+
+            ApiDownloadTicket latest = null;
+            for (int index = 0; index < 4096; index++)
+            {
+                latest = service.Issue(
+                    "background-job",
+                    $"job-{index}",
+                    "/downloads/jobs");
+            }
+
+            Assert.False(service.TryResolve(oldest.Token, "background-job", out _));
+            Assert.NotNull(latest);
+            Assert.True(service.TryResolve(latest.Token, "background-job", out string latestJobId));
+            Assert.Equal("job-4095", latestJobId);
+        }
+
         private static async Task<ApiLoginResponse> SetAdminPasswordAndLoginAsync(
             ApiIntegrationTestHarness harness,
             HttpClient anonymousClient)

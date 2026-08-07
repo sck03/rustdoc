@@ -738,7 +738,10 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 throw new InvalidDataException("服务器迁移包清单版本或包 ID 无效。");
             }
-            if (manifest.Files.Count == 0 || manifest.Files.Count > ExtractionLimits.MaximumEntries)
+            if (manifest.Files is null ||
+                manifest.Files.Count == 0 ||
+                manifest.Files.Count > ExtractionLimits.MaximumEntries ||
+                manifest.Files.Any(file => file is null))
             {
                 throw new InvalidDataException("服务器迁移包文件清单为空或过大。");
             }
@@ -746,7 +749,7 @@ namespace ExportDocManager.Services.Infrastructure
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (ServerMigrationFileManifest file in manifest.Files)
             {
-                string normalized = file.RelativePath.Replace('\\', '/').Trim('/');
+                string normalized = NormalizeRelativePath(file.RelativePath);
                 bool allowed = normalized.Equals(
                         ServerMigrationLayout.DatabaseEntry,
                         StringComparison.OrdinalIgnoreCase) ||
@@ -766,6 +769,7 @@ namespace ExportDocManager.Services.Infrastructure
                     StringComparison.OrdinalIgnoreCase);
                 if (!names.Add(normalized) ||
                     (allowsEmptyContent ? file.SizeBytes < 0 : file.SizeBytes <= 0) ||
+                    string.IsNullOrWhiteSpace(file.Sha256) ||
                     file.Sha256.Length != 64 ||
                     !file.Sha256.All(Uri.IsHexDigit) ||
                     !allowed)
@@ -805,8 +809,11 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 throw new InvalidDataException("服务器迁移包内部条目数量无效。");
             }
+            if (archive.Entries.Any(item => string.IsNullOrEmpty(item.Name)))
+            {
+                throw new InvalidDataException("服务器迁移包不能包含目录条目。");
+            }
             var fileEntries = archive.Entries
-                .Where(item => !string.IsNullOrEmpty(item.Name))
                 .Select(item => new
                 {
                     Entry = item,
@@ -832,8 +839,12 @@ namespace ExportDocManager.Services.Infrastructure
             ServerMigrationManifest manifest = JsonSerializer.Deserialize<ServerMigrationManifest>(
                 manifestStream,
                 JsonOptions) ?? throw new InvalidDataException("服务器迁移包清单为空。");
+            if (manifest.Files is null || manifest.Files.Any(file => file is null))
+            {
+                throw new InvalidDataException("服务器迁移包清单文件列表无效。");
+            }
             var expectedNames = manifest.Files
-                .Select(file => file.RelativePath.Replace('\\', '/').Trim('/'))
+                .Select(file => NormalizeRelativePath(file.RelativePath))
                 .Append(ServerMigrationLayout.ManifestEntry)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             if (expectedNames.Count != fileEntries.Count ||
@@ -853,15 +864,42 @@ namespace ExportDocManager.Services.Infrastructure
 
         internal static string ResolvePath(string root, string relativePath)
         {
+            string normalizedRelativePath = NormalizeRelativePath(relativePath);
             string fullRoot = Path.GetFullPath(root);
             string path = Path.GetFullPath(Path.Combine(
                 fullRoot,
-                relativePath.Replace('/', Path.DirectorySeparatorChar)));
+                normalizedRelativePath.Replace('/', Path.DirectorySeparatorChar)));
             if (!PathBoundaryHelper.IsWithinRoot(path, fullRoot))
             {
                 throw new InvalidDataException("服务器迁移包路径越界。");
             }
             return path;
+        }
+
+        internal static string NormalizeRelativePath(string relativePath)
+        {
+            string normalized = (relativePath ?? string.Empty).Trim().Replace('\\', '/');
+            if (string.IsNullOrWhiteSpace(normalized) ||
+                normalized.StartsWith("/", StringComparison.Ordinal) ||
+                Path.IsPathRooted(normalized) ||
+                normalized.IndexOf('\0') >= 0)
+            {
+                throw new InvalidDataException("服务器迁移包相对路径无效。");
+            }
+
+            string[] segments = normalized.Split('/', StringSplitOptions.None);
+            if (segments.Length == 0 ||
+                segments.Length > ExtractionLimits.MaximumPathDepth ||
+                segments.Any(segment =>
+                    string.IsNullOrWhiteSpace(segment) ||
+                    segment is "." or ".." ||
+                    segment.IndexOf(':') >= 0 ||
+                    segment.Any(char.IsControl)))
+            {
+                throw new InvalidDataException("服务器迁移包相对路径无效。");
+            }
+
+            return string.Join('/', segments);
         }
     }
 }

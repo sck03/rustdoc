@@ -783,8 +783,12 @@ namespace ExportDocManager.Services.Security
                     return false;
                 }
 
-                Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
-                Task<string> errorTask = process.StandardError.ReadToEndAsync();
+                Task<string> outputTask = BoundedProcessOutput.ReadAsync(
+                    process.StandardOutput,
+                    truncationMessage: "[授权平台命令输出过长，已截断]");
+                Task<string> errorTask = BoundedProcessOutput.ReadAsync(
+                    process.StandardError,
+                    truncationMessage: "[授权平台命令错误输出过长，已截断]");
 
                 if (standardInput != null)
                 {
@@ -801,6 +805,13 @@ namespace ExportDocManager.Services.Security
                     catch
                     {
                     }
+
+                    BoundedProcessOutput.DrainProcessAsync(process, TimeSpan.FromSeconds(5))
+                        .GetAwaiter()
+                        .GetResult();
+                    BoundedProcessOutput.ObserveAsync(TimeSpan.FromSeconds(5), outputTask, errorTask)
+                        .GetAwaiter()
+                        .GetResult();
 
                     return false;
                 }

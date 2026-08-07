@@ -9,6 +9,82 @@ namespace ExportDocManager.Infrastructure.Tests;
 
 public sealed class ServerMigrationSecurityTests
 {
+    [Theory]
+    [InlineData("../outside.txt")]
+    [InlineData("Data/Files/../Config/appsettings.json")]
+    [InlineData("/absolute/path.txt")]
+    [InlineData("C:/absolute/path.txt")]
+    [InlineData("Data//duplicate-separator.txt")]
+    [InlineData("Data/Files/\u0001-invalid.txt")]
+    public void ResolvePath_ShouldRejectTraversalAndRootedManifestPaths(string relativePath)
+    {
+        string root = CreateTestRoot("resolve-path");
+        try
+        {
+            Assert.Throws<InvalidDataException>(() =>
+                ServerMigrationService.ResolvePath(root, relativePath));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public void ResolvePath_ShouldRejectManifestPathsThatExceedPortableDepth()
+    {
+        string root = CreateTestRoot("resolve-path-depth");
+        try
+        {
+            string relativePath = string.Join('/', Enumerable.Repeat("segment", 13));
+            Assert.Throws<InvalidDataException>(() =>
+                ServerMigrationService.ResolvePath(root, relativePath));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ReadProcessOutput_ShouldBoundLargePostgreSqlToolDiagnostics()
+    {
+        string output = new string('x', 1_100_000);
+        await using var source = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(output));
+        using var reader = new StreamReader(source, System.Text.Encoding.UTF8);
+
+        string captured = await ServerMigrationPostgreSql.ReadProcessOutputAsync(reader);
+
+        Assert.Contains("PostgreSQL 工具输出过长，已截断", captured, StringComparison.Ordinal);
+        Assert.True(captured.Length < 1_100_000);
+        Assert.StartsWith(new string('x', 100), captured, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReadAndValidateManifest_ShouldRejectNullFileListAsInvalidData()
+    {
+        string root = CreateTestRoot("null-manifest-files");
+        try
+        {
+            WriteText(
+                Path.Combine(root, ServerMigrationLayout.ManifestEntry),
+                $$"""
+                {
+                  "schemaVersion": {{ServerMigrationLayout.SchemaVersion}},
+                  "packageId": "{{Guid.NewGuid():N}}",
+                  "files": null
+                }
+                """);
+
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                ServerMigrationService.ReadAndValidateManifestAsync(root, CancellationToken.None));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
     [Fact]
     public void ParseConfiguredMasterKey_ShouldAcceptHexAndBase64()
     {

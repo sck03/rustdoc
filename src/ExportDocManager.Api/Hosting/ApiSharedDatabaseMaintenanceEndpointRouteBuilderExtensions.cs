@@ -261,21 +261,32 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("包含数据库备份或样张文件前需要输入确认文本 INCLUDE OPTIONAL FILES。"));
                 }
 
-                var result = await maintenanceService.CreateSupportPackageAsync(
-                    new SupportPackageOptions
-                    {
-                        IncludeLatestDatabaseBackup = request?.IncludeLatestDatabaseBackup == true,
-                        IncludeSampleFiles = request?.IncludeSampleFiles == true
-                    },
-                    cancellationToken).ConfigureAwait(false);
-                return Results.Ok(new ApiSupportPackageResponse(
-                    result.Success,
-                    result.Message,
-                    result.FileName,
-                    result.FullPath,
-                    result.SizeBytes,
-                    result.SupportPackageRoot,
-                    result.StoragePolicy));
+                try
+                {
+                    var result = await maintenanceService.CreateSupportPackageAsync(
+                        new SupportPackageOptions
+                        {
+                            IncludeLatestDatabaseBackup = request?.IncludeLatestDatabaseBackup == true,
+                            IncludeSampleFiles = request?.IncludeSampleFiles == true
+                        },
+                        cancellationToken).ConfigureAwait(false);
+                    return Results.Ok(new ApiSupportPackageResponse(
+                        result.Success,
+                        result.Message,
+                        result.FileName,
+                        result.FullPath,
+                        result.SizeBytes,
+                        result.SupportPackageRoot,
+                        result.StoragePolicy));
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException)
+                {
+                    return WriteConflict($"支持包导出失败：{ex.Message}");
+                }
             })
             .WithName("SaveSupportPackageToRuntime");
 

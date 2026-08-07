@@ -2,6 +2,7 @@ using System.Diagnostics;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Utils;
 using Npgsql;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -30,26 +31,37 @@ namespace ExportDocManager.Services.Infrastructure
         {
             EnsureReady(tools);
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            await RunToolAsync(
-                tools.PgDumpPath,
-                [
-                    "--format=custom",
-                    "--blobs",
-                    "--no-owner",
-                    "--file", destination,
-                    "--host", settings.PostgreSqlHost,
-                    "--port", settings.PostgreSqlPort.ToString(),
-                    "--username", settings.PostgreSqlUsername,
-                    "--dbname", settings.PostgreSqlDatabase
-                ],
-                settings.PostgreSqlPassword,
-                TimeSpan.FromMinutes(30),
-                cancellationToken).ConfigureAwait(false);
-            if (!File.Exists(destination) || new FileInfo(destination).Length == 0)
+            string temporaryPath = AtomicFileHelper.GetSiblingTempFilePath(destination);
+            try
             {
-                throw new InvalidDataException("服务器迁移恢复前 PostgreSQL 安全备份为空。");
+                await RunToolAsync(
+                    tools.PgDumpPath,
+                    [
+                        "--format=custom",
+                        "--blobs",
+                        "--no-owner",
+                        "--file", temporaryPath,
+                        "--host", settings.PostgreSqlHost,
+                        "--port", settings.PostgreSqlPort.ToString(),
+                        "--username", settings.PostgreSqlUsername,
+                        "--dbname", settings.PostgreSqlDatabase
+                    ],
+                    settings.PostgreSqlPassword,
+                    TimeSpan.FromMinutes(30),
+                    cancellationToken).ConfigureAwait(false);
+
+                if (!File.Exists(temporaryPath) || new FileInfo(temporaryPath).Length == 0)
+                {
+                    throw new InvalidDataException("服务器迁移恢复前 PostgreSQL 安全备份为空。");
+                }
+
+                AtomicFileHelper.ReplaceFile(temporaryPath, destination);
+                RuntimeFilePermissionHelper.RestrictFile(destination);
             }
-            RuntimeFilePermissionHelper.RestrictFile(destination);
+            finally
+            {
+                AtomicFileHelper.TryDeleteFile(temporaryPath);
+            }
         }
 
         public static Task RestoreDatabaseAsync(
@@ -219,6 +231,13 @@ namespace ExportDocManager.Services.Infrastructure
             TimeSpan timeout,
             CancellationToken cancellationToken)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(executable);
+            ArgumentNullException.ThrowIfNull(arguments);
+            if (timeout <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(timeout));
+            }
+
             var startInfo = new ProcessStartInfo
             {
                 FileName = executable,
@@ -238,8 +257,8 @@ namespace ExportDocManager.Services.Infrastructure
 
             using var process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException("无法启动 PostgreSQL 客户端工具。");
-            Task<string> standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            Task<string> standardError = process.StandardError.ReadToEndAsync(cancellationToken);
+            Task<string> standardOutput = ReadProcessOutputAsync(process.StandardOutput);
+            Task<string> standardError = ReadProcessOutputAsync(process.StandardError);
             using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutSource.CancelAfter(timeout);
             try
@@ -249,6 +268,8 @@ namespace ExportDocManager.Services.Infrastructure
             catch (OperationCanceledException) when (timeoutSource.IsCancellationRequested)
             {
                 try { process.Kill(entireProcessTree: true); } catch { }
+                await DrainExitedProcessAsync(process).ConfigureAwait(false);
+                await ObserveProcessOutputAsync(standardOutput, standardError).ConfigureAwait(false);
                 if (cancellationToken.IsCancellationRequested)
                 {
                     throw;
@@ -262,6 +283,39 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 throw new InvalidOperationException(
                     $"PostgreSQL 客户端工具执行失败：{(string.IsNullOrWhiteSpace(error) ? output : error)}");
+            }
+        }
+
+        internal static async Task<string> ReadProcessOutputAsync(StreamReader reader)
+        {
+            return await BoundedProcessOutput.ReadAsync(
+                reader,
+                truncationMessage: "[PostgreSQL 工具输出过长，已截断]").ConfigureAwait(false);
+        }
+
+        private static async Task ObserveProcessOutputAsync(params Task<string>[] outputTasks)
+        {
+            try
+            {
+                await BoundedProcessOutput.ObserveAsync(TimeSpan.FromSeconds(5), outputTasks)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                // The original timeout/cancellation is more useful than a stream-drain error.
+            }
+        }
+
+        private static async Task DrainExitedProcessAsync(Process process)
+        {
+            try
+            {
+                await BoundedProcessOutput.DrainProcessAsync(process, TimeSpan.FromSeconds(5))
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                // A timed-out child is already being torn down; do not mask the original error.
             }
         }
 

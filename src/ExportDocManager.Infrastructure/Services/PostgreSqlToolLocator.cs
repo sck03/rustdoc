@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services
 {
@@ -126,13 +127,25 @@ namespace ExportDocManager.Services
             startInfo.ArgumentList.Add("--version");
             using var process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException($"无法启动 PostgreSQL 客户端工具：{executable}");
+            Task<string> outputTask = BoundedProcessOutput.ReadAsync(
+                process.StandardOutput,
+                truncationMessage: "[PostgreSQL 客户端版本输出过长，已截断]");
+            Task<string> errorTask = BoundedProcessOutput.ReadAsync(
+                process.StandardError,
+                truncationMessage: "[PostgreSQL 客户端错误输出过长，已截断]");
             if (!process.WaitForExit(5_000))
             {
                 try { process.Kill(entireProcessTree: true); } catch { }
+                BoundedProcessOutput.DrainProcessAsync(process, TimeSpan.FromSeconds(5))
+                    .GetAwaiter()
+                    .GetResult();
+                BoundedProcessOutput.ObserveAsync(TimeSpan.FromSeconds(5), outputTask, errorTask)
+                    .GetAwaiter()
+                    .GetResult();
                 throw new InvalidOperationException($"PostgreSQL 客户端版本检查超时：{executable}");
             }
-            string output = process.StandardOutput.ReadToEnd();
-            string error = process.StandardError.ReadToEnd();
+            string output = outputTask.GetAwaiter().GetResult();
+            string error = errorTask.GetAwaiter().GetResult();
             if (process.ExitCode != 0)
             {
                 throw new InvalidOperationException(

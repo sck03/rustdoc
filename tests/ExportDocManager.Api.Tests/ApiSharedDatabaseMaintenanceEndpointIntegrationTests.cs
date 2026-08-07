@@ -136,6 +136,20 @@ namespace ExportDocManager.Api.Tests
             });
             Assert.Equal(HttpStatusCode.Conflict, inactiveTargetResponse.StatusCode);
 
+            var oversizedScopeResponse = await adminClient.PostAsJsonAsync("/api/shared-database/ownership/transfer", new
+            {
+                fromUserId = createdOperator.User.Id,
+                toUserId = createdTarget.User.Id,
+                includeInvoices = true,
+                includePayments = false,
+                includeOtherBusinessData = false,
+                onlyUnassigned = false,
+                departmentId = new string('D', 51),
+                companyScope = "",
+                confirmationText = "TRANSFER OWNERSHIP"
+            });
+            Assert.Equal(HttpStatusCode.Conflict, oversizedScopeResponse.StatusCode);
+
             Directory.CreateDirectory(Path.Combine(harness.DataRoot, "Logs"));
             await File.WriteAllTextAsync(Path.Combine(harness.DataRoot, "Logs", "crash-test.log"), "sample crash diagnostic");
             await File.WriteAllTextAsync(
