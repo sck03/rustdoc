@@ -6,7 +6,7 @@ namespace ExportDocManager.Api.Hosting
 {
     public sealed partial class ApiBackgroundJobRetryDispatcher
     {
-        private static readonly JsonSerializerOptions RetryJsonOptions = new(JsonSerializerDefaults.Web);
+        private static readonly JsonSerializerOptions RetryJsonOptions = JsonSerializerOptions.Web;
 
         private readonly ApiBackgroundJobRunner jobRunner;
 

@@ -17,7 +17,7 @@ namespace ExportDocManager.Api.Hosting
         private const string ReadinessPath = "/readyz";
         private const string ReadinessPayload = "{\"status\":\"ok\"}";
         private const string HealthPath = "/healthz";
-        private static readonly JsonSerializerOptions ProbeJsonOptions = new(JsonSerializerDefaults.Web);
+        private static readonly JsonSerializerOptions ProbeJsonOptions = JsonSerializerOptions.Web;
 
         public static IApplicationBuilder UseExportDocManagerReadiness(
             this IApplicationBuilder app,

@@ -6,7 +6,7 @@ namespace ExportDocManager.Services.Infrastructure
 {
     public static class ServerMigrationSecurityAudit
     {
-        private static readonly object WriteGate = new();
+        private static readonly Lock WriteGate = new();
 
         public static void Write(
             IAppPathProvider pathProvider,

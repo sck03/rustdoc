@@ -183,7 +183,7 @@ Generated from committed npm/Cargo lock files, Cargo package metadata, restored 
 | vite | 7.3.6 | MIT | web |
 | yallist | 3.1.1 | ISC | web |
 
-## nuget (88)
+## nuget (79)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -202,36 +202,34 @@ Generated from committed npm/Cargo lock files, Cargo package metadata, restored 
 | HtmlAgilityPack | 1.12.4 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | MathNet.Numerics.Signed | 5.0.0 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
 | Microsoft.Bcl.AsyncInterfaces | 6.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.Bcl.Cryptography | 9.0.18 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.CodeCoverage | 17.12.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
-| Microsoft.Data.Sqlite | 8.0.29 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.Data.Sqlite.Core | 8.0.29 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.EntityFrameworkCore | 8.0.29 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.EntityFrameworkCore.Abstractions | 8.0.29 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.EntityFrameworkCore.Analyzers | 8.0.29 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.EntityFrameworkCore.InMemory | 8.0.29 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
-| Microsoft.EntityFrameworkCore.Relational | 8.0.29 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.EntityFrameworkCore.Sqlite.Core | 8.0.29 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.Extensions.Caching.Abstractions | 8.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.Extensions.Caching.Memory | 8.0.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.Extensions.Configuration.Abstractions | 8.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.Extensions.DependencyInjection | 8.0.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.Extensions.DependencyInjection.Abstractions | 8.0.2 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.Extensions.DependencyModel | 8.0.2 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.Extensions.Logging | 8.0.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.Extensions.Logging.Abstractions | 8.0.3 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.Extensions.Options | 8.0.2 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.Extensions.Primitives | 8.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.CodeCoverage | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| Microsoft.Data.Sqlite | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Data.Sqlite.Core | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.EntityFrameworkCore | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.EntityFrameworkCore.Abstractions | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.EntityFrameworkCore.Analyzers | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.EntityFrameworkCore.InMemory | 10.0.10 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
+| Microsoft.EntityFrameworkCore.Relational | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.EntityFrameworkCore.Sqlite.Core | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.Caching.Abstractions | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.Caching.Memory | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.Configuration.Abstractions | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.DependencyInjection | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.DependencyModel | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.Logging | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.Logging.Abstractions | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.Options | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.Primitives | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Microsoft.IO.RecyclableMemoryStream | 3.0.1 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
-| Microsoft.ML.OnnxRuntime | 1.23.2 | MIT | ExportDocManager.Infrastructure.csproj |
-| Microsoft.ML.OnnxRuntime.Managed | 1.23.2 | MIT | ExportDocManager.Infrastructure.csproj |
-| Microsoft.NET.Test.Sdk | 17.12.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| Microsoft.ML.OnnxRuntime | 1.28.0 | MIT | ExportDocManager.Infrastructure.csproj |
+| Microsoft.ML.OnnxRuntime.Managed | 1.28.0 | MIT | ExportDocManager.Infrastructure.csproj |
+| Microsoft.NET.Test.Sdk | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | Microsoft.Playwright | 1.61.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Microsoft.TestPlatform.ObjectModel | 17.12.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
-| Microsoft.TestPlatform.TestHost | 17.12.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
-| Newtonsoft.Json | 13.0.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
-| Npgsql | 8.0.6 | PostgreSQL | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Npgsql.EntityFrameworkCore.PostgreSQL | 8.0.11 | PostgreSQL | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.TestPlatform.ObjectModel | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| Microsoft.TestPlatform.TestHost | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| Npgsql | 10.0.3 | PostgreSQL | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Npgsql.EntityFrameworkCore.PostgreSQL | 10.0.3 | PostgreSQL | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | NPOI | 2.7.6 | Apache-2.0 | ExportDocManager.Infrastructure.Tests.csproj |
 | NSax | 1.0.2 | LGPL-3.0-only | ExportDocManager.Infrastructure.Tests.csproj |
 | PdfPig | 0.1.14 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
@@ -253,19 +251,12 @@ Generated from committed npm/Cargo lock files, Cargo package metadata, restored 
 | SQLitePCLRaw.lib.e_sqlite3 | 2.1.12 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | SQLitePCLRaw.provider.e_sqlite3 | 2.1.12 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | System.ComponentModel.Annotations | 5.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| System.Formats.Asn1 | 9.0.18 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | System.IO.Packaging | 8.0.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| System.Memory | 4.5.3 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj |
-| System.Memory | 4.5.5 | MIT | ExportDocManager.Infrastructure.csproj |
 | System.Numerics.Tensors | 9.0.0 | MIT | ExportDocManager.Infrastructure.csproj |
-| System.Reflection.Metadata | 1.6.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
-| System.Runtime.CompilerServices.Unsafe | 6.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| System.Security.Cryptography.Pkcs | 9.0.18 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| System.Security.Cryptography.ProtectedData | 8.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| System.Security.Cryptography.Xml | 9.0.18 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| System.Text.Encoding.CodePages | 8.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| System.Text.Encodings.Web | 6.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| System.Text.Json | 6.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| System.Security.Cryptography.Pkcs | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| System.Security.Cryptography.Pkcs | 8.0.1 | MIT | ExportDocManager.Api.csproj |
+| System.Security.Cryptography.ProtectedData | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| System.Security.Cryptography.Xml | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | xunit | 2.9.2 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | xunit.abstractions | 2.0.3 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | xunit.analyzers | 1.16.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |

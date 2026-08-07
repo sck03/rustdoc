@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Tools;
 
@@ -5,7 +6,7 @@ namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiEndpointRouteBuilderExtensions
     {
-        private static readonly HashSet<string> SupportedOcrImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+        private static readonly FrozenSet<string> SupportedOcrImageExtensions = new[]
         {
             ".png",
             ".jpg",
@@ -13,7 +14,7 @@ namespace ExportDocManager.Api.Hosting
             ".bmp",
             ".tif",
             ".tiff"
-        };
+        }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
         private const int MaxOcrImageContentBytes = OcrInputLimits.MaximumImageBytes;
         private const long MaxOcrImageFileBytes = MaxOcrImageContentBytes;

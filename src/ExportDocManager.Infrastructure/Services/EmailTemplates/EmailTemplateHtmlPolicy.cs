@@ -1,22 +1,23 @@
+using System.Collections.Frozen;
 using HtmlAgilityPack;
 
 namespace ExportDocManager.Services.EmailTemplates
 {
     internal static class EmailTemplateHtmlPolicy
     {
-        private static readonly HashSet<string> AllowedElements = new(StringComparer.OrdinalIgnoreCase)
+        private static readonly FrozenSet<string> AllowedElements = new[]
         {
             "a", "b", "blockquote", "br", "div", "em", "h1", "h2", "h3", "h4", "hr", "i",
             "li", "ol", "p", "s", "span", "strong", "table", "tbody", "td", "tfoot", "th",
             "thead", "tr", "u", "ul"
-        };
+        }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
-        private static readonly HashSet<string> BlockedElements = new(StringComparer.OrdinalIgnoreCase)
+        private static readonly FrozenSet<string> BlockedElements = new[]
         {
             "audio", "base", "button", "canvas", "embed", "form", "frame", "frameset", "iframe",
             "input", "link", "math", "meta", "object", "option", "script", "select", "source",
             "style", "svg", "textarea", "video"
-        };
+        }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
         public static string Sanitize(string value)
         {

@@ -18,7 +18,7 @@ namespace ExportDocManager.Services.Security
         private const int KeySize = 32;
         private const int NonceSize = 12;
         private const int TagSize = 16;
-        private static readonly object KeyFileGate = new();
+        private static readonly Lock KeyFileGate = new();
 
         private readonly string _securityRoot;
         private readonly Lazy<byte[]> _key;

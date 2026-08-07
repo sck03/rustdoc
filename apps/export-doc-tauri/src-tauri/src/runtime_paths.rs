@@ -1073,7 +1073,7 @@ fn resolve_sidecar_path(app_root: &Path) -> Result<PathBuf, Box<dyn Error>> {
                 .join("ExportDocManager.Api")
                 .join("bin")
                 .join("Debug")
-                .join("net8.0")
+                .join("net10.0")
                 .join(file_name),
         );
         candidates.push(
@@ -1082,7 +1082,7 @@ fn resolve_sidecar_path(app_root: &Path) -> Result<PathBuf, Box<dyn Error>> {
                 .join("ExportDocManager.Api")
                 .join("bin")
                 .join("Release")
-                .join("net8.0")
+                .join("net10.0")
                 .join("publish")
                 .join(file_name),
         );

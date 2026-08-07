@@ -23,11 +23,7 @@ namespace ExportDocManager.Utils
 
         private static string NormalizePathSegment(string value)
         {
-            var invalidChars = Path.GetInvalidFileNameChars();
-            var normalized = new string(value
-                .Trim()
-                .Select(ch => invalidChars.Contains(ch) ? '-' : ch)
-                .ToArray());
+            string normalized = CrossPlatformFileNamePolicy.ReplaceInvalidCharacters(value.Trim(), '-');
             return string.IsNullOrWhiteSpace(normalized) ? "Cache" : normalized;
         }
     }

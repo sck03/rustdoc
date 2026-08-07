@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -22,7 +23,7 @@ namespace ExportDocManager.Services.MasterData
         private readonly IReadOnlyList<IHsCodeRemoteProvider> _remoteProviders;
 
         // 海关标准计量单位代码映射表 (Customs Unit Code Map)
-        private static readonly Dictionary<string, string> CustomsUnitMap = new Dictionary<string, string>
+        private static readonly FrozenDictionary<string, string> CustomsUnitMap = new Dictionary<string, string>
         {
             { "001", "台" }, { "002", "座" }, { "003", "辆" }, { "004", "艘" }, { "005", "架" },
             { "006", "套" }, { "007", "个" }, { "008", "只" }, { "009", "头" }, { "010", "张" },
@@ -40,7 +41,7 @@ namespace ExportDocManager.Services.MasterData
             { "137", "微升" }, { "138", "升" }, { "139", "毫升" }, { "140", "微升" }, { "141", "升" },
             { "142", "毫升" }, { "143", "微升" }, { "144", "升" }, { "145", "毫升" }, { "146", "微升" },
             { "147", "升" }, { "148", "毫升" }, { "149", "微升" }, { "163", "克拉" }
-        };
+        }.ToFrozenDictionary(StringComparer.Ordinal);
 
         public HsCodeService(IDbContextFactory<AppDbContext> dbContextFactory, IHsCodeReadRepository hsCodeReadRepository)
             : this(dbContextFactory, hsCodeReadRepository, Enumerable.Empty<IHsCodeRemoteProvider>())

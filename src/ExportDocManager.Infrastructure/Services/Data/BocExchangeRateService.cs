@@ -21,7 +21,7 @@ namespace ExportDocManager.Services.Data
         private readonly ISettingsService _settingsService;
         private readonly HttpClient _httpClient;
         private readonly SemaphoreSlim _cacheRefreshLock = new(1, 1);
-        private readonly object _cacheSync = new();
+        private readonly Lock _cacheSync = new();
 
         // 缓存结果以避免频繁请求
         private List<ExchangeRateInfo> _cachedRates;

@@ -170,7 +170,6 @@ if ($Profile -ne "Container") {
         "win-x64" { "win64" }
         "linux-x64" { "linux64" }
         "linux-arm64" { "ChromiumArm64" }
-        "osx-x64" { "mac-x64" }
         "osx-arm64" { "mac-arm64" }
         default { throw "No browser payload mapping for $RuntimeIdentifier." }
     }

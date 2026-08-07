@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.IO;
 using System.Threading;
 using PDFtoImage;
@@ -14,16 +15,16 @@ namespace ExportDocManager.Services.Tools
         public const long MaximumFileBytes = 25L * 1024L * 1024L;
         public const int MaximumPdfPages = 50;
         public const int MaximumExtractedTextCharacters = 500_000;
-        private static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
+        private static readonly FrozenSet<string> TextExtensions = new[]
         {
             ".txt",
             ".md",
             ".csv",
             ".json",
             ".xml"
-        };
+        }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
-        private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+        private static readonly FrozenSet<string> ImageExtensions = new[]
         {
             ".png",
             ".jpg",
@@ -33,7 +34,7 @@ namespace ExportDocManager.Services.Tools
             ".tif",
             ".tiff",
             ".webp"
-        };
+        }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
         private readonly IOcrService _ocrService;
 

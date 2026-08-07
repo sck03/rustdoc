@@ -8,6 +8,7 @@ import {
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveDotnetCommand } from "./lib/dotnet-command.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argumentsList = process.argv.slice(2);
@@ -157,7 +158,7 @@ function collectCargoMetadata(scope, relativeManifestPath) {
 
 function collectNuGet() {
   const result = spawnSync(
-    "dotnet",
+    resolveDotnetCommand(),
     ["list", "ExportDocManager.sln", "package", "--include-transitive", "--format", "json"],
     { cwd: repositoryRoot, encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024 },
   );
@@ -199,7 +200,7 @@ function resolveNuGetPackagesRoot() {
   }
 
   const result = spawnSync(
-    "dotnet",
+    resolveDotnetCommand(),
     ["nuget", "locals", "global-packages", "--list", "--force-english-output"],
     { cwd: repositoryRoot, encoding: "utf8", windowsHide: true },
   );

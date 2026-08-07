@@ -195,8 +195,7 @@ namespace ExportDocManager.DataAccess
             string normalized = NormalizeSqliteDatabaseFileName(sqliteDatabaseFileName);
             if (Path.IsPathRooted(normalized) ||
                 !string.Equals(normalized, Path.GetFileName(normalized), StringComparison.Ordinal) ||
-                normalized.Any(ch => char.IsControl(ch) || ch is '<' or '>' or ':' or '"' or '/' or '\\' or '|' or '?' or '*') ||
-                normalized.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+                CrossPlatformFileNamePolicy.ContainsInvalidCharacters(normalized) ||
                 normalized.EndsWith(' ') ||
                 normalized.EndsWith('.'))
             {

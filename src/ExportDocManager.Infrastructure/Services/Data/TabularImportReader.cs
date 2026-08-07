@@ -33,10 +33,16 @@ namespace ExportDocManager.Services.Data
         {
             using var reader = new StreamReader(input, new UTF8Encoding(false), true, leaveOpen: true);
             var rows = new List<IReadOnlyList<string>>();
-            while (!reader.EndOfStream && rows.Count <= maximumRows)
+            while (rows.Count <= maximumRows)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                rows.Add(ParseCsvLine(await reader.ReadLineAsync(cancellationToken) ?? string.Empty));
+                var line = await reader.ReadLineAsync(cancellationToken);
+                if (line is null)
+                {
+                    break;
+                }
+
+                rows.Add(ParseCsvLine(line));
             }
             return rows;
         }

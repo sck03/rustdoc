@@ -1,10 +1,11 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveDotnetCommand } from "./lib/dotnet-command.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const result = spawnSync(
-  "dotnet",
+  resolveDotnetCommand(),
   ["list", "ExportDocManager.sln", "package", "--vulnerable", "--include-transitive", "--format", "json"],
   { cwd: repositoryRoot, encoding: "utf8", windowsHide: true },
 );

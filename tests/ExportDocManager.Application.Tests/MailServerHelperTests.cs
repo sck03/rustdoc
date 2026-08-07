@@ -54,6 +54,8 @@ namespace ExportDocManager.Application.Tests
         [InlineData("")]
         [InlineData("   ")]
         [InlineData("missing-at-symbol")]
+        [InlineData("@qq.com")]
+        [InlineData("user@")]
         [InlineData("a@b@c")]
         public void GetServerConfig_ShouldReturnNullForInvalidEmail(string email)
         {

@@ -19,16 +19,16 @@ jobs:
         include:
           - name: Windows x64 + Windows ARM64 contract
             os: windows-latest
-            x64_rid: win-x64
-            arm64_rid: win-arm64
+            primary_rid: win-x64
+            secondary_rid: win-arm64
           - name: Linux x64 + Linux ARM64 contract
             os: ubuntu-latest
-            x64_rid: linux-x64
-            arm64_rid: linux-arm64
-          - name: macOS native + macOS ARM64 contract
-            os: macos-latest
-            x64_rid: osx-x64
-            arm64_rid: osx-arm64
+            primary_rid: linux-x64
+            secondary_rid: linux-arm64
+          - name: macOS Apple Silicon ARM64 contract
+            os: macos-15
+            primary_rid: osx-arm64
+            secondary_rid: ''
 
     runs-on: ${{ matrix.os }}
     env:
@@ -52,7 +52,7 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.302
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -81,21 +81,23 @@ jobs:
         run: dotnet build src/ExportDocManager.Api/ExportDocManager.Api.csproj --no-restore -c Release -v minimal
 
       # A solution restore without --runtime creates only the portable
-      # net8.0 asset graph.  The contract builds below target two different
+      # net10.0 asset graph.  The contract builds below target two different
       # RIDs, so restore the complete project-reference graph explicitly for
-      # each RID before using --no-restore.  This avoids project.assets.json
+      # each declared RID before using --no-restore.  This avoids project.assets.json
       # failures in Domain/Application/Infrastructure on hosted runners.
-      - name: Restore x64 backend runtime graph
-        run: dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -r ${{ matrix.x64_rid }}
+      - name: Restore primary backend runtime graph
+        run: dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -r ${{ matrix.primary_rid }}
 
-      - name: Validate x64 backend contract
-        run: dotnet build src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj --no-restore -c Release -r ${{ matrix.x64_rid }} -v minimal
+      - name: Validate primary backend contract
+        run: dotnet build src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj --no-restore -c Release -r ${{ matrix.primary_rid }} -v minimal
 
-      - name: Restore ARM64 backend runtime graph
-        run: dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -r ${{ matrix.arm64_rid }}
+      - name: Restore secondary backend runtime graph
+        if: matrix.secondary_rid != ''
+        run: dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -r ${{ matrix.secondary_rid }}
 
-      - name: Validate ARM64 backend contract
-        run: dotnet build src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj --no-restore -c Release -r ${{ matrix.arm64_rid }} -v minimal
+      - name: Validate secondary backend contract
+        if: matrix.secondary_rid != ''
+        run: dotnet build src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj --no-restore -c Release -r ${{ matrix.secondary_rid }} -v minimal
 
       - name: Test portable runtime path contracts
         run: >-

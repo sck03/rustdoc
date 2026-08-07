@@ -12,7 +12,7 @@ namespace ExportDocManager.Api.Hosting
         private static readonly TimeSpan LockDuration = TimeSpan.FromMinutes(2);
         private static readonly TimeSpan Retention = TimeSpan.FromHours(1);
 
-        private readonly object _gate = new();
+        private readonly Lock _gate = new();
         private readonly Dictionary<string, AttemptState> _states = new(StringComparer.Ordinal);
         private readonly TimeProvider _timeProvider;
         private int _operationsSinceCleanup;

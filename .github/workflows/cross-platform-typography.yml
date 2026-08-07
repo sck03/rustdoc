@@ -71,14 +71,17 @@ jobs:
           - name: Windows 125% / 150% font contract
             os: windows-latest
             slug: windows-x64
+            chrome_platform: win64
             scale_profiles: windows-125,windows-150,windows-4k,desktop-zoom-200,mobile-safari-contract
           - name: macOS Retina font contract
-            os: macos-latest
-            slug: macos-native
+            os: macos-15
+            slug: macos-arm64
+            chrome_platform: mac-arm64
             scale_profiles: macos-retina,mobile-safari-contract
           - name: Linux font contract
             os: ubuntu-latest
             slug: linux-x64
+            chrome_platform: linux64
             scale_profiles: linux-100,mobile-320,mobile-375,mobile-keyboard-390,mobile-safari-contract
 
     runs-on: ${{ matrix.os }}
@@ -99,7 +102,7 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.302
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -124,7 +127,10 @@ jobs:
 
       - name: Provision Chrome Headless Shell
         shell: pwsh
-        run: ./scripts/provision-chrome-for-testing.ps1 -Product ChromeHeadlessShell
+        run: >-
+          ./scripts/provision-chrome-for-testing.ps1
+          -Product ChromeHeadlessShell
+          -Platform ${{ matrix.chrome_platform }}
 
       - name: Install frontend dependencies
         run: npm ci --prefix apps/export-doc-web

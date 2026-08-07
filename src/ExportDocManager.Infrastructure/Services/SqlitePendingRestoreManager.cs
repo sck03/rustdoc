@@ -25,7 +25,7 @@ namespace ExportDocManager.Services.Infrastructure
 
     public static class SqlitePendingRestoreManager
     {
-        private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+        private static readonly JsonSerializerOptions JsonOptions = JsonSerializerOptions.Web;
         private static readonly StringComparison PathComparison = OperatingSystem.IsWindows()
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;

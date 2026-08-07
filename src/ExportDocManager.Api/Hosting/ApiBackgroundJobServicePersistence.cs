@@ -16,7 +16,7 @@ namespace ExportDocManager.Api.Hosting
             WriteIndented = true
         };
 
-        private readonly object _persistenceLock = new();
+        private readonly Lock _persistenceLock = new();
         private readonly string _storePath;
         private readonly bool _useDatabaseStore;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;

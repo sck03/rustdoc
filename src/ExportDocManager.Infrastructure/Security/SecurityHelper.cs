@@ -7,7 +7,7 @@ namespace ExportDocManager.Services.Security
 {
     public static class SecurityHelper
     {
-        private static readonly object ProtectorGate = new();
+        private static readonly Lock ProtectorGate = new();
         private static LocalSecretProtector _protector =
             new(new RuntimeAppPathProvider());
 

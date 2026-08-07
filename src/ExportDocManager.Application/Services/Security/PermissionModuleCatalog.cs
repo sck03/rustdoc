@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+
 namespace ExportDocManager.Services.Security
 {
     public static class PermissionAccessLevel
@@ -117,12 +119,12 @@ namespace ExportDocManager.Services.Security
         ];
 
         public static readonly IReadOnlyDictionary<string, PermissionModuleDefinition> ByKey =
-            Modules.ToDictionary(module => module.Key, StringComparer.OrdinalIgnoreCase);
+            Modules.ToFrozenDictionary(module => module.Key, StringComparer.OrdinalIgnoreCase);
 
         public static bool IsKnown(string moduleKey) =>
             !string.IsNullOrWhiteSpace(moduleKey) && ByKey.ContainsKey(moduleKey.Trim());
 
-        private static readonly IReadOnlyDictionary<string, IReadOnlyList<PermissionModuleDependency>> Dependencies =
+        private static readonly FrozenDictionary<string, IReadOnlyList<PermissionModuleDependency>> Dependencies =
             new Dictionary<string, IReadOnlyList<PermissionModuleDependency>>(StringComparer.OrdinalIgnoreCase)
             {
                 [DocumentInvoices] =
@@ -147,7 +149,7 @@ namespace ExportDocManager.Services.Security
                 ],
                 [SalesOpportunities] = [new(CommonProductReference, PermissionAccessLevel.View)],
                 [SalesSuppliers] = [new(CommonProductReference, PermissionAccessLevel.View)]
-            };
+            }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
         public static IReadOnlyDictionary<string, string> ExpandDependencies(
             IEnumerable<PermissionTemplateModuleRecord> modules)

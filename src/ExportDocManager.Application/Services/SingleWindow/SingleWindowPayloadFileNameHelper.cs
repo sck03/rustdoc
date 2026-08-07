@@ -1,12 +1,13 @@
+using ExportDocManager.Utils;
+
 namespace ExportDocManager.Services.SingleWindow
 {
     public static class SingleWindowPayloadFileNameHelper
     {
         public static string BuildBaseFileName(string preferredName, string fallbackName, string extension)
         {
-            var safeName = string.IsNullOrWhiteSpace(preferredName)
-                ? fallbackName
-                : SanitizeFileName(preferredName);
+            string sourceName = string.IsNullOrWhiteSpace(preferredName) ? fallbackName : preferredName;
+            string safeName = SanitizeFileName(sourceName);
             return safeName + extension;
         }
 
@@ -77,10 +78,7 @@ namespace ExportDocManager.Services.SingleWindow
 
         private static string SanitizeFileName(string fileName)
         {
-            const string invalidChars = "<>:\"/\\|?*";
-            var sanitized = new string((fileName ?? string.Empty)
-                .Select(ch => char.IsControl(ch) || invalidChars.Contains(ch) ? '_' : ch)
-                .ToArray());
+            string sanitized = CrossPlatformFileNamePolicy.ReplaceInvalidCharacters(fileName, '_');
             sanitized = sanitized.Trim(' ', '.');
             return string.IsNullOrWhiteSpace(sanitized) ? "package" : sanitized;
         }

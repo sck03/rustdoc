@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveDotnetCommand } from "./lib/dotnet-command.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
@@ -21,7 +22,7 @@ const productEditionManifestFileName = "product-edition.json";
 const stableResourceDirs = new Set(["Templates", "OcrModels", "Resources", "Browsers", "Legal"]);
 const sidecarExcludedExtensions = new Set([".pdb", ".xml"]);
 // CoreCLR loads this LTTng provider opportunistically and tolerates its absence.
-// The .NET 8 binary requires liblttng-ust.so.0, which current Ubuntu releases no longer provide.
+// The optional provider has host-specific LTTng ABI requirements, so desktop bundles omit it.
 const sidecarExcludedFileNames = new Set(["libcoreclrtraceptprovider.so"]);
 const rootConfigFiles = [];
 const runtimeDataDirectories = ["Database", "Templates", "Files", "Exports", "SingleWindow", "Backups", "Cache", "Config", "Security", "WebView", "Logs"];
@@ -229,7 +230,8 @@ async function generateDependencyGovernance(buildEnv) {
 }
 
 function run(command, args, env) {
-  const result = spawnSync(command, args, {
+  const executable = command === "dotnet" ? resolveDotnetCommand(env) : command;
+  const result = spawnSync(executable, args, {
     cwd: repoRoot,
     env,
     shell: false,
@@ -527,7 +529,6 @@ function rustTargetTripleFromRid(runtimeIdentifier) {
     ["win-arm64", "aarch64-pc-windows-msvc"],
     ["linux-x64", "x86_64-unknown-linux-gnu"],
     ["linux-arm64", "aarch64-unknown-linux-gnu"],
-    ["osx-x64", "x86_64-apple-darwin"],
     ["osx-arm64", "aarch64-apple-darwin"],
   ]);
 
@@ -557,7 +558,6 @@ function rustHostMatchesRid(host, runtimeIdentifier) {
   if (runtimeIdentifier === "win-arm64") return host === "aarch64-pc-windows-msvc";
   if (runtimeIdentifier === "linux-x64") return host === "x86_64-unknown-linux-gnu";
   if (runtimeIdentifier === "linux-arm64") return host === "aarch64-unknown-linux-gnu";
-  if (runtimeIdentifier === "osx-x64") return host === "x86_64-apple-darwin";
   if (runtimeIdentifier === "osx-arm64") return host === "aarch64-apple-darwin";
   return false;
 }
@@ -654,10 +654,6 @@ function chromeForTestingPlatform() {
 
   if (rid === "osx-arm64") {
     return "mac-arm64";
-  }
-
-  if (rid === "osx-x64") {
-    return "mac-x64";
   }
 
   throw new Error(`No Chrome for Testing platform mapping is defined for ${rid}.`);

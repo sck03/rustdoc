@@ -22,31 +22,7 @@ namespace ExportDocManager.Services.MasterData
         private const int HistoryKeywordSourceLimit = 5000;
         private const int MaximumHistoryKeywordLength = 200;
         private const int MaximumKnowledgeQueryLength = 500;
-        private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = false };
-        private static readonly IReadOnlyDictionary<string, string> Synonyms = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["T-SHIRT"] = "T恤衫",
-            ["TSHIRT"] = "T恤衫",
-            ["T恤"] = "T恤衫",
-            ["男士"] = "男式",
-            ["男款"] = "男式",
-            ["MENS"] = "男式",
-            ["MEN'S"] = "男式",
-            ["女士"] = "女式",
-            ["女款"] = "女式",
-            ["WOMENS"] = "女式",
-            ["WOMEN'S"] = "女式",
-            ["全棉"] = "100%棉",
-            ["纯棉"] = "100%棉",
-            ["COTTON"] = "棉",
-            ["针织物"] = "针织",
-            ["KNITTED"] = "针织"
-        };
-        private static readonly IReadOnlyDictionary<string, string> RelatedTerms = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["针织"] = "钩编",
-            ["钩编"] = "针织"
-        };
+        private static readonly JsonSerializerOptions JsonOptions = JsonSerializerOptions.Web;
 
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
         private readonly BusinessDataAccessScope _businessDataAccessScope;

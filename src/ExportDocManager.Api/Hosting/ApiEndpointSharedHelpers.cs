@@ -11,7 +11,7 @@ namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiEndpointRouteBuilderExtensions
     {
-        private static readonly JsonSerializerOptions BackgroundJobRetryJsonOptions = new(JsonSerializerDefaults.Web);
+        private static readonly JsonSerializerOptions BackgroundJobRetryJsonOptions = JsonSerializerOptions.Web;
 
         private static IResult WriteConflict(string message)
         {
@@ -196,10 +196,8 @@ namespace ExportDocManager.Api.Hosting
 
         private static string SanitizeFileNamePart(string value)
         {
-            var chars = value.Trim()
-                .Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character)
-                .ToArray();
-            return new string(chars).Trim('.', ' ');
+            string normalized = CrossPlatformFileNamePolicy.ReplaceInvalidCharacters(value.Trim(), '_');
+            return normalized.Trim('.', ' ');
         }
 
         private sealed class TemporaryDownloadCleanup : IDisposable

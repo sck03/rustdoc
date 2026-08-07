@@ -42,7 +42,7 @@ pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
 - `container-images.yml`：只手工运行；启动时填写版本号并选择是否更新 `latest`，随后构建 `linux/amd64`、`linux/arm64` 的 API/Web 镜像并发布到 GHCR。
 - `windows-desktop-package.yml`：只手工运行；选择版本和 Document/Sales/Full，构建 Windows x64 NSIS 安装包。
 - `linux-desktop-package.yml`：只手工运行；选择版本、产品版本和 x64/ARM64 架构，构建对应 deb/AppImage。
-- `macos-desktop-package.yml`：只手工运行；选择版本、Apple Silicon ARM64/Intel x64 和产品版本，构建 macOS dmg；两种架构都内置 Chrome for Testing 官方 Headless Shell。
+- `macos-desktop-package.yml`：只手工运行；选择版本和产品版本，固定构建 Apple Silicon ARM64 macOS dmg，并内置官方 `mac-arm64` Chrome Headless Shell。
 - `desktop-package-reusable.yml`：上述三个桌面入口共用的内部编排，不会单独出现在手工运行列表中。
 - `windows-browser-server-package.yml`：只手工运行；生成无需 Docker 的 Windows x64 浏览器服务器 ZIP。
 - `linux-browser-server-package.yml`：只手工运行；生成无需 Docker 的 Linux x64 浏览器服务器 tar.gz。
@@ -52,7 +52,7 @@ pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
 
 手工发布 Docker 镜像时：进入 Actions → Build and publish container images → Run workflow，填写 `version`，例如 `0.1.2` 或 `0.1.2-beta.1`；`publish_latest=true` 时同时覆盖 `latest`。工作流会在临时 runner 中同步 `.NET/Web/Tauri/Rust` 内部版本，不会反向修改或提交仓库源码。最终镜像同时带版本标签和 `sha-*` 标签。
 
-手工生成桌面包时，进入对应的 `Build Windows/Linux/macOS desktop package` → `Run workflow`，填写版本并选择产品版；macOS 还可选择 ARM64 或 x64。默认结果位于该次运行的 Artifacts，保留 14 天。只有把 `publish_release` 改为 `true` 才会发布：Document、Sales、Full 分别进入 `exportdocmanager-document-v<版本>`、`exportdocmanager-sales-v<版本>`、`exportdocmanager-full-v<版本>` 的不可覆盖版本 Release，并分别更新自己的稳定或预发布通道清单。三个入口都会自动下载当前平台的 Chrome Headless Shell，并在打包前后验证浏览器可执行文件已经进入 Tauri 资源目录，因此最终安装包不要求普通用户另行下载浏览器。源码仓库仍不保存这些大体积二进制。Chrome for Testing 当前官方 Headless Shell 平台为 `linux64 / mac-arm64 / mac-x64 / win32 / win64`，所以 macOS ARM64 已开放手工打包；Linux ARM64 和 Windows ARM64 没有对应官方包，仍只保留应用编译契约，不能把 x64 浏览器伪装成 ARM64 交付。
+手工生成桌面包时，进入对应的 `Build Windows/Linux/macOS desktop package` → `Run workflow`，填写版本并选择产品版；macOS 固定为 Apple Silicon ARM64。默认结果位于该次运行的 Artifacts，保留 14 天。只有把 `publish_release` 改为 `true` 才会发布：Document、Sales、Full 分别进入 `exportdocmanager-document-v<版本>`、`exportdocmanager-sales-v<版本>`、`exportdocmanager-full-v<版本>` 的不可覆盖版本 Release，并分别更新自己的稳定或预发布通道清单。三个入口都会自动下载当前平台的 Chrome Headless Shell，并在打包前后验证浏览器可执行文件已经进入 Tauri 资源目录，因此最终安装包不要求普通用户另行下载浏览器。源码仓库仍不保存这些大体积二进制。虽然 Chrome for Testing 仍提供 `mac-x64`，ONNX Runtime `1.28.0` 官方包已不提供 Intel macOS native，因此项目不生成残缺的 Intel dmg；Linux ARM64 和 Windows ARM64 没有对应官方 Chrome Headless Shell，仍只保留应用编译契约，不能把 x64 浏览器伪装成 ARM64 交付。
 
 三产品版使用独立应用身份和更新信任材料：identifier 分别为 `com.exportdocmanager.desktop.document`、`com.exportdocmanager.desktop.sales`、`com.exportdocmanager.desktop.full`；仓库 Variables/Secrets 也按 `_DOCUMENT / _SALES / _FULL` 分开配置 updater 公钥、带密码私钥和私钥密码。`publish_release=false` 生成未签名验收 Artifact；`publish_release=true` 强制生成并校验 Tauri updater `.sig` 和独立 `latest-*.json`。Windows Authenticode、macOS Developer ID 和 Apple 公证按当前项目阶段暂缓，不是本轮 GitHub 构建门禁；正式商业分发前再配置并完成安装、升级、回滚和卸载验收。系统级代码签名暂缓不影响 updater 包签名继续强制。
 

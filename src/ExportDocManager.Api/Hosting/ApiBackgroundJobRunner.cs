@@ -198,7 +198,7 @@ namespace ExportDocManager.Api.Hosting
                 Gate = new SemaphoreSlim(concurrencyLimit, concurrencyLimit);
             }
 
-            public object SyncRoot { get; } = new();
+            public Lock SyncRoot { get; } = new();
 
             public SemaphoreSlim Gate { get; }
 

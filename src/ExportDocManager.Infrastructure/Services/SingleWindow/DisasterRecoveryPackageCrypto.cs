@@ -8,7 +8,7 @@ namespace ExportDocManager.Services.SingleWindow
     internal static class DisasterRecoveryPackageCrypto
     {
         private static readonly byte[] Magic = "EDMDRP01"u8.ToArray();
-        private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+        private static readonly JsonSerializerOptions JsonOptions = JsonSerializerOptions.Web;
         private const int SaltSize = 16;
         private const int NoncePrefixSize = 8;
         private const int NonceSize = 12;

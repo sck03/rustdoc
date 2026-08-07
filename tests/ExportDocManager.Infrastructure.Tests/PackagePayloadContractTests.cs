@@ -83,6 +83,9 @@ public sealed class PackagePayloadContractTests
         string root = FindWorkspaceRoot();
         string bundleScript = File.ReadAllText(Path.Combine(root, "scripts", "prepare-tauri-bundle.mjs"));
         string desktopWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "desktop-package-reusable.yml"));
+        string macOsWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "macos-desktop-package.yml"));
+        string typographyWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "cross-platform-typography.yml"));
+        string chromeProvisioning = File.ReadAllText(Path.Combine(root, "scripts", "provision-chrome-for-testing.ps1"));
         string packageVersions = File.ReadAllText(Path.Combine(root, "Directory.Packages.props"));
         string ocrManifest = File.ReadAllText(Path.Combine(root, "apps", "exportdoc-ocr-rs", "Cargo.toml"));
 
@@ -93,10 +96,18 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("const target = rustTarget;", bundleScript, StringComparison.Ordinal);
         Assert.DoesNotContain("ensureMacOsX64OnnxRuntime", bundleScript, StringComparison.Ordinal);
         Assert.DoesNotContain("onnxruntime-osx-x86_64", bundleScript, StringComparison.Ordinal);
-        Assert.Contains("Microsoft.ML.OnnxRuntime\" Version=\"1.23.2\"", packageVersions, StringComparison.Ordinal);
+        Assert.DoesNotContain("osx-x64", bundleScript, StringComparison.Ordinal);
+        Assert.Contains("Microsoft.ML.OnnxRuntime\" Version=\"1.28.0\"", packageVersions, StringComparison.Ordinal);
         Assert.Contains("\"api-23\"", ocrManifest, StringComparison.Ordinal);
         Assert.DoesNotContain("\"api-24\"", ocrManifest, StringComparison.Ordinal);
         Assert.Contains("EXPORTDOCMANAGER_RUST_TARGET: ${{ inputs.rust_target }}", desktopWorkflow, StringComparison.Ordinal);
+        Assert.Contains("runtime_identifier: osx-arm64", macOsWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("osx-x64", macOsWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("macos-15-intel", macOsWorkflow, StringComparison.Ordinal);
+        Assert.Contains("os: macos-15", typographyWorkflow, StringComparison.Ordinal);
+        Assert.Contains("chrome_platform: mac-arm64", typographyWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("mac-x64", chromeProvisioning, StringComparison.Ordinal);
+        Assert.Contains("only supports Apple Silicon ARM64", chromeProvisioning, StringComparison.Ordinal);
     }
 
     [Fact]

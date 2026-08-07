@@ -23,9 +23,9 @@ namespace ExportDocManager.Services.MasterData
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             if (!string.IsNullOrWhiteSpace(normalizedCodePrefix) && normalizedCodePrefix.All(char.IsDigit))
                 return await SearchByCodePrefixAsync(context, rawQuery, normalizedCodePrefix, maxResults, cancellationToken);
-            string primaryToken = BuildNgrams(normalizedQuery).OrderByDescending(token => token.Length).FirstOrDefault() ?? normalizedQuery;
-            var relatedPair = RelatedTerms.FirstOrDefault(pair => normalizedQuery.Contains(pair.Key, StringComparison.OrdinalIgnoreCase));
-            string relatedToken = string.IsNullOrWhiteSpace(relatedPair.Key) ? string.Empty : NormalizeSearchText(relatedPair.Value);
+            var queryGrams = HsCodeSearchTextNormalizer.BuildNgrams(normalizedQuery);
+            string primaryToken = queryGrams.MaxBy(static token => token.Length) ?? normalizedQuery;
+            string relatedToken = HsCodeSearchTextNormalizer.FindRelatedToken(normalizedQuery);
             var exampleQuery = context.HsCodeDeclarationExamples.AsNoTracking();
             if (!string.IsNullOrWhiteSpace(primaryToken))
                 exampleQuery = string.IsNullOrWhiteSpace(relatedToken)
@@ -74,10 +74,15 @@ namespace ExportDocManager.Services.MasterData
             foreach (var example in examples)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                int nameScore = ScoreText(normalizedQuery, NormalizeSearchText(example.ProductName));
-                int specificationScore = ScoreText(normalizedQuery, NormalizeSearchText(example.Specification));
-                int combinedScore = ScoreText(normalizedQuery, example.SearchText);
-                var assessment = AssessAttributes(normalizedQuery, NormalizeSearchText($"{example.ProductName} {example.Specification}"));
+                string normalizedName = NormalizeSearchText(example.ProductName);
+                string normalizedSpecification = NormalizeSearchText(example.Specification);
+                string normalizedCombined = string.IsNullOrWhiteSpace(example.SearchText)
+                    ? NormalizeSearchText($"{example.ProductName} {example.Specification}")
+                    : example.SearchText;
+                int nameScore = ScoreText(normalizedQuery, queryGrams, normalizedName);
+                int specificationScore = ScoreText(normalizedQuery, queryGrams, normalizedSpecification);
+                int combinedScore = ScoreText(normalizedQuery, queryGrams, normalizedCombined);
+                var assessment = AssessAttributes(normalizedQuery, normalizedCombined);
                 int textScore = Math.Max(combinedScore, (int)Math.Round(nameScore * 0.72d + specificationScore * 0.28d)) - assessment.Penalty;
                 if (textScore < 18) continue;
                 var resolution = ResolveCurrentCode(example, codeMap, relations);
@@ -125,11 +130,12 @@ namespace ExportDocManager.Services.MasterData
                     .Where(item => HsCodeValidityPolicy.IsTrustedActive(item) && !existing.Contains(item.NormalizedCode))
                     .Select(item =>
                     {
-                        var assessment = AssessAttributes(normalizedQuery, NormalizeSearchText($"{item.Name} {item.Elements} {item.Description}"));
+                        string candidateText = NormalizeSearchText($"{item.Name} {item.Elements} {item.Description}");
+                        var assessment = AssessAttributes(normalizedQuery, candidateText);
                         return new
                         {
                             Item = item,
-                            Score = ScoreText(normalizedQuery, NormalizeSearchText($"{item.Name} {item.Elements} {item.Description}")) - assessment.Penalty,
+                            Score = ScoreText(normalizedQuery, queryGrams, candidateText) - assessment.Penalty,
                             Assessment = assessment
                         };
                     })

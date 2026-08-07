@@ -43,8 +43,8 @@
 显示名称：`Cross-platform typography and report validation`
 
 - **触发：** `workflow_dispatch`；`main` push 和 PR 只在字体、模板、Web、报表服务及相关验证脚本路径变化时触发。
-- **平台：** 三个并行矩阵：`windows-latest`、`macos-latest`、`ubuntu-latest`；另有 Ubuntu 汇总 Job。
-- **做什么：** 安装受许可约束的 Noto CJK 报表字体和 Chrome Headless Shell，执行浏览器会话、CSS 治理、320/375/390 窄屏与缩放合同；渲染多语言长文本 PDF，检查换行、重叠、分页，再比较三平台指标。Linux 仅在该 CI 步骤显式使用 `EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX=1`，不改变生产默认值。
+- **平台：** 三个并行矩阵：`windows-latest`、固定 Apple Silicon ARM64 的 `macos-15`、`ubuntu-latest`；另有 Ubuntu 汇总 Job。
+- **做什么：** 按矩阵显式供给 `win64`、`mac-arm64`、`linux64` Chrome Headless Shell，并安装受许可约束的 Noto CJK 报表字体；执行浏览器会话、CSS 治理、320/375/390 窄屏与缩放合同，渲染多语言长文本 PDF，检查换行、重叠、分页，再比较三平台指标。Linux 仅在该 CI 步骤显式使用 `EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX=1`，不改变生产默认值；Intel macOS 不再属于该工作流支持范围。
 - **输出：** 每个平台上传缩放证据和 PDF/metrics/layout JSON；汇总 Job 上传比较报告。通常保留 14 天，汇总报告保留 30 天。
 - **Secrets/Variables：** 不需要自定义 Secret；字体和浏览器在 runner 临时目录准备。
 - **常见失败：** 字体许可证文件或字体下载失败、Chrome Headless Shell 下载/启动失败、Linux 系统库缺失、单场景 CDP 超时、当前模板导致文本重叠或跨平台分页指标偏差。
@@ -95,7 +95,7 @@
 显示名称：`Dependency security and SBOM governance`
 
 - **触发：** 手工、每周一 02:23 UTC 定时、`main` 依赖文件 push，以及依赖文件 PR。
-- **平台：** `ubuntu-latest`；.NET 8、Node.js 24 和 stable Rust。
+- **平台：** `ubuntu-latest`；.NET 10 SDK `10.0.302`、Node.js 24 和 stable Rust。
 - **做什么：** 锁定还原 Web/Tauri/npm/NuGet/Cargo 图，执行 npm 生产依赖审计、NuGet 直接/传递审计和三个 `Cargo.lock` 的 RustSec 审计，拒绝新增漏洞、unsound 或 yanked crate，并生成 SPDX 2.3、CycloneDX 1.6 和第三方依赖清单。当前已审查的 React Router RSC 公告和 Tauri GTK 传递例外必须保持精确契约，不能用“忽略全部漏洞”通过。
 - **输出：** `dependency-governance` Artifact，通常保留 30 天；不修改依赖版本、不创建 Dependabot PR。
 - **Secrets/Variables：** 不需要自定义 Secret；需要 runner 能访问 npm/NuGet/RustSec advisory 源，源不可达时应区分网络告警与真实审计结果。
@@ -123,10 +123,10 @@
 
 - **触发：** `workflow_call`，不能从 Actions 列表单独运行；由 Windows/Linux/macOS 三个平台入口调用。
 - **平台：** 由调用方传入 runner、平台、架构、产品版和 bundle 类型。
-- **做什么：** 安装 .NET 8/Node 24/Rust，准备开源字体和 Chrome Headless Shell（Linux ARM64 使用明确的 Chromium ARM64 路径），构建 API/Web/Tauri、OCR 资源并验证精简 payload。桌面资源准备会在 release 依赖治理前还原完整 `ExportDocManager.sln`，保证全新 checkout 或清理过 `bin/obj` 后仍能扫描全部项目。`publish_release=false` 生成未签名验收包；`true` 才启用 updater 签名、上传安装包并合并 `latest.json`。
+- **做什么：** 安装 .NET 10 SDK `10.0.302`/Node 24/Rust，准备开源字体和 Chrome Headless Shell（Linux ARM64 使用明确的 Chromium ARM64 路径），构建 API/Web/Tauri、OCR 资源并验证精简 payload。桌面资源准备会在 release 依赖治理前还原完整 `ExportDocManager.sln`，保证全新 checkout 或清理过 `bin/obj` 后仍能扫描全部项目。`publish_release=false` 生成未签名验收包；`true` 才启用 updater 签名、上传安装包并合并 `latest.json`。
 - **输出：** `export-doc-manager-<platform>-<arch>-<edition>-<version>` Artifact，通常保留 14 天；发布模式另上传 GitHub Release 资产。
 - **Secrets/Variables：** 测试模式不需要签名材料；发布模式必须配置仓库 Variable `EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY`，以及带密码的 Secrets `TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。`EXPORTDOCMANAGER_UPDATER_ENDPOINT` 改为可选：留空时安装包只内置公钥，由管理员安装后在系统设置中配置 GitHub、自建服务器或公司内网地址。若构建时就要内置 HTTP 默认地址，还必须显式配置 `EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT=true`；公网默认地址仍应使用 HTTPS。调用方使用 `secrets: inherit`，不应把私钥写入仓库或日志。
-- **常见失败：** 版本格式、浏览器资源缺失/执行权限、OCR 运行时缺库、公钥或私钥缺失、未显式放行却尝试内置 HTTP endpoint、Release tag 已被其它版本占用。依赖清单校验不再因表单版本与仓库当前版本不同而失败；若旧提交在 `dotnet list package` 阶段提示项目没有 assets 文件，应从最新 `main` 新建运行，当前流程会先还原完整解决方案。若 Windows 日志显示 `spawnSync npm.cmd EINVAL`，同样说明运行的是旧提交；当前包装器由 Node 直接启动项目锁定的 Tauri CLI，不再调用 `.cmd`。若提示 stale，错误会指出首个真实差异行，应重新生成并审查依赖，而不是删除 `--verify-repository`。Linux AppImage 使用 Tauri 自带的无 FUSE 解压运行模式，不需要额外安装 `libfuse2`；工作流显式安装 `file`、`xdg-utils`，并设置 `NO_STRIP=1`，避免 `linuxdeploy` 内置旧版 `strip` 重复处理 Ubuntu 24.04 新 ELF 段时退出。桌面 sidecar 会排除 CoreCLR 可选的 `libcoreclrtraceptprovider.so`，因为 .NET 8 的该诊断二进制仍声明旧 ABI `liblttng-ust.so.0`，而 Ubuntu 24.04 只有 `.so.1`；不要安装新 ABI 后伪造 `.so.0` 软链接。桌面构建统一带 `--verbose`，后续 `linuxdeploy`、签名或公证失败会保留真实子进程输出。桌面摘要固定使用 PowerShell 字面量 here-string，避免 Markdown 行尾反引号被解释为续行；治理门禁会拒绝重新引入该 ParserError。
+- **常见失败：** 版本格式、浏览器资源缺失/执行权限、OCR 运行时缺库、公钥或私钥缺失、未显式放行却尝试内置 HTTP endpoint、Release tag 已被其它版本占用。依赖清单校验不再因表单版本与仓库当前版本不同而失败；若旧提交在 `dotnet list package` 阶段提示项目没有 assets 文件，应从最新 `main` 新建运行，当前流程会先还原完整解决方案。若 Windows 日志显示 `spawnSync npm.cmd EINVAL`，同样说明运行的是旧提交；当前包装器由 Node 直接启动项目锁定的 Tauri CLI，不再调用 `.cmd`。若提示 stale，错误会指出首个真实差异行，应重新生成并审查依赖，而不是删除 `--verify-repository`。Linux AppImage 使用 Tauri 自带的无 FUSE 解压运行模式，不需要额外安装 `libfuse2`；工作流显式安装 `file`、`xdg-utils`，并设置 `NO_STRIP=1`，避免 `linuxdeploy` 内置旧版 `strip` 重复处理 Ubuntu 24.04 新 ELF 段时退出。桌面 sidecar 继续排除 CoreCLR 可选的 `libcoreclrtraceptprovider.so`，避免把宿主 LTTng ABI 作为应用启动依赖；不要用跨 ABI 软链接伪造兼容。桌面构建统一带 `--verbose`，后续 `linuxdeploy`、签名或公证失败会保留真实子进程输出。桌面摘要固定使用 PowerShell 字面量 here-string，避免 Markdown 行尾反引号被解释为续行；治理门禁会拒绝重新引入该 ParserError。
 - **耗时：** 15—40 分钟，首次下载浏览器和 Rust 依赖时更久。
 
 ### 2.9 Reusable browser server package
@@ -167,10 +167,10 @@
 文件：[`macos-desktop-package.yml`](../.github/workflows/macos-desktop-package.yml)
 显示名称：`Build macOS desktop package`
 
-- **触发：** 仅 `workflow_dispatch`；输入版本、产品版、ARM64/x64 和是否发布 Release。
-- **平台/产物：** `macos-15` 或 `macos-15-intel`，输出 dmg；按架构内置对应官方 Chrome Headless Shell。
+- **触发：** 仅 `workflow_dispatch`；输入版本、产品版和是否发布 Release。
+- **平台/产物：** 固定 `macos-15` Apple Silicon ARM64，输出 dmg，并内置官方 `mac-arm64` Chrome Headless Shell。
 - **发布：** 默认只生成 Artifact；发布模式要求同一套 updater Variables/Secrets。签名、公证和真机启动仍需单独验收，工作流成功不等于 Apple 发布合规完成。
-- **常见失败：** macOS runner 架构选择、浏览器执行权限、Tauri bundle、签名/公证材料或 Release 权限。Intel x64 必须使用最新 `main` 中统一锁定的 `Microsoft.ML.OnnxRuntime 1.23.2`：这是上游最后一个同时提供 `osx-x64`、`osx-arm64`、Windows 和 Linux x64/ARM64 原生资产的官方版本；Rust OCR 使用向后兼容的 C API 23。若日志仍尝试下载 `onnxruntime-osx-x86_64-1.27.1.tgz` 并返回 404，说明运行的是旧提交，不能用失败 job 的 Re-run 获取修复。
+- **常见失败：** Apple Silicon runner、浏览器执行权限、Tauri bundle、签名/公证材料或 Release 权限。当前使用 ONNX Runtime `1.28.0`；其官方包只提供 `osx-arm64`，所以 Intel x64 入口已删除。若工作流仍出现 `osx-x64`、`mac-x64` 或 `macos-*-intel`，说明运行的是旧提交，不能用失败 job 的 Re-run 获取当前修复。
 
 ### 2.13 Build Windows browser server package
 

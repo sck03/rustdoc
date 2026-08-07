@@ -1,8 +1,10 @@
+using System.Collections.Frozen;
+
 namespace ExportDocManager.Utils
 {
     public static class MailServerHelper
     {
-        private static readonly Dictionary<string, (string SmtpHost, int Port, bool Ssl)> CommonMailServers =
+        private static readonly FrozenDictionary<string, (string SmtpHost, int Port, bool Ssl)> CommonMailServers =
             new Dictionary<string, (string, int, bool)>
             {
                 { "qq.com", ("smtp.qq.com", 465, true) },
@@ -24,38 +26,42 @@ namespace ExportDocManager.Utils
                 { "wo.cn", ("smtp.wo.cn", 465, true) },
                 { "189.cn", ("smtp.189.cn", 465, true) },
                 { "bridgegroup.cn", ("smtpcom.263xmail.com", 465, true) }
-            };
+            }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
         public static (string SmtpHost, int Port, bool Ssl)? GetServerConfig(string email)
         {
-            if (string.IsNullOrWhiteSpace(email) || !email.Contains("@"))
+            if (string.IsNullOrWhiteSpace(email))
             {
                 return null;
             }
 
-            var parts = email.Split('@');
-            if (parts.Length != 2)
+            ReadOnlySpan<char> normalizedEmail = email.AsSpan().Trim();
+            int separatorIndex = normalizedEmail.IndexOf('@');
+            if (separatorIndex <= 0 ||
+                separatorIndex != normalizedEmail.LastIndexOf('@') ||
+                separatorIndex == normalizedEmail.Length - 1)
             {
                 return null;
             }
 
-            string domain = parts[1].ToLower().Trim();
+            string domain = normalizedEmail[(separatorIndex + 1)..].Trim().ToString();
             if (CommonMailServers.TryGetValue(domain, out var config))
             {
                 return config;
             }
 
-            if (domain.EndsWith("263.net") || domain.EndsWith("263.net.cn"))
+            if (domain.EndsWith("263.net", StringComparison.OrdinalIgnoreCase) ||
+                domain.EndsWith("263.net.cn", StringComparison.OrdinalIgnoreCase))
             {
                 return ("smtp.263.net", 465, true);
             }
 
-            if (domain.EndsWith("263xmail.com"))
+            if (domain.EndsWith("263xmail.com", StringComparison.OrdinalIgnoreCase))
             {
                 return ("smtpcom.263xmail.com", 465, true);
             }
 
-            return ($"smtp.{domain}", 465, true);
+            return ($"smtp.{domain.ToLowerInvariant()}", 465, true);
         }
     }
 }

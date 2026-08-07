@@ -9,6 +9,7 @@ import {
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { resolveDotnetCommand } from "./lib/dotnet-command.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const playwrightBrowsersPath = path.resolve(
@@ -23,7 +24,7 @@ const apiOutputRoot = path.join(
   "ExportDocManager.Api",
   "bin",
   "Release",
-  "net8.0",
+  "net10.0",
   runtimeIdentifier,
 );
 const apiDll = path.join(apiOutputRoot, "ExportDocManager.Api.dll");
@@ -57,7 +58,7 @@ if (!existsSync(path.join(appRoot, "wwwroot", "index.html"))) {
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const apiProcess = spawn(
-  "dotnet",
+  resolveDotnetCommand(),
   [apiDll, "--app-root", appRoot, "--data-root", dataRoot, "--urls", baseUrl],
   {
     cwd: repositoryRoot,

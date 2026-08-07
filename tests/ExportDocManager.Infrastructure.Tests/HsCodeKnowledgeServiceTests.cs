@@ -10,6 +10,20 @@ namespace ExportDocManager.Infrastructure.Tests;
 
 public sealed class HsCodeKnowledgeServiceTests
 {
+    [Theory]
+    [InlineData("T-SHIRT T恤", "T恤衫T恤衫")]
+    [InlineData("ＭＥＮＳ　１００％ＣＯＴＴＯＮ", "男式100%棉")]
+    [InlineData("针织物 / KNITTED", "针织针织")]
+    public void NormalizeSearchText_ShouldApplyLongestSynonymMatchesWithoutCascading(
+        string input,
+        string expected)
+    {
+        string normalized = HsCodeKnowledgeService.NormalizeSearchText(input);
+
+        Assert.Equal(expected, normalized);
+        Assert.Equal(normalized, HsCodeKnowledgeService.NormalizeSearchText(normalized));
+    }
+
     [Fact]
     public async Task Search_ShouldNormalizeFullWidthAndPreferProductName()
     {

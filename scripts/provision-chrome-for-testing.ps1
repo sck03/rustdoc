@@ -28,6 +28,11 @@ function Invoke-Main {
         $Platform = Get-DefaultChromeForTestingPlatform
     }
 
+    if ($Platform.StartsWith("mac-", [StringComparison]::OrdinalIgnoreCase) -and
+        -not $Platform.Equals("mac-arm64", [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Intel macOS is retired; Chrome for Testing provisioning only supports Apple Silicon ARM64."
+    }
+
     $productInfo = Get-ChromeForTestingProductInfo -Product $Product
     $destinationRootFullPath = [System.IO.Path]::GetFullPath($DestinationRoot)
     $cacheDirFullPath = [System.IO.Path]::GetFullPath($CacheDir)
@@ -141,11 +146,11 @@ function Get-DefaultChromeForTestingPlatform {
     }
 
     if ([Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([Runtime.InteropServices.OSPlatform]::OSX)) {
-        if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [Runtime.InteropServices.Architecture]::Arm64) {
-            return "mac-arm64"
+        if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [Runtime.InteropServices.Architecture]::Arm64) {
+            throw "Intel macOS is retired; automatic Chrome for Testing provisioning requires Apple Silicon ARM64."
         }
 
-        return "mac-x64"
+        return "mac-arm64"
     }
 
     throw "Unsupported OS for Chrome for Testing auto platform detection. Pass -Platform explicitly."

@@ -12,8 +12,15 @@ const requiredVersions = new Map([
   ["actions/upload-artifact", "v7"],
   ["actions/download-artifact", "v8"],
 ]);
+const requiredDotNetSdk = "10.0.302";
 const failures = [];
 let actionCount = 0;
+
+const chromeProvisioningPath = path.join(repositoryRoot, "scripts", "provision-chrome-for-testing.ps1");
+const chromeProvisioning = readFileSync(chromeProvisioningPath, "utf8");
+if (/\bmac-x64\b/iu.test(chromeProvisioning)) {
+  failures.push("provision-chrome-for-testing.ps1: retired Intel macOS Chrome payload is still supported.");
+}
 
 for (const entry of readdirSync(workflowRoot, { withFileTypes: true })) {
   if (!entry.isFile() || !/\.ya?ml$/iu.test(entry.name)) continue;
@@ -34,10 +41,25 @@ for (const entry of readdirSync(workflowRoot, { withFileTypes: true })) {
         failures.push(`${entry.name}:${index + 1}: actions/setup-node must explicitly select Node 24.`);
       }
     }
+    if (action === "actions/setup-dotnet") {
+      const localBlock = lines.slice(index + 1, index + 8).join("\n");
+      const escapedSdk = requiredDotNetSdk.replaceAll(".", "\\.");
+      if (!new RegExp(`dotnet-version:\\s*["']?${escapedSdk}["']?\\s*$`, "mu").test(localBlock)) {
+        failures.push(
+          `${entry.name}:${index + 1}: actions/setup-dotnet must explicitly select ${requiredDotNetSdk}.`,
+        );
+      }
+    }
   }
 
   if (/node-version:\s*["']?(?:20|22)["']?\b/mu.test(lines.join("\n"))) {
     failures.push(`${entry.name}: workflow still declares Node 20 or Node 22.`);
+  }
+  if (/dotnet-version:\s*["']?(?:8|9)(?:\.|["'])/mu.test(lines.join("\n"))) {
+    failures.push(`${entry.name}: workflow still declares .NET 8 or .NET 9.`);
+  }
+  if (/\b(?:osx-x64|mac-x64|macos-[^\s"']*-intel)\b/mu.test(lines.join("\n"))) {
+    failures.push(`${entry.name}: workflow still declares the retired Intel macOS desktop target.`);
   }
 
   let doubleQuotedHereStringStart = -1;

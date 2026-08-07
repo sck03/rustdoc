@@ -18,7 +18,7 @@ namespace ExportDocManager.Services.Reporting
         private readonly IAppPathProvider _pathProvider;
 
         private readonly SemaphoreSlim _templateConfigSemaphore = new(1, 1);
-        private readonly object _configLock = new();
+        private readonly Lock _configLock = new();
         private Dictionary<ReportDocumentType, string> _templatePathCache;
         private List<ReportTemplateConfig> _templateConfigs;
         private bool _templateConfigLoaded;

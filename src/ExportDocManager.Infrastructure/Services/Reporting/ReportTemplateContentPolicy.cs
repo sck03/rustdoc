@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 using ExportDocManager.Services.Errors;
@@ -18,27 +19,27 @@ internal static class ReportTemplateContentPolicy
     internal const int MaximumRenderedHtmlCharacters = 32_000_000;
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
 
-    private static readonly HashSet<string> PaymentForbiddenRoots = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly FrozenSet<string> PaymentForbiddenRoots = new[]
     {
         "Invoice", "Customer", "Exporter", "items", "item", "Invoice.Items",
         "ShowSeal", "withSeal", "doc_seal_path", "customs_seal_path", "shipping_marks_image_data"
-    };
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
-    private static readonly HashSet<string> ExportForbiddenRoots = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly FrozenSet<string> ExportForbiddenRoots = new[]
     {
         "Payment", "Payee", "cny_amount_upper", "payer_seal_path"
-    };
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
-    private static readonly HashSet<string> ForbiddenElements = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly FrozenSet<string> ForbiddenElements = new[]
     {
         "script", "iframe", "frame", "object", "embed", "applet", "portal", "fencedframe", "link", "base"
-    };
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
-    private static readonly HashSet<string> CssPresentationAttributes = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly FrozenSet<string> CssPresentationAttributes = new[]
     {
         "fill", "stroke", "filter", "clip-path", "mask", "cursor",
         "marker", "marker-start", "marker-mid", "marker-end"
-    };
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     private static readonly string[] SafeImageDataPrefixes =
     [

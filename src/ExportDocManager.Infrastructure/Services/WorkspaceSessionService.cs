@@ -4,7 +4,7 @@ namespace ExportDocManager.Services.Infrastructure
 {
     public sealed class WorkspaceSessionService : IWorkspaceSessionService
     {
-        private readonly object _syncRoot = new();
+        private readonly Lock _syncRoot = new();
         private Func<Task<bool>> _saveHandler;
         private Task<bool> _pendingSaveTask;
 

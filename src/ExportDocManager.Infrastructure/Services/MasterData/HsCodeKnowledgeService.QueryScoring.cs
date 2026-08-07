@@ -9,17 +9,16 @@ namespace ExportDocManager.Services.MasterData
 {
     public sealed partial class HsCodeKnowledgeService
     {
-        private static int ScoreText(string query, string candidate)
+        private static int ScoreText(string query, HashSet<string> queryGrams, string candidate)
         {
             if (string.IsNullOrWhiteSpace(query) || string.IsNullOrWhiteSpace(candidate)) return 0;
-            if (string.Equals(query, candidate, StringComparison.OrdinalIgnoreCase)) return 90;
-            int score = candidate.Contains(query, StringComparison.OrdinalIgnoreCase) ? 72 : query.Contains(candidate, StringComparison.OrdinalIgnoreCase) ? 62 : 0;
-            var queryGrams = BuildNgrams(query);
-            var candidateGrams = BuildNgrams(candidate);
-            int intersection = queryGrams.Intersect(candidateGrams).Count();
+            if (string.Equals(query, candidate, StringComparison.Ordinal)) return 90;
+            int score = candidate.Contains(query, StringComparison.Ordinal) ? 72 : query.Contains(candidate, StringComparison.Ordinal) ? 62 : 0;
+            var candidateGrams = HsCodeSearchTextNormalizer.BuildNgrams(candidate);
+            int intersection = CountIntersection(queryGrams, candidateGrams);
             int denominator = queryGrams.Count + candidateGrams.Count;
             int dice = denominator == 0 ? 0 : (int)Math.Round(intersection * 120d / denominator);
-            int relatedBoost = RelatedTerms.Any(pair => query.Contains(pair.Key, StringComparison.OrdinalIgnoreCase) && candidate.Contains(pair.Value, StringComparison.OrdinalIgnoreCase)) ? 12 : 0;
+            int relatedBoost = HsCodeSearchTextNormalizer.HasRelatedMatch(query, candidate) ? 12 : 0;
             return Math.Clamp(Math.Max(score, dice) + relatedBoost, 0, 90);
         }
 
@@ -113,21 +112,21 @@ namespace ExportDocManager.Services.MasterData
         }
 
         internal static string NormalizeSearchText(string value)
-        {
-            string normalized = (value ?? string.Empty).Normalize(NormalizationForm.FormKC).Trim().ToUpperInvariant();
-            foreach (var synonym in Synonyms.OrderByDescending(item => item.Key.Length))
-                normalized = normalized.Replace(synonym.Key.Normalize(NormalizationForm.FormKC).ToUpperInvariant(), synonym.Value.ToUpperInvariant(), StringComparison.Ordinal);
-            return new string(normalized.Where(character => char.IsLetterOrDigit(character) || character >= 0x4e00 && character <= 0x9fff || character == '%').ToArray());
-        }
+            => HsCodeSearchTextNormalizer.Normalize(value);
 
-        private static HashSet<string> BuildNgrams(string value)
+        private static int CountIntersection(HashSet<string> left, HashSet<string> right)
         {
-            string normalized = NormalizeSearchText(value);
-            var grams = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (normalized.Length <= 2) { if (normalized.Length > 0) grams.Add(normalized); return grams; }
-            for (int index = 0; index < normalized.Length - 1; index++) grams.Add(normalized.Substring(index, 2));
-            for (int index = 0; index < normalized.Length - 2; index++) grams.Add(normalized.Substring(index, 3));
-            return grams;
+            HashSet<string> smaller = left.Count <= right.Count ? left : right;
+            HashSet<string> larger = ReferenceEquals(smaller, left) ? right : left;
+            int count = 0;
+            foreach (string value in smaller)
+            {
+                if (larger.Contains(value))
+                {
+                    count++;
+                }
+            }
+            return count;
         }
 
         internal static string BuildFingerprint(params string[] values) =>

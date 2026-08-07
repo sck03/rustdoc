@@ -13,7 +13,7 @@ namespace ExportDocManager.Api.Hosting
         private readonly ConcurrentDictionary<string, long> _lastPersistedUtcTicks = new(StringComparer.OrdinalIgnoreCase);
         private readonly IAppPathProvider _pathProvider;
         private readonly ApiBackgroundJobRetentionOptions _retentionOptions;
-        private readonly object _historyCleanupLock = new();
+        private readonly Lock _historyCleanupLock = new();
 
         public ApiBackgroundJobService()
         {

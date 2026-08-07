@@ -5,7 +5,7 @@ namespace ExportDocManager.Utils
     public sealed class DebouncedTaskScheduler : IDisposable
     {
         private readonly TimeSpan _delay;
-        private readonly object _syncRoot = new();
+        private readonly Lock _syncRoot = new();
         private CancellationTokenSource _pendingSource = new();
         private bool _disposed;
 

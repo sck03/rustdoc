@@ -25,5 +25,19 @@ namespace ExportDocManager.Application.Tests
             Assert.Equal(expectedFileType, SingleWindowPayloadFileNameHelper.ResolveCooAttachmentFileType(fileName));
             Assert.Equal(expectedDocType, SingleWindowPayloadFileNameHelper.ResolveDocType(fileName));
         }
+
+        [Fact]
+        public void PayloadFileNameHelper_ShouldApplyCrossPlatformSafeCharacters()
+        {
+            string fileName = SingleWindowPayloadFileNameHelper.BuildBaseFileName(
+                " 发票:2026?\n ",
+                "fallback",
+                ".xml");
+
+            Assert.Equal("发票_2026__.xml", fileName);
+            Assert.Equal(
+                "fallback_name.xml",
+                SingleWindowPayloadFileNameHelper.BuildBaseFileName(" ", "fallback/name", ".xml"));
+        }
     }
 }

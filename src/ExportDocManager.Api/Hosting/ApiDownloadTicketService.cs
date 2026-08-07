@@ -14,7 +14,7 @@ namespace ExportDocManager.Api.Hosting
         private const int MaximumTicketCount = 4096;
         private readonly ConcurrentDictionary<string, TicketState> _tickets =
             new(StringComparer.Ordinal);
-        private readonly object _issueLock = new();
+        private readonly Lock _issueLock = new();
         private readonly TimeProvider _timeProvider;
 
         public ApiDownloadTicketService()

@@ -11,7 +11,7 @@ namespace ExportDocManager.Services.Tools
     {
         public const string ExecutableEnvironmentVariable = "EXPORTDOCMANAGER_RUST_OCR_EXECUTABLE";
         internal const int MaximumResponseCharacters = 4 * 1024 * 1024;
-        private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+        private static readonly JsonSerializerOptions JsonOptions = JsonSerializerOptions.Web;
         private readonly IAppPathProvider _paths;
         private readonly SemaphoreSlim _gate = new(1, 1);
         private static readonly TimeSpan QueueWaitLimit = TimeSpan.FromSeconds(30);

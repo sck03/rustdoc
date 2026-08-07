@@ -147,7 +147,7 @@ Windows MSI、Linux DEB、macOS DMG 可以作为人工安装资产同时发布�
 - [ ] 项目所有者为三个产品版分别生成带密码密钥对，并完成至少一次离线恢复演练。
 - [ ] 三组 GitHub 公钥 Variable、私钥 Secret 和私钥密码 Secret 已配置。
 - [ ] 管理员分别验证 GitHub HTTPS、自建 HTTPS、可信内网 HTTP 和空地址回退行为。
-- [ ] Windows x64、Linux x64/ARM64、macOS x64/ARM64 的平台键与更新产物核对完成。
+- [ ] Windows x64、Linux x64/ARM64、macOS Apple Silicon ARM64 的平台键与更新产物核对完成。
 - [ ] 正确签名升级、清单不可达、下载中断、签名篡改、版本相同和离线场景验证完成。
 - [ ] HTTP 场景确认只位于受控内网/VPN，防火墙不把更新端口暴露到公网。
 - [ ] 更新前后业务数据库、授权、运行目录和用户输出保持不变。
