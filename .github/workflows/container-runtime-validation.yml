@@ -443,40 +443,55 @@ jobs:
         working-directory: deploy/container
         shell: bash
         run: |
-          docker compose exec -T api /usr/bin/chromium --version \
-            > ../../artifacts/container-runtime/evidence/chromium-version.txt
-          docker compose exec -T api df -B1 /dev/shm \
-            > ../../artifacts/container-runtime/evidence/chromium-shared-memory.txt
-          docker compose exec -T api sh -eu -c '
-            test "${EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX:-}" = "false"
-            test "${EXPORTDOCMANAGER_CHROMIUM_DISABLE_DEV_SHM_USAGE:-}" = "false"
-            shm_bytes="$(df -B1 --output=size /dev/shm | tail -n 1 | tr -d " ")"
-            test "$shm_bytes" -ge 500000000
-            mkdir -p /runtime-data/Cache
-            probe_root="$(mktemp -d /runtime-data/Cache/chromium-validation.XXXXXX)"
-            cleanup() {
-              rm -rf "$probe_root"
-            }
-            trap cleanup EXIT INT TERM
-            if ! timeout 45s /usr/bin/chromium \
-              --headless=new \
-              --disable-background-networking \
-              --disable-default-apps \
-              --disable-extensions \
-              --disable-sync \
-              --no-first-run \
-              --no-default-browser-check \
-              --user-data-dir="$probe_root/profile" \
-              --print-to-pdf="$probe_root/probe.pdf" \
-              "data:text/html;charset=utf-8,<html><body><h1>ExportDocManager Chromium PDF</h1><p>Debian 13 runtime validation</p></body></html>" \
-              > "$probe_root/chromium.log" 2>&1; then
-              cat "$probe_root/chromium.log" >&2
-              exit 1
-            fi
-            test -s "$probe_root/probe.pdf"
-            test "$(head -c 5 "$probe_root/probe.pdf")" = "%PDF-"
-            test "$(stat -c "%s" "$probe_root/probe.pdf")" -gt 1000
-          '
+          set -o pipefail
+          chromium_log="../../artifacts/container-runtime/evidence/chromium-runtime.log"
+          if {
+            set -eu
+            docker compose exec -T api /usr/bin/chromium --version \
+              > ../../artifacts/container-runtime/evidence/chromium-version.txt
+            docker compose exec -T api df -B1 /dev/shm \
+              > ../../artifacts/container-runtime/evidence/chromium-shared-memory.txt
+            docker compose exec -T api sh -eux -c '
+              test "${EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX:-}" = "false"
+              test "${EXPORTDOCMANAGER_CHROMIUM_DISABLE_DEV_SHM_USAGE:-}" = "false"
+              test -u /usr/lib/chromium/chrome-sandbox
+              shm_bytes="$(df -B1 --output=size /dev/shm | tail -n 1 | tr -d " ")"
+              test "$shm_bytes" -ge 500000000
+              mkdir -p /runtime-data/Cache
+              probe_root="$(mktemp -d /runtime-data/Cache/chromium-validation.XXXXXX)"
+              cleanup() {
+                rm -rf "$probe_root"
+              }
+              trap cleanup EXIT INT TERM
+              if ! timeout 45s /usr/bin/chromium \
+                --headless=new \
+                --disable-background-networking \
+                --disable-default-apps \
+                --disable-extensions \
+                --disable-sync \
+                --no-first-run \
+                --no-default-browser-check \
+                --user-data-dir="$probe_root/profile" \
+                --print-to-pdf="$probe_root/probe.pdf" \
+                "data:text/html;charset=utf-8,<html><body><h1>ExportDocManager Chromium PDF</h1><p>Debian 13 runtime validation</p></body></html>" \
+                > "$probe_root/chromium.log" 2>&1; then
+                cat "$probe_root/chromium.log" >&2
+                exit 1
+              fi
+              test -s "$probe_root/probe.pdf"
+              test "$(head -c 5 "$probe_root/probe.pdf")" = "%PDF-"
+              test "$(stat -c "%s" "$probe_root/probe.pdf")" -gt 1000
+            '
+          } 2>&1 | tee "$chromium_log"; then
+            exit 0
+          fi
+
+          diagnostic="$(tail -n 80 "$chromium_log" || true)"
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=Native Chromium PDF validation failed::$diagnostic"
+          exit 1
 
       - name: Validate reverse-proxy and security-header boundary
         working-directory: deploy/container
