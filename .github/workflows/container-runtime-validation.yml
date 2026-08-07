@@ -317,13 +317,22 @@ jobs:
         timeout-minutes: 5
         run: |
           if ! docker compose up -d --no-build; then
-            echo "Container stack failed to reach its declared startup dependencies." >&2
-            docker compose ps --all || true
-            docker compose logs --no-color --tail=200 postgres api web || true
-            api_container_id="$(docker compose ps -q api)"
-            if [ -n "$api_container_id" ]; then
-              docker inspect --format '{{json .State.Health}}' "$api_container_id" || true
-            fi
+            startup_log="../../artifacts/container-runtime/evidence/container-startup.log"
+            {
+              echo "Container stack failed to reach its declared startup dependencies."
+              docker compose ps --all || true
+              docker compose logs --no-color --tail=200 postgres api web || true
+              api_container_id="$(docker compose ps -q api)"
+              if [ -n "$api_container_id" ]; then
+                docker inspect --format '{{json .State.Health}}' "$api_container_id" || true
+              fi
+            } 2>&1 | tee "$startup_log" >&2
+
+            diagnostic="$(tail -n 80 "$startup_log" || true)"
+            diagnostic="${diagnostic//'%'/'%25'}"
+            diagnostic="${diagnostic//$'\r'/'%0D'}"
+            diagnostic="${diagnostic//$'\n'/'%0A'}"
+            echo "::error title=Container stack startup failed::$diagnostic"
             exit 1
           fi
 
