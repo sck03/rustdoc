@@ -35,6 +35,10 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.DoesNotContain("opencv", rustManifest, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("FROM rust:", dockerfile, StringComparison.Ordinal);
             Assert.Contains("sidecar/ocr/exportdoc-ocr", dockerfile, StringComparison.Ordinal);
+            Assert.Contains("exportdoc-runtime-id", dockerfile, StringComparison.Ordinal);
+            Assert.Contains("amd64) echo linux-x64", dockerfile, StringComparison.Ordinal);
+            Assert.Contains("arm64) echo linux-arm64", dockerfile, StringComparison.Ordinal);
+            Assert.Contains("--runtime \"$runtime_identifier\"", dockerfile, StringComparison.Ordinal);
             Assert.Contains("tools/excel-analyzer-rs/Cargo.toml", workflow, StringComparison.Ordinal);
             Assert.Contains("Tools/exportdoc-excel-analyzer", dockerfile, StringComparison.Ordinal);
         }

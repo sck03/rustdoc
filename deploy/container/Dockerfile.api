@@ -14,13 +14,25 @@ RUN test "$(dotnet --version)" = "10.0.302"
 WORKDIR /src
 ARG TARGETARCH
 
+# The OCR sidecar loads the ONNX native library from the managed publish
+# output. Restore and publish for the target Linux RID explicitly; a portable
+# publish would omit libonnxruntime.so and make the build-time OCR probe fail.
+RUN case "$TARGETARCH" in \
+        amd64) echo linux-x64 > /tmp/exportdoc-runtime-id ;; \
+        arm64) echo linux-arm64 > /tmp/exportdoc-runtime-id ;; \
+        *) echo "Unsupported Docker target architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac
+
 COPY global.json Directory.Build.props Directory.Packages.props NuGet.Config version.json ./
 COPY src/ExportDocManager.Domain/ExportDocManager.Domain.csproj src/ExportDocManager.Domain/
 COPY src/ExportDocManager.Application/ExportDocManager.Application.csproj src/ExportDocManager.Application/
 COPY src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj src/ExportDocManager.Infrastructure/
 COPY src/ExportDocManager.Api/ExportDocManager.Api.csproj src/ExportDocManager.Api/
 RUN --mount=type=cache,id=exportdoc-nuget-${TARGETARCH},target=/root/.nuget/packages,sharing=locked \
-    dotnet restore src/ExportDocManager.Api/ExportDocManager.Api.csproj --configfile NuGet.Config
+    runtime_identifier="$(cat /tmp/exportdoc-runtime-id)" \
+    && dotnet restore src/ExportDocManager.Api/ExportDocManager.Api.csproj \
+        --runtime "$runtime_identifier" \
+        --configfile NuGet.Config
 
 COPY src/ src/
 COPY Shared/ Shared/
@@ -29,8 +41,10 @@ COPY Resources/ Resources/
 COPY --from=report-fonts /src/Resources/Fonts/OpenSource/ Resources/Fonts/OpenSource/
 COPY OcrModels/ OcrModels/
 RUN --mount=type=cache,id=exportdoc-nuget-${TARGETARCH},target=/root/.nuget/packages,sharing=locked \
-    dotnet publish src/ExportDocManager.Api/ExportDocManager.Api.csproj \
+    runtime_identifier="$(cat /tmp/exportdoc-runtime-id)" \
+    && dotnet publish src/ExportDocManager.Api/ExportDocManager.Api.csproj \
     --configuration Release \
+    --runtime "$runtime_identifier" \
     --no-restore \
     --output /out \
     /p:UseAppHost=false \
