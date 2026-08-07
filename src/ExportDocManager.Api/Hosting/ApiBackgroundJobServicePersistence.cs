@@ -5,6 +5,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -25,7 +26,21 @@ namespace ExportDocManager.Api.Hosting
         {
             if (_useDatabaseStore)
             {
-                LoadDatabaseJobs();
+                try
+                {
+                    LoadDatabaseJobs();
+                }
+                catch (PostgresException exception) when (
+                    string.Equals(
+                        exception.SqlState,
+                        PostgresErrorCodes.UndefinedTable,
+                        StringComparison.Ordinal))
+                {
+                    // A new shared deployment intentionally starts before the first
+                    // administrator login creates the schema. Keep the in-memory job
+                    // catalog empty until then; every other PostgreSQL failure remains
+                    // fatal so an unavailable or misconfigured database is not hidden.
+                }
                 return;
             }
 

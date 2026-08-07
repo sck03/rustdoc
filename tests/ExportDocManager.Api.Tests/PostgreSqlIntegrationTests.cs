@@ -43,6 +43,19 @@ namespace ExportDocManager.Api.Tests
 
             try
             {
+                var preInitializationJobs = new ApiBackgroundJobService(
+                    new RuntimeAppPathProvider(
+                        AppContext.BaseDirectory,
+                        Path.Combine(AppContext.BaseDirectory, $"postgres-preinit-jobs-{Guid.NewGuid():N}")),
+                    settings,
+                    factory);
+                var preInitializationPage = await preInitializationJobs.QueryAsync(new BackgroundJobQuery
+                {
+                    PageNumber = 1,
+                    PageSize = 10
+                });
+                Assert.Empty(preInitializationPage.Items);
+
                 var initialization = new DatabaseInitializationService(
                     factory,
                     settings,
