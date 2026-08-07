@@ -29,7 +29,9 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("ExportDocPackageProfile=Container", dockerfile, StringComparison.Ordinal);
         Assert.Contains("mcr.microsoft.com/dotnet/sdk:10.0.302-noble AS build", dockerfile, StringComparison.Ordinal);
         Assert.Contains("FROM debian:trixie-slim AS runtime", dockerfile, StringComparison.Ordinal);
-        Assert.Contains("https://packages.microsoft.com/debian/13/prod trixie main", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("https://packages.microsoft.com/config/debian/13/packages-microsoft-prod.deb", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("dpkg -i /tmp/packages-microsoft-prod.deb", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("dpkg --purge packages-microsoft-prod", dockerfile, StringComparison.Ordinal);
         Assert.Contains("aspnetcore-runtime-10.0 \\", dockerfile, StringComparison.Ordinal);
         Assert.Contains("dotnet-runtime-10.0 \\", dockerfile, StringComparison.Ordinal);
         Assert.Contains("test \"$aspnet_version\" = \"$netcore_version\"", dockerfile, StringComparison.Ordinal);
@@ -43,7 +45,7 @@ public sealed class PackagePayloadContractTests
         Assert.DoesNotContain("bookworm-pgdg", dockerfile, StringComparison.Ordinal);
         Assert.DoesNotContain("libicu72", dockerfile, StringComparison.Ordinal);
         Assert.DoesNotContain("        gnupg", dockerfile, StringComparison.Ordinal);
-        Assert.Contains("signed-by=/usr/share/keyrings/microsoft-prod.asc", dockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("https://packages.microsoft.com/keys/microsoft.asc", dockerfile, StringComparison.Ordinal);
         Assert.Contains("signed-by=/usr/share/keyrings/postgresql.asc", dockerfile, StringComparison.Ordinal);
         Assert.Contains("node:24-trixie-slim", dockerfile, StringComparison.Ordinal);
         Assert.Contains("rust:1.96-trixie", dockerfile, StringComparison.Ordinal);

@@ -85,10 +85,9 @@ RUN apt-get update \
         tini \
         tzdata \
         zlib1g \
-    && curl --fail --silent --show-error --location --output /usr/share/keyrings/microsoft-prod.asc \
-        https://packages.microsoft.com/keys/microsoft.asc \
-    && echo "deb [signed-by=/usr/share/keyrings/microsoft-prod.asc] https://packages.microsoft.com/debian/13/prod trixie main" \
-        > /etc/apt/sources.list.d/microsoft-prod.list \
+    && curl --fail --silent --show-error --location --output /tmp/packages-microsoft-prod.deb \
+        https://packages.microsoft.com/config/debian/13/packages-microsoft-prod.deb \
+    && dpkg -i /tmp/packages-microsoft-prod.deb \
     && curl --fail --silent --show-error --location --output /usr/share/keyrings/postgresql.asc \
         https://www.postgresql.org/media/keys/ACCC4CF8.asc \
     && echo "deb [signed-by=/usr/share/keyrings/postgresql.asc] https://apt.postgresql.org/pub/repos/apt trixie-pgdg main" \
@@ -106,11 +105,13 @@ RUN apt-get update \
     && test -n "$aspnet_version" \
     && test "$aspnet_version" = "$netcore_version" \
     && pg_dump --version | grep -F '18.' \
+    && dpkg --purge packages-microsoft-prod \
     && rm -rf \
         /var/lib/apt/lists/* \
+        /tmp/packages-microsoft-prod.deb \
         /etc/apt/sources.list.d/microsoft-prod.list \
         /etc/apt/sources.list.d/pgdg.list \
-        /usr/share/keyrings/microsoft-prod.asc \
+        /usr/share/keyrings/microsoft-prod.gpg \
         /usr/share/keyrings/postgresql.asc
 
 WORKDIR /app
