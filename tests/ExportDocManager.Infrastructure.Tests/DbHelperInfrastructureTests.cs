@@ -265,6 +265,8 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             var path = Path.Combine(Path.GetTempPath(), "ExportDocManager.Tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(path);
+            Directory.CreateDirectory(Path.Combine(path, "App_Data", "Config"));
+            Directory.CreateDirectory(Path.Combine(path, "App_Data", "Security"));
             return path;
         }
 

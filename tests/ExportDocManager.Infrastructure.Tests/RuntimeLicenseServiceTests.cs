@@ -119,7 +119,10 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.True(registration.Success);
 
                 var targetProvider = new RuntimeAppPathProvider(targetAppRoot, targetDataRoot);
-                Directory.Delete(targetProvider.SecurityRoot, recursive: true);
+                if (Directory.Exists(targetProvider.SecurityRoot))
+                {
+                    Directory.Delete(targetProvider.SecurityRoot, recursive: true);
+                }
                 CopyDirectory(sourceProvider.SecurityRoot, targetProvider.SecurityRoot);
 
                 var copiedStatus = await CreateService(
@@ -168,7 +171,10 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.True(registration.Success);
 
                 var targetProvider = new RuntimeAppPathProvider(targetAppRoot, targetDataRoot);
-                Directory.Delete(targetProvider.SecurityRoot, recursive: true);
+                if (Directory.Exists(targetProvider.SecurityRoot))
+                {
+                    Directory.Delete(targetProvider.SecurityRoot, recursive: true);
+                }
                 CopyDirectory(sourceProvider.SecurityRoot, targetProvider.SecurityRoot);
 
                 var copiedStatus = await CreateService(
@@ -285,11 +291,12 @@ namespace ExportDocManager.Infrastructure.Tests
             try
             {
                 var provider = new RuntimeAppPathProvider(appRoot, dataRoot);
+                var countingStore = new CountingAnchorStore(CreateAnchorStore(anchorRoot));
                 var service = CreateService(
                     provider,
                     () => "DEVICE-CONCURRENT",
                     () => "LOCAL-SEAL-CONCURRENT",
-                    CreateAnchorStore(anchorRoot));
+                    countingStore);
 
                 var statuses = await Task.WhenAll(
                     Enumerable.Range(0, 16).Select(_ => service.GetStatusAsync()));
@@ -298,6 +305,8 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.False(string.IsNullOrWhiteSpace(machineId));
                 Assert.All(statuses, status => Assert.False(status.IsTrialExpired));
                 Assert.True(File.Exists(Path.Combine(provider.SecurityRoot, "license.dat")));
+                Assert.Equal(1, countingStore.LoadCount);
+                Assert.Equal(1, countingStore.SaveCount);
             }
             finally
             {
@@ -395,6 +404,28 @@ namespace ExportDocManager.Infrastructure.Tests
                 expireDate = DateTime.Today.AddYears(1).Date.AddDays(1).AddTicks(-1);
                 return !string.IsNullOrWhiteSpace(machineId) &&
                     string.Equals(licenseKey, ValidLicenseKey, StringComparison.Ordinal);
+            }
+        }
+
+        private sealed class CountingAnchorStore(IRuntimeLicenseAnchorStore inner) : IRuntimeLicenseAnchorStore
+        {
+            private int _loadCount;
+            private int _saveCount;
+
+            public string StorageDescription => inner.StorageDescription;
+            public int LoadCount => Volatile.Read(ref _loadCount);
+            public int SaveCount => Volatile.Read(ref _saveCount);
+
+            public async Task<RuntimeLicenseAnchorData> LoadAsync(CancellationToken cancellationToken = default)
+            {
+                Interlocked.Increment(ref _loadCount);
+                return await inner.LoadAsync(cancellationToken);
+            }
+
+            public async Task SaveAsync(RuntimeLicenseAnchorData data, CancellationToken cancellationToken = default)
+            {
+                Interlocked.Increment(ref _saveCount);
+                await inner.SaveAsync(data, cancellationToken);
             }
         }
     }

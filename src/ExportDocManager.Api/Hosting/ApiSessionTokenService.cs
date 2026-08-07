@@ -162,10 +162,13 @@ namespace ExportDocManager.Api.Hosting
     public sealed class DatabaseApiSessionTokenService : IApiSessionTokenService
     {
         private static readonly TimeSpan DefaultLifetime = TimeSpan.FromHours(8);
+        private static readonly TimeSpan ValidationCacheLifetime = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan LastAccessWriteInterval = TimeSpan.FromMinutes(5);
         private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(1);
         private static readonly TimeSpan SessionHistoryRetention = TimeSpan.FromDays(7);
+        private const int MaximumValidationCacheEntries = 10_000;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
+        private readonly ConcurrentDictionary<string, CachedSessionValidation> _validationCache = new(StringComparer.Ordinal);
         private long _nextCleanupUtcTicks;
 
         public DatabaseApiSessionTokenService(IDbContextFactory<AppDbContext> contextFactory)
@@ -215,12 +218,18 @@ namespace ExportDocManager.Api.Hosting
 
             string tokenHash = HashToken(token.Trim());
             var now = DateTimeOffset.UtcNow;
+            if (TryGetCachedValidation(tokenHash, now, out User cachedUser))
+            {
+                return cachedUser;
+            }
+
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             await TryCleanupExpiredSessionsAsync(context, now, cancellationToken).ConfigureAwait(false);
             var session = await context.ApiUserSessions
                 .SingleOrDefaultAsync(item => item.TokenHash == tokenHash, cancellationToken);
             if (session == null || session.RevokedAt.HasValue || session.ExpiresAt <= now)
             {
+                _validationCache.TryRemove(tokenHash, out _);
                 return null;
             }
 
@@ -233,6 +242,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 session.RevokedAt = now;
                 await context.SaveChangesAsync(cancellationToken);
+                _validationCache.TryRemove(tokenHash, out _);
                 return null;
             }
 
@@ -244,6 +254,7 @@ namespace ExportDocManager.Api.Hosting
                 await context.SaveChangesAsync(cancellationToken);
             }
 
+            CacheValidation(tokenHash, user, session.ExpiresAt, now);
             return ApiUserDtoFactory.ToUserSnapshot(user);
         }
 
@@ -260,6 +271,7 @@ namespace ExportDocManager.Api.Hosting
             }
 
             string tokenHash = HashToken(token.Trim());
+            _validationCache.TryRemove(tokenHash, out _);
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var session = await context.ApiUserSessions
                 .SingleOrDefaultAsync(item => item.TokenHash == tokenHash, cancellationToken);
@@ -302,8 +314,90 @@ namespace ExportDocManager.Api.Hosting
                 await context.SaveChangesAsync(cancellationToken);
             }
 
+            foreach (var pair in _validationCache.ToArray())
+            {
+                if (pair.Value.User.Id == userId)
+                {
+                    _validationCache.TryRemove(pair.Key, out _);
+                }
+            }
+
             return sessions.Count;
         }
+
+        private bool TryGetCachedValidation(
+            string tokenHash,
+            DateTimeOffset now,
+            out User user)
+        {
+            user = null;
+            if (!_validationCache.TryGetValue(tokenHash, out var cached))
+            {
+                return false;
+            }
+
+            if (cached.CacheExpiresAt <= now || cached.SessionExpiresAt <= now)
+            {
+                _validationCache.TryRemove(tokenHash, out _);
+                return false;
+            }
+
+            user = ApiUserDtoFactory.ToUserSnapshot(cached.User);
+            return true;
+        }
+
+        private void CacheValidation(
+            string tokenHash,
+            User user,
+            DateTimeOffset sessionExpiresAt,
+            DateTimeOffset now)
+        {
+            var cacheExpiresAt = now.Add(ValidationCacheLifetime);
+            if (cacheExpiresAt > sessionExpiresAt)
+            {
+                cacheExpiresAt = sessionExpiresAt;
+            }
+
+            _validationCache[tokenHash] = new CachedSessionValidation(
+                ApiUserDtoFactory.ToUserSnapshot(user),
+                sessionExpiresAt,
+                cacheExpiresAt);
+            TrimValidationCache(now);
+        }
+
+        private void TrimValidationCache(DateTimeOffset now)
+        {
+            if (_validationCache.Count <= MaximumValidationCacheEntries)
+            {
+                return;
+            }
+
+            foreach (var pair in _validationCache.ToArray())
+            {
+                if (pair.Value.CacheExpiresAt <= now || pair.Value.SessionExpiresAt <= now)
+                {
+                    _validationCache.TryRemove(pair.Key, out _);
+                }
+            }
+
+            int overflow = _validationCache.Count - MaximumValidationCacheEntries;
+            if (overflow <= 0)
+            {
+                return;
+            }
+
+            foreach (var pair in _validationCache
+                .OrderBy(item => item.Value.CacheExpiresAt)
+                .Take(overflow))
+            {
+                _validationCache.TryRemove(pair.Key, out _);
+            }
+        }
+
+        private sealed record CachedSessionValidation(
+            User User,
+            DateTimeOffset SessionExpiresAt,
+            DateTimeOffset CacheExpiresAt);
 
         private async Task TryCleanupExpiredSessionsAsync(
             AppDbContext context,

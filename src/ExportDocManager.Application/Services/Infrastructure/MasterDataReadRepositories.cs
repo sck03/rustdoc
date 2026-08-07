@@ -7,16 +7,19 @@ namespace ExportDocManager.Services.Infrastructure
     public interface ICustomerReadRepository
     {
         Task<IReadOnlyList<Customer>> QueryAsync(CustomerReadQuery query, CancellationToken cancellationToken = default);
+        Task<PagedResult<Customer>> QueryPageAsync(CustomerReadQuery query, CancellationToken cancellationToken = default);
     }
 
     public interface IExporterReadRepository
     {
         Task<IReadOnlyList<Exporter>> QueryAsync(ExporterReadQuery query, CancellationToken cancellationToken = default);
+        Task<PagedResult<Exporter>> QueryPageAsync(ExporterReadQuery query, CancellationToken cancellationToken = default);
     }
 
     public interface IPayeeReadRepository
     {
         Task<IReadOnlyList<Payee>> QueryAsync(PayeeReadQuery query, CancellationToken cancellationToken = default);
+        Task<PagedResult<Payee>> QueryPageAsync(PayeeReadQuery query, CancellationToken cancellationToken = default);
     }
 
     public interface IProductReadRepository
@@ -29,11 +32,13 @@ namespace ExportDocManager.Services.Infrastructure
     public interface IPortReadRepository
     {
         Task<IReadOnlyList<Port>> QueryAsync(PortReadQuery query, CancellationToken cancellationToken = default);
+        Task<PagedResult<Port>> QueryPageAsync(PortReadQuery query, CancellationToken cancellationToken = default);
     }
 
     public interface IUnitReadRepository
     {
         Task<IReadOnlyList<Unit>> QueryAsync(UnitReadQuery query, CancellationToken cancellationToken = default);
+        Task<PagedResult<Unit>> QueryPageAsync(UnitReadQuery query, CancellationToken cancellationToken = default);
     }
 
     public interface IHsCodeReadRepository

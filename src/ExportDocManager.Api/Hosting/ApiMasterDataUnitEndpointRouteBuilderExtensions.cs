@@ -30,6 +30,26 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("ListUnits");
 
+            endpoints.MapGet("/api/master-data/units/page", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                IUnitReadRepository repository,
+                int pageNumber,
+                int pageSize,
+                string keyword,
+                CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                var page = await repository.QueryPageAsync(new UnitReadQuery
+                {
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    Keyword = keyword ?? string.Empty
+                }, cancellationToken);
+                return Results.Ok(ApiMasterDataDtoFactory.FromPage(page, ApiMasterDataDtoFactory.FromUnits));
+            })
+            .WithName("ListUnitsPage");
+
             endpoints.MapGet("/api/master-data/units/{id:int}", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,

@@ -29,6 +29,18 @@ internal static class ApiServiceExceptionMapper
     public static (int StatusCode, string Message) Map(Exception exception, string correlationId)
     {
         ArgumentNullException.ThrowIfNull(exception);
+        ServiceException explicitLoadSignal = Enumerate(exception)
+            .OfType<ServiceException>()
+            .FirstOrDefault(current => current is ServiceBusyException or ServiceTimeoutException);
+        if (explicitLoadSignal is ServiceBusyException busySignal)
+        {
+            return (StatusCodes.Status429TooManyRequests, busySignal.Message);
+        }
+        if (explicitLoadSignal is ServiceTimeoutException timeoutSignal)
+        {
+            return (StatusCodes.Status504GatewayTimeout, timeoutSignal.Message);
+        }
+
         if (ContainsNotFound(exception))
         {
             return (StatusCodes.Status404NotFound, FindNotFoundMessage(exception));
@@ -65,6 +77,10 @@ internal static class ApiServiceExceptionMapper
                 (StatusCodes.Status404NotFound, notFound.Message),
             PermissionDeniedException permission =>
                 (StatusCodes.Status403Forbidden, permission.Message),
+            ServiceBusyException busy =>
+                (StatusCodes.Status429TooManyRequests, busy.Message),
+            ServiceTimeoutException timeout =>
+                (StatusCodes.Status504GatewayTimeout, timeout.Message),
             ServiceConcurrencyException concurrency =>
                 (StatusCodes.Status409Conflict, concurrency.Message),
             ResourceConflictException conflict =>

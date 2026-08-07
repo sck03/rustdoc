@@ -603,7 +603,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
                 var service = new ChromiumHtmlToPdfService(pathProvider);
 
-                var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                var ex = await Assert.ThrowsAsync<InfrastructureServiceException>(() =>
                     service.RenderAsync("<html><body>Report</body></html>", destinationPath));
 
                 Assert.Contains("Browsers", ex.Message, StringComparison.Ordinal);

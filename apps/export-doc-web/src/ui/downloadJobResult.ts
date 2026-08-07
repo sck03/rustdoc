@@ -5,6 +5,7 @@ const terminalStatuses = new Set(["succeeded", "failed", "canceled"]);
 export type BackgroundJobWaitOptions = {
   timeoutMs?: number;
   pollIntervalMs?: number;
+  maxPollIntervalMs?: number;
   signal?: AbortSignal;
   timeoutMessage?: string;
 };
@@ -29,12 +30,17 @@ export async function waitForJobCompletion(
   options: BackgroundJobWaitOptions = {},
 ) {
   const timeoutMs = options.timeoutMs ?? 180_000;
-  const requestedPollInterval = options.pollIntervalMs ?? 500;
-  const pollIntervalMs = Number.isFinite(requestedPollInterval)
-    ? Math.min(30_000, Math.max(250, requestedPollInterval))
-    : 500;
+  const requestedPollInterval = options.pollIntervalMs ?? 1_000;
+  const initialPollIntervalMs = Number.isFinite(requestedPollInterval)
+    ? Math.min(30_000, Math.max(500, requestedPollInterval))
+    : 1_000;
+  const requestedMaximumPollInterval = options.maxPollIntervalMs ?? 5_000;
+  const maximumPollIntervalMs = Number.isFinite(requestedMaximumPollInterval)
+    ? Math.min(30_000, Math.max(initialPollIntervalMs, requestedMaximumPollInterval))
+    : Math.max(initialPollIntervalMs, 5_000);
   const signal = options.signal;
   const startedAt = Date.now();
+  let currentPollIntervalMs = initialPollIntervalMs;
   let job = acceptedJob;
 
   while (!terminalStatuses.has(job.status.toLowerCase())) {
@@ -43,8 +49,21 @@ export async function waitForJobCompletion(
       throw new Error(options.timeoutMessage || "后台任务仍在运行，可稍后到任务中心查看结果。");
     }
 
-    await delay(pollIntervalMs, signal);
+    if (typeof document !== "undefined" && document.hidden) {
+      await waitForDocumentVisibility(Math.max(0, timeoutMs - (Date.now() - startedAt)), signal);
+      continue;
+    }
+
+    await delay(currentPollIntervalMs, signal);
+    if (typeof document !== "undefined" && document.hidden) {
+      continue;
+    }
+
     job = await client.getJob({ jobId: job.jobId }, { signal });
+    currentPollIntervalMs = Math.min(
+      maximumPollIntervalMs,
+      Math.ceil(currentPollIntervalMs * 1.5),
+    );
   }
 
   if (job.status.toLowerCase() !== "succeeded") {
@@ -52,6 +71,33 @@ export async function waitForJobCompletion(
   }
 
   return job;
+}
+
+function waitForDocumentVisibility(timeoutMs: number, signal?: AbortSignal) {
+  if (typeof document === "undefined" || !document.hidden || timeoutMs <= 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const finish = () => {
+      window.clearTimeout(timeoutId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      signal?.removeEventListener("abort", handleAbort);
+      resolve();
+    };
+    const handleVisibilityChange = () => {
+      if (!document.hidden) finish();
+    };
+    const handleAbort = () => {
+      window.clearTimeout(timeoutId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      reject(signal?.reason ?? createAbortError());
+    };
+    const timeoutId = window.setTimeout(finish, timeoutMs);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    signal?.addEventListener("abort", handleAbort, { once: true });
+    if (signal?.aborted) handleAbort();
+  });
 }
 
 export async function downloadCompletedJobResult(

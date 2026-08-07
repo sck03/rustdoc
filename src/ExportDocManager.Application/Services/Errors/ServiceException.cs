@@ -59,3 +59,19 @@ public class InfrastructureServiceException : ServiceException
     {
     }
 }
+
+public class ServiceBusyException : ServiceException
+{
+    public ServiceBusyException(string message, Exception innerException = null)
+        : base(message, innerException)
+    {
+    }
+}
+
+public class ServiceTimeoutException : ServiceException
+{
+    public ServiceTimeoutException(string message, Exception innerException = null)
+        : base(message, innerException)
+    {
+    }
+}

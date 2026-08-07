@@ -32,18 +32,15 @@ namespace ExportDocManager.Services.Infrastructure
             var activeInvoices = BuildPreferredInvoiceQuery(
                 scopedInvoices.Where(invoice => invoice.Status != InvoiceStatusCatalog.Cancelled));
 
-            // Only the current and previous period rows are materialized.  The
-            // former implementation loaded every active invoice into the API
-            // process in order to deduplicate and count statuses, which made
-            // the dashboard increasingly expensive as history grew.
-            var monthlyInvoices = await SelectDashboardInvoiceSnapshots(activeInvoices
-                    .Where(invoice => invoice.InvoiceDate >= startOfMonth && invoice.InvoiceDate < endOfMonth),
-                includeCustomer: true,
+            var periodAggregates = await LoadPeriodAggregatesAsync(
+                context,
+                activeInvoices,
+                previousStartOfMonth,
+                startOfMonth,
+                endOfMonth,
                 cancellationToken);
-            var previousMonthlyInvoices = await SelectDashboardInvoiceSnapshots(activeInvoices
-                    .Where(invoice => invoice.InvoiceDate >= previousStartOfMonth && invoice.InvoiceDate < startOfMonth),
-                includeCustomer: false,
-                cancellationToken);
+            DashboardPeriodAggregate currentPeriod = periodAggregates.Current;
+            DashboardPeriodAggregate previousPeriod = periodAggregates.Previous;
 
             var statusCounts = await activeInvoices
                 .GroupBy(invoice => invoice.Status ?? string.Empty)
@@ -55,7 +52,7 @@ namespace ExportDocManager.Services.Infrastructure
             int verifiedCount = CountStatus(InvoiceStatusCatalog.Verified);
             int shippedCount = CountStatus(InvoiceStatusCatalog.Shipped);
             int completedCount = CountStatus(InvoiceStatusCatalog.Completed);
-            int totalActiveCount = await activeInvoices.CountAsync(cancellationToken);
+            int totalActiveCount = statusCounts.Sum(item => item.Count);
 
             var recentInvoices = await activeInvoices
                 .OrderByDescending(invoice => invoice.Id)
@@ -74,9 +71,9 @@ namespace ExportDocManager.Services.Infrastructure
             string singleWindowStatusSummary = await BuildSingleWindowStatusSummaryAsync(context, cancellationToken);
 
             return new DashboardSnapshot(
-                monthlyInvoices.Sum(invoice => invoice.TotalAmount),
-                monthlyInvoices.Sum(invoice => invoice.TotalProfit),
-                monthlyInvoices.Sum(invoice => invoice.TotalTaxRefundAmount),
+                currentPeriod.TotalAmount,
+                currentPeriod.TotalProfit,
+                currentPeriod.TotalTaxRefundAmount,
                 draftCount + verifiedCount,
                 shippedCount,
                 totalActiveCount,
@@ -84,34 +81,72 @@ namespace ExportDocManager.Services.Infrastructure
                 recentInvoices,
                 todoItems,
                 $"{localNow:yyyy年M月}",
-                previousMonthlyInvoices.Sum(invoice => invoice.TotalAmount),
-                previousMonthlyInvoices.Sum(invoice => invoice.TotalProfit),
-                previousMonthlyInvoices.Sum(invoice => invoice.TotalTaxRefundAmount),
-                monthlyInvoices.Count,
+                previousPeriod.TotalAmount,
+                previousPeriod.TotalProfit,
+                previousPeriod.TotalTaxRefundAmount,
+                currentPeriod.InvoiceCount,
                 draftCount,
                 verifiedCount,
                 completedCount);
         }
 
-        private static async Task<List<DashboardInvoiceSnapshot>> SelectDashboardInvoiceSnapshots(
-            IQueryable<Invoice> query,
-            bool includeCustomer,
+        private static async Task<DashboardPeriodAggregates> LoadPeriodAggregatesAsync(
+            AppDbContext context,
+            IQueryable<Invoice> activeInvoices,
+            DateTime previousStartOfMonth,
+            DateTime startOfMonth,
+            DateTime endOfMonth,
             CancellationToken cancellationToken)
         {
-            return await query
-                .Select(invoice => new DashboardInvoiceSnapshot
+            var periodQuery = activeInvoices.Where(invoice =>
+                invoice.InvoiceDate >= previousStartOfMonth &&
+                invoice.InvoiceDate < endOfMonth);
+
+            if (!context.Database.IsSqlite())
+            {
+                var rows = await periodQuery
+                    .GroupBy(invoice => invoice.InvoiceDate >= startOfMonth)
+                    .Select(group => new DashboardPeriodAggregate
+                    {
+                        IsCurrent = group.Key,
+                        InvoiceCount = group.Count(),
+                        TotalAmount = group.Sum(invoice => invoice.TotalAmount),
+                        TotalProfit = group.Sum(invoice => invoice.TotalProfit),
+                        TotalTaxRefundAmount = group.Sum(invoice => invoice.TotalTaxRefundAmount)
+                    })
+                    .ToListAsync(cancellationToken);
+                return new DashboardPeriodAggregates(
+                    rows.FirstOrDefault(row => row.IsCurrent) ?? new DashboardPeriodAggregate { IsCurrent = true },
+                    rows.FirstOrDefault(row => !row.IsCurrent) ?? new DashboardPeriodAggregate());
+            }
+
+            // SQLite cannot translate decimal SUM without lossy casts. Keep
+            // exact decimal arithmetic while limiting materialization to the
+            // two displayed months and only the four required columns.
+            var sqliteRows = await periodQuery
+                .Select(invoice => new DashboardPeriodValue
                 {
-                    Id = invoice.Id,
-                    InvoiceNo = invoice.InvoiceNo,
-                    Status = invoice.Status,
-                    Type = invoice.Type,
-                    InvoiceDate = invoice.InvoiceDate,
+                    IsCurrent = invoice.InvoiceDate >= startOfMonth,
                     TotalAmount = invoice.TotalAmount,
                     TotalProfit = invoice.TotalProfit,
-                    TotalTaxRefundAmount = invoice.TotalTaxRefundAmount,
-                    CustomerNameEN = includeCustomer ? invoice.CustomerNameEN : string.Empty
+                    TotalTaxRefundAmount = invoice.TotalTaxRefundAmount
                 })
                 .ToListAsync(cancellationToken);
+
+            DashboardPeriodAggregate Aggregate(bool isCurrent)
+            {
+                var values = sqliteRows.Where(row => row.IsCurrent == isCurrent).ToArray();
+                return new DashboardPeriodAggregate
+                {
+                    IsCurrent = isCurrent,
+                    InvoiceCount = values.Length,
+                    TotalAmount = values.Sum(row => row.TotalAmount),
+                    TotalProfit = values.Sum(row => row.TotalProfit),
+                    TotalTaxRefundAmount = values.Sum(row => row.TotalTaxRefundAmount)
+                };
+            }
+
+            return new DashboardPeriodAggregates(Aggregate(true), Aggregate(false));
         }
 
         private async Task<string> BuildSingleWindowStatusSummaryAsync(
@@ -220,17 +255,25 @@ namespace ExportDocManager.Services.Infrastructure
             return source.Where(invoice => preferredIds.Contains(invoice.Id));
         }
 
-        private sealed class DashboardInvoiceSnapshot
+        private sealed record DashboardPeriodAggregates(
+            DashboardPeriodAggregate Current,
+            DashboardPeriodAggregate Previous);
+
+        private sealed class DashboardPeriodAggregate
         {
-            public int Id { get; init; }
-            public string InvoiceNo { get; init; }
-            public string Status { get; init; }
-            public string Type { get; init; }
-            public DateTime InvoiceDate { get; init; }
+            public bool IsCurrent { get; init; }
+            public int InvoiceCount { get; init; }
             public decimal TotalAmount { get; init; }
             public decimal TotalProfit { get; init; }
             public decimal TotalTaxRefundAmount { get; init; }
-            public string CustomerNameEN { get; init; }
+        }
+
+        private sealed class DashboardPeriodValue
+        {
+            public bool IsCurrent { get; init; }
+            public decimal TotalAmount { get; init; }
+            public decimal TotalProfit { get; init; }
+            public decimal TotalTaxRefundAmount { get; init; }
         }
     }
 }

@@ -9,6 +9,9 @@ var pathProvider = string.IsNullOrWhiteSpace(runtimeOptions.DataRoot)
     ? new RuntimeAppPathProvider(runtimeOptions.AppRoot)
     : new RuntimeAppPathProvider(runtimeOptions.AppRoot, runtimeOptions.DataRoot);
 
+// Validate the complete existing path chain before any runtime directory,
+// recovery marker, cache file or database setting can be created.
+ApiStartupValidator.PrepareRuntimeDirectories(pathProvider);
 DbHelper.ConfigurePathProvider(pathProvider);
 // ASP.NET Core form buffering otherwise falls back to the process/system temp
 // directory for multipart requests.  Keep that transient data under the same

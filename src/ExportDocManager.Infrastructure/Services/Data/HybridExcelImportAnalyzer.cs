@@ -1,6 +1,7 @@
 using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using System.Diagnostics;
 using System.Text.Json;
@@ -37,6 +38,8 @@ namespace ExportDocManager.Services.Data
             ExcelImportSettings settings,
             CancellationToken cancellationToken = default)
         {
+            using IDisposable lease = await ExcelAnalysisExecutionGate.EnterAsync(cancellationToken)
+                .ConfigureAwait(false);
             settings ??= new ExcelImportSettings();
             var analyzerMode = ResolveAnalyzerMode();
             if (analyzerMode != ExcelAnalyzerMode.BuiltIn)
@@ -46,7 +49,7 @@ namespace ExportDocManager.Services.Data
             }
 
             return await _fallbackAnalyzer
-                .AnalyzeAsync(filePath, settings, cancellationToken)
+                .AnalyzeWithoutExecutionGateAsync(filePath, settings, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -59,7 +62,7 @@ namespace ExportDocManager.Services.Data
             if (string.IsNullOrWhiteSpace(analyzerPath))
             {
                 return await _fallbackAnalyzer
-                    .AnalyzeAsync(filePath, settings, cancellationToken)
+                    .AnalyzeWithoutExecutionGateAsync(filePath, settings, cancellationToken)
                     .ConfigureAwait(false);
             }
 
@@ -74,7 +77,7 @@ namespace ExportDocManager.Services.Data
                 }
 
                 var builtInReport = await _fallbackAnalyzer
-                    .AnalyzeAsync(filePath, settings, cancellationToken)
+                    .AnalyzeWithoutExecutionGateAsync(filePath, settings, cancellationToken)
                     .ConfigureAwait(false);
                 return MergeReports(rustReport, builtInReport);
             }
@@ -85,7 +88,7 @@ namespace ExportDocManager.Services.Data
             catch (Exception ex)
             {
                 var builtInReport = await _fallbackAnalyzer
-                    .AnalyzeAsync(filePath, settings, cancellationToken)
+                    .AnalyzeWithoutExecutionGateAsync(filePath, settings, cancellationToken)
                     .ConfigureAwait(false);
                 builtInReport.Issues.Insert(0, new ExcelImportAnalysisIssue
                 {
@@ -122,7 +125,7 @@ namespace ExportDocManager.Services.Data
 
             if (!process.Start())
             {
-                throw new InvalidOperationException("Rust Excel 分析器进程启动失败。");
+                throw new InfrastructureServiceException("Rust Excel 分析器进程启动失败。");
             }
 
             Task<string> stdoutTask = ReadProcessOutputAsync(
@@ -141,6 +144,11 @@ namespace ExportDocManager.Services.Data
                     stdoutTask,
                     stderrTask).ConfigureAwait(false);
             }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                TryKillProcess(process);
+                throw new ServiceTimeoutException("Rust Excel 分析器超过 30 秒未完成，任务已终止。");
+            }
             catch
             {
                 TryKillProcess(process);
@@ -151,14 +159,14 @@ namespace ExportDocManager.Services.Data
             string stderr = await stderrTask.ConfigureAwait(false);
             if (process.ExitCode != 0)
             {
-                throw new InvalidOperationException(
+                throw new InfrastructureServiceException(
                     string.IsNullOrWhiteSpace(stderr)
                         ? $"Rust Excel 分析器退出码 {process.ExitCode}。"
                         : stderr.Trim());
             }
 
             var rustReport = JsonSerializer.Deserialize<RustAnalysisReport>(stdout, JsonOptions)
-                ?? throw new InvalidOperationException("Rust Excel 分析器返回了空报告。");
+                ?? throw new InfrastructureServiceException("Rust Excel 分析器返回了空报告。");
 
             return MapRustReport(rustReport, filePath);
         }

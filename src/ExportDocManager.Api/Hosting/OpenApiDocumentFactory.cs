@@ -402,6 +402,32 @@ namespace ExportDocManager.Api.Hosting
             };
         }
 
+        private static object MasterDataPagedQueryPath(
+            string summary,
+            string operationId,
+            string itemSchemaName)
+        {
+            return new
+            {
+                get = new
+                {
+                    summary,
+                    operationId,
+                    parameters = new object[]
+                    {
+                        QueryParameter("keyword", "string", null, "Optional keyword filter."),
+                        QueryParameter("pageNumber", "integer", "int32", "Page number starting from 1.", required: true),
+                        QueryParameter("pageSize", "integer", "int32", "Page size capped by the API endpoint.", required: true)
+                    },
+                    responses = new Dictionary<string, object>
+                    {
+                        ["200"] = new { description = "Paged master data query results.", content = JsonContent($"ApiPagedResponseOf{itemSchemaName}") },
+                        ["401"] = new { description = "Missing or invalid bearer token." }
+                    }
+                }
+            };
+        }
+
         private static object SingleWindowSubmitPackageDownloadPath(
             string summary,
             string operationId)
@@ -1041,6 +1067,25 @@ namespace ExportDocManager.Api.Hosting
             {
                 type = "array",
                 items = RefSchema(schemaName)
+            };
+        }
+
+        private static object PagedResponseSchema(string itemSchemaName)
+        {
+            return new
+            {
+                type = "object",
+                required = new[] { "items", "totalCount", "pageNumber", "pageSize", "totalPages", "hasPreviousPage", "hasNextPage" },
+                properties = new Dictionary<string, object>
+                {
+                    ["items"] = RefArraySchema(itemSchemaName),
+                    ["totalCount"] = new { type = "integer", format = "int32" },
+                    ["pageNumber"] = new { type = "integer", format = "int32" },
+                    ["pageSize"] = new { type = "integer", format = "int32" },
+                    ["totalPages"] = new { type = "integer", format = "int32" },
+                    ["hasPreviousPage"] = new { type = "boolean" },
+                    ["hasNextPage"] = new { type = "boolean" }
+                }
             };
         }
     }

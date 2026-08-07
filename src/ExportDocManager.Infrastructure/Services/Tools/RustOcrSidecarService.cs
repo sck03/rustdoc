@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 
@@ -45,7 +46,7 @@ namespace ExportDocManager.Services.Tools
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                throw new InvalidOperationException("OCR 当前任务较多，请稍后重试。");
+                throw new ServiceBusyException("OCR 当前任务较多，请稍后重试。");
             }
 
             try
@@ -60,9 +61,14 @@ namespace ExportDocManager.Services.Tools
                     {
                         await StopAsync();
                     }
-                    catch
+                    catch (Exception ex)
                     {
                         await StopAsync();
+                        if (IsTransportFailure(ex))
+                        {
+                            throw new InfrastructureServiceException("Rust OCR Sidecar 通信失败或返回了无效响应。", ex);
+                        }
+
                         throw;
                     }
                 }
@@ -87,7 +93,7 @@ namespace ExportDocManager.Services.Tools
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                throw new InvalidOperationException("OCR 识别超过 90 秒，任务已终止，请缩小图片后重试。");
+                throw new ServiceTimeoutException("OCR 识别超过 90 秒，任务已终止，请缩小图片后重试。");
             }
             var response = JsonSerializer.Deserialize<RustOcrResponse>(line, JsonOptions) ?? throw new InvalidDataException("Rust OCR Sidecar返回了无效响应。");
             if (!string.Equals(response.Id, id, StringComparison.Ordinal)) throw new InvalidDataException("Rust OCR Sidecar响应编号不匹配。");
@@ -100,7 +106,10 @@ namespace ExportDocManager.Services.Tools
         }
 
         private static bool IsRecoverableTransportFailure(Exception exception, CancellationToken callerToken) =>
-            !callerToken.IsCancellationRequested && exception is IOException or JsonException or InvalidDataException;
+            !callerToken.IsCancellationRequested && IsTransportFailure(exception);
+
+        private static bool IsTransportFailure(Exception exception) =>
+            exception is IOException or JsonException or InvalidDataException;
 
         private static string TrimSidecarError(string error)
         {
@@ -115,7 +124,10 @@ namespace ExportDocManager.Services.Tools
         {
             if (_process is { HasExited: false }) return Task.CompletedTask;
             string executable = ResolveExecutable();
-            if (string.IsNullOrWhiteSpace(executable) || !File.Exists(executable)) throw new FileNotFoundException("未找到Rust OCR Sidecar。", executable);
+            if (string.IsNullOrWhiteSpace(executable) || !File.Exists(executable))
+            {
+                throw new InfrastructureServiceException("未找到 Rust OCR Sidecar，请安装随程序提供的 OCR 可选运行包。");
+            }
             string requestRoot = Path.Combine(_paths.CacheRoot, "OcrJobs");
             Directory.CreateDirectory(requestRoot);
             var startInfo = new ProcessStartInfo
@@ -132,9 +144,9 @@ namespace ExportDocManager.Services.Tools
             };
             startInfo.ArgumentList.Add("--model-root"); startInfo.ArgumentList.Add(Path.Combine(_paths.OcrModelRoot, "PaddleOCR", "V6"));
             startInfo.ArgumentList.Add("--allowed-root"); startInfo.ArgumentList.Add(requestRoot);
-            string runtime = ResolveOnnxRuntimeLibrary();
+            string runtime = FindOnnxRuntimeLibrary(_paths);
             if (!string.IsNullOrWhiteSpace(runtime)) startInfo.Environment["ORT_DYLIB_PATH"] = runtime;
-            _process = Process.Start(startInfo) ?? throw new InvalidOperationException("无法启动Rust OCR Sidecar。");
+            _process = Process.Start(startInfo) ?? throw new InfrastructureServiceException("无法启动 Rust OCR Sidecar。");
             _stdin = _process.StandardInput;
             _stdout = new BoundedTextLineReader(_process.StandardOutput);
             cancellationToken.ThrowIfCancellationRequested();
@@ -146,17 +158,19 @@ namespace ExportDocManager.Services.Tools
             return FindExecutable(_paths);
         }
 
-        private string ResolveOnnxRuntimeLibrary()
+        internal static string FindOnnxRuntimeLibrary(IAppPathProvider paths)
         {
+            ArgumentNullException.ThrowIfNull(paths);
             string name = OperatingSystem.IsWindows() ? "onnxruntime.dll" : OperatingSystem.IsMacOS() ? "libonnxruntime.dylib" : "libonnxruntime.so";
             // Keep startup deterministic and avoid walking a potentially large
             // installation tree on every sidecar restart. Packaging places the
             // native runtime in one of these bounded locations.
             foreach (string candidate in new[]
             {
-                Path.Combine(_paths.AppRoot, name),
-                Path.Combine(_paths.AppRoot, "sidecar", "ocr", name),
-                Path.Combine(_paths.AppRoot, "runtimes", name),
+                Path.Combine(paths.AppRoot, name),
+                Path.Combine(paths.AppRoot, "sidecar", name),
+                Path.Combine(paths.AppRoot, "sidecar", "ocr", name),
+                Path.Combine(paths.AppRoot, "runtimes", name),
             })
             {
                 if (File.Exists(candidate))
@@ -186,7 +200,7 @@ namespace ExportDocManager.Services.Tools
 
         private sealed record RustOcrResponse(string Id, bool Success, string FullText, List<RustOcrLine> Lines, string Error);
         private sealed record RustOcrLine(string Text, float Confidence, int X, int Y, int Width, int Height);
-        private sealed class RustOcrRecognitionException(string error) : InvalidOperationException($"Rust OCR识别失败：{error}");
+        private sealed class RustOcrRecognitionException(string error) : InfrastructureServiceException($"Rust OCR 识别失败：{error}");
     }
 
     internal sealed class BoundedTextLineReader : IDisposable

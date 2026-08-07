@@ -25,9 +25,10 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.Equal(Path.Combine(provider.AppRoot, "OcrModels"), provider.OcrModelRoot);
                 Assert.Equal(Path.Combine(provider.DataRoot, "Logs"), provider.LogRoot);
                 Assert.Equal(Path.Combine(provider.DataRoot, "WebView"), provider.WebViewRoot);
-                Assert.True(Directory.Exists(provider.DatabaseRoot));
-                Assert.True(Directory.Exists(provider.LogRoot));
-                Assert.True(Directory.Exists(provider.WebViewRoot));
+                Assert.False(Directory.Exists(provider.DataRoot));
+                Assert.False(Directory.Exists(provider.DatabaseRoot));
+                Assert.False(Directory.Exists(provider.LogRoot));
+                Assert.False(Directory.Exists(provider.WebViewRoot));
             }
             finally
             {
@@ -58,10 +59,11 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.Equal(Path.Combine(NormalizeRoot(dataRoot), "SingleWindow"), provider.SingleWindowRoot);
                 Assert.Equal(Path.Combine(NormalizeRoot(dataRoot), "Security"), provider.SecurityRoot);
                 Assert.Equal(Path.Combine(NormalizeRoot(dataRoot), "WebView"), provider.WebViewRoot);
-                Assert.True(Directory.Exists(provider.SingleWindowRoot));
-                Assert.True(Directory.Exists(provider.SecurityRoot));
-                Assert.True(Directory.Exists(provider.WebViewRoot));
-                Assert.True(Directory.Exists(provider.UserTemplateRoot));
+                Assert.True(Directory.Exists(provider.DataRoot));
+                Assert.False(Directory.Exists(provider.SingleWindowRoot));
+                Assert.False(Directory.Exists(provider.SecurityRoot));
+                Assert.False(Directory.Exists(provider.WebViewRoot));
+                Assert.False(Directory.Exists(provider.UserTemplateRoot));
             }
             finally
             {
@@ -89,7 +91,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 ];
 
                 Assert.All(stableResourcePaths, path => Assert.False(Directory.Exists(path)));
-                Assert.True(Directory.Exists(provider.DatabaseRoot));
+                Assert.False(Directory.Exists(provider.DatabaseRoot));
                 Assert.All(stableResourcePaths, path => Assert.False(Directory.Exists(path)));
             }
             finally

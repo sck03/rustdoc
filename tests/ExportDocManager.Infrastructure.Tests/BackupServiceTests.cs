@@ -116,6 +116,7 @@ namespace ExportDocManager.Infrastructure.Tests
             string appRoot = Path.Combine(root, "app");
             string dataRoot = Path.Combine(root, "data");
             var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
+            Directory.CreateDirectory(pathProvider.DatabaseRoot);
             string databasePath = Path.Combine(pathProvider.DatabaseRoot, "backup-test.db");
             var settings = new DatabaseConnectionSettings
             {

@@ -210,6 +210,44 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public void PrepareRuntimeDirectories_WhenAncestorIsLink_ShouldNotWriteOutsideBoundary()
+        {
+            string appRoot = CreateTempDirectory("edm-api-link-app");
+            string root = CreateTempDirectory("edm-api-link-root");
+            string externalRoot = CreateTempDirectory("edm-api-link-external");
+            string linkRoot = Path.Combine(root, "linked-data");
+            string dataRoot = Path.Combine(linkRoot, "business-data");
+
+            try
+            {
+                try
+                {
+                    Directory.CreateSymbolicLink(linkRoot, externalRoot);
+                }
+                catch (Exception ex) when (
+                    ex is IOException or
+                    UnauthorizedAccessException or
+                    PlatformNotSupportedException)
+                {
+                    return;
+                }
+
+                var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
+
+                Assert.Throws<InvalidOperationException>(
+                    () => ApiStartupValidator.PrepareRuntimeDirectories(pathProvider));
+                Assert.Empty(Directory.EnumerateFileSystemEntries(externalRoot));
+            }
+            finally
+            {
+                if (Directory.Exists(linkRoot)) Directory.Delete(linkRoot);
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(root);
+                DeleteDirectoryIfExists(externalRoot);
+            }
+        }
+
+        [Fact]
         public void ValidateLocalListenUrls_ShouldRejectLanOrWildcardAddresses()
         {
             Assert.Throws<InvalidOperationException>(
@@ -3018,6 +3056,7 @@ namespace ExportDocManager.Api.Tests
             try
             {
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
+                ApiStartupValidator.PrepareRuntimeDirectories(pathProvider);
                 var response = ApiHealthResponseFactory.Create(
                     pathProvider,
                     new DatabaseConnectionSettings(),

@@ -307,6 +307,8 @@ public sealed class SettingsServiceTests
             "settings-service-tests",
             $"edm-settings-{Guid.NewGuid():N}");
         Directory.CreateDirectory(path);
+        Directory.CreateDirectory(Path.Combine(path, "App_Data", "Config"));
+        Directory.CreateDirectory(Path.Combine(path, "App_Data", "Security"));
         return path;
     }
 

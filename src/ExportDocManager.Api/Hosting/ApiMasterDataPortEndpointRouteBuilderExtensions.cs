@@ -30,6 +30,26 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("ListPorts");
 
+            endpoints.MapGet("/api/master-data/ports/page", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                IPortReadRepository repository,
+                int pageNumber,
+                int pageSize,
+                string keyword,
+                CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                var page = await repository.QueryPageAsync(new PortReadQuery
+                {
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    Keyword = keyword ?? string.Empty
+                }, cancellationToken);
+                return Results.Ok(ApiMasterDataDtoFactory.FromPage(page, ApiMasterDataDtoFactory.FromPorts));
+            })
+            .WithName("ListPortsPage");
+
             endpoints.MapGet("/api/master-data/ports/{id:int}", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,

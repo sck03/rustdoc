@@ -2,6 +2,7 @@ using ExportDocManager.Services;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Tools;
 using ExportDocManager.Services.BrowserRuntime;
+using ExportDocManager.Services.Errors;
 
 namespace ExportDocManager.Services.Infrastructure
 {
@@ -39,7 +40,7 @@ namespace ExportDocManager.Services.Infrastructure
                     executablePath,
                     "Playwright 将通过受控 Chromium/CDP 连接执行 HS 查询降级；进程由应用登记、限流和退出清理。");
             }
-            catch (InvalidOperationException)
+            catch (InfrastructureServiceException)
             {
                 return new RuntimeDependencyDiagnostic(
                     "browser-automation",
@@ -66,7 +67,7 @@ namespace ExportDocManager.Services.Infrastructure
                     executablePath,
                     "报表 PDF 浏览器可执行文件已就绪。");
             }
-            catch (InvalidOperationException)
+            catch (InfrastructureServiceException)
             {
                 return new RuntimeDependencyDiagnostic(
                     "report-renderer",

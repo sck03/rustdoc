@@ -98,6 +98,48 @@ namespace ExportDocManager.Utils
             }
         }
 
+        public static string EnsureNoLinkLikeComponents(string path, string errorMessage)
+        {
+            string fullPath = Normalize(path);
+            string current = fullPath;
+            while (!string.IsNullOrWhiteSpace(current))
+            {
+                try
+                {
+                    FileAttributes attributes = File.GetAttributes(current);
+                    if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    {
+                        throw new UnauthorizedAccessException(
+                            $"{errorMessage} 路径不能经过符号链接、目录联接或其他重解析点：{current}");
+                    }
+                }
+                catch (FileNotFoundException)
+                {
+                }
+                catch (DirectoryNotFoundException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    throw;
+                }
+                catch (IOException ex)
+                {
+                    throw new UnauthorizedAccessException(errorMessage, ex);
+                }
+
+                string parent = Path.GetDirectoryName(current);
+                if (string.IsNullOrWhiteSpace(parent) ||
+                    string.Equals(parent, current, PathComparison))
+                {
+                    break;
+                }
+                current = parent;
+            }
+
+            return fullPath;
+        }
+
         public static string ResolveProtocolRelativePath(string root, string relativePath, string errorMessage)
         {
             if (string.IsNullOrWhiteSpace(relativePath))

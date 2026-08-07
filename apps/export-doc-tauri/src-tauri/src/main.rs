@@ -13,6 +13,7 @@ mod desktop_commands;
 mod log_rotation;
 mod runtime_layout;
 mod runtime_paths;
+mod runtime_tree_manifest;
 mod sidecar;
 mod tauri_updater_commands;
 mod window;

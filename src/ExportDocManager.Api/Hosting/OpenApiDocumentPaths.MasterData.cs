@@ -11,6 +11,10 @@ namespace ExportDocManager.Api.Hosting
                         "ApiCustomerDto",
                         "Create customer",
                         "createCustomer"),
+                    ["/api/master-data/customers/page"] = MasterDataPagedQueryPath(
+                        "List customers with server-side pagination",
+                        "listCustomersPage",
+                        "ApiCustomerDto"),
                     ["/api/master-data/customers/{id}"] = MasterDataDetailPath(
                         "Get customer",
                         "getCustomer",
@@ -26,6 +30,10 @@ namespace ExportDocManager.Api.Hosting
                         "ApiExporterDto",
                         "Create exporter",
                         "createExporter"),
+                    ["/api/master-data/exporters/page"] = MasterDataPagedQueryPath(
+                        "List exporters with server-side pagination",
+                        "listExportersPage",
+                        "ApiExporterDto"),
                     ["/api/master-data/exporters/{id}"] = MasterDataDetailPath(
                         "Get exporter",
                         "getExporter",
@@ -69,6 +77,10 @@ namespace ExportDocManager.Api.Hosting
                         "ApiPayeeDto",
                         "Create payee",
                         "createPayee"),
+                    ["/api/master-data/payees/page"] = MasterDataPagedQueryPath(
+                        "List payees with server-side pagination",
+                        "listPayeesPage",
+                        "ApiPayeeDto"),
                     ["/api/master-data/payees/{id}"] = MasterDataDetailPath(
                         "Get payee",
                         "getPayee",
@@ -99,6 +111,10 @@ namespace ExportDocManager.Api.Hosting
                         "ApiPortDto",
                         "Create port",
                         "createPort"),
+                    ["/api/master-data/ports/page"] = MasterDataPagedQueryPath(
+                        "List ports with server-side pagination",
+                        "listPortsPage",
+                        "ApiPortDto"),
                     ["/api/master-data/ports/{id}"] = MasterDataDetailPath(
                         "Get port",
                         "getPort",
@@ -114,6 +130,10 @@ namespace ExportDocManager.Api.Hosting
                         "ApiUnitDto",
                         "Create unit",
                         "createUnit"),
+                    ["/api/master-data/units/page"] = MasterDataPagedQueryPath(
+                        "List units with server-side pagination",
+                        "listUnitsPage",
+                        "ApiUnitDto"),
                     ["/api/master-data/units/{id}"] = MasterDataDetailPath(
                         "Get unit",
                         "getUnit",

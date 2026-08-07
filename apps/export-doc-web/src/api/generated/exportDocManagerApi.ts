@@ -1794,6 +1794,26 @@ export interface ApiPagedResponseOfApiCrmFollowUpDto {
   totalPages: number;
 }
 
+export interface ApiPagedResponseOfApiCustomerDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiCustomerDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface ApiPagedResponseOfApiExporterDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiExporterDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface ApiPagedResponseOfApiHsCodeDto {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
@@ -1814,10 +1834,30 @@ export interface ApiPagedResponseOfApiInvoiceListItemDto {
   totalPages: number;
 }
 
+export interface ApiPagedResponseOfApiPayeeDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiPayeeDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface ApiPagedResponseOfApiPaymentDto {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   items: ApiPaymentDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface ApiPagedResponseOfApiPortDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiPortDto[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
@@ -1858,6 +1898,16 @@ export interface ApiPagedResponseOfApiSupplierDto {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   items: ApiSupplierDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface ApiPagedResponseOfApiUnitDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiUnitDto[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
@@ -3956,6 +4006,12 @@ export interface ListCustomersRequest {
   keyword?: string;
 }
 
+export interface ListCustomersPageRequest {
+  keyword?: string;
+  pageNumber: number;
+  pageSize: number;
+}
+
 export interface ListCustomsCooProducerProfilesRequest {
   keyword?: string;
 }
@@ -3976,6 +4032,12 @@ export interface ListExchangeRatesRequest {
 
 export interface ListExportersRequest {
   keyword?: string;
+}
+
+export interface ListExportersPageRequest {
+  keyword?: string;
+  pageNumber: number;
+  pageSize: number;
 }
 
 export interface ListHsCodeKnowledgeExamplesRequest {
@@ -4020,6 +4082,12 @@ export interface ListPayeesRequest {
   keyword?: string;
 }
 
+export interface ListPayeesPageRequest {
+  keyword?: string;
+  pageNumber: number;
+  pageSize: number;
+}
+
 export interface ListPaymentsRequest {
   pageNumber?: number;
   pageSize?: number;
@@ -4028,6 +4096,12 @@ export interface ListPaymentsRequest {
 
 export interface ListPortsRequest {
   keyword?: string;
+}
+
+export interface ListPortsPageRequest {
+  keyword?: string;
+  pageNumber: number;
+  pageSize: number;
 }
 
 export interface ListProductsRequest {
@@ -4081,6 +4155,12 @@ export interface ListSupplierProductLinksRequest {
 
 export interface ListUnitsRequest {
   keyword?: string;
+}
+
+export interface ListUnitsPageRequest {
+  keyword?: string;
+  pageNumber: number;
+  pageSize: number;
 }
 
 export interface ListUserReportTemplateVersionsRequest {
@@ -5782,6 +5862,18 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listCustomersPage(request: ListCustomersPageRequest, init?: RequestInit): Promise<ApiPagedResponseOfApiCustomerDto> {
+    const path = "/api/master-data/customers/page";
+    return this.request<ApiPagedResponseOfApiCustomerDto>("GET", path, {
+      query: {
+        "keyword": request.keyword,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
   public listCustomsCooProducerProfiles(request: ListCustomsCooProducerProfilesRequest = {}, init?: RequestInit): Promise<ApiCustomsCooProducerProfileListResponse> {
     const path = "/api/single-window/coo/producer-profiles";
     return this.request<ApiCustomsCooProducerProfileListResponse>("GET", path, {
@@ -5834,6 +5926,18 @@ export class ExportDocManagerApiClient {
     return this.request<ApiExporterDto[]>("GET", path, {
       query: {
         "keyword": request.keyword,
+      },
+      init,
+    });
+  }
+
+  public listExportersPage(request: ListExportersPageRequest, init?: RequestInit): Promise<ApiPagedResponseOfApiExporterDto> {
+    const path = "/api/master-data/exporters/page";
+    return this.request<ApiPagedResponseOfApiExporterDto>("GET", path, {
+      query: {
+        "keyword": request.keyword,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
       },
       init,
     });
@@ -5918,6 +6022,18 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listPayeesPage(request: ListPayeesPageRequest, init?: RequestInit): Promise<ApiPagedResponseOfApiPayeeDto> {
+    const path = "/api/master-data/payees/page";
+    return this.request<ApiPagedResponseOfApiPayeeDto>("GET", path, {
+      query: {
+        "keyword": request.keyword,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
   public listPayments(request: ListPaymentsRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiPaymentDto> {
     const path = "/api/payments";
     return this.request<ApiPagedResponseOfApiPaymentDto>("GET", path, {
@@ -5940,6 +6056,18 @@ export class ExportDocManagerApiClient {
     return this.request<ApiPortDto[]>("GET", path, {
       query: {
         "keyword": request.keyword,
+      },
+      init,
+    });
+  }
+
+  public listPortsPage(request: ListPortsPageRequest, init?: RequestInit): Promise<ApiPagedResponseOfApiPortDto> {
+    const path = "/api/master-data/ports/page";
+    return this.request<ApiPagedResponseOfApiPortDto>("GET", path, {
+      query: {
+        "keyword": request.keyword,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
       },
       init,
     });
@@ -6037,6 +6165,18 @@ export class ExportDocManagerApiClient {
     return this.request<ApiUnitDto[]>("GET", path, {
       query: {
         "keyword": request.keyword,
+      },
+      init,
+    });
+  }
+
+  public listUnitsPage(request: ListUnitsPageRequest, init?: RequestInit): Promise<ApiPagedResponseOfApiUnitDto> {
+    const path = "/api/master-data/units/page";
+    return this.request<ApiPagedResponseOfApiUnitDto>("GET", path, {
+      query: {
+        "keyword": request.keyword,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
       },
       init,
     });

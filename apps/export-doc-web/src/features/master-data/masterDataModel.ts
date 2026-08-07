@@ -1,6 +1,5 @@
 import type { ApiHsCodeDto,ApiHsCodeRemoteDetailResolutionResponse,ApiProductDto,ApiUnitDto } from "../../api/index.ts";
 import { normalizeText,numberValue } from "../../ui/formUtils.ts";
-import { normalizeListPageSize } from "../../ui/listViewState.ts";
 import type {
 MasterDataColumnDefinition,
 MasterDataEntityConfig,
@@ -436,25 +435,6 @@ export function normalizeMixedFields(
   }
 
   return next;
-}
-
-export function normalizeArrayPage(rows: MasterDataRecord[], pageNumber: number, requestedPageSize: number) {
-  const pageSize = normalizeListPageSize(requestedPageSize);
-  const totalCount = rows.length;
-  const totalPages = Math.max(Math.ceil(totalCount / pageSize), 1);
-  const safePageNumber = Math.min(Math.max(pageNumber, 1), totalPages);
-  const startIndex = (safePageNumber - 1) * pageSize;
-  const items = rows.slice(startIndex, startIndex + pageSize);
-
-  return {
-    hasNextPage: safePageNumber < totalPages,
-    hasPreviousPage: safePageNumber > 1,
-    items,
-    pageNumber: safePageNumber,
-    pageSize,
-    totalCount,
-    totalPages,
-  };
 }
 
 export function encodeRouteId(value: string | number) {

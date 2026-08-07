@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 
 namespace ExportDocManager.Services.BrowserRuntime
 {
@@ -39,7 +40,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             {
                 string fullPath = Path.GetFullPath(configuredPath.Trim().Trim('"'));
                 if (File.Exists(fullPath)) return fullPath;
-                throw new InvalidOperationException($"{ChromiumExecutableEnvironmentVariable} 指向的 Chromium 可执行文件不存在：{fullPath}");
+                throw new InfrastructureServiceException($"{ChromiumExecutableEnvironmentVariable} 指向的 Chromium 可执行文件不存在：{fullPath}");
             }
 
             foreach (string relativePath in PreferredRelativeExecutables)
@@ -58,7 +59,7 @@ namespace ExportDocManager.Services.BrowserRuntime
                 }
             }
 
-            throw new InvalidOperationException(
+            throw new InfrastructureServiceException(
                 "未找到可用 Chromium。请把 Chrome Headless Shell、Chromium 或 Chrome for Testing 放在程序运行目录 Browsers/，或显式设置 EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE。程序不会自动下载到系统盘。");
         }
     }

@@ -31,6 +31,26 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("ListExporters");
 
+            endpoints.MapGet("/api/master-data/exporters/page", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                IExporterReadRepository repository,
+                int pageNumber,
+                int pageSize,
+                string keyword,
+                CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                var page = await repository.QueryPageAsync(new ExporterReadQuery
+                {
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    Keyword = keyword ?? string.Empty
+                }, cancellationToken);
+                return Results.Ok(ApiMasterDataDtoFactory.FromPage(page, ApiMasterDataDtoFactory.FromExporters));
+            })
+            .WithName("ListExportersPage");
+
             endpoints.MapGet("/api/master-data/exporters/{id:int}", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,

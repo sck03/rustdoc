@@ -39,6 +39,48 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task SharedMasterDataQueryPageAsync_ShouldReturnStableDatabasePages()
+        {
+            using var factory = new TestDbContextFactory();
+            await using (var context = await factory.CreateDbContextAsync())
+            {
+                foreach (int index in Enumerable.Range(1, 25))
+                {
+                    context.Customers.Add(new Customer { CustomerNameEN = $"Customer {index:00}" });
+                    context.Exporters.Add(new Exporter { ExporterNameEN = $"Exporter {index:00}" });
+                    context.Payees.Add(new Payee { Category = "Supplier", Name = $"Payee {index:00}" });
+                    context.Ports.Add(new Port { NameEN = $"Port {index:00}" });
+                    context.Units.Add(new Unit { NameEN = $"Unit {index:00}" });
+                }
+
+                await context.SaveChangesAsync();
+            }
+
+            var repository = new LocalMasterDataReadRepository(factory);
+            var customers = await ((ICustomerReadRepository)repository).QueryPageAsync(
+                new CustomerReadQuery { PageNumber = 2, PageSize = 10 });
+            var exporters = await ((IExporterReadRepository)repository).QueryPageAsync(
+                new ExporterReadQuery { PageNumber = 2, PageSize = 10 });
+            var payees = await ((IPayeeReadRepository)repository).QueryPageAsync(
+                new PayeeReadQuery { PageNumber = 2, PageSize = 10 });
+            var ports = await ((IPortReadRepository)repository).QueryPageAsync(
+                new PortReadQuery { PageNumber = 2, PageSize = 10 });
+            var units = await ((IUnitReadRepository)repository).QueryPageAsync(
+                new UnitReadQuery { PageNumber = 2, PageSize = 10 });
+
+            Assert.Equal((25, 2, 10, "Customer 11"),
+                (customers.TotalCount, customers.PageNumber, customers.Items.Count, customers.Items[0].CustomerNameEN));
+            Assert.Equal((25, 2, 10, "Exporter 11"),
+                (exporters.TotalCount, exporters.PageNumber, exporters.Items.Count, exporters.Items[0].ExporterNameEN));
+            Assert.Equal((25, 2, 10, "Payee 11"),
+                (payees.TotalCount, payees.PageNumber, payees.Items.Count, payees.Items[0].Name));
+            Assert.Equal((25, 2, 10, "Port 11"),
+                (ports.TotalCount, ports.PageNumber, ports.Items.Count, ports.Items[0].NameEN));
+            Assert.Equal((25, 2, 10, "Unit 11"),
+                (units.TotalCount, units.PageNumber, units.Items.Count, units.Items[0].NameEN));
+        }
+
+        [Fact]
         public async Task QueryPageAsync_ShouldMatchFormattedHsCodeByNormalizedCode()
         {
             using var factory = new TestDbContextFactory();

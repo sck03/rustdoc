@@ -1507,6 +1507,34 @@
 }
 
 @media (max-width: 480px) {
+  .workspace-nav {
+    padding: 7px 10px;
+  }
+
+  .brand-mark {
+    min-height: 36px;
+    padding: 0 6px;
+    font-size: var(--edm-font-size-md);
+  }
+
+  .workspace-header {
+    min-height: 58px;
+    padding: 7px 10px;
+  }
+
+  .workspace-title-block h1 {
+    font-size: var(--edm-font-size-xl);
+    line-height: 1.2;
+  }
+
+  .workspace-header .eyebrow {
+    max-width: min(58vw, 240px);
+    overflow: hidden;
+    font-size: var(--edm-font-size-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .login-screen {
     padding: 16px 10px;
   }

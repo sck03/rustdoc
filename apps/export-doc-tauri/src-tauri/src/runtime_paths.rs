@@ -11,6 +11,8 @@ use std::{
 
 use tauri::Manager;
 
+use crate::runtime_tree_manifest::{collect_tree_manifest, TreeManifest};
+
 const RUNTIME_PATHS_CONFIG_FILE_NAME: &str = "runtime-paths.json";
 const RUNTIME_PATHS_CONFIG_BACKUP_FILE_NAME: &str = "runtime-paths.json.bak";
 const RUNTIME_PATHS_CONFIG_SCHEMA_VERSION: u32 = 1;
@@ -19,7 +21,7 @@ const PORTABLE_RUNTIME_MARKER_FILE_NAME: &str = "portable-runtime.json";
 const RUNTIME_LAYOUT_MANIFEST_FILE_NAME: &str = "runtime-layout.json";
 const DATA_ROOT_MIGRATION_MARKER_FILE_NAME: &str = "pending-data-root-migration.json";
 const DATA_ROOT_MIGRATION_COMPLETE_FILE_NAME: &str = ".exportdoc-data-root-migration-complete";
-const DATA_ROOT_MIGRATION_SCHEMA_VERSION: u32 = 1;
+const DATA_ROOT_MIGRATION_SCHEMA_VERSION: u32 = 2;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -37,6 +39,16 @@ struct PendingDataRootMigration {
     source_root: String,
     target_root: String,
     requested_at_unix_seconds: u64,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CompletedDataRootMigration {
+    schema_version: u32,
+    source_root: String,
+    target_root: String,
+    requested_at_unix_seconds: u64,
+    source_manifest: TreeManifest,
 }
 
 #[derive(serde::Deserialize)]
@@ -283,6 +295,8 @@ pub(crate) fn schedule_data_root_migration(
 
     let source_root = canonical_runtime_data_root(&paths.data_root, true)?;
     ensure_expected_runtime_data_root(&source_root)?;
+    validate_migration_root_shape(requested_target, "targetRoot")?;
+    reject_link_like_path(requested_target)?;
     ensure_directory(requested_target)?;
     reject_link_like_path(requested_target)?;
     let target_root = canonical_runtime_data_root(requested_target, false)?;
@@ -343,6 +357,7 @@ fn apply_pending_data_root_migration(runtime_config_root: &Path) -> Result<(), B
     ensure_expected_runtime_data_root(&source_root)?;
     reject_link_like_path(&source_root)?;
 
+    reject_link_like_path(&target_root)?;
     ensure_directory(&target_root)?;
     reject_link_like_path(&target_root)?;
     let target_root = canonical_runtime_data_root(&target_root, false)?;
@@ -379,21 +394,30 @@ fn apply_pending_data_root_migration(runtime_config_root: &Path) -> Result<(), B
     }
 
     copy_directory_tree(&source_root, &staging_root)?;
-    let source_stats = collect_tree_stats(&source_root, None)?;
-    let staging_stats = collect_tree_stats(&staging_root, None)?;
-    if source_stats != staging_stats {
+    let source_manifest = collect_tree_manifest(&source_root, None)?;
+    let staging_manifest = collect_tree_manifest(&staging_root, None)?;
+    if source_manifest != staging_manifest {
         return Err(format!(
-            "Data-root migration verification failed: source has {} files / {} bytes, staging has {} files / {} bytes.",
-            source_stats.file_count,
-            source_stats.total_bytes,
-            staging_stats.file_count,
-            staging_stats.total_bytes
+            "Data-root migration verification failed: source has {} files / {} bytes / SHA-256 {}, staging has {} files / {} bytes / SHA-256 {}.",
+            source_manifest.file_count,
+            source_manifest.total_bytes,
+            source_manifest.sha256,
+            staging_manifest.file_count,
+            staging_manifest.total_bytes,
+            staging_manifest.sha256
         )
         .into());
     }
 
     let completion_path = staging_root.join(DATA_ROOT_MIGRATION_COMPLETE_FILE_NAME);
-    let completion_text = format!("{}\n", serde_json::to_string_pretty(&migration)?);
+    let completion = CompletedDataRootMigration {
+        schema_version: migration.schema_version,
+        source_root: migration.source_root.clone(),
+        target_root: migration.target_root.clone(),
+        requested_at_unix_seconds: migration.requested_at_unix_seconds,
+        source_manifest,
+    };
+    let completion_text = format!("{}\n", serde_json::to_string_pretty(&completion)?);
     write_new_file_atomically(&completion_path, completion_text.as_bytes())?;
     sync_directory(&staging_root);
     fs::rename(&staging_root, &target_root).map_err(|error| {
@@ -404,6 +428,12 @@ fn apply_pending_data_root_migration(runtime_config_root: &Path) -> Result<(), B
         )
     })?;
     sync_directory(target_root.parent().unwrap_or(Path::new(".")));
+
+    if !migration_completion_matches(&target_root, &migration)? {
+        return Err(
+            "Activated data-root migration failed its final SHA-256 manifest verification.".into(),
+        );
+    }
 
     finish_activated_data_root_migration(
         runtime_config_root,
@@ -688,11 +718,22 @@ fn migration_completion_matches(
         return Ok(false);
     }
 
-    let completed = read_pending_data_root_migration(&completion_path)?;
-    Ok(completed.schema_version == expected.schema_version
+    let completion_text = fs::read_to_string(&completion_path)?;
+    let completed: CompletedDataRootMigration = serde_json::from_str(&completion_text)?;
+    if completed.schema_version != DATA_ROOT_MIGRATION_SCHEMA_VERSION {
+        return Ok(false);
+    }
+    let metadata_matches = completed.schema_version == expected.schema_version
         && completed.source_root == expected.source_root
         && completed.target_root == expected.target_root
-        && completed.requested_at_unix_seconds == expected.requested_at_unix_seconds)
+        && completed.requested_at_unix_seconds == expected.requested_at_unix_seconds;
+    if !metadata_matches {
+        return Ok(false);
+    }
+
+    let target_manifest =
+        collect_tree_manifest(target_root, Some(DATA_ROOT_MIGRATION_COMPLETE_FILE_NAME))?;
+    Ok(target_manifest == completed.source_manifest)
 }
 
 fn data_root_migration_staging_path(
@@ -752,6 +793,7 @@ fn write_new_file_atomically(target_path: &Path, content: &[u8]) -> Result<(), B
 
 fn ensure_runtime_data_root_is_usable(data_root: &Path) -> Result<(), Box<dyn Error>> {
     validate_migration_root_shape(data_root, "dataRoot")?;
+    reject_link_like_path(data_root)?;
     ensure_runtime_data_directories(data_root)?;
     reject_link_like_path(data_root)?;
     probe_writable_directory(data_root)
@@ -958,50 +1000,6 @@ fn copy_directory_tree(source: &Path, target: &Path) -> Result<(), Box<dyn Error
     Ok(())
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
-struct TreeStats {
-    file_count: u64,
-    total_bytes: u64,
-}
-
-fn collect_tree_stats(
-    path: &Path,
-    excluded_name: Option<&str>,
-) -> Result<TreeStats, Box<dyn Error>> {
-    let mut stats = TreeStats::default();
-    collect_tree_stats_into(path, excluded_name, &mut stats)?;
-    Ok(stats)
-}
-
-fn collect_tree_stats_into(
-    path: &Path,
-    excluded_name: Option<&str>,
-    stats: &mut TreeStats,
-) -> Result<(), Box<dyn Error>> {
-    for entry in fs::read_dir(path)? {
-        let entry = entry?;
-        if excluded_name.is_some_and(|name| entry.file_name() == name) {
-            continue;
-        }
-        let entry_path = entry.path();
-        let metadata = fs::symlink_metadata(&entry_path)?;
-        if metadata.file_type().is_symlink() || is_windows_reparse_point(&metadata) {
-            return Err(format!(
-                "Link-like entry '{}' is not supported.",
-                entry_path.display()
-            )
-            .into());
-        }
-        if metadata.is_dir() {
-            collect_tree_stats_into(&entry_path, excluded_name, stats)?;
-        } else if metadata.is_file() {
-            stats.file_count += 1;
-            stats.total_bytes = stats.total_bytes.saturating_add(metadata.len());
-        }
-    }
-    Ok(())
-}
-
 fn sync_directory(path: &Path) {
     if let Ok(directory) = fs::File::open(path) {
         let _ = directory.sync_all();
@@ -1038,7 +1036,7 @@ fn prompt_for_runtime_data_root(
             )
         })?;
 
-    ensure_runtime_data_directories(&selected)?;
+    ensure_runtime_data_root_is_usable(&selected)?;
     Ok(selected)
 }
 

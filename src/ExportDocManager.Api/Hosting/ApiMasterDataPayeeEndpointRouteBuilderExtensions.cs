@@ -30,6 +30,26 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("ListPayees");
 
+            endpoints.MapGet("/api/master-data/payees/page", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                IPayeeReadRepository repository,
+                int pageNumber,
+                int pageSize,
+                string keyword,
+                CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                var page = await repository.QueryPageAsync(new PayeeReadQuery
+                {
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    Keyword = keyword ?? string.Empty
+                }, cancellationToken);
+                return Results.Ok(ApiMasterDataDtoFactory.FromPage(page, ApiMasterDataDtoFactory.FromPayees));
+            })
+            .WithName("ListPayeesPage");
+
             endpoints.MapGet("/api/master-data/payees/{id:int}", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,

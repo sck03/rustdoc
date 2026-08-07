@@ -1,8 +1,13 @@
 namespace ExportDocManager.Models.DTOs
 {
-    public abstract record SharedKeywordReadQuery
+    public abstract record SharedKeywordReadQuery : SharedDatabasePagedQuery
     {
         public string Keyword { get; init; } = string.Empty;
+
+        /// <summary>用于下拉选项等非分页读取的安全上限。</summary>
+        public int MaxCount { get; init; } = 200;
+
+        public bool ReturnAll { get; init; }
     }
 
     public sealed record CustomerReadQuery : SharedKeywordReadQuery;

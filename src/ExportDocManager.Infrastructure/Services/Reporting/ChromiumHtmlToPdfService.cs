@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using ExportDocManager.Services.BrowserRuntime;
 using Microsoft.Playwright;
@@ -69,7 +70,7 @@ namespace ExportDocManager.Services.Reporting
 
                 if (!File.Exists(pdfPath) || new FileInfo(pdfPath).Length == 0)
                 {
-                    throw new InvalidOperationException("Chromium 未生成有效的 PDF 文件。");
+                    throw new InfrastructureServiceException("Chromium 未生成有效的 PDF 文件。");
                 }
 
                 await AtomicFileHelper.WriteFileAtomicAsync(
@@ -283,7 +284,7 @@ namespace ExportDocManager.Services.Reporting
             if (!int.TryParse(configuredSeconds.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int seconds)
                 || seconds <= 0)
             {
-                throw new InvalidOperationException($"{ChromiumTimeoutEnvironmentVariable} 必须配置为大于 0 的整数秒数。");
+                throw new ServiceValidationException($"{ChromiumTimeoutEnvironmentVariable} 必须配置为大于 0 的整数秒数。");
             }
 
             return TimeSpan.FromSeconds(seconds);

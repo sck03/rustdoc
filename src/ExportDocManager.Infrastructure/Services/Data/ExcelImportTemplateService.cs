@@ -315,7 +315,7 @@ namespace ExportDocManager.Services.Data
                 return configuredExporterNameCn;
             }
 
-            var exporterNames = _exporterReadRepository.QueryAsync(new ExporterReadQuery())
+            var exporterNames = _exporterReadRepository.QueryAsync(new ExporterReadQuery { ReturnAll = true })
                 .GetAwaiter()
                 .GetResult()
                 .Select(exporter => exporter?.ExporterNameCN?.Trim())

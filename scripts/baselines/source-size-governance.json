@@ -23,6 +23,13 @@
       "maximumLines": 700
     },
     {
+      "name": "built-in Excel analyzer partials",
+      "directory": "src/ExportDocManager.Infrastructure/Services/Data",
+      "filePattern": "^BuiltInExcelImportAnalyzer(?:\\..+)?\\.cs$",
+      "maximumLines": 600,
+      "maximumAggregateLines": 1550
+    },
+    {
       "name": "maintenance settings panels",
       "directory": "apps/export-doc-web/src/features/settings",
       "filePattern": "^Maintenance.*\\.tsx$",

@@ -54,6 +54,17 @@ public sealed class ApiServiceExceptionMapperTests
     }
 
     [Fact]
+    public void Map_ShouldPreserveExplicitServiceTimeoutWhenInnerExceptionIsInfrastructureTimeout()
+    {
+        (int status, string message) = ApiServiceExceptionMapper.Map(
+            new ServiceTimeoutException("renderer timed out", new TimeoutException("process wait")),
+            "correlation-test");
+
+        Assert.Equal(StatusCodes.Status504GatewayTimeout, status);
+        Assert.Equal("renderer timed out", message);
+    }
+
+    [Fact]
     public void Map_ShouldTreatMissingFileAsNotFound()
     {
         (int status, string message) = ApiServiceExceptionMapper.Map(
@@ -103,6 +114,8 @@ public sealed class ApiServiceExceptionMapperTests
         { new ServiceValidationException("validation"), StatusCodes.Status400BadRequest },
         { new ResourceNotFoundException("missing"), StatusCodes.Status404NotFound },
         { new PermissionDeniedException("forbidden"), StatusCodes.Status403Forbidden },
+        { new ServiceBusyException("busy"), StatusCodes.Status429TooManyRequests },
+        { new ServiceTimeoutException("timeout"), StatusCodes.Status504GatewayTimeout },
         { new ResourceConflictException("conflict"), StatusCodes.Status409Conflict },
         { new ServiceConcurrencyException("concurrency"), StatusCodes.Status409Conflict },
         { new InfrastructureServiceException("unavailable"), StatusCodes.Status503ServiceUnavailable }

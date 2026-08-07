@@ -18,8 +18,14 @@ namespace ExportDocManager.Api.Hosting
 
             ValidateListenUrls(runtimeOptions, databaseSettings);
             ValidateBootstrapToken(runtimeOptions, databaseSettings);
-            ValidateRuntimeDirectories(pathProvider);
+            PrepareRuntimeDirectories(pathProvider);
             ValidateDatabasePath(pathProvider, databaseSettings);
+        }
+
+        public static void PrepareRuntimeDirectories(IAppPathProvider pathProvider)
+        {
+            ArgumentNullException.ThrowIfNull(pathProvider);
+            ValidateRuntimeDirectories(pathProvider);
         }
 
         public static void ValidateLocalListenUrls(string listenUrls)
@@ -115,6 +121,24 @@ namespace ExportDocManager.Api.Hosting
             }
 
             string dataRoot = pathProvider.DataRoot;
+            if (Path.GetPathRoot(dataRoot)?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                .Equals(dataRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    PathBoundaryHelper.PathComparison) == true)
+            {
+                throw new InvalidOperationException("业务数据目录不能是文件系统根目录。");
+            }
+
+            try
+            {
+                PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                    dataRoot,
+                    "业务数据目录不能包含符号链接或 Windows 重解析点。");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                throw new InvalidOperationException(ex.Message, ex);
+            }
+
             var managedDirectories = new (string Path, string Description)[]
             {
                 (dataRoot, "业务数据目录"),

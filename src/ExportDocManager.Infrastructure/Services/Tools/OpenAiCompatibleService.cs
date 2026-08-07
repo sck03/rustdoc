@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Tools
@@ -42,7 +43,7 @@ namespace ExportDocManager.Services.Tools
             // Allow empty API Key only for loopback endpoints (like Ollama on localhost).
             if (string.IsNullOrWhiteSpace(apiKey) && !endpoint.IsLoopback)
             {
-                throw new InvalidOperationException("AI API Key 未配置，请先到“系统设置 > AI 审查配置”中填写。");
+                throw new ServiceValidationException("AI API Key 未配置，请先到“系统设置 > AI 审查配置”中填写。");
             }
 
             var systemPrompt = string.IsNullOrWhiteSpace(aiSettings.SystemPrompt) 
@@ -98,7 +99,7 @@ namespace ExportDocManager.Services.Tools
                 }
             }
 
-            throw new InvalidOperationException("Failed to parse AI response.");
+            throw new InfrastructureServiceException("AI 服务返回了无法解析的响应。");
         }
 
         private static Uri BuildEndpointUri(string endpoint)
@@ -106,7 +107,7 @@ namespace ExportDocManager.Services.Tools
             if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) ||
                 (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
             {
-                throw new InvalidOperationException("AI 接口地址无效，请在“系统设置 > AI 审查配置”中填写完整的 http/https 地址。");
+                throw new ServiceValidationException("AI 接口地址无效，请在“系统设置 > AI 审查配置”中填写完整的 http/https 地址。");
             }
 
             return uri;

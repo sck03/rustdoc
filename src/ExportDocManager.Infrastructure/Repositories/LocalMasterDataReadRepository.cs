@@ -33,7 +33,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var keyword = TextSearchHelper.NormalizeFilter(query?.Keyword);
-            return await _accessScope.ApplyCustomerScope(context.Customers
+            IQueryable<Customer> customerQuery = _accessScope.ApplyCustomerScope(context.Customers
                 .AsNoTracking()
                 .AsQueryable())
                 .ApplyKeywordSearch(
@@ -46,14 +46,35 @@ namespace ExportDocManager.Services.Infrastructure
                     customer => customer.TaxId)
                 .OrderBy(customer => customer.CustomerNameEN)
                 .ThenBy(customer => customer.NotifyPartyName)
-                .ToListAsync(cancellationToken);
+                .ThenBy(customer => customer.Id);
+            if (query?.ReturnAll != true)
+            {
+                customerQuery = customerQuery.Take(Math.Clamp(query?.MaxCount ?? 200, 1, 500));
+            }
+            return await customerQuery.ToListAsync(cancellationToken);
+        }
+
+        public async Task<PagedResult<Customer>> QueryPageAsync(CustomerReadQuery query, CancellationToken cancellationToken = default)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var normalized = query ?? new CustomerReadQuery();
+            int pageNumber = Math.Max(1, normalized.PageNumber);
+            int pageSize = Math.Clamp(normalized.PageSize <= 0 ? 50 : normalized.PageSize, 1, 200);
+            string keyword = TextSearchHelper.NormalizeFilter(normalized.Keyword);
+            var rows = _accessScope.ApplyCustomerScope(context.Customers.AsNoTracking())
+                .ApplyKeywordSearch(keyword, customer => customer.CustomerNameEN, customer => customer.NotifyPartyName,
+                    customer => customer.ContactPerson, customer => customer.Phone, customer => customer.Email, customer => customer.TaxId)
+                .OrderBy(customer => customer.CustomerNameEN).ThenBy(customer => customer.NotifyPartyName).ThenBy(customer => customer.Id);
+            int totalCount = await rows.CountAsync(cancellationToken);
+            var items = await rows.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+            return new PagedResult<Customer>(items, totalCount, pageNumber, pageSize);
         }
 
         public async Task<IReadOnlyList<Exporter>> QueryAsync(ExporterReadQuery query, CancellationToken cancellationToken = default)
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var keyword = TextSearchHelper.NormalizeFilter(query?.Keyword);
-            return await _accessScope.ApplyExporterScope(context.Exporters
+            IQueryable<Exporter> exporterQuery = _accessScope.ApplyExporterScope(context.Exporters
                 .AsNoTracking()
                 .AsQueryable())
                 .ApplyKeywordSearch(
@@ -67,14 +88,36 @@ namespace ExportDocManager.Services.Infrastructure
                     exporter => exporter.BankName)
                 .OrderBy(exporter => exporter.ExporterNameEN)
                 .ThenBy(exporter => exporter.ExporterNameCN)
-                .ToListAsync(cancellationToken);
+                .ThenBy(exporter => exporter.Id);
+            if (query?.ReturnAll != true)
+            {
+                exporterQuery = exporterQuery.Take(Math.Clamp(query?.MaxCount ?? 200, 1, 500));
+            }
+            return await exporterQuery.ToListAsync(cancellationToken);
+        }
+
+        public async Task<PagedResult<Exporter>> QueryPageAsync(ExporterReadQuery query, CancellationToken cancellationToken = default)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var normalized = query ?? new ExporterReadQuery();
+            int pageNumber = Math.Max(1, normalized.PageNumber);
+            int pageSize = Math.Clamp(normalized.PageSize <= 0 ? 50 : normalized.PageSize, 1, 200);
+            string keyword = TextSearchHelper.NormalizeFilter(normalized.Keyword);
+            var rows = _accessScope.ApplyExporterScope(context.Exporters.AsNoTracking())
+                .ApplyKeywordSearch(keyword, exporter => exporter.ExporterNameEN, exporter => exporter.ExporterNameCN,
+                    exporter => exporter.ContactPerson, exporter => exporter.CreditCode, exporter => exporter.CustomsCode,
+                    exporter => exporter.Phone, exporter => exporter.BankName)
+                .OrderBy(exporter => exporter.ExporterNameEN).ThenBy(exporter => exporter.ExporterNameCN).ThenBy(exporter => exporter.Id);
+            int totalCount = await rows.CountAsync(cancellationToken);
+            var items = await rows.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+            return new PagedResult<Exporter>(items, totalCount, pageNumber, pageSize);
         }
 
         public async Task<IReadOnlyList<Payee>> QueryAsync(PayeeReadQuery query, CancellationToken cancellationToken = default)
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var keyword = TextSearchHelper.NormalizeFilter(query?.Keyword);
-            return await context.Payees
+            IQueryable<Payee> payeeQuery = context.Payees
                 .AsNoTracking()
                 .AsQueryable()
                 .ApplyKeywordSearch(
@@ -89,7 +132,28 @@ namespace ExportDocManager.Services.Infrastructure
                     payee => payee.Notes)
                 .OrderBy(payee => payee.Category)
                 .ThenBy(payee => payee.Name)
-                .ToListAsync(cancellationToken);
+                .ThenBy(payee => payee.Id);
+            if (query?.ReturnAll != true)
+            {
+                payeeQuery = payeeQuery.Take(Math.Clamp(query?.MaxCount ?? 200, 1, 500));
+            }
+            return await payeeQuery.ToListAsync(cancellationToken);
+        }
+
+        public async Task<PagedResult<Payee>> QueryPageAsync(PayeeReadQuery query, CancellationToken cancellationToken = default)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var normalized = query ?? new PayeeReadQuery();
+            int pageNumber = Math.Max(1, normalized.PageNumber);
+            int pageSize = Math.Clamp(normalized.PageSize <= 0 ? 50 : normalized.PageSize, 1, 200);
+            string keyword = TextSearchHelper.NormalizeFilter(normalized.Keyword);
+            var rows = context.Payees.AsNoTracking()
+                .ApplyKeywordSearch(keyword, payee => payee.Category, payee => payee.Name, payee => payee.BankName,
+                    payee => payee.RMBAccount, payee => payee.USDAccount, payee => payee.ContactPerson, payee => payee.Phone, payee => payee.Notes)
+                .OrderBy(payee => payee.Category).ThenBy(payee => payee.Name).ThenBy(payee => payee.Id);
+            int totalCount = await rows.CountAsync(cancellationToken);
+            var items = await rows.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+            return new PagedResult<Payee>(items, totalCount, pageNumber, pageSize);
         }
 
         public async Task<IReadOnlyList<Product>> QueryAsync(ProductReadQuery query, CancellationToken cancellationToken = default)
@@ -153,26 +217,66 @@ namespace ExportDocManager.Services.Infrastructure
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var keyword = TextSearchHelper.NormalizeFilter(query?.Keyword);
-            return await context.Ports
+            IQueryable<Port> portQuery = context.Ports
                 .AsNoTracking()
                 .AsQueryable()
                 .ApplyKeywordSearch(keyword, port => port.NameEN, port => port.NameCN, port => port.Country, port => port.Code)
                 .OrderBy(port => port.NameEN)
                 .ThenBy(port => port.NameCN)
-                .ToListAsync(cancellationToken);
+                .ThenBy(port => port.Id);
+            if (query?.ReturnAll != true)
+            {
+                portQuery = portQuery.Take(Math.Clamp(query?.MaxCount ?? 200, 1, 500));
+            }
+            return await portQuery.ToListAsync(cancellationToken);
+        }
+
+        public async Task<PagedResult<Port>> QueryPageAsync(PortReadQuery query, CancellationToken cancellationToken = default)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var normalized = query ?? new PortReadQuery();
+            int pageNumber = Math.Max(1, normalized.PageNumber);
+            int pageSize = Math.Clamp(normalized.PageSize <= 0 ? 50 : normalized.PageSize, 1, 200);
+            string keyword = TextSearchHelper.NormalizeFilter(normalized.Keyword);
+            var rows = context.Ports.AsNoTracking()
+                .ApplyKeywordSearch(keyword, port => port.NameEN, port => port.NameCN, port => port.Country, port => port.Code)
+                .OrderBy(port => port.NameEN).ThenBy(port => port.NameCN).ThenBy(port => port.Id);
+            int totalCount = await rows.CountAsync(cancellationToken);
+            var items = await rows.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+            return new PagedResult<Port>(items, totalCount, pageNumber, pageSize);
         }
 
         public async Task<IReadOnlyList<Unit>> QueryAsync(UnitReadQuery query, CancellationToken cancellationToken = default)
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var keyword = TextSearchHelper.NormalizeFilter(query?.Keyword);
-            return await context.Units
+            IQueryable<Unit> unitQuery = context.Units
                 .AsNoTracking()
                 .AsQueryable()
                 .ApplyKeywordSearch(keyword, unit => unit.NameEN, unit => unit.NameCN, unit => unit.Code)
                 .OrderBy(unit => unit.NameEN)
                 .ThenBy(unit => unit.NameCN)
-                .ToListAsync(cancellationToken);
+                .ThenBy(unit => unit.Id);
+            if (query?.ReturnAll != true)
+            {
+                unitQuery = unitQuery.Take(Math.Clamp(query?.MaxCount ?? 200, 1, 500));
+            }
+            return await unitQuery.ToListAsync(cancellationToken);
+        }
+
+        public async Task<PagedResult<Unit>> QueryPageAsync(UnitReadQuery query, CancellationToken cancellationToken = default)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var normalized = query ?? new UnitReadQuery();
+            int pageNumber = Math.Max(1, normalized.PageNumber);
+            int pageSize = Math.Clamp(normalized.PageSize <= 0 ? 50 : normalized.PageSize, 1, 200);
+            string keyword = TextSearchHelper.NormalizeFilter(normalized.Keyword);
+            var rows = context.Units.AsNoTracking()
+                .ApplyKeywordSearch(keyword, unit => unit.NameEN, unit => unit.NameCN, unit => unit.Code)
+                .OrderBy(unit => unit.NameEN).ThenBy(unit => unit.NameCN).ThenBy(unit => unit.Id);
+            int totalCount = await rows.CountAsync(cancellationToken);
+            var items = await rows.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+            return new PagedResult<Unit>(items, totalCount, pageNumber, pageSize);
         }
 
         public async Task<IReadOnlyList<HsCode>> QueryAsync(HsCodeReadQuery query, CancellationToken cancellationToken = default)

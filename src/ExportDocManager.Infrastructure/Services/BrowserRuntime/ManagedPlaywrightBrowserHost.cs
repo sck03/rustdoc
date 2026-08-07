@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Playwright;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 
@@ -100,7 +101,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             {
                 recycleBrowser = true;
                 string operationName = workload == BrowserWorkloadKind.PdfRendering ? "PDF 渲染" : "自动化";
-                throw new InvalidOperationException($"浏览器{operationName}超过 {Math.Ceiling(timeout.TotalSeconds)} 秒，已关闭本任务页面；受控浏览器将在其他并行页面结束后安全回收。");
+                throw new ServiceTimeoutException($"浏览器{operationName}超过 {Math.Ceiling(timeout.TotalSeconds)} 秒，已关闭本任务页面；受控浏览器将在其他并行页面结束后安全回收。");
             }
             catch
             {
@@ -175,6 +176,28 @@ namespace ExportDocManager.Services.BrowserRuntime
             BrowserWorkloadKind workload,
             CancellationToken cancellationToken)
         {
+            try
+            {
+                await StartBrowserProcessCoreAsync(workload, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (ServiceException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new InfrastructureServiceException("受控 Chromium 启动或连接失败。", ex);
+            }
+        }
+
+        private async Task StartBrowserProcessCoreAsync(
+            BrowserWorkloadKind workload,
+            CancellationToken cancellationToken)
+        {
             string executable = _resolver.Resolve();
             _profileRoot = Path.Combine(_pathProvider.CacheRoot, "BrowserRuntime", $"automation-{Environment.ProcessId}-{Guid.NewGuid():N}");
             Directory.CreateDirectory(_profileRoot);
@@ -203,8 +226,9 @@ namespace ExportDocManager.Services.BrowserRuntime
                 int markerIndex = args.Data?.IndexOf(marker, StringComparison.OrdinalIgnoreCase) ?? -1;
                 if (markerIndex >= 0) endpointSource.TrySetResult(args.Data![(markerIndex + marker.Length)..].Trim());
             };
-            process.Exited += (_, _) => endpointSource.TrySetException(new InvalidOperationException("受控 Chromium 在建立连接前退出。"));
-            if (!process.Start()) throw new InvalidOperationException("无法启动受控 Chromium 进程。");
+            process.Exited += (_, _) => endpointSource.TrySetException(
+                new InfrastructureServiceException("受控 Chromium 在建立连接前退出。"));
+            if (!process.Start()) throw new InfrastructureServiceException("无法启动受控 Chromium 进程。");
             process.BeginErrorReadLine();
             process.BeginOutputReadLine();
             _process = process;

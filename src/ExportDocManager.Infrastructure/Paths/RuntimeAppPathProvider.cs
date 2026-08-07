@@ -34,13 +34,13 @@ namespace ExportDocManager.Services.Infrastructure
 
         public string AppRoot => _appRoot;
 
-        public string DataRoot => EnsureDirectory(_dataRoot);
+        public string DataRoot => _dataRoot;
 
-        public string DatabaseRoot => GetDataDirectory("Database");
+        public string DatabaseRoot => GetDataPath("Database");
 
         public string TemplateRoot => GetAppPath("Templates");
 
-        public string UserTemplateRoot => GetDataDirectory("Templates");
+        public string UserTemplateRoot => GetDataPath("Templates");
 
         public string ResourceRoot => GetAppPath("Resources");
 
@@ -48,29 +48,29 @@ namespace ExportDocManager.Services.Infrastructure
 
         public string ToolRoot => GetAppPath("Tools");
 
-        public string FileRoot => GetDataDirectory("Files");
+        public string FileRoot => GetDataPath("Files");
 
-        public string ExportRoot => GetDataDirectory("Exports");
+        public string ExportRoot => GetDataPath("Exports");
 
-        public string BackupRoot => GetDataDirectory("Backups");
+        public string BackupRoot => GetDataPath("Backups");
 
-        public string SingleWindowRoot => GetDataDirectory("SingleWindow");
+        public string SingleWindowRoot => GetDataPath("SingleWindow");
 
         public string OcrModelRoot => GetAppPath("OcrModels");
 
-        public string LogRoot => GetDataDirectory("Logs");
+        public string LogRoot => GetDataPath("Logs");
 
-        public string CacheRoot => GetDataDirectory("Cache");
+        public string CacheRoot => GetDataPath("Cache");
 
-        public string ConfigRoot => GetDataDirectory("Config");
+        public string ConfigRoot => GetDataPath("Config");
 
-        public string SecurityRoot => GetDataDirectory("Security");
+        public string SecurityRoot => GetDataPath("Security");
 
-        public string WebViewRoot => GetDataDirectory("WebView");
+        public string WebViewRoot => GetDataPath("WebView");
 
-        private string GetDataDirectory(string name)
+        private string GetDataPath(string name)
         {
-            return EnsureDirectory(Path.Combine(DataRoot, name));
+            return Path.Combine(DataRoot, name);
         }
 
         private string GetAppPath(string name)
@@ -80,8 +80,11 @@ namespace ExportDocManager.Services.Infrastructure
 
         private static string NormalizeRoot(string path)
         {
-            return Path.GetFullPath(path)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string fullPath = Path.GetFullPath(path);
+            int rootLength = Path.GetPathRoot(fullPath)?.Length ?? 0;
+            return fullPath.Length > rootLength
+                ? fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                : fullPath;
         }
 
         private static string ResolveDefaultDataRoot(string appRoot)
@@ -92,10 +95,5 @@ namespace ExportDocManager.Services.Infrastructure
                 : configuredDataRoot;
         }
 
-        private static string EnsureDirectory(string path)
-        {
-            Directory.CreateDirectory(path);
-            return path;
-        }
     }
 }

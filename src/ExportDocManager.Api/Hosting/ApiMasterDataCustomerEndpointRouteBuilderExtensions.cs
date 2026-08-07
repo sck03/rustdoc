@@ -30,6 +30,26 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("ListCustomers");
 
+            endpoints.MapGet("/api/master-data/customers/page", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                ICustomerReadRepository repository,
+                int pageNumber,
+                int pageSize,
+                string keyword,
+                CancellationToken cancellationToken) =>
+            {
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                var page = await repository.QueryPageAsync(new CustomerReadQuery
+                {
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    Keyword = keyword ?? string.Empty
+                }, cancellationToken);
+                return Results.Ok(ApiMasterDataDtoFactory.FromPage(page, ApiMasterDataDtoFactory.FromCustomers));
+            })
+            .WithName("ListCustomersPage");
+
             endpoints.MapGet("/api/master-data/customers/{id:int}", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,

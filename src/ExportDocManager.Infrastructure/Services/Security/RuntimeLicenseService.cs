@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
@@ -8,7 +6,6 @@ using System.Text.Json;
 using ExportDocManager.Shared.Security;
 using ExportDocManager.Utils;
 using ExportDocManager.Services.Infrastructure;
-using Microsoft.Win32;
 
 namespace ExportDocManager.Services.Security
 {
@@ -24,7 +21,7 @@ namespace ExportDocManager.Services.Security
         private const string LinuxSecretServiceBindingPrefix = "linux-secret-service-v1:";
         private const string PlatformFallbackBindingPrefix = "platform-fallback-v1:";
         private const int LocalBindingSecretByteCount = 32;
-        private const int PlatformCommandTimeoutMs = 2500;
+        private static readonly TimeSpan StatusCacheLifetime = TimeSpan.FromSeconds(30);
         private const string StoragePolicy =
             "Tauri/Web/API 授权状态镜像到运行数据根 Security/license.dat；试用开始时间、稳定机器码种子、本机密封随机量和已验证注册码保存到平台机器级授权锚点（Windows 注册表 HKLM/HKCU + DPAPI LocalMachine，macOS Keychain，Linux Secret Service；平台安全锚点不可用时才回退到运行数据根 Security）。删除程序目录或 App_Data 后重新解压安装不会重置 7 天试用，也不会丢失已注册授权；业务数据库、模板、OCR 模型和普通运行数据不写系统盘默认用户目录。";
 
@@ -35,6 +32,7 @@ namespace ExportDocManager.Services.Security
         private readonly ILicenseSignatureVerifier _signatureVerifier;
         private readonly LocalSecretProtector _secretProtector;
         private readonly SemaphoreSlim _stateGate = new(1, 1);
+        private CachedLicenseStatus _cachedStatus;
 
         public RuntimeLicenseService(IAppPathProvider pathProvider)
             : this(pathProvider, null, null, null, null)
@@ -96,7 +94,7 @@ namespace ExportDocManager.Services.Security
             ILicenseSignatureVerifier signatureVerifier)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
-            _deviceFingerprintProvider = deviceFingerprintProvider ?? CreateDeviceFingerprint;
+            _deviceFingerprintProvider = deviceFingerprintProvider ?? RuntimeLicenseDeviceFingerprint.Create;
             _localBindingSecretProvider = localBindingSecretProvider;
             _anchorStore = anchorStore ?? RuntimeLicenseAnchorStoreFactory.CreateDefault(pathProvider);
             _signatureVerifier = signatureVerifier ?? new EcdsaLicenseSignatureVerifier();
@@ -105,10 +103,26 @@ namespace ExportDocManager.Services.Security
 
         public async Task<LicenseStatus> GetStatusAsync(CancellationToken cancellationToken = default)
         {
+            var cached = Volatile.Read(ref _cachedStatus);
+            long nowUtcTicks = DateTimeOffset.UtcNow.UtcTicks;
+            if (cached != null && cached.ExpiresAtUtcTicks > nowUtcTicks)
+            {
+                return cached.Status;
+            }
+
             await _stateGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                return await GetStatusCoreAsync(cancellationToken).ConfigureAwait(false);
+                cached = Volatile.Read(ref _cachedStatus);
+                nowUtcTicks = DateTimeOffset.UtcNow.UtcTicks;
+                if (cached != null && cached.ExpiresAtUtcTicks > nowUtcTicks)
+                {
+                    return cached.Status;
+                }
+
+                LicenseStatus status = await GetStatusCoreAsync(cancellationToken).ConfigureAwait(false);
+                CacheStatus(status, nowUtcTicks);
+                return status;
             }
             finally
             {
@@ -248,7 +262,7 @@ namespace ExportDocManager.Services.Security
                 now = anchorLastRunDate;
             }
 
-            if (now > anchor.LastRunDate)
+            if (ShouldAdvancePersistedLastRunDate(anchor.LastRunDate, now))
             {
                 anchor.LastRunDate = now;
                 anchorChanged = true;
@@ -382,10 +396,21 @@ namespace ExportDocManager.Services.Security
             string licenseKey,
             CancellationToken cancellationToken = default)
         {
+            Volatile.Write(ref _cachedStatus, null);
             await _stateGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                return await RegisterCoreAsync(licenseKey, cancellationToken).ConfigureAwait(false);
+                LicenseRegistrationResult result = await RegisterCoreAsync(licenseKey, cancellationToken).ConfigureAwait(false);
+                if (result.Success)
+                {
+                    CacheStatus(result.Status, DateTimeOffset.UtcNow.UtcTicks);
+                }
+                else
+                {
+                    Volatile.Write(ref _cachedStatus, null);
+                }
+
+                return result;
             }
             finally
             {
@@ -500,7 +525,13 @@ namespace ExportDocManager.Services.Security
 
             try
             {
-                await AtomicFileHelper.WriteAllTextAtomicAsync(GetMachineSeedPath(), seed, Encoding.UTF8, cancellationToken)
+                string path = GetMachineSeedPath();
+                if (await FileTextEqualsAsync(path, seed, cancellationToken).ConfigureAwait(false))
+                {
+                    return;
+                }
+
+                await AtomicFileHelper.WriteAllTextAtomicAsync(path, seed, Encoding.UTF8, cancellationToken)
                         .ConfigureAwait(false);
             }
             catch
@@ -652,6 +683,14 @@ namespace ExportDocManager.Services.Security
                     secret.StartsWith(WindowsLocalMachineBindingPrefix, StringComparison.Ordinal))
                 {
                     string rawSecret = secret[WindowsLocalMachineBindingPrefix.Length..];
+                    if (await WindowsLocalMachineSecretMatchesAsync(
+                            GetLocalBindingSecretPath(),
+                            rawSecret,
+                            cancellationToken)
+                        .ConfigureAwait(false))
+                    {
+                        return;
+                    }
                     string protectedPayload = ProtectWindowsLocalMachineSecret(rawSecret);
                     await AtomicFileHelper.WriteAllTextAtomicAsync(
                             GetLocalBindingSecretPath(),
@@ -674,6 +713,61 @@ namespace ExportDocManager.Services.Security
         private static DateTime MaxDate(DateTime first, DateTime second)
         {
             return first >= second ? first : second;
+        }
+
+        private static bool ShouldAdvancePersistedLastRunDate(DateTime lastRunDate, DateTime now)
+        {
+            return lastRunDate == default || now.Date > lastRunDate.Date;
+        }
+
+        private static async Task<bool> FileTextEqualsAsync(
+            string path,
+            string expected,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                return File.Exists(path) &&
+                    string.Equals(
+                        await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false),
+                        expected,
+                        StringComparison.Ordinal);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
+        [SupportedOSPlatform("windows")]
+        private static async Task<bool> WindowsLocalMachineSecretMatchesAsync(
+            string path,
+            string expectedSecret,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    return false;
+                }
+
+                string payload = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
+                if (!payload.StartsWith(WindowsLocalMachineBindingPrefix, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
+                byte[] protectedBytes = Convert.FromBase64String(payload[WindowsLocalMachineBindingPrefix.Length..]);
+                byte[] bytes = ProtectedData.Unprotect(protectedBytes, null, DataProtectionScope.LocalMachine);
+                return CryptographicOperations.FixedTimeEquals(
+                    bytes,
+                    Encoding.UTF8.GetBytes(expectedSecret));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException or CryptographicException)
+            {
+                return false;
+            }
         }
 
         private static bool SetAnchorRegistration(
@@ -742,89 +836,6 @@ namespace ExportDocManager.Services.Security
         {
             byte[] bytes = RandomNumberGenerator.GetBytes(LocalBindingSecretByteCount);
             return Convert.ToBase64String(bytes);
-        }
-
-        private static string ReadCommandOutput(string fileName, params string[] arguments)
-        {
-            return TryRunProcess(fileName, arguments, null, out string output)
-                ? output
-                : string.Empty;
-        }
-
-        private static bool TryRunProcess(
-            string fileName,
-            IEnumerable<string> arguments,
-            string standardInput,
-            out string output)
-        {
-            output = string.Empty;
-            try
-            {
-                using var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = fileName,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        RedirectStandardInput = standardInput != null,
-                        CreateNoWindow = true
-                    }
-                };
-
-                foreach (string argument in arguments)
-                {
-                    process.StartInfo.ArgumentList.Add(argument);
-                }
-
-                if (!process.Start())
-                {
-                    return false;
-                }
-
-                Task<string> outputTask = BoundedProcessOutput.ReadAsync(
-                    process.StandardOutput,
-                    truncationMessage: "[授权平台命令输出过长，已截断]");
-                Task<string> errorTask = BoundedProcessOutput.ReadAsync(
-                    process.StandardError,
-                    truncationMessage: "[授权平台命令错误输出过长，已截断]");
-
-                if (standardInput != null)
-                {
-                    process.StandardInput.Write(standardInput);
-                    process.StandardInput.Close();
-                }
-
-                if (!process.WaitForExit(PlatformCommandTimeoutMs))
-                {
-                    try
-                    {
-                        process.Kill(entireProcessTree: true);
-                    }
-                    catch
-                    {
-                    }
-
-                    BoundedProcessOutput.DrainProcessAsync(process, TimeSpan.FromSeconds(5))
-                        .GetAwaiter()
-                        .GetResult();
-                    BoundedProcessOutput.ObserveAsync(TimeSpan.FromSeconds(5), outputTask, errorTask)
-                        .GetAwaiter()
-                        .GetResult();
-
-                    return false;
-                }
-
-                output = outputTask.GetAwaiter().GetResult().Trim();
-                _ = errorTask.GetAwaiter().GetResult();
-                return process.ExitCode == 0;
-            }
-            catch
-            {
-                output = string.Empty;
-                return false;
-            }
         }
 
         private async Task<RuntimeLicenseData> LoadLicenseDataAsync(CancellationToken cancellationToken)
@@ -934,6 +945,23 @@ namespace ExportDocManager.Services.Security
             };
         }
 
+        private void CacheStatus(LicenseStatus status, long nowUtcTicks)
+        {
+            if (status == null)
+            {
+                Volatile.Write(ref _cachedStatus, null);
+                return;
+            }
+
+            Volatile.Write(
+                ref _cachedStatus,
+                new CachedLicenseStatus(status, nowUtcTicks + StatusCacheLifetime.Ticks));
+        }
+
+        private sealed record CachedLicenseStatus(
+            LicenseStatus Status,
+            long ExpiresAtUtcTicks);
+
         private sealed class MutableLicenseStatus
         {
             public bool IsRegistered { get; set; }
@@ -963,170 +991,5 @@ namespace ExportDocManager.Services.Security
             public string Signature { get; set; } = string.Empty;
         }
 
-        private static string CreateDeviceFingerprint()
-        {
-            var parts = new List<string>();
-
-            AddFingerprintPart(parts, RuntimeInformation.OSArchitecture.ToString());
-            AddFingerprintPart(parts, Environment.MachineName);
-
-            if (OperatingSystem.IsWindows())
-            {
-                AddWindowsFingerprintParts(parts);
-            }
-            else if (OperatingSystem.IsMacOS())
-            {
-                AddMacOsFingerprintParts(parts);
-            }
-            else
-            {
-                AddUnixFingerprintParts(parts);
-            }
-
-            if (parts.Count == 0)
-            {
-                AddFingerprintPart(parts, RuntimeInformation.ProcessArchitecture.ToString());
-            }
-
-            return string.Join("|", parts.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase));
-        }
-
-        [SupportedOSPlatform("windows")]
-        private static void AddWindowsFingerprintParts(List<string> parts)
-        {
-            AddFingerprintPart(parts, ReadWindowsRegistryValue(RegistryView.Registry64, @"SOFTWARE\Microsoft\Cryptography", "MachineGuid"));
-            AddFingerprintPart(parts, ReadWindowsRegistryValue(RegistryView.Registry32, @"SOFTWARE\Microsoft\Cryptography", "MachineGuid"));
-            AddFingerprintPart(parts, ReadWindowsRegistryValue(RegistryView.Registry64, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion", "ProductId"));
-            AddFingerprintPart(parts, ReadWindowsRegistryValue(RegistryView.Registry64, @"HARDWARE\DESCRIPTION\System\BIOS", "SystemManufacturer"));
-            AddFingerprintPart(parts, ReadWindowsRegistryValue(RegistryView.Registry64, @"HARDWARE\DESCRIPTION\System\BIOS", "SystemProductName"));
-            AddFingerprintPart(parts, ReadWindowsRegistryValue(RegistryView.Registry64, @"HARDWARE\DESCRIPTION\System\BIOS", "BaseBoardProduct"));
-            AddFingerprintPart(parts, ReadWindowsRegistryValue(RegistryView.Registry64, @"HARDWARE\DESCRIPTION\System\BIOS", "BIOSVendor"));
-        }
-
-        [SupportedOSPlatform("windows")]
-        private static string ReadWindowsRegistryValue(RegistryView view, string subKeyName, string valueName)
-        {
-            try
-            {
-                using var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
-                using var subKey = baseKey.OpenSubKey(subKeyName);
-                return subKey?.GetValue(valueName)?.ToString() ?? string.Empty;
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        [SupportedOSPlatform("macos")]
-        private static void AddMacOsFingerprintParts(List<string> parts)
-        {
-            AddFingerprintPart(parts, ReadFirstLine("/var/db/dbuuid"));
-
-            string ioreg = ReadCommandOutput(
-                "/usr/sbin/ioreg",
-                "-rd1",
-                "-c",
-                "IOPlatformExpertDevice");
-
-            AddFingerprintPart(parts, ExtractMacOsIoregValue(ioreg, "IOPlatformUUID"));
-            AddFingerprintPart(parts, ExtractMacOsIoregValue(ioreg, "IOPlatformSerialNumber"));
-        }
-
-        private static string ExtractMacOsIoregValue(string output, string key)
-        {
-            if (string.IsNullOrWhiteSpace(output) || string.IsNullOrWhiteSpace(key))
-            {
-                return string.Empty;
-            }
-
-            string marker = $"\"{key}\" =";
-            foreach (string line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-            {
-                int index = line.IndexOf(marker, StringComparison.Ordinal);
-                if (index < 0)
-                {
-                    continue;
-                }
-
-                string value = line[(index + marker.Length)..].Trim().Trim('"');
-                return value;
-            }
-
-            return string.Empty;
-        }
-
-        private static void AddUnixFingerprintParts(List<string> parts)
-        {
-            foreach (string path in new[]
-            {
-                "/etc/machine-id",
-                "/var/lib/dbus/machine-id",
-                "/sys/class/dmi/id/product_uuid",
-                "/sys/class/dmi/id/product_serial",
-                "/sys/class/dmi/id/board_serial"
-            })
-            {
-                AddFingerprintPart(parts, ReadFirstLine(path));
-            }
-        }
-
-        private static string ReadFirstLine(string path)
-        {
-            try
-            {
-                if (!File.Exists(path))
-                {
-                    return string.Empty;
-                }
-
-                return File.ReadLines(path).FirstOrDefault() ?? string.Empty;
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        private static void AddFingerprintPart(List<string> parts, string value)
-        {
-            string normalized = NormalizeFingerprintPart(value);
-            if (IsUsableFingerprintPart(normalized))
-            {
-                parts.Add(normalized);
-            }
-        }
-
-        private static string NormalizeFingerprintPart(string value)
-        {
-            return (value ?? string.Empty).Trim().ToUpperInvariant();
-        }
-
-        private static bool IsUsableFingerprintPart(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return false;
-            }
-
-            if (value.Length < 4)
-            {
-                return false;
-            }
-
-            if (value.Equals("TO BE FILLED BY O.E.M.", StringComparison.Ordinal) ||
-                value.Equals("DEFAULT STRING", StringComparison.Ordinal) ||
-                value.Equals("NONE", StringComparison.Ordinal) ||
-                value.Equals("UNKNOWN", StringComparison.Ordinal) ||
-                value.Equals("SYSTEM SERIAL NUMBER", StringComparison.Ordinal) ||
-                value.Equals("NOT SPECIFIED", StringComparison.Ordinal) ||
-                value.Equals("UNAVAILABLE", StringComparison.Ordinal) ||
-                value.Equals("00000000-0000-0000-0000-000000000000", StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            return true;
-        }
     }
 }
