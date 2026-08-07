@@ -29,6 +29,7 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("ExportDocPackageProfile=Container", dockerfile, StringComparison.Ordinal);
         Assert.Contains("mcr.microsoft.com/dotnet/sdk:10.0.302-noble AS build", dockerfile, StringComparison.Ordinal);
         Assert.Contains("FROM debian:trixie-slim AS runtime", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("        chromium-sandbox \\", dockerfile, StringComparison.Ordinal);
         Assert.Contains("https://packages.microsoft.com/config/debian/13/packages-microsoft-prod.deb", dockerfile, StringComparison.Ordinal);
         Assert.Contains("dpkg -i /tmp/packages-microsoft-prod.deb", dockerfile, StringComparison.Ordinal);
         Assert.Contains("dpkg --purge packages-microsoft-prod", dockerfile, StringComparison.Ordinal);

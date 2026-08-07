@@ -494,7 +494,7 @@ curl --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/readyz"
 
 企业网关或 CDN 在 Nginx 前终止 TLS 时，必须把其实际连接 Nginx 的固定 IP 加入 `EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES`，不要填写不受控网段，也不要直接公开 API `5188`。
 
-API 最终运行层固定为 `debian:trixie-slim`；Web 只承载静态资源和反向代理，使用更轻量的 `nginx:1.30.4-alpine3.24`。Debian 原生 Chromium 位于 `/usr/bin/chromium`；PostgreSQL 18 客户端来自 `trixie-pgdg`，位于 `/usr/lib/postgresql/18/bin`；.NET/ASP.NET Core Runtime 通过 Microsoft 官方 Debian 13 仓库配置包安装构建时可用的最新稳定 `10.0.x`，由官方配置包同步仓库签名密钥轮换，镜像构建会验证两个共享框架使用同一补丁版本，不会硬编码尚未发布到该仓库的包修订号。Microsoft Container Registry 当前没有稳定版 .NET 10 Trixie SDK/ASP.NET 标签，因此构建层使用官方 `10.0.302-noble`，不会再引用不存在的 `bookworm-slim` 标签。
+API 最终运行层固定为 `debian:trixie-slim`；Web 只承载静态资源和反向代理，使用更轻量的 `nginx:1.30.4-alpine3.24`。Debian 原生 Chromium 位于 `/usr/bin/chromium`，镜像在 `--no-install-recommends` 模式下显式安装配套的 `chromium-sandbox`，保持非 root 浏览器沙箱开启；PostgreSQL 18 客户端来自 `trixie-pgdg`，位于 `/usr/lib/postgresql/18/bin`；.NET/ASP.NET Core Runtime 通过 Microsoft 官方 Debian 13 仓库配置包安装构建时可用的最新稳定 `10.0.x`，由官方配置包同步仓库签名密钥轮换，镜像构建会验证两个共享框架使用同一补丁版本，不会硬编码尚未发布到该仓库的包修订号。Microsoft Container Registry 当前没有稳定版 .NET 10 Trixie SDK/ASP.NET 标签，因此构建层使用官方 `10.0.302-noble`，不会再引用不存在的 `bookworm-slim` 标签。
 
 API 服务分配 `shm_size: 512mb`，并固定 `EXPORTDOCMANAGER_CHROMIUM_DISABLE_DEV_SHM_USAGE=false`，让容器内 Chromium 使用内存文件系统而不是把共享内存工作负载转移到磁盘缓存；非容器部署仍保留兼容小 `/dev/shm` 环境的默认启动参数。
 
