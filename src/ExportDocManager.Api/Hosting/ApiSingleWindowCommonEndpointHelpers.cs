@@ -48,9 +48,5 @@ namespace ExportDocManager.Api.Hosting
             return false;
         }
 
-        private static bool IsSingleWindowMissingSource(InvalidOperationException ex)
-        {
-            return ex.Message.Contains("未找到", StringComparison.Ordinal);
-        }
     }
 }

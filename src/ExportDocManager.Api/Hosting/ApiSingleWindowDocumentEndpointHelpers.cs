@@ -2,6 +2,7 @@ using System.Reflection;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Utils;
@@ -34,7 +35,7 @@ namespace ExportDocManager.Api.Hosting
                     : await documentService.GetOrCreateAsync(invoiceId, cancellationToken);
                 return Results.Ok(ApiSingleWindowDtoFactory.FromCustomsCooDocument(document));
             }
-            catch (InvalidOperationException ex) when (IsSingleWindowMissingSource(ex))
+            catch (ResourceNotFoundException ex)
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
@@ -79,7 +80,7 @@ namespace ExportDocManager.Api.Hosting
                     ApiSingleWindowDtoFactory.FromCustomsCooDocument(refreshed),
                     "海关原产地证草稿已保存。"));
             }
-            catch (InvalidOperationException ex) when (IsSingleWindowMissingSource(ex))
+            catch (ResourceNotFoundException ex)
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
@@ -110,7 +111,7 @@ namespace ExportDocManager.Api.Hosting
                     : await documentService.GetOrCreateAsync(invoiceId, cancellationToken);
                 return Results.Ok(ApiSingleWindowDtoFactory.FromAgentConsignmentDocument(document));
             }
-            catch (InvalidOperationException ex) when (IsSingleWindowMissingSource(ex))
+            catch (ResourceNotFoundException ex)
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
@@ -142,7 +143,7 @@ namespace ExportDocManager.Api.Hosting
                     fields.Count,
                     ToApiLockedFields(fields)));
             }
-            catch (InvalidOperationException ex) when (IsSingleWindowMissingSource(ex))
+            catch (ResourceNotFoundException ex)
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
@@ -203,7 +204,7 @@ namespace ExportDocManager.Api.Hosting
                         ? $"已将 {changedCount} 个字段恢复为当前建议值。"
                         : "所选字段当前已经与建议值一致，无需解锁。"));
             }
-            catch (InvalidOperationException ex) when (IsSingleWindowMissingSource(ex))
+            catch (ResourceNotFoundException ex)
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
@@ -248,7 +249,7 @@ namespace ExportDocManager.Api.Hosting
                     ApiSingleWindowDtoFactory.FromAgentConsignmentDocument(refreshed),
                     "报关代理委托草稿已保存。"));
             }
-            catch (InvalidOperationException ex) when (IsSingleWindowMissingSource(ex))
+            catch (ResourceNotFoundException ex)
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
@@ -280,7 +281,7 @@ namespace ExportDocManager.Api.Hosting
                     fields.Count,
                     ToApiLockedFields(fields)));
             }
-            catch (InvalidOperationException ex) when (IsSingleWindowMissingSource(ex))
+            catch (ResourceNotFoundException ex)
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
@@ -341,7 +342,7 @@ namespace ExportDocManager.Api.Hosting
                         ? $"已将 {changedCount} 个字段恢复为当前建议值。"
                         : "所选字段当前已经与建议值一致，无需解锁。"));
             }
-            catch (InvalidOperationException ex) when (IsSingleWindowMissingSource(ex))
+            catch (ResourceNotFoundException ex)
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }

@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Security
@@ -36,7 +37,7 @@ namespace ExportDocManager.Services.Security
             string name = (request.Name ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(name))
             {
-                throw new ArgumentException("权限模板名称不能为空。");
+                throw new ServiceValidationException("权限模板名称不能为空。");
             }
 
             var modules = NormalizeModules(request.Modules);
@@ -46,7 +47,7 @@ namespace ExportDocManager.Services.Security
                 cancellationToken);
             if (duplicateCode)
             {
-                throw new InvalidOperationException("权限模板代码已存在。");
+                throw new ResourceConflictException("权限模板代码已存在。");
             }
 
             PermissionTemplate template;
@@ -64,11 +65,11 @@ namespace ExportDocManager.Services.Security
                 template = await context.PermissionTemplates
                     .Include(item => item.Modules)
                     .FirstOrDefaultAsync(item => item.Id == request.Id, cancellationToken)
-                    ?? throw new KeyNotFoundException("未找到权限模板。");
+                    ?? throw new ResourceNotFoundException("未找到权限模板。");
                 if (template.IsSystem &&
                     string.Equals(template.Code, BuiltInPermissionTemplateCatalog.Admin, StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new InvalidOperationException("系统管理员模板不可修改。");
+                    throw new ResourceConflictException("系统管理员模板不可修改。");
                 }
 
                 context.PermissionTemplateModules.RemoveRange(template.Modules);
@@ -102,13 +103,13 @@ namespace ExportDocManager.Services.Security
             if (template == null) return false;
             if (template.IsSystem)
             {
-                throw new InvalidOperationException("系统内置权限模板不可删除。");
+                throw new ResourceConflictException("系统内置权限模板不可删除。");
             }
 
             bool inUse = await context.Users.AnyAsync(user => user.PermissionTemplateId == id, cancellationToken);
             if (inUse)
             {
-                throw new InvalidOperationException("权限模板仍有用户使用，不能删除。");
+                throw new ResourceConflictException("权限模板仍有用户使用，不能删除。");
             }
 
             context.PermissionTemplates.Remove(template);
@@ -139,13 +140,13 @@ namespace ExportDocManager.Services.Security
             string code = (value ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(code))
             {
-                throw new ArgumentException("权限模板代码不能为空。");
+                throw new ServiceValidationException("权限模板代码不能为空。");
             }
 
             if (code.Length > 50 || code.Any(character =>
                     !char.IsLetterOrDigit(character) && character is not '-' and not '_' and not '.'))
             {
-                throw new ArgumentException("权限模板代码只能包含字母、数字、点、横线和下划线，且不能超过 50 个字符。");
+                throw new ServiceValidationException("权限模板代码只能包含字母、数字、点、横线和下划线，且不能超过 50 个字符。");
             }
 
             return code;
@@ -160,7 +161,7 @@ namespace ExportDocManager.Services.Security
                 !PermissionAccessLevel.IsKnown(module.AccessLevel));
             if (invalidAccessLevel != null)
             {
-                throw new ArgumentException($"模块 {invalidAccessLevel.ModuleKey} 的访问级别无效。");
+                throw new ServiceValidationException($"模块 {invalidAccessLevel.ModuleKey} 的访问级别无效。");
             }
 
             var normalized = submitted

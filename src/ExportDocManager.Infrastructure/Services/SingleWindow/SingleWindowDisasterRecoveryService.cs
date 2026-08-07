@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
@@ -72,7 +73,7 @@ namespace ExportDocManager.Services.SingleWindow
             DisasterRecoveryPackageCrypto.ValidatePassword(password);
             if (SingleWindowDisasterRecoveryManager.HasPendingRestore(_pathProvider))
             {
-                throw new InvalidOperationException("灾难恢复任务已排队，完成重启恢复前不能创建新的恢复包。");
+                throw new ResourceConflictException("灾难恢复任务已排队，完成重启恢复前不能创建新的恢复包。");
             }
             if (!File.Exists(_databasePath))
             {
@@ -82,7 +83,7 @@ namespace ExportDocManager.Services.SingleWindow
             string appSettingsPath = Path.Combine(_pathProvider.ConfigRoot, "appsettings.json");
             if (!File.Exists(appSettingsPath))
             {
-                throw new InvalidOperationException("Config/appsettings.json 尚未保存，请先在系统设置中保存配置。 ");
+                throw new ServiceValidationException("Config/appsettings.json 尚未保存，请先在系统设置中保存配置。 ");
             }
             EnsureLocalMasterKeyFile();
             string masterKeyPath = Path.Combine(_pathProvider.SecurityRoot, LocalSecretProtector.MasterKeyFileName);
@@ -191,12 +192,12 @@ namespace ExportDocManager.Services.SingleWindow
             }
             if (SingleWindowDisasterRecoveryManager.HasPendingRestore(_pathProvider))
             {
-                throw new InvalidOperationException("已有持卡机灾难恢复任务等待重启执行。");
+                throw new ResourceConflictException("已有持卡机灾难恢复任务等待重启执行。");
             }
             string normalRestoreMarker = SqlitePendingRestoreManager.GetMarkerPath(_databasePath);
             if (File.Exists(normalRestoreMarker))
             {
-                throw new InvalidOperationException("已有普通 SQLite 数据库还原任务等待重启，不能同时安排灾难恢复。");
+                throw new ResourceConflictException("已有普通 SQLite 数据库还原任务等待重启，不能同时安排灾难恢复。");
             }
 
             await BackupService.SqliteMaintenanceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -232,7 +233,7 @@ namespace ExportDocManager.Services.SingleWindow
                     stagingDirectoryName);
                 if (Directory.Exists(stagingRoot))
                 {
-                    throw new InvalidOperationException("同一恢复包已存在暂存数据，请先处理上一次恢复任务。");
+                    throw new ResourceConflictException("同一恢复包已存在暂存数据，请先处理上一次恢复任务。");
                 }
                 Directory.CreateDirectory(stagingRoot);
                 SingleWindowDisasterRecoveryManager.RestrictDirectoryPermissions(stagingRoot);
@@ -302,7 +303,7 @@ namespace ExportDocManager.Services.SingleWindow
             if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(
                     LocalSecretProtector.MasterKeyEnvironmentVariable)))
             {
-                throw new InvalidOperationException(
+                throw new ServiceValidationException(
                     "当前通过环境变量提供本地主密钥，无法写入独立恢复包。请由部署管理员单独备份该环境密钥。");
             }
             string keyPath = Path.Combine(_pathProvider.SecurityRoot, LocalSecretProtector.MasterKeyFileName);

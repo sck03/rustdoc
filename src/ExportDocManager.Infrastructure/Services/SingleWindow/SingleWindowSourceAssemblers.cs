@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,7 +28,7 @@ namespace ExportDocManager.Services.SingleWindow
             var invoice = await _businessDataAccessScope
                 .ApplyInvoiceScope(context.Invoices.AsNoTracking())
                 .FirstOrDefaultAsync(item => item.Id == invoiceId, cancellationToken)
-                ?? throw new InvalidOperationException("未找到要生成海关原产地证报文的发票。");
+                ?? throw new ResourceNotFoundException("未找到要生成海关原产地证报文的发票。");
 
             var items = await context.Items
                 .AsNoTracking()
@@ -90,7 +91,7 @@ namespace ExportDocManager.Services.SingleWindow
             var invoice = await _businessDataAccessScope
                 .ApplyInvoiceScope(context.Invoices.AsNoTracking())
                 .FirstOrDefaultAsync(item => item.Id == invoiceId, cancellationToken)
-                ?? throw new InvalidOperationException("未找到要生成报关代理委托报文的发票。");
+                ?? throw new ResourceNotFoundException("未找到要生成报关代理委托报文的发票。");
 
             var items = await context.Items
                 .AsNoTracking()

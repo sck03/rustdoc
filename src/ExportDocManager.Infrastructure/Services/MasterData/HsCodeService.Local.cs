@@ -132,16 +132,6 @@ namespace ExportDocManager.Services.MasterData
             }
         }
 
-        public async Task<List<HsCode>> GetAllLocalAsync()
-        {
-            var rows = await GetReadRepository().QueryAsync(new HsCodeReadQuery
-            {
-                ReturnAll = true,
-                PageSize = 100
-            });
-            return rows.ToList();
-        }
-
         public async Task<PagedResult<HsCode>> GetPagedLocalAsync(int pageNumber, int pageSize, string keyword = null)
         {
             return await GetReadRepository().QueryPageAsync(new HsCodeReadQuery

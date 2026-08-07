@@ -13,6 +13,10 @@ public sealed class PackagePayloadContractTests
         string desktopScript = File.ReadAllText(Path.Combine(root, "scripts", "prepare-tauri-bundle.mjs"));
         string serverWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "browser-server-package-reusable.yml"));
         string dockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.api"));
+        string webDockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.web"));
+        string compose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.yml"));
+        string ghcrCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.ghcr.yml"));
+        string containerRuntimeWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "container-runtime-validation.yml"));
         string verifier = File.ReadAllText(Path.Combine(root, "scripts", "verify-package-payload.ps1"));
 
         Assert.Contains("ExportDocPackageProfile=Desktop", desktopScript, StringComparison.Ordinal);
@@ -23,6 +27,45 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("setup-windows.cmd", serverWorkflow, StringComparison.Ordinal);
         Assert.Contains("version.json", serverWorkflow, StringComparison.Ordinal);
         Assert.Contains("ExportDocPackageProfile=Container", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("mcr.microsoft.com/dotnet/sdk:10.0.302-noble AS build", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("FROM debian:trixie-slim AS runtime", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("https://packages.microsoft.com/debian/13/prod trixie main", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("aspnetcore-runtime-10.0 \\", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("dotnet-runtime-10.0 \\", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("test \"$aspnet_version\" = \"$netcore_version\"", dockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("aspnetcore-runtime-10.0=", dockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("dotnet-runtime-10.0=", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("https://apt.postgresql.org/pub/repos/apt trixie-pgdg main", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("postgresql-client-18", dockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("COPY --from=dotnet-aspnet", dockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("dotnet/sdk:10.0-bookworm-slim", dockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("dotnet/aspnet:10.0-bookworm-slim", dockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("bookworm-pgdg", dockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("libicu72", dockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("        gnupg", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("signed-by=/usr/share/keyrings/microsoft-prod.asc", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("signed-by=/usr/share/keyrings/postgresql.asc", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("node:24-trixie-slim", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("rust:1.96-trixie", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("node:24-trixie-slim", webDockerfile, StringComparison.Ordinal);
+        Assert.Contains("nginx:1.30.4-alpine3.24", webDockerfile, StringComparison.Ordinal);
+        Assert.Contains("postgres:18.4-trixie", compose, StringComparison.Ordinal);
+        Assert.Contains("postgres:18.4-trixie", ghcrCompose, StringComparison.Ordinal);
+        Assert.Contains("postgres:18.4-trixie", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("nginx:1.30.4-alpine3.24", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("Validate native Chromium PDF runtime", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("--print-to-pdf", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("test \"${EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX:-}\" = \"false\"", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("test \"${EXPORTDOCMANAGER_CHROMIUM_DISABLE_DEV_SHM_USAGE:-}\" = \"false\"", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("\"global.json\"", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("\"Resources/**\"", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("postgres:18-bookworm", compose, StringComparison.Ordinal);
+        Assert.DoesNotContain("postgres:18-bookworm", ghcrCompose, StringComparison.Ordinal);
+        Assert.DoesNotContain("postgres:18-bookworm", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("nginx:1.27-alpine", webDockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("nginx:1.27-alpine", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("nginx:1.30.4-trixie", webDockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("nginx:1.30.4-trixie", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.DoesNotContain("COPY Browsers/", dockerfile, StringComparison.Ordinal);
         Assert.Contains("AS report-fonts", dockerfile, StringComparison.Ordinal);
         Assert.Contains("provision-report-fonts.mjs", dockerfile, StringComparison.Ordinal);
@@ -311,11 +354,17 @@ public sealed class PackagePayloadContractTests
         string localCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.yml"));
         string ghcrCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.ghcr.yml"));
         const string setting = "EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX";
+        const string sharedMemorySetting = "EXPORTDOCMANAGER_CHROMIUM_DISABLE_DEV_SHM_USAGE";
 
         Assert.Contains("USER 10001:10001", dockerfile, StringComparison.Ordinal);
         Assert.Contains($"{setting}=false", dockerfile, StringComparison.Ordinal);
         Assert.Contains($"{setting}: \"false\"", localCompose, StringComparison.Ordinal);
         Assert.Contains($"{setting}: \"false\"", ghcrCompose, StringComparison.Ordinal);
+        Assert.Contains($"{sharedMemorySetting}=false", dockerfile, StringComparison.Ordinal);
+        Assert.Contains($"{sharedMemorySetting}: \"false\"", localCompose, StringComparison.Ordinal);
+        Assert.Contains($"{sharedMemorySetting}: \"false\"", ghcrCompose, StringComparison.Ordinal);
+        Assert.Contains("shm_size: \"512mb\"", localCompose, StringComparison.Ordinal);
+        Assert.Contains("shm_size: \"512mb\"", ghcrCompose, StringComparison.Ordinal);
     }
 
     [Fact]

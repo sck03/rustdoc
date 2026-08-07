@@ -1,5 +1,6 @@
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.DTOs.SingleWindow;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.SingleWindow;
 
@@ -23,7 +24,7 @@ namespace ExportDocManager.Api.Hosting
                     cancellationToken);
                 return Results.Ok(review);
             }
-            catch (InvalidOperationException ex) when (IsSingleWindowMissingSource(ex))
+            catch (ResourceNotFoundException ex)
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }

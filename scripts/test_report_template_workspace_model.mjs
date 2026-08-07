@@ -18,9 +18,10 @@ const modelPath = path.join(
   "reports",
   "reportTemplateDesignerModel.ts",
 );
-const reportWorkspaceCss = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "reportWorkspace.css"), "utf8");
-const responsiveOverridesCss = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "responsiveOverrides.css"), "utf8");
-const themeCss = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "theme.css"), "utf8");
+const stylesRoot = path.join(repoRoot, "apps", "export-doc-web", "src");
+const reportWorkspaceCss = readCssGraph(path.join(stylesRoot, "reportWorkspace.css"));
+const responsiveOverridesCss = readCssGraph(path.join(stylesRoot, "responsiveOverrides.css"));
+const themeCss = readCssGraph(path.join(stylesRoot, "theme.css"));
 const workspaceStateSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "reportTemplateWorkspaceState.ts"), "utf8");
 const modelImportSpecifier = `./${path.relative(workspaceRoot, modelPath).replaceAll("\\", "/")}`;
 
@@ -126,4 +127,25 @@ function assertMatch(actual, expected, message) {
   if (!expected.test(actual)) {
     throw new Error(`${message}: pattern ${expected} not found`);
   }
+}
+
+function readCssGraph(entryPath, visited = new Set()) {
+  const absolutePath = path.resolve(entryPath);
+  if (visited.has(absolutePath)) {
+    return "";
+  }
+
+  visited.add(absolutePath);
+  const source = fs.readFileSync(absolutePath, "utf8");
+  const imports = [];
+  const importPattern = /@import\s+(?:url\()?\s*["']([^"']+)["']\s*\)?\s*;?/g;
+  let match;
+  while ((match = importPattern.exec(source)) !== null) {
+    const importedPath = match[1];
+    if (importedPath.startsWith(".") && importedPath.endsWith(".css")) {
+      imports.push(readCssGraph(path.resolve(path.dirname(absolutePath), importedPath), visited));
+    }
+  }
+
+  return `${source}\n${imports.join("\n")}`;
 }

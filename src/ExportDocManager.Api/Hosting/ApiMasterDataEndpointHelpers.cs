@@ -11,8 +11,7 @@ namespace ExportDocManager.Api.Hosting
             int id,
             CancellationToken cancellationToken)
         {
-            var rows = await repository.QueryAsync(new PayeeReadQuery(), cancellationToken);
-            return rows.FirstOrDefault(row => row.Id == id);
+            return await repository.GetByIdAsync(id, cancellationToken);
         }
 
         private static async Task<Port> FindPortByIdAsync(
@@ -20,8 +19,7 @@ namespace ExportDocManager.Api.Hosting
             int id,
             CancellationToken cancellationToken)
         {
-            var rows = await repository.QueryAsync(new PortReadQuery(), cancellationToken);
-            return rows.FirstOrDefault(row => row.Id == id);
+            return await repository.GetByIdAsync(id, cancellationToken);
         }
 
         private static async Task<Unit> FindUnitByIdAsync(
@@ -29,8 +27,7 @@ namespace ExportDocManager.Api.Hosting
             int id,
             CancellationToken cancellationToken)
         {
-            var rows = await repository.QueryAsync(new UnitReadQuery(), cancellationToken);
-            return rows.FirstOrDefault(row => row.Id == id);
+            return await repository.GetByIdAsync(id, cancellationToken);
         }
 
         private static async Task<HsCode> FindHsCodeByIdAsync(

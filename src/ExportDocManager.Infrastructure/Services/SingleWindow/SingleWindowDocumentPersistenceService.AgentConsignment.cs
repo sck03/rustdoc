@@ -3,6 +3,7 @@ using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Models.SingleWindow;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
@@ -118,7 +119,7 @@ namespace ExportDocManager.Services.SingleWindow
             ArgumentNullException.ThrowIfNull(snapshot);
             ArgumentNullException.ThrowIfNull(document);
 
-            var invoice = snapshot.Invoice ?? throw new InvalidOperationException("报关代理委托来源发票不能为空。");
+            var invoice = snapshot.Invoice ?? throw new ServiceValidationException("报关代理委托来源发票不能为空。");
 
             return await AppDbContextExecution.ExecuteInTransactionAsync(
                 _contextFactory,

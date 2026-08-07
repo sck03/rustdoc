@@ -81,6 +81,35 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task GetByIdAsync_ShouldFindRecordsBeyondDefaultListLimit()
+        {
+            using var factory = new TestDbContextFactory();
+            int payeeId;
+            int portId;
+            int unitId;
+            await using (var context = await factory.CreateDbContextAsync())
+            {
+                for (int index = 1; index <= 205; index++)
+                {
+                    context.Payees.Add(new Payee { Category = "Supplier", Name = $"Payee {index:000}" });
+                    context.Ports.Add(new Port { NameEN = $"Port {index:000}" });
+                    context.Units.Add(new Unit { NameEN = $"Unit {index:000}" });
+                }
+
+                await context.SaveChangesAsync();
+                payeeId = await context.Payees.OrderBy(item => item.Id).Select(item => item.Id).LastAsync();
+                portId = await context.Ports.OrderBy(item => item.Id).Select(item => item.Id).LastAsync();
+                unitId = await context.Units.OrderBy(item => item.Id).Select(item => item.Id).LastAsync();
+            }
+
+            var repository = new LocalMasterDataReadRepository(factory);
+
+            Assert.Equal("Payee 205", (await ((IPayeeReadRepository)repository).GetByIdAsync(payeeId))?.Name);
+            Assert.Equal("Port 205", (await ((IPortReadRepository)repository).GetByIdAsync(portId))?.NameEN);
+            Assert.Equal("Unit 205", (await ((IUnitReadRepository)repository).GetByIdAsync(unitId))?.NameEN);
+        }
+
+        [Fact]
         public async Task QueryPageAsync_ShouldMatchFormattedHsCodeByNormalizedCode()
         {
             using var factory = new TestDbContextFactory();

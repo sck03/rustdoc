@@ -91,13 +91,15 @@ namespace ExportDocManager.Services.MasterData
             }
         }
 
-        public async Task<Customer> GetCustomerByIdAsync(int id)
+        public async Task<Customer> GetCustomerByIdAsync(
+            int id,
+            CancellationToken cancellationToken = default)
         {
             try
             {
-                using var context = await _contextFactory.CreateDbContextAsync();
+                using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 return await _accessScope.ApplyCustomerScope(context.Customers)
-                    .FirstOrDefaultAsync(x => x.Id == id);
+                    .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
             }
             catch (ServiceException)
             {

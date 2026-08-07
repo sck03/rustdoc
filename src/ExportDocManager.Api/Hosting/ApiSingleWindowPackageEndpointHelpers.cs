@@ -1,5 +1,6 @@
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.DTOs.SingleWindow;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Utils;
@@ -38,7 +39,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 return Results.BadRequest(new ApiErrorResponse(ex.Message));
             }
-            catch (InvalidOperationException ex) when (IsSingleWindowMissingSource(ex))
+            catch (ResourceNotFoundException ex)
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
@@ -98,7 +99,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 return Results.BadRequest(new ApiErrorResponse(ex.Message));
             }
-            catch (InvalidOperationException ex) when (IsSingleWindowMissingSource(ex))
+            catch (ResourceNotFoundException ex)
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }

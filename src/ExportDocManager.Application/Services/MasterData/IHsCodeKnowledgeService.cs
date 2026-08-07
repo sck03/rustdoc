@@ -115,7 +115,7 @@ namespace ExportDocManager.Services.MasterData
         Task<int> ReviewRemoteCandidatesAsync(IReadOnlyList<HsCodeRemoteCandidateReviewInput> inputs, CancellationToken cancellationToken = default);
         Task<int> ResetRemoteCandidatesAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default);
         Task RefreshReplacementRelationsAsync(HsCodeImportPreview preview, CancellationToken cancellationToken = default);
-        Task<byte[]> ExportPackageAsync(DateTimeOffset? since = null, CancellationToken cancellationToken = default);
+        Task ExportPackageAsync(Stream destination, DateTimeOffset? since = null, CancellationToken cancellationToken = default);
         Task<HsCodeKnowledgePackagePreview> PreviewPackageAsync(string packagePath, CancellationToken cancellationToken = default);
         Task<HsCodeKnowledgeImportResult> ImportPackageAsync(HsCodeKnowledgePackagePreview preview, CancellationToken cancellationToken = default);
     }

@@ -1,5 +1,6 @@
 using System.Net.Mail;
 using ExportDocManager.Models;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Utils;
@@ -154,13 +155,14 @@ namespace ExportDocManager.Api.Hosting
                             .ToList();
                         if (attachments.Count == 0)
                         {
-                            throw new InvalidOperationException("未能生成任何单据附件。");
+                            throw new ResourceConflictException("未能生成任何单据附件。");
                         }
 
                         string recipient = await ResolveInvoiceDocumentEmailRecipientAsync(
                                 provider,
                                 documentSet.CustomerId,
-                                toAddress)
+                                toAddress,
+                                jobContext.CancellationToken)
                             .ConfigureAwait(false);
                         var jobSettingsService = provider.GetRequiredService<ISettingsService>();
                         var emailConfig = jobSettingsService.Settings?.Email ?? new EmailConfig();
@@ -210,7 +212,8 @@ namespace ExportDocManager.Api.Hosting
         private static async Task<string> ResolveInvoiceDocumentEmailRecipientAsync(
             IServiceProvider provider,
             int customerId,
-            string requestedToAddress)
+            string requestedToAddress,
+            CancellationToken cancellationToken)
         {
             if (!string.IsNullOrWhiteSpace(requestedToAddress))
             {
@@ -220,7 +223,9 @@ namespace ExportDocManager.Api.Hosting
             if (customerId > 0)
             {
                 var customerService = provider.GetRequiredService<ICustomerService>();
-                var customer = await customerService.GetCustomerByIdAsync(customerId).ConfigureAwait(false);
+                var customer = await customerService
+                    .GetCustomerByIdAsync(customerId, cancellationToken)
+                    .ConfigureAwait(false);
                 string customerEmail = customer?.Email?.Trim() ?? string.Empty;
                 if (!string.IsNullOrWhiteSpace(customerEmail))
                 {
@@ -228,7 +233,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             }
 
-            throw new InvalidOperationException("收件人地址不能为空，且当前发票客户档案没有邮箱。");
+            throw new ServiceValidationException("收件人地址不能为空，且当前发票客户档案没有邮箱。");
         }
 
         internal static string BuildInvoiceDocumentEmailSubject(
@@ -291,7 +296,7 @@ namespace ExportDocManager.Api.Hosting
             }
             catch (FormatException ex)
             {
-                throw new InvalidOperationException($"{label}无效：{ex.Message}", ex);
+                throw new ServiceValidationException($"{label}无效：{ex.Message}", ex);
             }
         }
 

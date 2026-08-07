@@ -275,7 +275,7 @@ namespace ExportDocManager.Services.Infrastructure
                 {
                     throw;
                 }
-                throw new TimeoutException("PostgreSQL 客户端工具执行超时。");
+                throw new ServiceTimeoutException("PostgreSQL 客户端工具执行超时。");
             }
 
             string output = (await standardOutput.ConfigureAwait(false)).Trim();

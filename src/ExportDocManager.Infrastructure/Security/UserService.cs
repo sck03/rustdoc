@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 
 namespace ExportDocManager.Services.Security
 {
@@ -158,7 +159,7 @@ namespace ExportDocManager.Services.Security
             {
                 var existing = await context.Users
                     .FirstOrDefaultAsync(item => item.Id == normalized.Id, cancellationToken)
-                    ?? throw new InvalidOperationException("未找到要保存的用户。");
+                    ?? throw new ResourceNotFoundException("未找到要保存的用户。");
 
                 PreventSelfLockout(normalized);
                 existing.Username = normalized.Username;
@@ -186,7 +187,7 @@ namespace ExportDocManager.Services.Security
             EnsureCurrentUserCanManageUsers();
             if (userId <= 0)
             {
-                throw new InvalidOperationException("请选择要删除的用户。");
+                throw new ServiceValidationException("请选择要删除的用户。");
             }
 
             return await AppDbContextExecution.ExecuteInTransactionAsync(
@@ -213,7 +214,7 @@ namespace ExportDocManager.Services.Security
             var username = (user.Username ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(username))
             {
-                throw new InvalidOperationException("用户名不能为空。");
+                throw new ServiceValidationException("用户名不能为空。");
             }
 
             return new User
@@ -243,7 +244,7 @@ namespace ExportDocManager.Services.Security
                     cancellationToken);
             if (duplicate)
             {
-                throw new InvalidOperationException("用户名已存在。");
+                throw new ResourceConflictException("用户名已存在。");
             }
         }
 
@@ -257,7 +258,7 @@ namespace ExportDocManager.Services.Security
 
             if (!normalized.IsActive || !CanManageUsers(normalized))
             {
-                throw new InvalidOperationException("不能停用当前管理员账号或取消自己的管理员角色。");
+                throw new ResourceConflictException("不能停用当前管理员账号或取消自己的管理员角色。");
             }
         }
 
@@ -269,7 +270,7 @@ namespace ExportDocManager.Services.Security
             var currentUser = _currentUserContext?.CurrentUser;
             if (currentUser != null && currentUser.Id == user.Id)
             {
-                throw new InvalidOperationException("不能删除当前登录账号。");
+                throw new ResourceConflictException("不能删除当前登录账号。");
             }
 
             if (IsActiveAdmin(user))
@@ -283,7 +284,7 @@ namespace ExportDocManager.Services.Security
                         cancellationToken);
                 if (!hasAnotherActiveAdmin)
                 {
-                    throw new InvalidOperationException("不能删除最后一个启用的管理员账号。");
+                    throw new ResourceConflictException("不能删除最后一个启用的管理员账号。");
                 }
             }
 
@@ -324,7 +325,7 @@ namespace ExportDocManager.Services.Security
 
             if (hasBusinessData)
             {
-                throw new InvalidOperationException("该用户已有业务数据归属，请停用账号而不是删除。");
+                throw new ResourceConflictException("该用户已有业务数据归属，请停用账号而不是删除。");
             }
         }
 
@@ -338,7 +339,7 @@ namespace ExportDocManager.Services.Security
         {
             if (!CanManageUsers(_currentUserContext?.CurrentUser))
             {
-                throw new UnauthorizedAccessException("只有管理员可以管理用户账号。");
+                throw new PermissionDeniedException("只有管理员可以管理用户账号。");
             }
         }
 
@@ -370,7 +371,7 @@ namespace ExportDocManager.Services.Security
                     template => template.Id == requestedTemplateId && template.IsActive,
                     cancellationToken);
                 if (available) return requestedTemplateId.Value;
-                throw new InvalidOperationException("选择的权限模板不存在或已停用。");
+                throw new ServiceValidationException("选择的权限模板不存在或已停用。");
             }
 
             string defaultCode = BuiltInPermissionTemplateCatalog.FindForRole(role).Code;

@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -39,7 +40,7 @@ namespace ExportDocManager.Infrastructure.Tests
                     new DatabaseConnectionSettings { Provider = DatabaseConnectionSettings.PostgreSqlProvider },
                     new FixedCurrentUserContext(admin));
 
-                var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                var exception = await Assert.ThrowsAsync<ResourceConflictException>(
                     () => service.DeleteUserAsync(target.Id));
                 Assert.Contains("停用账号", exception.Message, StringComparison.Ordinal);
             }

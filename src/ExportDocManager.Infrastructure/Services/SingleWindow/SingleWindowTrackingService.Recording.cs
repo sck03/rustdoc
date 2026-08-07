@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.SingleWindow
@@ -32,10 +33,10 @@ namespace ExportDocManager.Services.SingleWindow
                         .ApplySubmissionBatchScope(context.SwSubmissionBatches, context)
                         .FirstOrDefaultAsync(item => item.BatchReference == batchReference, cancellationToken)
                         .ConfigureAwait(false)
-                        ?? throw new InvalidOperationException("单一窗口提交版本尚未预留或当前账号无权访问。");
+                        ?? throw new ResourceNotFoundException("单一窗口提交版本尚未预留或当前账号无权访问。");
                     if (batch.Status != SingleWindowBatchStatusCatalog.Preparing)
                     {
-                        throw new InvalidOperationException("单一窗口提交版本已完成或已失败，不能重复写入提交包。");
+                        throw new ResourceConflictException("单一窗口提交版本已完成或已失败，不能重复写入提交包。");
                     }
 
                     EnsureManifestMatchesBatch(batch, manifest, requireSourcePackageDigest: false);
@@ -359,7 +360,7 @@ namespace ExportDocManager.Services.SingleWindow
                                    StringComparison.Ordinal);
             if (!sameBinding)
             {
-                throw new InvalidOperationException(
+                throw new ResourceConflictException(
                     "该提交包已绑定其他持卡机或操作卡档案，不能通过重复导入改绑。");
             }
 
@@ -373,7 +374,7 @@ namespace ExportDocManager.Services.SingleWindow
                 StringComparison.Ordinal);
             if (!isAwaitingFirstImport && !isAlreadyImported)
             {
-                throw new InvalidOperationException(
+                throw new ResourceConflictException(
                     "该提交包已经发送或进入回执阶段，不能重复导入并回退批次状态。");
             }
         }
@@ -384,14 +385,14 @@ namespace ExportDocManager.Services.SingleWindow
         {
             if (!_isSqlite)
             {
-                throw new InvalidOperationException("提交包只能导入独立 SQLite 持卡机；PostgreSQL 网络版不承担官方客户端操作。");
+                throw new ServiceValidationException("提交包只能导入独立 SQLite 持卡机；PostgreSQL 网络版不承担官方客户端操作。");
             }
 
             var profile = await _clientProfileService.GetActiveAsync(cancellationToken)
                 .ConfigureAwait(false);
             if (profile.Id <= 0 || !profile.IsEnabled)
             {
-                throw new InvalidOperationException("请先在本持卡机配置公司抬头、操作卡和官方客户端目录，再导入提交包。");
+                throw new ServiceValidationException("请先在本持卡机配置公司抬头、操作卡和官方客户端目录，再导入提交包。");
             }
 
             if (!string.Equals(
@@ -399,7 +400,7 @@ namespace ExportDocManager.Services.SingleWindow
                     manifest.CompanyScope?.Trim(),
                     StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException("提交包公司抬头与本持卡机绑定公司不一致，已拒绝导入。");
+                throw new PermissionDeniedException("提交包公司抬头与本持卡机绑定公司不一致，已拒绝导入。");
             }
 
             if (!string.Equals(profile.StationKey, manifest.StationKey, StringComparison.Ordinal) ||
@@ -407,7 +408,7 @@ namespace ExportDocManager.Services.SingleWindow
                 !string.Equals(profile.CardIdentifier, manifest.CardIdentifier, StringComparison.Ordinal) ||
                 !string.Equals(profile.ProfileName, manifest.ClientProfileName, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException(
+                throw new PermissionDeniedException(
                     "提交包已预分派给其他持卡机、操作档案或操作卡，当前档案不能领取。" );
             }
 
@@ -419,7 +420,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
             if (!canHandle)
             {
-                throw new InvalidOperationException("本持卡机操作卡未启用该单一窗口业务能力。");
+                throw new PermissionDeniedException("本持卡机操作卡未启用该单一窗口业务能力。");
             }
 
             string stationKey = await _stationIdentity
@@ -427,7 +428,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .ConfigureAwait(false);
             if (!string.Equals(profile.StationKey, stationKey, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("本持卡机身份与操作卡档案不一致，请重新保存操作卡配置。");
+                throw new ResourceConflictException("本持卡机身份与操作卡档案不一致，请重新保存操作卡配置。");
             }
 
             SingleWindowPackageIntegrity.ValidateAuthentication(

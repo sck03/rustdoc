@@ -3,6 +3,7 @@ using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using Microsoft.Data.Sqlite;
@@ -56,12 +57,12 @@ namespace ExportDocManager.Services.SingleWindow
         {
             if (sourceInvoiceId <= 0 || sourceDocumentId <= 0)
             {
-                throw new InvalidOperationException("生成单一窗口提交包前必须先保存有效的来源单据。");
+                throw new ServiceValidationException("生成单一窗口提交包前必须先保存有效的来源单据。");
             }
 
             if (string.IsNullOrWhiteSpace(companyScope))
             {
-                throw new InvalidOperationException("发票缺少公司抬头，无法匹配对应操作卡和持卡机。");
+                throw new ServiceValidationException("发票缺少公司抬头，无法匹配对应操作卡和持卡机。");
             }
 
             const int maxAttempts = 5;
@@ -130,7 +131,7 @@ namespace ExportDocManager.Services.SingleWindow
                 }
             }
 
-            throw new InvalidOperationException("无法为单一窗口提交包预留唯一版本，请稍后重试。");
+            throw new ServiceConcurrencyException("无法为单一窗口提交包预留唯一版本，请稍后重试。");
         }
 
         public async Task MarkSubmissionReservationFailedAsync(
@@ -180,30 +181,30 @@ namespace ExportDocManager.Services.SingleWindow
             var batch = await batches
                 .Where(item => item.BatchReference == normalizedReference && item.BusinessType == businessTypeText)
                 .FirstOrDefaultAsync(cancellationToken)
-                ?? throw new InvalidOperationException("未找到当前用户可访问的单一窗口提交批次。");
+                ?? throw new ResourceNotFoundException("未找到当前用户可访问的单一窗口提交批次。");
 
             string normalizedInvoiceNo = invoiceNo?.Trim() ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(normalizedInvoiceNo) &&
                 !string.Equals(batch.InvoiceNo, normalizedInvoiceNo, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("回执文件对应的发票号与提交批次不一致。");
+                throw new ServiceValidationException("回执文件对应的发票号与提交批次不一致。");
             }
 
             if (batch.SourceInvoiceId <= 0 ||
                 batch.SubmissionVersion <= 0 ||
                 string.IsNullOrWhiteSpace(batch.SubmitPackageDigest))
             {
-                throw new InvalidOperationException("提交批次缺少回执绑定所需的来源或摘要信息。");
+                throw new ServiceValidationException("提交批次缺少回执绑定所需的来源或摘要信息。");
             }
 
             if (string.IsNullOrWhiteSpace(batch.AssignedStationKey))
             {
-                throw new InvalidOperationException("提交批次尚未由持卡操作机领取并发送，不能生成回执包。");
+                throw new ResourceConflictException("提交批次尚未由持卡操作机领取并发送，不能生成回执包。");
             }
 
             if (!_isSqlite)
             {
-                throw new InvalidOperationException("回执包只能在独立 SQLite 持卡机上生成。");
+                throw new ServiceValidationException("回执包只能在独立 SQLite 持卡机上生成。");
             }
 
             string currentStationKey = await _stationIdentity
@@ -216,7 +217,7 @@ namespace ExportDocManager.Services.SingleWindow
                 !string.Equals(batch.AssignedCardIdentifier, currentProfile.CardIdentifier, StringComparison.Ordinal) ||
                 !string.Equals(batch.CompanyScope, currentProfile.CompanyScope, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException("回执包只能由导入并发送原提交包的持卡机和操作卡生成。");
+                throw new PermissionDeniedException("回执包只能由导入并发送原提交包的持卡机和操作卡生成。");
             }
 
             return new SingleWindowPackageBinding

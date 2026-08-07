@@ -109,6 +109,18 @@ public sealed class ApiServiceExceptionMapperTests
         Assert.DoesNotContain("sensitive", message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Map_ShouldTreatUnclassifiedInvalidOperationAsInternalFailure()
+    {
+        (int status, string message) = ApiServiceExceptionMapper.Map(
+            new InvalidOperationException("sensitive internal state"),
+            "correlation-invalid-operation");
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, status);
+        Assert.Contains("correlation-invalid-operation", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("sensitive", message, StringComparison.OrdinalIgnoreCase);
+    }
+
     public static TheoryData<Exception, int> ClassifiedExceptions => new()
     {
         { new ServiceValidationException("validation"), StatusCodes.Status400BadRequest },

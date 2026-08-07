@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 
@@ -40,7 +41,7 @@ namespace ExportDocManager.Services.Reporting
 
             if (File.Exists(resolvedPath))
             {
-                throw new IOException("目标模板已存在。");
+                throw new ResourceConflictException("目标模板已存在。");
             }
 
             string title = string.IsNullOrWhiteSpace(displayName)
@@ -130,7 +131,7 @@ namespace ExportDocManager.Services.Reporting
 
             if (File.Exists(resolvedNewPath))
             {
-                throw new IOException("目标模板已存在。");
+                throw new ResourceConflictException("目标模板已存在。");
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(resolvedNewPath)!);

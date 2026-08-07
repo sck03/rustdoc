@@ -59,7 +59,7 @@ namespace ExportDocManager.Services.Core
             var fileInfo = new FileInfo(fullPath);
             if (fileInfo.Length <= 0 || fileInfo.Length > MaxImageBytes)
             {
-                throw new InvalidOperationException("唛头图片大小无效或超过限制。");
+                throw new InvalidDataException("唛头图片大小无效或超过限制。");
             }
 
             byte[] bytes = await File.ReadAllBytesAsync(fullPath, cancellationToken);

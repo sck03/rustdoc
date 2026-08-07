@@ -1,5 +1,6 @@
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.SingleWindow;
 
 namespace ExportDocManager.Infrastructure.Tests
@@ -105,7 +106,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 AssignedCardIdentifier = "CARD-A"
             };
 
-            var error = Assert.Throws<InvalidOperationException>(() =>
+            var error = Assert.Throws<ResourceConflictException>(() =>
                 SingleWindowTrackingService.EnsureSubmitPackageCanBindToStation(
                     batch,
                     batch.AssignedStationKey,
@@ -144,7 +145,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 AssignedCardIdentifier = "CARD-A"
             };
 
-            var error = Assert.Throws<InvalidOperationException>(() =>
+            var error = Assert.Throws<ResourceConflictException>(() =>
                 SingleWindowTrackingService.EnsureSubmitPackageCanBindToStation(
                     batch,
                     batch.AssignedStationKey,

@@ -3,6 +3,7 @@ using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Data;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 
 namespace ExportDocManager.Infrastructure.Tests
@@ -42,7 +43,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public void ExportDefaultTemplate_ShouldInspectAllExportersBeforeSelectingUniqueName()
+        public async Task ExportDefaultTemplate_ShouldQueryAtMostTwoDistinctNames()
         {
             var appRoot = Path.Combine(Path.GetTempPath(), $"excel-template-app-{Guid.NewGuid():N}");
             var dataRoot = Path.Combine(Path.GetTempPath(), $"excel-template-data-{Guid.NewGuid():N}");
@@ -71,17 +72,71 @@ namespace ExportDocManager.Infrastructure.Tests
                     repository,
                     new RuntimeAppPathProvider(appRoot, dataRoot));
 
-                service.ExportDefaultTemplate(outputPath);
+                await service.ExportDefaultTemplateAsync(outputPath);
 
                 using var exported = new XLWorkbook(outputPath);
                 string exporterName = exported.Worksheet(1).Cell("A1").GetString();
-                Assert.True(repository.LastQuery.ReturnAll);
+                Assert.Equal(2, repository.LastDistinctNameLimit);
                 Assert.True(ExcelImportTemplateService.IsTemplateExporterPlaceholder(exporterName));
             }
             finally
             {
                 TryDeleteDirectory(appRoot);
                 TryDeleteDirectory(dataRoot);
+            }
+        }
+
+        [Fact]
+        public void ExportBookingSheet_ShouldClassifySourceOverwriteAsValidationError()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"excel-booking-validation-{Guid.NewGuid():N}");
+            string sourcePath = Path.Combine(root, "source.xlsx");
+
+            try
+            {
+                Directory.CreateDirectory(root);
+                File.WriteAllText(sourcePath, "source-marker");
+                var service = new ExcelImportTemplateService(
+                    new StubSettingsService(),
+                    new StubExporterReadRepository(),
+                    new RuntimeAppPathProvider(root, Path.Combine(root, "data")));
+
+                var error = Assert.Throws<ServiceValidationException>(() =>
+                    service.ExportBookingSheet(sourcePath, sourcePath));
+
+                Assert.Contains("不能覆盖源 Excel", error.Message, StringComparison.Ordinal);
+            }
+            finally
+            {
+                TryDeleteDirectory(root);
+            }
+        }
+
+        [Fact]
+        public void ExportBookingSheet_ShouldClassifyExistingTargetAsConflict()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"excel-booking-conflict-{Guid.NewGuid():N}");
+            string sourcePath = Path.Combine(root, "source.xlsx");
+            string targetPath = Path.Combine(root, "target.xlsx");
+
+            try
+            {
+                Directory.CreateDirectory(root);
+                File.WriteAllText(sourcePath, "source-marker");
+                File.WriteAllText(targetPath, "target-marker");
+                var service = new ExcelImportTemplateService(
+                    new StubSettingsService(),
+                    new StubExporterReadRepository(),
+                    new RuntimeAppPathProvider(root, Path.Combine(root, "data")));
+
+                var error = Assert.Throws<ResourceConflictException>(() =>
+                    service.ExportBookingSheet(sourcePath, targetPath, overwrite: false));
+
+                Assert.Contains("目标文件已存在", error.Message, StringComparison.Ordinal);
+            }
+            finally
+            {
+                TryDeleteDirectory(root);
             }
         }
 
@@ -118,6 +173,8 @@ namespace ExportDocManager.Infrastructure.Tests
 
             public ExporterReadQuery LastQuery { get; private set; } = new();
 
+            public int LastDistinctNameLimit { get; private set; }
+
             public Task<IReadOnlyList<Exporter>> QueryAsync(
                 ExporterReadQuery query,
                 CancellationToken cancellationToken = default)
@@ -134,6 +191,20 @@ namespace ExportDocManager.Infrastructure.Tests
                 CancellationToken cancellationToken = default)
             {
                 return Task.FromResult(new PagedResult<Exporter>([], 0, 1, 50));
+            }
+
+            public Task<IReadOnlyList<string>> QueryDistinctChineseNamesAsync(
+                int maxCount = 2,
+                CancellationToken cancellationToken = default)
+            {
+                LastDistinctNameLimit = maxCount;
+                IReadOnlyList<string> result = _exporters
+                    .Select(exporter => exporter?.ExporterNameCN?.Trim())
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(Math.Clamp(maxCount, 1, 10))
+                    .ToArray();
+                return Task.FromResult(result);
             }
         }
     }

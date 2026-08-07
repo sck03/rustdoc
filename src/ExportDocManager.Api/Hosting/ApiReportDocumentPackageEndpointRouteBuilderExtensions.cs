@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Core;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Utils;
@@ -353,7 +354,7 @@ namespace ExportDocManager.Api.Hosting
                 .ToList();
             if (entries.Count == 0)
             {
-                throw new InvalidOperationException("当前没有需要导出的单据 PDF。");
+                throw new ResourceNotFoundException("当前没有需要导出的单据 PDF。");
             }
 
             int range = Math.Max(1, endProgress - startProgress);

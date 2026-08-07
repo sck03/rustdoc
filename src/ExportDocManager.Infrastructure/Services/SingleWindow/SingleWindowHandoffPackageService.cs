@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using ExportDocManager.Services.Infrastructure;
 
@@ -126,7 +127,7 @@ namespace ExportDocManager.Services.SingleWindow
                         break;
                     }
                     default:
-                        throw new InvalidOperationException("不支持的单一窗口业务类型。");
+                        throw new ServiceValidationException("不支持的单一窗口业务类型。");
                 }
 
                 EnsureAssignmentMatchesDocument(stationAssignment, businessType, companyScope);
@@ -214,7 +215,7 @@ namespace ExportDocManager.Services.SingleWindow
                     cancellationToken);
                 if (trackingBatchId != reservation.BatchId)
                 {
-                    throw new InvalidOperationException("单一窗口提交包跟踪批次与版本预留不一致。");
+                    throw new ServiceConcurrencyException("单一窗口提交包跟踪批次与版本预留不一致。");
                 }
 
                 return new SingleWindowHandoffPackageResult
@@ -394,7 +395,7 @@ namespace ExportDocManager.Services.SingleWindow
                     companyScope?.Trim(),
                     StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException(
+                throw new PermissionDeniedException(
                     "持卡机授权码绑定的公司抬头与当前单据不一致。" );
             }
 
@@ -406,7 +407,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
             if (!canHandle)
             {
-                throw new InvalidOperationException("目标操作档案未启用当前单一窗口业务。" );
+                throw new PermissionDeniedException("目标操作档案未启用当前单一窗口业务。" );
             }
         }
     }

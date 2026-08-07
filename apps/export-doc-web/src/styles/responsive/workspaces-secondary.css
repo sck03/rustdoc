@@ -1,0 +1,414 @@
+@media (max-width: 860px) {
+
+  .confirmation-dialog-backdrop {
+    padding: 10px;
+  }
+
+  .confirmation-dialog {
+    width: calc(100vw - 20px);
+    padding: 15px;
+  }
+
+  .confirmation-dialog-footer {
+    flex-direction: column-reverse;
+  }
+
+  .confirmation-dialog-footer .command-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .query-export-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .query-inline-actions {
+    justify-content: flex-start;
+  }
+
+  .user-management-layout,
+  .permission-template-layout,
+  .permission-module-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-log-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-log-detail {
+    min-height: 280px;
+  }
+
+  .smart-ocr-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .smart-ocr-side-panel {
+    grid-template-rows: auto auto;
+  }
+
+  .smart-ocr-preview-panel .section-header span,
+  .smart-ocr-result-panel .section-header span {
+    max-width: 100%;
+  }
+
+  .smart-ocr-preview-viewport,
+  .smart-ocr-preview-empty {
+    min-height: 300px;
+  }
+
+  .smart-ocr-result-panel textarea {
+    min-height: 280px;
+  }
+
+  .exchange-rate-detail-grid,
+  .exchange-rate-layout,
+  .update-center-detail-grid,
+  .update-center-layout,
+  .update-package-detail-grid,
+  .mandatory-update-detail-grid,
+  .email-status-detail-grid,
+  .email-tool-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .startup-update-banner {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .startup-update-banner .command-button {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .exchange-rate-table-frame,
+  .currency-chip-list,
+  .update-release-notes,
+  .email-attachment-table-frame {
+    min-height: 280px;
+  }
+
+  .email-status-detail-grid .detail-item-wide {
+    grid-column: auto;
+  }
+
+  .field-grid-wide {
+    grid-template-columns: 1fr;
+  }
+
+  .report-preview-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .report-template-selector,
+  .report-template-tools {
+    width: 100%;
+    max-width: none;
+  }
+
+  .report-template-selector {
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .report-template-inline-field {
+    flex: 1 1 240px;
+  }
+
+  .report-template-inline-field select {
+    flex: 1 1 180px;
+    width: auto;
+    max-width: none;
+  }
+
+  .report-template-tools,
+  .report-export-actions {
+    justify-content: flex-start;
+  }
+
+  .report-template-tools .command-button,
+  .report-export-actions .command-button {
+    flex: 1 1 140px;
+    justify-content: center;
+  }
+
+  .report-template-action-group {
+    flex: 1 1 260px;
+    justify-content: flex-start;
+  }
+
+  .report-template-action-group + .report-template-action-group {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .report-export-advanced summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .report-export-advanced summary small {
+    white-space: normal;
+  }
+
+  .report-pdf-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .document-package-rules-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .document-package-template-row {
+    grid-template-columns: 1fr;
+  }
+
+  .document-email-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .document-email-actions {
+    justify-content: stretch;
+  }
+
+  .document-email-actions .command-button,
+  .document-email-actions .toggle-field {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .report-template-grid {
+    grid-template-columns: 1fr;
+    min-width: 0;
+    overflow-x: visible;
+  }
+
+  .report-template-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .template-selection-panel {
+    grid-column: auto;
+    grid-row: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .template-actions-panel,
+  .template-package-panel {
+    grid-column: auto;
+  }
+
+  .template-management-section,
+  .template-package-content,
+  .template-package-command-section,
+  .template-inline-details-content,
+  .template-package-advanced-content {
+    grid-template-columns: 1fr;
+  }
+
+  .template-management-actions,
+  .template-management-panel > .command-button {
+    flex: 1 1 140px;
+  }
+
+  .report-template-workspace-tabs {
+    width: 100%;
+  }
+
+  .report-template-preview-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .report-template-preview-actions {
+    justify-content: stretch;
+  }
+
+  .report-template-preview-actions .command-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .report-template-editor textarea,
+  .report-template-preview iframe {
+    min-height: 420px;
+  }
+
+  .segmented-control {
+    width: 100%;
+  }
+
+  .new-report-designer {
+    min-height: auto;
+    padding: 10px;
+  }
+
+  .new-report-designer-header {
+    grid-template-columns: 1fr;
+  }
+
+  .new-report-designer-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .new-report-designer-sidebar,
+  .new-report-designer-right-rail {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .new-report-designer-canvas {
+    min-height: 480px;
+  }
+
+  .section-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .shipping-mark-mode-row,
+  .shipping-mark-image-actions,
+  .shipping-mark-toolbar,
+  .shipping-mark-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .shipping-mark-mode-control,
+  .shipping-mark-image-actions .command-button {
+    width: 100%;
+  }
+
+  .shipping-mark-image-actions .command-button {
+    justify-content: center;
+  }
+
+  .shipping-mark-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
+    min-height: min(560px, calc(100vh - 20px));
+    min-height: min(560px, calc(100dvh - 20px));
+  }
+
+  .shipping-mark-canvas-shell {
+    padding: 8px;
+  }
+
+  .shipping-mark-canvas {
+    width: 100%;
+  }
+
+  .single-window-toolbar .search-form,
+  .filter-bar {
+    width: 100%;
+    max-width: none;
+  }
+
+  .inline-filter {
+    flex: 1 1 150px;
+  }
+
+  .inline-filter select {
+    width: 100%;
+  }
+
+  .detail-grid,
+  .single-window-client-folder-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-center-list-action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-center-list-action-grid .path-field,
+  .operation-center-list-action-grid .detail-item-wide {
+    grid-column: auto;
+  }
+
+  .single-window-station-fields,
+  .single-window-capability-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .single-window-mode-banner {
+    align-items: flex-start;
+  }
+
+  .single-window-station-profile .section-header,
+  .single-window-intake-card .section-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .single-window-station-profile .section-header .toolbar-actions,
+  .single-window-intake-card .section-header .toolbar-actions,
+  .single-window-profile-switch-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .single-window-station-profile .section-header .command-button,
+  .single-window-intake-card .section-header .command-button,
+  .single-window-profile-switch-actions .command-button {
+    flex: 1 1 150px;
+    justify-content: center;
+  }
+
+  .runtime-detail-grid .detail-item-wide {
+    grid-column: auto;
+  }
+
+  .customs-coo-summary-grid,
+  .single-window-document-summary-grid,
+  .handoff-result-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .single-window-export-review-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-consignment-workbench,
+  .agent-consignment-documents-grid,
+  .agent-consignment-receipt-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .coo-items-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .coo-items-rail {
+    max-height: 320px;
+  }
+
+  .coo-items-list {
+    max-height: 268px;
+  }
+
+  .coo-item-detail-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .coo-item-detail-actions {
+    justify-content: flex-start;
+  }
+
+  .single-window-review-subheader .toolbar-actions {
+    justify-content: flex-start;
+  }
+
+  .receipt-package-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-item-wide {
+    grid-column: auto;
+  }
+}

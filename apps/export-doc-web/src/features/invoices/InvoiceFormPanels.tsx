@@ -12,6 +12,7 @@ import {
   HsCodeKnowledgeFeedbackInput,
 } from "../../api/index.ts";
 import { DateField, EditableComboField, NumberField, SelectField, TextAreaField, TextField } from "../../ui/FormFields.tsx";
+import { RemoteSelectField } from "../../ui/RemoteSelectField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
@@ -215,8 +216,9 @@ export function InvoiceBasicInfoPanel({
 
 export function InvoicePartiesPanel({
   invoice,
-  customers,
-  exporters,
+  client,
+  selectedCustomer,
+  selectedExporter,
   isBusy,
   isEditable,
   message,
@@ -228,8 +230,9 @@ export function InvoicePartiesPanel({
   onSealError,
 }: {
   invoice: ApiInvoiceDetailDto;
-  customers: ApiCustomerDto[];
-  exporters: ApiExporterDto[];
+  client: ExportDocManagerApiClient;
+  selectedCustomer?: ApiCustomerDto | null;
+  selectedExporter?: ApiExporterDto | null;
   isBusy: boolean;
   isEditable: boolean;
   message: string | null;
@@ -240,14 +243,9 @@ export function InvoicePartiesPanel({
   onSealUpload: (sealType: ExporterSealType, file: File) => void;
   onSealError: (error: unknown) => void;
 }) {
-  function applyCustomer(customerId: string) {
-    if (!customerId) {
-      onChange({ customerId: undefined });
-      return;
-    }
-
-    const customer = customers.find((item) => item.id === Number(customerId));
+  function applyCustomer(customer: ApiCustomerDto | null) {
     if (!customer) {
+      onChange({ customerId: undefined });
       return;
     }
 
@@ -260,14 +258,9 @@ export function InvoicePartiesPanel({
     });
   }
 
-  function applyExporter(exporterId: string) {
-    if (!exporterId) {
-      onChange({ exporterId: undefined });
-      return;
-    }
-
-    const exporter = exporters.find((item) => item.id === Number(exporterId));
+  function applyExporter(exporter: ApiExporterDto | null) {
     if (!exporter) {
+      onChange({ exporterId: undefined });
       return;
     }
 
@@ -285,7 +278,6 @@ export function InvoicePartiesPanel({
     });
   }
 
-  const selectedExporter = exporters.find((item) => item.id === invoice.exporterId) ?? null;
   const sealActionDisabled = !canManageExporterSeals || !selectedExporter || sealBusy;
   const sealActionTitle = !selectedExporter
     ? "请先选择出口商档案"
@@ -306,16 +298,22 @@ export function InvoicePartiesPanel({
         <section className="invoice-party-group" aria-label="客户信息">
           <div className="invoice-party-group-heading"><strong>客户信息</strong><span>选择客户档案后可继续调整本张发票内容</span></div>
           <div className="field-grid">
-          <SelectField
-          label="客户档案"
-          value={invoice.customerId && invoice.customerId > 0 ? String(invoice.customerId) : ""}
-          disabled={isBusy || !isEditable}
-          options={customers.map((customer) => ({
-            value: String(customer.id),
-            label: customer.displayName || customer.customerNameEN || "-",
-          }))}
-          onChange={applyCustomer}
-        />
+          <RemoteSelectField<ApiCustomerDto>
+            label="客户档案"
+            value={invoice.customerId && invoice.customerId > 0 ? String(invoice.customerId) : ""}
+            selectedOption={selectedCustomer}
+            selectedLabel={invoice.customerNameEN || undefined}
+            disabled={isBusy || !isEditable}
+            queryKey={["master-data", "customers", "lookup"]}
+            loadOptions={async (keyword, signal) => (await client.listCustomersPage({
+              keyword: keyword || undefined,
+              pageNumber: 1,
+              pageSize: 50,
+            }, { signal })).items}
+            getValue={(customer) => String(customer.id)}
+            getLabel={(customer) => customer.displayName || customer.customerNameEN || "-"}
+            onChange={applyCustomer}
+          />
           <TextField
             className="field-grid-span-2"
             label="客户英文名"
@@ -350,16 +348,22 @@ export function InvoicePartiesPanel({
         <section className="invoice-party-group invoice-party-group-exporter" aria-label="出口商与收款信息">
           <div className="invoice-party-group-heading"><strong>出口商与收款信息</strong><span>企业身份、银行与印章集中维护</span></div>
           <div className="field-grid">
-          <SelectField
-          label="出口商档案"
-          value={invoice.exporterId && invoice.exporterId > 0 ? String(invoice.exporterId) : ""}
-          disabled={isBusy || !isEditable}
-          options={exporters.map((exporter) => ({
-            value: String(exporter.id),
-            label: exporter.exporterNameEN || exporter.exporterNameCN || "-",
-          }))}
-          onChange={applyExporter}
-        />
+          <RemoteSelectField<ApiExporterDto>
+            label="出口商档案"
+            value={invoice.exporterId && invoice.exporterId > 0 ? String(invoice.exporterId) : ""}
+            selectedOption={selectedExporter}
+            selectedLabel={invoice.exporterNameEN || invoice.exporterNameCN || undefined}
+            disabled={isBusy || !isEditable}
+            queryKey={["master-data", "exporters", "lookup"]}
+            loadOptions={async (keyword, signal) => (await client.listExportersPage({
+              keyword: keyword || undefined,
+              pageNumber: 1,
+              pageSize: 50,
+            }, { signal })).items}
+            getValue={(exporter) => String(exporter.id)}
+            getLabel={(exporter) => exporter.exporterNameEN || exporter.exporterNameCN || "-"}
+            onChange={applyExporter}
+          />
         <TextField
           className="field-grid-span-2"
           label="出口商英文名"

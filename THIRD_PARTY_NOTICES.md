@@ -749,21 +749,21 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | utrie | 1.0.2 | MIT | web |
 | npm | vite | 7.3.6 | MIT | web |
 | npm | yallist | 3.1.1 | ISC | web |
-| nuget | bblanchon.PDFium.Linux | 147.0.7690 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | bblanchon.PDFium.macOS | 147.0.7690 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | bblanchon.PDFium.Win32 | 147.0.7690 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | bblanchon.PDFium.Linux | 152.0.7961 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | bblanchon.PDFium.macOS | 152.0.7961 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | bblanchon.PDFium.Win32 | 152.0.7961 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | BouncyCastle.Cryptography | 2.6.2 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
-| nuget | ClosedXML | 0.105.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | ClosedXML | 0.105.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | ClosedXML.Parser | 2.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | DocumentFormat.OpenXml | 3.1.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | DocumentFormat.OpenXml.Framework | 3.1.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | Enums.NET | 5.0.0 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
-| nuget | ExcelDataReader | 3.8.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | ExcelDataReader | 3.9.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | ExcelNumberFormat | 1.1.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | ExtendedNumerics.BigDecimal | 2025.1001.2.129 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
 | nuget | HtmlAgilityPack | 1.12.4 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | MathNet.Numerics.Signed | 5.0.0 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
-| nuget | Microsoft.Bcl.AsyncInterfaces | 6.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | Microsoft.Bcl.AsyncInterfaces | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | Microsoft.CodeCoverage | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | nuget | Microsoft.Data.Sqlite | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | Microsoft.Data.Sqlite.Core | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
@@ -794,40 +794,49 @@ This file is the unified redistribution notice for package-manager dependencies 
 | nuget | Npgsql.EntityFrameworkCore.PostgreSQL | 10.0.3 | PostgreSQL | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | NPOI | 2.7.6 | Apache-2.0 | ExportDocManager.Infrastructure.Tests.csproj |
 | nuget | NSax | 1.0.2 | LGPL-3.0-only | ExportDocManager.Infrastructure.Tests.csproj |
-| nuget | PdfPig | 0.1.14 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | PdfPig | 0.1.15 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | PDFsharp | 6.2.4 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | PDFtoImage | 5.2.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | PDFtoImage | 5.3.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | RBush.Signed | 4.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | Scriban | 7.2.3 | BSD-2-Clause | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | Serilog | 4.3.1 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | Scriban | 7.2.6 | BSD-2-Clause | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | Serilog | 4.4.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | SharpZipLib | 1.4.2 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
 | nuget | SixLabors.Fonts | 1.0.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | SixLabors.Fonts | 1.0.1 | Apache-2.0 | ExportDocManager.Infrastructure.Tests.csproj |
 | nuget | SixLabors.ImageSharp | 2.1.11 | Apache-2.0 | ExportDocManager.Infrastructure.Tests.csproj |
-| nuget | SkiaSharp | 3.119.2 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | SkiaSharp.NativeAssets.Linux.NoDependencies | 3.119.2 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | SkiaSharp.NativeAssets.macOS | 3.119.2 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | SkiaSharp.NativeAssets.Win32 | 3.119.2 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | SQLitePCLRaw.bundle_e_sqlite3 | 2.1.12 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | SQLitePCLRaw.core | 2.1.12 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | SQLitePCLRaw.lib.e_sqlite3 | 2.1.12 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | SQLitePCLRaw.provider.e_sqlite3 | 2.1.12 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | SkiaSharp | 4.150.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | SkiaSharp.NativeAssets.Linux.NoDependencies | 4.150.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | SkiaSharp.NativeAssets.macOS | 4.150.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | SkiaSharp.NativeAssets.Win32 | 4.150.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | SQLite | 3.53.4 | LicenseRef-SQLite-Public-Domain | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | SQLitePCLRaw.bundle_e_sqlite3 | 3.0.5 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | SQLitePCLRaw.config.e_sqlite3 | 3.0.5 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | SQLitePCLRaw.core | 3.0.5 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | SQLitePCLRaw.provider.e_sqlite3 | 3.0.5 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | System.ComponentModel.Annotations | 5.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | System.IO.Packaging | 8.0.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | System.Numerics.Tensors | 9.0.0 | MIT | ExportDocManager.Infrastructure.csproj |
-| nuget | System.Security.Cryptography.Pkcs | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | System.Security.Cryptography.Pkcs | 8.0.1 | MIT | ExportDocManager.Api.csproj |
+| nuget | System.IO.Packaging | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| nuget | System.Numerics.Tensors | 10.0.10 | MIT | ExportDocManager.Infrastructure.csproj |
+| nuget | System.Security.Cryptography.Pkcs | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | System.Security.Cryptography.ProtectedData | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | System.Security.Cryptography.Xml | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| nuget | xunit | 2.9.2 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| nuget | xunit | 2.9.3 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | nuget | xunit.abstractions | 2.0.3 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
-| nuget | xunit.analyzers | 1.16.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
-| nuget | xunit.assert | 2.9.2 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
-| nuget | xunit.core | 2.9.2 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
-| nuget | xunit.extensibility.core | 2.9.2 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
-| nuget | xunit.extensibility.execution | 2.9.2 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
-| nuget | xunit.runner.visualstudio | 2.8.2 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| nuget | xunit.analyzers | 1.18.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| nuget | xunit.assert | 2.9.3 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| nuget | xunit.core | 2.9.3 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| nuget | xunit.extensibility.core | 2.9.3 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| nuget | xunit.extensibility.execution | 2.9.3 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| nuget | xunit.runner.visualstudio | 3.1.5 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | nuget | ZString | 2.6.0 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
+
+## Extracted package license references
+
+### SQLite Public Domain Dedication (LicenseRef-SQLite-Public-Domain)
+
+SQLite is Public Domain
+
+https://sqlite.org/copyright.html
+
 
 ## Bundled runtime assets
 

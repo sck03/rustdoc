@@ -80,8 +80,9 @@ namespace ExportDocManager.Api.Hosting
                     jobContext.CancellationToken.ThrowIfCancellationRequested();
 
                     var templateService = provider.GetRequiredService<IExcelImportTemplateService>();
-                    string outputPath = await Task.Run(
-                        () => templateService.ExportDefaultTemplate(destinationPath, overwrite: true),
+                    string outputPath = await templateService.ExportDefaultTemplateAsync(
+                        destinationPath,
+                        overwrite: true,
                         jobContext.CancellationToken);
 
                     jobContext.Report(95, "正在保存 Excel 模板", Path.GetFileName(outputPath), outputPath);

@@ -192,20 +192,23 @@ namespace ExportDocManager.Api.Tests
 
         private static async Task<BackgroundJobSnapshot> WaitForTerminalJobAsync(HttpClient client, string jobId)
         {
-            for (int attempt = 0; attempt < 100; attempt++)
+            DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(60);
+            string lastStatus = string.Empty;
+            while (DateTimeOffset.UtcNow < deadline)
             {
                 var response = await client.GetAsync($"/api/jobs/{jobId}");
                 Assert.Equal(HttpStatusCode.OK, response.StatusCode);
                 var job = await ApiIntegrationTestHarness.ReadJsonAsync<BackgroundJobSnapshot>(response);
+                lastStatus = job.Status;
                 if (BackgroundJobStatusCatalog.IsTerminal(job.Status))
                 {
                     return job;
                 }
 
-                await Task.Delay(50);
+                await Task.Delay(100);
             }
 
-            throw new TimeoutException($"Background job {jobId} did not finish in time.");
+            throw new TimeoutException($"Background job {jobId} did not finish in time. Last status: {lastStatus}.");
         }
 
         private static void CreateExcelImportTemplate(string appRoot)

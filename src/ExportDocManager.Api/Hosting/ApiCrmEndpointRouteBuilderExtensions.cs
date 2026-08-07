@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Crm;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Opportunities;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
@@ -41,8 +42,7 @@ namespace ExportDocManager.Api.Hosting
                     int affected = await service.UpdateCustomerStatusAsync(request?.Ids ?? [], request?.Status ?? string.Empty, ct);
                     return Results.Ok(new ApiCrmCustomerBatchStatusResult(affected, request.Status));
                 }
-                catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
-                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
+                catch (ServiceException ex) { return WriteServiceException(ex); }
             }).WithName("UpdateCrmCustomerBatchStatus");
 
             endpoints.MapGet("/api/crm/customers/export", async (HttpContext context, IApiSessionTokenService tokens,
@@ -63,7 +63,7 @@ namespace ExportDocManager.Api.Hosting
                     var saved = await service.SaveCustomerAsync(ToSaveRequest(request, 0), ct);
                     return Results.Created($"/api/crm/customers/{saved.Id}", ToApiDto(saved));
                 }
-                catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
+                catch (ServiceException ex) { return WriteServiceException(ex); }
             }).WithName("CreateCrmCustomer");
 
             endpoints.MapPut("/api/crm/customers/{id:int}", async (HttpContext context, IApiSessionTokenService tokens,
@@ -73,9 +73,7 @@ namespace ExportDocManager.Api.Hosting
                 if (request == null || id <= 0 || (request.Id > 0 && request.Id != id))
                     return Results.BadRequest(new ApiErrorResponse("CRM 客户ID无效。"));
                 try { return Results.Ok(ToApiDto(await service.SaveCustomerAsync(ToSaveRequest(request, id), ct))); }
-                catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
-                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
-                catch (KeyNotFoundException) { return Results.NotFound(); }
+                catch (ServiceException ex) { return WriteServiceException(ex); }
             }).WithName("UpdateCrmCustomer");
 
             endpoints.MapDelete("/api/crm/customers/{id:int}", async (HttpContext context, IApiSessionTokenService tokens,
@@ -88,7 +86,7 @@ namespace ExportDocManager.Api.Hosting
                         ? Results.Ok(new ApiCommandResponse(true, "CRM 客户已删除。"))
                         : Results.NotFound();
                 }
-                catch (InvalidOperationException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
+                catch (ServiceException ex) { return WriteServiceException(ex); }
             }).WithName("DeleteCrmCustomer");
 
             endpoints.MapPost("/api/crm/import/preview", async (HttpContext context, IApiSessionTokenService tokens,
@@ -130,7 +128,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (!HasSalesAccess(context, tokens, auth, out var denied)) return denied;
                 try { return Results.Ok(ToApiDto(await service.GetEmailVariableDraftAsync(customerId, ct))); }
-                catch (KeyNotFoundException) { return Results.NotFound(); }
+                catch (ServiceException ex) { return WriteServiceException(ex); }
             }).WithName("GetCrmEmailVariableDraft");
 
             endpoints.MapGet("/api/crm/customers/{customerId:int}/contacts", async (HttpContext context,
@@ -150,9 +148,7 @@ namespace ExportDocManager.Api.Hosting
                     var saved = await service.SaveContactAsync(ToSaveRequest(request, customerId, 0), ct);
                     return Results.Created($"/api/crm/customers/{customerId}/contacts/{saved.Id}", ToApiDto(saved));
                 }
-                catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
-                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
-                catch (KeyNotFoundException) { return Results.NotFound(); }
+                catch (ServiceException ex) { return WriteServiceException(ex); }
             }).WithName("CreateCrmContact");
 
             endpoints.MapPut("/api/crm/customers/{customerId:int}/contacts/{id:int}", async (HttpContext context,
@@ -163,9 +159,7 @@ namespace ExportDocManager.Api.Hosting
                 if (request == null || id <= 0 || (request.Id > 0 && request.Id != id))
                     return Results.BadRequest(new ApiErrorResponse("联系人ID无效。"));
                 try { return Results.Ok(ToApiDto(await service.SaveContactAsync(ToSaveRequest(request, customerId, id), ct))); }
-                catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
-                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
-                catch (KeyNotFoundException) { return Results.NotFound(); }
+                catch (ServiceException ex) { return WriteServiceException(ex); }
             }).WithName("UpdateCrmContact");
 
             endpoints.MapDelete("/api/crm/customers/{customerId:int}/contacts/{id:int}", async (HttpContext context,
@@ -179,7 +173,7 @@ namespace ExportDocManager.Api.Hosting
                         ? Results.Ok(new ApiCommandResponse(true, "联系人已删除，历史跟进仍保留。"))
                         : Results.NotFound();
                 }
-                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
+                catch (ServiceException ex) { return WriteServiceException(ex); }
             }).WithName("DeleteCrmContact");
 
             endpoints.MapGet("/api/crm/follow-ups", async (HttpContext context, IApiSessionTokenService tokens,
@@ -206,9 +200,7 @@ namespace ExportDocManager.Api.Hosting
                 if (!HasSalesAccess(context, tokens, auth, out var denied)) return denied;
                 if (request == null || request.Id > 0) return Results.BadRequest(new ApiErrorResponse("新增跟进不能包含已有ID。"));
                 try { return Results.Ok(ToApiDto(await service.SaveFollowUpAsync(ToSaveRequest(request, 0), ct))); }
-                catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
-                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
-                catch (KeyNotFoundException) { return Results.NotFound(); }
+                catch (ServiceException ex) { return WriteServiceException(ex); }
             }).WithName("CreateCrmFollowUp");
 
             endpoints.MapPut("/api/crm/follow-ups/{id:int}", async (HttpContext context, IApiSessionTokenService tokens,
@@ -217,9 +209,7 @@ namespace ExportDocManager.Api.Hosting
                 if (!HasSalesAccess(context, tokens, auth, out var denied)) return denied;
                 if (request == null || id <= 0) return Results.BadRequest(new ApiErrorResponse("跟进记录ID无效。"));
                 try { return Results.Ok(ToApiDto(await service.SaveFollowUpAsync(ToSaveRequest(request, id), ct))); }
-                catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
-                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
-                catch (KeyNotFoundException) { return Results.NotFound(); }
+                catch (ServiceException ex) { return WriteServiceException(ex); }
             }).WithName("UpdateCrmFollowUp");
 
             endpoints.MapDelete("/api/crm/follow-ups/{id:int}", async (HttpContext context, IApiSessionTokenService tokens,
@@ -232,7 +222,7 @@ namespace ExportDocManager.Api.Hosting
                         ? Results.Ok(new ApiCommandResponse(true, "跟进记录已删除。"))
                         : Results.NotFound();
                 }
-                catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
+                catch (ServiceException ex) { return WriteServiceException(ex); }
             }).WithName("DeleteCrmFollowUp");
         }
 

@@ -12,7 +12,7 @@ namespace ExportDocManager.Api.Tests
     public sealed class ApiMultiUserInfrastructureTests
     {
         [Fact]
-        public void DatabaseSessionService_ShouldPersistOnlyTokenHashAndHonorRevocation()
+        public async Task DatabaseSessionService_ShouldPersistOnlyTokenHashAndHonorRevocation()
         {
             using var database = TestDatabase.Create("sessions");
             int userId;
@@ -49,7 +49,7 @@ namespace ExportDocManager.Api.Tests
             }
 
             var service = new DatabaseApiSessionTokenService(database.Factory);
-            var issued = service.Issue(new User
+            var issued = await service.IssueAsync(new User
             {
                 Id = userId,
                 Username = "team-user",
@@ -67,18 +67,18 @@ namespace ExportDocManager.Api.Tests
                 Assert.Equal(64, stored.TokenHash.Length);
             }
 
-            var validated = service.Validate(issued.AccessToken);
+            var validated = await service.ValidateAsync(issued.AccessToken);
             Assert.Equal("team-user", validated?.Username);
             Assert.Equal(
                 PermissionAccessLevel.View,
                 validated?.EffectiveModuleAccess[PermissionModuleCatalog.DocumentInvoices]);
-            Assert.Equal(1, service.RevokeUserSessions(userId));
-            Assert.Null(service.Validate(issued.AccessToken));
-            Assert.Equal(0, service.RevokeUserSessions(userId));
+            Assert.Equal(1, await service.RevokeUserSessionsAsync(userId));
+            Assert.Null(await service.ValidateAsync(issued.AccessToken));
+            Assert.Equal(0, await service.RevokeUserSessionsAsync(userId));
         }
 
         [Fact]
-        public void DatabaseSessionService_ShouldRejectDisabledUser()
+        public async Task DatabaseSessionService_ShouldRejectDisabledUser()
         {
             using var database = TestDatabase.Create("disabled-session");
             User user;
@@ -97,7 +97,7 @@ namespace ExportDocManager.Api.Tests
             }
 
             var service = new DatabaseApiSessionTokenService(database.Factory);
-            var issued = service.Issue(user);
+            var issued = await service.IssueAsync(user);
             using (var context = database.Factory.CreateDbContext())
             {
                 var storedUser = context.Users.Single(item => item.Id == user.Id);
@@ -105,9 +105,62 @@ namespace ExportDocManager.Api.Tests
                 context.SaveChanges();
             }
 
-            Assert.Null(service.Validate(issued.AccessToken));
+            Assert.Null(await service.ValidateAsync(issued.AccessToken));
             using var verificationContext = database.Factory.CreateDbContext();
             Assert.NotNull(verificationContext.ApiUserSessions.Single().RevokedAt);
+        }
+
+        [Fact]
+        public async Task DatabaseSessionCleanup_ShouldContinueBeyondMaximumScanBatch()
+        {
+            using var database = TestDatabase.Create("session-cleanup-cursor");
+            var now = DateTimeOffset.UtcNow;
+            User user;
+            using (var context = database.Factory.CreateDbContext())
+            {
+                user = new User
+                {
+                    Username = "cleanup-user",
+                    PasswordHash = "hash",
+                    FullName = "Cleanup User",
+                    Role = "User",
+                    IsActive = true
+                };
+                context.Users.Add(user);
+                context.SaveChanges();
+
+                var activeSessions = Enumerable.Range(0, 10_000)
+                    .Select(index => new ApiUserSession
+                    {
+                        UserId = user.Id,
+                        TokenHash = index.ToString("X64"),
+                        CreatedAt = now,
+                        ExpiresAt = now.AddDays(1),
+                        LastAccessAt = now
+                    });
+                context.ApiUserSessions.AddRange(activeSessions);
+                context.ApiUserSessions.Add(new ApiUserSession
+                {
+                    UserId = user.Id,
+                    TokenHash = 10_000.ToString("X64"),
+                    CreatedAt = now.AddDays(-9),
+                    ExpiresAt = now.AddDays(-8),
+                    LastAccessAt = now.AddDays(-8)
+                });
+                context.SaveChanges();
+            }
+
+            var service = new DatabaseApiSessionTokenService(database.Factory);
+            await service.IssueAsync(user);
+            typeof(DatabaseApiSessionTokenService)
+                .GetField("_nextCleanupUtcTicks", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.SetValue(service, 0L);
+            await service.IssueAsync(user);
+
+            using var verificationContext = database.Factory.CreateDbContext();
+            Assert.DoesNotContain(
+                verificationContext.ApiUserSessions.AsNoTracking(),
+                session => session.TokenHash == 10_000.ToString("X64"));
         }
 
         [Fact]

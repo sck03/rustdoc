@@ -1,5 +1,6 @@
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Tools;
 
@@ -66,7 +67,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IContainerLoadingService containerLoadingService,
-                int id) =>
+                int id,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -78,13 +80,13 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("装柜方案 ID 无效。"));
                 }
 
-                var project = await containerLoadingService.GetProjectAsync(id);
+                var project = await containerLoadingService.GetProjectAsync(id, cancellationToken);
                 if (project == null)
                 {
                     return Results.NotFound(new ApiErrorResponse("装柜方案不存在或已删除。"));
                 }
 
-                var items = await containerLoadingService.GetProjectItemsAsync(id);
+                var items = await containerLoadingService.GetProjectItemsAsync(id, cancellationToken);
                 return Results.Ok(new ApiContainerPackingProjectResponse(
                     ApiContainerPackingProjectDtoFactory.FromProject(project, items),
                     ApiContainerPackingProjectDtoFactory.StoragePolicy));
@@ -95,7 +97,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IContainerLoadingService containerLoadingService,
-                ApiContainerPackingProjectSaveRequest request) =>
+                ApiContainerPackingProjectSaveRequest request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -113,8 +116,8 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    await containerLoadingService.SaveProjectAsync(project, items);
-                    var savedItems = await containerLoadingService.GetProjectItemsAsync(project.Id);
+                    await containerLoadingService.SaveProjectAsync(project, items, cancellationToken);
+                    var savedItems = await containerLoadingService.GetProjectItemsAsync(project.Id, cancellationToken);
                     return Results.Ok(new ApiContainerPackingProjectSaveResponse(
                         true,
                         project.Id,
@@ -122,9 +125,9 @@ namespace ExportDocManager.Api.Hosting
                         "装柜方案已保存。",
                         ApiContainerPackingProjectDtoFactory.StoragePolicy));
                 }
-                catch (InvalidOperationException ex)
+                catch (ServiceException ex)
                 {
-                    return Results.Conflict(new ApiErrorResponse(ex.Message));
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("SaveContainerPackingProject");
@@ -133,7 +136,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IContainerLoadingService containerLoadingService,
-                int id) =>
+                int id,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -145,13 +149,13 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("装柜方案 ID 无效。"));
                 }
 
-                var project = await containerLoadingService.GetProjectAsync(id);
+                var project = await containerLoadingService.GetProjectAsync(id, cancellationToken);
                 if (project == null)
                 {
                     return Results.NotFound(new ApiErrorResponse("装柜方案不存在或已删除。"));
                 }
 
-                await containerLoadingService.DeleteProjectAsync(id);
+                await containerLoadingService.DeleteProjectAsync(id, cancellationToken);
                 return Results.Ok(new ApiCommandResponse(true, "装柜方案已删除。"));
             })
             .WithName("DeleteContainerPackingProject");
@@ -159,14 +163,15 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapGet("/api/tools/container-packing/container-types", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
-                IContainerLoadingService containerLoadingService) =>
+                IContainerLoadingService containerLoadingService,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
                     return Results.Unauthorized();
                 }
 
-                var containerTypes = await containerLoadingService.GetContainerTypesAsync();
+                var containerTypes = await containerLoadingService.GetContainerTypesAsync(cancellationToken);
                 return Results.Ok(new ApiContainerTypeListResponse(
                     containerTypes.Select(ApiContainerPackingProjectDtoFactory.FromContainerType).ToList(),
                     ApiContainerPackingProjectDtoFactory.StoragePolicy));
@@ -177,7 +182,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IContainerLoadingService containerLoadingService,
-                ApiContainerTypeSaveRequest request) =>
+                ApiContainerTypeSaveRequest request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -193,7 +199,7 @@ namespace ExportDocManager.Api.Hosting
                 var containerType = ApiContainerPackingProjectDtoFactory.ToContainerType(request);
                 try
                 {
-                    await containerLoadingService.SaveContainerTypeAsync(containerType);
+                    await containerLoadingService.SaveContainerTypeAsync(containerType, cancellationToken);
                     return Results.Ok(new ApiContainerTypeSaveResponse(
                         true,
                         containerType.Id,
@@ -201,9 +207,9 @@ namespace ExportDocManager.Api.Hosting
                         "柜型已保存。",
                         ApiContainerPackingProjectDtoFactory.StoragePolicy));
                 }
-                catch (InvalidOperationException ex)
+                catch (ServiceException ex)
                 {
-                    return Results.Conflict(new ApiErrorResponse(ex.Message));
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("SaveContainerPackingContainerType");
@@ -212,7 +218,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IContainerLoadingService containerLoadingService,
-                int id) =>
+                int id,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -224,7 +231,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("柜型 ID 无效。"));
                 }
 
-                var containerType = (await containerLoadingService.GetContainerTypesAsync())
+                var containerType = (await containerLoadingService.GetContainerTypesAsync(cancellationToken))
                     .FirstOrDefault(type => type.Id == id);
                 if (containerType == null)
                 {
@@ -236,7 +243,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Conflict(new ApiErrorResponse("系统默认柜型不支持删除。"));
                 }
 
-                await containerLoadingService.DeleteContainerTypeAsync(id);
+                await containerLoadingService.DeleteContainerTypeAsync(id, cancellationToken);
                 return Results.Ok(new ApiCommandResponse(true, "柜型已删除。"));
             })
             .WithName("DeleteContainerPackingContainerType");

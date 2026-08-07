@@ -1,4 +1,5 @@
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,14 +32,14 @@ namespace ExportDocManager.Services.MasterData
             string specification = ValidateTextLength(input.Specification, 1500, "规格与申报要素");
             string source = ValidateTextLength(input.Source, 100, "实例来源");
             if (string.IsNullOrWhiteSpace(rawCode) || string.IsNullOrWhiteSpace(name))
-                throw new InvalidOperationException("申报实例必须填写历史/原始HS编码和商品名称。");
+                throw new ServiceValidationException("申报实例必须填写历史/原始HS编码和商品名称。");
             if (rawCode.Length > 20 || currentCode.Length > 20)
                 throw new ArgumentException("HS 编码不能超过 20 个字符。");
             string fingerprint = BuildFingerprint(rawCode, name, specification);
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             if (!string.IsNullOrWhiteSpace(currentCode) &&
                 !await HasTrustedActiveCodeAsync(context, currentCode, cancellationToken))
-                throw new InvalidOperationException("当前有效编码必须来自已验证的本地年度税则，并包含来源、年度和验证时间。");
+                throw new ServiceValidationException("当前有效编码必须来自已验证的本地年度税则，并包含来源、年度和验证时间。");
             var entity = input.Id > 0
                 ? await context.HsCodeDeclarationExamples.FirstOrDefaultAsync(item => item.Id == input.Id, cancellationToken)
                 : await context.HsCodeDeclarationExamples.FirstOrDefaultAsync(item => item.Fingerprint == fingerprint, cancellationToken);

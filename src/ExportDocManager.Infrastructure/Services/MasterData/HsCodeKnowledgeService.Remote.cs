@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -262,7 +263,7 @@ namespace ExportDocManager.Services.MasterData
 
             string currentCode = HsCodeTextHelper.NormalizeCode(input.CurrentCode);
             if (!await HasTrustedActiveCodeAsync(context, currentCode, cancellationToken))
-                throw new InvalidOperationException("确认前必须选择已验证年度税则中的当前有效 HS 编码。");
+                throw new ServiceValidationException("确认前必须选择已验证年度税则中的当前有效 HS 编码。");
             string fingerprint = BuildFingerprint(candidate.RawReportedHsCode, candidate.ProductName, candidate.Specification);
             var existingExample = await context.HsCodeDeclarationExamples
                 .FirstOrDefaultAsync(item => item.Fingerprint == fingerprint, cancellationToken);
@@ -272,7 +273,7 @@ namespace ExportDocManager.Services.MasterData
                 if (!string.IsNullOrWhiteSpace(existingCode) &&
                     !string.Equals(existingCode, currentCode, StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new InvalidOperationException("同一商品已有指向其他 HS 编码的正式实例，请先在实例库中处理冲突。");
+                    throw new ResourceConflictException("同一商品已有指向其他 HS 编码的正式实例，请先在实例库中处理冲突。");
                 }
 
                 // An existing company/manual instance is not owned by this remote

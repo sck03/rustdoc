@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
@@ -222,7 +223,7 @@ namespace ExportDocManager.Services.Infrastructure
             string fullTarget = Path.GetFullPath(targetRoot);
             EnsureNoReparsePoint(fullTarget);
             string parent = Path.GetDirectoryName(fullTarget)
-                ?? throw new InvalidOperationException("服务器迁移数据目录缺少父目录。");
+                ?? throw new InfrastructureServiceException("服务器迁移数据目录缺少父目录。");
             string leaf = Path.GetFileName(fullTarget);
             string replacement = Path.Combine(parent, $".{leaf}.migration-new-{marker.PackageId}");
             string oldSwap = Path.Combine(parent, $".{leaf}.migration-old-{marker.PackageId}");
@@ -378,7 +379,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
             if ((File.GetAttributes(fullSource) & FileAttributes.ReparsePoint) != 0)
             {
-                throw new InvalidOperationException($"服务器迁移目录不能是符号链接或重解析点：{fullSource}");
+                throw new ServiceValidationException($"服务器迁移目录不能是符号链接或重解析点：{fullSource}");
             }
             string fullTarget = Path.GetFullPath(targetRoot);
             EnsureNoReparsePoint(fullTarget);
@@ -393,7 +394,7 @@ namespace ExportDocManager.Services.Infrastructure
                 {
                     if ((item.Attributes & FileAttributes.ReparsePoint) != 0)
                     {
-                        throw new InvalidOperationException(
+                        throw new ServiceValidationException(
                             $"服务器迁移目录包含符号链接或重解析点：{item.FullName}");
                     }
                     string target = ResolveWithinRoot(
@@ -443,7 +444,7 @@ namespace ExportDocManager.Services.Infrastructure
                         : new FileInfo(current);
                     if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
                     {
-                        throw new InvalidOperationException(
+                        throw new ServiceValidationException(
                             $"服务器迁移目标路径包含符号链接或重解析点：{current}");
                     }
                 }

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 
 namespace ExportDocManager.Services.BrowserRuntime
@@ -65,7 +66,7 @@ namespace ExportDocManager.Services.BrowserRuntime
         {
             ArgumentNullException.ThrowIfNull(process);
             ThrowIfDisposed();
-            if (process.Id <= 0) throw new InvalidOperationException("浏览器进程尚未启动，无法登记归属。");
+            if (process.Id <= 0) throw new InfrastructureServiceException("浏览器进程尚未启动，无法登记归属。");
             var owned = new OwnedBrowserProcess(process, workload, purpose ?? string.Empty);
             _ownedProcesses[process.Id] = owned;
             return new BrowserProcessRegistration(this, process.Id);

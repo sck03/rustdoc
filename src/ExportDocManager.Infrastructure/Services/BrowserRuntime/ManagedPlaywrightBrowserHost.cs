@@ -216,7 +216,8 @@ namespace ExportDocManager.Services.BrowserRuntime
             };
             foreach (string argument in BuildBrowserArguments(
                          _profileRoot,
-                         ChromiumSandboxPolicy.ResolveNoSandboxSetting()))
+                         ChromiumSandboxPolicy.ResolveNoSandboxSetting(),
+                         ChromiumSharedMemoryPolicy.ResolveDisableDevShmUsageSetting()))
             {
                 process.StartInfo.ArgumentList.Add(argument);
             }
@@ -240,7 +241,10 @@ namespace ExportDocManager.Services.BrowserRuntime
             _useCount = 0;
         }
 
-        internal static IReadOnlyList<string> BuildBrowserArguments(string profileRoot, bool disableSandbox)
+        internal static IReadOnlyList<string> BuildBrowserArguments(
+            string profileRoot,
+            bool disableSandbox,
+            bool disableDevShmUsage = true)
         {
             var arguments = new List<string>
             {
@@ -250,7 +254,6 @@ namespace ExportDocManager.Services.BrowserRuntime
                 "--disable-gpu",
                 "--disable-extensions",
                 "--disable-background-networking",
-                "--disable-dev-shm-usage",
                 "--disable-sync",
                 "--no-first-run",
                 "--no-default-browser-check",
@@ -261,6 +264,10 @@ namespace ExportDocManager.Services.BrowserRuntime
             if (disableSandbox)
             {
                 arguments.Insert(1, "--no-sandbox");
+            }
+            if (disableDevShmUsage)
+            {
+                arguments.Insert(1, "--disable-dev-shm-usage");
             }
 
             return arguments;

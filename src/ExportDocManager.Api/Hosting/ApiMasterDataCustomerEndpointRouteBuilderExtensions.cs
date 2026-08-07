@@ -54,7 +54,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomerService customerService,
-                int id) =>
+                int id,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -66,7 +67,7 @@ namespace ExportDocManager.Api.Hosting
                     return BadMasterDataId("客户");
                 }
 
-                var customer = await customerService.GetCustomerByIdAsync(id);
+                var customer = await customerService.GetCustomerByIdAsync(id, cancellationToken);
                 return customer == null
                     ? Results.NotFound()
                     : Results.Ok(ApiMasterDataDtoFactory.FromCustomer(customer));

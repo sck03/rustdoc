@@ -7,6 +7,7 @@ namespace ExportDocManager.Services.Infrastructure
 {
     public sealed class CustomOptionService : ICustomOptionService
     {
+        private const int MaximumOptionsPerType = 500;
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
 
         public CustomOptionService(IDbContextFactory<AppDbContext> dbContextFactory)
@@ -14,7 +15,9 @@ namespace ExportDocManager.Services.Infrastructure
             _dbContextFactory = dbContextFactory;
         }
 
-        public IReadOnlyList<string> GetOptions(string optionType)
+        public async Task<IReadOnlyList<string>> GetOptionsAsync(
+            string optionType,
+            CancellationToken cancellationToken = default)
         {
             var normalizedType = TextSearchHelper.NormalizeValue(optionType);
             if (string.IsNullOrWhiteSpace(normalizedType))
@@ -22,20 +25,27 @@ namespace ExportDocManager.Services.Infrastructure
                 return Array.Empty<string>();
             }
 
-            using var context = _dbContextFactory.CreateDbContext();
-            return context.CustomOptions
+            await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var values = await context.CustomOptions
                 .AsNoTracking()
                 .Where(option => option.OptionType == normalizedType)
-                .OrderBy(option => option.CreatedDate)
+                .OrderByDescending(option => option.CreatedDate)
+                .ThenByDescending(option => option.Id)
+                .Take(MaximumOptionsPerType)
                 .Select(option => option.OptionValue)
-                .AsEnumerable()
+                .ToListAsync(cancellationToken);
+            values.Reverse();
+            return values
                 .Select(TextSearchHelper.NormalizeValue)
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
 
-        public void SaveOption(string optionType, string optionValue)
+        public async Task SaveOptionAsync(
+            string optionType,
+            string optionValue,
+            CancellationToken cancellationToken = default)
         {
             var normalizedType = TextSearchHelper.NormalizeValue(optionType);
             var normalizedValue = TextSearchHelper.NormalizeValue(optionValue);
@@ -44,26 +54,27 @@ namespace ExportDocManager.Services.Infrastructure
                 return;
             }
 
-            using var context = _dbContextFactory.CreateDbContext();
-            var exists = context.CustomOptions
+            await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            string comparisonValue = normalizedValue.ToUpperInvariant();
+            bool exists = await context.CustomOptions
                 .AsNoTracking()
-                .Where(option => option.OptionType == normalizedType)
-                .Select(option => option.OptionValue)
-                .AsEnumerable()
-                .Any(value => string.Equals(TextSearchHelper.NormalizeValue(value), normalizedValue, StringComparison.OrdinalIgnoreCase));
+                .AnyAsync(
+                    option => option.OptionType == normalizedType &&
+                        option.OptionValue.ToUpper() == comparisonValue,
+                    cancellationToken);
 
             if (exists)
             {
                 return;
             }
 
-            context.CustomOptions.Add(new CustomOption
+            await context.CustomOptions.AddAsync(new CustomOption
             {
                 OptionType = normalizedType,
                 OptionValue = normalizedValue,
                 CreatedDate = DateTime.Now
-            });
-            context.SaveChanges();
+            }, cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
         }
     }
 }

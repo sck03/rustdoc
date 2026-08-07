@@ -1,17 +1,20 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24-bookworm-slim AS report-fonts
+FROM node:24-trixie-slim AS report-fonts
 WORKDIR /src
 COPY scripts/provision-report-fonts.mjs scripts/verify-font-license-policy.mjs scripts/
 COPY Resources/Fonts/OpenSource/font-manifest.json Resources/Fonts/OpenSource/OFL-Noto-CJK.txt Resources/Fonts/OpenSource/README.md Resources/Fonts/OpenSource/
 RUN node scripts/provision-report-fonts.mjs \
     && node scripts/verify-font-license-policy.mjs --require-files
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0-bookworm-slim AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.302-noble AS build
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    DOTNET_NOLOGO=1
+RUN test "$(dotnet --version)" = "10.0.302"
 WORKDIR /src
 ARG TARGETARCH
 
-COPY Directory.Build.props Directory.Packages.props NuGet.Config version.json ./
+COPY global.json Directory.Build.props Directory.Packages.props NuGet.Config version.json ./
 COPY src/ExportDocManager.Domain/ExportDocManager.Domain.csproj src/ExportDocManager.Domain/
 COPY src/ExportDocManager.Application/ExportDocManager.Application.csproj src/ExportDocManager.Application/
 COPY src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj src/ExportDocManager.Infrastructure/
@@ -34,7 +37,7 @@ RUN --mount=type=cache,id=exportdoc-nuget-${TARGETARCH},target=/root/.nuget/pack
     /p:ExportDocPackageProfile=Container \
     && find src -type d \( -name bin -o -name obj \) -prune -exec rm -rf -- {} +
 
-FROM rust:1.96-bookworm AS ocr-build
+FROM rust:1.96-trixie AS ocr-build
 WORKDIR /src
 ARG TARGETARCH
 COPY apps/exportdoc-ocr-rs/Cargo.toml apps/exportdoc-ocr-rs/Cargo.lock ./
@@ -45,7 +48,7 @@ RUN --mount=type=cache,id=exportdoc-cargo-registry-${TARGETARCH},target=/usr/loc
     cargo build --release --locked \
     && install -Dm755 /src/target/release/exportdoc-ocr /out/exportdoc-ocr
 
-FROM rust:1.96-bookworm AS excel-analyzer-build
+FROM rust:1.96-trixie AS excel-analyzer-build
 WORKDIR /src
 ARG TARGETARCH
 COPY tools/excel-analyzer-rs/Cargo.toml tools/excel-analyzer-rs/Cargo.lock ./
@@ -56,38 +59,45 @@ RUN --mount=type=cache,id=exportdoc-cargo-registry-${TARGETARCH},target=/usr/loc
     cargo build --release --locked \
     && install -Dm755 /src/target/release/exportdoc-excel-analyzer /out/exportdoc-excel-analyzer
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-bookworm-slim AS runtime
+FROM debian:trixie-slim AS runtime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         chromium \
         curl \
-        gnupg \
         fonts-noto-cjk \
-        libasound2 \
-        libatk-bridge2.0-0 \
-        libatk1.0-0 \
-        libcups2 \
-        libdrm2 \
-        libgbm1 \
-        libgtk-3-0 \
         libgomp1 \
-        libnss3 \
-        libx11-xcb1 \
-        libxcomposite1 \
-        libxdamage1 \
-        libxfixes3 \
-        libxrandr2 \
+        libunwind8 \
         tini \
         tzdata \
-    && install -d -m 0755 /usr/share/postgresql-common/pgdg \
-    && curl --fail --silent --show-error --location https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-        | gpg --dearmor -o /usr/share/keyrings/postgresql.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+        zlib1g \
+    && curl --fail --silent --show-error --location --output /usr/share/keyrings/microsoft-prod.asc \
+        https://packages.microsoft.com/keys/microsoft.asc \
+    && echo "deb [signed-by=/usr/share/keyrings/microsoft-prod.asc] https://packages.microsoft.com/debian/13/prod trixie main" \
+        > /etc/apt/sources.list.d/microsoft-prod.list \
+    && curl --fail --silent --show-error --location --output /usr/share/keyrings/postgresql.asc \
+        https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && echo "deb [signed-by=/usr/share/keyrings/postgresql.asc] https://apt.postgresql.org/pub/repos/apt trixie-pgdg main" \
         > /etc/apt/sources.list.d/pgdg.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends postgresql-client-18 \
-    && rm -rf /var/lib/apt/lists/* /usr/share/postgresql-common/pgdg /etc/apt/sources.list.d/pgdg.list /usr/share/keyrings/postgresql.gpg
+    && apt-get install -y --no-install-recommends \
+        aspnetcore-runtime-10.0 \
+        dotnet-host \
+        dotnet-hostfxr-10.0 \
+        dotnet-runtime-10.0 \
+        dotnet-runtime-deps-10.0 \
+        postgresql-client-18 \
+    && aspnet_version="$(dotnet --list-runtimes | awk '$1 == "Microsoft.AspNetCore.App" && $2 ~ /^10\.0\.[0-9]+$/ { print $2; exit }')" \
+    && netcore_version="$(dotnet --list-runtimes | awk '$1 == "Microsoft.NETCore.App" && $2 ~ /^10\.0\.[0-9]+$/ { print $2; exit }')" \
+    && test -n "$aspnet_version" \
+    && test "$aspnet_version" = "$netcore_version" \
+    && pg_dump --version | grep -F '18.' \
+    && rm -rf \
+        /var/lib/apt/lists/* \
+        /etc/apt/sources.list.d/microsoft-prod.list \
+        /etc/apt/sources.list.d/pgdg.list \
+        /usr/share/keyrings/microsoft-prod.asc \
+        /usr/share/keyrings/postgresql.asc
 
 WORKDIR /app
 RUN groupadd --system --gid 10001 exportdoc \
@@ -107,6 +117,7 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:5188 \
     EXPORTDOCMANAGER_PRODUCT_EDITION=Full \
     EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
     EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX=false \
+    EXPORTDOCMANAGER_CHROMIUM_DISABLE_DEV_SHM_USAGE=false \
     EXPORTDOCMANAGER_OCR_RUNTIME=enabled \
     EXPORTDOCMANAGER_POSTGRES_BIN=/usr/lib/postgresql/18/bin \
     TZ=Asia/Shanghai

@@ -8,7 +8,7 @@ namespace ExportDocManager.Services.MasterData
     {
         Task<int> SaveCustomerAsync(Customer customer);
         Task<List<Customer>> GetAllCustomersAsync();
-        Task<Customer> GetCustomerByIdAsync(int id);
+        Task<Customer> GetCustomerByIdAsync(int id, CancellationToken cancellationToken = default);
         Task<bool> DeleteCustomerAsync(int id);
         Task<Customer> GetCustomerByNameAsync(string name);
         Task<List<Customer>> SearchCustomersAsync(string keyword);

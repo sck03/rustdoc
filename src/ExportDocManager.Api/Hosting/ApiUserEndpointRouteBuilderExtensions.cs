@@ -35,7 +35,7 @@ namespace ExportDocManager.Api.Hosting
                         UserRoleCatalog.Roles,
                         templates.Select(ToPermissionTemplateOptionDto).ToArray()));
                 }
-                catch (UnauthorizedAccessException ex)
+                catch (PermissionDeniedException ex)
                 {
                     return WriteForbidden(ex.Message);
                 }
@@ -92,11 +92,7 @@ namespace ExportDocManager.Api.Hosting
                         "用户已保存。",
                         ApiUserManagementDtoFactory.FromUser(savedUser)));
                 }
-                catch (UnauthorizedAccessException ex)
-                {
-                    return WriteForbidden(ex.Message);
-                }
-                catch (InvalidOperationException ex)
+                catch (ServiceException ex)
                 {
                     return WriteServiceException(ex);
                 }
@@ -158,11 +154,7 @@ namespace ExportDocManager.Api.Hosting
                         "用户已保存。",
                         ApiUserManagementDtoFactory.FromUser(savedUser)));
                 }
-                catch (UnauthorizedAccessException ex)
-                {
-                    return WriteForbidden(ex.Message);
-                }
-                catch (InvalidOperationException ex)
+                catch (ServiceException ex)
                 {
                     return WriteServiceException(ex);
                 }
@@ -204,11 +196,7 @@ namespace ExportDocManager.Api.Hosting
                         ? Results.Ok(new ApiCommandResponse(true, "用户已删除。"))
                         : Results.NotFound(new ApiErrorResponse("未找到要删除的用户。"));
                 }
-                catch (UnauthorizedAccessException ex)
-                {
-                    return WriteForbidden(ex.Message);
-                }
-                catch (InvalidOperationException ex)
+                catch (ServiceException ex)
                 {
                     return WriteServiceException(ex);
                 }

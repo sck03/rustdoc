@@ -2,7 +2,7 @@ name: export-doc-manager
 
 services:
   postgres:
-    image: postgres:18-bookworm
+    image: postgres:18.4-trixie
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-exportdoc}
@@ -30,6 +30,7 @@ services:
       EXPORTDOCMANAGER_PRODUCT_EDITION: Full
       EXPORTDOCMANAGER_DATA_ROOT: /runtime-data
       EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX: "false"
+      EXPORTDOCMANAGER_CHROMIUM_DISABLE_DEV_SHM_USAGE: "false"
       EXPORTDOCMANAGER_POSTGRES_BIN: /usr/lib/postgresql/18/bin
       EXPORTDOCMANAGER_ALLOWED_ORIGINS: ${EXPORTDOCMANAGER_ALLOWED_ORIGINS:-}
       EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY: ${EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY:-false}

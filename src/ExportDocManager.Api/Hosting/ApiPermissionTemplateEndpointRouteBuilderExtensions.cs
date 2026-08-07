@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Errors;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -48,7 +49,7 @@ namespace ExportDocManager.Api.Hosting
                         ? Results.Ok(new ApiCommandResponse(true, "权限模板已删除。"))
                         : Results.NotFound(new ApiErrorResponse("未找到权限模板。"));
                 }
-                catch (InvalidOperationException ex)
+                catch (ServiceException ex)
                 {
                     return WriteServiceException(ex);
                 }
@@ -83,15 +84,7 @@ namespace ExportDocManager.Api.Hosting
                     cancellationToken);
                 return Results.Ok(ToApiDto(saved));
             }
-            catch (ArgumentException ex)
-            {
-                return Results.BadRequest(new ApiErrorResponse(ex.Message));
-            }
-            catch (KeyNotFoundException)
-            {
-                return Results.NotFound(new ApiErrorResponse("未找到权限模板。"));
-            }
-            catch (InvalidOperationException ex)
+            catch (ServiceException ex)
             {
                 return WriteServiceException(ex);
             }

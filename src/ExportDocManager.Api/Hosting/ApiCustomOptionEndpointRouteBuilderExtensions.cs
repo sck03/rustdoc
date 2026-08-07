@@ -26,11 +26,12 @@ namespace ExportDocManager.Api.Hosting
 
         private static void MapCustomOptionEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/custom-options/{optionType}", (
+            endpoints.MapGet("/api/custom-options/{optionType}", async (
                 HttpContext context,
                 string optionType,
                 IApiSessionTokenService tokenService,
-                ICustomOptionService customOptionService) =>
+                ICustomOptionService customOptionService,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -42,16 +43,20 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse(error));
                 }
 
-                return Results.Ok(BuildCustomOptionResponse(definition, customOptionService));
+                return Results.Ok(await BuildCustomOptionResponseAsync(
+                    definition,
+                    customOptionService,
+                    cancellationToken));
             })
             .WithName("ListCustomOptions");
 
-            endpoints.MapPost("/api/custom-options/{optionType}", (
+            endpoints.MapPost("/api/custom-options/{optionType}", async (
                 HttpContext context,
                 string optionType,
                 ApiCustomOptionSaveRequest request,
                 IApiSessionTokenService tokenService,
-                ICustomOptionService customOptionService) =>
+                ICustomOptionService customOptionService,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -74,8 +79,11 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("自定义选项不能为空。"));
                 }
 
-                customOptionService.SaveOption(definition.OptionType, value);
-                return Results.Ok(BuildCustomOptionResponse(definition, customOptionService));
+                await customOptionService.SaveOptionAsync(definition.OptionType, value, cancellationToken);
+                return Results.Ok(await BuildCustomOptionResponseAsync(
+                    definition,
+                    customOptionService,
+                    cancellationToken));
             })
             .WithName("SaveCustomOption");
         }
@@ -104,13 +112,16 @@ namespace ExportDocManager.Api.Hosting
             return false;
         }
 
-        private static ApiCustomOptionListResponse BuildCustomOptionResponse(
+        private static async Task<ApiCustomOptionListResponse> BuildCustomOptionResponseAsync(
             CustomOptionDefinition definition,
-            ICustomOptionService customOptionService)
+            ICustomOptionService customOptionService,
+            CancellationToken cancellationToken)
         {
             var predefinedOptions = NormalizeOptionValues(definition.PredefinedOptions);
             var customOptions = definition.AllowCustomValues
-                ? NormalizeOptionValues(customOptionService.GetOptions(definition.OptionType))
+                ? NormalizeOptionValues(await customOptionService.GetOptionsAsync(
+                    definition.OptionType,
+                    cancellationToken))
                 : [];
             var options = predefinedOptions
                 .Concat(customOptions)

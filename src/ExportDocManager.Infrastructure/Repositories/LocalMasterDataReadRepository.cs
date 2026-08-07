@@ -113,6 +113,22 @@ namespace ExportDocManager.Services.Infrastructure
             return new PagedResult<Exporter>(items, totalCount, pageNumber, pageSize);
         }
 
+        public async Task<IReadOnlyList<string>> QueryDistinctChineseNamesAsync(
+            int maxCount = 2,
+            CancellationToken cancellationToken = default)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            int normalizedMaxCount = Math.Clamp(maxCount, 1, 10);
+            return await _accessScope.ApplyExporterScope(context.Exporters.AsNoTracking())
+                .Where(exporter => exporter.ExporterNameCN != null && exporter.ExporterNameCN != string.Empty)
+                .Select(exporter => exporter.ExporterNameCN.Trim())
+                .Where(name => name != string.Empty)
+                .Distinct()
+                .OrderBy(name => name)
+                .Take(normalizedMaxCount)
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<IReadOnlyList<Payee>> QueryAsync(PayeeReadQuery query, CancellationToken cancellationToken = default)
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
@@ -154,6 +170,21 @@ namespace ExportDocManager.Services.Infrastructure
             int totalCount = await rows.CountAsync(cancellationToken);
             var items = await rows.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
             return new PagedResult<Payee>(items, totalCount, pageNumber, pageSize);
+        }
+
+        async Task<Payee> IPayeeReadRepository.GetByIdAsync(
+            int id,
+            CancellationToken cancellationToken)
+        {
+            if (id <= 0)
+            {
+                return null;
+            }
+
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.Payees
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
         }
 
         public async Task<IReadOnlyList<Product>> QueryAsync(ProductReadQuery query, CancellationToken cancellationToken = default)
@@ -246,6 +277,21 @@ namespace ExportDocManager.Services.Infrastructure
             return new PagedResult<Port>(items, totalCount, pageNumber, pageSize);
         }
 
+        async Task<Port> IPortReadRepository.GetByIdAsync(
+            int id,
+            CancellationToken cancellationToken)
+        {
+            if (id <= 0)
+            {
+                return null;
+            }
+
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.Ports
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        }
+
         public async Task<IReadOnlyList<Unit>> QueryAsync(UnitReadQuery query, CancellationToken cancellationToken = default)
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
@@ -277,6 +323,21 @@ namespace ExportDocManager.Services.Infrastructure
             int totalCount = await rows.CountAsync(cancellationToken);
             var items = await rows.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
             return new PagedResult<Unit>(items, totalCount, pageNumber, pageSize);
+        }
+
+        async Task<Unit> IUnitReadRepository.GetByIdAsync(
+            int id,
+            CancellationToken cancellationToken)
+        {
+            if (id <= 0)
+            {
+                return null;
+            }
+
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.Units
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
         }
 
         public async Task<IReadOnlyList<HsCode>> QueryAsync(HsCodeReadQuery query, CancellationToken cancellationToken = default)

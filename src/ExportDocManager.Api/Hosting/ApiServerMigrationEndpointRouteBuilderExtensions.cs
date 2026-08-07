@@ -546,7 +546,6 @@ namespace ExportDocManager.Api.Hosting
 
         private static bool IsExpectedMigrationException(Exception exception) => exception is
             ServiceException or
-            InvalidOperationException or
             InvalidDataException or
             NotSupportedException or
             ArgumentException or

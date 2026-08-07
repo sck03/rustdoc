@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.SingleWindow;
 using Microsoft.EntityFrameworkCore;
 
@@ -91,7 +92,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 var service = CreateService(factory, root);
                 string sharedRoot = Path.Combine(root, "OfficialClient", "CompanyA");
 
-                var sameProfileError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                var sameProfileError = await Assert.ThrowsAsync<ServiceValidationException>(() =>
                     service.SaveAsync(CreateUpdate(
                         "公司 A / 卡 A",
                         "公司 A",
@@ -107,7 +108,7 @@ namespace ExportDocManager.Infrastructure.Tests
                     Path.Combine(root, "OfficialClient", "CompanyA-Coo"),
                     Path.Combine(root, "OfficialClient", "CompanyA-Acd")));
 
-                var crossProfileError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                var crossProfileError = await Assert.ThrowsAsync<ResourceConflictException>(() =>
                     service.SaveAsync(CreateUpdate(
                         "公司 B / 卡 B",
                         "公司 B",
@@ -140,7 +141,7 @@ namespace ExportDocManager.Infrastructure.Tests
                     profile.CustomsCooClientRootPath,
                     profile.AgentConsignmentClientRootPath,
                     profile.ProfileKey);
-                var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                var error = await Assert.ThrowsAsync<ResourceConflictException>(() =>
                     service.SaveAsync(identityChange));
 
                 Assert.Contains("请新增档案", error.Message, StringComparison.Ordinal);
@@ -182,7 +183,7 @@ namespace ExportDocManager.Infrastructure.Tests
                         Provider = DatabaseConnectionSettings.PostgreSqlProvider
                     });
 
-                var error = await Assert.ThrowsAsync<InvalidOperationException>(() => service.ListAsync());
+                var error = await Assert.ThrowsAsync<ServiceValidationException>(() => service.ListAsync());
                 Assert.Contains("SQLite", error.Message, StringComparison.Ordinal);
             }
             finally

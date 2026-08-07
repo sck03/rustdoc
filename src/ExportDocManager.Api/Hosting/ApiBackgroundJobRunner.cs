@@ -4,7 +4,7 @@ using System.Collections.Concurrent;
 
 namespace ExportDocManager.Api.Hosting
 {
-    public sealed partial class ApiBackgroundJobRunner
+    public sealed partial class ApiBackgroundJobRunner : IHostedService
     {
         private readonly ApiBackgroundJobService _jobs;
         private readonly IServiceScopeFactory _scopeFactory;
@@ -17,7 +17,12 @@ namespace ExportDocManager.Api.Hosting
         private readonly int _perUserQueueLimit;
         private readonly ConcurrentDictionary<string, UserConcurrencyState> _userConcurrency =
             new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, TaskCompletionSource> _activeJobs =
+            new(StringComparer.OrdinalIgnoreCase);
+        private readonly CancellationTokenSource _applicationStopping = new();
+        private readonly Lock _lifecycleSync = new();
         private int _reservedJobs;
+        private int _stopping;
 
         public ApiBackgroundJobRunner(
             ApiBackgroundJobService jobs,
@@ -77,6 +82,21 @@ namespace ExportDocManager.Api.Hosting
             var now = DateTimeOffset.UtcNow;
             var currentUser = _currentUserContext?.CurrentUser;
             string normalizedRequestedBy = requestedBy?.Trim() ?? string.Empty;
+            if (Volatile.Read(ref _stopping) != 0)
+            {
+                _jobs.CleanupControlledOutputPath(normalizedInitialOutputPath);
+                return CreateQueueRejectedJob(
+                    jobId,
+                    normalizedKind,
+                    title.Trim(),
+                    normalizedRequestedBy,
+                    currentUser,
+                    now,
+                    "应用正在停止，暂不接受新的后台任务。",
+                    normalizedRetryOperation,
+                    normalizedRetryRequestJson);
+            }
+
             if (!TryReserveQueueSlot(normalizedRequestedBy, out var userState, out string rejectionMessage))
             {
                 _jobs.CleanupControlledOutputPath(normalizedInitialOutputPath);
@@ -114,9 +134,39 @@ namespace ExportDocManager.Api.Hosting
                 RetryRequestJson = normalizedRetryRequestJson
             });
 
-            var cancellationSource = new CancellationTokenSource();
+            var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(_applicationStopping.Token);
             _jobs.RegisterCancellationSource(jobId, cancellationSource);
-            _ = Task.Run(() => RunAsync(snapshot, cancellationSource, executeAsync, userState));
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            bool activeJobRegistered;
+            bool shutdownStarted;
+            lock (_lifecycleSync)
+            {
+                shutdownStarted = Volatile.Read(ref _stopping) != 0;
+                activeJobRegistered = !shutdownStarted && _activeJobs.TryAdd(jobId, completion);
+            }
+
+            if (!activeJobRegistered)
+            {
+                _jobs.RemoveCancellationSource(jobId);
+                ReleaseQueueSlot(normalizedRequestedBy, userState);
+                if (shutdownStarted)
+                {
+                    _jobs.CleanupControlledOutputPath(normalizedInitialOutputPath);
+                    return CreateQueueRejectedJob(
+                        jobId,
+                        normalizedKind,
+                        title.Trim(),
+                        normalizedRequestedBy,
+                        currentUser,
+                        now,
+                        "应用正在停止，暂不接受新的后台任务。",
+                        normalizedRetryOperation,
+                        normalizedRetryRequestJson);
+                }
+
+                throw new InvalidOperationException($"后台任务 {jobId} 无法注册运行状态。");
+            }
+            _ = RunTrackedAsync(snapshot, cancellationSource, executeAsync, userState, completion);
 
             return snapshot;
         }

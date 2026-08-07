@@ -2,6 +2,7 @@ using ClosedXML.Excel;
 using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 
@@ -52,31 +53,45 @@ namespace ExportDocManager.Services.Data
             return templatePath;
         }
 
-        public string ExportDefaultTemplate(string targetFilePath, bool overwrite = true)
+        public async Task<string> ExportDefaultTemplateAsync(
+            string targetFilePath,
+            bool overwrite = true,
+            CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(targetFilePath);
 
+            string exporterNameCn = await ResolveExporterNameCnForTemplateAsync(cancellationToken)
+                .ConfigureAwait(false);
             string sourcePath = EnsureDefaultTemplateAvailable();
             string normalizedTargetPath = PrepareTargetPath(targetFilePath, overwrite);
-
-            using var workbook = new XLWorkbook(sourcePath);
-            PrepareBlankTemplateWorkbook(workbook);
-            SaveWorkbookAtomic(workbook, normalizedTargetPath);
-            return normalizedTargetPath;
+            return await Task.Run(() =>
+            {
+                using var workbook = new XLWorkbook(sourcePath);
+                PrepareBlankTemplateWorkbook(workbook, exporterNameCn);
+                SaveWorkbookAtomic(workbook, normalizedTargetPath);
+                return normalizedTargetPath;
+            }, cancellationToken).ConfigureAwait(false);
         }
 
-        public string ExportBlankBookingSheet(string targetFilePath, bool overwrite = true)
+        public async Task<string> ExportBlankBookingSheetAsync(
+            string targetFilePath,
+            bool overwrite = true,
+            CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(targetFilePath);
 
+            string exporterNameCn = await ResolveExporterNameCnForTemplateAsync(cancellationToken)
+                .ConfigureAwait(false);
             string sourcePath = EnsureDefaultTemplateAvailable();
             string normalizedTargetPath = PrepareTargetPath(targetFilePath, overwrite);
-
-            using var workbook = new XLWorkbook(sourcePath);
-            var worksheet = PrepareBlankTemplateWorkbook(workbook);
-            ApplyBookingSheetLayout(worksheet);
-            SaveWorkbookAtomic(workbook, normalizedTargetPath);
-            return normalizedTargetPath;
+            return await Task.Run(() =>
+            {
+                using var workbook = new XLWorkbook(sourcePath);
+                var worksheet = PrepareBlankTemplateWorkbook(workbook, exporterNameCn);
+                ApplyBookingSheetLayout(worksheet);
+                SaveWorkbookAtomic(workbook, normalizedTargetPath);
+                return normalizedTargetPath;
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         public string ExportBookingSheet(string sourceFilePath, string targetFilePath, bool overwrite = true)
@@ -93,7 +108,7 @@ namespace ExportDocManager.Services.Data
             string normalizedTargetPath = Path.GetFullPath(targetFilePath);
             if (string.Equals(normalizedSourcePath, normalizedTargetPath, PathBoundaryHelper.PathComparison))
             {
-                throw new IOException("订舱托单必须另存为新文件，不能覆盖源 Excel。");
+                throw new ServiceValidationException("订舱托单必须另存为新文件，不能覆盖源 Excel。");
             }
 
             PrepareTargetPath(normalizedTargetPath, overwrite);
@@ -146,7 +161,7 @@ namespace ExportDocManager.Services.Data
 
             if (!overwrite && File.Exists(normalizedTargetPath))
             {
-                throw new IOException($"目标文件已存在：{normalizedTargetPath}");
+                throw new ResourceConflictException($"目标文件已存在：{normalizedTargetPath}");
             }
 
             return normalizedTargetPath;
@@ -163,10 +178,12 @@ namespace ExportDocManager.Services.Data
                 });
         }
 
-        private IXLWorksheet PrepareBlankTemplateWorkbook(XLWorkbook workbook)
+        private static IXLWorksheet PrepareBlankTemplateWorkbook(
+            XLWorkbook workbook,
+            string exporterNameCn)
         {
             var worksheet = workbook.Worksheet(1);
-            worksheet.Cell(ExporterNameCnCellAddress).Value = ResolveExporterNameCnForTemplate();
+            worksheet.Cell(ExporterNameCnCellAddress).Value = exporterNameCn;
             return worksheet;
         }
 
@@ -307,7 +324,8 @@ namespace ExportDocManager.Services.Data
             }
         }
 
-        private string ResolveExporterNameCnForTemplate()
+        private async Task<string> ResolveExporterNameCnForTemplateAsync(
+            CancellationToken cancellationToken)
         {
             string configuredExporterNameCn = (_settingsService.Settings?.System?.DefaultTemplateExporterNameCn ?? string.Empty).Trim();
             if (!string.IsNullOrWhiteSpace(configuredExporterNameCn))
@@ -315,10 +333,10 @@ namespace ExportDocManager.Services.Data
                 return configuredExporterNameCn;
             }
 
-            var exporterNames = _exporterReadRepository.QueryAsync(new ExporterReadQuery { ReturnAll = true })
-                .GetAwaiter()
-                .GetResult()
-                .Select(exporter => exporter?.ExporterNameCN?.Trim())
+            var exporterNames = (await _exporterReadRepository
+                    .QueryDistinctChineseNamesAsync(2, cancellationToken)
+                    .ConfigureAwait(false))
+                .Select(name => name?.Trim())
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();

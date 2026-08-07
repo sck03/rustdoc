@@ -256,7 +256,7 @@ for (const file of walk(root)) {
   }
 }
 
-const responsiveCss = fs.readFileSync(path.join(root, "responsiveOverrides.css"), "utf8");
+const responsiveCss = readCssImportGraph(path.join(root, "responsiveOverrides.css"));
 for (const motionContract of [
   "@keyframes login-ambient-sweep",
   "@keyframes login-grid-drift",
@@ -269,7 +269,7 @@ for (const motionContract of [
   }
 }
 
-const themeCss = fs.readFileSync(path.join(root, "theme.css"), "utf8");
+const themeCss = readCssImportGraph(path.join(root, "theme.css"));
 for (const saveActionContract of [
   ".invoice-editor-sticky-actions > div > span",
   ".invoice-editor-sticky-actions .command-button:disabled",
@@ -351,6 +351,21 @@ function hasVisibleText(children, source) {
 function fail(node, source, message) {
   const position = source.getLineAndCharacterOfPosition(node.getStart(source));
   failures.push(`${path.relative(path.resolve(import.meta.dirname, ".."), source.fileName)}:${position.line + 1}: ${message}`);
+}
+
+function readCssImportGraph(entryPath, visited = new Set()) {
+  const resolvedPath = path.resolve(entryPath);
+  if (visited.has(resolvedPath)) return "";
+  visited.add(resolvedPath);
+
+  const css = fs.readFileSync(resolvedPath, "utf8");
+  const importedCss = [...css.matchAll(/@import\s+(?:url\(\s*)?["']([^"']+)["']\s*\)?[^;]*;/gu)]
+    .map((match) => match[1])
+    .filter((specifier) => specifier.startsWith("."))
+    .map((specifier) => readCssImportGraph(path.resolve(path.dirname(resolvedPath), specifier), visited))
+    .join("\n");
+
+  return `${importedCss}\n${css}`;
 }
 
 function* walk(directory) {

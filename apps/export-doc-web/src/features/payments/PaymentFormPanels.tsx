@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 import { CreditCard, RefreshCw, Save, Settings } from "lucide-react";
-import { ApiPayeeDto, ApiPaymentDto } from "../../api/index.ts";
+import { ApiPayeeDto, ApiPaymentDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { DateField, EditableComboField, NumberField, SelectField, TextAreaField, TextField } from "../../ui/FormFields.tsx";
 import { formatAmount } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import { RemoteSelectField } from "../../ui/RemoteSelectField.tsx";
 import { CustomOptionMap, getCustomOptions } from "../custom-options/customOptionModel.ts";
 
 type PaymentPatch = Partial<ApiPaymentDto>;
 
 export function PaymentBasicInfoPanel({
   payment,
+  client,
   isBusy,
   isReferenceDataBusy,
-  payees,
+  selectedPayee,
   payerNameOptions,
   referenceDataMessage,
   customOptions,
@@ -23,9 +25,10 @@ export function PaymentBasicInfoPanel({
   onRefreshReferenceData,
 }: {
   payment: ApiPaymentDto;
+  client: ExportDocManagerApiClient;
   isBusy: boolean;
   isReferenceDataBusy: boolean;
-  payees: ApiPayeeDto[];
+  selectedPayee?: ApiPayeeDto | null;
   payerNameOptions: string[];
   referenceDataMessage: string | null;
   customOptions?: CustomOptionMap;
@@ -42,31 +45,24 @@ export function PaymentBasicInfoPanel({
       return;
     }
 
-    const payee = payees.find((item) => item.id === payment.payeeId);
-    if (!payee) {
+    if (!selectedPayee || selectedPayee.id !== payment.payeeId) {
       return;
     }
 
     const accountNo = normalizeAccountNo(payment.accountNo);
-    if (payee.usdAccount && normalizeAccountNo(payee.usdAccount) === accountNo) {
+    if (selectedPayee.usdAccount && normalizeAccountNo(selectedPayee.usdAccount) === accountNo) {
       setAccountType("usd");
       return;
     }
 
-    if (payee.rmbAccount && normalizeAccountNo(payee.rmbAccount) === accountNo) {
+    if (selectedPayee.rmbAccount && normalizeAccountNo(selectedPayee.rmbAccount) === accountNo) {
       setAccountType("rmb");
     }
-  }, [payees, payment.accountNo, payment.payeeId]);
+  }, [selectedPayee, payment.accountNo, payment.payeeId]);
 
-  function applyPayee(payeeIdValue: string, nextAccountType = accountType) {
-    const payeeId = Number(payeeIdValue);
-    if (!Number.isInteger(payeeId) || payeeId <= 0) {
-      onChange({ payeeId: 0 });
-      return;
-    }
-
-    const payee = payees.find((item) => item.id === payeeId);
+  function applyPayee(payee: ApiPayeeDto | null, nextAccountType = accountType) {
     if (!payee) {
+      onChange({ payeeId: 0 });
       return;
     }
 
@@ -81,8 +77,8 @@ export function PaymentBasicInfoPanel({
   function changeAccountType(value: string) {
     const nextAccountType = value === "usd" ? "usd" : "rmb";
     setAccountType(nextAccountType);
-    if (payment.payeeId && payment.payeeId > 0) {
-      applyPayee(String(payment.payeeId), nextAccountType);
+    if (selectedPayee && payment.payeeId && payment.payeeId > 0) {
+      applyPayee(selectedPayee, nextAccountType);
     }
   }
 
@@ -123,14 +119,20 @@ export function PaymentBasicInfoPanel({
         <DateField label="付款日期" value={payment.paymentDate} onChange={(value) => onChange({ paymentDate: value })} />
         <DateField label="出运日期" value={payment.shipmentDate} onChange={(value) => onChange({ shipmentDate: value })} />
         <DateField label="收票日期" value={payment.receiptDate} onChange={(value) => onChange({ receiptDate: value })} />
-        <SelectField
+        <RemoteSelectField<ApiPayeeDto>
           label="支付对象资料"
           value={payment.payeeId && payment.payeeId > 0 ? String(payment.payeeId) : ""}
-          disabled={isBusy || isReferenceDataBusy}
-          options={payees.map((payee) => ({
-            value: String(payee.id),
-            label: payee.category ? `${payee.name} / ${payee.category}` : payee.name,
-          }))}
+          selectedOption={selectedPayee}
+          selectedLabel={payment.payeeName || undefined}
+          disabled={isBusy}
+          queryKey={["master-data", "payees", "lookup"]}
+          loadOptions={async (keyword, signal) => (await client.listPayeesPage({
+            keyword: keyword || undefined,
+            pageNumber: 1,
+            pageSize: 50,
+          }, { signal })).items}
+          getValue={(payee) => String(payee.id)}
+          getLabel={(payee) => payee.category ? `${payee.name} / ${payee.category}` : payee.name}
           onChange={applyPayee}
         />
         <SelectField

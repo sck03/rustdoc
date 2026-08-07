@@ -531,7 +531,7 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return Results.Conflict(new ApiErrorResponse(ex.Message));
+                    return WriteServiceException(ex);
                 }
                 catch (Exception ex)
                 {

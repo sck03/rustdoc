@@ -72,8 +72,6 @@ namespace ExportDocManager.Services.MasterData
         /// <summary>
         /// Gets all HS codes from the local database.
         /// </summary>
-        Task<List<HsCode>> GetAllLocalAsync();
-
         /// <summary>
         /// Gets a paged list of HS codes from the local database.
         /// </summary>

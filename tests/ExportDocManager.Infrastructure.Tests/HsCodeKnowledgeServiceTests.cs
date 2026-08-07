@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Security;
 using Microsoft.Data.Sqlite;
@@ -188,7 +189,7 @@ public sealed class HsCodeKnowledgeServiceTests
         Assert.False(result.CanUse);
         Assert.True(string.IsNullOrWhiteSpace(result.CurrentCode));
         var candidate = Assert.Single((await service.ListRemoteCandidatesAsync("Pending", "", 1, 30)).Items);
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        await Assert.ThrowsAsync<ServiceValidationException>(() =>
             service.ReviewRemoteCandidateAsync(new HsCodeRemoteCandidateReviewInput(candidate.Id, "6109100090", true)));
     }
 
@@ -361,7 +362,9 @@ public sealed class HsCodeKnowledgeServiceTests
         }
         var source = new HsCodeKnowledgeService(sourceFactory);
         await source.SaveExampleAsync(new HsCodeExampleInput(0, "6109100090", "6109100090", "棉制T恤衫", "针织", "Manual", 2026, "Active", true));
-        byte[] package = await source.ExportPackageAsync();
+        using var packageOutput = new MemoryStream();
+        await source.ExportPackageAsync(packageOutput);
+        byte[] package = packageOutput.ToArray();
         string path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.edmhs");
         await File.WriteAllBytesAsync(path, package);
         try
@@ -436,7 +439,9 @@ public sealed class HsCodeKnowledgeServiceTests
             });
             await context.SaveChangesAsync();
         }
-        byte[] package = await new HsCodeKnowledgeService(sourceFactory).ExportPackageAsync();
+        using var packageOutput = new MemoryStream();
+        await new HsCodeKnowledgeService(sourceFactory).ExportPackageAsync(packageOutput);
+        byte[] package = packageOutput.ToArray();
         string path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.edmhs");
         await File.WriteAllBytesAsync(path, package);
         try

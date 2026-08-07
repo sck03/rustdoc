@@ -165,19 +165,20 @@ namespace ExportDocManager.Api.Hosting
         private static readonly TimeSpan ValidationCacheLifetime = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan LastAccessWriteInterval = TimeSpan.FromMinutes(5);
         private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(1);
+        private static readonly TimeSpan CleanupContinuationInterval = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan SessionHistoryRetention = TimeSpan.FromDays(7);
         private const int MaximumValidationCacheEntries = 10_000;
+        private const int SessionMutationBatchSize = 500;
+        private const int MaximumCleanupScanCount = 10_000;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly ConcurrentDictionary<string, CachedSessionValidation> _validationCache = new(StringComparer.Ordinal);
         private long _nextCleanupUtcTicks;
+        private long _cleanupScanCursor;
 
         public DatabaseApiSessionTokenService(IDbContextFactory<AppDbContext> contextFactory)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         }
-
-        public ApiSessionToken Issue(User user, TimeSpan? lifetime = null)
-            => IssueAsync(user, lifetime).GetAwaiter().GetResult();
 
         public async Task<ApiSessionToken> IssueAsync(
             User user,
@@ -203,9 +204,6 @@ namespace ExportDocManager.Api.Hosting
 
             return new ApiSessionToken(token, expiresAt, ApiUserDtoFactory.ToUserSnapshot(user));
         }
-
-        public User Validate(string token)
-            => ValidateAsync(token).GetAwaiter().GetResult();
 
         public async Task<User> ValidateAsync(
             string token,
@@ -258,9 +256,6 @@ namespace ExportDocManager.Api.Hosting
             return ApiUserDtoFactory.ToUserSnapshot(user);
         }
 
-        public bool Revoke(string token)
-            => RevokeAsync(token).GetAwaiter().GetResult();
-
         public async Task<bool> RevokeAsync(
             string token,
             CancellationToken cancellationToken = default)
@@ -285,9 +280,6 @@ namespace ExportDocManager.Api.Hosting
             return true;
         }
 
-        public int RevokeUserSessions(int userId)
-            => RevokeUserSessionsAsync(userId).GetAwaiter().GetResult();
-
         public async Task<int> RevokeUserSessionsAsync(
             int userId,
             CancellationToken cancellationToken = default)
@@ -301,17 +293,40 @@ namespace ExportDocManager.Api.Hosting
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var activeSessions = context.ApiUserSessions
                 .Where(item => item.UserId == userId && !item.RevokedAt.HasValue);
-            var sessions = context.Database.IsSqlite()
-                ? activeSessions.AsEnumerable().Where(item => item.ExpiresAt > now).ToList()
-                : await activeSessions.Where(item => item.ExpiresAt > now).ToListAsync(cancellationToken);
-            foreach (var session in sessions)
+            int revokedCount = 0;
+            long lastSeenId = 0;
+            while (true)
             {
-                session.RevokedAt = now;
-            }
+                var candidates = await activeSessions
+                    .AsNoTracking()
+                    .Where(item => item.Id > lastSeenId)
+                    .OrderBy(item => item.Id)
+                    .Select(item => new { item.Id, item.ExpiresAt })
+                    .Take(SessionMutationBatchSize)
+                    .ToListAsync(cancellationToken);
+                if (candidates.Count == 0)
+                {
+                    break;
+                }
 
-            if (sessions.Count > 0)
-            {
-                await context.SaveChangesAsync(cancellationToken);
+                lastSeenId = candidates[^1].Id;
+                long[] sessionIds = candidates
+                    .Where(item => item.ExpiresAt > now)
+                    .Select(item => item.Id)
+                    .ToArray();
+                if (sessionIds.Length > 0)
+                {
+                    revokedCount += await context.ApiUserSessions
+                        .Where(item => sessionIds.Contains(item.Id) && !item.RevokedAt.HasValue)
+                        .ExecuteUpdateAsync(
+                            setters => setters.SetProperty(item => item.RevokedAt, (DateTimeOffset?)now),
+                            cancellationToken);
+                }
+
+                if (candidates.Count < SessionMutationBatchSize)
+                {
+                    break;
+                }
             }
 
             foreach (var pair in _validationCache.ToArray())
@@ -322,7 +337,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             }
 
-            return sessions.Count;
+            return revokedCount;
         }
 
         private bool TryGetCachedValidation(
@@ -417,23 +432,57 @@ namespace ExportDocManager.Api.Hosting
             }
 
             var cutoff = now.Subtract(SessionHistoryRetention);
-            var obsoleteSessions = context.Database.IsSqlite()
-                ? context.ApiUserSessions
-                    .AsEnumerable()
-                    .Where(item => item.ExpiresAt <= cutoff ||
-                        (item.RevokedAt.HasValue && item.RevokedAt.Value <= cutoff))
-                    .ToList()
-                : await context.ApiUserSessions
-                    .Where(item => item.ExpiresAt <= cutoff ||
-                        (item.RevokedAt.HasValue && item.RevokedAt.Value <= cutoff))
-                    .ToListAsync(cancellationToken);
-            if (obsoleteSessions.Count == 0)
+            long lastSeenId = Volatile.Read(ref _cleanupScanCursor);
+            int scannedCount = 0;
+            bool hasMoreRows = false;
+            while (scannedCount < MaximumCleanupScanCount)
             {
-                return;
+                int takeCount = Math.Min(SessionMutationBatchSize, MaximumCleanupScanCount - scannedCount);
+                var candidates = await context.ApiUserSessions
+                    .AsNoTracking()
+                    .Where(item => item.Id > lastSeenId)
+                    .OrderBy(item => item.Id)
+                    .Select(item => new { item.Id, item.ExpiresAt, item.RevokedAt })
+                    .Take(takeCount)
+                    .ToListAsync(cancellationToken);
+                if (candidates.Count == 0)
+                {
+                    hasMoreRows = false;
+                    break;
+                }
+
+                scannedCount += candidates.Count;
+                lastSeenId = candidates[^1].Id;
+                long[] obsoleteSessionIds = candidates
+                    .Where(item => item.ExpiresAt <= cutoff ||
+                        (item.RevokedAt.HasValue && item.RevokedAt.Value <= cutoff))
+                    .Select(item => item.Id)
+                    .ToArray();
+                if (obsoleteSessionIds.Length > 0)
+                {
+                    await context.ApiUserSessions
+                        .Where(item => obsoleteSessionIds.Contains(item.Id))
+                        .ExecuteDeleteAsync(cancellationToken);
+                }
+
+                hasMoreRows = candidates.Count == takeCount;
+                if (!hasMoreRows)
+                {
+                    break;
+                }
             }
 
-            context.ApiUserSessions.RemoveRange(obsoleteSessions);
-            await context.SaveChangesAsync(cancellationToken);
+            if (hasMoreRows && scannedCount >= MaximumCleanupScanCount)
+            {
+                Volatile.Write(ref _cleanupScanCursor, lastSeenId);
+                Volatile.Write(
+                    ref _nextCleanupUtcTicks,
+                    now.Add(CleanupContinuationInterval).UtcTicks);
+            }
+            else
+            {
+                Volatile.Write(ref _cleanupScanCursor, 0);
+            }
         }
 
         private static string CreateToken()

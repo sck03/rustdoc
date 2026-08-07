@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Utils;
@@ -187,6 +188,69 @@ public sealed class ReportTemplateDomainIsolationTests
                 created.Content);
             Assert.Equal(created.Content, saved.Content);
             Assert.Null(saved.WithSealDefault);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task CreateTemplateAsync_ShouldClassifyExistingTargetAsConflict()
+    {
+        string root = CreateTestRoot("template-create-conflict");
+        string appRoot = Path.Combine(root, "app");
+        string dataRoot = Path.Combine(root, "data");
+        string targetPath = Path.Combine(dataRoot, "Templates", "Internal", "existing.html");
+        Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+        await File.WriteAllTextAsync(targetPath, "<html><body>existing</body></html>");
+        var service = new ReportTemplateService(
+            new RuntimeAppPathProvider(appRoot, dataRoot),
+            new StubSettingsService(new AppSettings()));
+
+        try
+        {
+            var error = await Assert.ThrowsAsync<ResourceConflictException>(() =>
+                service.CreateTemplateAsync(
+                    ReportDocumentType.PaymentVoucher,
+                    "Internal/existing.html",
+                    "已存在模板"));
+
+            Assert.Equal("目标模板已存在。", error.Message);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task RenameTemplateAsync_ShouldClassifyExistingTargetAsConflict()
+    {
+        string root = CreateTestRoot("template-rename-conflict");
+        string appRoot = Path.Combine(root, "app");
+        string dataRoot = Path.Combine(root, "data");
+        string templateRoot = Path.Combine(dataRoot, "Templates", "Internal");
+        string sourcePath = Path.Combine(templateRoot, "source.html");
+        string targetPath = Path.Combine(templateRoot, "target.html");
+        Directory.CreateDirectory(templateRoot);
+        await File.WriteAllTextAsync(sourcePath, "<html><body>source</body></html>");
+        await File.WriteAllTextAsync(targetPath, "<html><body>target</body></html>");
+        var service = new ReportTemplateService(
+            new RuntimeAppPathProvider(appRoot, dataRoot),
+            new StubSettingsService(new AppSettings()));
+
+        try
+        {
+            var error = await Assert.ThrowsAsync<ResourceConflictException>(() =>
+                service.RenameTemplateAsync(
+                    ReportDocumentType.PaymentVoucher,
+                    "user:Internal/source.html",
+                    "Internal/target.html"));
+
+            Assert.Equal("目标模板已存在。", error.Message);
+            Assert.True(File.Exists(sourcePath));
+            Assert.True(File.Exists(targetPath));
         }
         finally
         {

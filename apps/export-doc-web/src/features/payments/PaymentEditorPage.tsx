@@ -56,9 +56,11 @@ export function PaymentEditorPage({
     staleTime: 5 * 60 * 1000,
   });
 
-  const payeesQuery = useQuery({
-    queryKey: queryKeys.masterDataRoot("payees"),
-    queryFn: ({ signal }) => client.listPayees({}, { signal }),
+  const selectedPayeeId = payment?.payeeId ?? 0;
+  const selectedPayeeQuery = useQuery({
+    queryKey: queryKeys.masterDataRecord("payees", String(selectedPayeeId)),
+    queryFn: ({ signal }) => client.getPayee({ id: selectedPayeeId }, { signal }),
+    enabled: selectedPayeeId > 0,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -161,23 +163,16 @@ export function PaymentEditorPage({
 
   const isBusy = paymentQuery.isFetching || savePaymentMutation.isPending || deletePaymentMutation.isPending;
   const paymentCustomOptions = customOptionsQuery.data ?? {};
-  const payees = useMemo(
-    () =>
-      [...(payeesQuery.data ?? [])]
-        .filter((payee) => payee.name?.trim())
-        .sort((left, right) => left.name.localeCompare(right.name, "zh-CN")),
-    [payeesQuery.data],
-  );
   const payerNameOptions = useMemo(
     () => paymentCustomOptions.PaymentPayerName ?? [],
     [paymentCustomOptions.PaymentPayerName],
   );
-  const referenceDataMessage = payeesQuery.isError
-    ? readApiError(payeesQuery.error)
+  const referenceDataMessage = selectedPayeeQuery.isError
+    ? readApiError(selectedPayeeQuery.error)
     : customOptionsQuery.isError
       ? readApiError(customOptionsQuery.error)
       : null;
-  const isReferenceDataBusy = payeesQuery.isFetching || customOptionsQuery.isFetching;
+  const isReferenceDataBusy = selectedPayeeQuery.isFetching || customOptionsQuery.isFetching;
   const currentPaymentSnapshot = useMemo(
     () => (payment ? buildPaymentSnapshot(payment, isNew || !isPaymentIdValid ? 0 : parsedPaymentId) : null),
     [isNew, isPaymentIdValid, parsedPaymentId, payment],
@@ -339,9 +334,10 @@ export function PaymentEditorPage({
           <fieldset className="permission-fieldset" disabled={!paymentPermission.canOperate}>
           <PaymentBasicInfoPanel
             payment={payment}
+            client={client}
             isBusy={isBusy}
             isReferenceDataBusy={isReferenceDataBusy}
-            payees={payees}
+            selectedPayee={selectedPayeeQuery.data}
             payerNameOptions={payerNameOptions}
             referenceDataMessage={referenceDataMessage}
             customOptions={paymentCustomOptions}
@@ -350,7 +346,7 @@ export function PaymentEditorPage({
             onOpenPayeeManagement={handleOpenPayeeManagement}
             canOpenPayeeManagement={masterDataPermission.canView}
             onRefreshReferenceData={() => {
-              void payeesQuery.refetch();
+              void queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("payees") });
               void customOptionsQuery.refetch();
             }}
           />

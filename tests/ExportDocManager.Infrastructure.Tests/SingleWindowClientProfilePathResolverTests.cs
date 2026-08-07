@@ -1,5 +1,6 @@
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.SingleWindow;
 
 namespace ExportDocManager.Infrastructure.Tests
@@ -51,7 +52,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public void NormalizeClientRootPath_ShouldRejectNetworkShare()
         {
-            var error = Assert.Throws<InvalidOperationException>(() =>
+            var error = Assert.Throws<ServiceValidationException>(() =>
                 SingleWindowClientProfilePathResolver.NormalizeClientRootPath(@"\\server\single-window"));
 
             Assert.Contains("本机磁盘", error.Message, StringComparison.Ordinal);
@@ -60,7 +61,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public void NormalizeClientRootPath_ShouldRejectRelativePath()
         {
-            var error = Assert.Throws<InvalidOperationException>(() =>
+            var error = Assert.Throws<ServiceValidationException>(() =>
                 SingleWindowClientProfilePathResolver.NormalizeClientRootPath(
                     Path.Combine("OfficialClient", "CompanyA")));
 

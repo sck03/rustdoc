@@ -2,7 +2,7 @@ import { FocusEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useSt
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { Download, FolderOpen, RefreshCw, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { ApiQueryInvoiceRowDto, ExportDocManagerApiClient } from "../../api/index.ts";
+import { ApiCustomerDto, ApiExporterDto, ApiQueryInvoiceRowDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { isDesktopBridgeAvailable, selectSaveExcelPath } from "../../desktop/desktopBridge.ts";
@@ -11,6 +11,7 @@ import { readStoredJson, writeStoredJson } from "../../ui/browserStorage.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { RemoteSelectField } from "../../ui/RemoteSelectField.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { formatAmount, formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
@@ -49,15 +50,19 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
   const [actionMessage, setActionMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [lastCreatedJobId, setLastCreatedJobId] = useState<string | null>(null);
 
-  const partiesQuery = useQuery({
-    queryKey: queryKeys.invoiceParties(),
-    queryFn: async ({ signal }) => {
-      const [customers, exporters] = await Promise.all([
-        client.listCustomers({}, { signal }),
-        client.listExporters({}, { signal }),
-      ]);
-      return { customers, exporters };
-    },
+  const selectedCustomerId = Number(filters.customerId);
+  const selectedCustomerQuery = useQuery({
+    queryKey: queryKeys.masterDataRecord("customers", String(selectedCustomerId)),
+    queryFn: ({ signal }) => client.getCustomer({ id: selectedCustomerId }, { signal }),
+    enabled: Number.isInteger(selectedCustomerId) && selectedCustomerId > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const selectedExporterId = Number(filters.exporterId);
+  const selectedExporterQuery = useQuery({
+    queryKey: queryKeys.masterDataRecord("exporters", String(selectedExporterId)),
+    queryFn: ({ signal }) => client.getExporter({ id: selectedExporterId }, { signal }),
+    enabled: Number.isInteger(selectedExporterId) && selectedExporterId > 0,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -149,17 +154,6 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
   const message = invoiceQuery.isError ? readApiError(invoiceQuery.error) : null;
   const canExport = queryPermission.canOperate && (!isDesktop || Boolean(exportPath.trim())) && !isActionBusy;
 
-  const customerOptions = useMemo(
-    () => (partiesQuery.data?.customers ?? []).slice().sort((left, right) => left.displayName.localeCompare(right.displayName)),
-    [partiesQuery.data?.customers],
-  );
-  const exporterOptions = useMemo(
-    () =>
-      (partiesQuery.data?.exporters ?? [])
-        .slice()
-        .sort((left, right) => left.exporterNameEN.localeCompare(right.exporterNameEN)),
-    [partiesQuery.data?.exporters],
-  );
   const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
 
   function updateFilter(key: keyof QueryFilters, value: string) {
@@ -251,36 +245,44 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
               onChange={(event) => updateFilter("endDate", event.target.value)}
             />
           </label>
-          <label className="inline-filter query-party-filter">
-            <span>客户</span>
-            <select
-              data-query-filter="customerId"
-              value={filters.customerId}
-              onChange={(event) => updateFilter("customerId", event.target.value)}
-            >
-              <option value="0">全部</option>
-              {customerOptions.map((customer) => (
-                <option key={customer.id} value={String(customer.id)}>
-                  {customer.displayName || customer.customerNameEN}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="inline-filter query-party-filter">
-            <span>出口商</span>
-            <select
-              data-query-filter="exporterId"
-              value={filters.exporterId}
-              onChange={(event) => updateFilter("exporterId", event.target.value)}
-            >
-              <option value="0">全部</option>
-              {exporterOptions.map((exporter) => (
-                <option key={exporter.id} value={String(exporter.id)}>
-                  {exporter.exporterNameEN || exporter.exporterNameCN}
-                </option>
-              ))}
-            </select>
-          </label>
+          <RemoteSelectField<ApiCustomerDto>
+            className="inline-filter query-party-filter"
+            label="客户"
+            value={filters.customerId === "0" ? "" : filters.customerId}
+            selectedOption={selectedCustomerQuery.data}
+            selectedLabel={selectedCustomerQuery.data?.displayName || `客户 #${filters.customerId}`}
+            emptyLabel="全部"
+            searchPlaceholder="搜索客户"
+            queryKey={["master-data", "customers", "lookup"]}
+            loadOptions={async (keyword, signal) => (await client.listCustomersPage({
+              keyword: keyword || undefined,
+              pageNumber: 1,
+              pageSize: 50,
+            }, { signal })).items}
+            getValue={(customer) => String(customer.id)}
+            getLabel={(customer) => customer.displayName || customer.customerNameEN || "-"}
+            dataQueryFilter="customerId"
+            onChange={(customer) => updateFilter("customerId", customer ? String(customer.id) : "0")}
+          />
+          <RemoteSelectField<ApiExporterDto>
+            className="inline-filter query-party-filter"
+            label="出口商"
+            value={filters.exporterId === "0" ? "" : filters.exporterId}
+            selectedOption={selectedExporterQuery.data}
+            selectedLabel={selectedExporterQuery.data?.exporterNameEN || selectedExporterQuery.data?.exporterNameCN || `出口商 #${filters.exporterId}`}
+            emptyLabel="全部"
+            searchPlaceholder="搜索出口商"
+            queryKey={["master-data", "exporters", "lookup"]}
+            loadOptions={async (keyword, signal) => (await client.listExportersPage({
+              keyword: keyword || undefined,
+              pageNumber: 1,
+              pageSize: 50,
+            }, { signal })).items}
+            getValue={(exporter) => String(exporter.id)}
+            getLabel={(exporter) => exporter.exporterNameEN || exporter.exporterNameCN || "-"}
+            dataQueryFilter="exporterId"
+            onChange={(exporter) => updateFilter("exporterId", exporter ? String(exporter.id) : "0")}
+          />
           <label className="inline-filter">
             <span>类型</span>
             <select
@@ -364,7 +366,8 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
       </section> : null}
 
       {message ? <InlineNotice tone="error" title="查询未完成">{message}</InlineNotice> : null}
-      {partiesQuery.isError ? <InlineNotice tone="warning" title="客户与出口商资料未加载">{readApiError(partiesQuery.error)}</InlineNotice> : null}
+      {selectedCustomerQuery.isError ? <InlineNotice tone="warning" title="当前客户资料未加载">{readApiError(selectedCustomerQuery.error)}</InlineNotice> : null}
+      {selectedExporterQuery.isError ? <InlineNotice tone="warning" title="当前出口商资料未加载">{readApiError(selectedExporterQuery.error)}</InlineNotice> : null}
       {actionMessage ? (
         <InlineNotice
           tone={actionMessage.kind === "success" ? "success" : "error"}

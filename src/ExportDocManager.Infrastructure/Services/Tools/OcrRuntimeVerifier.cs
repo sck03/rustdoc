@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 
@@ -21,7 +22,7 @@ namespace ExportDocManager.Services.Tools
             await using var host = new RustOcrSidecarHost(pathProvider);
             if (!host.IsAvailable(out _))
             {
-                throw new InvalidOperationException("未找到Rust PP-OCRv6 Sidecar，无法执行跨平台OCR发布验证。");
+                throw new InfrastructureServiceException("未找到 Rust PP-OCRv6 Sidecar，无法执行跨平台 OCR 发布验证。");
             }
 
             string jobRoot = Path.Combine(pathProvider.CacheRoot, "OcrJobs", $"verify-{Guid.NewGuid():N}");
@@ -37,7 +38,7 @@ namespace ExportDocManager.Services.Tools
                 string text = result.FullText.Trim();
                 if (!text.Contains("EXPORT DOC 2026", StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new InvalidOperationException($"Rust PP-OCRv6运行验证结果不符合预期：'{text}'。");
+                    throw new InfrastructureServiceException($"Rust PP-OCRv6 运行验证结果不符合预期：'{text}'。");
                 }
 
                 return new OcrRuntimeVerificationResult(

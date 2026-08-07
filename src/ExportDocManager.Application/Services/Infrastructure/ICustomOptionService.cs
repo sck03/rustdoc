@@ -2,8 +2,13 @@ namespace ExportDocManager.Services.Infrastructure
 {
     public interface ICustomOptionService
     {
-        IReadOnlyList<string> GetOptions(string optionType);
+        Task<IReadOnlyList<string>> GetOptionsAsync(
+            string optionType,
+            CancellationToken cancellationToken = default);
 
-        void SaveOption(string optionType, string optionValue);
+        Task SaveOptionAsync(
+            string optionType,
+            string optionValue,
+            CancellationToken cancellationToken = default);
     }
 }

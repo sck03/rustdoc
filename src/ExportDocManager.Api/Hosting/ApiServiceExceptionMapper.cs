@@ -102,8 +102,6 @@ internal static class ApiServiceExceptionMapper
             // first). They are dependency availability failures, not conflicts.
             OperationCanceledException =>
                 (StatusCodes.Status503ServiceUnavailable, "依赖服务暂时不可用，请稍后重试。"),
-            InvalidOperationException =>
-                (StatusCodes.Status409Conflict, exception.Message),
             _ =>
                 (StatusCodes.Status500InternalServerError,
                     string.IsNullOrWhiteSpace(correlationId)

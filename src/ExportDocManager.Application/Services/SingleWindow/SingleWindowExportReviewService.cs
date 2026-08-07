@@ -1,4 +1,5 @@
 using ExportDocManager.Models.DTOs.SingleWindow;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 
 namespace ExportDocManager.Services.SingleWindow
@@ -43,7 +44,7 @@ namespace ExportDocManager.Services.SingleWindow
             {
                 SingleWindowBusinessType.CustomsCoo => await BuildCustomsCooReviewAsync(invoiceId, cancellationToken),
                 SingleWindowBusinessType.AgentConsignment => await BuildAgentConsignmentReviewAsync(invoiceId, cancellationToken),
-                _ => throw new InvalidOperationException("不支持的单一窗口业务类型。")
+                _ => throw new ServiceValidationException("不支持的单一窗口业务类型。")
             };
         }
 

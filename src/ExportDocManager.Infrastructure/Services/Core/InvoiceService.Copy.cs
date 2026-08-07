@@ -80,7 +80,7 @@ namespace ExportDocManager.Services.Core
 
                         if (string.Equals(originalInvoice.Type?.Trim(), normalizedTargetType, StringComparison.Ordinal))
                         {
-                            throw new InvalidOperationException("目标发票类型必须与源发票类型不同。");
+                            throw new ServiceValidationException("目标发票类型必须与源发票类型不同。");
                         }
 
                         var newInvoice = CreateInvoiceClone(originalInvoice, originalInvoice.InvoiceNo, cloneOptions);
@@ -99,7 +99,7 @@ namespace ExportDocManager.Services.Core
                                 x.Type == newInvoice.Type);
                         if (targetExists)
                         {
-                            throw new InvalidOperationException($"同一发票号的{normalizedTargetType}已存在，未覆盖。");
+                            throw new ResourceConflictException($"同一发票号的{normalizedTargetType}已存在，未覆盖。");
                         }
 
                         if (cloneOptions.CopyItems)
@@ -117,7 +117,7 @@ namespace ExportDocManager.Services.Core
                         return newInvoice;
                     });
             }
-            catch (InvalidOperationException)
+            catch (ServiceException)
             {
                 throw;
             }

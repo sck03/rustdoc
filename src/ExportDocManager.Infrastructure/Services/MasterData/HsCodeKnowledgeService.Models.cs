@@ -256,11 +256,13 @@ namespace ExportDocManager.Services.MasterData
         {
             private readonly Stream _inner;
             private readonly long _maximumBytes;
+            private readonly bool _leaveOpen;
 
-            public MaximumLengthWriteStream(Stream inner, long maximumBytes)
+            public MaximumLengthWriteStream(Stream inner, long maximumBytes, bool leaveOpen = false)
             {
                 _inner = inner ?? throw new ArgumentNullException(nameof(inner));
                 _maximumBytes = maximumBytes;
+                _leaveOpen = leaveOpen;
             }
 
             private long BytesWritten { get; set; }
@@ -294,7 +296,7 @@ namespace ExportDocManager.Services.MasterData
 
             protected override void Dispose(bool disposing)
             {
-                if (disposing)
+                if (disposing && !_leaveOpen)
                 {
                     _inner.Dispose();
                 }

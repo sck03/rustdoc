@@ -1,5 +1,6 @@
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.DTOs.SingleWindow;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
 
@@ -62,7 +63,7 @@ namespace ExportDocManager.Api.Hosting
                     var result = await operationCenterService.GetDetailAsync(batchId, cancellationToken);
                     return Results.Ok(result);
                 }
-                catch (InvalidOperationException)
+                catch (ResourceNotFoundException)
                 {
                     return Results.NotFound();
                 }

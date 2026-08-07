@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:18-bookworm
+        image: postgres:18.4-trixie
         env:
           POSTGRES_DB: exportdoc_test
           POSTGRES_USER: exportdoc
@@ -100,7 +100,7 @@ jobs:
         shell: bash
         run: |
           echo "## PostgreSQL shared-database validation" >> "$GITHUB_STEP_SUMMARY"
-          echo "- PostgreSQL baseline: \`18-bookworm\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- PostgreSQL baseline: \`18.4-trixie\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- HS / declaration examples: \`${EXPORTDOC_TEST_HS_RECORDS}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Invoices / invoice items: \`${EXPORTDOC_TEST_INVOICE_RECORDS}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Coverage: initialization, pg_trgm/prefix indexes, paging, HS search, invoice history, optimistic concurrency, role and SQL safety boundaries" >> "$GITHUB_STEP_SUMMARY"

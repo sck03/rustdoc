@@ -7,6 +7,7 @@ using SkiaSharp;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
+using ExportDocManager.Services.Errors;
 
 namespace ExportDocManager.Services.Tools
 {
@@ -88,7 +89,7 @@ namespace ExportDocManager.Services.Tools
             extractedText = NormalizeText(extractedText);
             if (string.IsNullOrWhiteSpace(extractedText))
             {
-                throw new InvalidOperationException("未能从信用证文件中提取到有效文本。");
+                throw new ServiceValidationException("未能从信用证文件中提取到有效文本。");
             }
 
             if (extractedText.Length > MaximumExtractedTextCharacters)

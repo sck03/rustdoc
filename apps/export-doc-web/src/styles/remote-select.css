@@ -1,0 +1,53 @@
+.remote-select-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.remote-select-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+}
+
+.remote-select-controls input,
+.remote-select-controls select {
+  width: 100%;
+  min-width: 0;
+}
+
+.remote-select-status {
+  color: var(--edm-ink-500);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.remote-select-status.error {
+  color: var(--edm-danger);
+}
+
+.inline-filter.remote-select-field {
+  align-items: stretch;
+  min-height: 0;
+}
+
+.inline-filter.remote-select-field .form-field-label {
+  min-height: 18px;
+  font-size: 13px;
+}
+
+.query-party-filter.remote-select-field,
+.query-party-filter.remote-select-field input,
+.query-party-filter.remote-select-field select {
+  width: 220px;
+}
+
+@media (max-width: 760px) {
+  .query-party-filter.remote-select-field,
+  .query-party-filter.remote-select-field input,
+  .query-party-filter.remote-select-field select {
+    width: 100%;
+  }
+}

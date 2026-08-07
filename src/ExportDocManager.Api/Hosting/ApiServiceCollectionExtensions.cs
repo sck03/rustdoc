@@ -66,6 +66,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddSingleton(_ => ApiBackgroundJobRetentionOptions.FromEnvironment());
             services.AddSingleton<ApiBackgroundJobService>();
             services.AddSingleton<ApiBackgroundJobRunner>();
+            services.AddHostedService(provider => provider.GetRequiredService<ApiBackgroundJobRunner>());
             services.AddSingleton<ApiBackgroundJobRetryDispatcher>();
             services.AddHostedService<SqliteSingleInstanceHostedService>();
             services.AddHostedService<PostgreSqlAutomaticBackupHostedService>();

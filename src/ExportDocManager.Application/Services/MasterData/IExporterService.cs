@@ -8,7 +8,7 @@ namespace ExportDocManager.Services.MasterData
     {
         Task<int> SaveExporterAsync(Exporter exporter);
         Task<List<Exporter>> GetAllExportersAsync();
-        Task<Exporter> GetExporterByIdAsync(int id);
+        Task<Exporter> GetExporterByIdAsync(int id, CancellationToken cancellationToken = default);
         Task<bool> DeleteExporterAsync(int id);
         Task<Exporter> GetExporterByNameAsync(string name);
         Task<List<Exporter>> SearchExportersAsync(string keyword);

@@ -2107,10 +2107,10 @@ namespace ExportDocManager.Api.Tests
                 }, initialOutputPath: outputPath);
 
                 var final = await WaitForJobStatusAsync(jobService, job.JobId, BackgroundJobStatusCatalog.Failed);
+                await runner.StopAsync(CancellationToken.None);
                 Assert.Equal(string.Empty, final.OutputPath);
                 Assert.False(File.Exists(outputPath));
                 Assert.False(Directory.Exists(outputDirectory));
-                await Task.Delay(250);
             }
             finally
             {
@@ -2146,6 +2146,7 @@ namespace ExportDocManager.Api.Tests
                 });
 
                 var final = await WaitForJobStatusAsync(jobService, job.JobId, BackgroundJobStatusCatalog.Canceled);
+                await runner.StopAsync(CancellationToken.None);
                 Assert.Equal(string.Empty, final.OutputPath);
                 Assert.False(File.Exists(outputPath));
                 Assert.False(Directory.Exists(outputDirectory));

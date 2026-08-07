@@ -291,8 +291,9 @@ namespace ExportDocManager.Api.Hosting
                     jobContext.CancellationToken.ThrowIfCancellationRequested();
 
                     var templateService = provider.GetRequiredService<IExcelImportTemplateService>();
-                    string outputPath = await Task.Run(
-                        () => templateService.ExportBlankBookingSheet(destinationPath, overwrite: true),
+                    string outputPath = await templateService.ExportBlankBookingSheetAsync(
+                        destinationPath,
+                        overwrite: true,
                         jobContext.CancellationToken);
 
                     jobContext.Report(95, "正在保存空白托单", Path.GetFileName(outputPath), outputPath);

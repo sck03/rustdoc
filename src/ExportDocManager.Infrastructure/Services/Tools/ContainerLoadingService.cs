@@ -6,6 +6,7 @@ using ExportDocManager.Models;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 
 namespace ExportDocManager.Services.Tools
@@ -35,19 +36,23 @@ namespace ExportDocManager.Services.Tools
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<ContainerProject> GetProjectAsync(int projectId)
+        public async Task<ContainerProject> GetProjectAsync(
+            int projectId,
+            CancellationToken cancellationToken = default)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             return await _accessScope.ApplyContainerProjectScope(context.ContainerProjects.AsNoTracking())
-                .SingleOrDefaultAsync(project => project.Id == projectId);
+                .SingleOrDefaultAsync(project => project.Id == projectId, cancellationToken);
         }
 
-        public async Task<List<ContainerProjectItem>> GetProjectItemsAsync(int projectId)
+        public async Task<List<ContainerProjectItem>> GetProjectItemsAsync(
+            int projectId,
+            CancellationToken cancellationToken = default)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             bool canAccessProject = await _accessScope
                 .ApplyContainerProjectScope(context.ContainerProjects.AsNoTracking())
-                .AnyAsync(project => project.Id == projectId);
+                .AnyAsync(project => project.Id == projectId, cancellationToken);
             if (!canAccessProject)
             {
                 return new List<ContainerProjectItem>();
@@ -58,10 +63,13 @@ namespace ExportDocManager.Services.Tools
                 .Where(i => i.ProjectId == projectId)
                 .OrderBy(i => i.LoadSequence)
                 .ThenBy(i => i.Id)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
         }
 
-        public async Task SaveProjectAsync(ContainerProject project, List<ContainerProjectItem> items)
+        public async Task SaveProjectAsync(
+            ContainerProject project,
+            List<ContainerProjectItem> items,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(project);
             ArgumentNullException.ThrowIfNull(items);
@@ -77,12 +85,12 @@ namespace ExportDocManager.Services.Tools
 
             if (sanitizedItems.Count == 0)
             {
-                throw new InvalidOperationException("至少需要一个有效货物项才能保存装柜方案。");
+                throw new ServiceValidationException("至少需要一个有效货物项才能保存装柜方案。");
             }
 
             var savedProject = await AppDbContextExecution.ExecuteInTransactionAsync(
                 _contextFactory,
-                async (context, _) =>
+                async (context, token) =>
                 {
                     var now = DateTime.Now;
                     ContainerProject targetProject;
@@ -98,17 +106,17 @@ namespace ExportDocManager.Services.Tools
                         ApplyProjectValues(targetProject, project, now);
 
                         context.ContainerProjects.Add(targetProject);
-                        await context.SaveChangesAsync();
+                        await context.SaveChangesAsync(token);
                     }
                     else
                     {
                         targetProject = await _accessScope.ApplyContainerProjectScope(context.ContainerProjects)
-                            .SingleOrDefaultAsync(existingProject => existingProject.Id == project.Id)
-                            ?? throw new InvalidOperationException("要保存的装柜方案不存在，可能已被删除或不属于当前账号。");
+                            .SingleOrDefaultAsync(existingProject => existingProject.Id == project.Id, token)
+                            ?? throw new ResourceNotFoundException("要保存的装柜方案不存在，可能已被删除或不属于当前账号。");
 
                         if (project.VersionNumber <= 0)
                         {
-                            throw new InvalidOperationException("装柜方案缺少并发版本，请重新加载后再保存。");
+                            throw new ServiceValidationException("装柜方案缺少并发版本，请重新加载后再保存。");
                         }
 
                         if (targetProject.VersionNumber != project.VersionNumber)
@@ -123,7 +131,7 @@ namespace ExportDocManager.Services.Tools
 
                         await context.ContainerProjectItems
                             .Where(item => item.ProjectId == project.Id)
-                            .ExecuteDeleteAsync();
+                            .ExecuteDeleteAsync(token);
                     }
 
                     foreach (var item in sanitizedItems)
@@ -134,58 +142,72 @@ namespace ExportDocManager.Services.Tools
 
                     try
                     {
-                        await context.SaveChangesAsync();
+                        await context.SaveChangesAsync(token);
                     }
                     catch (DbUpdateConcurrencyException ex)
                     {
                         throw new BusinessConcurrencyException("装柜方案已被其他会话修改，请重新加载后再保存。", ex);
                     }
                     return targetProject;
-                });
+                },
+                cancellationToken);
 
             CopySavedProject(project, savedProject);
         }
 
-        public async Task DeleteProjectAsync(int projectId)
+        public async Task DeleteProjectAsync(
+            int projectId,
+            CancellationToken cancellationToken = default)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var project = await _accessScope.ApplyContainerProjectScope(context.ContainerProjects)
-                .SingleOrDefaultAsync(item => item.Id == projectId);
+                .SingleOrDefaultAsync(item => item.Id == projectId, cancellationToken);
             if (project != null)
             {
                 context.ContainerProjects.Remove(project);
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken);
             }
         }
 
         // --- Container Type Management ---
 
-        public async Task<List<ContainerTypeDefinition>> GetContainerTypesAsync()
+        public async Task<List<ContainerTypeDefinition>> GetContainerTypesAsync(
+            CancellationToken cancellationToken = default)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             return await context.ContainerTypeDefinitions
                 .AsNoTracking()
                 .OrderByDescending(t => t.IsSystemDefault)
                 .ThenBy(t => t.Name)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
         }
 
-        public async Task SaveContainerTypeAsync(ContainerTypeDefinition typeDef)
+        public async Task SaveContainerTypeAsync(
+            ContainerTypeDefinition typeDef,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(typeDef);
 
-            using var context = await _contextFactory.CreateDbContextAsync();
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             string normalizedName = NormalizeContainerTypeName(typeDef.Name);
             var savedType = await context.ContainerTypeDefinitions
-                .FirstOrDefaultAsync(item => item.Id == typeDef.Id);
+                .FirstOrDefaultAsync(item => item.Id == typeDef.Id, cancellationToken);
             if (savedType?.IsSystemDefault == true)
             {
-                throw new InvalidOperationException("系统默认柜型不支持覆盖，请换一个名称保存。");
+                throw new ResourceConflictException("系统默认柜型不支持覆盖，请换一个名称保存。");
             }
 
             if (savedType == null)
             {
-                var allTypes = await context.ContainerTypeDefinitions.ToListAsync();
+                var allTypes = await context.ContainerTypeDefinitions
+                    .AsNoTracking()
+                    .Select(item => new ContainerTypeDefinition
+                    {
+                        Id = item.Id,
+                        Name = item.Name,
+                        IsSystemDefault = item.IsSystemDefault
+                    })
+                    .ToListAsync(cancellationToken);
                 savedType = allTypes
                     .FirstOrDefault(item => string.Equals(
                         NormalizeContainerTypeName(item.Name),
@@ -194,7 +216,7 @@ namespace ExportDocManager.Services.Tools
 
                 if (savedType?.IsSystemDefault == true)
                 {
-                    throw new InvalidOperationException("系统默认柜型不支持覆盖，请换一个名称保存。");
+                    throw new ResourceConflictException("系统默认柜型不支持覆盖，请换一个名称保存。");
                 }
             }
 
@@ -223,7 +245,7 @@ namespace ExportDocManager.Services.Tools
                 savedType.IsSystemDefault = typeDef.IsSystemDefault;
             }
 
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(cancellationToken);
 
             typeDef.Id = savedType.Id;
             typeDef.Name = normalizedName;
@@ -235,14 +257,16 @@ namespace ExportDocManager.Services.Tools
             typeDef.IsSystemDefault = savedType.IsSystemDefault;
         }
 
-        public async Task DeleteContainerTypeAsync(int id)
+        public async Task DeleteContainerTypeAsync(
+            int id,
+            CancellationToken cancellationToken = default)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var typeDef = await context.ContainerTypeDefinitions.FindAsync(id);
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var typeDef = await context.ContainerTypeDefinitions.FindAsync([id], cancellationToken);
             if (typeDef != null && !typeDef.IsSystemDefault)
             {
                 context.ContainerTypeDefinitions.Remove(typeDef);
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken);
             }
         }
 

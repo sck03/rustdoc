@@ -321,6 +321,7 @@ namespace ExportDocManager.Api.Tests
             {
                 "ApiBackgroundJobRunner.cs",
                 "ApiBackgroundJobRunnerExecution.cs",
+                "ApiBackgroundJobRunnerLifecycle.cs",
                 "ApiBackgroundJobExecutionContext.cs"
             })
             {
@@ -353,6 +354,11 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("CreateScope", executionContent, StringComparison.Ordinal);
             Assert.Contains("HasRetryDescriptor", executionContent, StringComparison.Ordinal);
             Assert.Contains("LogError", executionContent, StringComparison.Ordinal);
+
+            string lifecycleContent = File.ReadAllText(Path.Combine(hostingRoot, "ApiBackgroundJobRunnerLifecycle.cs"));
+            Assert.Contains("StopAsync", lifecycleContent, StringComparison.Ordinal);
+            Assert.Contains("_applicationStopping.Cancel()", lifecycleContent, StringComparison.Ordinal);
+            Assert.Contains("Task.WhenAll", lifecycleContent, StringComparison.Ordinal);
 
             string contextContent = File.ReadAllText(Path.Combine(hostingRoot, "ApiBackgroundJobExecutionContext.cs"));
             Assert.Contains("class ApiBackgroundJobExecutionContext", contextContent, StringComparison.Ordinal);

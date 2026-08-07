@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Models;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -68,7 +69,7 @@ namespace ExportDocManager.Services.Crm
                     throw new BusinessConcurrencyException("保存现有 CRM 客户时必须提供版本号，请刷新后重试。");
                 entity = await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers)
                     .FirstOrDefaultAsync(item => item.Id == request.Id, cancellationToken)
-                    ?? throw new KeyNotFoundException("CRM 客户不存在或无权访问。");
+                    ?? throw new ResourceNotFoundException("CRM 客户不存在或无权访问。");
                 if (entity.VersionNumber != request.ExpectedVersion)
                     throw new BusinessConcurrencyException("该 CRM 客户已被其他用户修改，请刷新后重试。");
                 context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = request.ExpectedVersion;
@@ -110,11 +111,11 @@ namespace ExportDocManager.Services.Crm
             if (await _accessScope.ApplyCrmFollowUpScope(context.CrmFollowUps.AsNoTracking())
                     .AnyAsync(item => item.CrmCustomerId == id, cancellationToken))
             {
-                throw new InvalidOperationException("该客户已有跟进历史，不能直接删除；请改为停用状态以保留业务记录。");
+                throw new ResourceConflictException("该客户已有跟进历史，不能直接删除；请改为停用状态以保留业务记录。");
             }
             if (await _accessScope.ApplySalesOpportunityScope(context.SalesOpportunities.AsNoTracking())
                     .AnyAsync(item => item.CrmCustomerId == id, cancellationToken))
-                throw new InvalidOperationException("该客户已有商机记录，不能直接删除；请改为暂停或已流失状态。");
+                throw new ResourceConflictException("该客户已有商机记录，不能直接删除；请改为暂停或已流失状态。");
 
             context.CrmCustomers.Remove(entity);
             await context.SaveChangesAsync(cancellationToken);
@@ -127,9 +128,9 @@ namespace ExportDocManager.Services.Crm
             ArgumentNullException.ThrowIfNull(ids);
             int[] normalizedIds = ids.Where(id => id > 0).Distinct().Take(500).ToArray();
             status = Clean(status);
-            if (normalizedIds.Length == 0) throw new ArgumentException("请选择 CRM 客户。");
+            if (normalizedIds.Length == 0) throw new ServiceValidationException("请选择 CRM 客户。");
             if (status is not ("潜在客户" or "跟进中" or "已成交" or "暂停" or "已流失"))
-                throw new ArgumentException("CRM 客户状态无效。");
+                throw new ServiceValidationException("CRM 客户状态无效。");
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var rows = await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers)
                 .Where(item => normalizedIds.Contains(item.Id)).ToListAsync(cancellationToken);
@@ -156,7 +157,7 @@ namespace ExportDocManager.Services.Crm
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var customer = await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking())
                 .FirstOrDefaultAsync(item => item.Id == crmCustomerId, cancellationToken)
-                ?? throw new KeyNotFoundException("CRM 客户不存在或无权访问。");
+                ?? throw new ResourceNotFoundException("CRM 客户不存在或无权访问。");
             var contact = await context.CrmContacts.AsNoTracking().Where(item => item.CrmCustomerId == crmCustomerId)
                 .OrderByDescending(item => item.IsPrimary).ThenBy(item => item.Id).FirstOrDefaultAsync(cancellationToken);
             var user = _accessScope.CurrentUser;
@@ -193,13 +194,13 @@ namespace ExportDocManager.Services.Crm
             if (!await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking())
                     .AnyAsync(item => item.Id == request.CrmCustomerId, cancellationToken))
             {
-                throw new KeyNotFoundException("CRM 客户不存在或无权访问。");
+                throw new ResourceNotFoundException("CRM 客户不存在或无权访问。");
             }
 
             bool isNew = request.Id <= 0;
             CrmContact entity = request.Id > 0
                 ? await context.CrmContacts.FirstOrDefaultAsync(item => item.Id == request.Id && item.CrmCustomerId == request.CrmCustomerId, cancellationToken)
-                    ?? throw new KeyNotFoundException("联系人不存在。")
+                    ?? throw new ResourceNotFoundException("联系人不存在。")
                 : new CrmContact { CrmCustomerId = request.CrmCustomerId, VersionNumber = 1 };
             if (!isNew)
             {
@@ -317,20 +318,20 @@ namespace ExportDocManager.Services.Crm
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var customer = await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers)
                 .FirstOrDefaultAsync(item => item.Id == request.CrmCustomerId, cancellationToken)
-                ?? throw new KeyNotFoundException("CRM 客户不存在或无权访问。");
+                ?? throw new ResourceNotFoundException("CRM 客户不存在或无权访问。");
             CrmContact contact = null;
             if (request.CrmContactId is > 0)
             {
                 contact = await context.CrmContacts.FirstOrDefaultAsync(
                     item => item.Id == request.CrmContactId && item.CrmCustomerId == request.CrmCustomerId,
-                    cancellationToken) ?? throw new KeyNotFoundException("联系人不存在。");
+                    cancellationToken) ?? throw new ResourceNotFoundException("联系人不存在。");
             }
 
             bool isNew = request.Id <= 0;
             CrmFollowUp entity = request.Id > 0
                 ? await _accessScope.ApplyCrmFollowUpScope(context.CrmFollowUps)
                     .FirstOrDefaultAsync(item => item.Id == request.Id, cancellationToken)
-                    ?? throw new KeyNotFoundException("跟进记录不存在或无权访问。")
+                    ?? throw new ResourceNotFoundException("跟进记录不存在或无权访问。")
                 : new CrmFollowUp { VersionNumber = 1 };
             if (!isNew)
             {
@@ -403,7 +404,7 @@ namespace ExportDocManager.Services.Crm
         private static string Required(string value, string fieldName)
         {
             string normalized = Clean(value);
-            return normalized.Length == 0 ? throw new ArgumentException($"{fieldName}不能为空。") : normalized;
+            return normalized.Length == 0 ? throw new ServiceValidationException($"{fieldName}不能为空。") : normalized;
         }
 
         private static string Clean(string value) => (value ?? string.Empty).Trim();

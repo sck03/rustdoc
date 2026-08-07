@@ -117,13 +117,15 @@ namespace ExportDocManager.Services.MasterData
             }
         }
 
-        public async Task<Exporter> GetExporterByIdAsync(int id)
+        public async Task<Exporter> GetExporterByIdAsync(
+            int id,
+            CancellationToken cancellationToken = default)
         {
             try
             {
-                using var context = await _contextFactory.CreateDbContextAsync();
+                using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 return await _accessScope.ApplyExporterScope(context.Exporters)
-                    .FirstOrDefaultAsync(x => x.Id == id);
+                    .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
             }
             catch (ServiceException)
             {
@@ -191,11 +193,22 @@ namespace ExportDocManager.Services.MasterData
 
         public async Task<List<Exporter>> SearchExportersAsync(string keyword)
         {
-            var rows = await _exporterReadRepository.QueryAsync(new ExporterReadQuery
+            try
             {
-                Keyword = keyword ?? string.Empty
-            });
-            return rows.ToList();
+                var rows = await _exporterReadRepository.QueryAsync(new ExporterReadQuery
+                {
+                    Keyword = keyword ?? string.Empty
+                });
+                return rows.ToList();
+            }
+            catch (ServiceException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new InfrastructureServiceException("出口商搜索服务暂时不可用，请稍后重试。", ex);
+            }
         }
 
         private static bool IsUnchangedOrCleared(string requestedPath, string existingPath) =>

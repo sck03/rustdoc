@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -75,7 +76,7 @@ namespace ExportDocManager.Services.MasterData
             string code = HsCodeTextHelper.NormalizeCode(input.CandidateCode);
             if (string.IsNullOrWhiteSpace(code))
             {
-                throw new InvalidOperationException("确认结果必须包含HS编码。");
+                throw new ServiceValidationException("确认结果必须包含HS编码。");
             }
 
             if (code.Length > 20 || !code.All(char.IsDigit))
@@ -85,7 +86,7 @@ namespace ExportDocManager.Services.MasterData
 
             if (input.Accepted && !await HasTrustedActiveCodeAsync(context, code, cancellationToken).ConfigureAwait(false))
             {
-                throw new InvalidOperationException("确认适用前必须选择已验证年度税则中的当前有效编码。");
+                throw new ServiceValidationException("确认适用前必须选择已验证年度税则中的当前有效编码。");
             }
 
             string fingerprint = HsCodeKnowledgeService.BuildFingerprint(

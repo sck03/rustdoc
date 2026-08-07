@@ -684,12 +684,19 @@ namespace ExportDocManager.Infrastructure.Tests
 
             var sandboxed = ManagedPlaywrightBrowserHost.BuildBrowserArguments(userDataPath, disableSandbox: false);
             var explicitlyUnsandboxed = ManagedPlaywrightBrowserHost.BuildBrowserArguments(userDataPath, disableSandbox: true);
+            var sharedMemoryEnabled = ManagedPlaywrightBrowserHost.BuildBrowserArguments(
+                userDataPath,
+                disableSandbox: false,
+                disableDevShmUsage: false);
 
             Assert.DoesNotContain("--no-sandbox", sandboxed);
             Assert.Contains("--no-sandbox", explicitlyUnsandboxed);
+            Assert.Contains("--disable-dev-shm-usage", sandboxed);
+            Assert.DoesNotContain("--disable-dev-shm-usage", sharedMemoryEnabled);
             Assert.Contains("--allow-file-access-from-files", sandboxed);
             Assert.Contains("--allow-file-access-from-files", explicitlyUnsandboxed);
             Assert.Equal(sandboxed.Count + 1, explicitlyUnsandboxed.Count);
+            Assert.Equal(sandboxed.Count - 1, sharedMemoryEnabled.Count);
         }
 
         [Fact]

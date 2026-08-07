@@ -1,5 +1,6 @@
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 
 namespace ExportDocManager.Services.SingleWindow
 {
@@ -54,12 +55,12 @@ namespace ExportDocManager.Services.SingleWindow
             if (trimmed.StartsWith("\\\\", StringComparison.Ordinal) ||
                 trimmed.StartsWith("//", StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("持卡机官方客户端目录必须位于本机磁盘，不能使用网络共享路径。");
+                throw new ServiceValidationException("持卡机官方客户端目录必须位于本机磁盘，不能使用网络共享路径。");
             }
 
             if (!Path.IsPathRooted(trimmed))
             {
-                throw new InvalidOperationException("持卡机官方客户端目录必须使用本机绝对路径。");
+                throw new ServiceValidationException("持卡机官方客户端目录必须使用本机绝对路径。");
             }
 
             string normalized = Path.GetFullPath(trimmed);

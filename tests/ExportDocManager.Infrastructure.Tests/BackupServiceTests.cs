@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Errors;
 using Microsoft.Data.Sqlite;
 
 namespace ExportDocManager.Infrastructure.Tests
@@ -94,7 +95,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 byte[] firstMarker = await File.ReadAllBytesAsync(markerPath);
                 byte[] firstStagedDatabase = await File.ReadAllBytesAsync(stagedPath);
 
-                var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                var error = await Assert.ThrowsAsync<ResourceConflictException>(() =>
                     fixture.Service.ScheduleRestoreAsync(backupResult.FilePath));
 
                 Assert.Contains("已有 SQLite 数据库还原任务", error.Message, StringComparison.Ordinal);

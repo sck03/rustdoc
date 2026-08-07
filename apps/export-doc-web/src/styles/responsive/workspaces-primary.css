@@ -1,0 +1,449 @@
+/* Responsive overrides loaded after workspace feature styles. */
+@media (max-width: 860px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .identity-management-intro {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .identity-management-tabs,
+  .permission-level-guide {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-nav {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    max-height: none;
+    padding: 10px 12px;
+    overflow: visible;
+  }
+
+  .nav-list {
+    position: absolute;
+    top: calc(100% + 1px);
+    right: 0;
+    left: 0;
+    z-index: 62;
+    display: none;
+    max-height: min(72vh, 620px);
+    padding: 12px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    color: #f5fbf9;
+    background: #102725;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 22px 46px rgba(8, 24, 22, 0.26);
+  }
+
+  .workspace-nav-mobile-open .nav-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .nav-group {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .nav-sub-list {
+    margin: 4px 0 0 28px;
+    padding: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .nav-group-button,
+  .nav-item {
+    width: 100%;
+  }
+
+  .toolbar,
+  .editor-toolbar,
+  .settings-command-strip,
+  .pagination-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspace-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    min-height: 72px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .workspace-title-cluster,
+  .workspace-title-block {
+    min-width: 0;
+  }
+
+  .toolbar-actions {
+    justify-content: flex-end;
+  }
+
+  .single-window-document-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .single-window-toolbar-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .single-window-command-band {
+    flex-direction: column;
+  }
+
+  .single-window-tool-group,
+  .single-window-section-tools,
+  .single-window-tool-group-primary {
+    flex: 0 1 auto;
+    min-height: 0;
+  }
+
+  .single-window-section-nav {
+    position: static;
+  }
+
+  .single-window-section-nav-item {
+    flex: 1 1 calc(50% - 8px);
+  }
+
+  .settings-ai-grid,
+  .settings-single-window-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .single-window-tool-group-primary {
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  .settings-center-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-category-nav {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .settings-category-item {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .single-window-lock-backdrop {
+    padding: 10px;
+  }
+
+  .single-window-lock-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
+    min-height: min(520px, calc(100vh - 20px));
+    min-height: min(520px, calc(100dvh - 20px));
+    padding: 12px;
+  }
+
+  .single-window-lock-header,
+  .single-window-lock-toolbar,
+  .single-window-lock-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .single-window-lock-footer .command-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .producer-profile-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .producer-profile-search input {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  .producer-profile-target {
+    justify-content: space-between;
+  }
+
+  .producer-profile-layout {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .producer-profile-table-frame {
+    min-height: 220px;
+    max-height: 320px;
+  }
+
+  .producer-profile-editor {
+    overflow: visible;
+  }
+
+  .producer-profile-editor-grid {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+  }
+
+  .producer-profile-textarea {
+    grid-column: auto;
+  }
+
+  .producer-profile-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .producer-profile-footer .command-button:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .session-strip {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    width: auto;
+  }
+
+  .api-base {
+    max-width: 100%;
+  }
+
+  .login-panel {
+    margin: 18px 12px;
+    width: calc(100vw - 24px);
+  }
+
+  .work-surface {
+    padding: 12px;
+  }
+
+  .dashboard-page {
+    padding: 12px;
+  }
+
+  .dashboard-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-work-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-table-frame,
+  .dashboard-todo-list {
+    min-height: 280px;
+  }
+
+  .dashboard-todo-section {
+    order: -1;
+  }
+
+  .workspace-nav-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    background: rgba(8, 24, 22, 0.42);
+    border: 0;
+    border-radius: 0;
+    cursor: default;
+    touch-action: none;
+    backdrop-filter: blur(2px);
+  }
+
+  .job-tool-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .job-tool-link-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .job-excel-analysis-meta,
+  .job-excel-analysis-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .container-packing-project-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .tool-panel-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tool-panel-actions {
+    justify-content: flex-start;
+  }
+
+  .container-packing-render-mode {
+    width: 100%;
+  }
+
+  .container-packing-render-buttons {
+    flex: 1;
+  }
+
+  .container-packing-field-grid,
+  .container-packing-rules-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .packing-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .container-packing-visual-header,
+  .container-packing-3d-header,
+  .container-packing-projection-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .container-packing-3d-toolbar {
+    justify-content: flex-start;
+  }
+
+  .container-packing-view-buttons {
+    width: 100%;
+  }
+
+  .container-packing-3d-status {
+    justify-content: flex-start;
+  }
+
+  .container-packing-3d-stage,
+  .container-packing-3d-canvas {
+    height: 300px;
+    min-height: 280px;
+    max-height: 360px;
+  }
+
+  .container-packing-visual-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-zip-options {
+    grid-template-columns: 1fr;
+  }
+
+  .job-excel-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .job-excel-conflict-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-surface {
+    padding: 12px;
+  }
+
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field-grid-span-2 {
+    grid-column: auto;
+  }
+
+  .hs-code-tool-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hs-code-import-actions .command-button,
+  .hs-code-remote-form .command-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .hs-code-remote-search {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .settings-textarea-field {
+    grid-column: auto;
+  }
+
+  .communication-settings-grid .email-body-template-field,
+  .communication-settings-grid .webdav-password-setting,
+  .communication-settings-grid .webdav-enabled-setting {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .backup-action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-maintenance-query-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-maintenance-danger-zone > .command-button {
+    justify-self: stretch;
+  }
+
+  .maintenance-section-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .exchange-currency-manager {
+    grid-template-columns: 1fr;
+  }
+
+  .exchange-currency-action-stack {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+
+  .audit-log-maintenance-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-log-advanced-maintenance-content {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .audit-log-browser-download {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .audit-log-browser-download .command-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .audit-log-advanced-maintenance-content .command-button {
+    justify-content: center;
+    width: 100%;
+  }
+}

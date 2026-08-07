@@ -2,6 +2,7 @@ using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,7 +17,7 @@ namespace ExportDocManager.Services.SingleWindow
         {
             if (manifest.PackageType != SingleWindowPackageType.SubmitPackage)
             {
-                throw new InvalidOperationException("只有提交包可以建立新的单一窗口跟踪批次。");
+                throw new ServiceValidationException("只有提交包可以建立新的单一窗口跟踪批次。");
             }
 
             string batchReference = NormalizeBatchReference(manifest.BatchReference);
@@ -68,7 +69,7 @@ namespace ExportDocManager.Services.SingleWindow
         {
             if (manifest.PackageType != SingleWindowPackageType.ReceiptPackage)
             {
-                throw new InvalidOperationException("当前交接包不是单一窗口回执包。");
+                throw new ServiceValidationException("当前交接包不是单一窗口回执包。");
             }
 
             string batchReference = NormalizeBatchReference(manifest.BatchReference);
@@ -76,7 +77,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .ApplySubmissionBatchScope(context.SwSubmissionBatches, context)
                 .FirstOrDefaultAsync(item => item.BatchReference == batchReference, cancellationToken)
                 .ConfigureAwait(false)
-                ?? throw new InvalidOperationException("回执包对应的原提交批次不存在或当前账号无权访问。");
+                ?? throw new ResourceNotFoundException("回执包对应的原提交批次不存在或当前账号无权访问。");
             EnsureManifestMatchesBatch(batch, manifest, requireSourcePackageDigest: true);
             if ((!string.IsNullOrWhiteSpace(batch.AssignedStationKey) &&
                  !string.Equals(batch.AssignedStationKey, manifest.StationKey, StringComparison.Ordinal)) ||

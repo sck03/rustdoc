@@ -9,9 +9,15 @@ namespace ExportDocManager.Services.Data
 
         string EnsureDefaultTemplateAvailable();
 
-        string ExportDefaultTemplate(string targetFilePath, bool overwrite = true);
+        Task<string> ExportDefaultTemplateAsync(
+            string targetFilePath,
+            bool overwrite = true,
+            CancellationToken cancellationToken = default);
 
-        string ExportBlankBookingSheet(string targetFilePath, bool overwrite = true);
+        Task<string> ExportBlankBookingSheetAsync(
+            string targetFilePath,
+            bool overwrite = true,
+            CancellationToken cancellationToken = default);
 
         string ExportBookingSheet(string sourceFilePath, string targetFilePath, bool overwrite = true);
 

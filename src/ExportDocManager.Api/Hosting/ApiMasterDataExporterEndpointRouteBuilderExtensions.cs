@@ -55,7 +55,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterService exporterService,
-                int id) =>
+                int id,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -67,7 +68,7 @@ namespace ExportDocManager.Api.Hosting
                     return BadMasterDataId("出口商");
                 }
 
-                var exporter = await exporterService.GetExporterByIdAsync(id);
+                var exporter = await exporterService.GetExporterByIdAsync(id, cancellationToken);
                 return exporter == null
                     ? Results.NotFound()
                     : Results.Ok(ApiMasterDataDtoFactory.FromExporter(exporter));

@@ -17,10 +17,17 @@
       "maximumAggregateLines": 2000
     },
     {
+      "name": "runtime license service partials",
+      "directory": "src/ExportDocManager.Infrastructure/Services/Security",
+      "filePattern": "^RuntimeLicenseService(?:\\..+)?\\.cs$",
+      "maximumLines": 420,
+      "maximumAggregateLines": 1150
+    },
+    {
       "name": "server migration components",
       "directory": "src/ExportDocManager.Infrastructure/Services/ServerMigration",
       "filePattern": "^ServerMigration.*\\.cs$",
-      "maximumLines": 700
+      "maximumLines": 520
     },
     {
       "name": "built-in Excel analyzer partials",
@@ -36,10 +43,66 @@
       "maximumLines": 320
     },
     {
+      "name": "HS API endpoint modules",
+      "directory": "src/ExportDocManager.Api/Hosting",
+      "filePattern": "^ApiMasterDataHsCode.*EndpointRouteBuilderExtensions\\.cs$",
+      "maximumLines": 950
+    },
+    {
+      "name": "OpenAPI document modules",
+      "directory": "src/ExportDocManager.Api/Hosting",
+      "filePattern": "^OpenApiDocument(?:Paths|Schemas)\\..+\\.cs$",
+      "maximumLines": 1800
+    },
+    {
+      "name": "invoice editor orchestration",
+      "directory": "apps/export-doc-web/src/features/invoices",
+      "filePattern": "^InvoiceEditorPage\\.tsx$",
+      "maximumLines": 950
+    },
+    {
+      "name": "report designer schema modules",
+      "directory": "apps/export-doc-web/src/features/report-designer",
+      "filePattern": "^reportDesignerSchema(?:Validation|Values|Domains|DetailTable|BlockSettings)\\.ts$",
+      "maximumLines": 800,
+      "maximumAggregateLines": 1650
+    },
+    {
+      "name": "report designer mutation modules",
+      "directory": "apps/export-doc-web/src/features/report-designer",
+      "filePattern": "^reportDesigner(?:Mutations|BlockFactories|TableMutations|MutationUtils)\\.ts$",
+      "maximumLines": 450,
+      "maximumAggregateLines": 1200
+    },
+    {
       "name": "themed stylesheet modules",
       "directory": "apps/export-doc-web/src/styles",
       "filePattern": "^(?!foundation\\.css$|workspaces\\.css$|responsive\\.css$).+\\.css$",
       "maximumLines": 800
+    },
+    {
+      "name": "theme stylesheet import manifest",
+      "directory": "apps/export-doc-web/src",
+      "filePattern": "^theme\\.css$",
+      "maximumLines": 8
+    },
+    {
+      "name": "business stylesheet import manifest",
+      "directory": "apps/export-doc-web/src",
+      "filePattern": "^businessFeatures\\.css$",
+      "maximumLines": 8
+    },
+    {
+      "name": "report stylesheet import manifest",
+      "directory": "apps/export-doc-web/src",
+      "filePattern": "^reportWorkspace\\.css$",
+      "maximumLines": 8
+    },
+    {
+      "name": "responsive stylesheet import manifest",
+      "directory": "apps/export-doc-web/src",
+      "filePattern": "^responsiveOverrides\\.css$",
+      "maximumLines": 8
     }
   ]
 }

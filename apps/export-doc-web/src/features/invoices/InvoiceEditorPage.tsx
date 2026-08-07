@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Edit3, Minimize2, PackageSearch, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit3, Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
@@ -14,19 +14,10 @@ import { ConcurrencyConflictNotice, InlineNotice, PageState, PermissionNotice } 
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import {
   hasCustomOptionValue,
-  invoiceCustomOptionTypes,
-  loadCustomOptionMap,
 } from "../custom-options/customOptionModel.ts";
 import {
-  InvoiceBasicInfoPanel,
-  InvoiceExtendedFieldsPanel,
   InvoiceMarksAndItemsPanel,
-  InvoicePartiesPanel,
-  InvoiceShippingTermsPanel,
 } from "./InvoiceFormPanels.tsx";
-import { InvoiceLetterOfCreditPanel } from "./InvoiceLetterOfCreditPanel.tsx";
-import { InvoiceProfitAnalysisPanel } from "./InvoiceProfitAnalysisPanel.tsx";
-import { InvoiceReportPreviewPanel } from "./InvoiceReportPreviewPanel.tsx";
 import { InvoiceStatusReasonDialog } from "./InvoiceStatusReasonDialog.tsx";
 import {
   canDeleteInvoiceStatus,
@@ -46,13 +37,15 @@ import {
   type RouteInvoiceImportAction,
   uppercaseInvoiceEnglishText,
 } from "./invoiceModel.ts";
-import { InvoiceEditorNavigation } from "./InvoiceEditorNavigation.tsx";
+import { InvoiceEditorFormShell } from "./InvoiceEditorFormShell.tsx";
+import { InvoiceEditorDocumentSections } from "./InvoiceEditorDocumentSections.tsx";
 import {
   buildInvoiceSnapshot,
   mergeRouteInvoiceImportDraft,
   readInvoiceItemBlankRowCount,
 } from "./invoiceEditorHelpers.ts";
 import { calculateInvoiceTotals } from "./invoiceItemsEditorModel.ts";
+import { useInvoiceEditorReferenceData } from "./useInvoiceEditorReferenceData.ts";
 import { useInvoiceItemsWorkspace } from "./useInvoiceItemsWorkspace.ts";
 import type { ExporterSealType } from "../master-data/ExporterSealField.tsx";
 
@@ -136,20 +129,15 @@ export function InvoiceEditorPage({
     staleTime: 30 * 1000,
   });
 
-  const partiesQuery = useQuery({
-    queryKey: queryKeys.invoiceParties(),
-    queryFn: async ({ signal }) => {
-      const [nextCustomers, nextExporters] = await Promise.all([
-        client.listCustomers({}, { signal }),
-        client.listExporters({}, { signal }),
-      ]);
-      return {
-        customers: nextCustomers,
-        exporters: nextExporters,
-      };
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+  const selectedCustomerId = invoice?.customerId ?? 0;
+  const selectedExporterId = invoice?.exporterId ?? 0;
+  const {
+    selectedCustomerQuery,
+    selectedExporterQuery,
+    unitsQuery,
+    settingsQuery,
+    customOptionsQuery,
+  } = useInvoiceEditorReferenceData(client, selectedCustomerId, selectedExporterId);
 
   const exporterSealMutation = useMutation({
     mutationFn: async ({ sealType, file }: { sealType: ExporterSealType; file: File }) => {
@@ -167,7 +155,7 @@ export function InvoiceEditorPage({
       setMessage(null);
       setSuccessMessage(variables.sealType === "document" ? "出口商单证章已保存。" : "出口商报关章已保存。");
       await Promise.all([
-        partiesQuery.refetch(),
+        selectedExporterQuery.refetch(),
         queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("exporters") }),
       ]);
     },
@@ -175,24 +163,6 @@ export function InvoiceEditorPage({
       setMessage(readApiError(error));
       setSuccessMessage(null);
     },
-  });
-
-  const unitsQuery = useQuery({
-    queryKey: queryKeys.masterDataRoot("units"),
-    queryFn: ({ signal }) => client.listUnits({}, { signal }),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const settingsQuery = useQuery({
-    queryKey: queryKeys.settings(),
-    queryFn: ({ signal }) => client.getSettings({ signal }),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const customOptionsQuery = useQuery({
-    queryKey: queryKeys.customOptionsGroup("invoice-editor"),
-    queryFn: ({ signal }) => loadCustomOptionMap(client, invoiceCustomOptionTypes, signal),
-    staleTime: 5 * 60 * 1000,
   });
 
   useEffect(() => {
@@ -431,14 +401,12 @@ export function InvoiceEditorPage({
     },
   });
 
-  const customers = partiesQuery.data?.customers ?? [];
-  const exporters = partiesQuery.data?.exporters ?? [];
   const products = itemsWorkspace.products;
   const units: ApiUnitDto[] = unitsQuery.data ?? [];
   const invoiceCustomOptions = customOptionsQuery.data ?? {};
   const selectedCustomerEmail =
     invoice?.customerId && invoice.customerId > 0
-      ? customers.find((customer) => customer.id === invoice.customerId)?.email ?? ""
+      ? selectedCustomerQuery.data?.email ?? ""
       : "";
   const isBusy =
     invoiceQuery.isFetching ||
@@ -449,8 +417,12 @@ export function InvoiceEditorPage({
     deleteInvoiceMutation.isPending ||
     exporterSealMutation.isPending ||
     isLetterOfCreditBusy;
-  const isPartyBusy = partiesQuery.isFetching || exporterSealMutation.isPending;
-  const partyMessage = partiesQuery.isError ? readApiError(partiesQuery.error) : null;
+  const isPartyBusy = selectedCustomerQuery.isFetching || selectedExporterQuery.isFetching || exporterSealMutation.isPending;
+  const partyMessage = selectedCustomerQuery.isError
+    ? readApiError(selectedCustomerQuery.error)
+    : selectedExporterQuery.isError
+      ? readApiError(selectedExporterQuery.error)
+      : null;
   const productMessage = itemsWorkspace.productLibraryMessage;
   const unitLookupMessage = unitsQuery.isError ? readApiError(unitsQuery.error) : null;
   const isProductLibraryBusy = itemsWorkspace.isProductLibraryBusy;
@@ -479,7 +451,8 @@ export function InvoiceEditorPage({
   });
 
   function loadParties() {
-    void partiesQuery.refetch();
+    void queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("customers") });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("exporters") });
   }
 
   function patchInvoice(next: Partial<ApiInvoiceDetailDto>) {
@@ -871,147 +844,73 @@ export function InvoiceEditorPage({
       {!invoice && isBusy ? <PageState tone="loading" title="正在加载发票" description="请稍候，系统正在读取发票和商品明细。" /> : null}
 
       {invoice ? (
-        <form
-          className={isInvoiceItemsWorkbenchMode ? "invoice-form invoice-items-focus-form" : "invoice-form"}
+        <InvoiceEditorFormShell
+          invoice={invoice}
+          isWorkbench={isInvoiceItemsWorkbenchMode}
+          isBusy={isBusy}
+          isEditable={isInvoiceEditable}
+          formClassName={isInvoiceItemsWorkbenchMode ? "invoice-form invoice-items-focus-form" : "invoice-form"}
           onSubmit={handleSubmit}
           onKeyDownCapture={handleEnterAsTabFormKeyDown}
-        >
-          {isInvoiceItemsWorkbenchMode ? (
-            <div className="invoice-items-focus-shell" aria-label="商品明细工作台">
-              <div className="invoice-items-focus-header">
-                <button className="command-button secondary" type="button" onClick={closeInvoiceItemsWorkbench}>
-                  <Minimize2 size={17} aria-hidden="true" />
-                  <span>返回发票</span>
-                </button>
-                <div className="invoice-items-focus-title">
-                  <PackageSearch size={18} aria-hidden="true" />
-                  <strong>商品明细工作台</strong>
-                  <span>{invoice.invoiceNo || "新建发票"}</span>
-                </div>
-                <button className="command-button" type="submit" disabled={isBusy || !isInvoiceEditable}>
-                  <Save size={17} aria-hidden="true" />
-                  <span>保存</span>
-                </button>
-              </div>
-              {invoiceItemsPanel}
-            </div>
-          ) : (
-            <>
-              <InvoiceEditorNavigation
-                invoiceNo={invoice.invoiceNo || ""}
-                editable={isInvoiceEditable}
-                busy={isBusy}
-                saving={saveInvoiceMutation.isPending}
-                hasUnsavedChanges={hasUnsavedInvoiceChanges}
-                onNavigate={scrollToInvoiceSection}
-                onUppercase={uppercaseInvoiceText}
-              />
-
-              <div id="invoice-header-section" className="invoice-editor-section-anchor">
-                <InvoiceBasicInfoPanel
-                  invoice={invoice}
-                  canOpenSingleWindowDocuments={!isNew && isInvoiceIdValid && singleWindowPermission.canOperate}
-                  canCloneInvoiceType={!isNew && isInvoiceIdValid && invoicePermission.canOperate}
-                  cloneInvoiceTypeLabel={cloneInvoiceTypeLabel}
-                  canUnverifyInvoice={invoicePermission.canManage && canUnverifyInvoice}
-                  canTransitionStatus={!isNew && isInvoiceIdValid && invoicePermission.canOperate && Boolean(getNextInvoiceStatus(invoice.status))}
-                  canCancelStatus={!isNew && isInvoiceIdValid && invoicePermission.canManage && normalizeInvoiceStatus(invoice.status) !== "Cancelled"}
-                  isEditable={isInvoiceEditable}
-                  isBusy={isBusy}
-                  isCloneInvoiceTypeBusy={cloneInvoiceTypeMutation.isPending}
-                  isUnverifyInvoiceBusy={unverifyInvoiceMutation.isPending}
-                  isTransitionStatusBusy={statusTransitionMutation.isPending}
-                  onTransitionStatus={() => void handleTransitionInvoiceStatus()}
-                  onCancelStatus={() => void handleTransitionInvoiceStatus("Cancelled")}
-                  onChange={patchInvoice}
-                  onCloneInvoiceType={handleCloneInvoiceType}
-                  onUnverifyInvoice={handleUnverifyInvoice}
-                  onOpenCustomsCoo={handleOpenCustomsCoo}
-                  onOpenAgentConsignment={handleOpenAgentConsignment}
-                  customOptions={invoiceCustomOptions}
-                  onCommitCustomOption={commitInvoiceCustomOption}
-                  statusHistory={statusHistoryQuery.data}
-                  statusHistoryLoading={statusHistoryQuery.isFetching}
-                  statusHistoryMessage={statusHistoryQuery.isError ? readApiError(statusHistoryQuery.error) : null}
-                />
-
-                <InvoicePartiesPanel
-                  invoice={invoice}
-                  customers={customers}
-                  exporters={exporters}
-                  isEditable={isInvoiceEditable}
-                  isBusy={isPartyBusy}
-                  message={partyMessage}
-                  canManageExporterSeals={masterDataPermission.canOperate}
-                  sealBusy={exporterSealMutation.isPending}
-                  onRefresh={() => void loadParties()}
-                  onChange={patchInvoice}
-                  onSealUpload={(sealType, file) => exporterSealMutation.mutate({ sealType, file })}
-                  onSealError={(error) => {
-                    setMessage(readApiError(error));
-                    setSuccessMessage(null);
-                  }}
-                />
-
-                <InvoiceShippingTermsPanel
-                  invoice={invoice}
-                  isNewInvoice={isNew}
-                  isEditable={isInvoiceEditable}
-                  customOptions={invoiceCustomOptions}
-                  onChange={patchInvoice}
-                  onCommitCustomOption={commitInvoiceCustomOption}
-                />
-
-                <details className="invoice-new-optional-section information-tier-advanced">
-                  <summary>
-                    <span>报关与扩展字段（低频）</span>
-                    <small>报关行和低频自定义备注，按需展开</small>
-                  </summary>
-                  <InvoiceExtendedFieldsPanel
-                    invoice={invoice}
-                    isEditable={isInvoiceEditable && workspaceDeviceCapabilities.canUseAdvancedTools}
-                    onChange={patchInvoice}
-                  />
-                </details>
-              </div>
-
-              <div id="invoice-items-section" className="invoice-editor-section-anchor">
-                {invoiceItemsPanel}
-              </div>
-
-              <div id="invoice-analysis-section" className="invoice-editor-section-anchor">
-                <InvoiceProfitAnalysisPanel
-                  client={client}
-                  invoice={invoice}
-                  invoiceId={isNew ? 0 : parsedInvoiceId}
-                  disabled={!invoicePermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
-                />
-
-                <InvoiceLetterOfCreditPanel
-                  client={client}
-                  invoice={invoice}
-                  disabled={!isInvoiceEditable || !workspaceDeviceCapabilities.canUseAdvancedTools || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
-                  reviewDisabled={!invoicePermission.canOperate || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
-                  onChange={patchInvoice}
-                  onClearPageMessages={clearInvoicePageMessages}
-                  onBusyChange={setIsLetterOfCreditBusy}
-                />
-              </div>
-
-              <div id="invoice-report-section" className="invoice-editor-section-anchor">
-                <InvoiceReportPreviewPanel
-                  client={client}
-                  invoiceId={isNew || !isInvoiceIdValid ? 0 : parsedInvoiceId}
-                  invoiceDraft={currentInvoiceDraft}
-                  invoiceNo={invoice.invoiceNo}
-                  customerName={invoice.customerNameEN}
-                  defaultToAddress={selectedCustomerEmail}
-                  hasUnsavedDraftChanges={hasUnsavedInvoiceChanges}
-                />
-              </div>
-            </>
-          )}
-        </form>
+          onCloseWorkbench={closeInvoiceItemsWorkbench}
+          itemsPanel={invoiceItemsPanel}
+          documentSections={
+            <InvoiceEditorDocumentSections
+              client={client}
+              invoice={invoice}
+              invoiceId={isNew ? 0 : parsedInvoiceId}
+              reportInvoiceId={isNew || !isInvoiceIdValid ? 0 : parsedInvoiceId}
+              invoiceDraft={currentInvoiceDraft ?? undefined}
+              selectedCustomer={selectedCustomerQuery.data}
+              selectedExporter={selectedExporterQuery.data}
+              selectedCustomerEmail={selectedCustomerEmail}
+              customOptions={invoiceCustomOptions}
+              statusHistory={statusHistoryQuery.data}
+              statusHistoryLoading={statusHistoryQuery.isFetching}
+              statusHistoryMessage={statusHistoryQuery.isError ? readApiError(statusHistoryQuery.error) : null}
+              itemsPanel={invoiceItemsPanel}
+              cloneInvoiceTypeLabel={cloneInvoiceTypeLabel}
+              isEditable={isInvoiceEditable}
+              isBusy={isBusy}
+              isSaving={saveInvoiceMutation.isPending}
+              hasUnsavedChanges={hasUnsavedInvoiceChanges}
+              canOpenSingleWindowDocuments={!isNew && isInvoiceIdValid && singleWindowPermission.canOperate}
+              canCloneInvoiceType={!isNew && isInvoiceIdValid && invoicePermission.canOperate}
+              canUnverifyInvoice={invoicePermission.canManage && canUnverifyInvoice}
+              canTransitionStatus={!isNew && isInvoiceIdValid && invoicePermission.canOperate && Boolean(getNextInvoiceStatus(invoice.status))}
+              canCancelStatus={!isNew && isInvoiceIdValid && invoicePermission.canManage && normalizeInvoiceStatus(invoice.status) !== "Cancelled"}
+              canUseAdvancedTools={workspaceDeviceCapabilities.canUseAdvancedTools}
+              canManageExporterSeals={masterDataPermission.canOperate}
+              cloneInvoiceTypeBusy={cloneInvoiceTypeMutation.isPending}
+              unverifyInvoiceBusy={unverifyInvoiceMutation.isPending}
+              transitionStatusBusy={statusTransitionMutation.isPending}
+              partyBusy={isPartyBusy}
+              partyMessage={partyMessage}
+              sealBusy={exporterSealMutation.isPending}
+              profitAnalysisDisabled={!invoicePermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
+              letterOfCreditDisabled={!isInvoiceEditable || !workspaceDeviceCapabilities.canUseAdvancedTools || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
+              letterOfCreditReviewDisabled={!invoicePermission.canOperate || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
+              onNavigate={scrollToInvoiceSection}
+              onUppercase={uppercaseInvoiceText}
+              onChange={patchInvoice}
+              onTransitionStatus={() => void handleTransitionInvoiceStatus()}
+              onCancelStatus={() => void handleTransitionInvoiceStatus("Cancelled")}
+              onCloneInvoiceType={handleCloneInvoiceType}
+              onUnverifyInvoice={handleUnverifyInvoice}
+              onOpenCustomsCoo={handleOpenCustomsCoo}
+              onOpenAgentConsignment={handleOpenAgentConsignment}
+              onCommitCustomOption={commitInvoiceCustomOption}
+              onRefreshParties={() => void loadParties()}
+              onSealUpload={(sealType, file) => exporterSealMutation.mutate({ sealType, file })}
+              onSealError={(error) => {
+                setMessage(readApiError(error));
+                setSuccessMessage(null);
+              }}
+              onClearPageMessages={clearInvoicePageMessages}
+              onLetterOfCreditBusyChange={setIsLetterOfCreditBusy}
+            />
+          }
+        />
       ) : null}
       {isCancelReasonDialogOpen ? (
         <InvoiceStatusReasonDialog

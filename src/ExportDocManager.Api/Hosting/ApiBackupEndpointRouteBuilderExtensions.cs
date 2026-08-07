@@ -1,4 +1,5 @@
 using ExportDocManager.Models;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 
@@ -703,7 +704,7 @@ namespace ExportDocManager.Api.Hosting
             if (!PathBoundaryHelper.IsWithinRoot(targetPath, fullBackupRoot) ||
                 string.Equals(targetPath, fullBackupRoot, PathBoundaryHelper.PathComparison))
             {
-                throw new InvalidOperationException("云备份下载目标必须位于运行数据根 Backups 目录内。");
+                throw new ServiceValidationException("云备份下载目标必须位于运行数据根 Backups 目录内。");
             }
 
             return targetPath;

@@ -33,6 +33,7 @@ const approvedLicenseIdentifiers = new Set([
   "ISC",
   "LGPL-2.1-or-later",
   "LGPL-3.0-only",
+  "LicenseRef-SQLite-Public-Domain",
   "LLVM-exception",
   "MIT",
   "MIT-0",
@@ -44,6 +45,16 @@ const approvedLicenseIdentifiers = new Set([
   "Unicode-DFS-2016",
   "Unlicense",
   "Zlib",
+]);
+const extractedLicensingInfo = new Map([
+  [
+    "LicenseRef-SQLite-Public-Domain",
+    {
+      name: "SQLite Public Domain Dedication",
+      extractedText: "SQLite is Public Domain\n\nhttps://sqlite.org/copyright.html",
+      seeAlsos: ["https://sqlite.org/copyright.html"],
+    },
+  ],
 ]);
 const components = new Map();
 
@@ -256,6 +267,7 @@ function mapKnownLicenseUrl(value) {
 
 function detectLicenseText(value) {
   const normalized = String(value || "");
+  if (/SQLite\s+is\s+Public\s+Domain/iu.test(normalized)) return "LicenseRef-SQLite-Public-Domain";
   if (/Permission is hereby granted, free of charge/iu.test(normalized)) return "MIT";
   if (/Apache License\s+Version 2\.0/iu.test(normalized)) return "Apache-2.0";
   if (/Redistribution and use in source and binary forms/iu.test(normalized)) {
@@ -292,6 +304,7 @@ function buildSpdx(items, generatedAt) {
     }],
     comment: `Used by: ${item.scopes.join(", ")}`,
   }));
+  const usedExtractedLicenses = resolveUsedExtractedLicenses(items);
   return {
     spdxVersion: "SPDX-2.3",
     dataLicense: "CC0-1.0",
@@ -300,6 +313,7 @@ function buildSpdx(items, generatedAt) {
     documentNamespace: `https://github.com/sck03/rustdoc/sbom/${randomUUID()}`,
     creationInfo: { created: generatedAt, creators: ["Tool: ExportDocManager dependency governance script"] },
     packages,
+    ...(usedExtractedLicenses.length > 0 ? { hasExtractedLicensingInfos: usedExtractedLicenses } : {}),
     relationships: packages.map((item) => ({
       spdxElementId: "SPDXRef-DOCUMENT",
       relationshipType: "DESCRIBES",
@@ -352,6 +366,19 @@ function buildNotices(items) {
     );
   }
 
+  const usedExtractedLicenses = resolveUsedExtractedLicenses(items);
+  if (usedExtractedLicenses.length > 0) {
+    lines.push("", "## Extracted package license references", "");
+    for (const license of usedExtractedLicenses) {
+      lines.push(
+        `### ${license.name} (${license.licenseId})`,
+        "",
+        license.extractedText,
+        "",
+      );
+    }
+  }
+
   lines.push(
     "",
     "## Bundled runtime assets",
@@ -375,6 +402,18 @@ function buildNotices(items) {
     "",
   );
   return `${lines.join("\n").trimEnd()}\n`;
+}
+
+function resolveUsedExtractedLicenses(items) {
+  return [...new Set(items.map((item) => item.license))]
+    .map((licenseId) => [licenseId, extractedLicensingInfo.get(licenseId)])
+    .filter((entry) => entry[1])
+    .map(([licenseId, license]) => ({
+      licenseId,
+      name: license.name,
+      extractedText: license.extractedText,
+      seeAlsos: license.seeAlsos,
+    }));
 }
 
 function buildInventory(items) {

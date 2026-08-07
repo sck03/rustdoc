@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -116,7 +117,7 @@ namespace ExportDocManager.Services.SingleWindow
             var batch = await _businessDataAccessScope
                 .ApplySubmissionBatchScope(context.SwSubmissionBatches.AsNoTracking(), context)
                 .FirstOrDefaultAsync(item => item.Id == batchId, cancellationToken)
-                ?? throw new InvalidOperationException("未找到指定的单一窗口批次。");
+                ?? throw new ResourceNotFoundException("未找到指定的单一窗口批次。");
 
             var packageRecords = await context.SwHandoffPackageRecords
                 .AsNoTracking()

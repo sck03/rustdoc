@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
@@ -71,7 +72,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .ConfigureAwait(false);
             if (profile == null)
             {
-                throw new InvalidOperationException(
+                throw new ResourceNotFoundException(
                     "本持卡机尚未启用操作档案。请先创建公司抬头与操作卡档案，并设为当前档案。");
             }
             profile.StationAssignmentCode = SingleWindowStationAssignmentCode.Encode(
@@ -107,7 +108,7 @@ namespace ExportDocManager.Services.SingleWindow
             string cardIdentifier = NormalizeRequired(update.CardIdentifier, 120, "操作卡标识");
             if (!update.CanSubmitCustomsCoo && !update.CanSubmitAgentConsignment)
             {
-                throw new InvalidOperationException("操作档案必须至少启用一种单一窗口业务能力。");
+                throw new ServiceValidationException("操作档案必须至少启用一种单一窗口业务能力。");
             }
 
             string requestedProfileKey = NormalizeProfileKey(update.ProfileKey, allowEmpty: true);
@@ -139,14 +140,14 @@ namespace ExportDocManager.Services.SingleWindow
                 string.Equals(item.ProfileKey, profileKey, StringComparison.Ordinal));
             if (profile == null && !string.IsNullOrWhiteSpace(requestedProfileKey))
             {
-                throw new InvalidOperationException("未找到要修改的本机操作档案。");
+                throw new ResourceNotFoundException("未找到要修改的本机操作档案。");
             }
 
             if (profile != null &&
                 (!string.Equals(profile.CompanyScope, companyScope, StringComparison.Ordinal) ||
                  !string.Equals(profile.CardIdentifier, cardIdentifier, StringComparison.Ordinal)))
             {
-                throw new InvalidOperationException(
+                throw new ResourceConflictException(
                     "操作档案创建后不能原地更换公司抬头或操作卡标识；如需换卡或切换抬头，请新增档案。档案名称、业务能力和交接目录仍可修改。");
             }
 
@@ -156,14 +157,14 @@ namespace ExportDocManager.Services.SingleWindow
             if (otherProfiles.Any(item =>
                     string.Equals(item.ProfileName, profileName, StringComparison.OrdinalIgnoreCase)))
             {
-                throw new InvalidOperationException("本持卡机已存在同名操作档案，请使用便于区分的档案名称。");
+                throw new ResourceConflictException("本持卡机已存在同名操作档案，请使用便于区分的档案名称。");
             }
 
             if (otherProfiles.Any(item =>
                     string.Equals(item.CompanyScope, companyScope, StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(item.CardIdentifier, cardIdentifier, StringComparison.OrdinalIgnoreCase)))
             {
-                throw new InvalidOperationException("该公司抬头与操作卡已经建立档案，无需重复创建。");
+                throw new ResourceConflictException("该公司抬头与操作卡已经建立档案，无需重复创建。");
             }
 
             EnsureProfileRootsAreIndependent(
@@ -246,7 +247,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .ConfigureAwait(false);
             var selected = stationProfiles.FirstOrDefault(item =>
                 string.Equals(item.ProfileKey, normalizedProfileKey, StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("未找到要启用的本机操作档案。");
+                ?? throw new ResourceNotFoundException("未找到要启用的本机操作档案。");
 
             foreach (var profile in stationProfiles)
             {
@@ -268,7 +269,7 @@ namespace ExportDocManager.Services.SingleWindow
         {
             if (!_isSqlite)
             {
-                throw new InvalidOperationException(
+                throw new ServiceValidationException(
                     "持卡操作机仅支持独立 SQLite 单机版；PostgreSQL 网络版只负责制单和回执归档。");
             }
         }
@@ -296,7 +297,7 @@ namespace ExportDocManager.Services.SingleWindow
         {
             if (PathsOverlap(customsCooRoot, agentConsignmentRoot))
             {
-                throw new InvalidOperationException(
+                throw new ServiceValidationException(
                     "海关原产地证与报关代理委托的数据目录不能相同或互相包含。");
             }
         }
@@ -317,7 +318,7 @@ namespace ExportDocManager.Services.SingleWindow
                 if (requestedRoots.Any(requested =>
                         existingRoots.Any(existing => PathsOverlap(requested, existing))))
                 {
-                    throw new InvalidOperationException(
+                    throw new ResourceConflictException(
                         $"当前目录与操作档案“{other.ProfileName}”的目录相同或互相包含；不同公司和操作卡必须使用独立目录。");
                 }
             }
@@ -350,7 +351,7 @@ namespace ExportDocManager.Services.SingleWindow
             string normalized = NormalizeOptional(value, maxLength);
             if (string.IsNullOrWhiteSpace(normalized))
             {
-                throw new InvalidOperationException($"{fieldName}不能为空。");
+                throw new ServiceValidationException($"{fieldName}不能为空。");
             }
 
             return normalized;
@@ -361,7 +362,7 @@ namespace ExportDocManager.Services.SingleWindow
             string normalized = value?.Trim() ?? string.Empty;
             if (normalized.Length > maxLength)
             {
-                throw new InvalidOperationException($"配置内容不能超过 {maxLength} 个字符。");
+                throw new ServiceValidationException($"配置内容不能超过 {maxLength} 个字符。");
             }
 
             return normalized;
@@ -379,7 +380,7 @@ namespace ExportDocManager.Services.SingleWindow
                 !normalized.StartsWith("SWP-", StringComparison.Ordinal) ||
                 !Guid.TryParseExact(normalized[4..], "N", out _))
             {
-                throw new InvalidOperationException("操作档案标识无效。");
+                throw new ServiceValidationException("操作档案标识无效。");
             }
 
             return normalized;

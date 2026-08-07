@@ -70,7 +70,7 @@ namespace ExportDocManager.Services.Core
 
                             if (invoice.CustomerId == 0)
                             {
-                                throw new InvalidOperationException("保存或获取客户信息失败");
+                                throw new InfrastructureServiceException("保存或获取客户信息失败");
                             }
                         }
 
@@ -97,7 +97,7 @@ namespace ExportDocManager.Services.Core
 
                             if (invoice.ExporterId == 0)
                             {
-                                throw new InvalidOperationException("保存或获取出口商信息失败");
+                                throw new InfrastructureServiceException("保存或获取出口商信息失败");
                             }
                         }
 

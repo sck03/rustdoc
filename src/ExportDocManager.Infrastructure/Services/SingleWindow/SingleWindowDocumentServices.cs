@@ -3,6 +3,7 @@ using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Models.SingleWindow;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
@@ -73,7 +74,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .ApplyInvoiceScope(context.Invoices.AsNoTracking())
                 .FirstOrDefaultAsync(item => item.Id == invoiceId, cancellationToken)
                 .ConfigureAwait(false)
-                ?? throw new InvalidOperationException("未找到对应的发票。");
+                ?? throw new ResourceNotFoundException("未找到对应的发票。");
 
             var invoiceItems = await context.Items
                 .AsNoTracking()

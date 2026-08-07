@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
@@ -89,7 +90,7 @@ namespace ExportDocManager.Services.SingleWindow
             string markerPath = GetPendingMarkerPath(pathProvider);
             if (File.Exists(markerPath))
             {
-                throw new InvalidOperationException("已有持卡机灾难恢复任务等待重启执行。");
+                throw new ResourceConflictException("已有持卡机灾难恢复任务等待重启执行。");
             }
             Directory.CreateDirectory(Path.GetDirectoryName(markerPath)!);
             RestrictDirectoryPermissions(Path.GetDirectoryName(markerPath)!);

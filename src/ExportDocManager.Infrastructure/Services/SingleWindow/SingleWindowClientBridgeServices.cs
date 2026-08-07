@@ -1,4 +1,5 @@
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -45,7 +46,7 @@ namespace ExportDocManager.Services.SingleWindow
 
             if (!_isSqlite)
             {
-                throw new InvalidOperationException("官方单一窗口客户端只能由独立 SQLite 持卡机操作。");
+                throw new ServiceValidationException("官方单一窗口客户端只能由独立 SQLite 持卡机操作。");
             }
         }
     }

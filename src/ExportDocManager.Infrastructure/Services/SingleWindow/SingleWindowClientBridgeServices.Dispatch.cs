@@ -3,6 +3,7 @@ using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -99,17 +100,17 @@ namespace ExportDocManager.Services.SingleWindow
                     var batch = await _businessDataAccessScope
                         .ApplySubmissionBatchScope(context.SwSubmissionBatches, context)
                         .FirstOrDefaultAsync(item => item.Id == batchId, token)
-                        ?? throw new InvalidOperationException("未找到要写入交接 OutBox 的单一窗口批次。");
+                        ?? throw new ResourceNotFoundException("未找到要写入交接 OutBox 的单一窗口批次。");
                     if (!Enum.TryParse<SingleWindowBusinessType>(batch.BusinessType, true, out var businessType))
                     {
-                        throw new InvalidOperationException("单一窗口批次业务类型无效。");
+                        throw new ServiceValidationException("单一窗口批次业务类型无效。");
                     }
 
                     EnsureBatchBelongsToCurrentStation(batch, profile, stationKey, businessType);
                     if (batch.Status is not SingleWindowBatchStatusCatalog.SubmitPackageImported and
                         not SingleWindowBatchStatusCatalog.ClientDispatchFailed)
                     {
-                        throw new InvalidOperationException(
+                        throw new ResourceConflictException(
                             "只有本机已导入且尚未派发，或上次派发已完整回滚的提交包可以写入官方客户端。" );
                     }
 
@@ -146,7 +147,7 @@ namespace ExportDocManager.Services.SingleWindow
                     var batch = await _businessDataAccessScope
                         .ApplySubmissionBatchScope(context.SwSubmissionBatches, context)
                         .FirstOrDefaultAsync(item => item.Id == batchId, token)
-                        ?? throw new InvalidOperationException("客户端派发批次在确认阶段不存在。");
+                        ?? throw new ResourceNotFoundException("客户端派发批次在确认阶段不存在。");
                     EnsureBatchBelongsToCurrentStation(
                         batch,
                         profile,
@@ -154,7 +155,7 @@ namespace ExportDocManager.Services.SingleWindow
                         Enum.Parse<SingleWindowBusinessType>(batch.BusinessType, true));
                     if (batch.Status != SingleWindowBatchStatusCatalog.ClientDispatching)
                     {
-                        throw new InvalidOperationException("客户端派发状态已被其他操作修改，不能确认完成。");
+                        throw new ServiceConcurrencyException("客户端派发状态已被其他操作修改，不能确认完成。");
                     }
 
                     DateTime nowUtc = DateTime.UtcNow;
@@ -230,7 +231,7 @@ namespace ExportDocManager.Services.SingleWindow
             string resolved = SingleWindowClientProfilePathResolver.ResolveConfiguredRoot(profile, businessType);
             if (string.IsNullOrWhiteSpace(resolved))
             {
-                throw new InvalidOperationException("本机操作卡尚未配置该业务的官方单一窗口客户端目录。");
+                throw new ServiceValidationException("本机操作卡尚未配置该业务的官方单一窗口客户端目录。");
             }
 
             return SingleWindowClientProfilePathResolver.NormalizeClientRootPath(resolved);
@@ -244,25 +245,25 @@ namespace ExportDocManager.Services.SingleWindow
         {
             if (profile.Id <= 0 || !profile.IsEnabled)
             {
-                throw new InvalidOperationException("请先完成本持卡机的公司抬头、操作卡和官方客户端目录配置。");
+                throw new ServiceValidationException("请先完成本持卡机的公司抬头、操作卡和官方客户端目录配置。");
             }
 
             if (!string.Equals(batch.AssignedStationKey, stationKey, StringComparison.Ordinal) ||
                 !string.Equals(profile.StationKey, stationKey, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("该提交包不属于当前持卡机。");
+                throw new PermissionDeniedException("该提交包不属于当前持卡机。");
             }
 
             if (!string.Equals(batch.AssignedProfileKey, profile.ProfileKey, StringComparison.Ordinal) ||
                 !string.Equals(batch.AssignedCardIdentifier, profile.CardIdentifier, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException(
+                throw new PermissionDeniedException(
                     "该批次绑定了其他公司或操作卡档案，请先切换到导入该批次的操作档案。");
             }
 
             if (!string.Equals(batch.CompanyScope, profile.CompanyScope, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException("提交包公司抬头与本机操作卡绑定公司不一致。");
+                throw new PermissionDeniedException("提交包公司抬头与本机操作卡绑定公司不一致。");
             }
 
             bool canHandle = businessType switch
@@ -273,7 +274,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
             if (!canHandle)
             {
-                throw new InvalidOperationException("本机操作卡未启用该单一窗口业务能力。");
+                throw new PermissionDeniedException("本机操作卡未启用该单一窗口业务能力。");
             }
         }
 
@@ -341,7 +342,7 @@ namespace ExportDocManager.Services.SingleWindow
             var archive = await context.SwSubmitPackageArchives
                 .AsNoTracking()
                 .FirstOrDefaultAsync(item => item.BatchId == batch.Id, cancellationToken)
-                ?? throw new InvalidOperationException("共享数据库中缺少该批次的提交包归档，无法在本操作机恢复。");
+                ?? throw new ResourceNotFoundException("共享数据库中缺少该批次的提交包归档，无法在本操作机恢复。");
             if (archive.Content == null || archive.Content.LongLength != archive.SizeBytes || archive.SizeBytes <= 0)
             {
                 throw new InvalidDataException("共享数据库中的提交包归档大小无效。");

@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Utils;
 using Microsoft.Data.Sqlite;
@@ -192,13 +193,13 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 if (File.Exists(markerPath))
                 {
-                    throw new InvalidOperationException(
+                    throw new ResourceConflictException(
                         "已有 SQLite 数据库还原任务等待下次启动执行。请先重启程序完成该任务，再安排新的还原。");
                 }
 
                 if (SingleWindowDisasterRecoveryManager.HasPendingRestore(_pathProvider))
                 {
-                    throw new InvalidOperationException("已有持卡机灾难恢复任务等待下次启动执行，请先重启完成恢复。");
+                    throw new ResourceConflictException("已有持卡机灾难恢复任务等待下次启动执行，请先重启完成恢复。");
                 }
 
                 string safetyBackupPath = File.Exists(_databasePath)

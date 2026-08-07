@@ -23,7 +23,14 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 var rows = await repository.QueryAsync(
-                    new UnitReadQuery { Keyword = keyword ?? string.Empty },
+                    new UnitReadQuery
+                    {
+                        Keyword = keyword ?? string.Empty,
+                        // Unit selectors are intentionally complete for normal use,
+                        // but remain bounded so a corrupted or unexpectedly large
+                        // catalog cannot materialize an unbounded response.
+                        MaxCount = 500
+                    },
                     cancellationToken);
 
                 return Results.Ok(ApiMasterDataDtoFactory.FromUnits(rows));

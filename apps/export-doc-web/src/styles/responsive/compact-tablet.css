@@ -1,0 +1,188 @@
+@media (max-width: 680px) {
+  :where(.app-shell, .login-screen) :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    font-size: 16px !important;
+  }
+
+  .workspace-header {
+    align-items: center;
+    min-height: 68px;
+    padding: 9px 12px;
+  }
+
+  .workspace-title-block h1 {
+    font-size: 21px;
+  }
+
+  .workspace-header .eyebrow {
+    margin-bottom: 1px;
+    letter-spacing: 0;
+  }
+
+  .dashboard-metric-grid {
+    gap: 8px;
+  }
+
+  .dashboard-metric {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    min-height: 82px;
+    padding: 11px 12px;
+    border-left-width: 3px;
+  }
+
+  .dashboard-metric-icon {
+    display: none;
+  }
+
+  .dashboard-metric strong {
+    margin-top: 4px;
+    font-size: clamp(17px, 5.4vw, 20px);
+  }
+
+  .dashboard-table-frame,
+  .dashboard-todo-list {
+    min-height: 0;
+  }
+
+  .workspace-nav-backdrop:active {
+    transform: none;
+  }
+
+  .login-input-shell {
+    min-height: var(--edm-touch-target);
+    height: var(--edm-touch-target);
+  }
+
+  .app-shell :where(
+    .command-button,
+    .primary-button,
+    .secondary-button,
+    .icon-button,
+    .compact-icon-button,
+    .nav-group-button,
+    .nav-item,
+    .nav-rail-item,
+    .settings-category-item,
+    .master-data-tab,
+    .report-template-workspace-tabs button,
+    .segmented-control button,
+    .density-toggle-button
+  ) {
+    min-width: var(--edm-touch-target);
+    min-height: var(--edm-touch-target) !important;
+  }
+
+  .login-submit-button,
+  .login-connection-settings summary {
+    min-height: var(--edm-touch-target);
+  }
+
+  .report-template-mobile-selection {
+    display: block;
+    min-width: 0;
+    padding: 12px;
+    background: #ffffff;
+    border: 1px solid var(--edm-line);
+    border-radius: var(--edm-radius-md);
+    box-shadow: var(--edm-shadow-sm);
+  }
+
+  .report-template-mobile-selection .template-selection-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .report-template-sticky-header .segmented-control,
+  .report-template-sticky-header button[type="submit"] {
+    display: none;
+  }
+}
+
+@media (min-width: 861px) and (max-width: 1180px) {
+  .maintenance-section-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .maintenance-technical-nav {
+    grid-column: 1 / -1;
+  }
+
+  .single-window-tool-group,
+  .single-window-section-tools {
+    flex-basis: calc(50% - 8px);
+  }
+
+  .coo-items-workbench {
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  }
+
+  .single-window-tool-group-primary {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  .settings-ai-grid,
+  .settings-single-window-grid {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
+  .settings-ai-grid .settings-textarea-field {
+    grid-column: 1 / -1;
+  }
+
+  .report-template-grid {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+  }
+
+  .report-template-sidebar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .report-template-mobile-selection {
+    display: block;
+    min-width: 0;
+    padding: 12px;
+    background: #ffffff;
+    border: 1px solid var(--edm-line);
+    border-radius: var(--edm-radius-md);
+    box-shadow: var(--edm-shadow-sm);
+  }
+
+  .template-selection-panel {
+    grid-column: span 3;
+    grid-row: auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .template-actions-panel,
+  .template-package-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .report-template-preview-toolbar {
+    grid-template-columns: minmax(220px, 280px) minmax(260px, 1fr);
+  }
+
+  .report-template-preview-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .new-report-designer-grid {
+    grid-template-columns: 230px minmax(620px, 1fr);
+    height: auto;
+  }
+
+  .new-report-designer-right-rail {
+    grid-column: 1 / -1;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .single-window-board-grid {
+    grid-template-columns: 1fr;
+  }
+}

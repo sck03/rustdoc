@@ -269,7 +269,7 @@ namespace ExportDocManager.Services.Reporting
                 .ConfigureAwait(false);
             if (brokenImageCount > 0)
             {
-                throw new InvalidOperationException($"报表中有 {brokenImageCount} 张图片加载或解码失败，已停止生成 PDF，避免输出缺图文件。");
+                throw new ServiceValidationException($"报表中有 {brokenImageCount} 张图片加载或解码失败，已停止生成 PDF，避免输出缺图文件。");
             }
         }
 

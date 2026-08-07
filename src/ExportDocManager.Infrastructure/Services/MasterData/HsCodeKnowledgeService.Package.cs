@@ -9,13 +9,21 @@ namespace ExportDocManager.Services.MasterData
 {
     public sealed partial class HsCodeKnowledgeService
     {
-        public async Task<byte[]> ExportPackageAsync(DateTimeOffset? since = null, CancellationToken cancellationToken = default)
+        public async Task ExportPackageAsync(
+            Stream destination,
+            DateTimeOffset? since = null,
+            CancellationToken cancellationToken = default)
         {
+            ArgumentNullException.ThrowIfNull(destination);
+            if (!destination.CanWrite)
+            {
+                throw new ArgumentException("HS知识包导出目标必须可写。", nameof(destination));
+            }
+
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             DateTime? sinceUtc = since?.UtcDateTime;
 
-            using var output = new MemoryStream();
-            await using (var boundedOutput = new MaximumLengthWriteStream(output, MaximumPackageBytes))
+            await using (var boundedOutput = new MaximumLengthWriteStream(destination, MaximumPackageBytes, leaveOpen: true))
             {
                 using var archive = new ZipArchive(boundedOutput, ZipArchiveMode.Create, leaveOpen: true);
                 long expandedBytes = 0;
@@ -63,8 +71,7 @@ namespace ExportDocManager.Services.MasterData
                 await using var manifestStream = manifestEntry.Open();
                 await manifestStream.WriteAsync(manifestBytes, cancellationToken).ConfigureAwait(false);
             }
-
-            return output.ToArray();
+            await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<HsCodeKnowledgePackagePreview> PreviewPackageAsync(string packagePath, CancellationToken cancellationToken = default)

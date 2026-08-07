@@ -1,5 +1,6 @@
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,22 +22,22 @@ namespace ExportDocManager.Services.SingleWindow
             var batch = await _businessDataAccessScope
                 .ApplySubmissionBatchScope(context.SwSubmissionBatches.AsNoTracking(), context)
                 .FirstOrDefaultAsync(item => item.Id == batchId, cancellationToken)
-                ?? throw new InvalidOperationException("未找到要收集回执的单一窗口批次。");
+                ?? throw new ResourceNotFoundException("未找到要收集回执的单一窗口批次。");
             if (!Enum.TryParse<SingleWindowBusinessType>(batch.BusinessType, true, out var businessType))
             {
-                throw new InvalidOperationException("单一窗口批次业务类型无效。");
+                throw new ServiceValidationException("单一窗口批次业务类型无效。");
             }
 
             EnsureBatchBelongsToCurrentStation(batch, profile, stationKey, businessType);
             if (batch.Status == SingleWindowBatchStatusCatalog.SubmitPackageImported)
             {
-                throw new InvalidOperationException("请先把该批次发送到官方客户端，再收集回执。");
+                throw new ResourceConflictException("请先把该批次发送到官方客户端，再收集回执。");
             }
 
             string receiptRootPath = ResolveConfiguredRoot(profile, businessType);
             if (string.IsNullOrWhiteSpace(receiptRootPath) || !Directory.Exists(receiptRootPath))
             {
-                throw new InvalidOperationException("本机操作卡配置的官方回执目录不存在。");
+                throw new ResourceNotFoundException("本机操作卡配置的官方回执目录不存在。");
             }
 
             var receiptFiles = await CollectMatchingReceiptFilesAsync(receiptRootPath, batch, cancellationToken);

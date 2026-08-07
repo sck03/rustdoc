@@ -233,7 +233,7 @@ namespace ExportDocManager.Services.Core
                     if (preview.InvoiceExists && preview.ExistingInvoiceId <= 0 &&
                         action is not InvoiceImportConflictAction.Skip and not InvoiceImportConflictAction.NewInvoiceNo)
                     {
-                        throw new InvalidOperationException("目标公司范围已有相同发票号和类型，但当前账号无权覆盖；请改用新发票号导入。");
+                        throw new PermissionDeniedException("目标公司范围已有相同发票号和类型，但当前账号无权覆盖；请改用新发票号导入。");
                     }
 
                     Invoice existingInvoiceForMutation = null;
@@ -245,12 +245,12 @@ namespace ExportDocManager.Services.Core
                             .FirstOrDefaultAsync(item => item.Id == preview.ExistingInvoiceId, token);
                         if (existingInvoiceForMutation == null)
                         {
-                            throw new InvalidOperationException("目标发票已不存在或当前账号无权修改，请刷新后重试。");
+                            throw new ResourceNotFoundException("目标发票已不存在或当前账号无权修改，请刷新后重试。");
                         }
 
                         if (!InvoiceStatusCatalog.IsEditable(existingInvoiceForMutation.Status))
                         {
-                            throw new InvalidOperationException("目标发票已锁定，请先反审核回草稿后再导入覆盖或追加明细。");
+                            throw new ResourceConflictException("目标发票已锁定，请先反审核回草稿后再导入覆盖或追加明细。");
                         }
                     }
 
