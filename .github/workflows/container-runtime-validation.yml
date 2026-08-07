@@ -291,7 +291,25 @@ jobs:
         working-directory: deploy/container
         shell: bash
         timeout-minutes: 15
-        run: docker compose build
+        run: |
+          set -o pipefail
+          build_log="../../artifacts/container-runtime/evidence/container-build.log"
+          mkdir -p "$(dirname "$build_log")"
+
+          if docker compose build --progress=plain 2>&1 | tee "$build_log"; then
+            exit 0
+          fi
+
+          echo "::group::Container build failure tail"
+          tail -n 120 "$build_log" || true
+          echo "::endgroup::"
+
+          diagnostic="$(tail -n 40 "$build_log" || true)"
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=Container image build failed::$diagnostic"
+          exit 1
 
       - name: Start HTTP stack
         working-directory: deploy/container
