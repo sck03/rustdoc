@@ -368,6 +368,10 @@ public sealed class PackagePayloadContractTests
         Assert.Contains($"{sharedMemorySetting}: \"false\"", ghcrCompose, StringComparison.Ordinal);
         Assert.Contains("shm_size: \"512mb\"", localCompose, StringComparison.Ordinal);
         Assert.Contains("shm_size: \"512mb\"", ghcrCompose, StringComparison.Ordinal);
+        Assert.Contains("cap_add:", localCompose, StringComparison.Ordinal);
+        Assert.Contains("- SYS_ADMIN", localCompose, StringComparison.Ordinal);
+        Assert.Contains("cap_add:", ghcrCompose, StringComparison.Ordinal);
+        Assert.Contains("- SYS_ADMIN", ghcrCompose, StringComparison.Ordinal);
     }
 
     [Fact]

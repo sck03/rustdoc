@@ -83,7 +83,7 @@
 
 - **触发：** `workflow_dispatch`；`main` push/PR 在 Compose、Dockerfile、API/Web、OCR 或该工作流变化时触发。
 - **平台：** `ubuntu-latest`，真实执行 Docker Compose。
-- **做什么：** 校验 HTTP 基础 Compose 和 HTTPS overlay；构建 Debian 13 API 镜像与轻量 `nginx:1.30.4-alpine3.24` Web 镜像并分步启动；检查 `/readyz`、匿名轻量 `/healthz`、CSP/HSTS、API `5188` 不对宿主发布；在 API 容器的非 root 用户、`EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX=false` 条件下调用 Debian 原生 Chromium 生成并校验真实 PDF；删除并重建 PostgreSQL 容器验证 bind volume 数据持久化；在 runner 内执行 `pg_dump/pg_restore` 恢复验收，最后清理容器。匿名 `/healthz` 在 API 路由表和鉴权/许可证/数据库服务解析之前由早期探针直接返回，不扫描浏览器、OCR、PostgreSQL 工具或服务器路径；管理员 Bearer/可信桌面连接仍可进入完整诊断。
+- **做什么：** 校验 HTTP 基础 Compose 和 HTTPS overlay；构建 Debian 13 API 镜像与轻量 `nginx:1.30.4-alpine3.24` Web 镜像并分步启动；检查 `/readyz`、匿名轻量 `/healthz`、CSP/HSTS、API `5188` 不对宿主发布；确认 API 仍以非 root UID/GID `10001` 运行、Compose 只加入 Chromium 容器沙箱所需的 `SYS_ADMIN` capability，并在 `EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX=false` 条件下调用 Debian 原生 Chromium 生成和校验真实 PDF；删除并重建 PostgreSQL 容器验证 bind volume 数据持久化；在 runner 内执行 `pg_dump/pg_restore` 恢复验收，最后清理容器。匿名 `/healthz` 在 API 路由表和鉴权/许可证/数据库服务解析之前由早期探针直接返回，不扫描浏览器、OCR、PostgreSQL 工具或服务器路径；管理员 Bearer/可信桌面连接仍可进入完整诊断。
 - **输出：** 只上传 `artifacts/container-runtime/evidence` 下的探针、Compose 状态和日志证据，不递归扫描 PostgreSQL 数据目录，也不上传数据库 dump；通常保留 14 天。
 - **Secrets/Variables：** 不需要自定义 Secret。测试密码、自签证书和端口由工作流临时生成，不能用于生产。
 - **常见失败：** Docker 构建超过 15 分钟、API 启动/健康检查超过 5 分钟、镜像内 Chromium/OCR 缺库、端口或 Docker 网段冲突、volume 权限不足、备份恢复失败。API 的 `expose: 5188` 只表示 Compose 内部可达，不等于宿主端口发布；边界检查读取容器实际 `NetworkSettings.Ports` 的 host binding，不使用会把 `expose` 也打印出来的 `docker compose port` 作为判据。

@@ -21,6 +21,10 @@ services:
   api:
     image: ${EXPORTDOCMANAGER_IMAGE_NAMESPACE:?请设置 EXPORTDOCMANAGER_IMAGE_NAMESPACE}/export-doc-manager-api:${EXPORTDOCMANAGER_IMAGE_TAG:?请设置精确的 EXPORTDOCMANAGER_IMAGE_TAG，禁止使用 latest}
     restart: unless-stopped
+    # Required by Chromium's Linux process sandbox inside Docker. The API
+    # process itself still runs as the fixed unprivileged uid/gid 10001.
+    cap_add:
+      - SYS_ADMIN
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:5188
       EXPORTDOCMANAGER_NETWORK_MODE: "true"

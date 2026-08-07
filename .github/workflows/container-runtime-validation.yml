@@ -447,6 +447,13 @@ jobs:
           chromium_log="../../artifacts/container-runtime/evidence/chromium-runtime.log"
           if {
             set -eu
+            api_container_id="$(docker compose ps -q api)"
+            test -n "$api_container_id"
+            docker inspect --format '{{json .HostConfig.CapAdd}}' "$api_container_id" \
+              > ../../artifacts/container-runtime/evidence/chromium-container-capabilities.json
+            jq -e 'map(ascii_upcase) | index("SYS_ADMIN") != null' \
+              ../../artifacts/container-runtime/evidence/chromium-container-capabilities.json \
+              >/dev/null
             docker compose exec -T api /usr/bin/chromium --version \
               > ../../artifacts/container-runtime/evidence/chromium-version.txt
             docker compose exec -T api df -B1 /dev/shm \

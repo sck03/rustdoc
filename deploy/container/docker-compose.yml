@@ -23,6 +23,12 @@ services:
       context: ../..
       dockerfile: deploy/container/Dockerfile.api
     restart: unless-stopped
+    # Chromium keeps its Linux process sandbox enabled. Docker's default
+    # capability set blocks the PID/network namespace creation required by
+    # that sandbox, so grant only the documented sandbox capability instead
+    # of weakening the browser with --no-sandbox.
+    cap_add:
+      - SYS_ADMIN
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:5188
       EXPORTDOCMANAGER_NETWORK_MODE: "true"
