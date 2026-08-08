@@ -195,6 +195,7 @@ jobs:
         run: dotnet restore tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj --configfile NuGet.Config
 
       - name: Render long multilingual built-in reports to PDF
+        timeout-minutes: 10
         env:
           EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX: ${{ runner.os == 'Linux' && '1' || '0' }}
         run: >-
@@ -203,6 +204,7 @@ jobs:
           -m:1
           -p:BuildInParallel=false
           --no-restore
+          --logger "console;verbosity=normal"
           --filter "FullyQualifiedName~RenderBuiltInProgramTemplatesToPdf|FullyQualifiedName~RenderBuiltInProgramTemplatesWithMultiItemBusinessDataToPdf"
 
       - name: Verify PDF wrapping and reject overlapping text

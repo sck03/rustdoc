@@ -12,6 +12,7 @@ namespace ExportDocManager.Services.BrowserRuntime
         public const string StartupTimeoutEnvironmentVariable = "EXPORTDOCMANAGER_BROWSER_STARTUP_TIMEOUT_SECONDS";
         public const string RecycleUsesEnvironmentVariable = "EXPORTDOCMANAGER_BROWSER_AUTOMATION_RECYCLE_USES";
         public const string RecycleMinutesEnvironmentVariable = "EXPORTDOCMANAGER_BROWSER_AUTOMATION_RECYCLE_MINUTES";
+        private static readonly TimeSpan BrowserShutdownTimeout = TimeSpan.FromSeconds(5);
 
         private readonly BrowserRuntimeManager _runtime;
         private readonly BrowserExecutableResolver _resolver;
@@ -478,10 +479,23 @@ namespace ExportDocManager.Services.BrowserRuntime
 
         private async Task StopBrowserCoreAsync()
         {
-            if (_browser != null) try { await _browser.CloseAsync().ConfigureAwait(false); } catch { }
+            IBrowser browser = _browser;
             _browser = null;
-            _playwright?.Dispose();
-            _playwright = null;
+            if (browser != null)
+            {
+                try
+                {
+                    await browser.CloseAsync()
+                        .WaitAsync(BrowserShutdownTimeout)
+                        .ConfigureAwait(false);
+                }
+                catch
+                {
+                    // A CDP-connected browser can stop responding during shutdown;
+                    // the owned process is force-terminated below so disposal never
+                    // leaves a report worker waiting indefinitely.
+                }
+            }
             if (_process != null)
             {
                 await BrowserRuntimeManager.KillOwnedProcessAsync(_process).ConfigureAwait(false);
@@ -490,6 +504,8 @@ namespace ExportDocManager.Services.BrowserRuntime
                 _process.Dispose();
                 _process = null;
             }
+            _playwright?.Dispose();
+            _playwright = null;
             await DeleteRuntimeDirectoryAsync(_profileRoot).ConfigureAwait(false);
             await DeleteRuntimeDirectoryAsync(_artifactsRoot).ConfigureAwait(false);
             _profileRoot = null;

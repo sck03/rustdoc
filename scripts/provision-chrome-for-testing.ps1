@@ -64,7 +64,7 @@ function Invoke-Main {
     }
 
     $playwrightCache = $null
-    if ($Version -eq $playwrightRuntime.ChromiumVersion) {
+    if ($Product -eq "ChromeHeadlessShell" -and $Version -eq $playwrightRuntime.ChromiumVersion) {
         $playwrightCache = Get-CompatiblePlaywrightBrowserCache `
             -RepositoryRoot $repoRoot `
             -ProductInfo $productInfo `
@@ -125,7 +125,10 @@ function Invoke-Main {
         throw "$($productInfo.DisplayName) executable was not found after extraction under '$installRoot'."
     }
     Set-UnixExecutablePermission -Path $executablePath
-    $versionOutput = Test-ChromeExecutable -Path $executablePath
+    $versionOutput = Test-ChromeExecutable `
+        -Path $executablePath `
+        -Product $Product `
+        -ExpectedVersion $download.Version
 
     $manifest = [ordered]@{
         product = $Product
@@ -182,8 +185,29 @@ function Assert-NoRunningBrowserFromRoot {
 function Test-ChromeExecutable {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Path
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("ChromeHeadlessShell", "Chrome")]
+        [string]$Product,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ExpectedVersion
     )
+
+    if ($Product -eq "Chrome" -and
+        [Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([Runtime.InteropServices.OSPlatform]::Windows)) {
+        $fileVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
+        $version = ([string]$fileVersion.ProductVersion).Trim()
+        if ([string]::IsNullOrWhiteSpace($version)) {
+            $version = ([string]$fileVersion.FileVersion).Trim()
+        }
+        if ($version -ne $ExpectedVersion) {
+            throw "Chrome for Testing file version '$version' does not match expected version '$ExpectedVersion'."
+        }
+
+        return "$([string]$fileVersion.ProductName) $version".Trim()
+    }
 
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = [Diagnostics.ProcessStartInfo]::new()
@@ -206,6 +230,9 @@ function Test-ChromeExecutable {
         [string]$output = ($process.StandardOutput.ReadToEnd() + " " + $process.StandardError.ReadToEnd()).Trim()
         if ($process.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($output)) {
             throw "Browser executable validation failed with exit code $($process.ExitCode): $output"
+        }
+        if ($output -notmatch [regex]::Escape($ExpectedVersion)) {
+            throw "Browser executable reported '$output', which does not match expected version '$ExpectedVersion'."
         }
 
         return $output

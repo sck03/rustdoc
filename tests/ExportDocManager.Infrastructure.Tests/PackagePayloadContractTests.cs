@@ -205,6 +205,11 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("playwrightCompatible", chromeProvisioning, StringComparison.Ordinal);
         Assert.Contains("Assert-NoRunningBrowserFromRoot", chromeProvisioning, StringComparison.Ordinal);
         Assert.Contains("Test-ChromeExecutable", chromeProvisioning, StringComparison.Ordinal);
+        Assert.Contains("FileVersionInfo", chromeProvisioning, StringComparison.Ordinal);
+        Assert.Contains("ExpectedVersion", chromeProvisioning, StringComparison.Ordinal);
+        Assert.Contains("$Product -eq \"ChromeHeadlessShell\" -and", chromeProvisioning, StringComparison.Ordinal);
+        Assert.Contains("timeout-minutes: 10", typographyWorkflow, StringComparison.Ordinal);
+        Assert.Contains("--logger \"console;verbosity=normal\"", typographyWorkflow, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -360,6 +365,34 @@ public sealed class PackagePayloadContractTests
             Assert.Contains("location /downloads/postgresql-backups/", config, StringComparison.Ordinal);
             Assert.Contains("proxy_buffering off", config, StringComparison.Ordinal);
             Assert.Contains("client_max_body_size 128m", config, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void ContainerNginxConfigs_ShouldPreserveSecurityHeadersInsideLocations()
+    {
+        string root = FindWorkspaceRoot();
+        foreach (string fileName in new[] { "nginx.conf", "nginx.https.conf", "nginx.acme.conf" })
+        {
+            string config = File.ReadAllText(Path.Combine(root, "deploy", "container", fileName));
+            System.Text.RegularExpressions.MatchCollection locations =
+                System.Text.RegularExpressions.Regex.Matches(
+                    config,
+                    @"location\s+[^{]+\{(?<body>[^{}]*)\}",
+                    System.Text.RegularExpressions.RegexOptions.Singleline);
+
+            Assert.True(locations.Count > 0, $"No location blocks were found in {fileName}.");
+            foreach (System.Text.RegularExpressions.Match location in locations)
+            {
+                Assert.DoesNotContain(
+                    "add_header ",
+                    location.Groups["body"].Value,
+                    StringComparison.OrdinalIgnoreCase);
+            }
+
+            Assert.Contains("expires 1y", config, StringComparison.Ordinal);
+            Assert.Contains("expires -1", config, StringComparison.Ordinal);
+            Assert.DoesNotContain("add_header Cache-Control", config, StringComparison.OrdinalIgnoreCase);
         }
     }
 
