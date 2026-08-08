@@ -530,6 +530,10 @@ $resolvedRuntimeRoot = Assert-SafeDirectoryPath $RuntimeRoot "容器运行数据
 $apiDataRoot = Assert-SafeDirectoryPath (Join-Path $resolvedRuntimeRoot "api-data") "API 数据目录"
 $configRoot = Assert-SafeDirectoryPath (Join-Path $apiDataRoot "Config") "API 配置目录"
 New-Item -ItemType Directory -Force -Path $configRoot | Out-Null
+$reportPdfRoot = Assert-SafeDirectoryPath (Join-Path $apiDataRoot "Cache/ReportPdf") "报表临时目录"
+New-Item -ItemType Directory -Force -Path $reportPdfRoot | Out-Null
+$browserRoot = Assert-SafeDirectoryPath (Join-Path $resolvedRuntimeRoot "browser") "隔离浏览器数据目录"
+New-Item -ItemType Directory -Force -Path $browserRoot | Out-Null
 $postgresRoot = Assert-SafeDirectoryPath (Join-Path $resolvedRuntimeRoot "postgres") "PostgreSQL 数据目录"
 New-Item -ItemType Directory -Force -Path $postgresRoot | Out-Null
 $letsencryptRoot = Assert-SafeDirectoryPath (Join-Path $resolvedRuntimeRoot "letsencrypt") "证书目录"
@@ -537,7 +541,7 @@ $acmeWebRoot = Assert-SafeDirectoryPath (Join-Path $resolvedRuntimeRoot "acme-we
 New-Item -ItemType Directory -Force -Path $letsencryptRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $acmeWebRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $environmentRoot | Out-Null
-foreach ($directoryPath in @($resolvedRuntimeRoot, $apiDataRoot, $configRoot, $postgresRoot, $letsencryptRoot, $acmeWebRoot, $environmentRoot)) {
+foreach ($directoryPath in @($resolvedRuntimeRoot, $apiDataRoot, $configRoot, $reportPdfRoot, $browserRoot, $postgresRoot, $letsencryptRoot, $acmeWebRoot, $environmentRoot)) {
     [void](Assert-SafeDirectoryPath $directoryPath "受管容器目录")
 }
 
@@ -561,12 +565,15 @@ if (-not $IsWindows) {
 
     Set-UnixRuntimeOwner $resolvedRuntimeRoot 0 0
     Set-UnixRuntimeOwner $apiDataRoot 10001 10001 -Recursive
+    Set-UnixRuntimeOwner $browserRoot 10001 10001 -Recursive
     Set-UnixRuntimeOwner $postgresRoot 999 999 -Recursive
     Set-UnixRuntimeOwner $letsencryptRoot 0 0 -Recursive
     Set-UnixRuntimeOwner $acmeWebRoot 0 0 -Recursive
     Set-UnixRuntimeMode $resolvedRuntimeRoot $ownerOnlyDirectory
     Set-UnixRuntimeMode $apiDataRoot $containerDirectory
     Set-UnixRuntimeMode $configRoot $containerDirectory
+    Set-UnixRuntimeMode $reportPdfRoot $containerDirectory
+    Set-UnixRuntimeMode $browserRoot $containerDirectory
     Set-UnixRuntimeMode $postgresRoot $ownerOnlyDirectory
     Set-UnixRuntimeMode $letsencryptRoot $ownerOnlyDirectory
     Set-UnixRuntimeMode $acmeWebRoot $publicReadDirectory

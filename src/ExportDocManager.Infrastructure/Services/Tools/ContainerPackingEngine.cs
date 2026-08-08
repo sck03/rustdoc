@@ -1,5 +1,6 @@
 using System.Threading;
 using ExportDocManager.Models.DTOs;
+using ExportDocManager.Services.Errors;
 
 namespace ExportDocManager.Services.Tools
 {
@@ -8,7 +9,49 @@ namespace ExportDocManager.Services.Tools
         public ContainerPackingAnalysis Analyze(ContainerPackingRequest request, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(request);
+            ContainerPackingResourcePolicy.Validate(request);
 
+            using var executionLease = ContainerPackingExecutionGate.Enter(cancellationToken);
+            return AnalyzeWithTimeout(request, cancellationToken);
+        }
+
+        public async Task<ContainerPackingAnalysis> AnalyzeAsync(
+            ContainerPackingRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            ContainerPackingResourcePolicy.Validate(request);
+
+            using var executionLease = await ContainerPackingExecutionGate
+                .EnterAsync(cancellationToken)
+                .ConfigureAwait(false);
+            return AnalyzeWithTimeout(request, cancellationToken);
+        }
+
+        private static ContainerPackingAnalysis AnalyzeWithTimeout(
+            ContainerPackingRequest request,
+            CancellationToken cancellationToken)
+        {
+            using var operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            operationCancellation.CancelAfter(ContainerPackingExecutionGate.ResolveOperationTimeout());
+            try
+            {
+                return AnalyzeCore(request, operationCancellation.Token);
+            }
+            catch (OperationCanceledException ex) when (
+                !cancellationToken.IsCancellationRequested &&
+                operationCancellation.IsCancellationRequested)
+            {
+                throw new ServiceTimeoutException(
+                    "装箱分析超过允许的计算时间，请减少货物行数、使用托盘约束或拆分方案。",
+                    ex);
+            }
+        }
+
+        private static ContainerPackingAnalysis AnalyzeCore(
+            ContainerPackingRequest request,
+            CancellationToken cancellationToken)
+        {
             var container = request.Container;
             var rules = request.Rules;
             var itemStates = BuildItemStates(request)
@@ -66,7 +109,8 @@ namespace ExportDocManager.Services.Tools
                         placedUnits,
                         container,
                         rules,
-                        remainingWeightCapacity);
+                        remainingWeightCapacity,
+                        cancellationToken);
 
                     if (candidate == null)
                     {

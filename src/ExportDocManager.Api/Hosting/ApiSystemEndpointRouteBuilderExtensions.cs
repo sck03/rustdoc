@@ -132,12 +132,23 @@ namespace ExportDocManager.Api.Hosting
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IShutdownMaintenanceService shutdownMaintenanceService,
                 IAppPathProvider pathProvider,
+                IHostApplicationLifetime applicationLifetime,
                 CancellationToken cancellationToken) =>
             {
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
                     return WriteForbidden("退出维护只能由受信任的桌面版执行。");
                 }
+
+                // Let Kestrel finish sending the maintenance result before asking the
+                // host to stop. The desktop shell then waits for the normal hosted
+                // service/IAsyncDisposable shutdown chain and only force-kills after
+                // a bounded timeout.
+                context.Response.OnCompleted(() =>
+                {
+                    applicationLifetime.StopApplication();
+                    return Task.CompletedTask;
+                });
 
                 try
                 {

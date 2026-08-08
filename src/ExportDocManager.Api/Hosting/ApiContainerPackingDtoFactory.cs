@@ -11,9 +11,18 @@ namespace ExportDocManager.Api.Hosting
         {
             ArgumentNullException.ThrowIfNull(request);
 
-            var container = request.Container ?? new ApiContainerDimensionsDto();
-            var rules = request.Rules ?? new ApiContainerPackingRulesDto();
-            var cargoItems = (request.CargoItems ?? new List<ApiContainerPackingCargoInputDto>())
+            return ToRequest(request.Container, request.CargoItems, request.Rules);
+        }
+
+        public static ContainerPackingRequest ToRequest(
+            ApiContainerDimensionsDto container,
+            IReadOnlyCollection<ApiContainerPackingCargoInputDto> cargoItems,
+            ApiContainerPackingRulesDto rules)
+        {
+            container ??= new ApiContainerDimensionsDto();
+            rules ??= new ApiContainerPackingRulesDto();
+
+            var normalizedCargoItems = (cargoItems ?? Array.Empty<ApiContainerPackingCargoInputDto>())
                 .Where(item => item != null)
                 .Select(ToCargoInput)
                 .ToList();
@@ -25,7 +34,7 @@ namespace ExportDocManager.Api.Hosting
                     Math.Max(container.Height, 0),
                     Math.Max(container.Volume, 0m),
                     Math.Max(container.MaxWeight, 0m)),
-                cargoItems,
+                normalizedCargoItems,
                 new ContainerPackingRules(
                     rules.AllowRotation,
                     rules.UsePalletConstraints,

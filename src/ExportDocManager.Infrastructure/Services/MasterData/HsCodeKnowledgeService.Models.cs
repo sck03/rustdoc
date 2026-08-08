@@ -133,10 +133,25 @@ namespace ExportDocManager.Services.MasterData
         private static DateTime? Max(DateTime? left, DateTime? right) => !left.HasValue ? right : !right.HasValue ? left : left > right ? left : right;
         private static DateTime Max(DateTime left, DateTime right) => left > right ? left : right;
 
-        private static async Task<byte[]> ReadEntryAsync(ZipArchive archive, string name, CancellationToken cancellationToken)
+        private static ZipArchiveEntry GetRequiredKnowledgeEntry(ZipArchive archive, string name)
         {
             var entry = archive.GetEntry(name) ?? throw new InvalidDataException($"HS知识库缺少文件：{name}。");
-            if (entry.Length > MaximumKnowledgeEntryBytes)
+            if (entry.Length > HsCodeKnowledgePackagePolicy.MaximumEntryBytes)
+            {
+                throw new InvalidDataException($"HS知识库文件过大：{name}。");
+            }
+
+            return entry;
+        }
+
+        private static async Task<byte[]> ReadEntryAsync(
+            ZipArchive archive,
+            string name,
+            long maximumBytes,
+            CancellationToken cancellationToken)
+        {
+            var entry = GetRequiredKnowledgeEntry(archive, name);
+            if (entry.Length > maximumBytes)
             {
                 throw new InvalidDataException($"HS知识库文件过大：{name}。");
             }
@@ -145,9 +160,34 @@ namespace ExportDocManager.Services.MasterData
             await BoundedStreamHelper.CopyToAsync(
                 stream,
                 output,
-                MaximumKnowledgeEntryBytes,
+                maximumBytes,
                 cancellationToken);
             return output.ToArray();
+        }
+
+        private static async Task<string> ComputeEntrySha256Async(
+            ZipArchiveEntry entry,
+            CancellationToken cancellationToken)
+        {
+            await using var stream = entry.Open();
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            byte[] buffer = new byte[128 * 1024];
+            long totalBytes = 0;
+            while (true)
+            {
+                int read = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+                if (read == 0)
+                {
+                    return Convert.ToHexString(hash.GetHashAndReset());
+                }
+
+                totalBytes += read;
+                if (totalBytes > HsCodeKnowledgePackagePolicy.MaximumEntryBytes)
+                {
+                    throw new InvalidDataException($"HS知识库文件过大：{entry.FullName}。");
+                }
+                hash.AppendData(buffer, 0, read);
+            }
         }
 
         private sealed class HashingQuotaWriteStream : Stream

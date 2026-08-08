@@ -11,6 +11,7 @@ namespace ExportDocManager.Api.Hosting
         public const long ExporterSealImageBytes = ExporterSealFilePolicy.MaximumBytes;
         public const long ExcelImportBytes = 25L * 1024L * 1024L;
         public const long PackageImportBytes = 50L * 1024L * 1024L;
+        public const long HsCodeKnowledgePackageBytes = HsCodeKnowledgePackagePolicy.MaximumPackageBytes;
         public const long PdfMergeBytes = 100L * 1024L * 1024L;
         public const long ServerMigrationPackageBytes = 4L * 1024L * 1024L * 1024L + 64L * 1024L * 1024L;
         public const long MaximumRequestBodyBytes = 128L * 1024L * 1024L;

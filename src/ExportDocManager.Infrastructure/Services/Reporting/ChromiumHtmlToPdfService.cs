@@ -101,7 +101,10 @@ namespace ExportDocManager.Services.Reporting
             }
         }
 
-        public string ResolveRendererExecutablePath() => _executableResolver.Resolve();
+        public string ResolveRendererExecutablePath() =>
+            BrowserCdpEndpointPolicy.TryResolve(out Uri endpoint)
+                ? endpoint.ToString().TrimEnd('/')
+                : _executableResolver.Resolve();
 
         internal string PrepareHtml(string html, HtmlToPdfRenderOptions options)
         {

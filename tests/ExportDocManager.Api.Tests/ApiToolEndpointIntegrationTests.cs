@@ -7,6 +7,7 @@ using System.Text.Json;
 using ClosedXML.Excel;
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Tools;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -274,6 +275,35 @@ namespace ExportDocManager.Api.Tests
                     }
                 });
             Assert.Equal(HttpStatusCode.BadRequest, invalidContainerPackingResponse.StatusCode);
+
+            var excessiveContainerPackingResponse = await adminClient.PostAsJsonAsync(
+                "/api/tools/container-packing/analyze",
+                new
+                {
+                    container = new
+                    {
+                        length = 1200,
+                        width = 235,
+                        height = 239,
+                        volume = 67.4m,
+                        maxWeight = 28000m
+                    },
+                    cargoItems = new[]
+                    {
+                        new
+                        {
+                            name = "超量货物",
+                            quantity = ContainerPackingResourcePolicy.MaximumPlacementUnits + 1,
+                            length = 60,
+                            width = 40,
+                            height = 40,
+                            weight = 10,
+                            unitsPerPallet = 1,
+                            preferredZone = "Auto"
+                        }
+                    }
+                });
+            Assert.Equal(HttpStatusCode.BadRequest, excessiveContainerPackingResponse.StatusCode);
 
             var invalidExcelImportResponse = await adminClient.PostAsJsonAsync(
                 "/api/tools/excel/import-preview",

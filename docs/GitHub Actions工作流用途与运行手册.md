@@ -16,7 +16,7 @@
 | 原生多平台契约 | [`cross-platform-validation.yml`](../.github/workflows/cross-platform-validation.yml) | 手工 | Windows/Linux/macOS 的 x64/ARM64 编译、Tauri/Rust 合同 |
 | 真实共享数据库 | [`postgresql-integration-validation.yml`](../.github/workflows/postgresql-integration-validation.yml) | `main` 相关路径 push、PR、手工 | PostgreSQL 18 初始化、索引、容量、并发、岗位权限和 SQL 安全 |
 | 容器运行时 | [`container-runtime-validation.yml`](../.github/workflows/container-runtime-validation.yml) | `main` 相关路径 push、PR、手工 | HTTP/HTTPS Compose、镜像、探针、volume 持久化和备份恢复 |
-| 镜像发布 | [`container-images.yml`](../.github/workflows/container-images.yml) | 手工 | Linux amd64/arm64 API/Web 镜像并推送 GHCR |
+| 镜像发布 | [`container-images.yml`](../.github/workflows/container-images.yml) | 手工 | Linux amd64/arm64 API/Browser/Web 镜像并推送 GHCR |
 | 桌面打包 | 三个平台入口 + [`desktop-package-reusable.yml`](../.github/workflows/desktop-package-reusable.yml) | 手工 | Windows NSIS、Linux deb/AppImage、macOS dmg Artifact；可选 Release |
 | 浏览器服务器打包 | 两个平台入口 + [`browser-server-package-reusable.yml`](../.github/workflows/browser-server-package-reusable.yml) | 手工 | Windows ZIP、Linux x64/ARM64 tar.gz Artifact；可选 Release |
 
@@ -81,12 +81,13 @@
 文件：[`container-runtime-validation.yml`](../.github/workflows/container-runtime-validation.yml)
 显示名称：`Container runtime lifecycle validation`
 
-- **触发：** `workflow_dispatch`；`main` push/PR 在 Compose、Dockerfile、API/Web、OCR 或该工作流变化时触发。
+- **触发：** `workflow_dispatch`；`main` push/PR 在 Compose、Dockerfile、API/Browser/Web、OCR 或该工作流变化时触发。
 - **平台：** `ubuntu-latest`，真实执行 Docker Compose。
-- **做什么：** 校验 HTTP 基础 Compose 和 HTTPS overlay；构建 Debian 13 API 镜像与轻量 `nginx:1.30.4-alpine3.24` Web 镜像并分步启动；检查 `/readyz`、匿名轻量 `/healthz`、CSP/HSTS、API `5188` 不对宿主发布；确认 API 仍以非 root UID/GID `10001` 运行、Compose 只加入 Chromium 容器沙箱所需的 `SYS_ADMIN` capability，并在 `EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX=false` 条件下调用 Debian 原生 Chromium 生成和校验真实 PDF；删除并重建 PostgreSQL 容器验证 bind volume 数据持久化；在 runner 内执行 `pg_dump/pg_restore` 恢复验收，最后清理容器。匿名 `/healthz` 在 API 路由表和鉴权/许可证/数据库服务解析之前由早期探针直接返回，不扫描浏览器、OCR、PostgreSQL 工具或服务器路径；管理员 Bearer/可信桌面连接仍可进入完整诊断。
+- **做什么：** 校验 HTTP 基础 Compose 和 HTTPS overlay；构建 Debian 13 API、隔离 Browser 与轻量 `nginx:1.30.4-alpine3.24` Web 镜像并分步启动；检查 `/readyz`、匿名轻量 `/healthz`、CSP/HSTS，确认 API `5188` 和 Browser CDP `9222` 均不对宿主发布。工作流要求 API/Browser 都以非 root UID/GID `10001` 运行，只有 Browser 具有 Chromium 沙箱所需的 `SYS_ADMIN`，API 丢弃全部 capability；同时确认 API 镜像不存在 `/usr/bin/chromium`、Browser 环境中没有 PostgreSQL/维护/主密钥/首次启用 secrets、Browser 不接入 backend 网络。随后在 Browser 内检查 512 MiB `/dev/shm`、setuid sandbox、CDP `/json/version`，用独立临时 profile 生成真实 PDF，并通过 API 的远程 CDP 路径完成业务探针。最后删除并重建 PostgreSQL 容器验证 bind volume 持久化，在 runner 内执行 `pg_dump/pg_restore` 恢复验收。匿名 `/healthz` 在 API 路由表和鉴权/许可证/数据库服务解析之前由早期探针直接返回，不扫描浏览器、OCR、PostgreSQL 工具或服务器路径；管理员 Bearer/可信桌面连接仍可进入完整诊断。
+- **远程浏览器桥接探针：** Compose 启动完成后，工作流在 API 容器内执行 `dotnet ExportDocManager.Api.dll --verify-browser-runtime`；该命令只渲染一个临时 PDF、校验 `%PDF-` 签名并清理缓存，不监听 HTTP 端口，也不会改变正常启动流程。
 - **输出：** 只上传 `artifacts/container-runtime/evidence` 下的探针、Compose 状态和日志证据，不递归扫描 PostgreSQL 数据目录，也不上传数据库 dump；通常保留 14 天。
 - **Secrets/Variables：** 不需要自定义 Secret。测试密码、自签证书和端口由工作流临时生成，不能用于生产。
-- **常见失败：** Docker 构建超过 15 分钟、API 启动/健康检查超过 5 分钟、镜像内 Chromium/OCR 缺库、端口或 Docker 网段冲突、volume 权限不足、备份恢复失败。API 的 `expose: 5188` 只表示 Compose 内部可达，不等于宿主端口发布；边界检查读取容器实际 `NetworkSettings.Ports` 的 host binding，不使用会把 `expose` 也打印出来的 `docker compose port` 作为判据。
+- **常见失败：** Docker 构建超过 15 分钟、Browser/CDP 或 API 健康检查超时、Browser Chromium/sandbox/字体缺库、API OCR 缺库、capability 或网络隔离漂移、端口/Docker 网段冲突、volume 权限不足、备份恢复失败。API 的 `expose: 5188` 与 Browser 的 `expose: 9222` 只表示 Compose 内部可达，不等于宿主端口发布；边界检查读取容器实际 `NetworkSettings.Ports` 的 host binding，不使用会把 `expose` 也打印出来的 `docker compose port` 作为判据。
 - **耗时：** 通常 10—30 分钟；构建和启动均有明确上限，失败时先看上传的 evidence 与 API health JSON。公开 `/healthz` 采用 3 次、每次最多 3 秒的有界重试；仍失败时步骤会额外尝试 API 容器内直连并输出 Web/API/Compose 诊断，避免只看到一个无上下文的 curl 超时。
 
 ### 2.6 Dependency security and SBOM governance
@@ -108,13 +109,13 @@
 显示名称：`Build and publish container images`
 
 - **触发：** 仅 `workflow_dispatch`；表单要求版本号，可选择是否更新 `latest`。
-- **平台：** `ubuntu-latest`，Docker Buildx + QEMU；矩阵构建 `api` 和 `web` 两个组件的 `linux/amd64`、`linux/arm64`。
+- **平台：** `ubuntu-latest`，Docker Buildx + QEMU；矩阵构建 `api`、`browser` 和 `web` 三个组件的 `linux/amd64`、`linux/arm64`。
 - **做什么：** 校验版本并同步 runner 工作区版本，构建带 provenance/SBOM 的多架构镜像，写入版本、`latest`（可选）和 SHA 标签。
-- **输出：** 推送到 `ghcr.io/<仓库所有者>/export-doc-manager-api` 和 `...-web`；不上传普通 Artifact、不创建 GitHub Release。
+- **输出：** 推送到 `ghcr.io/<仓库所有者>/export-doc-manager-api`、`...-browser` 和 `...-web`；不上传普通 Artifact、不创建 GitHub Release。
 - **部署：** 镜像发布后，Linux x64/ARM64 VPS 可直接运行 `deploy/container/install-container.sh`，无需克隆或重新构建源码。`--mode http` 用于受控内网；`--mode https --domain ... --email ...` 保留 Nginx 为唯一业务代理，并由 Certbot 自动申请和续期证书。生产环境建议传精确版本 tag；完整命令、升级、Private Package 登录和数据目录见 [`deploy/container/README.md`](../deploy/container/README.md)。
 - **Secrets/Variables：** 使用 GitHub 自动 `GITHUB_TOKEN`，工作流权限为 `packages: write`；不需要额外私钥。
 - **常见失败：** GHCR 权限/包可见性、版本格式错误、QEMU 或 Buildx 构建失败、Dockerfile 公开源码边界检查失败。API 镜像会先回收一次性 Ubuntu runner 上明确无关的 Android、宿主 .NET SDK、GHC/Haskell 和 Swift 工具空间；该 job 的 .NET 发布在 Docker SDK 镜像内完成。NuGet/Cargo 使用 BuildKit cache mount，GHA cache 使用 `mode=min`；若仍出现 `No space left on device`，先确认这些步骤实际执行并查看 `df -h /`，不要通过关闭 provenance/SBOM 或删除随包 OCR/字体绕过交付契约。工作流只在手工确认后推送，不能把测试分支镜像误当生产版本。
-- **耗时：** 多架构 API/Web 通常 10—30 分钟，首次无缓存时可能更久。
+- **耗时：** 多架构 API/Browser/Web 通常 10—35 分钟，首次无缓存时可能更久。
 
 ### 2.8 Reusable desktop package build
 

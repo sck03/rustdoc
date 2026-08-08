@@ -31,6 +31,9 @@ jobs:
           - component: api
             dockerfile: deploy/container/Dockerfile.api
             cache_mode: min
+          - component: browser
+            dockerfile: deploy/container/Dockerfile.browser
+            cache_mode: max
           - component: web
             dockerfile: deploy/container/Dockerfile.web
             cache_mode: max

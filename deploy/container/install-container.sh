@@ -614,14 +614,16 @@ RUNTIME_ROOT=$(cd -- "$RUNTIME_ROOT" && pwd -P)
 [[ "$RUNTIME_ROOT" != "/" ]] || fail "The resolved runtime data root must not be the filesystem root."
 API_DATA_ROOT="$RUNTIME_ROOT/api-data"
 CONFIG_ROOT="$API_DATA_ROOT/Config"
+REPORT_PDF_ROOT="$API_DATA_ROOT/Cache/ReportPdf"
+BROWSER_ROOT="$RUNTIME_ROOT/browser"
 POSTGRES_ROOT="$RUNTIME_ROOT/postgres"
 LETSENCRYPT_ROOT="$RUNTIME_ROOT/letsencrypt"
 ACME_WEB_ROOT="$RUNTIME_ROOT/acme-webroot"
-for runtime_directory in "$API_DATA_ROOT" "$CONFIG_ROOT" "$POSTGRES_ROOT" "$LETSENCRYPT_ROOT" "$ACME_WEB_ROOT"; do
+for runtime_directory in "$API_DATA_ROOT" "$CONFIG_ROOT" "$REPORT_PDF_ROOT" "$BROWSER_ROOT" "$POSTGRES_ROOT" "$LETSENCRYPT_ROOT" "$ACME_WEB_ROOT"; do
   assert_safe_directory_path "$runtime_directory" "Managed runtime directory"
 done
-mkdir -p -- "$CONFIG_ROOT" "$POSTGRES_ROOT" "$LETSENCRYPT_ROOT" "$ACME_WEB_ROOT"
-for runtime_directory in "$API_DATA_ROOT" "$CONFIG_ROOT" "$POSTGRES_ROOT" "$LETSENCRYPT_ROOT" "$ACME_WEB_ROOT"; do
+mkdir -p -- "$CONFIG_ROOT" "$REPORT_PDF_ROOT" "$BROWSER_ROOT" "$POSTGRES_ROOT" "$LETSENCRYPT_ROOT" "$ACME_WEB_ROOT"
+for runtime_directory in "$API_DATA_ROOT" "$CONFIG_ROOT" "$REPORT_PDF_ROOT" "$BROWSER_ROOT" "$POSTGRES_ROOT" "$LETSENCRYPT_ROOT" "$ACME_WEB_ROOT"; do
   assert_safe_directory_path "$runtime_directory" "Managed runtime directory"
 done
 SETTINGS_FILE="$CONFIG_ROOT/appsettings.json"
@@ -631,11 +633,13 @@ SETTINGS_FILE="$CONFIG_ROOT/appsettings.json"
 # Debian image runs as uid/gid 999. Bind-mount ownership is prepared up front
 # so neither service needs a world-writable host directory.
 chown -R 10001:10001 "$API_DATA_ROOT"
+chown -R 10001:10001 "$BROWSER_ROOT"
 chown -R 999:999 "$POSTGRES_ROOT"
 chown root:root "$RUNTIME_ROOT" "$LETSENCRYPT_ROOT" "$ACME_WEB_ROOT"
 chmod 700 "$RUNTIME_ROOT"
 chmod 0700 "$POSTGRES_ROOT"
 chmod 0750 "$API_DATA_ROOT" "$CONFIG_ROOT"
+chmod 0750 "$REPORT_PDF_ROOT" "$BROWSER_ROOT"
 chmod 0700 "$LETSENCRYPT_ROOT"
 chmod 0755 "$ACME_WEB_ROOT"
 if [[ ! -f "$SETTINGS_FILE" ]]; then
@@ -777,7 +781,7 @@ fi
 
 if ! "${COMPOSE[@]}" up -d --remove-orphans; then
   "${COMPOSE[@]}" ps --all >&2 || true
-  DIAGNOSTIC_SERVICES=(postgres api web)
+  DIAGNOSTIC_SERVICES=(postgres browser api web)
   [[ "$MODE" == "https" ]] && DIAGNOSTIC_SERVICES+=(certbot)
   "${COMPOSE[@]}" logs --no-color --tail=120 "${DIAGNOSTIC_SERVICES[@]}" >&2 || true
   fail "Container startup failed. Review the service logs above; existing runtime data was not deleted."
@@ -812,7 +816,7 @@ for attempt in {1..120}; do
 done
 if ((READY != 1)); then
   "${COMPOSE[@]}" ps --all >&2 || true
-  DIAGNOSTIC_SERVICES=(postgres api web)
+  DIAGNOSTIC_SERVICES=(postgres browser api web)
   [[ "$MODE" == "https" ]] && DIAGNOSTIC_SERVICES+=(certbot)
   "${COMPOSE[@]}" logs --no-color --tail=120 "${DIAGNOSTIC_SERVICES[@]}" >&2 || true
   if [[ "$MODE" == "https" ]]; then

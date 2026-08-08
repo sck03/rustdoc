@@ -94,7 +94,7 @@ namespace ExportDocManager.Api.Hosting
                         await ApiUploadLimits.CopyRequestBodyAsync(
                             context.Request,
                             output,
-                            ApiUploadLimits.PackageImportBytes,
+                            ApiUploadLimits.HsCodeKnowledgePackageBytes,
                             cancellationToken);
                     }
 

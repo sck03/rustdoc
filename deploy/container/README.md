@@ -1,6 +1,6 @@
 # ExportDocManager Full 容器版部署与运维
 
-正式容器拓扑为 `Nginx Web + ASP.NET Core API + PostgreSQL 18`；HTTPS 模式额外运行 Certbot 自动续期容器。SQLite 仅用于单机版。API `5188` 和 PostgreSQL `5432` 不发布到宿主机，用户只访问 Nginx。
+正式容器拓扑为 `Nginx Web + ASP.NET Core API + 隔离 Chromium Browser + PostgreSQL 18`；HTTPS 模式额外运行 Certbot 自动续期容器。SQLite 仅用于单机版。API `5188`、Browser CDP `9222` 和 PostgreSQL `5432` 都不发布到宿主机，用户只访问 Nginx。
 
 本文以 Linux VPS 默认目录 `/opt/export-doc-manager` 为准。下文命令均假定当前为 `root`；普通账号先执行 `sudo -i`，不要直接对 `edm` Shell 函数使用 `sudo`。
 
@@ -14,11 +14,12 @@
 | 密码、镜像版本和部署参数 | `/opt/export-doc-manager/.env` |
 | PostgreSQL 原始数据 | `/opt/export-doc-manager/runtime/postgres/` |
 | API 配置、印章、模板、日志、缓存和应用备份 | `/opt/export-doc-manager/runtime/api-data/` |
+| 隔离 Chromium profile 与自身缓存（可重建） | `/opt/export-doc-manager/runtime/browser/` |
 | 本地主密钥 | `/opt/export-doc-manager/runtime/api-data/Security/local-master-key.bin` |
 | Let's Encrypt 证书 | `/opt/export-doc-manager/runtime/letsencrypt/` |
 | 本文创建的运维数据库备份 | `/opt/export-doc-manager/backups/postgresql/` |
 
-完整迁移必须同时保留数据库备份、`.env` 和 `runtime/api-data/`。缺少 `Security/local-master-key.bin`，或更换 `.env` 中显式配置的 `EXPORTDOCMANAGER_MASTER_KEY`，可能导致已有加密配置无法解密。
+完整迁移必须同时保留数据库备份、`.env` 和 `runtime/api-data/`。缺少 `Security/local-master-key.bin`，或更换 `.env` 中显式配置的 `EXPORTDOCMANAGER_MASTER_KEY`，可能导致已有加密配置无法解密。`runtime/browser/` 只保存隔离浏览器的可重建 profile/缓存，不属于业务迁移必需数据。
 
 Docker 镜像和构建缓存由 Docker Engine 的全局 `data-root` 管理，不属于应用目录。若需放到独立数据盘，应在首次安装前按 Docker 官方方法配置 Engine。
 
@@ -109,9 +110,9 @@ edm() {
 
 ```bash
 edm ps -a
-edm logs --no-color --tail=200 postgres api web
+edm logs --no-color --tail=200 postgres browser api web
 edm restart api web
-edm restart postgres api web
+edm restart postgres browser api web
 ```
 
 HTTPS 证书续期日志：
@@ -260,7 +261,7 @@ edm exec -T postgres sh -ec '
 ```bash
 edm up -d
 edm ps -a
-edm logs --no-color --tail=100 postgres api web
+edm logs --no-color --tail=100 postgres browser api web
 ```
 
 人工核对登录、权限、发票、客户、出口商、印章、HS 查询、任务和审计记录。恢复失败时不要先开放 Web，应检查 PostgreSQL 日志和备份文件。
@@ -484,7 +485,7 @@ HTTPS 改用新域名时，先完成 DNS 和防火墙设置：
 
 ```bash
 edm ps -a
-edm logs --no-color --tail=100 postgres api web
+edm logs --no-color --tail=100 postgres browser api web
 ```
 
 原 HTTPS 域名尚未切换 DNS 时，可在新服务器本机验证：
@@ -502,9 +503,11 @@ curl --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/readyz"
 
 企业网关或 CDN 在 Nginx 前终止 TLS 时，必须把其实际连接 Nginx 的固定 IP 加入 `EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES`，不要填写不受控网段，也不要直接公开 API `5188`。
 
-API 最终运行层固定为 `debian:trixie-slim`；Web 只承载静态资源和反向代理，使用更轻量的 `nginx:1.30.4-alpine3.24`。Debian 原生 Chromium 位于 `/usr/bin/chromium`，镜像在 `--no-install-recommends` 模式下显式安装配套的 `chromium-sandbox`，API 继续以固定非 root UID/GID `10001` 运行；两份 Compose 仅向 API 容器加入 Chromium 官方容器沙箱所需的 `SYS_ADMIN` capability，使 PID/Network namespace 沙箱在 Docker 默认能力边界中可用，不使用 `--no-sandbox`，API `5188` 也不向宿主发布。PostgreSQL 18 客户端来自 `trixie-pgdg`，位于 `/usr/lib/postgresql/18/bin`；.NET/ASP.NET Core Runtime 通过 Microsoft 官方 Debian 13 仓库配置包安装构建时可用的最新稳定 `10.0.x`，由官方配置包同步仓库签名密钥轮换，镜像构建会验证两个共享框架使用同一补丁版本，不会硬编码尚未发布到该仓库的包修订号。Microsoft Container Registry 当前没有稳定版 .NET 10 Trixie SDK/ASP.NET 标签，因此构建层使用官方 `10.0.302-noble`，不会再引用不存在的 `bookworm-slim` 标签。
+API 与 Browser 最终运行层都固定为 `debian:trixie-slim`；Web 只承载静态资源和反向代理，继续使用更轻量的 `nginx:1.30.4-alpine3.24`。Debian 原生 Chromium 和配套 `chromium-sandbox` 只安装在独立 Browser 镜像的 `/usr/bin/chromium`，API 镜像不再携带浏览器。API 与 Browser 都以固定非 root UID/GID `10001` 运行；API 丢弃全部 Linux capabilities 并启用 `no-new-privileges`，只有 Browser 获得 Chromium 命名空间沙箱所需的 `SYS_ADMIN`，仍不使用 `--no-sandbox`。Browser 不接入 PostgreSQL `backend` 网络，也不接收数据库、维护账号、主密钥或首次启用令牌；API 仅通过不发布到宿主的专用 `browser` 网络访问 `http://browser:9222`。PostgreSQL 18 客户端来自 `trixie-pgdg`，位于 API 镜像 `/usr/lib/postgresql/18/bin`；.NET/ASP.NET Core Runtime 通过 Microsoft 官方 Debian 13 仓库配置包安装构建时可用的最新稳定 `10.0.x`，由官方配置包同步仓库签名密钥轮换，镜像构建会验证两个共享框架使用同一补丁版本，不会硬编码尚未发布到该仓库的包修订号。Microsoft Container Registry 当前没有稳定版 .NET 10 Trixie SDK/ASP.NET 标签，因此构建层使用官方 `10.0.302-noble`，不会再引用不存在的 `bookworm-slim` 标签。
 
-API 服务分配 `shm_size: 512mb`，并固定 `EXPORTDOCMANAGER_CHROMIUM_DISABLE_DEV_SHM_USAGE=false`，让容器内 Chromium 使用内存文件系统而不是把共享内存工作负载转移到磁盘缓存；非容器部署仍保留兼容小 `/dev/shm` 环境的默认启动参数。
+Browser 服务分配 `shm_size: 512mb`，让 Chromium 使用内存文件系统而不是把共享内存工作负载转移到磁盘缓存。API 生成的 `runtime/api-data/Cache/ReportPdf` 以只读方式挂载到 Browser 的同等运行路径；Browser 只能读取当前临时报表和随镜像提供的开源字体，PDF 字节通过 CDP 返回 API 后再由 API 原子写入目标文件。非容器部署仍保留兼容小 `/dev/shm` 环境的默认启动参数。
+
+Compose 默认资源档位为 API `2 CPU / 2 GiB / 512 PID`、Browser `1.5 CPU / 1536 MiB / 512 PID`、PostgreSQL `2 CPU / 2 GiB / 256 PID`、Web `0.5 CPU / 256 MiB / 128 PID`，均可在 `.env` 中按主机容量调整。API、Browser、PostgreSQL 和 Web 分别有 60/15/45/15 秒停止宽限，避免长任务无限占用主机或升级时粗暴截断数据库。
 
 Compose 固定使用 Debian 13 基线的 `postgres:18.4-trixie`，初始化参数为：
 
@@ -514,7 +517,7 @@ Compose 固定使用 Debian 13 基线的 `postgres:18.4-trixie`，初始化参�
 
 PostgreSQL 18 容器数据位于 `/var/lib/postgresql/18/docker`，因此宿主 `runtime/postgres/` 必须挂载到 `/var/lib/postgresql`，不能改成旧版常见的 `/var/lib/postgresql/data`。跨 PostgreSQL 大版本升级必须使用验证过的 dump/restore 或 `pg_upgrade`，不能直接复用旧版原始数据目录。
 
-外层 `runtime/` 使用 `root:root 700`。API 镜像以固定 `10001:10001` 非 root 身份运行，`runtime/api-data/` 由安装器设置为该身份可写的 `750`；PostgreSQL 目录由固定 `999:999` 身份持有并保持 `700`，应用配置文件为 `600`。这些 bind mount 不再依赖 `777/1777` 世界可写权限，也不要脱离不可遍历的父目录单独暴露。
+外层 `runtime/` 使用 `root:root 700`。API 与 Browser 镜像都以固定 `10001:10001` 非 root 身份运行；`runtime/api-data/`、`runtime/api-data/Cache/ReportPdf/` 和 `runtime/browser/` 由安装器设置为该身份可访问的 `750`，其中 ReportPdf 对 Browser 只读。PostgreSQL 目录由固定 `999:999` 身份持有并保持 `700`，应用配置文件为 `600`。这些 bind mount 不再依赖 `777/1777` 世界可写权限，也不要脱离不可遍历的父目录单独暴露。
 
 ## 9. 开发者附录
 
@@ -527,4 +530,4 @@ PostgreSQL 18 容器数据位于 `/var/lib/postgresql/18/docker`，因此宿主 
 - `initialize-container-runtime.ps1`：克隆仓库后的 PowerShell 初始化工具；Windows 可直接运行，Linux/macOS 需使用 `sudo pwsh` 以设置固定容器 UID/GID；可信 HTTP 开发环境需显式设置 `-WebBindAddress 0.0.0.0`，并按需增加 `-AllowHttpDisasterRecovery`；
 - `install-container.sh`：Linux VPS 正式安装、升级和恢复入口。
 
-GitHub 工作流 `Container runtime lifecycle validation` 会验证启动、健康探针、安全响应头、PostgreSQL bind mount 持久化和 `pg_dump/pg_restore`。CI 成功不能替代生产环境的异机备份和恢复演练。
+GitHub 工作流 `Container runtime lifecycle validation` 会验证四服务启动、Browser 沙箱与 CDP、API/Browser 凭据和网络隔离、真实 Chromium PDF、安全响应头、PostgreSQL bind mount 持久化和 `pg_dump/pg_restore`。CI 成功不能替代生产环境的异机备份和恢复演练。

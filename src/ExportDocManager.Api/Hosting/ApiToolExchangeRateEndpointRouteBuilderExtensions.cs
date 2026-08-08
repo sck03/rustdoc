@@ -1,5 +1,6 @@
 using ExportDocManager.Models;
 using ExportDocManager.Services.Data;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 
@@ -36,7 +37,7 @@ namespace ExportDocManager.Api.Hosting
                         exchangeRateService.ClearCache();
                     }
 
-                    var rates = await exchangeRateService.GetExchangeRatesAsync();
+                    var rates = await exchangeRateService.GetExchangeRatesAsync(cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var exchangeRateSettings = EnsureExchangeRateSettings(settingsService.Settings);
@@ -64,6 +65,10 @@ namespace ExportDocManager.Api.Hosting
                         new ApiErrorResponse("汇率查询已取消。"),
                         statusCode: StatusCodes.Status499ClientClosedRequest);
                 }
+                catch (ServiceException ex)
+                {
+                    return WriteServiceException(ex);
+                }
                 catch (Exception ex)
                 {
                     return WriteInfrastructureFailure("汇率查询服务暂时不可用，请稍后重试。", ex);
@@ -86,7 +91,7 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     await settingsService.LoadAsync();
-                    var currencies = await exchangeRateService.GetAvailableCurrenciesAsync();
+                    var currencies = await exchangeRateService.GetAvailableCurrenciesAsync(cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
 
                     return Results.Ok(new ApiExchangeRateAvailableCurrenciesResponse
@@ -107,6 +112,10 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Json(
                         new ApiErrorResponse("货币列表查询已取消。"),
                         statusCode: StatusCodes.Status499ClientClosedRequest);
+                }
+                catch (ServiceException ex)
+                {
+                    return WriteServiceException(ex);
                 }
                 catch (Exception ex)
                 {
@@ -144,8 +153,8 @@ namespace ExportDocManager.Api.Hosting
         private static string ResolveExchangeRateSourceUrl(ExchangeRateSettings settings)
         {
             return string.IsNullOrWhiteSpace(settings.Url)
-                ? "https://www.boc.cn/sourcedb/whpj/"
-                : settings.Url.Trim();
+                ? ExchangeRateEndpointPolicy.DefaultUrl
+                : ExchangeRateEndpointPolicy.Normalize(settings.Url).ToString();
         }
 
         private static string BuildExchangeRateStatusText(int rateCount, DateTimeOffset fetchedAt)

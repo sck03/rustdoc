@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:24-trixie-slim AS report-fonts
+WORKDIR /src
+COPY scripts/provision-report-fonts.mjs scripts/verify-font-license-policy.mjs scripts/
+COPY Resources/Fonts/OpenSource/font-manifest.json Resources/Fonts/OpenSource/OFL-Noto-CJK.txt Resources/Fonts/OpenSource/README.md Resources/Fonts/OpenSource/
+RUN node scripts/provision-report-fonts.mjs \
+    && node scripts/verify-font-license-policy.mjs --require-files
+
+FROM debian:trixie-slim
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        chromium \
+        chromium-sandbox \
+        curl \
+        fonts-noto-cjk \
+        tini \
+        tzdata \
+    && test -u /usr/lib/chromium/chrome-sandbox \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --system --gid 10001 exportdoc-browser \
+    && useradd --system --uid 10001 --gid 10001 --home-dir /browser-data --no-create-home exportdoc-browser \
+    && install -d -o 10001 -g 10001 -m 0750 \
+        /browser-data \
+        /runtime-data/Cache/ReportPdf \
+        /app/Resources/Fonts/OpenSource
+COPY --from=report-fonts --chown=10001:10001 /src/Resources/Fonts/OpenSource/ /app/Resources/Fonts/OpenSource/
+
+ENV HOME=/browser-data \
+    XDG_CACHE_HOME=/browser-data/cache \
+    XDG_CONFIG_HOME=/browser-data/config \
+    TZ=Asia/Shanghai
+USER 10001:10001
+EXPOSE 9222
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/chromium"]
+CMD ["--headless", "--remote-debugging-address=0.0.0.0", "--remote-debugging-port=9222", "--remote-allow-origins=*", "--user-data-dir=/browser-data/profile", "--allow-file-access-from-files", "--disable-gpu", "--disable-background-networking", "--disable-background-timer-throttling", "--disable-backgrounding-occluded-windows", "--disable-breakpad", "--disable-component-update", "--disable-default-apps", "--disable-extensions", "--disable-sync", "--force-color-profile=srgb", "--metrics-recording-only", "--no-first-run", "--no-default-browser-check", "--password-store=basic", "--use-mock-keychain", "--export-tagged-pdf", "about:blank"]

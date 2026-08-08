@@ -844,6 +844,7 @@ https://sqlite.org/copyright.html
 - PaddleOCR/PP-OCRv6 model provenance and notices are shipped at `OcrModels/PaddleOCR/V6/THIRD_PARTY_NOTICES.md`.
 - The Rust Excel analyzer notice is shipped at `Tools/EXCEL_ANALYZER_NOTICES.md`.
 - Chrome Headless Shell or the reviewed Playwright Chromium ARM64 build is shipped with its upstream license/notice file under `Browsers/`; the clean-package gate rejects browser payloads without a corresponding notice.
+- The container-only browser image installs Debian 13 `chromium`, `chromium-sandbox`, and `fonts-noto-cjk` from the official Debian repository. Their package copyright files remain available under `/usr/share/doc` in that image; the API and Web images do not embed a second Chromium copy.
 
 ### Noto CJK font license
 

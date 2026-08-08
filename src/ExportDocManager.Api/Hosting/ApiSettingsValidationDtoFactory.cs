@@ -1,5 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
+using ExportDocManager.Services.Data;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 
 namespace ExportDocManager.Api.Hosting
@@ -295,6 +297,17 @@ namespace ExportDocManager.Api.Hosting
             if (string.IsNullOrWhiteSpace(normalized.Url))
             {
                 messages.Add(Warning("exchangeRate.url", "汇率源网址为空，今日汇率工具将无法联网刷新。", false));
+            }
+            else
+            {
+                try
+                {
+                    _ = ExchangeRateEndpointPolicy.Normalize(normalized.Url);
+                }
+                catch (ServiceValidationException ex)
+                {
+                    messages.Add(Error("exchangeRate.url", ex.Message, false));
+                }
             }
         }
 

@@ -6,7 +6,7 @@ namespace ExportDocManager.Infrastructure.Tests
     public class ContainerPackingEngineTests
     {
         [Fact]
-        public void Analyze_ShouldPackSimpleCargoWithoutWinFormsDependencies()
+        public async Task AnalyzeAsync_ShouldPackSimpleCargoWithoutWinFormsDependencies()
         {
             var engine = new ContainerPackingEngine();
             var cargoColor = ContainerPackingColor.FromRgb(66, 135, 245);
@@ -40,7 +40,7 @@ namespace ExportDocManager.Infrastructure.Tests
                     MinimumSupportAreaPercent: 70m,
                     RequireSameFootprintStacking: false));
 
-            var analysis = engine.Analyze(request);
+            var analysis = await engine.AnalyzeAsync(request);
 
             Assert.Equal(4, analysis.TotalPackages);
             Assert.Equal(4, analysis.PackedPackages);

@@ -23,7 +23,10 @@ namespace ExportDocManager.Services.MasterData
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             DateTime? sinceUtc = since?.UtcDateTime;
 
-            await using (var boundedOutput = new MaximumLengthWriteStream(destination, MaximumPackageBytes, leaveOpen: true))
+            await using (var boundedOutput = new MaximumLengthWriteStream(
+                             destination,
+                             HsCodeKnowledgePackagePolicy.MaximumPackageBytes,
+                             leaveOpen: true))
             {
                 using var archive = new ZipArchive(boundedOutput, ZipArchiveMode.Create, leaveOpen: true);
                 long expandedBytes = 0;
@@ -35,8 +38,8 @@ namespace ExportDocManager.Services.MasterData
                     await using var entryStream = zipEntry.Open();
                     using var hashingStream = new HashingQuotaWriteStream(
                         entryStream,
-                        MaximumKnowledgeEntryBytes,
-                        MaximumKnowledgeExpandedBytes,
+                        HsCodeKnowledgePackagePolicy.MaximumEntryBytes,
+                        HsCodeKnowledgePackagePolicy.MaximumExpandedBytes,
                         () => expandedBytes);
                     await JsonSerializer.SerializeAsync(
                         hashingStream,
@@ -78,7 +81,7 @@ namespace ExportDocManager.Services.MasterData
         {
             var info = new FileInfo(packagePath ?? string.Empty);
             if (!info.Exists) throw new FileNotFoundException("HS知识库文件不存在。", packagePath);
-            if (info.Length <= 0 || info.Length > MaximumPackageBytes) throw new InvalidDataException("HS知识库文件为空或超过100MB限制。");
+            if (info.Length <= 0 || info.Length > HsCodeKnowledgePackagePolicy.MaximumPackageBytes) throw new InvalidDataException("HS知识库文件为空或超过100MB限制。");
             using var archive = ZipFile.OpenRead(info.FullName);
             var knownNames = new HashSet<string>(["manifest.json", "hs-codes.json", "declaration-examples.json", "replacement-relations.json", "search-feedback.json"], StringComparer.OrdinalIgnoreCase);
             var packageEntries = archive.Entries
@@ -89,20 +92,32 @@ namespace ExportDocManager.Services.MasterData
                 .Any(group => group.Count() > 1);
             if (packageEntries.Count != knownNames.Count ||
                 hasDuplicateEntry ||
-                packageEntries.Any(entry => !knownNames.Contains(entry.FullName) || entry.Length > MaximumKnowledgeEntryBytes) ||
-                packageEntries.Sum(entry => entry.Length) > MaximumKnowledgeExpandedBytes)
+                packageEntries.Any(entry => !knownNames.Contains(entry.FullName) || entry.Length > HsCodeKnowledgePackagePolicy.MaximumEntryBytes) ||
+                packageEntries.Sum(entry => entry.Length) > HsCodeKnowledgePackagePolicy.MaximumExpandedBytes)
                 throw new InvalidDataException("HS知识库包含未知或过大的文件。");
-            byte[] manifestBytes = await ReadEntryAsync(archive, "manifest.json", cancellationToken);
+            byte[] manifestBytes = await ReadEntryAsync(
+                archive,
+                "manifest.json",
+                HsCodeKnowledgePackagePolicy.MaximumManifestBytes,
+                cancellationToken);
             var manifest = JsonSerializer.Deserialize<KnowledgeManifest>(manifestBytes, JsonOptions)
                 ?? throw new InvalidDataException("HS知识库清单无效。");
             if (!string.Equals(manifest.SchemaVersion, PackageSchemaVersion, StringComparison.Ordinal))
                 throw new InvalidDataException($"不支持的HS知识库版本：{manifest.SchemaVersion}。");
             async Task<T> ReadAndVerifyAsync<T>(string name)
             {
-                byte[] bytes = await ReadEntryAsync(archive, name, cancellationToken);
-                if (!manifest.Checksums.TryGetValue(name, out string expected) || !string.Equals(expected, Sha256(bytes), StringComparison.OrdinalIgnoreCase))
+                var entry = GetRequiredKnowledgeEntry(archive, name);
+                string actualChecksum = await ComputeEntrySha256Async(entry, cancellationToken);
+                if (!manifest.Checksums.TryGetValue(name, out string expected) ||
+                    !string.Equals(expected, actualChecksum, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException($"HS知识库文件校验失败：{name}。");
-                return JsonSerializer.Deserialize<T>(bytes, JsonOptions) ?? throw new InvalidDataException($"HS知识库内容无效：{name}。");
+
+                await using var stream = entry.Open();
+                return await JsonSerializer.DeserializeAsync<T>(
+                           stream,
+                           JsonOptions,
+                           cancellationToken).ConfigureAwait(false)
+                       ?? throw new InvalidDataException($"HS知识库内容无效：{name}。");
             }
             var codes = await ReadAndVerifyAsync<List<HsCode>>("hs-codes.json");
             var examples = await ReadAndVerifyAsync<List<HsCodeDeclarationExample>>("declaration-examples.json");

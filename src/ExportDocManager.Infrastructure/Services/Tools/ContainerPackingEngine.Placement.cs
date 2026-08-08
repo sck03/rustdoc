@@ -26,7 +26,8 @@ namespace ExportDocManager.Services.Tools
             IReadOnlyList<PlacedLoadUnit> placedUnits,
             ContainerDimensions container,
             ContainerPackingRules rules,
-            decimal remainingWeightCapacity)
+            decimal remainingWeightCapacity,
+            CancellationToken cancellationToken)
         {
             if (itemState.Height <= 0 || itemState.WeightPerLoad > remainingWeightCapacity)
             {
@@ -36,8 +37,10 @@ namespace ExportDocManager.Services.Tools
             PlacementCandidate? bestCandidate = null;
             foreach (var orientation in GetOrientations(itemState))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 foreach (var floorCandidate in GetFloorCandidates(itemState, orientation, planners, stacks, container, rules.EnforceCenterOfGravity))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     bestCandidate = TryUpdateBestCandidate(
                         bestCandidate,
                         floorCandidate,
@@ -48,6 +51,7 @@ namespace ExportDocManager.Services.Tools
 
                 foreach (var stackCandidate in GetStackCandidates(itemState, orientation, stacks, container, rules))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     bestCandidate = TryUpdateBestCandidate(
                         bestCandidate,
                         stackCandidate,
@@ -67,16 +71,20 @@ namespace ExportDocManager.Services.Tools
             ContainerDimensions container,
             ContainerPackingRules rules)
         {
-            var centerMetrics = CalculateCenterOfGravity(
-                placedUnits.Count == 0
-                    ? [candidate.Placement]
-                    : placedUnits.Concat([candidate.Placement]).ToList(),
-                container,
-                rules);
-
-            if (rules.EnforceCenterOfGravity && !centerMetrics.IsWithinTolerance)
+            CenterOfGravityMetrics centerMetrics = default;
+            if (rules.EnforceCenterOfGravity)
             {
-                return bestCandidate;
+                centerMetrics = CalculateCenterOfGravity(
+                    placedUnits.Count == 0
+                        ? [candidate.Placement]
+                        : placedUnits.Concat([candidate.Placement]).ToList(),
+                    container,
+                    rules);
+
+                if (!centerMetrics.IsWithinTolerance)
+                {
+                    return bestCandidate;
+                }
             }
 
             var scoredCandidate = candidate with

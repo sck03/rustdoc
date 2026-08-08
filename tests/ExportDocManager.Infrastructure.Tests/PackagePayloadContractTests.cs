@@ -58,6 +58,7 @@ public sealed class PackagePayloadContractTests
         string desktopScript = File.ReadAllText(Path.Combine(root, "scripts", "prepare-tauri-bundle.mjs"));
         string serverWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "browser-server-package-reusable.yml"));
         string dockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.api"));
+        string browserDockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.browser"));
         string webDockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.web"));
         string compose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.yml"));
         string ghcrCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.ghcr.yml"));
@@ -74,7 +75,12 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("ExportDocPackageProfile=Container", dockerfile, StringComparison.Ordinal);
         Assert.Contains("mcr.microsoft.com/dotnet/sdk:10.0.302-noble AS build", dockerfile, StringComparison.Ordinal);
         Assert.Contains("FROM debian:trixie-slim AS runtime", dockerfile, StringComparison.Ordinal);
-        Assert.Contains("        chromium-sandbox \\", dockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("        chromium \\", dockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("        chromium-sandbox \\", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("FROM debian:trixie-slim", browserDockerfile, StringComparison.Ordinal);
+        Assert.Contains("        chromium-sandbox \\", browserDockerfile, StringComparison.Ordinal);
+        Assert.Contains("test -u /usr/lib/chromium/chrome-sandbox", browserDockerfile, StringComparison.Ordinal);
+        Assert.Contains("USER 10001:10001", browserDockerfile, StringComparison.Ordinal);
         Assert.Contains("https://packages.microsoft.com/config/debian/13/packages-microsoft-prod.deb", dockerfile, StringComparison.Ordinal);
         Assert.Contains("dpkg -i /tmp/packages-microsoft-prod.deb", dockerfile, StringComparison.Ordinal);
         Assert.Contains("dpkg --purge packages-microsoft-prod", dockerfile, StringComparison.Ordinal);
@@ -101,10 +107,11 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("postgres:18.4-trixie", ghcrCompose, StringComparison.Ordinal);
         Assert.Contains("postgres:18.4-trixie", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("nginx:1.30.4-alpine3.24", containerRuntimeWorkflow, StringComparison.Ordinal);
-        Assert.Contains("Validate native Chromium PDF runtime", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("Validate isolated Chromium PDF runtime and capability boundary", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("--print-to-pdf", containerRuntimeWorkflow, StringComparison.Ordinal);
-        Assert.Contains("test \"${EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX:-}\" = \"false\"", containerRuntimeWorkflow, StringComparison.Ordinal);
-        Assert.Contains("test \"${EXPORTDOCMANAGER_CHROMIUM_DISABLE_DEV_SHM_USAGE:-}\" = \"false\"", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("EXPORTDOCMANAGER_BROWSER_CDP_ENDPOINT: http://browser:9222", compose, StringComparison.Ordinal);
+        Assert.Contains("EXPORTDOCMANAGER_BROWSER_CDP_ENDPOINT: http://browser:9222", ghcrCompose, StringComparison.Ordinal);
+        Assert.Contains("docker compose exec -T api sh -ec 'test ! -e /usr/bin/chromium'", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("\"global.json\"", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("\"Resources/**\"", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.DoesNotContain("postgres:18-bookworm", compose, StringComparison.Ordinal);
@@ -445,28 +452,31 @@ public sealed class PackagePayloadContractTests
     }
 
     [Fact]
-    public void ContainerApi_ShouldRunAsUnprivilegedUserWithChromiumSandboxEnabled()
+    public void ContainerBrowser_ShouldIsolateChromiumSandboxFromDatabaseCredentials()
     {
         string root = FindWorkspaceRoot();
-        string dockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.api"));
+        string apiDockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.api"));
+        string browserDockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.browser"));
         string localCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.yml"));
         string ghcrCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.ghcr.yml"));
-        const string setting = "EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX";
-        const string sharedMemorySetting = "EXPORTDOCMANAGER_CHROMIUM_DISABLE_DEV_SHM_USAGE";
 
-        Assert.Contains("USER 10001:10001", dockerfile, StringComparison.Ordinal);
-        Assert.Contains($"{setting}=false", dockerfile, StringComparison.Ordinal);
-        Assert.Contains($"{setting}: \"false\"", localCompose, StringComparison.Ordinal);
-        Assert.Contains($"{setting}: \"false\"", ghcrCompose, StringComparison.Ordinal);
-        Assert.Contains($"{sharedMemorySetting}=false", dockerfile, StringComparison.Ordinal);
-        Assert.Contains($"{sharedMemorySetting}: \"false\"", localCompose, StringComparison.Ordinal);
-        Assert.Contains($"{sharedMemorySetting}: \"false\"", ghcrCompose, StringComparison.Ordinal);
+        Assert.Contains("USER 10001:10001", apiDockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("chromium-sandbox", apiDockerfile, StringComparison.Ordinal);
+        Assert.Contains("USER 10001:10001", browserDockerfile, StringComparison.Ordinal);
+        Assert.Contains("chromium-sandbox", browserDockerfile, StringComparison.Ordinal);
+        Assert.Contains("EXPORTDOCMANAGER_BROWSER_CDP_ENDPOINT: http://browser:9222", localCompose, StringComparison.Ordinal);
+        Assert.Contains("EXPORTDOCMANAGER_BROWSER_CDP_ENDPOINT: http://browser:9222", ghcrCompose, StringComparison.Ordinal);
         Assert.Contains("shm_size: \"512mb\"", localCompose, StringComparison.Ordinal);
         Assert.Contains("shm_size: \"512mb\"", ghcrCompose, StringComparison.Ordinal);
+        Assert.Contains("cap_drop:\n      - ALL", localCompose.Replace("\r\n", "\n"), StringComparison.Ordinal);
+        Assert.Contains("cap_drop:\n      - ALL", ghcrCompose.Replace("\r\n", "\n"), StringComparison.Ordinal);
         Assert.Contains("cap_add:", localCompose, StringComparison.Ordinal);
         Assert.Contains("- SYS_ADMIN", localCompose, StringComparison.Ordinal);
         Assert.Contains("cap_add:", ghcrCompose, StringComparison.Ordinal);
         Assert.Contains("- SYS_ADMIN", ghcrCompose, StringComparison.Ordinal);
+        Assert.Contains("api-data/Cache/ReportPdf:/runtime-data/Cache/ReportPdf:ro", localCompose, StringComparison.Ordinal);
+        Assert.Contains("networks:\n      - browser", localCompose.Replace("\r\n", "\n"), StringComparison.Ordinal);
+        Assert.Contains("backend:\n    internal: true", localCompose.Replace("\r\n", "\n"), StringComparison.Ordinal);
     }
 
     [Fact]

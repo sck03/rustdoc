@@ -40,6 +40,18 @@ namespace ExportDocManager.Services.Infrastructure
         {
             try
             {
+                if (BrowserCdpEndpointPolicy.TryResolve(out Uri endpoint))
+                {
+                    return new RuntimeDependencyDiagnostic(
+                        "browser-automation",
+                        "受控网页自动化",
+                        "optional",
+                        "ready",
+                        true,
+                        endpoint.ToString().TrimEnd('/'),
+                        "Playwright 将连接隔离 Chromium 服务执行 HS 查询降级；浏览器容器不持有数据库维护凭据。");
+                }
+
                 string executablePath = _browserExecutableResolver.Resolve();
                 return new RuntimeDependencyDiagnostic(
                     "browser-automation",
@@ -50,7 +62,7 @@ namespace ExportDocManager.Services.Infrastructure
                     executablePath,
                     "Playwright 将通过受控 Chromium/CDP 连接执行 HS 查询降级；进程由应用登记、限流和退出清理。");
             }
-            catch (InfrastructureServiceException)
+            catch (ServiceException ex)
             {
                 return new RuntimeDependencyDiagnostic(
                     "browser-automation",
@@ -59,7 +71,7 @@ namespace ExportDocManager.Services.Infrastructure
                     "missing",
                     false,
                     Path.GetFullPath(_pathProvider.BrowserRoot),
-                    "未找到浏览器运行包；HS 本地库和静态 HTTP 查询仍可使用，只有动态网页降级不可用。");
+                    $"浏览器运行时配置不可用：{ex.Message} HS 本地库和静态 HTTP 查询仍可使用，只有动态网页降级不可用。");
             }
         }
 
@@ -67,6 +79,18 @@ namespace ExportDocManager.Services.Infrastructure
         {
             try
             {
+                if (BrowserCdpEndpointPolicy.TryResolve(out Uri endpoint))
+                {
+                    return new RuntimeDependencyDiagnostic(
+                        "report-renderer",
+                        "报表 PDF 浏览器",
+                        "feature",
+                        "ready",
+                        true,
+                        endpoint.ToString().TrimEnd('/'),
+                        "报表 PDF 将由隔离 Chromium 服务生成；临时报表目录以只读方式共享给浏览器容器。");
+                }
+
                 string executablePath = _browserExecutableResolver.Resolve();
                 return new RuntimeDependencyDiagnostic(
                     "report-renderer",
@@ -77,7 +101,7 @@ namespace ExportDocManager.Services.Infrastructure
                     executablePath,
                     "报表 PDF 浏览器可执行文件已就绪。");
             }
-            catch (InfrastructureServiceException)
+            catch (ServiceException ex)
             {
                 return new RuntimeDependencyDiagnostic(
                     "report-renderer",
@@ -86,7 +110,7 @@ namespace ExportDocManager.Services.Infrastructure
                     "missing",
                     false,
                     Path.GetFullPath(_pathProvider.BrowserRoot),
-                    "未找到随程序发布的浏览器运行包；HTML 预览仍可使用，但 PDF 生成不可用。");
+                    $"报表浏览器运行时配置不可用：{ex.Message} HTML 预览仍可使用，但 PDF 生成不可用。");
             }
         }
 

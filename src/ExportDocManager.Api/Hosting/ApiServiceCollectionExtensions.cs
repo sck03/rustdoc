@@ -89,7 +89,19 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IAuditLogService, AuditLogService>();
             services.AddScoped<IShutdownMaintenanceService, ShutdownMaintenanceService>();
             services.AddScoped<ISystemLogCleanupService, SystemLogCleanupService>();
-            services.AddHttpClient("ExchangeRates");
+            services.AddHttpClient("ExchangeRates", client =>
+                {
+                    client.Timeout = Timeout.InfiniteTimeSpan;
+                    client.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml");
+                })
+                .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+                {
+                    AllowAutoRedirect = false,
+                    AutomaticDecompression = System.Net.DecompressionMethods.All,
+                    ConnectCallback = ExchangeRateEndpointPolicy.ConnectPublicHostAsync,
+                    UseProxy = false,
+                    PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+                });
             services.AddHttpClient("AI");
             services.AddSingleton<IExchangeRateService>(provider =>
                 new BocExchangeRateService(

@@ -1,4 +1,6 @@
 using ExportDocManager.Models.DTOs;
+using ExportDocManager.Services.Errors;
+using ExportDocManager.Services.Tools;
 
 namespace ExportDocManager.Application.Tests
 {
@@ -63,6 +65,70 @@ namespace ExportDocManager.Application.Tests
             Assert.Equal(0x87, color.G);
             Assert.Equal(0xF5, color.B);
             Assert.Equal(unchecked((int)0xCC4287F5), color.ToArgb());
+        }
+
+        [Fact]
+        public void ResourcePolicy_ShouldRejectUnboundedPlacementWork()
+        {
+            var request = CreateRequest(
+                quantity: ContainerPackingResourcePolicy.MaximumPlacementUnits + 1,
+                usePallet: false,
+                unitsPerPallet: 1,
+                usePalletConstraints: false);
+
+            var error = Assert.Throws<ServiceValidationException>(
+                () => ContainerPackingResourcePolicy.Validate(request));
+
+            Assert.Contains("装载单元", error.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void ResourcePolicy_ShouldAllowLargePackageCountsWhenPalletizedIntoBoundedUnits()
+        {
+            var request = CreateRequest(
+                quantity: ContainerPackingResourcePolicy.MaximumTotalPackages,
+                usePallet: true,
+                unitsPerPallet: 1_000,
+                usePalletConstraints: true);
+
+            ContainerPackingResourcePolicy.Validate(request);
+        }
+
+        private static ContainerPackingRequest CreateRequest(
+            int quantity,
+            bool usePallet,
+            int unitsPerPallet,
+            bool usePalletConstraints)
+        {
+            return new ContainerPackingRequest(
+                new ContainerDimensions(1200, 235, 239, 67.4m, 28000m),
+                [
+                    new ContainerPackingCargoInput(
+                        "货物",
+                        60m,
+                        40m,
+                        40m,
+                        10m,
+                        quantity,
+                        ContainerPackingColor.FromRgb(66, 135, 245),
+                        usePallet,
+                        unitsPerPallet,
+                        0m,
+                        ContainerCargoZone.Auto,
+                        1,
+                        string.Empty)
+                ],
+                new ContainerPackingRules(
+                    AllowRotation: true,
+                    UsePalletConstraints: usePalletConstraints,
+                    DefaultPalletLength: 120,
+                    DefaultPalletWidth: 100,
+                    DefaultPalletHeight: 15,
+                    DefaultPalletWeight: 25m,
+                    EnforceCenterOfGravity: false,
+                    CenterOfGravityTolerancePercent: 20m,
+                    MinimumSupportAreaPercent: 70m,
+                    RequireSameFootprintStacking: false));
         }
     }
 }

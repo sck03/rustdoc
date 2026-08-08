@@ -77,10 +77,7 @@ FROM debian:trixie-slim AS runtime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
-        chromium \
-        chromium-sandbox \
         curl \
-        fonts-noto-cjk \
         libgomp1 \
         libunwind8 \
         tini \
@@ -131,9 +128,6 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:5188 \
     EXPORTDOCMANAGER_DATA_ROOT=/runtime-data \
     EXPORTDOCMANAGER_NETWORK_MODE=true \
     EXPORTDOCMANAGER_PRODUCT_EDITION=Full \
-    EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
-    EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX=false \
-    EXPORTDOCMANAGER_CHROMIUM_DISABLE_DEV_SHM_USAGE=false \
     EXPORTDOCMANAGER_OCR_RUNTIME=enabled \
     EXPORTDOCMANAGER_POSTGRES_BIN=/usr/lib/postgresql/18/bin \
     TZ=Asia/Shanghai

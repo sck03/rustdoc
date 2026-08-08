@@ -4,6 +4,10 @@ services:
   postgres:
     image: postgres:18.4-trixie
     restart: unless-stopped
+    cpus: "${EXPORTDOCMANAGER_POSTGRES_CPUS:-2.0}"
+    mem_limit: "${EXPORTDOCMANAGER_POSTGRES_MEMORY_LIMIT:-2g}"
+    pids_limit: ${EXPORTDOCMANAGER_POSTGRES_PIDS_LIMIT:-256}
+    stop_grace_period: 45s
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-exportdoc}
       POSTGRES_USER: ${POSTGRES_USER:-exportdoc}
@@ -23,18 +27,50 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    networks:
+      - backend
+
+  browser:
+    build:
+      context: ../..
+      dockerfile: deploy/container/Dockerfile.browser
+    restart: unless-stopped
+    cpus: "${EXPORTDOCMANAGER_BROWSER_CPUS:-1.5}"
+    mem_limit: "${EXPORTDOCMANAGER_BROWSER_MEMORY_LIMIT:-1536m}"
+    pids_limit: ${EXPORTDOCMANAGER_BROWSER_PIDS_LIMIT:-512}
+    stop_grace_period: 15s
+    cap_add:
+      - SYS_ADMIN
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    shm_size: "512mb"
+    volumes:
+      - ${EXPORTDOCMANAGER_RUNTIME_ROOT:-./runtime}/browser:/browser-data
+      - ${EXPORTDOCMANAGER_RUNTIME_ROOT:-./runtime}/api-data/Cache/ReportPdf:/runtime-data/Cache/ReportPdf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error --max-time 3 http://127.0.0.1:9222/json/version >/dev/null"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+      start_period: 10s
+    expose:
+      - "9222"
+    networks:
+      - browser
 
   api:
     build:
       context: ../..
       dockerfile: deploy/container/Dockerfile.api
     restart: unless-stopped
-    # Chromium keeps its Linux process sandbox enabled. Docker's default
-    # capability set blocks the PID/network namespace creation required by
-    # that sandbox, so grant only the documented sandbox capability instead
-    # of weakening the browser with --no-sandbox.
-    cap_add:
-      - SYS_ADMIN
+    cpus: "${EXPORTDOCMANAGER_API_CPUS:-2.0}"
+    mem_limit: "${EXPORTDOCMANAGER_API_MEMORY_LIMIT:-2g}"
+    pids_limit: ${EXPORTDOCMANAGER_API_PIDS_LIMIT:-512}
+    stop_grace_period: 60s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:5188
       EXPORTDOCMANAGER_NETWORK_MODE: "true"
@@ -46,8 +82,7 @@ services:
       EXPORTDOCMANAGER_MASTER_KEY: ${EXPORTDOCMANAGER_MASTER_KEY:-}
       EXPORTDOCMANAGER_PRODUCT_EDITION: Full
       EXPORTDOCMANAGER_DATA_ROOT: /runtime-data
-      EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX: "false"
-      EXPORTDOCMANAGER_CHROMIUM_DISABLE_DEV_SHM_USAGE: "false"
+      EXPORTDOCMANAGER_BROWSER_CDP_ENDPOINT: http://browser:9222
       EXPORTDOCMANAGER_ALLOWED_ORIGINS: ${EXPORTDOCMANAGER_ALLOWED_ORIGINS:-}
       EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY: ${EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY:-false}
       EXPORTDOCMANAGER_TRUSTED_PROXIES: "${EXPORTDOCMANAGER_REVERSE_PROXY_IP:?请先运行 initialize-container-runtime.ps1 或在 .env 中设置 EXPORTDOCMANAGER_REVERSE_PROXY_IP};${EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES:-}"
@@ -55,11 +90,14 @@ services:
       EXPORTDOCMANAGER_BROWSER_GLOBAL_CONCURRENCY: ${EXPORTDOCMANAGER_BROWSER_GLOBAL_CONCURRENCY:-2}
       EXPORTDOCMANAGER_BROWSER_PDF_CONCURRENCY: ${EXPORTDOCMANAGER_BROWSER_PDF_CONCURRENCY:-2}
       EXPORTDOCMANAGER_BROWSER_AUTOMATION_CONCURRENCY: ${EXPORTDOCMANAGER_BROWSER_AUTOMATION_CONCURRENCY:-1}
-    shm_size: "512mb"
+      EXPORTDOCMANAGER_CONTAINER_PACKING_CONCURRENCY: ${EXPORTDOCMANAGER_CONTAINER_PACKING_CONCURRENCY:-2}
+      EXPORTDOCMANAGER_CONTAINER_PACKING_TIMEOUT_SECONDS: ${EXPORTDOCMANAGER_CONTAINER_PACKING_TIMEOUT_SECONDS:-10}
     volumes:
       - ${EXPORTDOCMANAGER_RUNTIME_ROOT:-./runtime}/api-data:/runtime-data
     depends_on:
       postgres:
+        condition: service_healthy
+      browser:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent --show-error --max-time 3 http://127.0.0.1:5188/readyz >/dev/null"]
@@ -69,23 +107,34 @@ services:
       start_period: 10s
     expose:
       - "5188"
+    networks:
+      - frontend
+      - backend
+      - browser
 
   web:
     build:
       context: ../..
       dockerfile: deploy/container/Dockerfile.web
     restart: unless-stopped
+    cpus: "${EXPORTDOCMANAGER_WEB_CPUS:-0.5}"
+    mem_limit: "${EXPORTDOCMANAGER_WEB_MEMORY_LIMIT:-256m}"
+    pids_limit: ${EXPORTDOCMANAGER_WEB_PIDS_LIMIT:-128}
+    stop_grace_period: 15s
     ports:
       - "${EXPORTDOCMANAGER_WEB_BIND_ADDRESS:-127.0.0.1}:${EXPORTDOCMANAGER_WEB_PORT:-8080}:8080"
     depends_on:
       api:
         condition: service_healthy
     networks:
-      default:
+      frontend:
         ipv4_address: ${EXPORTDOCMANAGER_REVERSE_PROXY_IP:?请先运行 initialize-container-runtime.ps1 或在 .env 中设置 EXPORTDOCMANAGER_REVERSE_PROXY_IP}
 
 networks:
-  default:
+  frontend:
     ipam:
       config:
         - subnet: ${EXPORTDOCMANAGER_CONTAINER_SUBNET:?请先运行 initialize-container-runtime.ps1 或在 .env 中设置 EXPORTDOCMANAGER_CONTAINER_SUBNET}
+  backend:
+    internal: true
+  browser:

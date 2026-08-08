@@ -1,6 +1,6 @@
 # GitHub 开源发布与 Docker 镜像说明
 
-> 更新日期：2026-07-30
+> 更新日期：2026-08-08
 
 ## 1. 公开仓库边界
 
@@ -39,7 +39,7 @@ pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
 - `public-source-guard.yml`：当前只允许手工运行，检查公开边界、Action Node 24/Artifact 版本政策和 updater 信任契约。
 - `cross-platform-validation.yml`：只手工运行，检查 Windows、Linux、macOS 的 .NET/Web/Tauri 契约。
 - `browser-compatibility.yml`：Web/API 相关 push、PR 或手工运行；在真实 Firefox、WebKit 的桌面和手机视口检查登录、响应式分类、横向溢出、页面异常、HTTP 500 和严重无障碍问题。
-- `container-images.yml`：只手工运行；启动时填写版本号并选择是否更新 `latest`，随后构建 `linux/amd64`、`linux/arm64` 的 API/Web 镜像并发布到 GHCR。
+- `container-images.yml`：只手工运行；启动时填写版本号并选择是否更新 `latest`，随后构建 `linux/amd64`、`linux/arm64` 的 API/Browser/Web 三个镜像并发布到 GHCR。
 - `windows-desktop-package.yml`：只手工运行；选择版本和 Document/Sales/Full，构建 Windows x64 NSIS 安装包。
 - `linux-desktop-package.yml`：只手工运行；选择版本、产品版本和 x64/ARM64 架构，构建对应 deb/AppImage。
 - `macos-desktop-package.yml`：只手工运行；选择版本和产品版本，固定构建 Apple Silicon ARM64 macOS dmg，并内置官方 `mac-arm64` Chrome Headless Shell。
@@ -62,6 +62,7 @@ pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
 
 ```text
 ghcr.io/<github-owner>/export-doc-manager-api:<tag>
+ghcr.io/<github-owner>/export-doc-manager-browser:<tag>
 ghcr.io/<github-owner>/export-doc-manager-web:<tag>
 ```
 
@@ -73,7 +74,7 @@ ghcr.io/<github-owner>/export-doc-manager-web:<tag>
 
 ```dotenv
 EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/你的github账号
-EXPORTDOCMANAGER_IMAGE_TAG=latest
+EXPORTDOCMANAGER_IMAGE_TAG=0.1.2
 ```
 
 初始化运行目录并启动（初始化脚本会自动选择不与宿主机接口、路由表和 Docker 网络重叠的紧凑 `/28`；企业 VPN 有大范围路由时可用 `-ContainerSubnet/-ReverseProxyIp` 显式指定 `/24` 至 `/28`）：
@@ -83,7 +84,7 @@ pwsh -NoProfile -File deploy/container/initialize-container-runtime.ps1
 docker compose -f deploy/container/docker-compose.ghcr.yml --env-file deploy/container/.env up -d
 ```
 
-数据库、配置、日志、缓存和导出任务全部位于 `EXPORTDOCMANAGER_RUNTIME_ROOT` 指定目录，默认是 `deploy/container/runtime/`，不会写入源码仓库，也不依赖系统 C 盘用户目录。
+数据库、配置、日志、缓存和导出任务全部位于 `EXPORTDOCMANAGER_RUNTIME_ROOT` 指定目录，默认是 `deploy/container/runtime/`，不会写入源码仓库，也不依赖系统 C 盘用户目录。隔离 Browser 的可重建 profile/缓存位于 `runtime/browser/`；API 临时报表目录以只读方式共享给 Browser，数据库 secrets 和 backend 网络不会进入 Browser 容器。正式部署应使用已发布的精确版本标签，不使用可变 `latest`。
 
 ## 5. 是否可从 GitHub 网页直接上传
 

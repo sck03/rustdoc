@@ -60,7 +60,22 @@
       "name": "HS API endpoint modules",
       "directory": "src/ExportDocManager.Api/Hosting",
       "filePattern": "^ApiMasterDataHsCode.*EndpointRouteBuilderExtensions\\.cs$",
-      "maximumLines": 950
+      "maximumLines": 520,
+      "maximumAggregateLines": 1700
+    },
+    {
+      "name": "Tauri desktop command modules",
+      "directory": "apps/export-doc-tauri/src-tauri/src",
+      "filePattern": "^desktop_(?:commands|file_dialog_commands|open_commands|pdf_commands)\\.rs$",
+      "maximumLines": 500,
+      "maximumAggregateLines": 1200
+    },
+    {
+      "name": "Tauri runtime path modules",
+      "directory": "apps/export-doc-tauri/src-tauri/src",
+      "filePattern": "^runtime_(?:paths|paths_config|paths_tests|sidecar_path)\\.rs$",
+      "maximumLines": 900,
+      "maximumAggregateLines": 1500
     },
     {
       "name": "OpenAPI document modules",

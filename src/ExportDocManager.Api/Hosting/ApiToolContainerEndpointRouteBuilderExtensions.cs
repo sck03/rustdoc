@@ -10,7 +10,7 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapContainerPackingToolEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapPost("/api/tools/container-packing/analyze", (
+            endpoints.MapPost("/api/tools/container-packing/analyze", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IContainerPackingEngine packingEngine,
@@ -30,7 +30,9 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    var analysis = packingEngine.Analyze(packingRequest, cancellationToken);
+                    var analysis = await packingEngine
+                        .AnalyzeAsync(packingRequest, cancellationToken)
+                        .ConfigureAwait(false);
                     return Results.Ok(ApiContainerPackingDtoFactory.FromAnalysis(analysis));
                 }
                 catch (OperationCanceledException)
@@ -38,6 +40,10 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Json(
                         new ApiErrorResponse("装箱分析已取消。"),
                         statusCode: StatusCodes.Status499ClientClosedRequest);
+                }
+                catch (ServiceException ex)
+                {
+                    return WriteServiceException(ex);
                 }
             })
             .WithName("AnalyzeContainerPacking");
@@ -296,6 +302,15 @@ namespace ExportDocManager.Api.Hosting
             }
 
             packingRequest = ApiContainerPackingDtoFactory.ToRequest(request);
+            try
+            {
+                ContainerPackingResourcePolicy.Validate(packingRequest);
+            }
+            catch (ServiceValidationException ex)
+            {
+                packingRequest = null;
+                return Results.BadRequest(new ApiErrorResponse(ex.Message));
+            }
             return null;
         }
 
@@ -343,6 +358,19 @@ namespace ExportDocManager.Api.Hosting
                 }
             }
 
+            try
+            {
+                ContainerPackingResourcePolicy.Validate(
+                    ApiContainerPackingDtoFactory.ToRequest(
+                        request.Container,
+                        request.CargoItems,
+                        request.Rules));
+            }
+            catch (ServiceValidationException ex)
+            {
+                return Results.BadRequest(new ApiErrorResponse(ex.Message));
+            }
+
             return null;
         }
 
@@ -366,6 +394,20 @@ namespace ExportDocManager.Api.Hosting
             if (request.Length <= 0 || request.Width <= 0 || request.Height <= 0)
             {
                 return Results.BadRequest(new ApiErrorResponse("柜型长、宽、高必须大于 0。"));
+            }
+
+            try
+            {
+                ContainerPackingResourcePolicy.ValidateContainer(new ContainerDimensions(
+                    request.Length,
+                    request.Width,
+                    request.Height,
+                    request.MaxVolume,
+                    request.MaxWeight));
+            }
+            catch (ServiceValidationException ex)
+            {
+                return Results.BadRequest(new ApiErrorResponse(ex.Message));
             }
 
             return null;

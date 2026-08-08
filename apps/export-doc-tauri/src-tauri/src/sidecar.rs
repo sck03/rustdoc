@@ -21,6 +21,8 @@ pub(crate) const DESKTOP_ACCESS_TOKEN_ENV: &str = "EXPORTDOCMANAGER_DESKTOP_TOKE
 const SHUTDOWN_MAINTENANCE_PATH: &str = "/api/system/shutdown-maintenance";
 const MAX_SHUTDOWN_RESPONSE_BYTES: u64 = 1024 * 1024;
 const MAX_ENDPOINT_PUBLICATION_BYTES: u64 = 4096;
+const GRACEFUL_PROCESS_EXIT_TIMEOUT: Duration = Duration::from_secs(15);
+const FORCED_PROCESS_EXIT_TIMEOUT: Duration = Duration::from_secs(3);
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -84,8 +86,8 @@ pub(crate) fn start_sidecar(paths: &RuntimePaths) -> Result<SidecarLaunch, Box<d
     let endpoint_file = create_sidecar_endpoint_file(paths)?;
     let stdout_log_path = paths.log_root.join("api-sidecar.stdout.log");
     let stderr_log_path = paths.log_root.join("api-sidecar.stderr.log");
-    let mut stdout_log = crate::log_rotation::open_append_log_file(&stdout_log_path)?;
-    let mut stderr_log = crate::log_rotation::open_append_log_file(&stderr_log_path)?;
+    let mut stdout_log = crate::log_rotation::RotatingLogWriter::open(&stdout_log_path)?;
+    let mut stderr_log = crate::log_rotation::RotatingLogWriter::open(&stderr_log_path)?;
 
     write_sidecar_launch_marker(&mut stdout_log, listen_url, paths)?;
     write_sidecar_launch_marker(&mut stderr_log, listen_url, paths)?;
@@ -105,14 +107,21 @@ pub(crate) fn start_sidecar(paths: &RuntimePaths) -> Result<SidecarLaunch, Box<d
         .env("EXPORTDOCMANAGER_DATA_ROOT", &paths.data_root)
         .env(DESKTOP_ACCESS_TOKEN_ENV, &desktop_access_token)
         .stdin(Stdio::null())
-        .stdout(Stdio::from(stdout_log))
-        .stderr(Stdio::from(stderr_log));
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
 
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
-        command.creation_flags(CREATE_NO_WINDOW);
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+        command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
     }
 
     let mut child = match command.spawn() {
@@ -127,14 +136,24 @@ pub(crate) fn start_sidecar(paths: &RuntimePaths) -> Result<SidecarLaunch, Box<d
         }
     };
 
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "API sidecar stdout pipe was not created.".to_owned())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "API sidecar stderr pipe was not created.".to_owned())?;
+    spawn_log_pump(stdout, stdout_log, "stdout");
+    spawn_log_pump(stderr, stderr_log, "stderr");
+
     let api_base_url =
         wait_for_endpoint_and_health(&mut child, &endpoint_file, Duration::from_secs(20));
     let _ = fs::remove_file(&endpoint_file);
     let api_base_url = match api_base_url {
         Ok(value) => value,
         Err(error) => {
-            let _ = child.kill();
-            let _ = child.wait();
+            terminate_child_tree(&mut child);
             return Err(format!(
                 "{error}. See sidecar logs: '{}' and '{}'.",
                 stdout_log_path.display(),
@@ -170,8 +189,9 @@ pub(crate) fn stop_sidecar(app: &tauri::AppHandle) {
             .store(true, Ordering::Release);
         if let Ok(mut child) = state.child.lock() {
             if let Some(mut process) = child.take() {
-                let _ = process.kill();
-                let _ = process.wait();
+                if !wait_for_child_exit(&mut process, GRACEFUL_PROCESS_EXIT_TIMEOUT) {
+                    terminate_child_tree(&mut process);
+                }
             }
         }
     }
@@ -227,8 +247,8 @@ pub(crate) fn get_desktop_runtime_context(
     state.runtime_context()
 }
 
-fn write_sidecar_launch_marker(
-    log: &mut fs::File,
+fn write_sidecar_launch_marker<W: Write>(
+    log: &mut W,
     listen_url: &str,
     paths: &RuntimePaths,
 ) -> Result<(), Box<dyn Error>> {
@@ -239,6 +259,93 @@ fn write_sidecar_launch_marker(
         paths.data_root.display()
     )
     .map_err(|error| format!("Failed to write sidecar launch marker: {error}").into())
+}
+
+fn spawn_log_pump<R>(
+    reader: R,
+    writer: crate::log_rotation::RotatingLogWriter,
+    stream_name: &'static str,
+) where
+    R: Read + Send + 'static,
+{
+    thread::spawn(move || {
+        if let Err(error) = crate::log_rotation::copy_to_rotating_log(reader, writer) {
+            eprintln!("API sidecar {stream_name} log pump failed: {error}");
+        }
+    });
+}
+
+fn wait_for_child_exit(child: &mut Child, timeout: Duration) -> bool {
+    let deadline = Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return true,
+            Ok(None) if Instant::now() < deadline => {
+                thread::sleep(Duration::from_millis(50));
+            }
+            Ok(None) | Err(_) => return false,
+        }
+    }
+}
+
+#[cfg(windows)]
+fn terminate_child_tree(child: &mut Child) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+    if child.try_wait().ok().flatten().is_none() {
+        let _ = Command::new("taskkill")
+            .args(["/PID", &child.id().to_string(), "/T", "/F"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    if !wait_for_child_exit(child, FORCED_PROCESS_EXIT_TIMEOUT) {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+}
+
+#[cfg(unix)]
+fn terminate_child_tree(child: &mut Child) {
+    unsafe extern "C" {
+        fn kill(pid: i32, signal: i32) -> i32;
+    }
+    const SIGTERM: i32 = 15;
+    const SIGKILL: i32 = 9;
+
+    if child.try_wait().ok().flatten().is_some() {
+        return;
+    }
+    let Ok(process_group_id) = i32::try_from(child.id()) else {
+        let _ = child.kill();
+        let _ = child.wait();
+        return;
+    };
+
+    // The sidecar is launched as its own process group, so a negative pid
+    // reaches the API and any helper/browser processes it has not yet reaped.
+    unsafe {
+        let _ = kill(-process_group_id, SIGTERM);
+    }
+    if wait_for_child_exit(child, FORCED_PROCESS_EXIT_TIMEOUT) {
+        return;
+    }
+    unsafe {
+        let _ = kill(-process_group_id, SIGKILL);
+    }
+    if !wait_for_child_exit(child, FORCED_PROCESS_EXIT_TIMEOUT) {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+}
+
+#[cfg(not(any(windows, unix)))]
+fn terminate_child_tree(child: &mut Child) {
+    let _ = child.kill();
+    let _ = child.wait();
 }
 
 fn create_sidecar_endpoint_file(paths: &RuntimePaths) -> Result<PathBuf, Box<dyn Error>> {

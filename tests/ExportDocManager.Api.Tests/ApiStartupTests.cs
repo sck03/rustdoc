@@ -1918,16 +1918,22 @@ namespace ExportDocManager.Api.Tests
             {
                 JobId = "failed",
                 Title = "失败",
-                Status = BackgroundJobStatusCatalog.Failed,
+                Status = BackgroundJobStatusCatalog.Running,
                 CreatedAt = DateTimeOffset.UtcNow
             });
             service.Upsert(new BackgroundJobSnapshot
             {
                 JobId = "succeeded",
                 Title = "成功",
-                Status = BackgroundJobStatusCatalog.Succeeded,
+                Status = BackgroundJobStatusCatalog.Running,
                 CreatedAt = DateTimeOffset.UtcNow
             });
+            service.Update("failed", current => CopyJobState(current, current.Status, 10));
+            service.Update("succeeded", current => CopyJobState(current, current.Status, 20));
+            service.Update("failed", current => CopyJobState(current, BackgroundJobStatusCatalog.Failed, current.ProgressPercent));
+            service.Update("succeeded", current => CopyJobState(current, BackgroundJobStatusCatalog.Succeeded, current.ProgressPercent));
+
+            Assert.Equal(2, service.PersistThrottleEntryCount);
 
             bool deleteRunning = await service.DeleteAsync("running");
             bool deleteFailed = await service.DeleteAsync("failed");
@@ -1939,6 +1945,35 @@ namespace ExportDocManager.Api.Tests
             Assert.NotNull(await service.GetAsync("running"));
             Assert.Null(await service.GetAsync("failed"));
             Assert.Null(await service.GetAsync("succeeded"));
+            Assert.Equal(0, service.PersistThrottleEntryCount);
+        }
+
+        private static BackgroundJobSnapshot CopyJobState(
+            BackgroundJobSnapshot current,
+            string status,
+            int? progressPercent)
+        {
+            return new BackgroundJobSnapshot
+            {
+                JobId = current.JobId,
+                Kind = current.Kind,
+                Title = current.Title,
+                Status = status,
+                ProgressPercent = progressPercent,
+                StatusText = current.StatusText,
+                DetailText = current.DetailText,
+                RequestedBy = current.RequestedBy,
+                RequestedByUserId = current.RequestedByUserId,
+                CreatedAt = current.CreatedAt,
+                StartedAt = current.StartedAt,
+                CompletedAt = current.CompletedAt,
+                OutputPath = current.OutputPath,
+                ErrorMessage = current.ErrorMessage,
+                CanCancel = current.CanCancel,
+                CanRetry = current.CanRetry,
+                RetryOperation = current.RetryOperation,
+                RetryRequestJson = current.RetryRequestJson
+            };
         }
 
         [Fact]

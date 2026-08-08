@@ -1,8 +1,10 @@
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Services.Tools;
+using ExportDocManager.Utils;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 
@@ -47,6 +49,12 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 builder.Services.AddExportDocManagerApiServices(pathProvider, databaseSettings, runtimeOptions);
 
 await using var app = builder.Build();
+if (args.Any(value => string.Equals(value, "--verify-browser-runtime", StringComparison.OrdinalIgnoreCase)))
+{
+    await VerifyBrowserRuntimeAsync(app.Services, pathProvider);
+    return;
+}
+
 app.UseExportDocManagerForwardedHeaders(runtimeOptions);
 app.UseExportDocManagerApiSafety();
 app.UseCors(ApiCorsPolicy.LocalFrontendPolicyName);
@@ -69,6 +77,46 @@ try
 finally
 {
     ApiEndpointPublication.Remove(runtimeOptions.EndpointFile);
+}
+
+static async Task VerifyBrowserRuntimeAsync(
+    IServiceProvider services,
+    IAppPathProvider pathProvider)
+{
+    string verificationRoot = Path.Combine(
+        pathProvider.CacheRoot,
+        "BrowserRuntimeVerification",
+        Guid.NewGuid().ToString("N"));
+    string destinationPath = Path.Combine(verificationRoot, "probe.pdf");
+    try
+    {
+        Directory.CreateDirectory(verificationRoot);
+        using IServiceScope scope = services.CreateScope();
+        var renderer = scope.ServiceProvider.GetRequiredService<IHtmlToPdfService>();
+        var result = await renderer.RenderAsync(
+                "<!doctype html><html><head><meta charset=\"utf-8\"></head>" +
+                "<body><h1>ExportDocManager Browser Runtime</h1>" +
+                "<p>Remote CDP PDF bridge validation</p></body></html>",
+                destinationPath,
+                new HtmlToPdfRenderOptions { DocumentTitle = "ExportDocManager Browser Runtime" })
+            .ConfigureAwait(false);
+
+        using var pdf = File.OpenRead(destinationPath);
+        Span<byte> signature = stackalloc byte[5];
+        int read = pdf.Read(signature);
+        if (read != signature.Length ||
+            !signature.SequenceEqual("%PDF-"u8))
+        {
+            throw new InvalidDataException("Browser runtime did not produce a valid PDF signature.");
+        }
+
+        Console.WriteLine(
+            $"Browser runtime verification passed. Renderer={result.RendererPath}; Bytes={pdf.Length}");
+    }
+    finally
+    {
+        AtomicFileHelper.TryDeleteDirectory(verificationRoot);
+    }
 }
 
 public partial class Program

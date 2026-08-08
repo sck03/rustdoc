@@ -132,6 +132,5 @@ namespace ExportDocManager.Services.MasterData
         internal static string BuildFingerprint(params string[] values) =>
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("|", values.Select(value => (value ?? string.Empty).Trim().ToUpperInvariant())))));
 
-        private static string Sha256(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
     }
 }

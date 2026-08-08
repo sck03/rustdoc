@@ -953,13 +953,8 @@ namespace ExportDocManager.Infrastructure.Tests
             string root = Path.GetDirectoryName(executablePath)!;
             Directory.CreateDirectory(root);
             File.WriteAllText(executablePath, "test-browser");
-            foreach (string fileName in new[]
-            {
-                "icudtl.dat",
-                "v8_context_snapshot.bin",
-                "headless_lib_data.pak",
-                "headless_lib_strings.pak"
-            })
+            foreach (string fileName in BrowserExecutableResolver.GetRequiredHeadlessShellFiles(
+                         BrowserExecutableResolver.GetRuntimePlatform()))
             {
                 File.WriteAllText(Path.Combine(root, fileName), "test-resource");
             }

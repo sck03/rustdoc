@@ -267,13 +267,7 @@ namespace ExportDocManager.Services.BrowserRuntime
         private static void ValidateHeadlessShellBundle(string executablePath)
         {
             string root = Path.GetDirectoryName(executablePath)!;
-            string[] requiredFiles =
-            {
-                "icudtl.dat",
-                "v8_context_snapshot.bin",
-                "headless_lib_data.pak",
-                "headless_lib_strings.pak"
-            };
+            IReadOnlyList<string> requiredFiles = GetRequiredHeadlessShellFiles(GetRuntimePlatform());
             string missing = requiredFiles.FirstOrDefault(file =>
             {
                 string path = Path.Combine(root, file);
@@ -296,6 +290,24 @@ namespace ExportDocManager.Services.BrowserRuntime
             // version.dll is missing is therefore treated as a loader/sandbox
             // startup failure and caught by the version probe, not "fixed" by
             // copying an arbitrary DLL beside the executable.
+        }
+
+        internal static IReadOnlyList<string> GetRequiredHeadlessShellFiles(string runtimePlatform)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(runtimePlatform);
+            string snapshotFile = runtimePlatform.ToLowerInvariant() switch
+            {
+                "mac-arm64" => "v8_context_snapshot.arm64.bin",
+                "mac-x64" => "v8_context_snapshot.x86_64.bin",
+                _ => "v8_context_snapshot.bin"
+            };
+            return
+            [
+                "icudtl.dat",
+                snapshotFile,
+                "headless_lib_data.pak",
+                "headless_lib_strings.pak"
+            ];
         }
 
         private static void ProbeVersion(string executablePath)

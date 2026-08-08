@@ -28,6 +28,7 @@ namespace ExportDocManager.Services.BrowserRuntime
         private string _profileRoot;
         private string _artifactsRoot;
         private DateTimeOffset _startedAt;
+        private bool _remoteBrowser;
         private int _useCount;
         private int _activeOperations;
         private bool _recycleRequested;
@@ -53,6 +54,12 @@ namespace ExportDocManager.Services.BrowserRuntime
         {
             try
             {
+                if (BrowserCdpEndpointPolicy.TryResolve(out Uri endpoint))
+                {
+                    return $"隔离浏览器服务已配置：{endpoint.GetLeftPart(UriPartial.Authority)}；" +
+                           "Chromium 与数据库维护凭据不在同一进程。";
+                }
+
                 string executable = _resolver.Resolve();
                 string sandboxState = ChromiumSandboxPolicy.ResolveNoSandboxSetting()
                     ? "已进入旧版系统/显式配置兼容模式"
@@ -142,8 +149,12 @@ namespace ExportDocManager.Services.BrowserRuntime
             }
             catch
             {
-                if (_process == null || _process.HasExited || _browser == null || !_browser.IsConnected)
+                if (_browser == null ||
+                    !_browser.IsConnected ||
+                    (!_remoteBrowser && (_process == null || _process.HasExited)))
+                {
                     recycleBrowser = true;
+                }
                 throw;
             }
             finally
@@ -179,7 +190,9 @@ namespace ExportDocManager.Services.BrowserRuntime
                     _recycleRequested = false;
                 }
 
-                if (_browser == null || !_browser.IsConnected || _process == null || _process.HasExited)
+                bool localProcessUnavailable =
+                    !_remoteBrowser && (_process == null || _process.HasExited);
+                if (_browser == null || !_browser.IsConnected || localProcessUnavailable)
                 {
                     await StopBrowserCoreAsync().ConfigureAwait(false);
                     await StartBrowserCoreAsync(workload, cancellationToken).ConfigureAwait(false);
@@ -229,7 +242,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             BrowserWorkloadKind workload,
             CancellationToken cancellationToken)
         {
-            const int maximumAttempts = 2;
+            int maximumAttempts = BrowserCdpEndpointPolicy.TryResolve(out _) ? 5 : 2;
             Exception lastTransientError = null;
             for (int attempt = 1; attempt <= maximumAttempts; attempt++)
             {
@@ -248,7 +261,8 @@ namespace ExportDocManager.Services.BrowserRuntime
                     await StopBrowserCoreAsync().ConfigureAwait(false);
                     if (attempt < maximumAttempts)
                     {
-                        await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+                        await Task.Delay(TimeSpan.FromMilliseconds(250 * attempt), cancellationToken)
+                            .ConfigureAwait(false);
                     }
                 }
                 catch (ServiceException)
@@ -275,6 +289,16 @@ namespace ExportDocManager.Services.BrowserRuntime
         {
             TimeSpan startupTimeout = TimeSpan.FromSeconds(
                 ReadPositiveInt(StartupTimeoutEnvironmentVariable, 15, 5, 60));
+            if (BrowserCdpEndpointPolicy.TryResolve(out Uri remoteEndpoint))
+            {
+                await ConnectRemoteBrowserCoreAsync(
+                        remoteEndpoint,
+                        startupTimeout,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                return;
+            }
+
             string executable = _resolver.Resolve();
             string runDirectoryName = $"p-{Environment.ProcessId}-{Guid.NewGuid():N}"[..20];
             _profileRoot = Path.Combine(_pathProvider.CacheRoot, "Br", runDirectoryName);
@@ -333,7 +357,35 @@ namespace ExportDocManager.Services.BrowserRuntime
                     })
                 .WaitAsync(startupTimeout, cancellationToken)
                 .ConfigureAwait(false);
-            _startedAt = DateTimeOffset.Now;
+            _remoteBrowser = false;
+            _startedAt = DateTimeOffset.UtcNow;
+            _useCount = 0;
+        }
+
+        private async Task ConnectRemoteBrowserCoreAsync(
+            Uri endpoint,
+            TimeSpan startupTimeout,
+            CancellationToken cancellationToken)
+        {
+            string runDirectoryName = $"p-{Environment.ProcessId}-{Guid.NewGuid():N}"[..20];
+            _profileRoot = null;
+            _artifactsRoot = Path.Combine(_pathProvider.CacheRoot, "Ba", runDirectoryName);
+            Directory.CreateDirectory(_artifactsRoot);
+            _playwright = await Playwright.CreateAsync()
+                .WaitAsync(startupTimeout, cancellationToken)
+                .ConfigureAwait(false);
+            _browser = await _playwright.Chromium.ConnectOverCDPAsync(
+                    endpoint.ToString(),
+                    new BrowserTypeConnectOverCDPOptions
+                    {
+                        ArtifactsDir = _artifactsRoot,
+                        IsLocal = false,
+                        Timeout = (float)startupTimeout.TotalMilliseconds
+                    })
+                .WaitAsync(startupTimeout, cancellationToken)
+                .ConfigureAwait(false);
+            _remoteBrowser = true;
+            _startedAt = DateTimeOffset.UtcNow;
             _useCount = 0;
         }
 
@@ -447,10 +499,15 @@ namespace ExportDocManager.Services.BrowserRuntime
 
         private bool ShouldRecycle()
         {
-            if (_browser == null) return false;
+            if (_browser == null || _remoteBrowser)
+            {
+                return false;
+            }
+
             int maxUses = ReadPositiveInt(RecycleUsesEnvironmentVariable, 100, 1, 1000);
             int maxMinutes = ReadPositiveInt(RecycleMinutesEnvironmentVariable, 30, 1, 240);
-            return Volatile.Read(ref _useCount) >= maxUses || DateTimeOffset.Now - _startedAt >= TimeSpan.FromMinutes(maxMinutes);
+            return Volatile.Read(ref _useCount) >= maxUses ||
+                   DateTimeOffset.UtcNow - _startedAt >= TimeSpan.FromMinutes(maxMinutes);
         }
 
         private void CleanupStaleProfiles()
@@ -535,6 +592,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             }
             _playwright?.Dispose();
             _playwright = null;
+            _remoteBrowser = false;
             await DeleteRuntimeDirectoryAsync(_profileRoot).ConfigureAwait(false);
             await DeleteRuntimeDirectoryAsync(_artifactsRoot).ConfigureAwait(false);
             _profileRoot = null;

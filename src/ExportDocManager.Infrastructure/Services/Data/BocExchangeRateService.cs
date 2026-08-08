@@ -1,22 +1,24 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 using ExportDocManager.Models;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
-using Serilog;
 
 namespace ExportDocManager.Services.Data
 {
     public class BocExchangeRateService : IExchangeRateService, IDisposable
     {
-        private const string DefaultUrl = "https://www.boc.cn/sourcedb/whpj/";
         private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
         private const long MaximumResponseBytes = 5L * 1024L * 1024L;
+        private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(30);
 
         private readonly ISettingsService _settingsService;
         private readonly HttpClient _httpClient;
@@ -27,14 +29,26 @@ namespace ExportDocManager.Services.Data
         private List<ExchangeRateInfo> _cachedRates;
         private string _cachedRatesSignature = string.Empty;
         private DateTime _lastFetchTime = DateTime.MinValue;
+        private readonly Func<string, CancellationToken, Task<IPAddress[]>> _resolveHostAsync;
+        private readonly TimeSpan _requestTimeout;
 
-        public BocExchangeRateService(ISettingsService settingsService, HttpClient httpClient)
+        public BocExchangeRateService(
+            ISettingsService settingsService,
+            HttpClient httpClient,
+            Func<string, CancellationToken, Task<IPAddress[]>> resolveHostAsync = null,
+            TimeSpan? requestTimeout = null)
         {
             ArgumentNullException.ThrowIfNull(settingsService);
             ArgumentNullException.ThrowIfNull(httpClient);
 
             _settingsService = settingsService;
             _httpClient = httpClient;
+            _resolveHostAsync = resolveHostAsync ?? ((host, token) => Dns.GetHostAddressesAsync(host, token));
+            _requestTimeout = requestTimeout ?? DefaultRequestTimeout;
+            if (_requestTimeout <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(requestTimeout));
+            }
         }
 
         public void ClearCache()
@@ -47,49 +61,41 @@ namespace ExportDocManager.Services.Data
             }
         }
 
-        public async Task<decimal?> GetUsdCnyBuyingRateAsync()
+        public async Task<decimal?> GetUsdCnyBuyingRateAsync(CancellationToken cancellationToken = default)
         {
-            var rates = await GetExchangeRatesAsync();
+            var rates = await GetExchangeRatesAsync(cancellationToken);
             if (rates == null) return null;
             
             var usdRate = rates.FirstOrDefault(r => r.CurrencyName == "美元");
             return usdRate?.BuyingRate;
         }
 
-        public async Task<List<string>> GetAvailableCurrenciesAsync()
+        public async Task<List<string>> GetAvailableCurrenciesAsync(CancellationToken cancellationToken = default)
         {
-            try
+            var rows = await LoadRowsAsync(GetExchangeRateUrl(), cancellationToken);
+            if (rows == null)
             {
-                var rows = await LoadRowsAsync(GetExchangeRateUrl());
-                if (rows != null)
-                {
-                    var currencies = new HashSet<string>();
-                    foreach (var row in rows)
-                    {
-                        var cells = row.SelectNodes("td");
-                        if (cells != null && cells.Count >= 6)
-                        {
-                            var currencyName = cells[0].InnerText.Trim();
-                            if (!string.IsNullOrEmpty(currencyName) && currencyName != "货币名称")
-                            {
-                                currencies.Add(currencyName);
-                            }
-                        }
-                    }
+                return [];
+            }
 
-                    return currencies.OrderBy(c => c).ToList();
+            var currencies = new HashSet<string>();
+            foreach (var row in rows)
+            {
+                var cells = row.SelectNodes("td");
+                if (cells != null && cells.Count >= 6)
+                {
+                    var currencyName = cells[0].InnerText.Trim();
+                    if (!string.IsNullOrEmpty(currencyName) && currencyName != "货币名称")
+                    {
+                        currencies.Add(currencyName);
+                    }
                 }
             }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Error fetching available currencies");
-                System.Diagnostics.Debug.WriteLine($"Error fetching available currencies: {ex.Message}");
-            }
 
-            return new List<string>();
+            return currencies.OrderBy(c => c).ToList();
         }
 
-        public async Task<List<ExchangeRateInfo>> GetExchangeRatesAsync()
+        public async Task<List<ExchangeRateInfo>> GetExchangeRatesAsync(CancellationToken cancellationToken = default)
         {
             var cacheDuration = Math.Max(0, _settingsService.Settings.ExchangeRate.CacheDurationMinutes);
             var configuredCurrencies = GetConfiguredCurrencies();
@@ -104,7 +110,7 @@ namespace ExportDocManager.Services.Data
                 return cachedRates;
             }
 
-            await _cacheRefreshLock.WaitAsync();
+            await _cacheRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
                 if (TryGetCachedRates(cacheDuration, cacheSignature, out cachedRates))
@@ -112,7 +118,7 @@ namespace ExportDocManager.Services.Data
                     return cachedRates;
                 }
 
-                var rows = await LoadRowsAsync(GetExchangeRateUrl());
+                var rows = await LoadRowsAsync(GetExchangeRateUrl(), cancellationToken);
                 if (rows == null)
                 {
                     return null;
@@ -158,12 +164,6 @@ namespace ExportDocManager.Services.Data
                     return CloneRates(orderedRates);
                 }
             }
-            catch (Exception ex)
-            {
-                // Log error if logging system exists
-                Log.Error(ex, "Error fetching exchange rate");
-                System.Diagnostics.Debug.WriteLine($"Error fetching exchange rate: {ex.Message}");
-            }
             finally
             {
                 _cacheRefreshLock.Release();
@@ -175,7 +175,7 @@ namespace ExportDocManager.Services.Data
         private string GetExchangeRateUrl()
         {
             var url = _settingsService.Settings.ExchangeRate.Url;
-            return string.IsNullOrWhiteSpace(url) ? DefaultUrl : url;
+            return ExchangeRateEndpointPolicy.Normalize(url).ToString();
         }
 
         private List<string> GetConfiguredCurrencies()
@@ -190,33 +190,86 @@ namespace ExportDocManager.Services.Data
             return currencies?.Distinct(StringComparer.Ordinal).ToList() ?? [];
         }
 
-        private async Task<HtmlNodeCollection> LoadRowsAsync(string url)
+        private async Task<HtmlNodeCollection> LoadRowsAsync(string url, CancellationToken cancellationToken)
         {
-            using var operationCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.UserAgent.ParseAdd(UserAgent);
-
-            using var response = await _httpClient.SendAsync(
-                request,
-                HttpCompletionOption.ResponseHeadersRead,
-                operationCancellation.Token);
-            response.EnsureSuccessStatusCode();
-            if (response.Content.Headers.ContentLength is long contentLength && contentLength > MaximumResponseBytes)
+            using var timeoutSource = new CancellationTokenSource(_requestTimeout);
+            using var operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                timeoutSource.Token);
+            try
             {
-                throw new PayloadLimitExceededException(MaximumResponseBytes);
-            }
+                Uri endpoint = ExchangeRateEndpointPolicy.Normalize(url);
+                for (int redirect = 0; redirect <= ExchangeRateEndpointPolicy.MaximumRedirects; redirect++)
+                {
+                    await ExchangeRateEndpointPolicy.ValidatePublicHostAsync(
+                            endpoint,
+                            _resolveHostAsync,
+                            operationCancellation.Token)
+                        .ConfigureAwait(false);
+                    using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+                    request.Headers.UserAgent.ParseAdd(UserAgent);
+                    using var response = await _httpClient.SendAsync(
+                            request,
+                            HttpCompletionOption.ResponseHeadersRead,
+                            operationCancellation.Token)
+                        .ConfigureAwait(false);
+                    if ((int)response.StatusCode is >= 300 and < 400)
+                    {
+                        if (redirect == ExchangeRateEndpointPolicy.MaximumRedirects ||
+                            response.Headers.Location == null)
+                        {
+                            throw new InfrastructureServiceException("汇率源重定向次数超过安全上限或缺少目标地址。");
+                        }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(operationCancellation.Token);
-            await using var buffer = new MemoryStream();
-            await BoundedStreamHelper.CopyToAsync(
-                stream,
-                buffer,
-                MaximumResponseBytes,
-                operationCancellation.Token);
-            buffer.Position = 0;
-            var doc = new HtmlAgilityPack.HtmlDocument();
-            doc.Load(buffer, true);
-            return doc.DocumentNode.SelectNodes("//table//tr") ?? doc.DocumentNode.SelectNodes("//tr");
+                        endpoint = ExchangeRateEndpointPolicy.Normalize(
+                            new Uri(endpoint, response.Headers.Location).ToString());
+                        continue;
+                    }
+
+                    response.EnsureSuccessStatusCode();
+                    if (response.Content.Headers.ContentLength is long contentLength && contentLength > MaximumResponseBytes)
+                    {
+                        throw new PayloadLimitExceededException(MaximumResponseBytes);
+                    }
+
+                    await using var stream = await response.Content.ReadAsStreamAsync(operationCancellation.Token);
+                    await using var buffer = new MemoryStream();
+                    await BoundedStreamHelper.CopyToAsync(
+                        stream,
+                        buffer,
+                        MaximumResponseBytes,
+                        operationCancellation.Token);
+                    buffer.Position = 0;
+                    var doc = new HtmlAgilityPack.HtmlDocument();
+                    doc.Load(buffer, true);
+                    return doc.DocumentNode.SelectNodes("//table//tr") ?? doc.DocumentNode.SelectNodes("//tr");
+                }
+
+                throw new InfrastructureServiceException("汇率源重定向次数超过安全上限。");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException ex) when (timeoutSource.IsCancellationRequested)
+            {
+                throw new ServiceTimeoutException(
+                    $"汇率源在 {_requestTimeout.TotalSeconds:0.#} 秒内未完成响应。",
+                    ex);
+            }
+            catch (ServiceException)
+            {
+                throw;
+            }
+            catch (PayloadLimitExceededException ex)
+            {
+                throw new InfrastructureServiceException("汇率源返回内容超过 5 MiB 安全上限。", ex);
+            }
+            catch (Exception ex) when (
+                ex is HttpRequestException or IOException or SocketException or InvalidOperationException)
+            {
+                throw new InfrastructureServiceException("无法读取汇率源，请检查网络、证书或远端服务状态。", ex);
+            }
         }
 
         private bool TryGetCachedRates(int cacheDurationMinutes, string cacheSignature, out List<ExchangeRateInfo> rates)
@@ -225,7 +278,7 @@ namespace ExportDocManager.Services.Data
             {
                 if (_cachedRates == null ||
                     !string.Equals(_cachedRatesSignature, cacheSignature, StringComparison.Ordinal) ||
-                    (DateTime.Now - _lastFetchTime).TotalMinutes >= cacheDurationMinutes)
+                    (DateTime.UtcNow - _lastFetchTime).TotalMinutes >= cacheDurationMinutes)
                 {
                     rates = null;
                     return false;
@@ -242,7 +295,7 @@ namespace ExportDocManager.Services.Data
             {
                 _cachedRates = CloneRates(rates);
                 _cachedRatesSignature = cacheSignature ?? string.Empty;
-                _lastFetchTime = DateTime.Now;
+                _lastFetchTime = DateTime.UtcNow;
             }
         }
 
@@ -253,7 +306,7 @@ namespace ExportDocManager.Services.Data
 
         private static string BuildCacheSignature(string url, IEnumerable<string> currencies)
         {
-            var normalizedUrl = string.IsNullOrWhiteSpace(url) ? DefaultUrl : url.Trim();
+            var normalizedUrl = ExchangeRateEndpointPolicy.Normalize(url).ToString();
             var normalizedCurrencies = (currencies ?? Enumerable.Empty<string>())
                 .Where(currency => !string.IsNullOrWhiteSpace(currency))
                 .Select(currency => currency.Trim())

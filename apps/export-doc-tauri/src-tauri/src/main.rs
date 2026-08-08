@@ -10,9 +10,14 @@ use std::{
 use tauri::{Emitter, Manager};
 
 mod desktop_commands;
+mod desktop_file_dialog_commands;
+mod desktop_open_commands;
+mod desktop_pdf_commands;
 mod log_rotation;
 mod runtime_layout;
 mod runtime_paths;
+mod runtime_paths_config;
+mod runtime_sidecar_path;
 mod runtime_tree_manifest;
 mod sidecar;
 mod tauri_updater_commands;
@@ -51,30 +56,30 @@ fn run_tauri_app() -> tauri::Result<()> {
             }
         }))
         .invoke_handler(tauri::generate_handler![
-            desktop_commands::select_single_window_package_file,
-            desktop_commands::select_invoice_transfer_package_file,
-            desktop_commands::select_disaster_recovery_package_file,
-            desktop_commands::select_receipt_file,
-            desktop_commands::select_receipt_files,
-            desktop_commands::select_pdf_files,
-            desktop_commands::select_email_attachment_files,
-            desktop_commands::select_customs_coo_attachment_files,
-            desktop_commands::select_letter_of_credit_file,
-            desktop_commands::select_ocr_image_file,
-            desktop_commands::select_exporter_seal_image_file,
-            desktop_commands::read_exporter_seal_image_file_as_data_url,
-            desktop_commands::read_ocr_image_file_as_data_url,
-            desktop_commands::select_excel_file,
-            desktop_commands::select_directory,
-            desktop_commands::select_report_template_package_file,
-            desktop_commands::select_save_package_path,
-            desktop_commands::select_save_invoice_transfer_package_path,
-            desktop_commands::select_save_report_template_package_path,
-            desktop_commands::select_save_pdf_path,
-            desktop_commands::select_save_zip_path,
-            desktop_commands::select_save_excel_path,
-            desktop_commands::save_pdf_file,
-            desktop_commands::open_path,
+            desktop_file_dialog_commands::select_single_window_package_file,
+            desktop_file_dialog_commands::select_invoice_transfer_package_file,
+            desktop_file_dialog_commands::select_disaster_recovery_package_file,
+            desktop_file_dialog_commands::select_receipt_file,
+            desktop_file_dialog_commands::select_receipt_files,
+            desktop_file_dialog_commands::select_pdf_files,
+            desktop_file_dialog_commands::select_email_attachment_files,
+            desktop_file_dialog_commands::select_customs_coo_attachment_files,
+            desktop_file_dialog_commands::select_letter_of_credit_file,
+            desktop_file_dialog_commands::select_ocr_image_file,
+            desktop_file_dialog_commands::select_exporter_seal_image_file,
+            desktop_file_dialog_commands::read_exporter_seal_image_file_as_data_url,
+            desktop_file_dialog_commands::read_ocr_image_file_as_data_url,
+            desktop_file_dialog_commands::select_excel_file,
+            desktop_file_dialog_commands::select_directory,
+            desktop_file_dialog_commands::select_report_template_package_file,
+            desktop_file_dialog_commands::select_save_package_path,
+            desktop_file_dialog_commands::select_save_invoice_transfer_package_path,
+            desktop_file_dialog_commands::select_save_report_template_package_path,
+            desktop_file_dialog_commands::select_save_pdf_path,
+            desktop_file_dialog_commands::select_save_zip_path,
+            desktop_file_dialog_commands::select_save_excel_path,
+            desktop_pdf_commands::save_pdf_file,
+            desktop_open_commands::open_path,
             desktop_commands::get_runtime_storage_context,
             desktop_commands::schedule_data_root_migration,
             desktop_commands::log_frontend_error,

@@ -15,6 +15,8 @@ namespace ExportDocManager.Api.Hosting
         private readonly ApiBackgroundJobRetentionOptions _retentionOptions;
         private readonly Lock _historyCleanupLock = new();
 
+        internal int PersistThrottleEntryCount => _lastPersistedUtcTicks.Count;
+
         public ApiBackgroundJobService()
         {
             _retentionOptions = new ApiBackgroundJobRetentionOptions().Normalize();
@@ -139,6 +141,7 @@ namespace ExportDocManager.Api.Hosting
             bool removed = _jobs.TryRemove(key, out var removedJob);
             if (removed)
             {
+                _lastPersistedUtcTicks.TryRemove(key, out _);
                 TryDeleteControlledBrowserOutput(removedJob?.OutputPath);
                 DeletePersistedJobs(new[] { key });
             }
@@ -169,6 +172,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (_jobs.TryRemove(pair.Key, out var removedJob))
                 {
+                    _lastPersistedUtcTicks.TryRemove(pair.Key, out _);
                     TryDeleteControlledBrowserOutput(removedJob?.OutputPath);
                     removedJobIds.Add(pair.Key);
                     removedCount++;

@@ -216,6 +216,12 @@ jobs:
           test "$(sudo stat -c '%a' "$installer_root/runtime/api-data/Config")" = "750"
           test "$(sudo stat -c '%a' "$installer_root/runtime/api-data/Config/appsettings.json")" = "600"
           test "$(sudo stat -c '%u:%g' "$installer_root/runtime/api-data/Config/appsettings.json")" = "10001:10001"
+          test -d "$installer_root/runtime/api-data/Cache/ReportPdf"
+          test "$(sudo stat -c '%u:%g' "$installer_root/runtime/api-data/Cache/ReportPdf")" = "10001:10001"
+          test "$(sudo stat -c '%a' "$installer_root/runtime/api-data/Cache/ReportPdf")" = "750"
+          test -d "$installer_root/runtime/browser"
+          test "$(sudo stat -c '%u:%g' "$installer_root/runtime/browser")" = "10001:10001"
+          test "$(sudo stat -c '%a' "$installer_root/runtime/browser")" = "750"
 
           postgres_probe="exportdoc-installer-postgres-${{ github.run_id }}"
           cleanup_installer_probe() {
@@ -340,7 +346,7 @@ jobs:
             {
               echo "Container stack failed to reach its declared startup dependencies."
               docker compose ps --all || true
-              docker compose logs --no-color --tail=200 postgres api web || true
+              docker compose logs --no-color --tail=200 postgres browser api web || true
               api_container_id="$(docker compose ps -q api)"
               if [ -n "$api_container_id" ]; then
                 docker inspect --format '{{json .State.Health}}' "$api_container_id" || true
@@ -361,7 +367,7 @@ jobs:
         run: |
           show_diagnostics() {
             docker compose ps --all || true
-            docker compose logs --no-color --tail=200 postgres api web || true
+            docker compose logs --no-color --tail=200 postgres browser api web || true
             api_container_id="$(docker compose ps -q api)"
             if [ -n "$api_container_id" ]; then
               docker inspect --format '{{json .State.Health}}' "$api_container_id" || true
@@ -458,7 +464,7 @@ jobs:
             rm -f "${probe}.committed"
           '
 
-      - name: Validate native Chromium PDF runtime
+      - name: Validate isolated Chromium PDF runtime and capability boundary
         working-directory: deploy/container
         shell: bash
         run: |
@@ -467,30 +473,35 @@ jobs:
           if {
             set -eu
             api_container_id="$(docker compose ps -q api)"
-            test -n "$api_container_id"
-            docker inspect --format '{{json .HostConfig.CapAdd}}' "$api_container_id" \
-              > ../../artifacts/container-runtime/evidence/chromium-container-capabilities.json
+            browser_container_id="$(docker compose ps -q browser)"
+            test -n "$api_container_id" && test -n "$browser_container_id"
+            docker inspect --format '{{json .HostConfig.CapAdd}}' "$browser_container_id" \
+              > ../../artifacts/container-runtime/evidence/browser-container-capabilities.json
             jq -e 'map(ascii_upcase) | index("SYS_ADMIN") != null' \
-              ../../artifacts/container-runtime/evidence/chromium-container-capabilities.json \
+              ../../artifacts/container-runtime/evidence/browser-container-capabilities.json \
               >/dev/null
-            docker compose exec -T api /usr/bin/chromium --version \
+            docker inspect --format '{{json .HostConfig.CapAdd}}' "$api_container_id" \
+              > ../../artifacts/container-runtime/evidence/api-container-capabilities.json
+            jq -e '(. // []) | map(ascii_upcase) | index("SYS_ADMIN") == null' \
+              ../../artifacts/container-runtime/evidence/api-container-capabilities.json \
+              >/dev/null
+            docker compose exec -T browser /usr/bin/chromium --version \
               > ../../artifacts/container-runtime/evidence/chromium-version.txt
-            docker compose exec -T api df -B1 /dev/shm \
+            docker compose exec -T browser df -B1 /dev/shm \
               > ../../artifacts/container-runtime/evidence/chromium-shared-memory.txt
-            docker compose exec -T api sh -eux -c '
-              test "${EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX:-}" = "false"
-              test "${EXPORTDOCMANAGER_CHROMIUM_DISABLE_DEV_SHM_USAGE:-}" = "false"
+            docker compose exec -T browser sh -eux -c '
               test -u /usr/lib/chromium/chrome-sandbox
               shm_bytes="$(df -B1 --output=size /dev/shm | tail -n 1 | tr -d " ")"
               test "$shm_bytes" -ge 500000000
-              mkdir -p /runtime-data/Cache
-              probe_root="$(mktemp -d /runtime-data/Cache/chromium-validation.XXXXXX)"
+              test -n "$(curl --fail --silent http://127.0.0.1:9222/json/version)"
+              probe_root="$(mktemp -d /browser-data/chromium-validation.XXXXXX)"
               cleanup() {
                 rm -rf "$probe_root"
               }
               trap cleanup EXIT INT TERM
               if ! timeout 45s /usr/bin/chromium \
                 --headless=new \
+                --remote-debugging-port=0 \
                 --disable-background-networking \
                 --disable-default-apps \
                 --disable-extensions \
@@ -508,6 +519,15 @@ jobs:
               test "$(head -c 5 "$probe_root/probe.pdf")" = "%PDF-"
               test "$(stat -c "%s" "$probe_root/probe.pdf")" -gt 1000
             '
+            browser_env="$(docker inspect --format '{{json .Config.Env}}' "$browser_container_id")"
+            jq -e 'map(select(test("(?i)(POSTGRES|DATABASE|MAINTENANCE|BOOTSTRAP|MASTER_KEY|PASSWORD)"))) | length == 0' \
+              <<<"$browser_env" >/dev/null
+            api_env="$(docker inspect --format '{{json .Config.Env}}' "$api_container_id")"
+            jq -e 'map(select(startswith("EXPORTDOCMANAGER_BROWSER_CDP_ENDPOINT=http://browser:9222"))) | length == 1' \
+              <<<"$api_env" >/dev/null
+            docker compose exec -T api sh -ec 'test ! -e /usr/bin/chromium'
+            browser_networks="$(docker inspect --format '{{json .NetworkSettings.Networks}}' "$browser_container_id")"
+            jq -e 'keys | any(contains("backend")) | not' <<<"$browser_networks" >/dev/null
           } 2>&1 | tee "$chromium_log"; then
             exit 0
           fi
@@ -516,7 +536,24 @@ jobs:
           diagnostic="${diagnostic//'%'/'%25'}"
           diagnostic="${diagnostic//$'\r'/'%0D'}"
           diagnostic="${diagnostic//$'\n'/'%0A'}"
-          echo "::error title=Native Chromium PDF validation failed::$diagnostic"
+          echo "::error title=Isolated Chromium PDF validation failed::$diagnostic"
+          exit 1
+
+      - name: Validate API remote CDP PDF bridge
+        working-directory: deploy/container
+        shell: bash
+        run: |
+          bridge_log="../../artifacts/container-runtime/evidence/api-remote-cdp-pdf.log"
+          if docker compose exec -T api sh -eu -c \
+            'dotnet ExportDocManager.Api.dll --verify-browser-runtime' 2>&1 | tee "$bridge_log"; then
+            exit 0
+          fi
+
+          diagnostic="$(tail -n 80 "$bridge_log" || true)"
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=API remote CDP PDF bridge validation failed::$diagnostic"
           exit 1
 
       - name: Validate reverse-proxy and security-header boundary
@@ -582,8 +619,33 @@ jobs:
           grep -F "$EXPORTDOCMANAGER_POSTGRES_APP_USER|t|f|f|f" <<<"$role_flags"
           grep -F "$EXPORTDOCMANAGER_POSTGRES_OWNER_ROLE|f|f|f|f" <<<"$role_flags"
           grep -F "$EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_USER|t|f|t|f" <<<"$role_flags"
-          docker compose exec -T postgres sh -ec \
-            'PGPASSWORD="$EXPORTDOCMANAGER_POSTGRES_APP_PASSWORD" psql -v ON_ERROR_STOP=1 -U "$EXPORTDOCMANAGER_POSTGRES_APP_USER" -d "$POSTGRES_DB" -c '\''SELECT count(*) FROM "Users"'\'' >/dev/null'
+
+          docker compose exec -T \
+            -e PGPASSWORD="$EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_PASSWORD" \
+            postgres psql -v ON_ERROR_STOP=1 \
+            -U "$EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_USER" \
+            -d "$POSTGRES_DB" \
+            --set=owner_role="$EXPORTDOCMANAGER_POSTGRES_OWNER_ROLE" <<'SQL'
+          SET ROLE :"owner_role";
+          DROP TABLE IF EXISTS container_app_role_probe;
+          CREATE TABLE container_app_role_probe (
+            id integer PRIMARY KEY,
+            marker text NOT NULL
+          );
+          INSERT INTO container_app_role_probe (id, marker) VALUES (1, 'owner-created');
+          SQL
+
+          docker compose exec -T \
+            -e PGPASSWORD="$EXPORTDOCMANAGER_POSTGRES_APP_PASSWORD" \
+            postgres psql -v ON_ERROR_STOP=1 \
+            -U "$EXPORTDOCMANAGER_POSTGRES_APP_USER" \
+            -d "$POSTGRES_DB" <<'SQL'
+          SELECT marker FROM container_app_role_probe WHERE id = 1;
+          INSERT INTO container_app_role_probe (id, marker) VALUES (2, 'app-inserted');
+          UPDATE container_app_role_probe SET marker = 'app-updated' WHERE id = 1;
+          DELETE FROM container_app_role_probe WHERE id = 2;
+          SQL
+
           if docker compose exec -T postgres sh -ec \
             'PGPASSWORD="$EXPORTDOCMANAGER_POSTGRES_APP_PASSWORD" psql -v ON_ERROR_STOP=1 -U "$EXPORTDOCMANAGER_POSTGRES_APP_USER" -d "$POSTGRES_DB" -c '\''CREATE TABLE forbidden_app_ddl(id integer)'\'' >/dev/null 2>&1'; then
             echo "The PostgreSQL application role unexpectedly has schema DDL privileges." >&2
@@ -627,7 +689,7 @@ jobs:
         run: |
           mkdir -p ../../artifacts/container-runtime/evidence
           docker compose -f docker-compose.yml -f docker-compose.https.yml ps --all > ../../artifacts/container-runtime/evidence/compose-ps.txt 2>&1 || true
-          docker compose -f docker-compose.yml -f docker-compose.https.yml logs --no-color > ../../artifacts/container-runtime/evidence/compose.log 2>&1 || true
+          docker compose -f docker-compose.yml -f docker-compose.https.yml logs --no-color postgres browser api web > ../../artifacts/container-runtime/evidence/compose.log 2>&1 || true
 
       - name: Upload lifecycle evidence
         if: ${{ always() }}
