@@ -374,11 +374,17 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.True(ReportFontPolicy.Inspect(pathProvider).Complete, "Pinned Noto CJK report fonts must be provisioned before formal PDF validation.");
                 string rendererPath = new ChromiumHtmlToPdfService(pathProvider).ResolveRendererExecutablePath();
                 Assert.StartsWith(Path.Combine(appRoot, "Browsers"), rendererPath, StringComparison.OrdinalIgnoreCase);
+                await using var browserRuntime = new BrowserRuntimeManager();
+                await using var browserHost = new ManagedPlaywrightPdfBrowserHost(
+                    browserRuntime,
+                    new BrowserExecutableResolver(pathProvider),
+                    pathProvider);
+                var pdfRenderer = new ChromiumHtmlToPdfService(pathProvider, browserRuntime, browserHost);
 
                 await using var invoiceFactory = new TestDbContextFactory();
                 int invoiceId = await SeedInvoiceWithMatchingPaymentAsync(invoiceFactory);
                 var invoiceHtmlService = new ReportHtmlService(invoiceFactory, new StubSettingsService(), pathProvider);
-                var invoicePdfService = new ReportPdfRenderService(invoiceHtmlService, new ChromiumHtmlToPdfService(pathProvider));
+                var invoicePdfService = new ReportPdfRenderService(invoiceHtmlService, pdfRenderer);
 
                 var invoiceTemplates = new[]
                 {
@@ -406,7 +412,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 await using var paymentFactory = new TestDbContextFactory();
                 int paymentId = await SeedPaymentWithMatchingInvoiceAsync(paymentFactory);
                 var paymentHtmlService = new ReportHtmlService(paymentFactory, new StubSettingsService(), pathProvider);
-                var paymentPdfService = new ReportPdfRenderService(paymentHtmlService, new ChromiumHtmlToPdfService(pathProvider));
+                var paymentPdfService = new ReportPdfRenderService(paymentHtmlService, pdfRenderer);
                 var paymentTemplates = new[]
                 {
                     new BuiltInPdfCase("payment-voucher", ReportDocumentType.PaymentVoucher, Path.Combine(appRoot, "Templates", "Internal", "payment_voucher_template.html"), 1, "portrait", 20000, "portrait"),
@@ -446,10 +452,17 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
                 Assert.True(ReportFontPolicy.Inspect(pathProvider).Complete, "Pinned Noto CJK report fonts must be provisioned before cross-platform pagination validation.");
+                await using var browserRuntime = new BrowserRuntimeManager();
+                await using var browserHost = new ManagedPlaywrightPdfBrowserHost(
+                    browserRuntime,
+                    new BrowserExecutableResolver(pathProvider),
+                    pathProvider);
                 await using var factory = new TestDbContextFactory();
                 var seed = await SeedSameInvoiceNumberActualCustomsAndPaymentAsync(factory);
                 var htmlService = new ReportHtmlService(factory, new StubSettingsService(), pathProvider);
-                var pdfService = new ReportPdfRenderService(htmlService, new ChromiumHtmlToPdfService(pathProvider));
+                var pdfService = new ReportPdfRenderService(
+                    htmlService,
+                    new ChromiumHtmlToPdfService(pathProvider, browserRuntime, browserHost));
 
                 string invoiceTemplatePath = Path.Combine(appRoot, "Templates", "Export", "invoice_template.html");
                 string packingListTemplatePath = Path.Combine(appRoot, "Templates", "Export", "packing_list_template.html");
