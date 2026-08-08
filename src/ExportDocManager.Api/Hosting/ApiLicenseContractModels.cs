@@ -23,7 +23,7 @@ namespace ExportDocManager.Api.Hosting
 
     public static class ApiLicenseDtoFactory
     {
-        public static ApiLicenseStatusResponse FromStatus(LicenseStatus status)
+        public static ApiLicenseStatusResponse FromStatus(LicenseStatus status, bool revealPaths = true)
         {
             ArgumentNullException.ThrowIfNull(status);
 
@@ -35,18 +35,20 @@ namespace ExportDocManager.Api.Hosting
                 status.MachineId ?? string.Empty,
                 status.Message ?? string.Empty,
                 status.ExpireDate,
-                status.LicenseStoragePath ?? string.Empty,
+                ApiResponsePathPolicy.Reveal(status.LicenseStoragePath, revealPaths),
                 status.StoragePolicy ?? string.Empty);
         }
 
-        public static ApiLicenseRegisterResponse FromResult(LicenseRegistrationResult result)
+        public static ApiLicenseRegisterResponse FromResult(
+            LicenseRegistrationResult result,
+            bool revealPaths = true)
         {
             ArgumentNullException.ThrowIfNull(result);
 
             return new ApiLicenseRegisterResponse(
                 result.Success,
                 result.Message ?? string.Empty,
-                FromStatus(result.Status));
+                FromStatus(result.Status, revealPaths));
         }
     }
 }

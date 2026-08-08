@@ -56,7 +56,8 @@ namespace ExportDocManager.Api.Hosting
                     paths,
                     databaseSettings,
                     sqliteDatabasePath,
-                    dependencyDiagnostics.Inspect());
+                    dependencyDiagnostics.Inspect(),
+                    hasDesktopAccess);
                 return Results.Ok(response);
             })
             .WithName("Healthz");
@@ -175,6 +176,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 ISystemLogCleanupService logCleanupService,
                 IAppPathProvider pathProvider,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
@@ -195,7 +197,8 @@ namespace ExportDocManager.Api.Hosting
                         true,
                         $"日志清理已完成：审计日志 {result.DeletedAuditLogs} 条，文本日志 {result.DeletedTextLogs} 个。",
                         result,
-                        pathProvider));
+                        pathProvider,
+                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
                 }
                 catch (OperationCanceledException)
                 {
@@ -203,7 +206,8 @@ namespace ExportDocManager.Api.Hosting
                         false,
                         "日志清理已取消。",
                         new SystemLogCleanupResult(),
-                        pathProvider));
+                        pathProvider,
+                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
                 }
                 catch (Exception ex)
                 {
@@ -264,7 +268,8 @@ namespace ExportDocManager.Api.Hosting
             bool success,
             string message,
             SystemLogCleanupResult result,
-            IAppPathProvider pathProvider)
+            IAppPathProvider pathProvider,
+            bool revealPaths)
         {
             result ??= new SystemLogCleanupResult();
             return new ApiSystemLogCleanupResponse(
@@ -274,7 +279,7 @@ namespace ExportDocManager.Api.Hosting
                 result.DeletedTextLogs,
                 result.DeletedTextLogsByAge,
                 result.DeletedTextLogsByCount,
-                pathProvider.LogRoot,
+                ApiResponsePathPolicy.Reveal(pathProvider.LogRoot, revealPaths),
                 SystemLogCleanupStoragePolicy);
         }
     }

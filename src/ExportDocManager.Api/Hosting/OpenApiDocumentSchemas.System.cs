@@ -238,7 +238,7 @@ namespace ExportDocManager.Api.Hosting
                                 ["deletedTextLogs"] = new { type = "integer", format = "int32" },
                                 ["deletedTextLogsByAge"] = new { type = "integer", format = "int32" },
                                 ["deletedTextLogsByCount"] = new { type = "integer", format = "int32" },
-                                ["logRoot"] = StringProperty("Program root logs directory."),
+                                ["logRoot"] = StringProperty("Runtime log directory for trusted desktop clients; empty for browser clients."),
                                 ["storagePolicy"] = StringProperty("Manual log cleanup storage and data-domain policy.")
                             }
                         },

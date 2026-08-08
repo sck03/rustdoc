@@ -1,4 +1,5 @@
 using ExportDocManager.Api.Hosting;
+using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -97,6 +98,82 @@ public sealed class ApiBackgroundJobRunnerLifecycleTests
             BackgroundJobSnapshot final = await jobService.GetAsync(job.JobId);
             Assert.NotNull(final);
             Assert.True(BackgroundJobStatusCatalog.IsTerminal(final.Status));
+        }
+    }
+
+    [Fact]
+    public async Task Enqueue_WhenPersistenceFails_ShouldReleaseQueueCapacityAndRemovePhantomJob()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "edm-job-persistence-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var pathProvider = new RuntimeAppPathProvider(
+                Path.Combine(root, "app"),
+                Path.Combine(root, "data"));
+            Directory.CreateDirectory(pathProvider.CacheRoot);
+            string backgroundJobRoot = Path.Combine(pathProvider.CacheRoot, "BackgroundJobs");
+            await File.WriteAllTextAsync(backgroundJobRoot, "blocks the persistence directory");
+
+            var jobService = new ApiBackgroundJobService(pathProvider);
+            using var provider = new ServiceCollection().BuildServiceProvider();
+            var runner = new ApiBackgroundJobRunner(
+                jobService,
+                provider.GetRequiredService<IServiceScopeFactory>(),
+                NullLogger<ApiBackgroundJobRunner>.Instance,
+                new ApiBackgroundJobConcurrencyOptions
+                {
+                    GlobalLimit = 1,
+                    PerUserLimit = 1,
+                    BrowserLimit = 1,
+                    GlobalQueueLimit = 4,
+                    PerUserQueueLimit = 2
+                });
+
+            for (int index = 0; index < 4; index++)
+            {
+                string outputPath = Path.Combine(
+                    pathProvider.ExportRoot,
+                    "Browser",
+                    "PersistenceFailure",
+                    index.ToString(),
+                    "partial.zip");
+                Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+                await File.WriteAllTextAsync(outputPath, "partial");
+
+                Assert.ThrowsAny<IOException>(() => runner.Enqueue(
+                    "PersistenceFailure",
+                    $"持久化失败任务 {index}",
+                    "alice",
+                    (_, _) => Task.FromResult(string.Empty),
+                    initialOutputPath: outputPath));
+                Assert.False(File.Exists(outputPath));
+            }
+
+            PagedResult<BackgroundJobSnapshot> failedPage = await jobService.QueryAsync(
+                new BackgroundJobQuery { PageNumber = 1, PageSize = 100 });
+            Assert.Equal(0, failedPage.TotalCount);
+
+            File.Delete(backgroundJobRoot);
+            Directory.CreateDirectory(backgroundJobRoot);
+            BackgroundJobSnapshot accepted = runner.Enqueue(
+                "PersistenceRecovery",
+                "持久化恢复任务",
+                "alice",
+                (_, _) => Task.FromResult(string.Empty));
+
+            Assert.NotEqual(ApiBackgroundJobQueueStatusCatalog.Rejected, accepted.StatusText);
+            await runner.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
         }
     }
 }

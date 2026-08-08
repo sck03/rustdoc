@@ -209,7 +209,10 @@ namespace ExportDocManager.Services.Reporting
         {
             ManagedPlaywrightBrowserHost browserHost = _browserHost;
             bool disposeBrowserHost = browserHost == null;
-            browserHost ??= new ManagedPlaywrightBrowserHost(_browserRuntime, _executableResolver, _pathProvider);
+            browserHost ??= new ManagedPlaywrightPdfBrowserHost(
+                _browserRuntime,
+                _executableResolver,
+                _pathProvider);
             try
             {
                 await browserHost.ExecuteAsync(

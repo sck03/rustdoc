@@ -60,6 +60,24 @@ public class InfrastructureServiceException : ServiceException
     }
 }
 
+public sealed class InsufficientStorageException : ServiceException
+{
+    public InsufficientStorageException(
+        string message,
+        long requiredBytes = 0,
+        long availableBytes = 0,
+        Exception innerException = null)
+        : base(message, innerException)
+    {
+        RequiredBytes = requiredBytes;
+        AvailableBytes = availableBytes;
+    }
+
+    public long RequiredBytes { get; }
+
+    public long AvailableBytes { get; }
+}
+
 public class ServiceBusyException : ServiceException
 {
     public ServiceBusyException(string message, Exception innerException = null)

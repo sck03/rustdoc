@@ -97,6 +97,7 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IReportTemplateStorageDiagnosticsService diagnosticsService,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
@@ -112,7 +113,9 @@ namespace ExportDocManager.Api.Hosting
 
                 var result = await diagnosticsService.CheckAsync(cancellationToken);
                 return Results.Ok(new ApiReportTemplateStorageStatusResponse(
-                    result.TemplateRoot,
+                    ApiResponsePathPolicy.Reveal(
+                        result.TemplateRoot,
+                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
                     result.Exists,
                     result.Writable,
                     result.Message,

@@ -10,6 +10,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ILicenseService licenseService,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -18,7 +19,9 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 var status = await licenseService.GetStatusAsync(cancellationToken);
-                return Results.Ok(ApiLicenseDtoFactory.FromStatus(status));
+                return Results.Ok(ApiLicenseDtoFactory.FromStatus(
+                    status,
+                    ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
             })
             .WithName("GetLicenseStatus");
 
@@ -27,6 +30,7 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ILicenseService licenseService,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 ApiLicenseRegisterRequest request,
                 CancellationToken cancellationToken) =>
             {
@@ -51,10 +55,14 @@ namespace ExportDocManager.Api.Hosting
                 var result = await licenseService.RegisterAsync(request.LicenseKey, cancellationToken);
                 if (!result.Success)
                 {
-                    return Results.BadRequest(ApiLicenseDtoFactory.FromResult(result));
+                    return Results.BadRequest(ApiLicenseDtoFactory.FromResult(
+                        result,
+                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
                 }
 
-                return Results.Ok(ApiLicenseDtoFactory.FromResult(result));
+                return Results.Ok(ApiLicenseDtoFactory.FromResult(
+                    result,
+                    ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
             })
             .WithName("RegisterLicense");
         }

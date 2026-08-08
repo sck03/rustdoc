@@ -26,16 +26,22 @@ Docker 镜像和构建缓存由 Docker Engine 的全局 `data-root` 管理，不
 
 ### 内网 HTTP
 
-只应向办公网、VLAN 或 VPN 放行 `8080`：
+安装器默认只绑定回环地址 `127.0.0.1`，适合先通过 SSH 隧道或本机浏览器验收：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sck03/rustdoc/main/deploy/container/install-container.sh |
   sudo bash -s -- --mode http --tag 0.1.2
 ```
 
-访问：`http://服务器IP:8080`。
+访问：`http://127.0.0.1:8080`。需要在可信办公网/VPN 提供 HTTP 时，显式设置绑定地址；若要在 HTTP 上进行敏感恢复，还必须显式开启灾备开关：
 
-HTTP 模式安装器会显式写入 `EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY=true`，因此网页备份恢复和完整迁移可直接使用；这也是为什么 HTTP 模式只能放在受防火墙保护的可信办公网/VPN。HTTPS 模式始终写入 `false`，由 Nginx TLS 通道满足安全要求。不要把 HTTP 端口暴露到公网或访客网络。
+```bash
+sudo /opt/export-doc-manager/install-container.sh \
+  --mode http --tag 0.1.2 --web-bind-address 0.0.0.0 \
+  --allow-insecure-disaster-recovery
+```
+
+HTTP 模式默认写入 `EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY=false`，数据库恢复、完整迁移和其它敏感灾备操作会要求 HTTPS、本机回环通道或显式可信 HTTP。普通登录仍可在 HTTP 模式使用，但凭据和业务数据没有传输加密。HTTPS 模式始终写入 `false`，由 Nginx TLS 通道满足安全要求。不要把未加密 HTTP 端口暴露到公网或访客网络。
 
 ### 公网 HTTPS
 
@@ -121,7 +127,7 @@ MODE=$(sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' .env)
 ./install-container.sh --mode "$MODE" --tag 0.1.3
 ```
 
-安装器会保留 `.env`、数据库、API DataRoot 和证书。安装根、运行根和关键子目录必须是真实非根目录，不能经过符号链接；部署根会收紧为 root `700`。新部署清单会先完整下载到安装目录内的临时 staging，校验安装器语法及 HTTP/HTTPS Compose 双模式后才原子替换；锁文件、环境更新、资产激活和首次令牌标记均拒绝链接或使用 `mktemp`。Compose 校验、镜像拉取、证书申请、容器启动或就绪检查任一步失败时，会恢复旧 `.env`、旧部署文件和本次可能改写的 Let's Encrypt 状态，并用 `--force-recreate` 重新创建原 HTTP/HTTPS 容器，确保恢复后的证书目录和配置重新挂载。`--no-start` 成功时只保留已校验的新文件，不改变容器。
+安装器会保留 `.env`、数据库、API DataRoot 和证书。安装根、运行根和关键子目录必须是真实非根目录，不能经过符号链接；部署根会收紧为 root `700`。新部署资产会先完整下载到安装目录内的临时 staging，逐项核对 `deployment-assets.sha256`，再校验安装器语法及 HTTP/HTTPS Compose 双模式后原子替换；锁文件、环境更新、资产激活和首次令牌标记均拒绝链接或使用 `mktemp`。Compose 校验、镜像拉取、证书申请、容器启动或就绪检查任一步失败时，会恢复旧 `.env`、旧部署文件和本次可能改写的 Let's Encrypt 状态，并用 `--force-recreate` 重新创建原 HTTP/HTTPS 容器，确保恢复后的证书目录和配置重新挂载。`--no-start` 成功时只保留已校验的新文件，不改变容器。
 
 ## 4. 数据库备份
 
@@ -514,7 +520,8 @@ PostgreSQL 18 容器数据位于 `/var/lib/postgresql/18/docker`，因此宿主 
 - `docker-compose.yml`：从源码构建，只用于开发和 CI；
 - `docker-compose.acme.yml`：一键 HTTPS 和自动续期；
 - `docker-compose.https.yml`：手工证书 overlay；
-- `initialize-container-runtime.ps1`：克隆仓库后的 PowerShell 初始化工具；Windows 可直接运行，Linux/macOS 需使用 `sudo pwsh` 以设置固定容器 UID/GID；可信 HTTP 开发环境需显式增加 `-AllowHttpDisasterRecovery`；
+- `deployment-assets.sha256`：安装器下载资产的 SHA-256 完整性清单；
+- `initialize-container-runtime.ps1`：克隆仓库后的 PowerShell 初始化工具；Windows 可直接运行，Linux/macOS 需使用 `sudo pwsh` 以设置固定容器 UID/GID；可信 HTTP 开发环境需显式设置 `-WebBindAddress 0.0.0.0`，并按需增加 `-AllowHttpDisasterRecovery`；
 - `install-container.sh`：Linux VPS 正式安装、升级和恢复入口。
 
 GitHub 工作流 `Container runtime lifecycle validation` 会验证启动、健康探针、安全响应头、PostgreSQL bind mount 持久化和 `pg_dump/pg_restore`。CI 成功不能替代生产环境的异机备份和恢复演练。

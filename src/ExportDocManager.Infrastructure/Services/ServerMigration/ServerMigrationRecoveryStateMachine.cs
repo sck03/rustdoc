@@ -11,13 +11,14 @@ namespace ExportDocManager.Services.Infrastructure;
 /// <summary>
 /// 启动前服务器恢复状态机。它独立编排验证、安全备份、数据库恢复、文件切换、完成与回滚。
 /// </summary>
-public static class ServerMigrationRecoveryStateMachine
+public static partial class ServerMigrationRecoveryStateMachine
 {
     public static async Task ApplyAsync(
         IAppPathProvider pathProvider,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(pathProvider);
+        using FileStream migrationLock = ServerMigrationManager.AcquireExclusiveLock(pathProvider);
         string markerPath = ServerMigrationManager.GetPendingMarkerPath(pathProvider);
         if (!File.Exists(markerPath))
         {
@@ -48,6 +49,18 @@ public static class ServerMigrationRecoveryStateMachine
             marker.StagingDirectoryName);
         if (ServerMigrationRestorePhase.IsTerminal(marker.Phase))
         {
+            if (marker.ManualRecoveryRequired)
+            {
+                ServerMigrationManager.WriteStatus(
+                    pathProvider,
+                    marker,
+                    string.IsNullOrWhiteSpace(marker.LastError)
+                        ? "服务器迁移自动回滚未完整完成，需要管理员使用安全备份人工恢复。"
+                        : marker.LastError,
+                    ServerMigrationManager.GetSafetyBackupRoot(pathProvider, marker.PackageId));
+                return;
+            }
+
             AtomicFileHelper.TryDeleteDirectory(stagingRoot);
             AtomicFileHelper.TryDeleteFile(markerPath);
             return;
@@ -117,6 +130,24 @@ public static class ServerMigrationRecoveryStateMachine
                 marker,
                 ServerMigrationRestorePhase.SafetyBackup,
                 "正在创建数据库与运行文件安全备份。");
+            long stagedManifestBytes = ServerMigrationStorageBudget.SumManifestBytes(marker.Manifest);
+            long stagedDatabaseBytes = new FileInfo(databaseDump).Length;
+            long replacementBytes = Math.Max(0, stagedManifestBytes - stagedDatabaseBytes);
+            long currentRuntimeBytes =
+                ServerMigrationStorageBudget.SumDirectoryBytes(pathProvider.FileRoot) +
+                ServerMigrationStorageBudget.SumDirectoryBytes(pathProvider.UserTemplateRoot) +
+                ServerMigrationStorageBudget.SumDirectoryBytes(pathProvider.SingleWindowRoot) +
+                ServerMigrationStorageBudget.SumDirectoryBytes(Path.Combine(pathProvider.DataRoot, "Marks")) +
+                ServerMigrationStorageBudget.SumDirectoryBytes(pathProvider.ConfigRoot) +
+                ServerMigrationStorageBudget.SumDirectoryBytes(pathProvider.SecurityRoot);
+            ServerMigrationStorageBudget.EnsureAvailable(
+                safetyRoot,
+                ServerMigrationStorageBudget.WithSafetyMargin(Math.Max(stagedDatabaseBytes * 2, stagedDatabaseBytes)),
+                "创建 PostgreSQL 安全备份");
+            ServerMigrationStorageBudget.EnsureAvailable(
+                pathProvider.DataRoot,
+                ServerMigrationStorageBudget.WithSafetyMargin(currentRuntimeBytes, replacementBytes),
+                "创建运行文件安全备份");
             Directory.CreateDirectory(safetyRoot);
             RuntimeFilePermissionHelper.RestrictDirectory(safetyRoot);
             string safetyDump = Path.Combine(safetyRoot, "before-restore.dump");
@@ -161,6 +192,7 @@ public static class ServerMigrationRecoveryStateMachine
             marker.Phase = ServerMigrationRestorePhase.Completed;
             marker.UpdatedAtUtc = DateTimeOffset.UtcNow;
             marker.LastError = string.Empty;
+            marker.ManualRecoveryRequired = false;
             ServerMigrationManager.WriteMarker(markerPath, marker);
             ServerMigrationManager.WriteStatus(
                 pathProvider,
@@ -168,7 +200,10 @@ public static class ServerMigrationRecoveryStateMachine
                 "服务器迁移恢复已完成。恢复前安全备份已保留。",
                 safetyRoot);
             AtomicFileHelper.TryDeleteFile(markerPath);
-            AtomicFileHelper.TryDeleteDirectory(stagingRoot);
+            if (!marker.ManualRecoveryRequired)
+            {
+                AtomicFileHelper.TryDeleteDirectory(stagingRoot);
+            }
             ServerMigrationSecurityAudit.Write(
                 pathProvider,
                 "apply-restore",
@@ -188,7 +223,10 @@ public static class ServerMigrationRecoveryStateMachine
                 safetyRoot,
                 ex,
                 cancellationToken).ConfigureAwait(false);
-            AtomicFileHelper.TryDeleteDirectory(stagingRoot);
+            if (!marker.ManualRecoveryRequired)
+            {
+                AtomicFileHelper.TryDeleteDirectory(stagingRoot);
+            }
             ServerMigrationSecurityAudit.Write(
                 pathProvider,
                 "apply-restore",
@@ -239,9 +277,12 @@ public static class ServerMigrationRecoveryStateMachine
             safetyRoot,
             interruption,
             cancellationToken).ConfigureAwait(false);
-        AtomicFileHelper.TryDeleteDirectory(ServerMigrationPackageValidator.ResolvePath(
-            ServerMigrationManager.GetControlRoot(pathProvider),
-            marker.StagingDirectoryName));
+        if (!marker.ManualRecoveryRequired)
+        {
+            AtomicFileHelper.TryDeleteDirectory(ServerMigrationPackageValidator.ResolvePath(
+                ServerMigrationManager.GetControlRoot(pathProvider),
+                marker.StagingDirectoryName));
+        }
         ServerMigrationSecurityAudit.Write(
             pathProvider,
             "recover-interrupted-restore",
@@ -337,9 +378,13 @@ public static class ServerMigrationRecoveryStateMachine
         marker.Phase = ServerMigrationRestorePhase.Failed;
         marker.UpdatedAtUtc = DateTimeOffset.UtcNow;
         marker.LastError = result;
+        marker.ManualRecoveryRequired = rollbackErrors.Count > 0;
         ServerMigrationManager.TryWriteMarker(markerPath, marker);
         ServerMigrationManager.WriteStatus(pathProvider, marker, result, safetyRoot);
-        AtomicFileHelper.TryDeleteFile(markerPath);
+        if (!marker.ManualRecoveryRequired)
+        {
+            AtomicFileHelper.TryDeleteFile(markerPath);
+        }
         return result;
     }
 
@@ -397,99 +442,4 @@ public static class ServerMigrationRecoveryStateMachine
         await Task.CompletedTask;
     }
 
-    private static void ValidateStagedManifest(
-        string stagingRoot,
-        ServerMigrationManifest manifest)
-    {
-        if (manifest is null ||
-            manifest.SchemaVersion != ServerMigrationLayout.SchemaVersion ||
-            manifest.Files is null ||
-            manifest.Files.Count == 0 ||
-            manifest.Files.Any(file => file is null) ||
-            !manifest.Files.Any(file => file.RelativePath.Equals(
-                ServerMigrationLayout.DatabaseEntry,
-                StringComparison.OrdinalIgnoreCase)))
-        {
-            throw new InvalidDataException("服务器迁移清单缺少数据库备份或版本无效。");
-        }
-        bool fullMigration = manifest.Files.Any(file =>
-            !file.RelativePath.Equals(
-                ServerMigrationLayout.DatabaseEntry,
-                StringComparison.OrdinalIgnoreCase));
-        if (fullMigration &&
-            (!manifest.Files.Any(file => file.RelativePath.Equals(
-                ServerMigrationLayout.ConfigEntry("appsettings.json"),
-                StringComparison.OrdinalIgnoreCase)) ||
-             !manifest.Files.Any(file => file.RelativePath.Equals(
-                ServerMigrationLayout.SecurityEntry(LocalSecretProtector.MasterKeyFileName),
-                StringComparison.OrdinalIgnoreCase))))
-        {
-            throw new InvalidDataException("服务器完整迁移清单缺少运行配置或本地主密钥。");
-        }
-        foreach (ServerMigrationFileManifest file in manifest.Files)
-        {
-            _ = ServerMigrationPackageValidator.NormalizeRelativePath(file.RelativePath);
-            string path = ServerMigrationPackageValidator.ResolvePath(stagingRoot, file.RelativePath);
-            if (!File.Exists(path) ||
-                new FileInfo(path).Length != file.SizeBytes ||
-                !string.Equals(
-                    ServerMigrationPackageValidator.ComputeSha256(path),
-                    file.Sha256,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidDataException($"服务器迁移暂存文件校验失败：{file.RelativePath}");
-            }
-        }
-    }
-
-    private static void ValidateMasterKeyCompatibility(
-        string stagingRoot,
-        ServerMigrationManifest manifest)
-    {
-        if (manifest?.Files is null || manifest.Files.Any(file => file is null))
-        {
-            throw new InvalidDataException("服务器迁移清单文件列表无效。");
-        }
-        string masterKeyEntry = ServerMigrationLayout.SecurityEntry(
-            LocalSecretProtector.MasterKeyFileName);
-        bool fullMigration = manifest.Files.Any(file =>
-            !file.RelativePath.Equals(
-                ServerMigrationLayout.DatabaseEntry,
-                StringComparison.OrdinalIgnoreCase));
-        ServerMigrationFileManifest masterKey = manifest.Files.FirstOrDefault(file =>
-            file.RelativePath.Equals(masterKeyEntry, StringComparison.OrdinalIgnoreCase));
-        if (!fullMigration)
-        {
-            return;
-        }
-        if (masterKey == null)
-        {
-            throw new InvalidDataException("服务器迁移包缺少本地主密钥。");
-        }
-
-        string configured = Environment.GetEnvironmentVariable(
-            LocalSecretProtector.MasterKeyEnvironmentVariable)?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(configured))
-        {
-            return;
-        }
-        byte[] configuredKey = ServerMigrationService.ParseConfiguredMasterKey(configured);
-        byte[] packageKey = File.ReadAllBytes(ServerMigrationPackageValidator.ResolvePath(
-            stagingRoot,
-            masterKeyEntry));
-        try
-        {
-            if (packageKey.Length != 32 ||
-                !CryptographicOperations.FixedTimeEquals(configuredKey, packageKey))
-            {
-                throw new ServiceValidationException(
-                    "目标服务器的 EXPORTDOCMANAGER_MASTER_KEY 与迁移包不一致；数据库尚未恢复，请使用源服务器主密钥重新部署目标服务。");
-            }
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(configuredKey);
-            CryptographicOperations.ZeroMemory(packageKey);
-        }
-    }
 }

@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Errors;
@@ -104,6 +105,88 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 SqlitePendingRestoreManager.ApplyPendingRestore(fixture.PathProvider, fixture.Settings);
                 Assert.Equal("first-queued-version", await ReadValueAsync(fixture.DatabasePath));
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                DeleteDirectoryIfExists(root);
+            }
+        }
+
+        [Fact]
+        public async Task BackupList_ShouldUseManagedFileNamesAndIgnoreUnrelatedZipFiles()
+        {
+            string root = CreateTestRoot("sqlite-backup-list-filter");
+            try
+            {
+                var fixture = CreateFixture(root);
+                await WriteValueAsync(fixture.DatabasePath, "managed-backup");
+                DatabaseBackupResult backupResult = await fixture.Service.BackupDatabaseAsync();
+                Assert.True(backupResult.Success, backupResult.Message);
+
+                string unrelatedZip = Path.Combine(fixture.PathProvider.BackupRoot, "customer-upload.zip");
+                await File.WriteAllBytesAsync(unrelatedZip, [1, 2, 3, 4]);
+
+                List<string> backups = fixture.Service.GetAvailableBackups();
+
+                Assert.Single(backups);
+                Assert.Equal(backupResult.FilePath, backups[0]);
+                Assert.DoesNotContain(unrelatedZip, backups, StringComparer.OrdinalIgnoreCase);
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                DeleteDirectoryIfExists(root);
+            }
+        }
+
+        [Fact]
+        public async Task ImportBackup_ShouldQuickCheckDownloadedZipAndAvoidOverwritingExistingName()
+        {
+            string root = CreateTestRoot("sqlite-backup-import");
+            try
+            {
+                var fixture = CreateFixture(root);
+                await WriteValueAsync(fixture.DatabasePath, "imported-value");
+                DatabaseBackupResult source = await fixture.Service.BackupDatabaseAsync();
+                Assert.True(source.Success, source.Message);
+
+                DatabaseBackupImportResult imported = await fixture.Service.ImportBackupAsync(
+                    source.FilePath,
+                    Path.GetFileName(source.FilePath));
+
+                Assert.True(imported.Success, imported.Message);
+                Assert.NotEqual(source.FilePath, imported.FilePath);
+                Assert.True(File.Exists(imported.FilePath));
+                Assert.Equal(
+                    new FileInfo(source.FilePath).Length,
+                    new FileInfo(imported.FilePath).Length);
+                Assert.Equal(2, fixture.Service.GetAvailableBackups().Count);
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                DeleteDirectoryIfExists(root);
+            }
+        }
+
+        [Fact]
+        public async Task ImportBackup_ShouldRejectZipWithUnexpectedEntries()
+        {
+            string root = CreateTestRoot("sqlite-backup-import-invalid");
+            try
+            {
+                var fixture = CreateFixture(root);
+                string invalidPath = Path.Combine(root, "unexpected.zip");
+                await using (var stream = new FileStream(invalidPath, FileMode.CreateNew))
+                using (var archive = new ZipArchive(stream, ZipArchiveMode.Create))
+                {
+                    archive.CreateEntry("other.db");
+                }
+
+                await Assert.ThrowsAsync<ServiceValidationException>(() =>
+                    fixture.Service.ImportBackupAsync(invalidPath));
+                Assert.Empty(fixture.Service.GetAvailableBackups());
             }
             finally
             {

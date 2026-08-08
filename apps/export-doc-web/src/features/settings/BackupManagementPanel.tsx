@@ -21,7 +21,7 @@ import { NumberField, SelectField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { formatBytes, formatRuntimeDate } from "./settingsFormatters.ts";
+import { formatBytes, formatManagedPath, formatRuntimeDate, serverManagedFileLabel } from "./settingsFormatters.ts";
 
 export default function BackupManagementPanel({
   client,
@@ -465,7 +465,7 @@ export default function BackupManagementPanel({
         <div className="detail-item detail-item-wide">
           <span>备份目录</span>
           <div className="detail-value-row">
-            <strong title={backupQuery.data?.backupRoot || "-"}>{backupQuery.data?.backupRoot || "-"}</strong>
+            <strong title={formatManagedPath(backupQuery.data?.backupRoot)}>{formatManagedPath(backupQuery.data?.backupRoot)}</strong>
             <div className="detail-item-actions">{renderOpenPathAction(backupQuery.data?.backupRoot, "打开备份目录", onPathError)}</div>
           </div>
         </div>
@@ -550,7 +550,7 @@ export default function BackupManagementPanel({
             <div className="detail-item detail-item-wide">
               <span>恢复包目录</span>
               <div className="detail-value-row">
-                <strong title={disasterRecoveryStatus?.recoveryRoot || "-"}>{disasterRecoveryStatus?.recoveryRoot || "-"}</strong>
+                <strong title={formatManagedPath(disasterRecoveryStatus?.recoveryRoot)}>{formatManagedPath(disasterRecoveryStatus?.recoveryRoot)}</strong>
                 <div className="detail-item-actions">
                   {renderOpenPathAction(disasterRecoveryStatus?.recoveryRoot, "打开恢复包目录", onPathError)}
                 </div>
@@ -671,7 +671,7 @@ export default function BackupManagementPanel({
                   <td>{formatRuntimeDate(backup.lastWriteTime)}</td>
                   <td>
                     <div className="table-path-cell">
-                      <span title={backup.fullPath}>{backup.fullPath || "-"}</span>
+                      <span title={formatManagedPath(backup.fullPath, serverManagedFileLabel)}>{formatManagedPath(backup.fullPath, serverManagedFileLabel)}</span>
                       {renderOpenPathAction(backup.fullPath, "打开备份文件", onPathError)}
                     </div>
                   </td>

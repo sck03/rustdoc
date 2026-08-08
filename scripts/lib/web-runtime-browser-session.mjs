@@ -3,9 +3,13 @@ import { writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { waitForDevToolsUrl } from "./chromium-cdp.mjs";
+import {
+  buildChromiumSandboxArguments,
+  detectChromiumRuntime,
+} from "./chromium-sandbox-policy.mjs";
 
 export async function startChrome(options) {
-  const runtime = detectChromeRuntime();
+  const runtime = detectChromiumRuntime();
   const args = buildChromeLaunchArguments(options, runtime);
   const chrome = spawn(options.browserExecutable, args, {
     stdio: ["ignore", "pipe", "pipe"],
@@ -44,6 +48,7 @@ export function buildChromeLaunchArguments(options, runtime = detectChromeRuntim
     "--disable-extensions",
     "--disable-gpu",
     "--disable-sync",
+    "--force-device-scale-factor=1",
     "--metrics-recording-only",
     "--no-default-browser-check",
     "--no-first-run",
@@ -59,19 +64,9 @@ export function buildChromeLaunchArguments(options, runtime = detectChromeRuntim
     args.unshift("--disable-dev-shm-usage");
   }
 
-  if (runtime.platform === "linux" && (runtime.isCi || runtime.isRoot)) {
-    args.unshift("--no-sandbox");
-  }
+  args.unshift(...buildChromiumSandboxArguments(runtime));
 
   return args;
-}
-
-function detectChromeRuntime() {
-  return {
-    platform: process.platform,
-    isCi: Boolean(process.env.CI),
-    isRoot: typeof process.getuid === "function" && process.getuid() === 0,
-  };
 }
 
 function waitForChildExit(child, timeoutMs) {

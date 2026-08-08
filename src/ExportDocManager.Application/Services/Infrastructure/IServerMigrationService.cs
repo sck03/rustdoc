@@ -47,12 +47,14 @@ namespace ExportDocManager.Services.Infrastructure
             string packageFileName,
             string password,
             ServerMigrationRequestContext requestContext,
-            CancellationToken cancellationToken = default);
+            CancellationToken cancellationToken = default,
+            long? expectedPackageBytes = null);
 
         Task<ServerMigrationRestoreResult> StageDatabaseRestoreAsync(
             Stream databaseBackup,
             string backupFileName,
             ServerMigrationRequestContext requestContext,
-            CancellationToken cancellationToken = default);
+            CancellationToken cancellationToken = default,
+            long? expectedBackupBytes = null);
     }
 }

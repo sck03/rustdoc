@@ -16,7 +16,10 @@ namespace ExportDocManager.Services.Infrastructure
             ("SwSubmissionBatches", "SubmitPackagePath"),
             ("SwSubmissionBatches", "WorkingDirectoryPath"),
             ("SwSubmissionBatches", "LastReceiptPackagePath"),
-            ("SwSubmissionBatches", "ClientDispatchPath")
+            ("SwSubmissionBatches", "ClientDispatchPath"),
+            ("ApiBackgroundJobs", "OutputPath"),
+            ("SwClientProfiles", "CustomsCooClientRootPath"),
+            ("SwClientProfiles", "AgentConsignmentClientRootPath")
         ];
 
         public static async Task RewriteDatabasePathsAsync(

@@ -696,7 +696,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | css-line-break | 2.1.0 | MIT | web |
 | npm | csstype | 3.2.3 | MIT | web |
 | npm | debug | 4.4.3 | MIT | web |
-| npm | dompurify | 3.4.12 | (MPL-2.0 OR Apache-2.0) | web |
+| npm | dompurify | 3.4.13 | (MPL-2.0 OR Apache-2.0) | web |
 | npm | electron-to-chromium | 1.5.376 | ISC | web |
 | npm | esbuild | 0.28.1 | MIT | web |
 | npm | escalade | 3.2.0 | MIT | web |
@@ -729,8 +729,8 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | react | 18.3.1 | MIT | web |
 | npm | react-dom | 18.3.1 | MIT | web |
 | npm | react-refresh | 0.18.0 | MIT | web |
-| npm | react-router | 7.18.1 | MIT | web |
-| npm | react-router-dom | 7.18.1 | MIT | web |
+| npm | react-router | 7.18.2 | MIT | web |
+| npm | react-router-dom | 7.18.2 | MIT | web |
 | npm | regenerator-runtime | 0.13.11 | MIT | web |
 | npm | rgbcolor | 1.0.1 | MIT | web |
 | npm | rollup | 4.62.2 | MIT | web |

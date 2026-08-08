@@ -1,9 +1,54 @@
 using System.Diagnostics;
+using System.Text.Json;
+using System.Xml.Linq;
 
 namespace ExportDocManager.Infrastructure.Tests;
 
 public sealed class PackagePayloadContractTests
 {
+    [Fact]
+    public void PlaywrightChromiumPin_ShouldMatchRestoredPackageMetadata()
+    {
+        string root = FindWorkspaceRoot();
+        string packagePropsPath = Path.Combine(root, "Directory.Packages.props");
+        var packageProps = XDocument.Load(packagePropsPath);
+        string packageVersion = packageProps.Descendants("PackageVersion")
+            .Single(element => string.Equals((string)element.Attribute("Include"), "Microsoft.Playwright", StringComparison.Ordinal))
+            .Attribute("Version")?.Value ?? string.Empty;
+        string expectedBrowserVersion = packageProps.Descendants("PlaywrightChromiumVersion").Single().Value;
+        string expectedRevision = packageProps.Descendants("PlaywrightChromiumRevision").Single().Value;
+
+        string assetsPath = Path.Combine(
+            root,
+            "tests",
+            "ExportDocManager.Infrastructure.Tests",
+            "obj",
+            "project.assets.json");
+        using var assetsDocument = JsonDocument.Parse(File.ReadAllText(assetsPath));
+        string packageFolder = assetsDocument.RootElement.GetProperty("packageFolders")
+            .EnumerateObject()
+            .Select(property => property.Name)
+            .First();
+        string libraryKey = $"Microsoft.Playwright/{packageVersion}";
+        string relativePackagePath = assetsDocument.RootElement.GetProperty("libraries")
+            .GetProperty(libraryKey)
+            .GetProperty("path")
+            .GetString() ?? string.Empty;
+        string browserMetadataPath = Path.Combine(
+            packageFolder,
+            relativePackagePath.Replace('/', Path.DirectorySeparatorChar),
+            ".playwright",
+            "package",
+            "browsers.json");
+        using var browserDocument = JsonDocument.Parse(File.ReadAllText(browserMetadataPath));
+        JsonElement chromium = browserDocument.RootElement.GetProperty("browsers")
+            .EnumerateArray()
+            .Single(browser => browser.GetProperty("name").GetString() == "chromium");
+
+        Assert.Equal(expectedBrowserVersion, chromium.GetProperty("browserVersion").GetString());
+        Assert.Equal(expectedRevision, chromium.GetProperty("revision").GetString());
+    }
+
     [Fact]
     public void ReleasePipelines_ShouldUseProfilesAndRejectDuplicateHeavyPayloads()
     {
@@ -154,6 +199,12 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("chrome_platform: mac-arm64", typographyWorkflow, StringComparison.Ordinal);
         Assert.DoesNotContain("mac-x64", chromeProvisioning, StringComparison.Ordinal);
         Assert.Contains("only supports Apple Silicon ARM64", chromeProvisioning, StringComparison.Ordinal);
+        Assert.Contains("PlaywrightChromiumVersion", packageVersions, StringComparison.Ordinal);
+        Assert.Contains("Get-PlaywrightRuntimeMetadata", chromeProvisioning, StringComparison.Ordinal);
+        Assert.Contains("PlaywrightCompatible", chromeProvisioning, StringComparison.Ordinal);
+        Assert.Contains("playwrightCompatible", chromeProvisioning, StringComparison.Ordinal);
+        Assert.Contains("Assert-NoRunningBrowserFromRoot", chromeProvisioning, StringComparison.Ordinal);
+        Assert.Contains("Test-ChromeExecutable", chromeProvisioning, StringComparison.Ordinal);
     }
 
     [Fact]

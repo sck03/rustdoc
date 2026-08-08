@@ -113,10 +113,7 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 PersistJob(next);
-                if (_cancellationSources.TryGetValue(key, out var source))
-                {
-                    source.Cancel();
-                }
+                TryCancel(key);
 
                 return Task.FromResult(true);
             }
@@ -195,16 +192,59 @@ namespace ExportDocManager.Api.Hosting
             }
 
             string key = job.JobId.Trim();
-            var normalized = _jobs.AddOrUpdate(
+            bool hadPrevious = _jobs.TryGetValue(key, out var previous);
+            BackgroundJobSnapshot normalized = _jobs.AddOrUpdate(
                 key,
                 _ => NormalizeNewJob(job, key),
                 (_, current) => Normalize(job, current));
-            PersistJob(normalized);
-            if (BackgroundJobStatusCatalog.IsTerminal(normalized.Status))
+            try
             {
-                PruneTerminalHistory();
+                PersistJob(normalized);
+                if (BackgroundJobStatusCatalog.IsTerminal(normalized.Status))
+                {
+                    PruneTerminalHistory();
+                }
+
+                return normalized;
             }
-            return normalized;
+            catch
+            {
+                // Enqueue callers reserve queue capacity before Upsert. Restore the
+                // in-memory snapshot when durable persistence fails so a rejected
+                // write cannot leave a phantom task consuming capacity forever.
+                if (hadPrevious)
+                {
+                    _jobs[key] = previous;
+                }
+                else
+                {
+                    _jobs.TryRemove(key, out _);
+                }
+
+                try
+                {
+                    if (hadPrevious)
+                    {
+                        PersistJob(previous);
+                    }
+                    else if (_useDatabaseStore)
+                    {
+                        DeleteDatabaseJobs(new[] { key });
+                    }
+                    else
+                    {
+                        PersistJobs();
+                    }
+                }
+                catch
+                {
+                    // The original persistence exception is more useful to the
+                    // caller. A later retry/startup load will reconcile durable
+                    // state if the storage itself remains unavailable.
+                }
+
+                throw;
+            }
         }
 
         public BackgroundJobSnapshot Update(
@@ -253,6 +293,28 @@ namespace ExportDocManager.Api.Hosting
             if (_cancellationSources.TryRemove(jobId.Trim(), out var source))
             {
                 source.Dispose();
+            }
+        }
+
+        private bool TryCancel(string jobId)
+        {
+            if (string.IsNullOrWhiteSpace(jobId) ||
+                !_cancellationSources.TryGetValue(jobId.Trim(), out var source))
+            {
+                return false;
+            }
+
+            try
+            {
+                source.Cancel();
+                return true;
+            }
+            catch (ObjectDisposedException)
+            {
+                // Completion may remove and dispose the source immediately after
+                // the lookup. A completed task is already non-cancelable; do not
+                // turn that harmless race into a 500 response.
+                return false;
             }
         }
 

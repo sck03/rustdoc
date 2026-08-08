@@ -53,7 +53,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, initialListResponse.StatusCode);
             var initialList = await ApiIntegrationTestHarness.ReadJsonAsync<ApiBackupListResponse>(initialListResponse);
             string expectedBackupRoot = Path.Combine(harness.DataRoot, "Backups");
-            Assert.Equal(expectedBackupRoot, initialList.BackupRoot);
+            Assert.Equal(string.Empty, initialList.BackupRoot);
             Assert.Contains("运行数据根 Backups", initialList.StoragePolicy, StringComparison.Ordinal);
             Assert.Contains("不读取发票/付款业务表", initialList.StoragePolicy, StringComparison.Ordinal);
             Assert.Empty(initialList.Backups);
@@ -65,8 +65,9 @@ namespace ExportDocManager.Api.Tests
             var backup = Assert.Single(created.Backups);
             Assert.True(created.Success);
             Assert.EndsWith(".zip", backup.FileName, StringComparison.OrdinalIgnoreCase);
-            Assert.StartsWith(expectedBackupRoot, Path.GetFullPath(backup.FullPath), StringComparison.OrdinalIgnoreCase);
-            Assert.True(File.Exists(backup.FullPath));
+            Assert.Equal(string.Empty, backup.FullPath);
+            string physicalBackupPath = Path.Combine(expectedBackupRoot, backup.FileName);
+            Assert.True(File.Exists(physicalBackupPath));
             Assert.True(backup.SizeBytes > 0);
 
             var unsafeRestoreResponse = await adminClient.PostAsJsonAsync("/api/backup/restore", new
@@ -83,7 +84,7 @@ namespace ExportDocManager.Api.Tests
             });
             Assert.Equal(HttpStatusCode.BadRequest, unconfirmedRestoreResponse.StatusCode);
 
-            File.SetLastWriteTimeUtc(backup.FullPath, DateTime.UtcNow.AddDays(-10));
+            File.SetLastWriteTimeUtc(physicalBackupPath, DateTime.UtcNow.AddDays(-10));
             var cleanupResponse = await adminClient.PostAsJsonAsync("/api/backup/cleanup", new
             {
                 daysToKeep = 1
@@ -92,7 +93,31 @@ namespace ExportDocManager.Api.Tests
             var cleanup = await ApiIntegrationTestHarness.ReadJsonAsync<ApiBackupCreateResponse>(cleanupResponse);
             Assert.True(cleanup.Success);
             Assert.Empty(cleanup.Backups);
-            Assert.False(File.Exists(backup.FullPath));
+            Assert.False(File.Exists(physicalBackupPath));
+        }
+
+        [Fact]
+        public async Task BackupEndpoints_ShouldRevealServerPathsOnlyToTrustedDesktopClient()
+        {
+            const string desktopToken = "backup-desktop-token-2026";
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-backup-desktop-paths",
+                "api-backup-desktop.db",
+                desktopAccessToken: desktopToken);
+            using var anonymousClient = harness.CreateClient(desktopAccessToken: desktopToken);
+            ApiLoginResponse adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken, desktopToken);
+
+            HttpResponseMessage createResponse = await adminClient.PostAsync("/api/backup", content: null);
+            Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+            ApiBackupCreateResponse created =
+                await ApiIntegrationTestHarness.ReadJsonAsync<ApiBackupCreateResponse>(createResponse);
+            ApiBackupItemDto backup = Assert.Single(created.Backups);
+
+            string expectedRoot = Path.Combine(harness.DataRoot, "Backups");
+            Assert.Equal(expectedRoot, created.BackupRoot);
+            Assert.Equal(Path.Combine(expectedRoot, backup.FileName), backup.FullPath);
+            Assert.True(File.Exists(backup.FullPath));
         }
 
         [Fact]
@@ -113,7 +138,9 @@ namespace ExportDocManager.Api.Tests
                 Assert.Equal(HttpStatusCode.OK, createBackupResponse.StatusCode);
                 var created = await ApiIntegrationTestHarness.ReadJsonAsync<ApiBackupCreateResponse>(createBackupResponse);
                 var backup = Assert.Single(created.Backups);
-                Assert.True(File.Exists(backup.FullPath));
+                string physicalBackupPath = Path.Combine(harness.DataRoot, "Backups", backup.FileName);
+                Assert.Equal(string.Empty, backup.FullPath);
+                Assert.True(File.Exists(physicalBackupPath));
 
                 const string transientUsername = "restore-transient";
                 var createTransientUserResponse = await adminClient.PostAsJsonAsync("/api/users", new
@@ -162,7 +189,7 @@ namespace ExportDocManager.Api.Tests
                 Assert.DoesNotContain(usersAfterRestart.Users, user => user.Username == transientUsername);
 
                 var backupListAfterRestart = await GetBackupsAsync(restartedAdminClient);
-                Assert.Equal(Path.Combine(dataRoot, "Backups"), backupListAfterRestart.BackupRoot);
+                Assert.Equal(string.Empty, backupListAfterRestart.BackupRoot);
                 Assert.Contains(backupListAfterRestart.Backups, item => item.FileName == backup.FileName);
             }
             finally
@@ -323,7 +350,9 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, createBackupResponse.StatusCode);
             var created = await ApiIntegrationTestHarness.ReadJsonAsync<ApiBackupCreateResponse>(createBackupResponse);
             var backup = Assert.Single(created.Backups);
-            Assert.StartsWith(Path.Combine(harness.DataRoot, "Backups"), backup.FullPath, StringComparison.OrdinalIgnoreCase);
+            string physicalBackupPath = Path.Combine(harness.DataRoot, "Backups", backup.FileName);
+            Assert.Equal(string.Empty, backup.FullPath);
+            Assert.True(File.Exists(physicalBackupPath));
 
             var configuredStatusResponse = await adminClient.GetAsync("/api/backup/cloud/status");
             Assert.Equal(HttpStatusCode.OK, configuredStatusResponse.StatusCode);
@@ -344,9 +373,9 @@ namespace ExportDocManager.Api.Tests
             var uploaded = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCloudBackupCommandResponse>(uploadResponse);
             Assert.True(uploaded.Success);
             Assert.Equal(backup.FileName, uploaded.RemoteFileName);
-            Assert.Equal(backup.FullPath, uploaded.LocalBackupPath);
+            Assert.Equal(string.Empty, uploaded.LocalBackupPath);
             Assert.Equal(backup.SizeBytes, uploaded.SizeBytes);
-            Assert.StartsWith(Path.Combine(harness.DataRoot, "Backups"), uploaded.LocalBackupPath, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(string.Empty, uploaded.BackupRoot);
 
             Assert.True(webDavServer.Uploads.TryGetValue(backup.FileName, out var remoteBytes));
             Assert.True(remoteBytes.Length > 0);
@@ -358,10 +387,10 @@ namespace ExportDocManager.Api.Tests
             var remoteBackup = Assert.Single(remoteList.Backups);
             Assert.Equal(backup.FileName, remoteBackup.FileName);
             Assert.Equal(backup.SizeBytes, remoteBackup.SizeBytes);
-            Assert.Equal(Path.Combine(harness.DataRoot, "Backups"), remoteList.BackupRoot);
+            Assert.Equal(string.Empty, remoteList.BackupRoot);
 
-            File.Delete(backup.FullPath);
-            Assert.False(File.Exists(backup.FullPath));
+            File.Delete(physicalBackupPath);
+            Assert.False(File.Exists(physicalBackupPath));
 
             var invalidDownloadResponse = await adminClient.PostAsJsonAsync("/api/backup/cloud/download", new
             {
@@ -378,9 +407,10 @@ namespace ExportDocManager.Api.Tests
             Assert.True(downloaded.Success);
             Assert.Equal(backup.FileName, downloaded.RemoteFileName);
             Assert.Equal(backup.SizeBytes, downloaded.SizeBytes);
-            Assert.StartsWith(Path.Combine(harness.DataRoot, "Backups"), downloaded.LocalBackupPath, StringComparison.OrdinalIgnoreCase);
-            Assert.True(File.Exists(downloaded.LocalBackupPath));
-            Assert.Equal(remoteBytes, await File.ReadAllBytesAsync(downloaded.LocalBackupPath));
+            Assert.Equal(string.Empty, downloaded.LocalBackupPath);
+            Assert.Equal(string.Empty, downloaded.BackupRoot);
+            Assert.True(File.Exists(physicalBackupPath));
+            Assert.Equal(remoteBytes, await File.ReadAllBytesAsync(physicalBackupPath));
 
             var localBackupsAfterDownload = await GetBackupsAsync(adminClient);
             Assert.Contains(localBackupsAfterDownload.Backups, item => item.FileName == backup.FileName);

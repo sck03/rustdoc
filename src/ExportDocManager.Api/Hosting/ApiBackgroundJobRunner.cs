@@ -112,27 +112,39 @@ namespace ExportDocManager.Api.Hosting
                     normalizedRetryRequestJson);
             }
 
-            var snapshot = _jobs.Upsert(new BackgroundJobSnapshot
+            BackgroundJobSnapshot snapshot;
+            try
             {
-                JobId = jobId,
-                Kind = normalizedKind,
-                Title = title.Trim(),
-                Status = BackgroundJobStatusCatalog.Queued,
-                ProgressPercent = 0,
-                StatusText = "排队中",
-                DetailText = string.Empty,
-                RequestedBy = normalizedRequestedBy,
-                RequestedByUserId = currentUser != null &&
-                    string.Equals(currentUser.Username, normalizedRequestedBy, StringComparison.OrdinalIgnoreCase)
-                        ? currentUser.Id
-                        : 0,
-                CreatedAt = now,
-                OutputPath = normalizedInitialOutputPath,
-                CanCancel = true,
-                CanRetry = false,
-                RetryOperation = normalizedRetryOperation,
-                RetryRequestJson = normalizedRetryRequestJson
-            });
+                snapshot = _jobs.Upsert(new BackgroundJobSnapshot
+                {
+                    JobId = jobId,
+                    Kind = normalizedKind,
+                    Title = title.Trim(),
+                    Status = BackgroundJobStatusCatalog.Queued,
+                    ProgressPercent = 0,
+                    StatusText = "排队中",
+                    DetailText = string.Empty,
+                    RequestedBy = normalizedRequestedBy,
+                    RequestedByUserId = currentUser != null &&
+                        string.Equals(currentUser.Username, normalizedRequestedBy, StringComparison.OrdinalIgnoreCase)
+                            ? currentUser.Id
+                            : 0,
+                    CreatedAt = now,
+                    OutputPath = normalizedInitialOutputPath,
+                    CanCancel = true,
+                    CanRetry = false,
+                    RetryOperation = normalizedRetryOperation,
+                    RetryRequestJson = normalizedRetryRequestJson
+                });
+            }
+            catch
+            {
+                // Persistence can fail after the queue slot has been reserved.
+                // Always compensate both the quota and the controlled output.
+                ReleaseQueueSlot(normalizedRequestedBy, userState);
+                _jobs.CleanupControlledOutputPath(normalizedInitialOutputPath);
+                throw;
+            }
 
             var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(_applicationStopping.Token);
             _jobs.RegisterCancellationSource(jobId, cancellationSource);

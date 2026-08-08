@@ -21,6 +21,8 @@ namespace ExportDocManager.Api.Hosting
 
         public string ListenUrls { get; init; } = DefaultListenUrls;
 
+        public string EndpointFile { get; init; } = string.Empty;
+
         public string DesktopAccessToken { get; init; } = string.Empty;
 
         public string ProductEdition { get; init; } = ProductEditionCatalog.Full;
@@ -48,6 +50,7 @@ namespace ExportDocManager.Api.Hosting
             string urls = ReadOption(args, "--urls") ??
                 Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ??
                 DefaultListenUrls;
+            string endpointFile = ReadOption(args, "--endpoint-file") ?? string.Empty;
             string desktopAccessToken =
                 Environment.GetEnvironmentVariable(DesktopAccessTokenEnvironmentVariable) ??
                 string.Empty;
@@ -71,6 +74,7 @@ namespace ExportDocManager.Api.Hosting
                 AppRoot = NormalizeRoot(appRoot),
                 DataRoot = string.IsNullOrWhiteSpace(dataRoot) ? string.Empty : NormalizeRoot(dataRoot),
                 ListenUrls = NormalizeListenUrls(urls),
+                EndpointFile = NormalizeOptionalPath(endpointFile),
                 DesktopAccessToken = desktopAccessToken.Trim(),
                 ProductEdition = ProductEditionCatalog.Normalize(productEdition),
                 NetworkMode = ParseBoolean(networkModeValue),
@@ -113,6 +117,9 @@ namespace ExportDocManager.Api.Hosting
                 : string.Join(';', urls
                     .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
         }
+
+        private static string NormalizeOptionalPath(string path) =>
+            string.IsNullOrWhiteSpace(path) ? string.Empty : Path.GetFullPath(path.Trim());
 
         private static bool ParseBoolean(string value) =>
             bool.TryParse(value?.Trim(), out bool parsed) && parsed;

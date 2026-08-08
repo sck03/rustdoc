@@ -9,6 +9,7 @@ import {
   locateChromeForTesting,
 } from "./lib/report-regression-common.mjs";
 import { createReportRegressionTemplateCases } from "./lib/report-regression-template-cases.mjs";
+import { buildChromiumSandboxArguments } from "./lib/chromium-sandbox-policy.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -64,6 +65,7 @@ function renderScreenshot(chromePath, testCase) {
   const result = spawnSync(
     chromePath,
     [
+      ...buildChromiumSandboxArguments(),
       "--headless",
       "--disable-gpu",
       "--disable-extensions",

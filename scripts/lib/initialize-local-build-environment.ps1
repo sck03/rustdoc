@@ -73,5 +73,7 @@ Set-LocalEnvironmentPath -Name "DOTNET_CLI_HOME" -RelativePath "dotnet-cli"
 Set-LocalEnvironmentPath -Name "NUGET_PACKAGES" -RelativePath "nuget-packages"
 Set-LocalEnvironmentPath -Name "NUGET_HTTP_CACHE_PATH" -RelativePath "nuget-http-cache"
 Set-LocalEnvironmentPath -Name "npm_config_cache" -RelativePath "npm-cache"
-Set-LocalEnvironmentPath -Name "TEMP" -RelativePath "temp"
-Set-LocalEnvironmentPath -Name "TMP" -RelativePath "temp"
+if ($env:OS -ne "Windows_NT") {
+    Set-LocalEnvironmentPath -Name "TEMP" -RelativePath "temp"
+    Set-LocalEnvironmentPath -Name "TMP" -RelativePath "temp"
+}

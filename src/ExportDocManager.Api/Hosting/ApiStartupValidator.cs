@@ -19,7 +19,43 @@ namespace ExportDocManager.Api.Hosting
             ValidateListenUrls(runtimeOptions, databaseSettings);
             ValidateBootstrapToken(runtimeOptions, databaseSettings);
             PrepareRuntimeDirectories(pathProvider);
+            ValidateEndpointPublication(pathProvider, runtimeOptions);
             ValidateDatabasePath(pathProvider, databaseSettings);
+        }
+
+        public static void ValidateEndpointPublication(
+            IAppPathProvider pathProvider,
+            ApiRuntimeOptions runtimeOptions)
+        {
+            ArgumentNullException.ThrowIfNull(pathProvider);
+            ArgumentNullException.ThrowIfNull(runtimeOptions);
+            if (string.IsNullOrWhiteSpace(runtimeOptions.EndpointFile))
+            {
+                return;
+            }
+
+            if (runtimeOptions.NetworkMode || string.IsNullOrWhiteSpace(runtimeOptions.DesktopAccessToken))
+            {
+                throw new InvalidOperationException("动态端点文件只允许由带桌面令牌的本机 sidecar 使用。");
+            }
+
+            string[] listenUrls = (runtimeOptions.ListenUrls ?? string.Empty).Split(
+                ';',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (listenUrls.Length != 1 ||
+                !Uri.TryCreate(listenUrls[0], UriKind.Absolute, out Uri uri) ||
+                uri.Scheme != Uri.UriSchemeHttp ||
+                !IsLoopbackHost(uri.Host) ||
+                uri.Port != 0)
+            {
+                throw new InvalidOperationException(
+                    "动态端点文件要求 API 仅监听 http://127.0.0.1:0 或等价 IPv6 回环地址。");
+            }
+
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                runtimeOptions.EndpointFile,
+                pathProvider.CacheRoot,
+                "动态端点文件必须位于运行数据根 Cache 目录内。");
         }
 
         public static void PrepareRuntimeDirectories(IAppPathProvider pathProvider)
@@ -244,7 +280,7 @@ namespace ExportDocManager.Api.Hosting
             }
         }
 
-        private static bool IsLoopbackHost(string host)
+        internal static bool IsLoopbackHost(string host)
         {
             if (string.IsNullOrWhiteSpace(host))
             {

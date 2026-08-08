@@ -12,6 +12,15 @@ namespace ExportDocManager.Services.Infrastructure
         Task<DatabaseBackupResult> BackupDatabaseAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// 验证并导入一个外部 SQLite 备份。导入成功后只发布一个干净的、受管的 ZIP，
+        /// 不把未经 quick_check 的下载文件直接放进备份列表。
+        /// </summary>
+        Task<DatabaseBackupImportResult> ImportBackupAsync(
+            string sourceFilePath,
+            string preferredFileName = null,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// 清理旧备份文件
         /// </summary>
         /// <param name="daysToKeep">保留最近多少天的备份</param>
@@ -36,6 +45,12 @@ namespace ExportDocManager.Services.Infrastructure
         bool Skipped,
         string Message,
         string FilePath);
+
+    public sealed record DatabaseBackupImportResult(
+        bool Success,
+        string Message,
+        string FilePath,
+        long SizeBytes);
 
     public sealed record DatabaseRestoreScheduleResult(
         bool Success,

@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { ApiReportTemplatePreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
-import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
+import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import {
   isDesktopBridgeAvailable,
@@ -64,8 +64,9 @@ export function ReportTemplateDesignerPage({
   canManageTemplates: boolean;
   canDesignTemplates: boolean;
 }) {
-  const workspaceDeviceMode = useWorkspaceDeviceMode();
-  const workspaceDeviceCapabilities = getWorkspaceDeviceCapabilities(workspaceDeviceMode);
+  const workspaceDeviceProfile = useWorkspaceDeviceProfile();
+  const workspaceDeviceMode = workspaceDeviceProfile.mode;
+  const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
   const isLimitedReportView = !workspaceDeviceCapabilities.canUseDenseWorkbench;
   const requestConfirmation = useConfirmation();
   const invoiceOutputPermission = useModulePermission("document.invoice-reports");
@@ -718,7 +719,9 @@ export function ReportTemplateDesignerPage({
         <WorkspaceDeviceNotice
           mode={workspaceDeviceMode}
           phone="可选择模板、查看预览和进行轻量确认；可视化设计、高级 HTML、模板保存和模板包导入导出请使用桌面端。"
-          tablet="可选择模板、查看预览和进行现场确认；完整报表设计、高级 HTML、模板保存和模板包导入导出请使用桌面端。"
+          tablet={workspaceDeviceCapabilities.canUseAdvancedTools
+            ? "可选择模板、查看预览、使用高级 HTML 并导入导出模板包；完整可视化设计仍需要更宽屏幕。"
+            : "可选择模板、查看预览和进行现场确认；连接鼠标或触控板后可使用高级 HTML 与模板包导入导出。"}
         />
 
         {isLimitedReportView ? (

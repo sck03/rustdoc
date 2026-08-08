@@ -16,3 +16,10 @@ export function formatSettingDateTime(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
+
+export const serverManagedDirectoryLabel = "服务器受管目录";
+export const serverManagedFileLabel = "服务器受管文件";
+
+export function formatManagedPath(value: string | null | undefined, fallback = serverManagedDirectoryLabel) {
+  return value?.trim() || fallback;
+}

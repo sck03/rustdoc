@@ -35,6 +35,56 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task QueuedAutomationLease_ShouldNotBlockAvailablePdfCapacity()
+        {
+            string previousGlobal = Environment.GetEnvironmentVariable(BrowserRuntimeManager.GlobalConcurrencyEnvironmentVariable);
+            string previousPdf = Environment.GetEnvironmentVariable(BrowserRuntimeManager.PdfConcurrencyEnvironmentVariable);
+            string previousAutomation = Environment.GetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable);
+            Environment.SetEnvironmentVariable(BrowserRuntimeManager.GlobalConcurrencyEnvironmentVariable, "2");
+            Environment.SetEnvironmentVariable(BrowserRuntimeManager.PdfConcurrencyEnvironmentVariable, "2");
+            Environment.SetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable, "1");
+            try
+            {
+                await using var runtime = new BrowserRuntimeManager();
+                await using var firstAutomation = await runtime.AcquireAsync(BrowserWorkloadKind.WebAutomation);
+                Task<BrowserWorkloadLease> queuedAutomation = runtime.AcquireAsync(BrowserWorkloadKind.WebAutomation);
+                await Task.Delay(100);
+                Assert.False(queuedAutomation.IsCompleted);
+
+                await using var pdf = await runtime
+                    .AcquireAsync(BrowserWorkloadKind.PdfRendering)
+                    .WaitAsync(TimeSpan.FromSeconds(2));
+                Assert.Equal(1, runtime.GetSnapshot().ActivePdfTasks);
+
+                await firstAutomation.DisposeAsync();
+                await using var secondAutomation = await queuedAutomation.WaitAsync(TimeSpan.FromSeconds(2));
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(BrowserRuntimeManager.GlobalConcurrencyEnvironmentVariable, previousGlobal);
+                Environment.SetEnvironmentVariable(BrowserRuntimeManager.PdfConcurrencyEnvironmentVariable, previousPdf);
+                Environment.SetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable, previousAutomation);
+            }
+        }
+
+        [Theory]
+        [InlineData("file:///runtime-data/report.html", BrowserNavigationPolicy.LocalFilesOnly, true)]
+        [InlineData("data:text/html,ok", BrowserNavigationPolicy.LocalFilesOnly, true)]
+        [InlineData("https://www.i5a6.com/hscode/search", BrowserNavigationPolicy.LocalFilesOnly, false)]
+        [InlineData("https://www.i5a6.com/hscode/search", BrowserNavigationPolicy.I5a6Only, true)]
+        [InlineData("https://www.i5a6.com:443/hscode/search", BrowserNavigationPolicy.I5a6Only, true)]
+        [InlineData("https://user@www.i5a6.com/hscode/search", BrowserNavigationPolicy.I5a6Only, false)]
+        [InlineData("http://www.i5a6.com/hscode/search", BrowserNavigationPolicy.I5a6Only, false)]
+        [InlineData("https://www.i5a6.com.evil.test/hscode/search", BrowserNavigationPolicy.I5a6Only, false)]
+        public void NavigationPolicy_ShouldKeepPdfLocalAndHsAutomationOnItsTrustedOrigin(
+            string url,
+            BrowserNavigationPolicy policy,
+            bool expected)
+        {
+            Assert.Equal(expected, ManagedPlaywrightBrowserHost.IsNavigationAllowed(url, policy));
+        }
+
+        [Fact]
         public async Task OwnedProcessRegistration_ShouldOnlyTrackExplicitProcess()
         {
             await using var runtime = new BrowserRuntimeManager();

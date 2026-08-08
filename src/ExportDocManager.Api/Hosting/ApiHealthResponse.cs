@@ -69,43 +69,49 @@ namespace ExportDocManager.Api.Hosting
                 string.Empty,
                 Array.Empty<ApiRuntimePathInfo>(),
                 Array.Empty<ApiRuntimeDependencyInfo>(),
-                "公开健康检查只返回服务版本、状态和数据库模式；服务器绝对路径与依赖明细仅向桌面可信连接或管理员账号返回。");
+                "公开健康检查只返回服务版本、状态和数据库模式；运行依赖明细仅向管理员或桌面可信连接返回，服务器绝对路径只向桌面可信连接返回。");
         }
 
         public static ApiHealthResponse Create(
             IAppPathProvider paths,
             DatabaseConnectionSettings databaseSettings,
             string sqliteDatabasePath,
-            IReadOnlyList<RuntimeDependencyDiagnostic> runtimeDependencies)
+            IReadOnlyList<RuntimeDependencyDiagnostic> runtimeDependencies,
+            bool revealPaths = true)
         {
             ArgumentNullException.ThrowIfNull(paths);
             ArgumentNullException.ThrowIfNull(databaseSettings);
             ArgumentNullException.ThrowIfNull(runtimeDependencies);
 
-            var runtimePaths = CreateRuntimePaths(paths, sqliteDatabasePath);
+            var runtimePaths = CreateRuntimePaths(paths, sqliteDatabasePath, revealPaths);
 
             return new ApiHealthResponse(
                 "ok",
                 DateTimeOffset.UtcNow,
                 ProductVersionProvider.ProductVersion,
                 ProductVersionProvider.InformationalVersion,
-                paths.AppRoot,
-                paths.DataRoot,
-                paths.DatabaseRoot,
-                paths.SingleWindowRoot,
-                paths.TemplateRoot,
-                paths.OcrModelRoot,
-                paths.LogRoot,
+                ApiResponsePathPolicy.Reveal(paths.AppRoot, revealPaths),
+                ApiResponsePathPolicy.Reveal(paths.DataRoot, revealPaths),
+                ApiResponsePathPolicy.Reveal(paths.DatabaseRoot, revealPaths),
+                ApiResponsePathPolicy.Reveal(paths.SingleWindowRoot, revealPaths),
+                ApiResponsePathPolicy.Reveal(paths.TemplateRoot, revealPaths),
+                ApiResponsePathPolicy.Reveal(paths.OcrModelRoot, revealPaths),
+                ApiResponsePathPolicy.Reveal(paths.LogRoot, revealPaths),
                 DatabaseModeHelper.GetCurrentModeText(databaseSettings),
-                sqliteDatabasePath ?? string.Empty,
+                ApiResponsePathPolicy.Reveal(sqliteDatabasePath, revealPaths),
                 runtimePaths,
                 runtimeDependencies
-                    .Select(ToApiRuntimeDependency)
+                    .Select(diagnostic => ToApiRuntimeDependency(diagnostic, revealPaths))
                     .ToArray(),
-                "程序根只保存可执行文件以及 Templates/Resources/Browsers/Tools/OcrModels 等只读随程序资源。设置、用户模板、数据库、日志、缓存、备份、WebView 和其它业务可写数据统一使用 data root（默认 App_Data，可由 --data-root 指向其它磁盘）；授权镜像保存到运行数据根 Security，试用锚点和已注册许可证保存到平台机器级授权锚点。");
+                revealPaths
+                    ? "程序根只保存可执行文件以及 Templates/Resources/Browsers/Tools/OcrModels 等只读随程序资源。设置、用户模板、数据库、日志、缓存、备份、WebView 和其它业务可写数据统一使用 data root（默认 App_Data，可由 --data-root 指向其它磁盘）；授权镜像保存到运行数据根 Security，试用锚点和已注册许可证保存到平台机器级授权锚点。"
+                    : "浏览器管理页可查看服务器受管目录和依赖的可用状态，但不返回服务器绝对路径；绝对路径只向携带有效桌面令牌的本机 Tauri sidecar 返回。所有业务可写数据仍统一位于管理员配置的数据根。"
+            );
         }
 
-        private static ApiRuntimeDependencyInfo ToApiRuntimeDependency(RuntimeDependencyDiagnostic diagnostic)
+        private static ApiRuntimeDependencyInfo ToApiRuntimeDependency(
+            RuntimeDependencyDiagnostic diagnostic,
+            bool revealPaths)
         {
             return new ApiRuntimeDependencyInfo(
                 diagnostic.Key,
@@ -113,34 +119,35 @@ namespace ExportDocManager.Api.Hosting
                 diagnostic.Requirement,
                 diagnostic.Status,
                 diagnostic.Ready,
-                diagnostic.ResolvedPath,
+                ApiResponsePathPolicy.Reveal(diagnostic.ResolvedPath, revealPaths),
                 diagnostic.Message);
         }
 
         private static IReadOnlyList<ApiRuntimePathInfo> CreateRuntimePaths(
             IAppPathProvider paths,
-            string sqliteDatabasePath)
+            string sqliteDatabasePath,
+            bool revealPaths)
         {
             var result = new List<ApiRuntimePathInfo>
             {
-                DirectoryPath("app-root", "程序根", paths.AppRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Core, "程序可执行文件和随程序资源的只读根目录。"),
-                DirectoryPath("template-root", "内置报表模板", paths.TemplateRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Feature, "随程序发布，只读加载且不在运行时改写。"),
-                DirectoryPath("resource-root", "公共资源", paths.ResourceRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Feature, "Excel 模板、单一窗口词典等随程序资源。"),
-                DirectoryPath("browser-root", "浏览器运行包", paths.BrowserRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Feature, "报表渲染使用的跨平台浏览器资源。"),
-                DirectoryPath("tool-root", "工具运行包", paths.ToolRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Optional, "PostgreSQL、Excel helper 等可选工具。"),
-                DirectoryPath("ocr-model-root", "OCR 模型", paths.OcrModelRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Optional, "可选 OCR 模型与原生运行资源。"),
-                DirectoryPath("data-root", "运行数据根", paths.DataRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "全部默认业务可写目录的统一根。"),
-                DirectoryPath("user-template-root", "用户报表模板", paths.UserTemplateRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Feature, "用户新建、编辑副本和导入的报表模板。"),
-                DirectoryPath("database-root", "数据库目录", paths.DatabaseRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "SQLite 数据库及数据库相关运行文件。"),
-                DirectoryPath("file-root", "业务文件", paths.FileRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "业务附件和受管文件。"),
-                DirectoryPath("export-root", "导出目录", paths.ExportRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "未显式选择外部目录时的受管导出位置。"),
-                DirectoryPath("backup-root", "备份目录", paths.BackupRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "SQLite、PostgreSQL 与云备份工作目录。"),
-                DirectoryPath("single-window-root", "单一窗口目录", paths.SingleWindowRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "交接包、回执和客户端交换数据。"),
-                DirectoryPath("log-root", "日志目录", paths.LogRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "API、OCR、前端和桌面正常运行日志。"),
-                DirectoryPath("cache-root", "缓存目录", paths.CacheRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "可清理的短生命周期任务缓存。"),
-                DirectoryPath("config-root", "运行配置", paths.ConfigRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "运行路径与本机配置数据。"),
-                DirectoryPath("security-root", "安全数据", paths.SecurityRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "授权镜像等本机安全数据。"),
-                DirectoryPath("webview-root", "WebView 数据", paths.WebViewRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "桌面 WebView 配置、缓存和浏览器存储。")
+                DirectoryPath("app-root", "程序根", paths.AppRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Core, "程序可执行文件和随程序资源的只读根目录。", revealPaths),
+                DirectoryPath("template-root", "内置报表模板", paths.TemplateRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Feature, "随程序发布，只读加载且不在运行时改写。", revealPaths),
+                DirectoryPath("resource-root", "公共资源", paths.ResourceRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Feature, "Excel 模板、单一窗口词典等随程序资源。", revealPaths),
+                DirectoryPath("browser-root", "浏览器运行包", paths.BrowserRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Feature, "报表渲染使用的跨平台浏览器资源。", revealPaths),
+                DirectoryPath("tool-root", "工具运行包", paths.ToolRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Optional, "PostgreSQL、Excel helper 等可选工具。", revealPaths),
+                DirectoryPath("ocr-model-root", "OCR 模型", paths.OcrModelRoot, "program-resource", "read-only", ApiRuntimePathRequirement.Optional, "可选 OCR 模型与原生运行资源。", revealPaths),
+                DirectoryPath("data-root", "运行数据根", paths.DataRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "全部默认业务可写目录的统一根。", revealPaths),
+                DirectoryPath("user-template-root", "用户报表模板", paths.UserTemplateRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Feature, "用户新建、编辑副本和导入的报表模板。", revealPaths),
+                DirectoryPath("database-root", "数据库目录", paths.DatabaseRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "SQLite 数据库及数据库相关运行文件。", revealPaths),
+                DirectoryPath("file-root", "业务文件", paths.FileRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "业务附件和受管文件。", revealPaths),
+                DirectoryPath("export-root", "导出目录", paths.ExportRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "未显式选择外部目录时的受管导出位置。", revealPaths),
+                DirectoryPath("backup-root", "备份目录", paths.BackupRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "SQLite、PostgreSQL 与云备份工作目录。", revealPaths),
+                DirectoryPath("single-window-root", "单一窗口目录", paths.SingleWindowRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "交接包、回执和客户端交换数据。", revealPaths),
+                DirectoryPath("log-root", "日志目录", paths.LogRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "API、OCR、前端和桌面正常运行日志。", revealPaths),
+                DirectoryPath("cache-root", "缓存目录", paths.CacheRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "可清理的短生命周期任务缓存。", revealPaths),
+                DirectoryPath("config-root", "运行配置", paths.ConfigRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "运行路径与本机配置数据。", revealPaths),
+                DirectoryPath("security-root", "安全数据", paths.SecurityRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "授权镜像等本机安全数据。", revealPaths),
+                DirectoryPath("webview-root", "WebView 数据", paths.WebViewRoot, "runtime-data", "read-write", ApiRuntimePathRequirement.Core, "桌面 WebView 配置、缓存和浏览器存储。", revealPaths)
             };
 
             if (!string.IsNullOrWhiteSpace(sqliteDatabasePath))
@@ -148,7 +155,7 @@ namespace ExportDocManager.Api.Hosting
                 result.Add(new ApiRuntimePathInfo(
                     "sqlite-database",
                     "SQLite 文件",
-                    Path.GetFullPath(sqliteDatabasePath),
+                    ApiResponsePathPolicy.Reveal(Path.GetFullPath(sqliteDatabasePath), revealPaths),
                     "database-file",
                     "read-write",
                     ApiRuntimePathRequirement.Core,
@@ -166,12 +173,13 @@ namespace ExportDocManager.Api.Hosting
             string storageClass,
             string accessMode,
             string requirement,
-            string description)
+            string description,
+            bool revealPaths)
         {
             return new ApiRuntimePathInfo(
                 key,
                 label,
-                Path.GetFullPath(path),
+                ApiResponsePathPolicy.Reveal(Path.GetFullPath(path), revealPaths),
                 storageClass,
                 accessMode,
                 requirement,

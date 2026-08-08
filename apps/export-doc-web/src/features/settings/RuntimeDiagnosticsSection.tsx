@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Database, FolderCheck, HardDrive, PackageOpen, RefreshCw } from "lucide-react";
 import type { ApiHealthResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
-import { formatRuntimeDate } from "./settingsFormatters.ts";
+import { formatManagedPath, formatRuntimeDate } from "./settingsFormatters.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import {
@@ -84,8 +84,8 @@ export function RuntimeDiagnosticsSection({
             <span>{templateStorageMutation.data.message}</span>
           </div>
           <div className="runtime-template-storage-path">
-            <code title={templateStorageMutation.data.templateRoot}>{templateStorageMutation.data.templateRoot}</code>
-            {templateStorageMutation.data.exists
+            <code title={formatManagedPath(templateStorageMutation.data.templateRoot)}>{formatManagedPath(templateStorageMutation.data.templateRoot)}</code>
+            {templateStorageMutation.data.exists && templateStorageMutation.data.templateRoot
               ? renderOpenPathAction(templateStorageMutation.data.templateRoot, "打开模板目录", onPathError)
               : null}
           </div>
@@ -147,6 +147,7 @@ function RuntimeDependencyCard({
   item: RuntimeDependencyItem;
   onPathError: (message: string) => void;
 }) {
+  const resolvedPath = formatManagedPath(item.resolvedPath);
   return (
     <section className={`runtime-dependency-card runtime-dependency-card-${item.status}`} aria-label={item.label}>
       <div className="runtime-dependency-card-header">
@@ -161,8 +162,8 @@ function RuntimeDependencyCard({
         </span>
       </div>
       <p>{item.message}</p>
-      <div className="runtime-dependency-path" title={item.resolvedPath}>{item.resolvedPath}</div>
-      {item.ready ? renderOpenPathAction(item.resolvedPath, `打开${item.label}`, onPathError) : null}
+      <div className="runtime-dependency-path" title={resolvedPath}>{resolvedPath}</div>
+      {item.ready && item.resolvedPath ? renderOpenPathAction(item.resolvedPath, `打开${item.label}`, onPathError) : null}
     </section>
   );
 }
@@ -223,20 +224,21 @@ function RuntimePathRow({
   item: RuntimePathItem;
   onPathError: (message: string) => void;
 }) {
+  const displayPath = formatManagedPath(item.path);
   return (
     <div className="runtime-path-row">
       <div className="runtime-path-name">
         <strong>{item.label}</strong>
         <span>{item.description || "运行目录"}</span>
       </div>
-      <div className="runtime-path-value" title={item.path}>{item.path}</div>
+      <div className="runtime-path-value" title={displayPath}>{displayPath}</div>
       <div className="runtime-path-meta">
         <span className={`runtime-path-requirement runtime-path-requirement-${item.requirement}`}>
           {runtimePathRequirementLabel(item.requirement)}
         </span>
         <span className="runtime-path-access">{runtimePathAccessModeLabel(item.accessMode)}</span>
         <RuntimePathStatus availability={item.availability} requirement={item.requirement} />
-        {item.availability === "available"
+        {item.availability === "available" && item.path
           ? renderOpenPathAction(item.path, `打开${item.label}`, onPathError)
           : null}
       </div>

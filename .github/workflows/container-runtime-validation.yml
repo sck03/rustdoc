@@ -64,6 +64,7 @@ jobs:
     env:
       COMPOSE_DIRECTORY: deploy/container
       EXPORTDOCMANAGER_WEB_PORT: "18080"
+      EXPORTDOCMANAGER_WEB_BIND_ADDRESS: "127.0.0.1"
       EXPORTDOCMANAGER_HTTPS_PORT: "18443"
       POSTGRES_DB: exportdoc
       POSTGRES_USER: exportdoc
@@ -102,6 +103,7 @@ jobs:
           test "$first_token" = "$(sudo sed -n 's/^EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=//p' "$installer_root/.env")"
           test "$(sudo sed -n 's/^EXPORTDOCMANAGER_IMAGE_TAG=//p' "$installer_root/.env")" = "validation"
           test "$(sudo sed -n 's/^EXPORTDOCMANAGER_WEB_PORT=//p' "$installer_root/.env")" = "18080"
+          test "$(sudo sed -n 's/^EXPORTDOCMANAGER_WEB_BIND_ADDRESS=//p' "$installer_root/.env")" = "127.0.0.1"
 
           sudo env EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE="file://${{ github.workspace }}/deploy/container" \
             bash "$installer_root/install-container.sh" \
@@ -112,6 +114,7 @@ jobs:
             --no-start
           test "$(sudo sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' "$installer_root/.env")" = "https"
           test "$(sudo sed -n 's/^EXPORTDOCMANAGER_WEB_PORT=//p' "$installer_root/.env")" = "80"
+          test "$(sudo sed -n 's/^EXPORTDOCMANAGER_WEB_BIND_ADDRESS=//p' "$installer_root/.env")" = "0.0.0.0"
 
           sudo env EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE="file://${{ github.workspace }}/deploy/container" \
             bash "$installer_root/install-container.sh" \
@@ -122,7 +125,7 @@ jobs:
           test "$first_password" = "$(sudo sed -n 's/^POSTGRES_PASSWORD=//p' "$installer_root/.env")"
           test "$first_token" = "$(sudo sed -n 's/^EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=//p' "$installer_root/.env")"
           test "$(sudo sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' "$installer_root/.env")" = "http"
-          test "$(sudo sed -n 's/^EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY=//p' "$installer_root/.env")" = "true"
+          test "$(sudo sed -n 's/^EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY=//p' "$installer_root/.env")" = "false"
           test "$(sudo find "$installer_root" -maxdepth 1 -name '.env.previous.*' -print -quit)" = ""
 
           rollback_assets="${{ runner.temp }}/container-installer-rollback-assets"
@@ -133,6 +136,7 @@ jobs:
           cp deploy/container/docker-compose.acme.yml "$rollback_assets/"
           cp deploy/container/nginx.acme.conf "$rollback_assets/"
           cp deploy/container/install-container.sh "$rollback_assets/"
+          cp deploy/container/deployment-assets.sha256 "$rollback_assets/"
           printf 'services: [\n' > "$rollback_assets/docker-compose.ghcr.yml"
           printf '# previous environment\n' > "$rollback_root/.env"
           printf '# previous compose\n' > "$rollback_root/docker-compose.ghcr.yml"
@@ -265,6 +269,12 @@ jobs:
         run: |
           docker compose config --quiet
           docker compose -f docker-compose.yml -f docker-compose.https.yml config --quiet
+          static_https_config="$(docker compose -f docker-compose.yml -f docker-compose.https.yml config)"
+          grep -q 'target: 8443' <<<"$static_https_config"
+          if grep -q 'target: 8080' <<<"$static_https_config"; then
+            echo "Static-certificate HTTPS mode must not publish the cleartext web listener." >&2
+            exit 1
+          fi
           EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/sck03 \
             EXPORTDOCMANAGER_IMAGE_TAG=validation \
             docker compose -f docker-compose.ghcr.yml config --quiet

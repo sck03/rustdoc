@@ -228,7 +228,6 @@ fn normalize_path_for_prefix(path: &Path) -> PathBuf {
     }
 
     env::current_dir()
-        .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(path)
 }

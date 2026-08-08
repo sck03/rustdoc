@@ -58,6 +58,34 @@ public sealed class ApiSecurityBoundaryTests
         Assert.True(attempts.RecordFailure("alice", "10.0.0.5").Allowed);
     }
 
+    [Fact]
+    public void LoginAttempts_ShouldKeepAttackerControlledStateWithinHardLimit()
+    {
+        var attempts = new ApiLoginAttemptService(
+            new MutableTimeProvider(DateTimeOffset.Parse("2026-08-08T00:00:00Z")));
+
+        for (int index = 0; index < ApiLoginAttemptService.MaximumTrackedStates + 100; index++)
+        {
+            attempts.RecordFailure($"rotating-user-{index}", "10.0.0.5");
+        }
+
+        Assert.InRange(
+            attempts.TrackedStateCount,
+            1,
+            ApiLoginAttemptService.MaximumTrackedStates);
+    }
+
+    [Fact]
+    public void PostgreSqlSingleInstanceLockId_ShouldBeStableAndDatabaseScoped()
+    {
+        long first = PostgreSqlSingleInstanceHostedService.CalculateLockId("exportdoc");
+        long sameDatabase = PostgreSqlSingleInstanceHostedService.CalculateLockId(" ExportDoc ");
+        long otherDatabase = PostgreSqlSingleInstanceHostedService.CalculateLockId("exportdoc_sales");
+
+        Assert.Equal(first, sameDatabase);
+        Assert.NotEqual(first, otherDatabase);
+    }
+
     private sealed class MutableTimeProvider : TimeProvider
     {
         public MutableTimeProvider(DateTimeOffset now) => UtcNow = now;

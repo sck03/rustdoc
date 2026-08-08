@@ -5,11 +5,41 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Infrastructure.Tests;
 
 public sealed class ServerMigrationSecurityTests
 {
+    [Fact]
+    public void StorageBudget_ShouldUseActualPayloadSizesAndASmallSafetyMargin()
+    {
+        long budget = ServerMigrationStorageBudget.WithSafetyMargin(1_024, 2_048);
+
+        Assert.Equal(ServerMigrationStorageBudget.SafetyMarginBytes + 3_072, budget);
+    }
+
+    [Fact]
+    public void StorageBudget_ShouldClassifyUnavailableDiskSpace()
+    {
+        string root = CreateTestRoot("storage-budget");
+        try
+        {
+            var exception = Assert.Throws<InsufficientStorageException>(() =>
+                ServerMigrationStorageBudget.EnsureAvailable(
+                    root,
+                    long.MaxValue,
+                    "测试迁移阶段"));
+
+            Assert.Equal(long.MaxValue, exception.RequiredBytes);
+            Assert.Contains("测试迁移阶段", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
     [Theory]
     [InlineData("../outside.txt")]
     [InlineData("Data/Files/../Config/appsettings.json")]
@@ -485,6 +515,94 @@ public sealed class ServerMigrationSecurityTests
         {
             DeleteDirectory(root);
         }
+    }
+
+    [Fact]
+    public async Task ApplyPendingRestoreAsync_WhenRollbackIsIncomplete_ShouldKeepMarkerAndStagingForManualRecovery()
+    {
+        string root = CreateTestRoot("incomplete-rollback");
+        try
+        {
+            var paths = new RuntimeAppPathProvider(
+                Path.Combine(root, "app"),
+                Path.Combine(root, "data"));
+            string packageId = Guid.NewGuid().ToString("N");
+            string stagingDirectoryName = $"pending-{packageId}";
+            string stagingRoot = Path.Combine(
+                ServerMigrationManager.GetControlRoot(paths),
+                stagingDirectoryName);
+            WriteText(Path.Combine(stagingRoot, "recovery-probe.txt"), "keep-for-recovery");
+
+            string safetyRoot = ServerMigrationManager.GetSafetyBackupRoot(paths, packageId);
+            string targetRoot = Path.Combine(paths.FileRoot, "live");
+            WriteText(Path.Combine(targetRoot, "current.txt"), "changed-data");
+            var state = new ServerMigrationFileTransactionState
+            {
+                PackageId = packageId,
+                FullMigration = true,
+                Directories =
+                [
+                    new ServerMigrationDirectoryTransaction
+                    {
+                        TargetPath = targetRoot,
+                        ReplacementPath = Path.Combine(root, "missing-replacement"),
+                        OldSwapPath = Path.Combine(root, "missing-old-swap"),
+                        SnapshotPath = Path.Combine(safetyRoot, "missing-snapshot"),
+                        OriginallyExisted = true
+                    }
+                ]
+            };
+            WriteText(
+                Path.Combine(safetyRoot, "file-transaction.json"),
+                JsonSerializer.Serialize(state, ServerMigrationService.JsonOptions));
+
+            PendingServerMigrationRestore marker = CreateMarker(
+                packageId,
+                stagingDirectoryName,
+                ServerMigrationRestorePhase.ApplyingFiles);
+            string markerPath = ServerMigrationManager.GetPendingMarkerPath(paths);
+            WriteText(
+                markerPath,
+                JsonSerializer.Serialize(marker, ServerMigrationService.JsonOptions));
+
+            await ServerMigrationManager.ApplyPendingRestoreAsync(paths);
+
+            Assert.True(File.Exists(markerPath));
+            Assert.True(Directory.Exists(stagingRoot));
+            Assert.Equal("changed-data", File.ReadAllText(Path.Combine(targetRoot, "current.txt")));
+            PendingServerMigrationRestore failedMarker = JsonSerializer.Deserialize<PendingServerMigrationRestore>(
+                File.ReadAllText(markerPath),
+                ServerMigrationService.JsonOptions)!;
+            Assert.True(failedMarker.ManualRecoveryRequired);
+            Assert.Equal(ServerMigrationRestorePhase.Failed, failedMarker.Phase);
+            Assert.Contains("自动回滚未完全成功", failedMarker.LastError, StringComparison.Ordinal);
+
+            await ServerMigrationManager.ApplyPendingRestoreAsync(paths);
+
+            Assert.True(File.Exists(markerPath));
+            Assert.True(Directory.Exists(stagingRoot));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public void PackageGenerator_ShouldEnforceSourceBudgetBeforeHashing()
+    {
+        long maximum = ServerMigrationPackageGenerator.MaximumSourceBytes;
+
+        Assert.Equal(
+            maximum,
+            ServerMigrationPackageGenerator.ValidateNextSourceBudget(0, 0, maximum));
+        Assert.Throws<PayloadLimitExceededException>(() =>
+            ServerMigrationPackageGenerator.ValidateNextSourceBudget(1, maximum, 1));
+        Assert.Throws<InvalidDataException>(() =>
+            ServerMigrationPackageGenerator.ValidateNextSourceBudget(
+                ServerMigrationPackageValidator.ExtractionLimits.MaximumEntries - 1,
+                0,
+                0));
     }
 
     [Fact]

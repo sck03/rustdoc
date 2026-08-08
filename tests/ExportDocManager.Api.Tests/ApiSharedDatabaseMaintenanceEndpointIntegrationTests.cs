@@ -249,13 +249,16 @@ namespace ExportDocManager.Api.Tests
             var list = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPostgreSqlPhysicalBackupListResponse>(listResponse);
             Assert.False(list.Status.PostgreSqlSelected);
             Assert.False(list.Status.PostgreSqlConfigured);
-            Assert.Equal(Path.Combine(harness.DataRoot, "Backups", "PostgreSQL"), list.Status.BackupRoot);
+            Assert.Equal(string.Empty, list.Status.BackupRoot);
+            Assert.Equal(string.Empty, list.Status.ToolBinRoot);
+            Assert.Equal(string.Empty, list.Status.PgDumpPath);
             Assert.Empty(list.Backups);
 
             var createResponse = await adminClient.PostAsync("/api/postgresql-maintenance/backups", content: null);
             Assert.Equal(HttpStatusCode.BadRequest, createResponse.StatusCode);
-            Assert.True(Directory.Exists(list.Status.BackupRoot));
-            Assert.Empty(Directory.EnumerateFiles(list.Status.BackupRoot));
+            string physicalBackupRoot = Path.Combine(harness.DataRoot, "Backups", "PostgreSQL");
+            Assert.True(Directory.Exists(physicalBackupRoot));
+            Assert.Empty(Directory.EnumerateFiles(physicalBackupRoot));
         }
 
         [Fact]

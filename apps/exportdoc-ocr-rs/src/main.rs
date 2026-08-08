@@ -622,6 +622,29 @@ fn validate_image_path(value: &str, root: &Path) -> Result<PathBuf> {
     Ok(path)
 }
 
+fn write_response(w: &mut impl Write, r: Response) -> Result<()> {
+    serde_json::to_writer(&mut *w, &r)?;
+    w.write_all(b"\n")?;
+    w.flush()?;
+    Ok(())
+}
+
+fn argument(args: &[String], name: &str) -> Option<String> {
+    args.windows(2).find(|p| p[0] == name).map(|p| p[1].clone())
+}
+
+fn thread_count() -> usize {
+    std::thread::available_parallelism()
+        .map(|n| n.get().clamp(1, 4))
+        .unwrap_or(2)
+}
+
+fn text_quality(s: &str) -> usize {
+    s.chars()
+        .filter(|c| c.is_alphanumeric() || ('\u{4e00}'..='\u{9fff}').contains(c))
+        .count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -717,23 +740,4 @@ mod tests {
         assert!(pixel_count(resized.width(), resized.height()) <= 2_500);
         assert_eq!((resized.width(), resized.height()), (50, 50));
     }
-}
-fn write_response(w: &mut impl Write, r: Response) -> Result<()> {
-    serde_json::to_writer(&mut *w, &r)?;
-    w.write_all(b"\n")?;
-    w.flush()?;
-    Ok(())
-}
-fn argument(args: &[String], name: &str) -> Option<String> {
-    args.windows(2).find(|p| p[0] == name).map(|p| p[1].clone())
-}
-fn thread_count() -> usize {
-    std::thread::available_parallelism()
-        .map(|n| n.get().clamp(1, 4))
-        .unwrap_or(2)
-}
-fn text_quality(s: &str) -> usize {
-    s.chars()
-        .filter(|c| c.is_alphanumeric() || ('\u{4e00}'..='\u{9fff}').contains(c))
-        .count()
 }

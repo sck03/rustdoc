@@ -3,7 +3,7 @@ import type { ApiPostgreSqlMaintenanceStatusResponse, ApiSharedDatabaseBackupIte
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
-import { formatBytes, formatRuntimeDate } from "./settingsFormatters.ts";
+import { formatBytes, formatManagedPath, formatRuntimeDate, serverManagedFileLabel } from "./settingsFormatters.ts";
 
 export function MaintenanceDatabaseBackupPanel({
   canManageSettings,
@@ -62,11 +62,11 @@ export function MaintenanceDatabaseBackupPanel({
         <div className="detail-item"><span>应用账号</span><strong title={status?.username || "-"}>{status?.username || "-"}</strong></div>
         <div className="detail-item detail-item-wide">
           <span>物理备份目录</span>
-          <div className="detail-value-row"><strong title={status?.backupRoot || "-"}>{status?.backupRoot || "-"}</strong><div className="detail-item-actions">{renderOpenPathAction(status?.backupRoot, "打开 PostgreSQL 备份目录", onPathError)}</div></div>
+          <div className="detail-value-row"><strong title={formatManagedPath(status?.backupRoot)}>{formatManagedPath(status?.backupRoot)}</strong><div className="detail-item-actions">{renderOpenPathAction(status?.backupRoot, "打开 PostgreSQL 备份目录", onPathError)}</div></div>
         </div>
         <div className="detail-item detail-item-wide">
           <span>工具目录</span>
-          <div className="detail-value-row"><strong title={status?.toolBinRoot || "-"}>{status?.toolBinRoot || "-"}</strong><div className="detail-item-actions">{renderOpenPathAction(status?.toolBinRoot, "打开 PostgreSQL 工具目录", onPathError)}</div></div>
+          <div className="detail-value-row"><strong title={formatManagedPath(status?.toolBinRoot)}>{formatManagedPath(status?.toolBinRoot)}</strong><div className="detail-item-actions">{renderOpenPathAction(status?.toolBinRoot, "打开 PostgreSQL 工具目录", onPathError)}</div></div>
         </div>
       </div>
       <ResponsiveTableFrame className="backup-table-frame" label="PostgreSQL 团队库物理备份列表">
@@ -78,7 +78,7 @@ export function MaintenanceDatabaseBackupPanel({
                 <td>{backup.fileName}</td>
                 <td>{formatBytes(backup.sizeBytes)}</td>
                 <td>{formatRuntimeDate(backup.createdAt)}</td>
-                <td><div className="table-path-cell"><span title={backup.fullPath}>{backup.fullPath || "-"}</span>{renderOpenPathAction(backup.fullPath, "打开 PostgreSQL 备份", onPathError)}</div></td>
+                <td><div className="table-path-cell"><span title={formatManagedPath(backup.fullPath, serverManagedFileLabel)}>{formatManagedPath(backup.fullPath, serverManagedFileLabel)}</span>{renderOpenPathAction(backup.fullPath, "打开 PostgreSQL 备份", onPathError)}</div></td>
               </tr>
             )) : <tr><td className="empty-cell" colSpan={4}>{isLoading ? "加载中" : "暂无 PostgreSQL 物理备份"}</td></tr>}
           </tbody>

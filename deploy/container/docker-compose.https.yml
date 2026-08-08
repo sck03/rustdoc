@@ -1,7 +1,9 @@
 services:
   web:
-    ports:
-      - "${EXPORTDOCMANAGER_HTTPS_PORT:-8443}:8443"
+    # Compose normally appends overlay ports to the base list. Override the
+    # list so static-certificate mode never keeps the cleartext 8080 mapping.
+    ports: !override
+      - "${EXPORTDOCMANAGER_WEB_BIND_ADDRESS:-0.0.0.0}:${EXPORTDOCMANAGER_HTTPS_PORT:-8443}:8443"
     volumes:
       - ./nginx.https.conf:/etc/nginx/conf.d/default.conf:ro
       - ${EXPORTDOCMANAGER_TLS_CERTIFICATE:?请设置 EXPORTDOCMANAGER_TLS_CERTIFICATE}:/etc/nginx/tls/server.crt:ro

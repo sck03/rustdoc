@@ -22,9 +22,15 @@ on:
       - "scripts/test_web_runtime_browser_session.mjs"
       - "scripts/test_login_security_contracts.mjs"
       - "scripts/test_react_router_declarative_contract.mjs"
+      - "scripts/test_report_template_pdf_pixel_regression.mjs"
       - "scripts/lib/chromium-cdp.mjs"
       - "scripts/lib/child-process-tree.mjs"
+      - "scripts/lib/chromium-sandbox-policy.mjs"
+      - "scripts/lib/pdf-viewer-page-capture.mjs"
+      - "scripts/lib/report-regression-common.mjs"
+      - "scripts/lib/report-regression-template-cases.mjs"
       - "scripts/lib/web-runtime-browser-session.mjs"
+      - "tests/ReportTemplateFixtures/**"
       - "src/ExportDocManager.Infrastructure/Services/Reporting/**"
       - "tests/ExportDocManager.Infrastructure.Tests/ReportHtmlServiceInfrastructureTests.cs"
       - ".github/workflows/cross-platform-typography.yml"
@@ -47,9 +53,15 @@ on:
       - "scripts/test_web_runtime_browser_session.mjs"
       - "scripts/test_login_security_contracts.mjs"
       - "scripts/test_react_router_declarative_contract.mjs"
+      - "scripts/test_report_template_pdf_pixel_regression.mjs"
       - "scripts/lib/chromium-cdp.mjs"
       - "scripts/lib/child-process-tree.mjs"
+      - "scripts/lib/chromium-sandbox-policy.mjs"
+      - "scripts/lib/pdf-viewer-page-capture.mjs"
+      - "scripts/lib/report-regression-common.mjs"
+      - "scripts/lib/report-regression-template-cases.mjs"
       - "scripts/lib/web-runtime-browser-session.mjs"
+      - "tests/ReportTemplateFixtures/**"
       - "src/ExportDocManager.Infrastructure/Services/Reporting/**"
       - "tests/ExportDocManager.Infrastructure.Tests/ReportHtmlServiceInfrastructureTests.cs"
       - ".github/workflows/cross-platform-typography.yml"
@@ -132,6 +144,14 @@ jobs:
           -Product ChromeHeadlessShell
           -Platform ${{ matrix.chrome_platform }}
 
+      - name: Provision full Chrome for PDF viewer regression
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >-
+          ./scripts/provision-chrome-for-testing.ps1
+          -Product Chrome
+          -Platform ${{ matrix.chrome_platform }}
+
       - name: Install frontend dependencies
         run: npm ci --prefix apps/export-doc-web
 
@@ -143,6 +163,19 @@ jobs:
 
       - name: Prevent source responsibility files from regrowing
         run: npm --prefix apps/export-doc-web run test:source-size-governance
+
+      - name: Validate real PDF viewer page navigation and pixels
+        if: runner.os == 'Windows'
+        run: npm --prefix apps/export-doc-web run test:template-pdf-pixels
+
+      - name: Upload PDF viewer regression evidence
+        if: runner.os == 'Windows' && always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: report-pdf-viewer-${{ matrix.slug }}
+          path: .codex-runtime/report-template-pdf-pixel-regression
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Validate density, scaling and native font rendering
         timeout-minutes: 5

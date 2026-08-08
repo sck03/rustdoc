@@ -12,7 +12,7 @@ import {
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
-import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
+import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import {
   isDesktopBridgeAvailable,
   openPath,
@@ -71,8 +71,9 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
   const invoicePermission = useModulePermission("document.invoices");
   const excelPermission = useModulePermission("document.excel");
   const singleWindowPermission = useModulePermission("document.single-window");
-  const workspaceDeviceMode = useWorkspaceDeviceMode();
-  const workspaceDeviceCapabilities = getWorkspaceDeviceCapabilities(workspaceDeviceMode);
+  const workspaceDeviceProfile = useWorkspaceDeviceProfile();
+  const workspaceDeviceMode = workspaceDeviceProfile.mode;
+  const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
   const [initialListViewState] = useState(() => loadListViewState(invoiceListViewStateStorageKey));
   const [keyword, setKeyword] = useState(initialListViewState.keyword);
   const [committedKeyword, setCommittedKeyword] = useState(initialListViewState.keyword);
@@ -511,7 +512,9 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
       <WorkspaceDeviceNotice
         mode={workspaceDeviceMode}
         phone="可查看、搜索和打开已有发票进行简单回填；新建完整发票、Excel/单据包导入和批量输出请使用电脑浏览器或桌面端。"
-        tablet="可查看、搜索、新建基础草稿和进行轻量编辑；Excel/单据包导入和批量输出请使用电脑浏览器或桌面端。"
+        tablet={workspaceDeviceCapabilities.canImportExport
+          ? "可查看、编辑并执行 Excel/单据包导入导出；大批量处理建议使用更宽屏幕。"
+          : "可查看、搜索、新建基础草稿和进行轻量编辑；连接鼠标或触控板后可使用 Excel 与单据包导入导出。"}
       />
       <div className="toolbar">
         <form className="search-form" onSubmit={handleSearch}>

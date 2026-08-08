@@ -5,6 +5,7 @@ using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
+using Npgsql;
 
 namespace ExportDocManager.Infrastructure.Tests
 {
@@ -59,6 +60,48 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 Environment.SetEnvironmentVariable(DbHelper.PostgreSqlMaximumPoolSizeEnvironmentVariable, previous);
             }
+        }
+
+        [Fact]
+        public void PostgreSqlConnectionString_ShouldNotAllowAdditionalOptionsToReplaceConnectionIdentity()
+        {
+            var settings = new DatabaseConnectionSettings
+            {
+                Provider = DatabaseConnectionSettings.PostgreSqlProvider,
+                PostgreSqlHost = "127.0.0.1",
+                PostgreSqlDatabase = "exportdoc",
+                PostgreSqlUsername = "exportdoc",
+                PostgreSqlPassword = "secret",
+                PostgreSqlAdditionalOptions = "Host=evil.example;Timeout=9999"
+            };
+
+            var error = Assert.Throws<ServiceValidationException>(
+                () => DbHelper.BuildPostgreSqlConnectionString(settings));
+
+            Assert.Contains("不支持字段", error.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void PostgreSqlConnectionString_ShouldApplyAllowedOptionsInsideSafeBounds()
+        {
+            var builder = new Npgsql.NpgsqlConnectionStringBuilder(
+                DbHelper.BuildPostgreSqlConnectionString(new DatabaseConnectionSettings
+                {
+                    Provider = DatabaseConnectionSettings.PostgreSqlProvider,
+                    PostgreSqlHost = "127.0.0.1",
+                    PostgreSqlDatabase = "exportdoc",
+                    PostgreSqlUsername = "exportdoc",
+                    PostgreSqlPassword = "secret",
+                    PostgreSqlAdditionalOptions = "SSL Mode=Require;Maximum Pool Size=1000;Timeout=9999"
+                }));
+
+            Assert.Equal("127.0.0.1", builder.Host);
+            Assert.Equal("exportdoc", builder.Database);
+            Assert.Equal("exportdoc", builder.Username);
+            Assert.Equal(SslMode.Require, builder.SslMode);
+            Assert.Equal(200, builder.MaxPoolSize);
+            Assert.Equal(120, builder.Timeout);
+            Assert.True(builder.Pooling);
         }
 
         [Fact]
@@ -316,6 +359,15 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.True(PasswordHasher.VerifyPassword(hash, "valid-password"));
             Assert.False(PasswordHasher.VerifyPassword(hash, "wrong-password"));
             Assert.False(PasswordHasher.VerifyPassword("broken-hash", "valid-password"));
+
+            string salt = Convert.ToBase64String(new byte[16]);
+            string key = Convert.ToBase64String(new byte[32]);
+            Assert.False(PasswordHasher.VerifyPassword(
+                $"{PasswordHasher.MinimumAcceptedIterations - 1}.{salt}.{key}",
+                "valid-password"));
+            Assert.False(PasswordHasher.VerifyPassword(
+                $"{PasswordHasher.MaximumAcceptedIterations + 1}.{salt}.{key}",
+                "valid-password"));
         }
 
         [Fact]

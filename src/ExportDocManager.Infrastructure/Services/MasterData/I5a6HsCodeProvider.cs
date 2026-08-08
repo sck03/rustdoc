@@ -1,5 +1,6 @@
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.BrowserRuntime;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.Playwright;
 
@@ -23,7 +24,8 @@ namespace ExportDocManager.Services.MasterData
             var handler = new SocketsHttpHandler
             {
                 AutomaticDecompression = System.Net.DecompressionMethods.All,
-                PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+                PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+                AllowAutoRedirect = false
             };
             var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
@@ -34,10 +36,7 @@ namespace ExportDocManager.Services.MasterData
         public string Name => "i5a6";
         public int Priority => 100;
 
-        public bool CanHandleDetailUrl(string detailUrl) =>
-            Uri.TryCreate(detailUrl, UriKind.Absolute, out var uri) &&
-            uri.Scheme == Uri.UriSchemeHttps &&
-            string.Equals(uri.Host, "www.i5a6.com", StringComparison.OrdinalIgnoreCase);
+        public bool CanHandleDetailUrl(string detailUrl) => IsTrustedUri(detailUrl);
 
         public async Task<IReadOnlyList<HsCode>> SearchAsync(string keyword, CancellationToken cancellationToken = default)
         {
@@ -77,6 +76,7 @@ namespace ExportDocManager.Services.MasterData
                 if (bundle.Records.Count > 0) return bundle;
             }
             catch (OperationCanceledException) { throw; }
+            catch (PayloadLimitExceededException) { throw; }
             catch (Exception)
             {
             }
@@ -104,6 +104,7 @@ namespace ExportDocManager.Services.MasterData
                     DateTimeOffset.UtcNow);
             }
             catch (OperationCanceledException) { throw; }
+            catch (PayloadLimitExceededException) { throw; }
             catch (Exception)
             {
                 return await _browserHost.ExecuteAsync(
@@ -166,11 +167,14 @@ namespace ExportDocManager.Services.MasterData
             CancellationToken cancellationToken)
         {
             string url = $"{BaseUrl}/hscode/key/{System.Net.WebUtility.UrlEncode(keyword)}";
-            await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded }).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            await WaitForSemanticContentAsync(page, detailPage: false).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            string html = await page.ContentAsync().ConfigureAwait(false);
+            await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded })
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+            EnsureTrustedPageUrl(page.Url);
+            await WaitForSemanticContentAsync(page, detailPage: false, cancellationToken).ConfigureAwait(false);
+            string html = await page.ContentAsync()
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
             return I5a6PageParser.ParseSearchPage(html, keyword, "i5a6", DateTimeOffset.UtcNow);
         }
 
@@ -193,16 +197,24 @@ namespace ExportDocManager.Services.MasterData
             HsCodeRemoteSearchRecord record,
             CancellationToken cancellationToken)
         {
-            await page.GotoAsync(record.Item.DetailUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded }).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            await WaitForSemanticContentAsync(page, detailPage: true).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            string html = await page.ContentAsync().ConfigureAwait(false);
+            await page.GotoAsync(record.Item.DetailUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded })
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+            EnsureTrustedPageUrl(page.Url);
+            await WaitForSemanticContentAsync(page, detailPage: true, cancellationToken).ConfigureAwait(false);
+            string html = await page.ContentAsync()
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
             return I5a6PageParser.ParseDetailPage(html, record.Item, record.InstanceCount, record.EvidenceUrl, DateTimeOffset.UtcNow);
         }
 
         private async Task<string> GetHtmlWithRetryAsync(string url, CancellationToken cancellationToken)
         {
+            if (!IsTrustedUri(url))
+            {
+                throw new ServiceValidationException("i5a6 请求地址必须使用受信任的 HTTPS 主机和默认端口。");
+            }
+
             Exception lastError = null;
             for (int attempt = 1; attempt <= 2; attempt++)
             {
@@ -241,18 +253,44 @@ namespace ExportDocManager.Services.MasterData
             throw new HttpRequestException("i5a6 静态页面连续两次读取失败。", lastError);
         }
 
-        private static async Task WaitForSemanticContentAsync(IPage page, bool detailPage)
+        private static async Task WaitForSemanticContentAsync(
+            IPage page,
+            bool detailPage,
+            CancellationToken cancellationToken)
         {
             string expression = detailPage
                 ? "() => document.body && (/商品编码|申报要素|已作废/.test(document.body.innerText || ''))"
                 : "() => document.body && (document.querySelectorAll('table tr').length > 1 || document.querySelectorAll('a[href*=\"/hscode/detail/\"]').length > 0 || /(?:0\\s*条|未找到|无相关)/.test(document.body.innerText || ''))";
             try
             {
-                await page.WaitForFunctionAsync(expression, null, new PageWaitForFunctionOptions { Timeout = 4_000 }).ConfigureAwait(false);
+                await page.WaitForFunctionAsync(
+                        expression,
+                        null,
+                        new PageWaitForFunctionOptions { Timeout = 4_000 })
+                    .WaitAsync(cancellationToken)
+                    .ConfigureAwait(false);
             }
             catch (PlaywrightException)
             {
                 // The parser still receives the final DOM and applies its own quality gate.
+            }
+        }
+
+        internal static bool IsTrustedUri(string value)
+        {
+            return Uri.TryCreate(value, UriKind.Absolute, out Uri uri) &&
+                   uri.Scheme == Uri.UriSchemeHttps &&
+                   string.Equals(uri.Host, "www.i5a6.com", StringComparison.OrdinalIgnoreCase) &&
+                   (uri.IsDefaultPort || uri.Port == 443) &&
+                   string.IsNullOrEmpty(uri.UserInfo) &&
+                   string.IsNullOrEmpty(uri.Fragment);
+        }
+
+        private static void EnsureTrustedPageUrl(string value)
+        {
+            if (!IsTrustedUri(value))
+            {
+                throw new ServiceValidationException("i5a6 页面跳转到了未受信任的地址，已停止浏览器降级查询。");
             }
         }
 

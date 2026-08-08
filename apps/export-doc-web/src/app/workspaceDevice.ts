@@ -9,6 +9,12 @@ export type WorkspaceDeviceCapabilities = {
   canUseAdvancedTools: boolean;
 };
 
+export type WorkspaceDeviceProfile = {
+  mode: WorkspaceDeviceMode;
+  hasFinePointer: boolean;
+  capabilities: WorkspaceDeviceCapabilities;
+};
+
 export const workspacePhoneMaxWidth = 680;
 export const workspaceDesktopMinWidth = 1181;
 
@@ -33,11 +39,15 @@ const capabilities: Record<WorkspaceDeviceMode, WorkspaceDeviceCapabilities> = {
   },
 };
 
-export function useWorkspaceDeviceMode(): WorkspaceDeviceMode {
+export function useWorkspaceDeviceProfile(): WorkspaceDeviceProfile {
   const isPhone = useMediaQuery(`(max-width: ${workspacePhoneMaxWidth}px)`);
   const isDesktop = useMediaQuery(`(min-width: ${workspaceDesktopMinWidth}px)`);
   const hasFinePointer = useMediaQuery("(any-pointer: fine) and (any-hover: hover)");
-  return resolveWorkspaceDeviceMode(isPhone, isDesktop, hasFinePointer);
+  return resolveWorkspaceDeviceProfile(isPhone, isDesktop, hasFinePointer);
+}
+
+export function useWorkspaceDeviceMode(): WorkspaceDeviceMode {
+  return useWorkspaceDeviceProfile().mode;
 }
 
 export function resolveWorkspaceDeviceMode(
@@ -51,8 +61,29 @@ export function resolveWorkspaceDeviceMode(
   return "tablet";
 }
 
-export function getWorkspaceDeviceCapabilities(mode: WorkspaceDeviceMode) {
-  return capabilities[mode];
+export function resolveWorkspaceDeviceProfile(
+  isPhoneWidth: boolean,
+  isDesktopWidth: boolean,
+  hasFinePointer: boolean,
+): WorkspaceDeviceProfile {
+  const mode = resolveWorkspaceDeviceMode(isPhoneWidth, isDesktopWidth, hasFinePointer);
+  return {
+    mode,
+    hasFinePointer,
+    capabilities: getWorkspaceDeviceCapabilities(mode, hasFinePointer),
+  };
+}
+
+export function getWorkspaceDeviceCapabilities(
+  mode: WorkspaceDeviceMode,
+  hasFinePointer = false,
+): WorkspaceDeviceCapabilities {
+  if (mode !== "tablet" || !hasFinePointer) return capabilities[mode];
+  return {
+    ...capabilities.tablet,
+    canImportExport: true,
+    canUseAdvancedTools: true,
+  };
 }
 
 export function getWorkspaceDeviceLabel(mode: WorkspaceDeviceMode) {

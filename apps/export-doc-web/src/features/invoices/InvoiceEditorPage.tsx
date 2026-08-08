@@ -4,7 +4,7 @@ import { ArrowLeft, Edit3, Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
-import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
+import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { isConcurrencyConflict, normalizeText, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
@@ -65,8 +65,9 @@ export function InvoiceEditorPage({
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const workspaceDeviceMode = useWorkspaceDeviceMode();
-  const workspaceDeviceCapabilities = getWorkspaceDeviceCapabilities(workspaceDeviceMode);
+  const workspaceDeviceProfile = useWorkspaceDeviceProfile();
+  const workspaceDeviceMode = workspaceDeviceProfile.mode;
+  const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
   const [initialNewRouteState] = useState(() => ({
     invoiceDraft: readRouteInvoiceDraft(location.state),
     successMessage: readRouteSuccessMessage(location.state),
@@ -838,7 +839,9 @@ export function InvoiceEditorPage({
       <WorkspaceDeviceNotice
         mode={workspaceDeviceMode}
         phone="手机端用于查看、搜索、审批和简单回填；商品明细工作台、批量录入、信用证处理和导入导出请使用桌面端。"
-        tablet="平板端用于轻量编辑和现场确认；商品明细工作台、批量录入、信用证处理和导入导出请使用桌面端。"
+        tablet={workspaceDeviceCapabilities.canUseAdvancedTools
+          ? "可进行轻量编辑、信用证处理和导入导出；商品明细密集工作台与批量录入仍需更宽屏幕。"
+          : "平板端用于轻量编辑和现场确认；连接鼠标或触控板后可使用信用证处理和导入导出。"}
       />
 
       {!invoice && isBusy ? <PageState tone="loading" title="正在加载发票" description="请稍候，系统正在读取发票和商品明细。" /> : null}

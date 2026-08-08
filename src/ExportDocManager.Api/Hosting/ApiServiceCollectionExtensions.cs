@@ -66,9 +66,10 @@ namespace ExportDocManager.Api.Hosting
             services.AddSingleton(_ => ApiBackgroundJobRetentionOptions.FromEnvironment());
             services.AddSingleton<ApiBackgroundJobService>();
             services.AddSingleton<ApiBackgroundJobRunner>();
+            services.AddHostedService<SqliteSingleInstanceHostedService>();
+            services.AddHostedService<PostgreSqlSingleInstanceHostedService>();
             services.AddHostedService(provider => provider.GetRequiredService<ApiBackgroundJobRunner>());
             services.AddSingleton<ApiBackgroundJobRetryDispatcher>();
-            services.AddHostedService<SqliteSingleInstanceHostedService>();
             services.AddHostedService<PostgreSqlAutomaticBackupHostedService>();
             services.AddSingleton<IBackgroundJobService>(provider =>
                 provider.GetRequiredService<ApiBackgroundJobService>());
@@ -130,7 +131,12 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IAuxiliaryService, AuxiliaryService>();
             services.AddSingleton<BrowserRuntimeManager>();
             services.AddSingleton<BrowserExecutableResolver>();
-            services.AddSingleton<ManagedPlaywrightBrowserHost>();
+            services.AddSingleton(provider => new ManagedPlaywrightBrowserHost(
+                provider.GetRequiredService<BrowserRuntimeManager>(),
+                provider.GetRequiredService<BrowserExecutableResolver>(),
+                pathProvider,
+                BrowserNavigationPolicy.I5a6Only));
+            services.AddSingleton<ManagedPlaywrightPdfBrowserHost>();
             services.AddSingleton<IHsCodeRemoteProvider, I5a6HsCodeProvider>();
             services.AddScoped<IHsCodeKnowledgeService, HsCodeKnowledgeService>();
             services.AddScoped<IHsCodeService, HsCodeService>();
@@ -162,7 +168,10 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IReportTemplateStorageDiagnosticsService, ReportTemplateStorageDiagnosticsService>();
             services.AddScoped<IReportTemplatePackageService, ReportTemplatePackageService>();
             services.AddSingleton<IReportTemplateFieldCatalogService, ReportTemplateFieldCatalogService>();
-            services.AddScoped<IHtmlToPdfService, ChromiumHtmlToPdfService>();
+            services.AddScoped<IHtmlToPdfService>(provider => new ChromiumHtmlToPdfService(
+                pathProvider,
+                provider.GetRequiredService<BrowserRuntimeManager>(),
+                provider.GetRequiredService<ManagedPlaywrightPdfBrowserHost>()));
             services.AddScoped<IReportPdfRenderService, ReportPdfRenderService>();
             services.AddScoped<SingleWindowTrackingService>();
             services.AddScoped<ISingleWindowTrackingService>(provider =>

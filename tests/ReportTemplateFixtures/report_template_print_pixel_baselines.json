@@ -94,8 +94,8 @@
       "viewport": {
         "width": 900,
         "height": 1270,
-        "fingerprintHex": "ffffffffffff5800001ff8000003c000fc00003ffffffffffffffffefffffffffffffffffa80003fff80003fff80003fff800020ffff8020ff800020ffffffffffffffbfffffffff1f800000ffff0000000007fc000006040000040400000404000007fcfe07e000fc0000000000000000000000000000000000000000000000",
-        "occupiedCells": 446,
+        "fingerprintHex": "ffffffffffff5800001ff8000003c000fc00003ffffffffffffffffefffffffffffffffffa80003fff80003fff80003fff800020ffff8020ff800020ffffffffffffffbfffffffffffff000000000000000007fc000006040000040400000404000007fcfe07e000fc0000000000000000000000000000000000000000000000",
+        "occupiedCells": 440,
         "contentBounds": {
           "left": 20,
           "top": 24,
@@ -106,8 +106,8 @@
       "fullPage": {
         "width": 900,
         "height": 1270,
-        "fingerprintHex": "ffffffffffff5800001ff8000003c000fc00003ffffffffffffffffefffffffffffffffffa80003fff80003fff80003fff800020ffff8020ff800020ffffffffffffffbfffffffff1f800000ffff0000000007fc000006040000040400000404000007fcfe07e000fc0000000000000000000000000000000000000000000000",
-        "occupiedCells": 446,
+        "fingerprintHex": "ffffffffffff5800001ff8000003c000fc00003ffffffffffffffffefffffffffffffffffa80003fff80003fff80003fff800020ffff8020ff800020ffffffffffffffbfffffffffffff000000000000000007fc000006040000040400000404000007fcfe07e000fc0000000000000000000000000000000000000000000000",
+        "occupiedCells": 440,
         "contentBounds": {
           "left": 20,
           "top": 24,
@@ -146,25 +146,25 @@
       "viewport": {
         "width": 900,
         "height": 1270,
-        "fingerprintHex": "001ff8ff001fd800fe0003fffc0003fffc000000fffffe00fffffffffffffffffffffffffffffefffffffffffffffffff3f7f9f8f3f781f8ffffc000fffffffefffffffcff000000fc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        "occupiedCells": 417,
+        "fingerprintHex": "001ff8ff001fd800fc0003fffc0003fffc000000fffffc00ffffffffffffffffffffffffffffffffe1ffc0fffffffffff3f7f9f8f3f781f8ffff8000fffffffeffe00000ff0000007c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 385,
         "contentBounds": {
           "left": 20,
           "top": 0,
           "width": 880,
-          "height": 728
+          "height": 718
         }
       },
       "fullPage": {
         "width": 900,
         "height": 1270,
-        "fingerprintHex": "001ff8ff001fd800fe0003fffc0003fffc000000fffffe00fffffffffffffffffffffffffffffefffffffffffffffffff3f7f9f8f3f781f8ffffc000fffffffefffffffcff000000fc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        "occupiedCells": 417,
+        "fingerprintHex": "001ff8ff001fd800fc0003fffc0003fffc000000fffffc00ffffffffffffffffffffffffffffffffe1ffc0fffffffffff3f7f9f8f3f781f8ffff8000fffffffeffe00000ff0000007c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 385,
         "contentBounds": {
           "left": 20,
           "top": 0,
           "width": 880,
-          "height": 728
+          "height": 718
         }
       }
     },
@@ -224,8 +224,8 @@
       "viewport": {
         "width": 900,
         "height": 1270,
-        "fingerprintHex": "003ffc00003ffc000007e0007fffffe0fffffffffffffff7ffffffff95ff5ff5ffffffffffffffff9ffffffffffffffff122489ff122489fffffffffffffffffff8000fdffffffffe01c070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        "occupiedCells": 452,
+        "fingerprintHex": "003ffc00003ffc000007e0007ffffffefffffffffffffff7ffffffff95ff5ff5ffffffffffffffff9ffffffffffffffff122489ff122489fffffffffffffffffff8000fdffffffffe01c070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 456,
         "contentBounds": {
           "left": 20,
           "top": 29,
@@ -236,8 +236,8 @@
       "fullPage": {
         "width": 900,
         "height": 1270,
-        "fingerprintHex": "003ffc00003ffc000007e0007fffffe0fffffffffffffff7ffffffff95ff5ff5ffffffffffffffff9ffffffffffffffff122489ff122489fffffffffffffffffff8000fdffffffffe01c070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        "occupiedCells": 452,
+        "fingerprintHex": "003ffc00003ffc000007e0007ffffffefffffffffffffff7ffffffff95ff5ff5ffffffffffffffff9ffffffffffffffff122489ff122489fffffffffffffffffff8000fdffffffffe01c070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "occupiedCells": 456,
         "contentBounds": {
           "left": 20,
           "top": 29,

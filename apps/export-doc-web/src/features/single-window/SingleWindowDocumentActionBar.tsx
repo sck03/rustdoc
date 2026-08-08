@@ -10,7 +10,7 @@ import {
   Undo2,
   WandSparkles,
 } from "lucide-react";
-import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
+import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 
 export function SingleWindowDocumentActionBar({
   title,
@@ -50,8 +50,7 @@ export function SingleWindowDocumentActionBar({
   onBuildReview: () => void;
 }) {
   const [viewMode, setViewMode] = useState<"standard" | "advanced">("standard");
-  const workspaceDeviceMode = useWorkspaceDeviceMode();
-  const canUseAdvancedTools = getWorkspaceDeviceCapabilities(workspaceDeviceMode).canUseAdvancedTools;
+  const canUseAdvancedTools = useWorkspaceDeviceProfile().capabilities.canUseAdvancedTools;
   const isActionDisabled = isBusy || !isDocumentReady || !isInvoiceIdValid;
 
   useEffect(() => {
@@ -86,7 +85,7 @@ export function SingleWindowDocumentActionBar({
             type="button"
             aria-pressed={viewMode === "advanced"}
             disabled={!canUseAdvancedTools}
-            title={canUseAdvancedTools ? "显示高级报关属性和技术操作" : "高级报关属性请使用桌面端"}
+            title={canUseAdvancedTools ? "显示高级报关属性和技术操作" : "高级报关属性需要带鼠标或触控板的电脑"}
             onClick={() => setViewMode("advanced")}
           >
             高级模式

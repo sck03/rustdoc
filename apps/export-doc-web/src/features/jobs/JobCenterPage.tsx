@@ -1,48 +1,39 @@
-import { FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, Download, FileArchive, FileStack, Play, RefreshCw, Save, Search, Trash2 } from "lucide-react";
+import { Play, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
-import { type ApiReportTemplateDto, type BackgroundJobSnapshot, ExportDocManagerApiClient } from "../../api/index.ts";
+import { type BackgroundJobSnapshot, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
-import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
-import {
-  isDesktopBridgeAvailable,
-  selectPdfFiles,
-  selectSavePdfPath,
-  selectSaveZipPath,
-} from "../../desktop/desktopBridge.ts";
-import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
-import { SelectField } from "../../ui/FormFields.tsx";
+import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
+import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
-import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { listPageSizeOptions, loadListViewState, normalizeListPageSize, saveListViewState } from "../../ui/listViewState.ts";
-import { PathField, PathTextAreaField } from "../../ui/PathField.tsx";
-import { formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
+import { readApiError } from "../../ui/formUtils.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
+import { InvoiceReportZipJobPanel, PdfMergeJobPanel } from "./JobCreationPanels.tsx";
+import { JobTable } from "./JobTable.tsx";
+import {
+  findPreferredInvoiceTemplate,
+  hasActiveJobs,
+  jobStatusOptions,
+  readPathLines,
+} from "./jobPresentation.ts";
 import { normalizeJobId } from "./jobNavigation.ts";
 import { useJobCenterOperations } from "./useJobCenterOperations.ts";
 
 const invoiceReportType = "ExportDocument";
 const jobListViewStateStorageKey = "export-doc-manager.job-list-view-state.v1";
 
-const jobStatusOptions = [
-  { value: "Queued", label: "排队中" },
-  { value: "Running", label: "运行中" },
-  { value: "Succeeded", label: "已完成" },
-  { value: "Failed", label: "失败" },
-  { value: "Canceling", label: "取消中" },
-  { value: "Canceled", label: "已取消" },
-];
-
 export function JobCenterPage({ client }: { client: ExportDocManagerApiClient }) {
   const jobPermission = useModulePermission("document.jobs");
   const reportPermission = useModulePermission("document.reports");
   const invoiceReportPermission = useModulePermission("document.invoice-reports");
-  const workspaceDeviceMode = useWorkspaceDeviceMode();
-  const workspaceDeviceCapabilities = getWorkspaceDeviceCapabilities(workspaceDeviceMode);
+  const workspaceDeviceProfile = useWorkspaceDeviceProfile();
+  const workspaceDeviceMode = workspaceDeviceProfile.mode;
+  const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = normalizeJobId(searchParams.get("jobId"));
@@ -61,14 +52,16 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
 
   const jobsQuery = useQuery({
     queryKey: queryKeys.jobs(pageNumber, pageSize, committedKeyword.trim(), status),
-    queryFn: ({ signal }) =>
-      client.listJobs({
-        status: status || undefined,
-        keyword: committedKeyword.trim() || undefined,
-        pageNumber,
-        pageSize,
-      }, { signal }),
+    queryFn: ({ signal }) => client.listJobs({
+      status: status || undefined,
+      keyword: committedKeyword.trim() || undefined,
+      pageNumber,
+      pageSize,
+    }, { signal }),
     placeholderData: keepPreviousData,
+    refetchInterval: (query) => hasActiveJobs(query.state.data?.items) ? 2_000 : false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 
   const reportTemplatesQuery = useQuery({
@@ -98,7 +91,18 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
     focusJob,
     clearFocusedJob,
   });
-  const { pdfSources, pdfDestination, pdfUploadFiles, reportInvoiceIds, reportZipDestination, reportTemplatePath, reportWithSeal, reportInvoiceIdList, canStartPdfMerge, canStartReportZip } = operations;
+  const {
+    pdfSources,
+    pdfDestination,
+    pdfUploadFiles,
+    reportInvoiceIds,
+    reportZipDestination,
+    reportTemplatePath,
+    reportWithSeal,
+    reportInvoiceIdList,
+    canStartPdfMerge,
+    canStartReportZip,
+  } = operations;
 
   useEffect(() => {
     if (jobsQuery.data && jobsQuery.data.pageNumber !== pageNumber) {
@@ -107,10 +111,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   }, [jobsQuery.data, pageNumber]);
 
   useEffect(() => {
-    if (!focusedJobId) {
-      return;
-    }
-
+    if (!focusedJobId) return;
     setKeyword(focusedJobId);
     setCommittedKeyword(focusedJobId);
     setStatus("");
@@ -118,25 +119,16 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   }, [focusedJobId]);
 
   useEffect(() => {
-    if (focusedJobId) {
-      return;
-    }
-
-    saveListViewState(jobListViewStateStorageKey, {
-      keyword: committedKeyword,
-      pageSize,
-    });
+    if (focusedJobId) return;
+    saveListViewState(jobListViewStateStorageKey, { keyword: committedKeyword, pageSize });
   }, [committedKeyword, focusedJobId, pageSize]);
 
   useEffect(() => {
-    if (!reportTemplatesQuery.data?.length || reportTemplatePath) {
-      return;
-    }
-
+    if (!reportTemplatesQuery.data?.length || reportTemplatePath) return;
     const preferredTemplate = findPreferredInvoiceTemplate(reportTemplatesQuery.data);
     operations.setReportTemplatePath(preferredTemplate.templatePath);
     operations.setReportWithSeal(preferredTemplate.withSealDefault ?? true);
-  }, [reportTemplatePath, reportTemplatesQuery.data]);
+  }, [operations, reportTemplatePath, reportTemplatesQuery.data]);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -162,10 +154,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   function focusJob(jobId: string, nextMessage: string) {
     const normalizedJobId = normalizeJobId(jobId);
     operations.showSuccess(nextMessage);
-    if (!normalizedJobId) {
-      return;
-    }
-
+    if (!normalizedJobId) return;
     setKeyword(normalizedJobId);
     setCommittedKeyword(normalizedJobId);
     setStatus("");
@@ -174,9 +163,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   }
 
   function clearFocusedJob() {
-    if (focusedJobId) {
-      setSearchParams({}, { replace: true });
-    }
+    if (focusedJobId) setSearchParams({}, { replace: true });
   }
 
   const page = jobsQuery.data ?? null;
@@ -185,7 +172,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   const errorMessage = jobsQuery.isError ? readApiError(jobsQuery.error) : null;
   const reportTemplates = reportTemplatesQuery.data ?? [];
   const reportTemplateErrorMessage = reportTemplatesQuery.isError ? readApiError(reportTemplatesQuery.error) : null;
-  const isBusy = jobsQuery.isFetching || operations.isBusy || reportTemplatesQuery.isFetching;
+  const isActionBusy = operations.isBusy || reportTemplatesQuery.isFetching;
 
   return (
     <section className="work-surface job-center-surface" aria-label="任务中心">
@@ -195,115 +182,95 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
       <WorkspaceDeviceNotice
         mode={workspaceDeviceMode}
         phone="可查看任务进度、处理失败任务和接收提醒；批量报表、PDF 合并、清理及文件导入导出请使用桌面端。"
-        tablet="可查看任务进度并处理单个失败任务；批量报表、PDF 合并、清理及文件导入导出请使用桌面端。"
+        tablet={workspaceDeviceCapabilities.canImportExport
+          ? "可创建、下载和处理文件任务；受限屏幕下不提供批量清理，密集任务管理建议使用更宽屏幕。"
+          : "可查看任务进度并处理单个失败任务；连接鼠标或触控板后可创建、下载和处理文件任务。"}
       />
-      {jobPermission.canOperate && workspaceDeviceCapabilities.canImportExport ? <section className="job-create-panel" aria-label="新建任务">
-        {canCreateInvoiceReportZip ? <details>
-          <summary>
-            <span>批量报表 ZIP</span>
-            <small>{reportInvoiceIdList.length} 张发票</small>
-          </summary>
-          <InvoiceReportZipJobPanel
-            invoiceIds={reportInvoiceIds}
-            invoiceCount={reportInvoiceIdList.length}
-            destinationPath={reportZipDestination}
-            templatePath={reportTemplatePath}
-            withSeal={reportWithSeal}
-            templates={reportTemplates}
-            templateErrorMessage={reportTemplateErrorMessage}
-            isTemplateLoading={reportTemplatesQuery.isFetching}
-            disabled={isBusy}
-            canSubmit={canStartReportZip && !reportTemplatesQuery.isFetching}
-            onInvoiceIdsChange={operations.setReportInvoiceIds}
-            onDestinationPathChange={operations.setReportZipDestination}
-            onTemplatePathChange={operations.setReportTemplatePath}
-            onWithSealChange={operations.setReportWithSeal}
-            onSubmit={() => operations.reportZipMutation.mutate()}
-            onMessage={operations.handleChildMessage}
-            defaultExportDirectory={defaultExportDirectory}
-          />
-        </details> : (
-          <PermissionNotice>当前权限可使用普通后台任务，但未同时授予发票单据输出权限，批量报表 ZIP 已隐藏。</PermissionNotice>
-        )}
-        <details>
-          <summary>
-            <span>PDF 合并</span>
-            <small>{readPathLines(pdfSources).length} 个源文件</small>
-          </summary>
-          {desktopAvailable ? <PdfMergeJobPanel
-            sourcePaths={pdfSources}
-            destinationPath={pdfDestination}
-            disabled={isBusy}
-            canSubmit={canStartPdfMerge}
-            onSourcePathsChange={operations.setPdfSources}
-            onDestinationPathChange={operations.setPdfDestination}
-            onSubmit={() => operations.pdfMergeMutation.mutate()}
-            onMessage={operations.handleChildMessage}
-            defaultExportDirectory={defaultExportDirectory}
-          /> : <form className="job-tool-panel" onSubmit={(event) => { event.preventDefault(); operations.clearFeedback(); operations.pdfMergeMutation.mutate(); }}>
-            <label className="inline-filter"><span>源 PDF</span><input type="file" accept="application/pdf,.pdf" multiple disabled={isBusy} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; operations.setPdfUploadFiles(files); }} /></label>
-            <div className="job-tool-submit-row"><span>{pdfUploadFiles.length} 个源文件</span><button className="solid action-button" type="submit" disabled={!canStartPdfMerge}><Play size={16} aria-hidden="true" /><span>合并并下载</span></button></div>
-            <div className="field-help">文件仅暂存在程序临时区，任务结束后自动清理。</div>
-          </form>}
-        </details>
-      </section> : null}
+      {jobPermission.canOperate && workspaceDeviceCapabilities.canImportExport ? (
+        <section className="job-create-panel" aria-label="新建任务">
+          {canCreateInvoiceReportZip ? (
+            <details>
+              <summary><span>批量报表 ZIP</span><small>{reportInvoiceIdList.length} 张发票</small></summary>
+              <InvoiceReportZipJobPanel
+                invoiceIds={reportInvoiceIds}
+                invoiceCount={reportInvoiceIdList.length}
+                destinationPath={reportZipDestination}
+                templatePath={reportTemplatePath}
+                withSeal={reportWithSeal}
+                templates={reportTemplates}
+                templateErrorMessage={reportTemplateErrorMessage}
+                isTemplateLoading={reportTemplatesQuery.isFetching}
+                disabled={isActionBusy}
+                canSubmit={canStartReportZip && !reportTemplatesQuery.isFetching}
+                onInvoiceIdsChange={operations.setReportInvoiceIds}
+                onDestinationPathChange={operations.setReportZipDestination}
+                onTemplatePathChange={operations.setReportTemplatePath}
+                onWithSealChange={operations.setReportWithSeal}
+                onSubmit={() => operations.reportZipMutation.mutate()}
+                onMessage={operations.handleChildMessage}
+                defaultExportDirectory={defaultExportDirectory}
+              />
+            </details>
+          ) : <PermissionNotice>当前权限可使用普通后台任务，但未同时授予发票单据输出权限，批量报表 ZIP 已隐藏。</PermissionNotice>}
+          <details>
+            <summary><span>PDF 合并</span><small>{readPathLines(pdfSources).length} 个源文件</small></summary>
+            {desktopAvailable ? (
+              <PdfMergeJobPanel
+                sourcePaths={pdfSources}
+                destinationPath={pdfDestination}
+                disabled={isActionBusy}
+                canSubmit={canStartPdfMerge}
+                onSourcePathsChange={operations.setPdfSources}
+                onDestinationPathChange={operations.setPdfDestination}
+                onSubmit={() => operations.pdfMergeMutation.mutate()}
+                onMessage={operations.handleChildMessage}
+                defaultExportDirectory={defaultExportDirectory}
+              />
+            ) : (
+              <form className="job-tool-panel" onSubmit={(event) => { event.preventDefault(); operations.clearFeedback(); operations.pdfMergeMutation.mutate(); }}>
+                <label className="inline-filter"><span>源 PDF</span><input type="file" accept="application/pdf,.pdf" multiple disabled={isActionBusy} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; operations.setPdfUploadFiles(files); }} /></label>
+                <div className="job-tool-submit-row"><span>{pdfUploadFiles.length} 个源文件</span><button className="solid action-button" type="submit" disabled={!canStartPdfMerge}><Play size={16} aria-hidden="true" /><span>合并并下载</span></button></div>
+                <div className="field-help">文件仅暂存在程序临时区，任务结束后自动清理。</div>
+              </form>
+            )}
+          </details>
+        </section>
+      ) : null}
 
       <div className="toolbar">
         <form className="search-form" onSubmit={handleSearch}>
           <Search size={17} aria-hidden="true" />
-          <input
-            aria-label="搜索任务"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="任务号、标题、输出路径、错误"
-          />
+          <input aria-label="搜索任务" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="任务号、标题、输出文件、错误" />
         </form>
-        <div className="filter-bar">
-          <FilterSelect label="状态" value={status} options={jobStatusOptions} onChange={changeStatus} />
-        </div>
+        <div className="filter-bar"><FilterSelect label="状态" value={status} options={jobStatusOptions} onChange={changeStatus} /></div>
         <div className="toolbar-actions">
-          {workspaceDeviceCapabilities.canUseBatchOperations ? <button
-            className="command-button secondary"
-            type="button"
-            title="清理已完成、失败、已取消的任务记录"
-            disabled={!jobPermission.canManage || isBusy || jobs.length === 0}
-            onClick={() => void operations.handleClearFinishedJobs()}
-          >
-            <Trash2 size={17} aria-hidden="true" />
-            <span>清理已结束</span>
-          </button> : null}
-          <button
-            className="icon-button"
-            type="button"
-            title="刷新" aria-label="刷新"
-            disabled={isBusy}
-            onClick={() => void jobsQuery.refetch()}
-          >
+          {workspaceDeviceCapabilities.canUseBatchOperations ? (
+            <button className="command-button secondary" type="button" title="清理已完成、失败、已取消的任务记录" disabled={!jobPermission.canManage || isActionBusy || jobs.length === 0} onClick={() => void operations.handleClearFinishedJobs()}>
+              <Trash2 size={17} aria-hidden="true" /><span>清理已结束</span>
+            </button>
+          ) : null}
+          <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={jobsQuery.isFetching || operations.isBusy} onClick={() => void jobsQuery.refetch()}>
             <RefreshCw size={18} aria-hidden="true" />
           </button>
         </div>
       </div>
 
       {errorMessage ? <InlineNotice tone="error" title="任务中心操作失败">{errorMessage}</InlineNotice> : null}
-      {operations.message ? (
-        <InlineNotice tone={operations.messageTone}>
-          {operations.message}
-        </InlineNotice>
-      ) : null}
+      {operations.message ? <InlineNotice tone={operations.messageTone}>{operations.message}</InlineNotice> : null}
 
       <JobTable
         data={jobs}
         focusedJobId={focusedJobId}
-        isBusy={isBusy}
+        isBusy={jobsQuery.isPending || operations.isBusy}
         hasError={Boolean(errorMessage)}
         canOperate={jobPermission.canOperate}
         canManage={jobPermission.canManage}
         canDownload={workspaceDeviceCapabilities.canImportExport}
         onMessage={operations.handleChildMessage}
-        onCancel={(job) => void operations.handleCancelJob(job)}
+        onCancel={(job: BackgroundJobSnapshot) => void operations.handleCancelJob(job)}
         onRetry={(jobId) => operations.retryMutation.mutate(jobId)}
-        onDelete={(job) => void operations.handleDeleteJob(job)}
-        onDownload={(job) => operations.downloadMutation.mutate(job)}
+        onDelete={(job: BackgroundJobSnapshot) => void operations.handleDeleteJob(job)}
+        onDownload={(job: BackgroundJobSnapshot) => operations.downloadMutation.mutate(job)}
         desktopAvailable={desktopAvailable}
       />
 
@@ -313,375 +280,11 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
         totalCount={page?.totalCount ?? 0}
         pageSize={pageSize}
         pageSizeOptions={listPageSizeOptions}
-        isBusy={isBusy}
+        isBusy={operations.isBusy}
         onPageChange={setPageNumber}
         onPageSizeChange={handlePageSizeChange}
       />
     </section>
-  );
-}
-
-function InvoiceReportZipJobPanel({
-  invoiceIds,
-  invoiceCount,
-  destinationPath,
-  templatePath,
-  withSeal,
-  templates,
-  templateErrorMessage,
-  isTemplateLoading,
-  disabled,
-  canSubmit,
-  onInvoiceIdsChange,
-  onDestinationPathChange,
-  onTemplatePathChange,
-  onWithSealChange,
-  onSubmit,
-  onMessage,
-  defaultExportDirectory,
-}: {
-  invoiceIds: string;
-  invoiceCount: number;
-  destinationPath: string;
-  templatePath: string;
-  withSeal: boolean;
-  templates: ApiReportTemplateDto[];
-  templateErrorMessage: string | null;
-  isTemplateLoading: boolean;
-  disabled: boolean;
-  canSubmit: boolean;
-  onInvoiceIdsChange: (value: string) => void;
-  onDestinationPathChange: (value: string) => void;
-  onTemplatePathChange: (value: string) => void;
-  onWithSealChange: (value: boolean) => void;
-  onSubmit: () => void;
-  onMessage: (message: string | null) => void;
-  defaultExportDirectory: string;
-}) {
-  const desktopAvailable = isDesktopBridgeAvailable();
-
-  function handleTemplateChange(value: string) {
-    onTemplatePathChange(value);
-    const template = templates.find((item) => item.templatePath === value);
-    if (template) {
-      onWithSealChange(template.withSealDefault ?? true);
-    }
-    onMessage(null);
-  }
-
-  async function pickDestination() {
-    try {
-      const selected = await selectSaveZipPath("invoice-reports.zip", defaultExportDirectory);
-      if (selected) {
-        onDestinationPathChange(selected);
-        onMessage(null);
-      }
-    } catch (error) {
-      onMessage(readDesktopError(error));
-    }
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    onMessage(null);
-    onSubmit();
-  }
-
-  return (
-    <form className="job-tool-panel" aria-label="批量报表 ZIP 任务" onSubmit={handleSubmit}>
-      {templateErrorMessage ? <InlineNotice tone="warning" title="报表模板未完整加载">{templateErrorMessage}</InlineNotice> : null}
-
-      <div className="job-tool-grid job-report-zip-grid">
-        <PathTextAreaField
-          label="发票 ID"
-          value={invoiceIds}
-          disabled={disabled}
-          onChange={(value) => {
-            onInvoiceIdsChange(value);
-            onMessage(null);
-          }}
-        />
-        <div className="job-tool-stack">
-          <div className="report-zip-options">
-            <SelectField
-              label="模板"
-              value={templatePath}
-              disabled={disabled || isTemplateLoading || templates.length === 0}
-              options={templates.map((template) => ({
-                value: template.templatePath,
-                label: template.displayName || fileNameFromPath(template.templatePath),
-              }))}
-              onChange={handleTemplateChange}
-            />
-            <label className="toggle-field">
-              <input
-                type="checkbox"
-                checked={withSeal}
-                disabled={disabled}
-                onChange={(event) => {
-                  onWithSealChange(event.target.checked);
-                  onMessage(null);
-                }}
-              />
-              <span>带章</span>
-            </label>
-          </div>
-          {desktopAvailable ? <PathField
-            label="输出 ZIP"
-            value={destinationPath}
-            disabled={disabled}
-            onChange={(value) => {
-              onDestinationPathChange(value);
-              onMessage(null);
-            }}
-            actions={
-              <>
-                {desktopAvailable ? (
-                  <DesktopIconButton title="选择保存位置" disabled={disabled} onClick={pickDestination}>
-                    <FileArchive size={15} aria-hidden="true" />
-                  </DesktopIconButton>
-                ) : null}
-                {renderOpenPathAction(destinationPath, "打开输出位置", onMessage)}
-              </>
-            }
-          /> : <div className="field-help">ZIP 将保存到浏览器默认下载目录。</div>}
-        </div>
-      </div>
-      <div className="job-tool-submit-row">
-        <span>{invoiceCount} 张发票</span>
-        <button className="solid action-button" type="submit" disabled={!canSubmit}>
-          <Play size={16} aria-hidden="true" />
-          <span>{desktopAvailable ? "开始" : "生成并下载"}</span>
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function PdfMergeJobPanel({
-  sourcePaths,
-  destinationPath,
-  disabled,
-  canSubmit,
-  onSourcePathsChange,
-  onDestinationPathChange,
-  onSubmit,
-  onMessage,
-  defaultExportDirectory,
-}: {
-  sourcePaths: string;
-  destinationPath: string;
-  disabled: boolean;
-  canSubmit: boolean;
-  onSourcePathsChange: (value: string) => void;
-  onDestinationPathChange: (value: string) => void;
-  onSubmit: () => void;
-  onMessage: (message: string | null) => void;
-  defaultExportDirectory: string;
-}) {
-  const desktopAvailable = isDesktopBridgeAvailable();
-
-  async function pickPdfSources() {
-    try {
-      const selected = await selectPdfFiles();
-      if (selected.length > 0) {
-        const merged = [...readPathLines(sourcePaths), ...selected]
-          .filter((value, index, values) => values.findIndex((item) => item.toLowerCase() === value.toLowerCase()) === index)
-          .join("\n");
-        onSourcePathsChange(merged);
-      }
-    } catch (error) {
-      onMessage(readDesktopError(error));
-    }
-  }
-
-  async function pickDestination() {
-    try {
-      const selected = await selectSavePdfPath("merged.pdf", defaultExportDirectory);
-      if (selected) {
-        onDestinationPathChange(selected);
-      }
-    } catch (error) {
-      onMessage(readDesktopError(error));
-    }
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    onMessage(null);
-    onSubmit();
-  }
-
-  return (
-    <form className="job-tool-panel" aria-label="PDF 合并任务" onSubmit={handleSubmit}>
-      <div className="job-tool-grid">
-        <PathTextAreaField
-          label="源 PDF"
-          value={sourcePaths}
-          disabled={disabled}
-          onChange={onSourcePathsChange}
-          actions={
-            desktopAvailable ? (
-              <DesktopIconButton title="选择 PDF 文件" disabled={disabled} onClick={pickPdfSources}>
-                <FileStack size={15} aria-hidden="true" />
-              </DesktopIconButton>
-            ) : undefined
-          }
-        />
-        <PathField
-          label="输出 PDF"
-          value={destinationPath}
-          disabled={disabled}
-          onChange={onDestinationPathChange}
-          actions={
-            <>
-              {desktopAvailable ? (
-                <DesktopIconButton title="选择保存位置" disabled={disabled} onClick={pickDestination}>
-                  <Save size={15} aria-hidden="true" />
-                </DesktopIconButton>
-              ) : null}
-              {renderOpenPathAction(destinationPath, "打开输出位置", onMessage)}
-            </>
-          }
-        />
-      </div>
-      <div className="job-tool-submit-row">
-        <span>{readPathLines(sourcePaths).length} 个源文件</span>
-        <button className="solid action-button" type="submit" disabled={!canSubmit}>
-          <Play size={16} aria-hidden="true" />
-          <span>开始</span>
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function JobTable({
-  data,
-  focusedJobId,
-  isBusy,
-  hasError,
-  canOperate,
-  canManage,
-  canDownload,
-  onMessage,
-  onCancel,
-  onRetry,
-  onDelete,
-  onDownload,
-  desktopAvailable,
-}: {
-  data: BackgroundJobSnapshot[];
-  focusedJobId: string;
-  isBusy: boolean;
-  hasError: boolean;
-  canOperate: boolean;
-  canManage: boolean;
-  canDownload: boolean;
-  onMessage: (message: string | null) => void;
-  onCancel: (job: BackgroundJobSnapshot) => void;
-  onRetry: (jobId: string) => void;
-  onDelete: (job: BackgroundJobSnapshot) => void;
-  onDownload: (job: BackgroundJobSnapshot) => void;
-  desktopAvailable: boolean;
-}) {
-  return (
-    <ResponsiveTableFrame label="后台任务列表" busy={isBusy} mobileLayout="scroll">
-      <table className="job-table">
-        <thead>
-          <tr>
-            <th>任务</th>
-            <th>类型</th>
-            <th>状态</th>
-            <th>进度</th>
-            <th>消息</th>
-            <th>输出</th>
-            <th>创建</th>
-            <th>完成</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.length === 0 && !hasError ? (
-            <tr>
-              <td colSpan={9} className="empty-cell">
-                {isBusy ? "加载中" : "暂无任务"}
-              </td>
-            </tr>
-          ) : (
-            data.map((job) => {
-              const isFocused = Boolean(focusedJobId) && job.jobId.toLowerCase() === focusedJobId.toLowerCase();
-              const canDelete = isTerminalJob(job.status);
-              return (
-              <tr
-                key={job.jobId}
-                className={isFocused ? "job-row-focused" : undefined}
-              >
-                <td>
-                  <div className="job-title-cell">
-                    <strong title={job.title}>{job.title || job.jobId}</strong>
-                    <span title={job.jobId}>{job.jobId}</span>
-                  </div>
-                </td>
-                <td>{job.kind || "-"}</td>
-                <td>
-                  <span className="status-pill">{formatJobStatus(job.status)}</span>
-                </td>
-                <td className="amount-cell">{formatProgress(job.progressPercent)}</td>
-                <td className="message-cell" title={readJobMessage(job)}>
-                  {readJobMessage(job)}
-                </td>
-                <td className="path-cell" title={desktopAvailable ? job.outputPath : undefined}>
-                  <div className="table-path-cell job-output-path-cell">
-                    <span>{desktopAvailable ? (job.outputPath || "-") : (job.outputPath ? fileNameFromPath(job.outputPath) : "-")}</span>
-                    {desktopAvailable && job.outputPath?.trim() ? renderOpenPathAction(job.outputPath, "打开任务输出", onMessage) : null}
-                    {canDownload && !desktopAvailable && job.status.toLowerCase() === "succeeded" && job.outputPath ? (
-                      <button className="icon-button compact-icon-button" type="button" title="下载任务结果" aria-label="下载任务结果" onClick={() => onDownload(job)}>
-                        <Download size={16} aria-hidden="true" />
-                      </button>
-                    ) : null}
-                  </div>
-                </td>
-                <td>{formatDateTime(job.createdAt)}</td>
-                <td>{formatDateTime(job.completedAt)}</td>
-                <td>
-                  <div className="job-row-actions">
-                    <button
-                      className="icon-button compact-icon-button"
-                      type="button"
-                      title="重试任务" aria-label="重试任务"
-                      disabled={!canOperate || isBusy || !job.canRetry}
-                      onClick={() => onRetry(job.jobId)}
-                    >
-                      <RefreshCw size={16} aria-hidden="true" />
-                    </button>
-                    <button
-                      className="icon-button compact-icon-button"
-                      type="button"
-                      title="取消任务" aria-label="取消任务"
-                      disabled={!canOperate || isBusy || !job.canCancel}
-                      onClick={() => onCancel(job)}
-                    >
-                      <Ban size={16} aria-hidden="true" />
-                    </button>
-                    <button
-                      className="icon-button compact-icon-button"
-                      type="button"
-                      title="删除任务记录" aria-label="删除任务记录"
-                      disabled={!canManage || isBusy || !canDelete}
-                      onClick={() => onDelete(job)}
-                    >
-                      <Trash2 size={16} aria-hidden="true" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              );
-            })
-          )}
-        </tbody>
-      </table>
-    </ResponsiveTableFrame>
   );
 }
 
@@ -701,77 +304,8 @@ function FilterSelect({
       <span>{label}</span>
       <select value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="">全部</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     </label>
   );
-}
-
-function formatJobStatus(value?: string) {
-  return jobStatusOptions.find((option) => option.value.toLowerCase() === value?.toLowerCase())?.label ?? value ?? "-";
-}
-
-function isTerminalJob(value?: string) {
-  const normalized = value?.toLowerCase();
-  return normalized === "succeeded" || normalized === "failed" || normalized === "canceled";
-}
-
-function formatProgress(value?: number) {
-  return typeof value === "number" ? `${formatPlainNumber(value)}%` : "-";
-}
-
-function readJobMessage(job: BackgroundJobSnapshot) {
-  return job.errorMessage || job.detailText || job.statusText || "-";
-}
-
-function formatDateTime(value?: string) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString("zh-CN", {
-        hour12: false,
-      });
-}
-
-function readPathLines(value: string) {
-  return value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
-function readPositiveIntegerTokens(value: string) {
-  const seen = new Set<number>();
-  const result: number[] = [];
-
-  for (const token of value.split(/[\s,;，；]+/)) {
-    const trimmed = token.trim();
-    if (!/^\d+$/.test(trimmed)) {
-      continue;
-    }
-
-    const parsed = Number.parseInt(trimmed, 10);
-    if (parsed > 0 && !seen.has(parsed)) {
-      seen.add(parsed);
-      result.push(parsed);
-    }
-  }
-
-  return result;
-}
-
-function findPreferredInvoiceTemplate(templates: ApiReportTemplateDto[]) {
-  return templates.find((template) => fileNameFromPath(template.templatePath).toLowerCase() === "invoice_template.html") ?? templates[0];
-}
-
-function fileNameFromPath(value: string) {
-  return value.split(/[\\/]/).filter(Boolean).at(-1) ?? value;
 }

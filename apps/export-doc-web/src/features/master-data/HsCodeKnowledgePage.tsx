@@ -4,7 +4,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import type { ExportDocManagerApiClient, HsCodeKnowledgeExampleInput } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
-import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
+import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
@@ -37,8 +37,9 @@ export function HsCodeKnowledgePage({ client }: { client: ExportDocManagerApiCli
   const { section = "search" } = useParams();
   const permission = useModulePermission("document.hs-knowledge");
   const queryClient = useQueryClient();
-  const workspaceDeviceMode = useWorkspaceDeviceMode();
-  const workspaceDeviceCapabilities = getWorkspaceDeviceCapabilities(workspaceDeviceMode);
+  const workspaceDeviceProfile = useWorkspaceDeviceProfile();
+  const workspaceDeviceMode = workspaceDeviceProfile.mode;
+  const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
   const [maintenanceOpen, setMaintenanceOpen] = useState(() => maintenanceSections.some(([key]) => key === section));
   useEffect(() => { setMaintenanceOpen(maintenanceSections.some(([key]) => key === section)); }, [section]);
   if (!sections.some(([key]) => key === section)) return <Navigate to="/master-data/hs-knowledge/search" replace />;
@@ -58,8 +59,8 @@ export function HsCodeKnowledgePage({ client }: { client: ExportDocManagerApiCli
     {section === "search" ? <KnowledgeSearch client={client} canOperate={permission.canOperate}/> : null}
     {section === "examples" ? <ExampleLibrary client={client} canOperate={permission.canManage && workspaceDeviceMode !== "phone"} canManage={permission.canManage && workspaceDeviceMode !== "phone"} canBatchManage={permission.canManage && workspaceDeviceCapabilities.canUseBatchOperations}/> : null}
     {section === "history" ? <HistoryLearning client={client} canOperate={permission.canManage}/> : null}
-    {section === "transfer" ? <><WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="知识库迁移属于完整导入导出操作，请使用桌面端。" tablet="知识库迁移属于完整导入导出操作，请使用桌面端。"/><KnowledgeTransfer client={client} canImport={permission.canManage && workspaceDeviceCapabilities.canImportExport} canExport={permission.canManage && workspaceDeviceCapabilities.canImportExport}/></> : null}
-    {section === "annual" ? <div className="knowledge-task-card knowledge-tool-card"><WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="年度税则导入和版本维护请使用桌面端；手机端可继续查询当前有效编码。" tablet="年度税则导入和版本维护请使用桌面端；平板端可继续查询和现场确认。"/><p className="knowledge-task-lead">只有年度税则导入和可信知识库迁移可以建立当前有效编码；每条有效编码都必须带来源、年度和验证时间。</p><HsCodeToolsPanel mode="import" client={client} disabled={!permission.canManage || !workspaceDeviceCapabilities.canImportExport} keyword="" onLocalDataChanged={async () => { await queryClient.invalidateQueries({ queryKey: ["hs-knowledge"] }); }}/></div> : null}
+    {section === "transfer" ? <>{!workspaceDeviceCapabilities.canImportExport ? <WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="知识库迁移属于完整导入导出操作，请使用带鼠标或触控板的电脑。" tablet="连接鼠标或触控板后可在当前设备完成知识库迁移。"/> : null}<KnowledgeTransfer client={client} canImport={permission.canManage && workspaceDeviceCapabilities.canImportExport} canExport={permission.canManage && workspaceDeviceCapabilities.canImportExport}/></> : null}
+    {section === "annual" ? <div className="knowledge-task-card knowledge-tool-card">{!workspaceDeviceCapabilities.canImportExport ? <WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="年度税则导入和版本维护请使用带鼠标或触控板的电脑；手机端可继续查询当前有效编码。" tablet="连接鼠标或触控板后可在当前设备导入年度税则；当前仍可查询和现场确认。"/> : null}<p className="knowledge-task-lead">只有年度税则导入和可信知识库迁移可以建立当前有效编码；每条有效编码都必须带来源、年度和验证时间。</p><HsCodeToolsPanel mode="import" client={client} disabled={!permission.canManage || !workspaceDeviceCapabilities.canImportExport} keyword="" onLocalDataChanged={async () => { await queryClient.invalidateQueries({ queryKey: ["hs-knowledge"] }); }}/></div> : null}
     {section === "online" ? <div className="knowledge-task-card knowledge-tool-card"><WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="可联网搜索并逐条审核候选；批量审核请使用桌面端。" tablet="可联网搜索并逐条审核候选；批量审核请使用桌面端。"/><p className="knowledge-task-lead">联网实例只进入待审核候选池。选择已验证年度税则中的有效编码后，才会加入公司的申报实例库。</p><HsCodeToolsPanel mode="remote" client={client} disabled={!permission.canManage} keyword="" onLocalDataChanged={async () => undefined} onRemoteCandidatesChanged={async () => { await queryClient.invalidateQueries({ queryKey: ["hs-remote-candidates"] }); }}/><RemoteCandidateReview client={client} canOperate={permission.canManage} canBatchOperate={permission.canManage && workspaceDeviceCapabilities.canUseBatchOperations}/></div> : null}
   </section>;
 }

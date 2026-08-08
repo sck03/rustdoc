@@ -201,6 +201,9 @@ const templateCatalog = [
         minDarkPixelsInsidePaper: 1500,
         minNonWhitePixelsInsidePaper: 5000,
         minColorBucketsInsidePaper: 12,
+        pageMetricMinimums: {
+          2: { minPaperWhiteRatio: 0.25 },
+        },
       },
     },
   },
@@ -252,6 +255,9 @@ const templateCatalog = [
         minDarkPixelsInsidePaper: 2500,
         minNonWhitePixelsInsidePaper: 7000,
         minColorBucketsInsidePaper: 12,
+        pageMetricMinimums: {
+          2: { minPaperWhiteRatio: 0.25 },
+        },
       },
     },
   },
@@ -348,6 +354,10 @@ const templateCatalog = [
         minDarkPixelsInsidePaper: 4500,
         minNonWhitePixelsInsidePaper: 6000,
         minColorBucketsInsidePaper: 20,
+        pageMetricMinimums: {
+          2: { minColorBucketsInsidePaper: 12 },
+          3: { minColorBucketsInsidePaper: 12 },
+        },
       },
     },
   },

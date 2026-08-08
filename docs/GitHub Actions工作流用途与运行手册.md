@@ -44,10 +44,10 @@
 
 - **触发：** `workflow_dispatch`；`main` push 和 PR 只在字体、模板、Web、报表服务及相关验证脚本路径变化时触发。
 - **平台：** 三个并行矩阵：`windows-latest`、固定 Apple Silicon ARM64 的 `macos-15`、`ubuntu-latest`；另有 Ubuntu 汇总 Job。
-- **做什么：** 按矩阵显式供给 `win64`、`mac-arm64`、`linux64` Chrome Headless Shell，并安装受许可约束的 Noto CJK 报表字体；执行浏览器会话、CSS 治理、320/375/390 窄屏与缩放合同，渲染多语言长文本 PDF，检查换行、重叠、分页，再比较三平台指标。Linux 仅在该 CI 步骤显式使用 `EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX=1`，不改变生产默认值；Intel macOS 不再属于该工作流支持范围。
-- **输出：** 每个平台上传缩放证据和 PDF/metrics/layout JSON；汇总 Job 上传比较报告。通常保留 14 天，汇总报告保留 30 天。
+- **做什么：** 按矩阵显式供给 `win64`、`mac-arm64`、`linux64` Chrome Headless Shell，并安装受许可约束的 Noto CJK 报表字体；执行浏览器会话、CSS 治理、320/375/390 窄屏与缩放合同，渲染多语言长文本 PDF，检查换行、重叠、分页，再比较三平台指标。Windows 矩阵还会供给完整 Chrome，附加到内置 PDF Viewer 后真实切换并校验 18 张页面像素及多页截图哈希。Linux 仅在该 CI 步骤显式使用 `EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX=1`，不改变生产默认值；Intel macOS 不再属于该工作流支持范围。
+- **输出：** 每个平台上传缩放证据和 PDF/metrics/layout JSON；Windows 额外上传 PDF Viewer 截图、实际指纹和汇总；汇总 Job 上传比较报告。通常保留 14 天，汇总报告保留 30 天。
 - **Secrets/Variables：** 不需要自定义 Secret；字体和浏览器在 runner 临时目录准备。
-- **常见失败：** 字体许可证文件或字体下载失败、Chrome Headless Shell 下载/启动失败、Linux 系统库缺失、单场景 CDP 超时、当前模板导致文本重叠或跨平台分页指标偏差。
+- **常见失败：** 字体许可证文件或字体下载失败、Chrome Headless Shell/完整 Chrome 下载或启动失败、Linux 系统库缺失、单场景 CDP 超时、PDF Viewer 未切到目标页、当前模板导致文本重叠或跨平台分页指标偏差。
 - **耗时：** 三平台并行通常 8—20 分钟；首次下载字体/浏览器或 runner 拥堵时更久。单个缩放合同有 5 分钟上限。
 
 ### 2.3 Cross-platform validation

@@ -201,7 +201,7 @@ namespace ExportDocManager.Api.Hosting
                             required = new[] { "templateRoot", "exists", "writable", "message", "storagePolicy" },
                             properties = new Dictionary<string, object>
                             {
-                                ["templateRoot"] = StringProperty("Resolved program-root Templates directory."),
+                                ["templateRoot"] = StringProperty("Resolved template directory for trusted desktop clients; empty for browser clients."),
                                 ["exists"] = new { type = "boolean" },
                                 ["writable"] = new { type = "boolean" },
                                 ["message"] = StringProperty("User-facing diagnostic result."),

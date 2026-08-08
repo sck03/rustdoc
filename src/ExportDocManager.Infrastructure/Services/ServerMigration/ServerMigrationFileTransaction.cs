@@ -143,6 +143,8 @@ namespace ExportDocManager.Services.Infrastructure
                 return;
             }
 
+            ValidateRollbackSnapshots(state);
+
             foreach (ServerMigrationDirectoryTransaction directory in state.Directories.AsEnumerable().Reverse())
             {
                 AtomicFileHelper.TryDeleteDirectory(directory.TargetPath);
@@ -170,6 +172,28 @@ namespace ExportDocManager.Services.Infrastructure
             }
 
             CleanupPrepared(state);
+        }
+
+        private static void ValidateRollbackSnapshots(ServerMigrationFileTransactionState state)
+        {
+            foreach (ServerMigrationDirectoryTransaction directory in state.Directories)
+            {
+                if (directory.OriginallyExisted && !Directory.Exists(directory.SnapshotPath))
+                {
+                    throw new DirectoryNotFoundException(
+                        $"服务器迁移目录快照源不存在：{Path.GetFullPath(directory.SnapshotPath)}");
+                }
+            }
+
+            foreach (ServerMigrationFileTransactionItem file in state.Files)
+            {
+                if (file.OriginallyExisted && !File.Exists(file.SnapshotPath))
+                {
+                    throw new FileNotFoundException(
+                        "服务器迁移文件快照源不存在。",
+                        Path.GetFullPath(file.SnapshotPath));
+                }
+            }
         }
 
         public static void CleanupPrepared(ServerMigrationFileTransactionState state)

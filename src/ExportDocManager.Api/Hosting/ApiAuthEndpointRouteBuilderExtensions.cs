@@ -56,6 +56,10 @@ namespace ExportDocManager.Api.Hosting
                                 new ApiErrorResponse("登录尝试过于频繁，请稍后再试。"),
                                 statusCode: StatusCodes.Status429TooManyRequests);
                         }
+
+                        return Results.Json(
+                            new ApiErrorResponse(initializationResult.ErrorMessage),
+                            statusCode: StatusCodes.Status401Unauthorized);
                     }
 
                     return Results.Json(

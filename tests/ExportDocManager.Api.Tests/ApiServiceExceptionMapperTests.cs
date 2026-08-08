@@ -130,6 +130,7 @@ public sealed class ApiServiceExceptionMapperTests
         { new ServiceTimeoutException("timeout"), StatusCodes.Status504GatewayTimeout },
         { new ResourceConflictException("conflict"), StatusCodes.Status409Conflict },
         { new ServiceConcurrencyException("concurrency"), StatusCodes.Status409Conflict },
-        { new InfrastructureServiceException("unavailable"), StatusCodes.Status503ServiceUnavailable }
+        { new InfrastructureServiceException("unavailable"), StatusCodes.Status503ServiceUnavailable },
+        { new InsufficientStorageException("disk full"), StatusCodes.Status507InsufficientStorage }
     };
 }

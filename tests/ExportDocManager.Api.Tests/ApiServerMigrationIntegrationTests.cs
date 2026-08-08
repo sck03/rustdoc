@@ -351,7 +351,8 @@ namespace ExportDocManager.Api.Tests
                 string packageFileName,
                 string password,
                 ServerMigrationRequestContext requestContext,
-                CancellationToken cancellationToken = default)
+                CancellationToken cancellationToken = default,
+                long? expectedPackageBytes = null)
             {
                 ServerRestoreCalls++;
                 LastPackagePassword = password;
@@ -370,7 +371,8 @@ namespace ExportDocManager.Api.Tests
                 Stream databaseBackup,
                 string backupFileName,
                 ServerMigrationRequestContext requestContext,
-                CancellationToken cancellationToken = default)
+                CancellationToken cancellationToken = default,
+                long? expectedBackupBytes = null)
             {
                 DatabaseRestoreCalls++;
                 LastDatabaseFileName = backupFileName;

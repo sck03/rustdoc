@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Data.Common;
+using System.Globalization;
 using System.IO;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +20,49 @@ namespace ExportDocManager.DataAccess
         public const string PostgreSqlPasswordEnvironmentVariable = PostgreSqlPasswordResolver.PasswordEnvironmentVariable;
         public const string PostgreSqlPasswordFileEnvironmentVariable = PostgreSqlPasswordResolver.PasswordFileEnvironmentVariable;
         private static IAppPathProvider _pathProvider = new RuntimeAppPathProvider();
+        private static readonly HashSet<string> AllowedPostgreSqlAdditionalOptionNames =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                "SSL Mode",
+                "Trust Server Certificate",
+                "Root Certificate",
+                "SSL Certificate",
+                "SSL Key",
+                "Check Certificate Revocation",
+                "Channel Binding",
+                "Timeout",
+                "Command Timeout",
+                "Cancellation Timeout",
+                "Keepalive",
+                "Tcp Keepalive",
+                "Tcp Keepalive Time",
+                "Tcp Keepalive Interval",
+                "Pooling",
+                "Minimum Pool Size",
+                "Maximum Pool Size",
+                "Connection Idle Lifetime",
+                "Connection Pruning Interval",
+                "Connection Lifetime",
+                "No Reset On Close",
+                "Enlist",
+                "Multiplexing",
+                "Read Buffer Size",
+                "Write Buffer Size",
+                "Socket Receive Buffer Size",
+                "Socket Send Buffer Size",
+                "Load Balance Hosts",
+                "Host Recheck Seconds",
+                "Target Session Attributes"
+            };
+        private static readonly IReadOnlyDictionary<string, (int Minimum, int Maximum)> BoundedPostgreSqlAdditionalIntegerOptions =
+            new Dictionary<string, (int Minimum, int Maximum)>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Minimum Pool Size"] = (0, 200),
+                ["Maximum Pool Size"] = (5, 200),
+                ["Connection Idle Lifetime"] = (0, 3600),
+                ["Timeout"] = (1, 120),
+                ["Command Timeout"] = (1, 600)
+            };
 
         public static void ConfigurePathProvider(IAppPathProvider pathProvider)
         {
@@ -283,14 +329,33 @@ namespace ExportDocManager.DataAccess
                 ApplicationName = "ExportDocManager"
             };
 
-            string connectionString = builder.ConnectionString;
             string additionalOptions = NormalizePostgreSqlAdditionalOptions(settings.PostgreSqlAdditionalOptions);
             if (!string.IsNullOrWhiteSpace(additionalOptions))
             {
-                connectionString = $"{connectionString};{additionalOptions}";
+                var additionalBuilder = new NpgsqlConnectionStringBuilder(additionalOptions);
+                foreach (string key in additionalBuilder.Keys)
+                {
+                    if (!AllowedPostgreSqlAdditionalOptionNames.Contains(key))
+                    {
+                        throw new ServiceValidationException(
+                            $"PostgreSQL 附加参数不支持字段：{key}。仅允许 TLS、超时、连接池和保活参数。");
+                    }
+
+                    builder[key] = additionalBuilder[key];
+                }
             }
 
-            return connectionString;
+            // Keep operator-tunable pool and timeout values inside safe bounds even
+            // when they come from the optional connection parameter string.
+            builder.Pooling = true;
+            builder.MinPoolSize = Math.Clamp(builder.MinPoolSize, 0, 200);
+            builder.MaxPoolSize = Math.Clamp(builder.MaxPoolSize, 5, 200);
+            builder.MinPoolSize = Math.Min(builder.MinPoolSize, builder.MaxPoolSize);
+            builder.ConnectionIdleLifetime = Math.Clamp(builder.ConnectionIdleLifetime, 0, 3600);
+            builder.Timeout = Math.Clamp(builder.Timeout, 1, 120);
+            builder.CommandTimeout = Math.Clamp(builder.CommandTimeout, 1, 600);
+
+            return builder.ConnectionString;
         }
 
         public static int NormalizePostgreSqlPort(int postgreSqlPort)
@@ -315,7 +380,66 @@ namespace ExportDocManager.DataAccess
 
         public static string NormalizePostgreSqlAdditionalOptions(string value)
         {
-            return NormalizePostgreSqlText(value).Trim(';');
+            string normalized = NormalizePostgreSqlText(value).Trim(';');
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                var rawBuilder = new DbConnectionStringBuilder
+                {
+                    ConnectionString = normalized
+                };
+
+                // Validate every key before handing any value to Npgsql. This keeps
+                // identity replacement errors deterministic even when another value
+                // is outside Npgsql's own range (for example Timeout > 1024).
+                foreach (string key in rawBuilder.Keys)
+                {
+                    if (!AllowedPostgreSqlAdditionalOptionNames.Contains(key))
+                    {
+                        throw new ServiceValidationException(
+                            $"PostgreSQL 附加参数不支持字段：{key}。仅允许 TLS、超时、连接池和保活参数。");
+                    }
+                }
+
+                var builder = new NpgsqlConnectionStringBuilder();
+                foreach (string key in rawBuilder.Keys)
+                {
+                    object optionValue = NormalizePostgreSqlAdditionalOptionValue(key, rawBuilder[key]);
+                    builder[key] = optionValue;
+                }
+
+                return builder.ConnectionString.Trim(';');
+            }
+            catch (ServiceValidationException)
+            {
+                throw;
+            }
+            catch (ArgumentException ex)
+            {
+                throw new ServiceValidationException(
+                    $"PostgreSQL 附加参数格式无效：{ex.Message}", ex);
+            }
+        }
+
+        private static object NormalizePostgreSqlAdditionalOptionValue(string key, object value)
+        {
+            if (!BoundedPostgreSqlAdditionalIntegerOptions.TryGetValue(key, out var bounds))
+            {
+                return value;
+            }
+
+            string text = Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+            if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed))
+            {
+                throw new ServiceValidationException(
+                    $"PostgreSQL 附加参数 {key} 必须是整数。");
+            }
+
+            return Math.Clamp(parsed, bounds.Minimum, bounds.Maximum);
         }
 
         public static string NormalizePostgreSqlPassword(string value)

@@ -11,15 +11,23 @@ export async function stopProcessTree(child, timeoutMs = 5000) {
   if (!child?.pid) return;
 
   if (process.platform === "win32") {
-    if (child.exitCode !== null || child.signalCode !== null) return;
-    await new Promise((resolve) => {
-      const killer = spawn("taskkill.exe", ["/pid", String(child.pid), "/T", "/F"], {
-        stdio: "ignore",
-        windowsHide: true,
-      });
-      killer.once("exit", resolve);
-      killer.once("error", resolve);
-    });
+    if (!isProcessAlive(child.pid)) return;
+    await runCleanupProcess("taskkill.exe", ["/pid", String(child.pid), "/T", "/F"]);
+    if (isProcessAlive(child.pid)) {
+      const command =
+        `$process = [Diagnostics.Process]::GetProcessById(${child.pid}); ` +
+        "$process.Kill($true); $process.WaitForExit(5000) | Out-Null";
+      await runCleanupProcess("powershell.exe", [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        command,
+      ]);
+    }
+    if (isProcessAlive(child.pid)) {
+      child.kill("SIGKILL");
+    }
     await waitForChildExit(child, timeoutMs);
     return;
   }
@@ -33,6 +41,17 @@ export async function stopProcessTree(child, timeoutMs = 5000) {
   await waitForChildExit(child, Math.min(timeoutMs, 1000));
 }
 
+function runCleanupProcess(command, args) {
+  return new Promise((resolve) => {
+    const killer = spawn(command, args, {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    killer.once("exit", resolve);
+    killer.once("error", resolve);
+  });
+}
+
 function signalProcessGroup(pid, signal) {
   try {
     process.kill(-pid, signal);
@@ -44,6 +63,17 @@ function signalProcessGroup(pid, signal) {
 function isProcessGroupAlive(pid) {
   try {
     process.kill(-pid, 0);
+    return true;
+  } catch (error) {
+    if (error?.code === "ESRCH") return false;
+    if (error?.code === "EPERM") return true;
+    throw error;
+  }
+}
+
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0);
     return true;
   } catch (error) {
     if (error?.code === "ESRCH") return false;

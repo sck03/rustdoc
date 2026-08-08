@@ -45,7 +45,16 @@ namespace ExportDocManager.Services.Infrastructure
             if (systemSettings.BackupRetentionDays > 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                _backupService.CleanOldBackups(systemSettings.BackupRetentionDays);
+                try
+                {
+                    _backupService.CleanOldBackups(systemSettings.BackupRetentionDays);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    AddMaintenanceError(maintenanceErrors, ex.Message);
+                    Log.Warning(ex, "Old database backup cleanup failed during shutdown maintenance.");
+                }
+
                 var backupResult = await _backupService
                     .BackupDatabaseAsync(cancellationToken)
                     .ConfigureAwait(false);

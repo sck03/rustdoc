@@ -42,15 +42,20 @@ namespace ExportDocManager.Services.BrowserRuntime
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
-            await _globalGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             SemaphoreSlim workloadGate = workload == BrowserWorkloadKind.PdfRendering ? _pdfGate : _automationGate;
+            // Acquire the specific workload slot first. Holding a global slot while
+            // waiting for a saturated workload queue creates head-of-line blocking:
+            // a queued automation request could otherwise prevent an available PDF
+            // slot from being used. Every acquisition path uses this order and the
+            // release path mirrors it.
+            await workloadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                await workloadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                await _globalGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             }
             catch
             {
-                _globalGate.Release();
+                workloadGate.Release();
                 throw;
             }
 

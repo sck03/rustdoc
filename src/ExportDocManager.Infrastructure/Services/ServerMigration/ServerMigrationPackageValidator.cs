@@ -169,6 +169,38 @@ internal static class ServerMigrationPackageValidator
         }
     }
 
+    public static long GetDeclaredUncompressedBytes(string zipPath)
+    {
+        using var archive = ZipFile.OpenRead(zipPath);
+        long total = 0;
+        foreach (ZipArchiveEntry entry in archive.Entries)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Name))
+            {
+                continue;
+            }
+
+            if (entry.Length < 0 || entry.Length > ExtractionLimits.MaximumEntryBytes)
+            {
+                throw new PayloadLimitExceededException(ExtractionLimits.MaximumEntryBytes);
+            }
+
+            try
+            {
+                total = checked(total + entry.Length);
+            }
+            catch (OverflowException ex)
+            {
+                throw new InvalidDataException("迁移包展开总大小超出安全上限。", ex);
+            }
+            if (total > ExtractionLimits.MaximumTotalBytes)
+            {
+                throw new PayloadLimitExceededException(ExtractionLimits.MaximumTotalBytes);
+            }
+        }
+        return total;
+    }
+
     public static string ResolvePath(string root, string relativePath)
     {
         string normalizedRelativePath = NormalizeRelativePath(relativePath);

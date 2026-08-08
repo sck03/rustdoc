@@ -86,6 +86,7 @@ public sealed class ServerMigrationService : IServerMigrationService
             throw new ResourceConflictException("已有服务器迁移任务等待重启执行。请先完成恢复。");
         }
 
+        using FileStream migrationLock = ServerMigrationManager.AcquireExclusiveLock(_pathProvider);
         await MigrationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         string workingRoot = Path.Combine(_pathProvider.CacheRoot, "ServerMigration", Guid.NewGuid().ToString("N"));
         string payloadPath = Path.Combine(workingRoot, "payload.zip");
@@ -122,7 +123,8 @@ public sealed class ServerMigrationService : IServerMigrationService
         string packageFileName,
         string password,
         ServerMigrationRequestContext requestContext,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        long? expectedPackageBytes = null)
     {
         EnsurePostgreSqlSupported();
         ArgumentNullException.ThrowIfNull(package);
@@ -138,6 +140,7 @@ public sealed class ServerMigrationService : IServerMigrationService
             throw new ResourceConflictException("已有服务器迁移任务等待重启执行。");
         }
 
+        using FileStream migrationLock = ServerMigrationManager.AcquireExclusiveLock(_pathProvider);
         await MigrationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         string workingRoot = Path.Combine(_pathProvider.CacheRoot, "ServerMigration", Guid.NewGuid().ToString("N"));
         string encryptedPath = Path.Combine(workingRoot, fileName);
@@ -149,11 +152,41 @@ public sealed class ServerMigrationService : IServerMigrationService
         {
             Directory.CreateDirectory(workingRoot);
             RuntimeFilePermissionHelper.RestrictDirectory(workingRoot);
+            long? incomingBytes = expectedPackageBytes;
+            if (!incomingBytes.HasValue && package.CanSeek)
+            {
+                incomingBytes = Math.Max(0, package.Length - package.Position);
+            }
+            if (incomingBytes is > ServerMigrationPackageValidator.MaximumPackageBytes)
+            {
+                throw new PayloadLimitExceededException(ServerMigrationPackageValidator.MaximumPackageBytes);
+            }
+            ServerMigrationStorageBudget.EnsureAvailable(
+                workingRoot,
+                ServerMigrationStorageBudget.WithSafetyMargin(incomingBytes ?? 0),
+                "接收服务器迁移包");
             await ServerMigrationPackageValidator.CopyBoundedAsync(package, encryptedPath, ServerMigrationPackageValidator.MaximumPackageBytes, cancellationToken).ConfigureAwait(false);
+            long declaredPlaintextBytes = await DisasterRecoveryPackageCrypto
+                .ReadDeclaredPlaintextLengthAsync(encryptedPath, cancellationToken)
+                .ConfigureAwait(false);
+            ServerMigrationStorageBudget.EnsureAvailable(
+                workingRoot,
+                ServerMigrationStorageBudget.WithSafetyMargin(declaredPlaintextBytes),
+                "解密服务器迁移包");
             await DisasterRecoveryPackageCrypto.DecryptAsync(encryptedPath, payloadPath, password, cancellationToken).ConfigureAwait(false);
             ServerMigrationPackageValidator.ValidateArchiveEntries(payloadPath);
+            long declaredExtractedBytes = ServerMigrationPackageValidator.GetDeclaredUncompressedBytes(payloadPath);
+            ServerMigrationStorageBudget.EnsureAvailable(
+                extractedRoot,
+                ServerMigrationStorageBudget.WithSafetyMargin(declaredExtractedBytes),
+                "解压服务器迁移包");
             await ZipArchiveHelper.ExtractToDirectorySafeAsync(payloadPath, extractedRoot, cancellationToken, limits: ServerMigrationPackageValidator.ExtractionLimits).ConfigureAwait(false);
             ServerMigrationManifest manifest = await ServerMigrationPackageValidator.ReadAndValidateManifestAsync(extractedRoot, cancellationToken).ConfigureAwait(false);
+            long stagedBytes = ServerMigrationStorageBudget.SumManifestBytes(manifest);
+            ServerMigrationStorageBudget.EnsureAvailable(
+                _pathProvider.BackupRoot,
+                ServerMigrationStorageBudget.WithSafetyMargin(stagedBytes),
+                "准备服务器迁移暂存数据");
             packageId = manifest.PackageId;
             string sourceDump = ResolvePath(extractedRoot, ServerMigrationLayout.DatabaseEntry);
             await ServerMigrationDatabaseRestorer.ValidateDumpContainerAsync(PostgreSqlToolLocator.Resolve(_pathProvider), sourceDump, cancellationToken).ConfigureAwait(false);
@@ -202,7 +235,8 @@ public sealed class ServerMigrationService : IServerMigrationService
         Stream databaseBackup,
         string backupFileName,
         ServerMigrationRequestContext requestContext,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        long? expectedBackupBytes = null)
     {
         EnsurePostgreSqlSupported();
         ArgumentNullException.ThrowIfNull(databaseBackup);
@@ -211,6 +245,7 @@ public sealed class ServerMigrationService : IServerMigrationService
         if (!fileName.EndsWith(".dump", StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("PostgreSQL 恢复文件必须是 .dump custom-format 备份。");
         if (ServerMigrationManager.HasPendingRestore(_pathProvider)) throw new ResourceConflictException("已有服务器迁移或数据库恢复任务等待重启执行。");
 
+        using FileStream migrationLock = ServerMigrationManager.AcquireExclusiveLock(_pathProvider);
         await MigrationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         string workingRoot = Path.Combine(_pathProvider.CacheRoot, "ServerMigration", Guid.NewGuid().ToString("N"));
         string dumpPath = Path.Combine(workingRoot, fileName);
@@ -220,6 +255,19 @@ public sealed class ServerMigrationService : IServerMigrationService
         {
             Directory.CreateDirectory(workingRoot);
             RuntimeFilePermissionHelper.RestrictDirectory(workingRoot);
+            long? incomingBytes = expectedBackupBytes;
+            if (!incomingBytes.HasValue && databaseBackup.CanSeek)
+            {
+                incomingBytes = Math.Max(0, databaseBackup.Length - databaseBackup.Position);
+            }
+            if (incomingBytes is > DisasterRecoveryPackageCrypto.MaximumPlaintextBytes)
+            {
+                throw new PayloadLimitExceededException(DisasterRecoveryPackageCrypto.MaximumPlaintextBytes);
+            }
+            ServerMigrationStorageBudget.EnsureAvailable(
+                workingRoot,
+                ServerMigrationStorageBudget.WithSafetyMargin(incomingBytes ?? 0),
+                "接收 PostgreSQL 数据库备份");
             await ServerMigrationPackageValidator.CopyBoundedAsync(databaseBackup, dumpPath, DisasterRecoveryPackageCrypto.MaximumPlaintextBytes, cancellationToken).ConfigureAwait(false);
             if (new FileInfo(dumpPath).Length == 0) throw new InvalidDataException("PostgreSQL 备份文件不能为空。");
             await ServerMigrationDatabaseRestorer.ValidateDumpContainerAsync(PostgreSqlToolLocator.Resolve(_pathProvider), dumpPath, cancellationToken).ConfigureAwait(false);
@@ -227,6 +275,10 @@ public sealed class ServerMigrationService : IServerMigrationService
             string stagingRoot = Path.Combine(ServerMigrationManager.GetControlRoot(_pathProvider), stagingDirectoryName);
             Directory.CreateDirectory(stagingRoot);
             RuntimeFilePermissionHelper.RestrictDirectory(stagingRoot);
+            ServerMigrationStorageBudget.EnsureAvailable(
+                stagingRoot,
+                ServerMigrationStorageBudget.WithSafetyMargin(new FileInfo(dumpPath).Length),
+                "准备 PostgreSQL 数据库恢复暂存数据");
             string target = ResolvePath(stagingRoot, ServerMigrationLayout.DatabaseEntry);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             await FileCopyHelper.CopyAsync(dumpPath, target, overwrite: false, cancellationToken: cancellationToken).ConfigureAwait(false);

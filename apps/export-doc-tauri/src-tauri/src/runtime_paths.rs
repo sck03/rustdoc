@@ -529,7 +529,7 @@ fn read_data_root_from_config(
     config_path: &Path,
     app_root: &Path,
 ) -> Result<PathBuf, RuntimePathsConfigReadError> {
-    let config_text = fs::read_to_string(&config_path).map_err(|error| {
+    let config_text = fs::read_to_string(config_path).map_err(|error| {
         RuntimePathsConfigReadError::recoverable(format!(
             "Failed to read runtime paths config '{}': {error}",
             config_path.display()

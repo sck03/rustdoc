@@ -15,7 +15,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
-                ISharedDatabaseMaintenanceService maintenanceService) =>
+                ISharedDatabaseMaintenanceService maintenanceService,
+                ApiDesktopAccessOptions desktopAccessOptions) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -28,9 +29,14 @@ namespace ExportDocManager.Api.Hosting
                     return WriteForbidden("只有管理员可以查看 PostgreSQL 团队库备份。");
                 }
 
+                bool revealPaths = ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions);
                 return Results.Ok(new ApiPostgreSqlPhysicalBackupListResponse(
-                    ToPostgreSqlMaintenanceStatusResponse(maintenanceService.GetPostgreSqlMaintenanceStatus()),
-                    maintenanceService.ListPostgreSqlPhysicalBackups().Select(ToSharedDatabaseBackupItemDto).ToArray()));
+                    ToPostgreSqlMaintenanceStatusResponse(
+                        maintenanceService.GetPostgreSqlMaintenanceStatus(),
+                        revealPaths),
+                    maintenanceService.ListPostgreSqlPhysicalBackups()
+                        .Select(item => ToSharedDatabaseBackupItemDto(item, revealPaths))
+                        .ToArray()));
             })
             .WithName("ListPostgreSqlPhysicalBackups");
 
@@ -91,6 +97,7 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISharedDatabaseMaintenanceService maintenanceService,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 ApiPostgreSqlRestorePlanRequest request,
                 CancellationToken cancellationToken) =>
             {
@@ -121,13 +128,14 @@ namespace ExportDocManager.Api.Hosting
                             OldOwnerRoles = request.OldOwnerRoles ?? Array.Empty<string>()
                         },
                         cancellationToken).ConfigureAwait(false);
+                    bool revealPaths = ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions);
                     return Results.Ok(new ApiPostgreSqlRestorePlanResponse(
                         result.Success,
                         result.Message,
-                        result.PlanRoot,
-                        result.RestoreScriptPath,
-                        result.OwnershipSqlPath,
-                        result.BackupFilePath,
+                        ApiResponsePathPolicy.Reveal(result.PlanRoot, revealPaths),
+                        ApiResponsePathPolicy.Reveal(result.RestoreScriptPath, revealPaths),
+                        ApiResponsePathPolicy.Reveal(result.OwnershipSqlPath, revealPaths),
+                        ApiResponsePathPolicy.Reveal(result.BackupFilePath, revealPaths),
                         result.StoragePolicy));
                 }
                 catch (Exception ex) when (ex is ServiceException or InvalidOperationException)
@@ -371,7 +379,8 @@ namespace ExportDocManager.Api.Hosting
         }
 
         private static ApiPostgreSqlMaintenanceStatusResponse ToPostgreSqlMaintenanceStatusResponse(
-            PostgreSqlMaintenanceStatus status)
+            PostgreSqlMaintenanceStatus status,
+            bool revealPaths)
         {
             return new ApiPostgreSqlMaintenanceStatusResponse(
                 status.PostgreSqlSelected,
@@ -380,16 +389,18 @@ namespace ExportDocManager.Api.Hosting
                 status.Port,
                 status.Database,
                 status.Username,
-                status.BackupRoot,
-                status.ToolBinRoot,
-                status.PgDumpPath,
-                status.PgRestorePath,
-                status.PsqlPath,
+                ApiResponsePathPolicy.Reveal(status.BackupRoot, revealPaths),
+                ApiResponsePathPolicy.Reveal(status.ToolBinRoot, revealPaths),
+                ApiResponsePathPolicy.Reveal(status.PgDumpPath, revealPaths),
+                ApiResponsePathPolicy.Reveal(status.PgRestorePath, revealPaths),
+                ApiResponsePathPolicy.Reveal(status.PsqlPath, revealPaths),
                 status.ToolsReady,
                 status.StoragePolicy);
         }
 
-        private static ApiSharedDatabaseBackupItemDto ToSharedDatabaseBackupItemDto(SharedDatabaseBackupItem item)
+        private static ApiSharedDatabaseBackupItemDto ToSharedDatabaseBackupItemDto(
+            SharedDatabaseBackupItem item,
+            bool revealPaths)
         {
             if (item == null)
             {
@@ -398,7 +409,7 @@ namespace ExportDocManager.Api.Hosting
 
             return new ApiSharedDatabaseBackupItemDto(
                 item.FileName,
-                item.FullPath,
+                ApiResponsePathPolicy.Reveal(item.FullPath, revealPaths),
                 item.SizeBytes,
                 item.CreatedAt,
                 item.LastWriteTime);

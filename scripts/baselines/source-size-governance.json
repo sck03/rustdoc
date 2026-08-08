@@ -30,6 +30,13 @@
       "maximumLines": 520
     },
     {
+      "name": "report template package components",
+      "directory": "src/ExportDocManager.Infrastructure/Services/Reporting",
+      "filePattern": "^ReportTemplatePackageService(?:\\..+)?\\.cs$",
+      "maximumLines": 320,
+      "maximumAggregateLines": 920
+    },
+    {
       "name": "built-in Excel analyzer partials",
       "directory": "src/ExportDocManager.Infrastructure/Services/Data",
       "filePattern": "^BuiltInExcelImportAnalyzer(?:\\..+)?\\.cs$",
@@ -41,6 +48,13 @@
       "directory": "apps/export-doc-web/src/features/settings",
       "filePattern": "^Maintenance.*\\.tsx$",
       "maximumLines": 320
+    },
+    {
+      "name": "job center components",
+      "directory": "apps/export-doc-web/src/features/jobs",
+      "filePattern": "^(?:JobCenterPage|JobCreationPanels|JobTable|jobPresentation|useJobCenterOperations)\\.(?:tsx|ts)$",
+      "maximumLines": 320,
+      "maximumAggregateLines": 830
     },
     {
       "name": "HS API endpoint modules",

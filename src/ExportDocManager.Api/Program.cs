@@ -3,6 +3,8 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Services.Tools;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 
 var runtimeOptions = ApiRuntimeOptions.Parse(args);
 var pathProvider = string.IsNullOrWhiteSpace(runtimeOptions.DataRoot)
@@ -44,7 +46,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 });
 builder.Services.AddExportDocManagerApiServices(pathProvider, databaseSettings, runtimeOptions);
 
-var app = builder.Build();
+await using var app = builder.Build();
 app.UseExportDocManagerForwardedHeaders(runtimeOptions);
 app.UseExportDocManagerApiSafety();
 app.UseCors(ApiCorsPolicy.LocalFrontendPolicyName);
@@ -56,7 +58,18 @@ app.UseExportDocManagerLicenseRequirement();
 app.UseExportDocManagerBrowserFrontend(pathProvider.AppRoot);
 app.MapExportDocManagerApiEndpoints(runtimeOptions, databaseSettings);
 app.MapExportDocManagerBrowserFallback(pathProvider.AppRoot);
-app.Run();
+await app.StartAsync();
+try
+{
+    var server = app.Services.GetRequiredService<IServer>();
+    var addresses = server.Features.Get<IServerAddressesFeature>()?.Addresses ?? app.Urls;
+    ApiEndpointPublication.Publish(runtimeOptions.EndpointFile, addresses);
+    await app.WaitForShutdownAsync();
+}
+finally
+{
+    ApiEndpointPublication.Remove(runtimeOptions.EndpointFile);
+}
 
 public partial class Program
 {

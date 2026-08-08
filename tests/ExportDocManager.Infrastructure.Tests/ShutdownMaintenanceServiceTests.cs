@@ -176,6 +176,47 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task RunAsync_WhenOldBackupCleanupFails_ShouldReportErrorAndContinueBackup()
+        {
+            string root = CreateTestRoot("shutdown-maintenance-cleanup-error");
+            try
+            {
+                string appRoot = Path.Combine(root, "app");
+                string dataRoot = Path.Combine(root, "data");
+                string backupRoot = Path.Combine(dataRoot, "Backups");
+                Directory.CreateDirectory(Path.Combine(dataRoot, "Logs"));
+                Directory.CreateDirectory(backupRoot);
+                string backupPath = Path.Combine(backupRoot, "20260808_data.zip");
+                await File.WriteAllTextAsync(backupPath, "backup");
+
+                var settingsService = new TestSettingsService(new AppSettings
+                {
+                    System = new SystemSettings { BackupRetentionDays = 7 },
+                    WebDav = new WebDavSettings { Enabled = false }
+                });
+                var backupService = new TestBackupService([backupPath])
+                {
+                    CleanOldBackupsException = new IOException("backup directory unavailable")
+                };
+                var service = new ShutdownMaintenanceService(
+                    settingsService,
+                    backupService,
+                    new TestCloudSyncService(),
+                    new TestAuditLogService(0),
+                    new TestAppPathProvider(appRoot, dataRoot));
+
+                var result = await service.RunAsync();
+
+                Assert.True(backupService.BackupDatabaseCalled);
+                Assert.Contains("backup directory unavailable", result.CloudSyncErrorMessage, StringComparison.Ordinal);
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(root);
+            }
+        }
+
+        [Fact]
         public async Task RunAsync_WhenReportedBackupFileIsMissing_ShouldNotFallBackToAnOlderBackup()
         {
             string root = CreateTestRoot("shutdown-maintenance-missing-new-backup");
@@ -379,6 +420,8 @@ namespace ExportDocManager.Infrastructure.Tests
 
             public DatabaseBackupResult BackupResult { get; init; }
 
+            public Exception CleanOldBackupsException { get; init; }
+
             public Task<DatabaseBackupResult> BackupDatabaseAsync(CancellationToken cancellationToken = default)
             {
                 BackupDatabaseCalled = true;
@@ -389,9 +432,21 @@ namespace ExportDocManager.Infrastructure.Tests
                     FilePath: _availableBackups.FirstOrDefault() ?? string.Empty));
             }
 
+            public Task<DatabaseBackupImportResult> ImportBackupAsync(
+                string sourceFilePath,
+                string preferredFileName = null,
+                CancellationToken cancellationToken = default)
+            {
+                throw new NotSupportedException();
+            }
+
             public void CleanOldBackups(int daysToKeep)
             {
                 CleanOldBackupsDaysToKeep = daysToKeep;
+                if (CleanOldBackupsException != null)
+                {
+                    throw CleanOldBackupsException;
+                }
             }
 
             public List<string> GetAvailableBackups()

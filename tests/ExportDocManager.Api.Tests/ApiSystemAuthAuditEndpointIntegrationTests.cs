@@ -1,12 +1,34 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ExportDocManager.Api.Tests
 {
     public class ApiSystemAuthAuditEndpointIntegrationTests
     {
+        [Fact]
+        public async Task Login_WhenBootstrapTokenAuthenticationFails_ShouldReturnUnauthorized()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-bootstrap-auth-failure",
+                "api-bootstrap-auth-failure.db",
+                configureServices: services =>
+                    services.AddSingleton<IDatabaseInitializationService>(
+                        new AuthenticationFailureInitializationService()));
+            using var client = harness.CreateClient();
+
+            var response = await client.PostAsJsonAsync("/api/auth/login", new
+            {
+                username = "admin",
+                password = "initial-password"
+            });
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
         [Fact]
         public async Task SystemAuthAndAuditEndpoints_ShouldPreserveHttpBehaviorAndRuntimeDataRoot()
         {
@@ -108,9 +130,11 @@ namespace ExportDocManager.Api.Tests
             using (var adminHealthDocument = JsonDocument.Parse(await adminHealthResponse.Content.ReadAsStringAsync()))
             {
                 var root = adminHealthDocument.RootElement;
-                Assert.Equal(Path.GetFullPath(harness.AppRoot), Path.GetFullPath(root.GetProperty("appRoot").GetString() ?? string.Empty));
-                Assert.Equal(Path.GetFullPath(harness.DataRoot), Path.GetFullPath(root.GetProperty("dataRoot").GetString() ?? string.Empty));
+                Assert.Equal(string.Empty, root.GetProperty("appRoot").GetString());
+                Assert.Equal(string.Empty, root.GetProperty("dataRoot").GetString());
                 Assert.NotEmpty(root.GetProperty("runtimePaths").EnumerateArray());
+                Assert.All(root.GetProperty("runtimePaths").EnumerateArray(), item =>
+                    Assert.Equal(string.Empty, item.GetProperty("path").GetString()));
             }
 
             Assert.True(File.Exists(harness.DatabasePath));
@@ -143,10 +167,7 @@ namespace ExportDocManager.Api.Tests
                 Assert.False(root.GetProperty("isRegistered").GetBoolean());
                 Assert.Equal(7, root.GetProperty("trialDays").GetInt32());
                 Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("machineId").GetString()));
-                Assert.StartsWith(
-                    Path.Combine(harness.DataRoot, "Security"),
-                    Path.GetFullPath(root.GetProperty("licenseStoragePath").GetString() ?? string.Empty),
-                    StringComparison.OrdinalIgnoreCase);
+                Assert.Equal(string.Empty, root.GetProperty("licenseStoragePath").GetString());
                 Assert.DoesNotContain(@"C:\", root.GetProperty("storagePolicy").GetString() ?? string.Empty);
             }
 
@@ -232,6 +253,20 @@ namespace ExportDocManager.Api.Tests
             anchor.LicenseKey = string.Empty;
             anchor.LicenseExpireDate = default;
             await anchorStore.SaveAsync(anchor);
+        }
+
+        private sealed class AuthenticationFailureInitializationService : IDatabaseInitializationService
+        {
+            public Task<DatabaseInitializationResult> InitializeAsync(
+                string username,
+                string password,
+                string bootstrapToken = null)
+            {
+                return Task.FromResult(DatabaseInitializationResult.Fail(
+                    "首次管理员初始化令牌无效。",
+                    shouldResetPassword: false,
+                    isAuthenticationFailure: true));
+            }
         }
     }
 }

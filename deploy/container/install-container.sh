@@ -13,11 +13,13 @@ INSTALL_DIR=$DEFAULT_INSTALL_DIR
 IMAGE_NAMESPACE=""
 IMAGE_TAG=""
 WEB_PORT=""
+WEB_BIND_ADDRESS=""
 PUBLIC_DOMAIN=""
 ACME_EMAIL=""
 REPOSITORY_REF="main"
 CONTAINER_SUBNET=""
 ALLOW_NETWORK_OVERLAP=0
+ALLOW_INSECURE_DISASTER_RECOVERY=0
 NO_START=0
 
 usage() {
@@ -34,6 +36,9 @@ Options:
   --image-namespace VALUE    Image namespace (default: ghcr.io/sck03)
   --install-dir PATH         Deployment and runtime root (default: /opt/export-doc-manager)
   --web-port PORT            Internal HTTP host port (default: 8080)
+  --web-bind-address ADDRESS HTTP bind address (default: 127.0.0.1)
+  --allow-insecure-disaster-recovery
+                              Explicitly allow sensitive recovery uploads over HTTP
   --domain DOMAIN            Public DNS name for HTTPS mode
   --email EMAIL              ACME expiry notice email for HTTPS mode
   --repo-ref REF             Git ref used to download deployment assets (default: main)
@@ -81,6 +86,8 @@ while (($# > 0)); do
     --image-namespace) IMAGE_NAMESPACE=${2:?Missing value for --image-namespace}; shift 2 ;;
     --install-dir) INSTALL_DIR=${2:?Missing value for --install-dir}; shift 2 ;;
     --web-port) WEB_PORT=${2:?Missing value for --web-port}; shift 2 ;;
+    --web-bind-address) WEB_BIND_ADDRESS=${2:?Missing value for --web-bind-address}; shift 2 ;;
+    --allow-insecure-disaster-recovery) ALLOW_INSECURE_DISASTER_RECOVERY=1; shift ;;
     --domain) PUBLIC_DOMAIN=${2:?Missing value for --domain}; shift 2 ;;
     --email) ACME_EMAIL=${2:?Missing value for --email}; shift 2 ;;
     --repo-ref) REPOSITORY_REF=${2:?Missing value for --repo-ref}; shift 2 ;;
@@ -135,9 +142,11 @@ if command -v flock >/dev/null 2>&1; then
 fi
 
 ASSET_BASE=${EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE:-"https://raw.githubusercontent.com/sck03/rustdoc/${REPOSITORY_REF}/deploy/container"}
+CHECKSUM_MANIFEST=deployment-assets.sha256
 DEPLOYMENT_ASSETS=(docker-compose.ghcr.yml docker-compose.acme.yml nginx.acme.conf install-container.sh)
+MANAGED_DEPLOYMENT_ASSETS=("$CHECKSUM_MANIFEST" "${DEPLOYMENT_ASSETS[@]}")
 ENVIRONMENT_FILE="$INSTALL_DIR/.env"
-for managed_file in "${DEPLOYMENT_ASSETS[@]}" .env; do
+for managed_file in "${MANAGED_DEPLOYMENT_ASSETS[@]}" .env; do
   managed_path="$INSTALL_DIR/$managed_file"
   [[ ! -L "$managed_path" ]] || fail "Managed deployment files must not be symbolic links: $managed_path"
   [[ ! -e "$managed_path" || -f "$managed_path" ]] || fail "Managed deployment paths must be regular files: $managed_path"
@@ -155,7 +164,7 @@ DEPLOYMENT_SUCCEEDED=0
 
 restore_deployment_assets() {
   local asset
-  for asset in "${DEPLOYMENT_ASSETS[@]}"; do
+  for asset in "${MANAGED_DEPLOYMENT_ASSETS[@]}"; do
     if [[ -f "$ASSET_BACKUP/$asset" ]]; then
       cp -p -- "$ASSET_BACKUP/$asset" "$INSTALL_DIR/$asset"
     elif [[ -f "$ASSET_BACKUP/.missing-$asset" ]]; then
@@ -257,9 +266,42 @@ download_asset() {
   chmod 600 "$destination"
 }
 
+verify_deployment_manifest() {
+  local manifest="$ASSET_STAGE/$CHECKSUM_MANIFEST"
+  local entry_count=0
+  local hash
+  local name
+  local extra
+  local expected
+  local actual
+
+  while read -r hash name extra; do
+    [[ -n "$hash" ]] || continue
+    [[ "$hash" != \#* ]] || continue
+    [[ "$hash" =~ ^[0-9A-Fa-f]{64}$ && -n "$name" && -z "$extra" ]] ||
+      fail "Deployment checksum manifest has an invalid entry."
+    case " ${DEPLOYMENT_ASSETS[*]} " in
+      *" $name "*) ;;
+      *) fail "Deployment checksum manifest contains an unmanaged asset: $name" ;;
+    esac
+    ((entry_count += 1))
+  done < "$manifest"
+  ((entry_count == ${#DEPLOYMENT_ASSETS[@]})) ||
+    fail "Deployment checksum manifest must contain exactly ${#DEPLOYMENT_ASSETS[@]} managed assets."
+
+  for name in "${DEPLOYMENT_ASSETS[@]}"; do
+    expected=$(awk -v name="$name" '$2 == name { print tolower($1) }' "$manifest")
+    [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || fail "Deployment checksum is missing or duplicated: $name"
+    actual=$(openssl dgst -sha256 "$ASSET_STAGE/$name" | awk '{ print tolower($NF) }')
+    [[ "$actual" == "$expected" ]] || fail "Deployment asset checksum mismatch: $name"
+  done
+}
+
+download_asset "$CHECKSUM_MANIFEST"
 for asset in "${DEPLOYMENT_ASSETS[@]}"; do
   download_asset "$asset"
 done
+verify_deployment_manifest
 bash -n "$ASSET_STAGE/install-container.sh"
 STAGED_VALIDATION_ENV="$ASSET_STAGE/.compose-validation.env"
 cat > "$STAGED_VALIDATION_ENV" <<EOF
@@ -271,6 +313,7 @@ EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/sck03
 EXPORTDOCMANAGER_IMAGE_TAG=validation
 EXPORTDOCMANAGER_RUNTIME_ROOT=$INSTALL_DIR/.compose-validation-runtime
 EXPORTDOCMANAGER_WEB_PORT=18080
+EXPORTDOCMANAGER_WEB_BIND_ADDRESS=127.0.0.1
 EXPORTDOCMANAGER_HTTPS_PORT=18443
 EXPORTDOCMANAGER_CONTAINER_SUBNET=172.31.255.0/28
 EXPORTDOCMANAGER_REVERSE_PROXY_IP=172.31.255.10
@@ -287,7 +330,7 @@ docker compose \
   --env-file "$STAGED_VALIDATION_ENV" \
   config --quiet
 
-for asset in "${DEPLOYMENT_ASSETS[@]}"; do
+for asset in "${MANAGED_DEPLOYMENT_ASSETS[@]}"; do
   if [[ -f "$INSTALL_DIR/$asset" ]]; then
     cp -p -- "$INSTALL_DIR/$asset" "$ASSET_BACKUP/$asset"
   else
@@ -307,7 +350,7 @@ fi
 chmod 600 "$ENVIRONMENT_BACKUP"
 ROLLBACK_REQUIRED=1
 
-for asset in "${DEPLOYMENT_ASSETS[@]}"; do
+for asset in "${MANAGED_DEPLOYMENT_ASSETS[@]}"; do
   ACTIVATION_FILE=$(mktemp "$INSTALL_DIR/.$asset.activate.XXXXXX")
   cp -- "$ASSET_STAGE/$asset" "$ACTIVATION_FILE"
   chmod 600 "$ACTIVATION_FILE"
@@ -345,6 +388,17 @@ set_env_value() {
   ENVIRONMENT_TEMP_FILE=""
 }
 
+ipv4_to_int() {
+  local address=$1 a b c d octet
+  IFS=. read -r a b c d <<< "$address"
+  [[ -n ${d:-} && $a =~ ^[0-9]{1,3}$ && $b =~ ^[0-9]{1,3}$ && $c =~ ^[0-9]{1,3}$ && $d =~ ^[0-9]{1,3}$ ]] || return 1
+  for octet in "$a" "$b" "$c" "$d"; do
+    [[ "$octet" == "0" || "$octet" != 0* ]] || return 1
+  done
+  ((10#$a <= 255 && 10#$b <= 255 && 10#$c <= 255 && 10#$d <= 255)) || return 1
+  printf '%u\n' "$(((10#$a << 24) + (10#$b << 16) + (10#$c << 8) + 10#$d))"
+}
+
 EXISTING_MODE=$(env_value EXPORTDOCMANAGER_DEPLOYMENT_MODE)
 MODE=${MODE:-$EXISTING_MODE}
 MODE=${MODE:-http}
@@ -361,6 +415,19 @@ fi
 WEB_PORT=${WEB_PORT:-8080}
 [[ "$WEB_PORT" =~ ^[0-9]+$ ]] && ((WEB_PORT >= 1 && WEB_PORT <= 65535)) ||
   fail "--web-port must be between 1 and 65535."
+if [[ -z "$WEB_BIND_ADDRESS" && "$MODE" == "$EXISTING_MODE" ]]; then
+  WEB_BIND_ADDRESS=$(env_value EXPORTDOCMANAGER_WEB_BIND_ADDRESS)
+fi
+if [[ "$MODE" == "https" ]]; then
+  WEB_BIND_ADDRESS=${WEB_BIND_ADDRESS:-0.0.0.0}
+else
+  WEB_BIND_ADDRESS=${WEB_BIND_ADDRESS:-127.0.0.1}
+fi
+ipv4_to_int "$WEB_BIND_ADDRESS" >/dev/null ||
+  fail "--web-bind-address must be an IPv4 address such as 127.0.0.1 or 0.0.0.0."
+if [[ "$MODE" == "http" && "$WEB_BIND_ADDRESS" != 127.* && $ALLOW_INSECURE_DISASTER_RECOVERY -eq 1 ]]; then
+  note "WARNING: HTTP recovery uploads are explicitly enabled on a non-loopback interface; use HTTPS for untrusted networks." >&2
+fi
 [[ "$IMAGE_NAMESPACE" =~ ^ghcr\.io/[a-z0-9][a-z0-9._-]*$ ]] ||
   fail "--image-namespace must look like ghcr.io/account."
 [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || fail "Invalid container image tag."
@@ -408,14 +475,6 @@ BOOTSTRAP_TOKEN=${BOOTSTRAP_TOKEN:-$(random_hex 32)}
   fail "PostgreSQL password is invalid or shorter than 12 characters."
 (( ${#BOOTSTRAP_TOKEN} >= 24 && ${#BOOTSTRAP_TOKEN} <= 512 )) && [[ "$BOOTSTRAP_TOKEN" =~ ^[A-Za-z0-9._~!@%+=:-]+$ ]] ||
   fail "Bootstrap token must contain 24-512 safe characters."
-
-ipv4_to_int() {
-  local address=$1 a b c d
-  IFS=. read -r a b c d <<< "$address"
-  [[ -n ${d:-} && $a =~ ^[0-9]+$ && $b =~ ^[0-9]+$ && $c =~ ^[0-9]+$ && $d =~ ^[0-9]+$ ]] || return 1
-  ((a <= 255 && b <= 255 && c <= 255 && d <= 255)) || return 1
-  printf '%u\n' "$(((a << 24) + (b << 16) + (c << 8) + d))"
-}
 
 int_to_ipv4() {
   local value=$1
@@ -569,12 +628,18 @@ set_env_value EXPORTDOCMANAGER_BOOTSTRAP_TOKEN "$BOOTSTRAP_TOKEN"
 set_env_value EXPORTDOCMANAGER_MASTER_KEY "$MASTER_KEY"
 if [[ "$MODE" == "https" ]]; then
   set_env_value EXPORTDOCMANAGER_WEB_PORT 80
+  set_env_value EXPORTDOCMANAGER_WEB_BIND_ADDRESS "$WEB_BIND_ADDRESS"
   set_env_value EXPORTDOCMANAGER_HTTPS_PORT 443
   set_env_value EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY false
 else
   set_env_value EXPORTDOCMANAGER_WEB_PORT "$WEB_PORT"
+  set_env_value EXPORTDOCMANAGER_WEB_BIND_ADDRESS "$WEB_BIND_ADDRESS"
   set_env_value EXPORTDOCMANAGER_HTTPS_PORT 8443
-  set_env_value EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY true
+  if ((ALLOW_INSECURE_DISASTER_RECOVERY == 1)); then
+    set_env_value EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY true
+  else
+    set_env_value EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY false
+  fi
 fi
 set_env_value EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES "$ADDITIONAL_TRUSTED_PROXIES"
 set_env_value EXPORTDOCMANAGER_TLS_CERTIFICATE ./secrets/tls/server.crt
@@ -679,11 +744,19 @@ fi
 if [[ "$MODE" == "https" ]]; then
   READINESS_URL="https://${PUBLIC_DOMAIN}/readyz"
   ACCESS_URL="https://${PUBLIC_DOMAIN}"
-  READINESS_ARGUMENTS=(--resolve "${PUBLIC_DOMAIN}:443:127.0.0.1")
+  READINESS_ADDRESS=$WEB_BIND_ADDRESS
+  [[ "$READINESS_ADDRESS" != "0.0.0.0" ]] || READINESS_ADDRESS=127.0.0.1
+  READINESS_ARGUMENTS=(--resolve "${PUBLIC_DOMAIN}:443:${READINESS_ADDRESS}")
 else
-  READINESS_URL="http://127.0.0.1:${WEB_PORT}/readyz"
-  HOST_ADDRESS=$(hostname -I 2>/dev/null | awk '{print $1}')
-  ACCESS_URL="http://${HOST_ADDRESS:-SERVER_IP}:${WEB_PORT}"
+  READINESS_ADDRESS=$WEB_BIND_ADDRESS
+  if [[ "$READINESS_ADDRESS" == "0.0.0.0" ]]; then
+    READINESS_ADDRESS=127.0.0.1
+    HOST_ADDRESS=$(hostname -I 2>/dev/null | awk '{print $1}')
+    ACCESS_URL="http://${HOST_ADDRESS:-SERVER_IP}:${WEB_PORT}"
+  else
+    ACCESS_URL="http://${WEB_BIND_ADDRESS}:${WEB_PORT}"
+  fi
+  READINESS_URL="http://${READINESS_ADDRESS}:${WEB_PORT}/readyz"
   READINESS_ARGUMENTS=()
 fi
 

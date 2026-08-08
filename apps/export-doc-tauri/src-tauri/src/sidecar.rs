@@ -2,7 +2,8 @@ use std::{
     error::Error,
     fs,
     io::{Read, Write},
-    net::{TcpListener, TcpStream},
+    net::TcpStream,
+    path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -19,6 +20,7 @@ use crate::runtime_paths::RuntimePaths;
 pub(crate) const DESKTOP_ACCESS_TOKEN_ENV: &str = "EXPORTDOCMANAGER_DESKTOP_TOKEN";
 const SHUTDOWN_MAINTENANCE_PATH: &str = "/api/system/shutdown-maintenance";
 const MAX_SHUTDOWN_RESPONSE_BYTES: u64 = 1024 * 1024;
+const MAX_ENDPOINT_PUBLICATION_BYTES: u64 = 4096;
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -68,22 +70,32 @@ pub(crate) struct SidecarLaunch {
     pub(crate) child: Child,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SidecarEndpointPublication {
+    schema_version: u32,
+    api_base_url: String,
+    process_id: u32,
+}
+
 pub(crate) fn start_sidecar(paths: &RuntimePaths) -> Result<SidecarLaunch, Box<dyn Error>> {
-    let port = reserve_loopback_port()?;
-    let listen_url = format!("http://127.0.0.1:{port}");
+    let listen_url = "http://127.0.0.1:0";
     let desktop_access_token = resolve_desktop_access_token()?;
+    let endpoint_file = create_sidecar_endpoint_file(paths)?;
     let stdout_log_path = paths.log_root.join("api-sidecar.stdout.log");
     let stderr_log_path = paths.log_root.join("api-sidecar.stderr.log");
     let mut stdout_log = crate::log_rotation::open_append_log_file(&stdout_log_path)?;
     let mut stderr_log = crate::log_rotation::open_append_log_file(&stderr_log_path)?;
 
-    write_sidecar_launch_marker(&mut stdout_log, &listen_url, paths)?;
-    write_sidecar_launch_marker(&mut stderr_log, &listen_url, paths)?;
+    write_sidecar_launch_marker(&mut stdout_log, listen_url, paths)?;
+    write_sidecar_launch_marker(&mut stderr_log, listen_url, paths)?;
 
     let mut command = Command::new(&paths.sidecar_path);
     command
         .arg("--urls")
-        .arg(&listen_url)
+        .arg(listen_url)
+        .arg("--endpoint-file")
+        .arg(&endpoint_file)
         .arg("--app-root")
         .arg(&paths.app_root)
         .arg("--data-root")
@@ -103,26 +115,37 @@ pub(crate) fn start_sidecar(paths: &RuntimePaths) -> Result<SidecarLaunch, Box<d
         command.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let mut child = command.spawn().map_err(|error| {
-        format!(
-            "Failed to start API sidecar at '{}': {error}",
-            paths.sidecar_path.display()
-        )
-    })?;
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            let _ = fs::remove_file(&endpoint_file);
+            return Err(format!(
+                "Failed to start API sidecar at '{}': {error}",
+                paths.sidecar_path.display()
+            )
+            .into());
+        }
+    };
 
-    if let Err(error) = wait_for_health(port, Duration::from_secs(20)) {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(format!(
-            "{error}. See sidecar logs: '{}' and '{}'.",
-            stdout_log_path.display(),
-            stderr_log_path.display()
-        )
-        .into());
-    }
+    let api_base_url =
+        wait_for_endpoint_and_health(&mut child, &endpoint_file, Duration::from_secs(20));
+    let _ = fs::remove_file(&endpoint_file);
+    let api_base_url = match api_base_url {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(format!(
+                "{error}. See sidecar logs: '{}' and '{}'.",
+                stdout_log_path.display(),
+                stderr_log_path.display()
+            )
+            .into());
+        }
+    };
 
     Ok(SidecarLaunch {
-        api_base_url: listen_url,
+        api_base_url,
         desktop_access_token,
         child,
     })
@@ -218,11 +241,38 @@ fn write_sidecar_launch_marker(
     .map_err(|error| format!("Failed to write sidecar launch marker: {error}").into())
 }
 
-fn reserve_loopback_port() -> Result<u16, Box<dyn Error>> {
-    let listener = TcpListener::bind(("127.0.0.1", 0))?;
-    let port = listener.local_addr()?.port();
-    drop(listener);
-    Ok(port)
+fn create_sidecar_endpoint_file(paths: &RuntimePaths) -> Result<PathBuf, Box<dyn Error>> {
+    let endpoint_root = paths.data_root.join("Cache").join("Sidecar");
+    fs::create_dir_all(&endpoint_root)?;
+    restrict_endpoint_directory(&endpoint_root)?;
+    let mut nonce = [0_u8; 16];
+    getrandom::getrandom(&mut nonce)
+        .map_err(|error| format!("Failed to create sidecar endpoint nonce: {error}"))?;
+    Ok(endpoint_root.join(format!("endpoint-{}.json", to_hex(&nonce))))
+}
+
+#[cfg(unix)]
+fn restrict_endpoint_directory(path: &Path) -> Result<(), Box<dyn Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn restrict_endpoint_directory(_path: &Path) -> Result<(), Box<dyn Error>> {
+    Ok(())
+}
+
+#[cfg(unix)]
+fn restrict_endpoint_file(path: &Path) -> Result<(), Box<dyn Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn restrict_endpoint_file(_path: &Path) -> Result<(), Box<dyn Error>> {
+    Ok(())
 }
 
 fn resolve_desktop_access_token() -> Result<String, Box<dyn Error>> {
@@ -250,19 +300,79 @@ fn to_hex(bytes: &[u8]) -> String {
     output
 }
 
-fn wait_for_health(port: u16, timeout: Duration) -> Result<(), String> {
+fn wait_for_endpoint_and_health(
+    child: &mut Child,
+    endpoint_file: &Path,
+    timeout: Duration,
+) -> Result<String, String> {
     let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
-        if probe_health(port).unwrap_or(false) {
-            return Ok(());
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|error| format!("Failed to inspect API sidecar process: {error}"))?
+        {
+            return Err(format!(
+                "API sidecar exited before publishing its endpoint: {status}"
+            ));
+        }
+
+        match read_endpoint_publication(endpoint_file, child.id()) {
+            Ok(Some(api_base_url)) => {
+                let authority = resolve_loopback_authority(&api_base_url)?;
+                if probe_health(&authority).unwrap_or(false) {
+                    return Ok(api_base_url.trim_end_matches('/').to_owned());
+                }
+            }
+            Ok(None) => {}
+            Err(error) => return Err(error),
         }
 
         thread::sleep(Duration::from_millis(250));
     }
 
     Err(format!(
-        "API sidecar did not become healthy on 127.0.0.1:{port}"
+        "API sidecar did not publish a healthy loopback endpoint within {} seconds",
+        timeout.as_secs()
     ))
+}
+
+fn read_endpoint_publication(
+    endpoint_file: &Path,
+    expected_process_id: u32,
+) -> Result<Option<String>, String> {
+    let metadata = match fs::metadata(endpoint_file) {
+        Ok(value) => value,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("Failed to inspect API endpoint file: {error}")),
+    };
+    if !metadata.is_file() || metadata.len() == 0 || metadata.len() > MAX_ENDPOINT_PUBLICATION_BYTES
+    {
+        return Err("API endpoint file has an invalid size or type.".to_owned());
+    }
+    restrict_endpoint_file(endpoint_file)
+        .map_err(|error| format!("Failed to restrict API endpoint file permissions: {error}"))?;
+
+    let content = fs::read_to_string(endpoint_file)
+        .map_err(|error| format!("Failed to read API endpoint file: {error}"))?;
+    let publication: SidecarEndpointPublication = serde_json::from_str(&content)
+        .map_err(|error| format!("API endpoint file is invalid: {error}"))?;
+    if publication.schema_version != 1 {
+        return Err(format!(
+            "Unsupported API endpoint file schema version: {}",
+            publication.schema_version
+        ));
+    }
+    if publication.process_id != expected_process_id {
+        return Err("API endpoint file belongs to a different process.".to_owned());
+    }
+    let authority = resolve_loopback_authority(&publication.api_base_url)?;
+    let address: std::net::SocketAddr = authority
+        .parse()
+        .map_err(|error| format!("API endpoint authority is invalid: {error}"))?;
+    if address.port() == 0 {
+        return Err("API endpoint file still contains the dynamic port placeholder.".to_owned());
+    }
+    Ok(Some(publication.api_base_url))
 }
 
 fn post_shutdown_maintenance(
@@ -450,16 +560,14 @@ fn build_shutdown_maintenance_request(
     ))
 }
 
-fn probe_health(port: u16) -> std::io::Result<bool> {
+fn probe_health(authority: &str) -> std::io::Result<bool> {
     let mut stream = TcpStream::connect_timeout(
-        &format!("127.0.0.1:{port}")
-            .parse()
-            .expect("valid loopback address"),
+        &authority.parse().expect("validated loopback authority"),
         Duration::from_millis(300),
     )?;
     stream.set_read_timeout(Some(Duration::from_millis(500)))?;
     stream.write_all(
-        format!("GET /healthz HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n")
+        format!("GET /healthz HTTP/1.1\r\nHost: {authority}\r\nConnection: close\r\n\r\n")
             .as_bytes(),
     )?;
 
@@ -476,6 +584,50 @@ mod tests {
     #[test]
     fn encodes_desktop_access_token_bytes_as_hex() {
         assert_eq!(to_hex(&[0x00, 0x5a, 0xff]), "005aff");
+    }
+
+    #[test]
+    fn reads_process_bound_sidecar_endpoint_publication() {
+        let root =
+            std::env::temp_dir().join(format!("exportdoc-sidecar-endpoint-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("endpoint.json");
+        fs::write(
+            &path,
+            r#"{"schemaVersion":1,"apiBaseUrl":"http://127.0.0.1:5199","processId":42}"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            read_endpoint_publication(&path, 42).unwrap(),
+            Some("http://127.0.0.1:5199".to_owned())
+        );
+        assert!(read_endpoint_publication(&path, 43)
+            .unwrap_err()
+            .contains("different process"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn rejects_unresolved_dynamic_sidecar_endpoint() {
+        let root = std::env::temp_dir().join(format!(
+            "exportdoc-sidecar-endpoint-zero-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("endpoint.json");
+        fs::write(
+            &path,
+            r#"{"schemaVersion":1,"apiBaseUrl":"http://127.0.0.1:0","processId":42}"#,
+        )
+        .unwrap();
+
+        assert!(read_endpoint_publication(&path, 42)
+            .unwrap_err()
+            .contains("dynamic port placeholder"));
+
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

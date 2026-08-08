@@ -2,6 +2,8 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <PlaywrightChromiumVersion>149.0.7827.55</PlaywrightChromiumVersion>
+    <PlaywrightChromiumRevision>1228</PlaywrightChromiumRevision>
   </PropertyGroup>
 
   <ItemGroup>

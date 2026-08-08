@@ -137,8 +137,8 @@ namespace ExportDocManager.Api.Tests
             var templateStorage = await ApiIntegrationTestHarness.ReadJsonAsync<ApiReportTemplateStorageStatusResponse>(templateStorageResponse);
             Assert.True(templateStorage.Exists);
             Assert.True(templateStorage.Writable);
-            Assert.Equal(Path.Combine(harness.DataRoot, "Templates"), templateStorage.TemplateRoot);
-            Assert.Empty(Directory.GetFiles(templateStorage.TemplateRoot, ".edm-template-write-check-*.tmp"));
+            Assert.Equal(string.Empty, templateStorage.TemplateRoot);
+            Assert.Empty(Directory.GetFiles(Path.Combine(harness.DataRoot, "Templates"), ".edm-template-write-check-*.tmp"));
 
             var exportFieldsResponse = await adminClient.GetAsync("/api/reports/templates/fields?reportType=ExportDocument");
             Assert.Equal(HttpStatusCode.OK, exportFieldsResponse.StatusCode);

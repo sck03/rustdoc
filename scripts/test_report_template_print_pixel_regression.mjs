@@ -12,6 +12,7 @@ import {
   pickBounds,
 } from "./lib/report-regression-common.mjs";
 import { createReportRegressionTemplateCases } from "./lib/report-regression-template-cases.mjs";
+import { buildChromiumSandboxArguments } from "./lib/chromium-sandbox-policy.mjs";
 import {
   CdpClient,
   closeChrome,
@@ -66,6 +67,7 @@ async function renderPrintScreenshot(chromePath, testCase) {
   const child = spawn(
     chromePath,
     [
+      ...buildChromiumSandboxArguments(),
       "--headless",
       "--disable-gpu",
       "--disable-extensions",

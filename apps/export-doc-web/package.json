@@ -36,7 +36,7 @@
     "test:cross-browser-ui": "node ../../scripts/smoke-cross-browser-ui.mjs",
     "test:login-security-contracts": "node ../../scripts/test_login_security_contracts.mjs",
     "test:router-contract": "node ../../scripts/test_react_router_declarative_contract.mjs",
-    "audit:production": "node ../../scripts/audit-npm-production.mjs . --allow-reviewed-react-router-rsc",
+    "audit:production": "node ../../scripts/audit-npm-production.mjs .",
     "test:scale-contracts": "node ../../scripts/test_frontend_scale_contracts.mjs",
     "test:style-governance": "node ../../scripts/check_frontend_style_governance.mjs",
     "test:source-size-governance": "node ../../scripts/check_source_size_governance.mjs",
@@ -55,8 +55,11 @@
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "7.18.1",
+    "react-router-dom": "7.18.2",
     "three": "^0.184.0"
+  },
+  "overrides": {
+    "dompurify": "^3.4.13"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

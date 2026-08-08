@@ -8,7 +8,7 @@ const webRoot = path.join(repoRoot, "apps", "export-doc-web");
 const packageJson = JSON.parse(fs.readFileSync(path.join(webRoot, "package.json"), "utf8"));
 const packageLock = JSON.parse(fs.readFileSync(path.join(webRoot, "package-lock.json"), "utf8"));
 
-const expectedVersion = "7.18.1";
+const expectedVersion = "7.18.2";
 assert.equal(
   packageJson.dependencies?.["react-router-dom"],
   expectedVersion,

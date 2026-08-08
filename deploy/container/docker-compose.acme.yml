@@ -7,7 +7,7 @@ services:
         (while :; do sleep 3600; nginx -s reload; done) &
         exec nginx -g 'daemon off;'
     ports:
-      - "${EXPORTDOCMANAGER_HTTPS_PORT:-443}:8443"
+      - "${EXPORTDOCMANAGER_WEB_BIND_ADDRESS:-0.0.0.0}:${EXPORTDOCMANAGER_HTTPS_PORT:-443}:8443"
     volumes:
       - ./nginx.acme.conf:/etc/nginx/conf.d/default.conf:ro
       - ${EXPORTDOCMANAGER_RUNTIME_ROOT:-./runtime}/letsencrypt:/etc/letsencrypt:ro

@@ -1,5 +1,5 @@
 param(
-    [string]$Channel = "Stable",
+    [string]$Channel = "",
     [string]$Version = "",
     [ValidateSet("ChromeHeadlessShell", "Chrome")]
     [string]$Product = "ChromeHeadlessShell",
@@ -34,6 +34,12 @@ function Invoke-Main {
     }
 
     $productInfo = Get-ChromeForTestingProductInfo -Product $Product
+    $playwrightRuntime = Get-PlaywrightRuntimeMetadata -RepositoryRoot $repoRoot
+    $versionWasExplicit = -not [string]::IsNullOrWhiteSpace($Version)
+    $channelWasExplicit = -not [string]::IsNullOrWhiteSpace($Channel)
+    if (-not $versionWasExplicit -and -not $channelWasExplicit) {
+        $Version = $playwrightRuntime.ChromiumVersion
+    }
     $destinationRootFullPath = [System.IO.Path]::GetFullPath($DestinationRoot)
     $cacheDirFullPath = [System.IO.Path]::GetFullPath($CacheDir)
     $repoRootFullPath = [System.IO.Path]::GetFullPath($repoRoot)
@@ -57,55 +63,234 @@ function Invoke-Main {
         }
     }
 
-    $download = Get-ChromeDownload -Channel $Channel -Version $Version -Platform $Platform -ProductInfo $productInfo
-    $zipPath = Join-Path $cacheDirFullPath ("{0}-for-testing-{1}-{2}.zip" -f $productInfo.CachePrefix, $download.Version, $Platform)
+    $playwrightCache = $null
+    if ($Version -eq $playwrightRuntime.ChromiumVersion) {
+        $playwrightCache = Get-CompatiblePlaywrightBrowserCache `
+            -RepositoryRoot $repoRoot `
+            -ProductInfo $productInfo `
+            -Revision $playwrightRuntime.ChromiumRevision
+    }
 
-    if (-not (Test-Path -LiteralPath $zipPath)) {
-        Write-Host "Downloading $($productInfo.DisplayName) for Testing:"
-        Write-Host "  Version : $($download.Version)"
-        Write-Host "  Platform: $Platform"
-        Write-Host "  Url     : $($download.Url)"
-        Write-Host "  Cache   : $zipPath"
-        Download-File -Url $download.Url -DestinationPath $zipPath
+    if ($null -ne $playwrightCache) {
+        $download = [PSCustomObject]@{
+            Version = $playwrightRuntime.ChromiumVersion
+            Url = "https://playwright.dev/dotnet/docs/browsers"
+            PayloadRoot = $playwrightCache.PayloadRoot
+            SourceKind = "PlaywrightLocalCache"
+        }
     }
     else {
-        Write-Host "Using cached $($productInfo.DisplayName) for Testing zip:"
-        Write-Host "  $zipPath"
+        $download = Get-ChromeDownload -Channel $Channel -Version $Version -Platform $Platform -ProductInfo $productInfo
+    }
+
+    $zipPath = Join-Path $cacheDirFullPath ("{0}-for-testing-{1}-{2}.zip" -f $productInfo.CachePrefix, $download.Version, $Platform)
+    if ([string]::IsNullOrWhiteSpace($download.PayloadRoot)) {
+        if (-not (Test-Path -LiteralPath $zipPath)) {
+            Write-Host "Downloading $($productInfo.DisplayName) for Testing:"
+            Write-Host "  Version : $($download.Version)"
+            Write-Host "  Platform: $Platform"
+            Write-Host "  Url     : $($download.Url)"
+            Write-Host "  Cache   : $zipPath"
+            Download-File -Url $download.Url -DestinationPath $zipPath
+        }
+        else {
+            Write-Host "Using cached $($productInfo.DisplayName) for Testing zip:"
+            Write-Host "  $zipPath"
+        }
+    }
+    else {
+        Write-Host "Using Playwright-compatible browser cache:"
+        Write-Host "  $($download.PayloadRoot)"
     }
 
     if (Test-Path -LiteralPath $installRoot) {
         Assert-InRepoPath -Path $installRoot -Purpose "Chrome for Testing install root"
+        Assert-NoRunningBrowserFromRoot -Root $installRoot
         Remove-Item -LiteralPath $installRoot -Recurse -Force
     }
 
     New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
-    Write-Host "Extracting $($productInfo.DisplayName) for Testing:"
+    Write-Host "Staging $($productInfo.DisplayName) for Testing:"
     Write-Host "  $installRoot"
-
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $installRoot, $true)
+    if ([string]::IsNullOrWhiteSpace($download.PayloadRoot)) {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $installRoot, $true)
+    }
+    else {
+        Copy-Item -LiteralPath $download.PayloadRoot -Destination $installRoot -Recurse -Force
+    }
 
     $executablePath = Find-ChromeExecutable -Root $installRoot
     if ([string]::IsNullOrWhiteSpace($executablePath)) {
         throw "$($productInfo.DisplayName) executable was not found after extraction under '$installRoot'."
     }
     Set-UnixExecutablePermission -Path $executablePath
+    $versionOutput = Test-ChromeExecutable -Path $executablePath
 
     $manifest = [ordered]@{
         product = $Product
         version = $download.Version
-        channel = $Channel
+        channel = if ($channelWasExplicit) { $Channel } elseif ($versionWasExplicit) { "ExplicitVersion" } else { "PlaywrightCompatible" }
         platform = $Platform
         sourceUrl = $download.Url
         executablePath = $executablePath
+        playwrightPackageVersion = $playwrightRuntime.PackageVersion
+        playwrightChromiumVersion = $playwrightRuntime.ChromiumVersion
+        playwrightChromiumRevision = $playwrightRuntime.ChromiumRevision
+        playwrightCompatible = $download.Version -eq $playwrightRuntime.ChromiumVersion
+        sourceKind = $download.SourceKind
+        validatedVersionOutput = $versionOutput
         installedAt = [DateTimeOffset]::UtcNow.ToString("O")
         storagePolicy = "Installed under program-root Browsers directory; cache kept under repo artifacts. Not installed to system C drive application folders."
+        compatibilityPolicy = "Default provisioning pins Chrome for Testing to the Chromium version declared for Microsoft.Playwright in Directory.Packages.props. Pass -Channel or -Version only for explicit compatibility diagnostics."
     }
 
     $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 
     Write-Host "$($productInfo.DisplayName) for Testing is ready:"
     Write-Host "  $executablePath"
+}
+
+function Assert-NoRunningBrowserFromRoot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root
+    )
+
+    if (-not [Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([Runtime.InteropServices.OSPlatform]::Windows)) {
+        return
+    }
+
+    $rootPrefix = [IO.Path]::GetFullPath($Root).TrimEnd(
+        [IO.Path]::DirectorySeparatorChar,
+        [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    $running = @(Get-Process -Name "chrome", "chrome-headless-shell" -ErrorAction SilentlyContinue |
+        Where-Object {
+            try {
+                -not [string]::IsNullOrWhiteSpace($_.Path) -and
+                    [IO.Path]::GetFullPath($_.Path).StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)
+            }
+            catch {
+                $false
+            }
+        })
+    if ($running.Count -gt 0) {
+        throw "Refusing to replace a browser runtime while its process is running: $($running.Id -join ', '). Close ExportDocManager and retry."
+    }
+}
+
+function Test-ChromeExecutable {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = [Diagnostics.ProcessStartInfo]::new()
+    $process.StartInfo.FileName = $Path
+    $process.StartInfo.UseShellExecute = $false
+    $process.StartInfo.RedirectStandardOutput = $true
+    $process.StartInfo.RedirectStandardError = $true
+    $process.StartInfo.CreateNoWindow = $true
+    $process.StartInfo.ErrorDialog = $false
+    $process.StartInfo.ArgumentList.Add("--version")
+    try {
+        if (-not $process.Start()) {
+            throw "Browser executable did not start."
+        }
+        if (-not $process.WaitForExit(15000)) {
+            $process.Kill($true)
+            throw "Browser executable version check timed out."
+        }
+
+        [string]$output = ($process.StandardOutput.ReadToEnd() + " " + $process.StandardError.ReadToEnd()).Trim()
+        if ($process.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($output)) {
+            throw "Browser executable validation failed with exit code $($process.ExitCode): $output"
+        }
+
+        return $output
+    }
+    finally {
+        if (-not $process.HasExited) {
+            try { $process.Kill($true) } catch { }
+        }
+        $process.Dispose()
+    }
+}
+
+function Get-PlaywrightRuntimeMetadata {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
+    )
+
+    $packagePropsPath = Join-Path $RepositoryRoot "Directory.Packages.props"
+    if (-not (Test-Path -LiteralPath $packagePropsPath -PathType Leaf)) {
+        throw "Directory.Packages.props was not found: $packagePropsPath"
+    }
+
+    [xml]$packageProps = Get-Content -LiteralPath $packagePropsPath -Raw
+    $playwrightPackage = @($packageProps.Project.ItemGroup.PackageVersion) |
+        Where-Object { $_.Include -eq "Microsoft.Playwright" } |
+        Select-Object -First 1
+    $chromiumVersion = @($packageProps.Project.PropertyGroup.PlaywrightChromiumVersion) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -First 1
+    $chromiumRevision = @($packageProps.Project.PropertyGroup.PlaywrightChromiumRevision) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -First 1
+
+    if ($null -eq $playwrightPackage -or [string]::IsNullOrWhiteSpace($playwrightPackage.Version)) {
+        throw "Microsoft.Playwright package version is missing from Directory.Packages.props."
+    }
+    if ([string]::IsNullOrWhiteSpace($chromiumVersion)) {
+        throw "PlaywrightChromiumVersion is missing from Directory.Packages.props."
+    }
+    if ([string]::IsNullOrWhiteSpace($chromiumRevision)) {
+        throw "PlaywrightChromiumRevision is missing from Directory.Packages.props."
+    }
+
+    [PSCustomObject]@{
+        PackageVersion = [string]$playwrightPackage.Version
+        ChromiumVersion = [string]$chromiumVersion
+        ChromiumRevision = [string]$chromiumRevision
+    }
+}
+
+function Get-CompatiblePlaywrightBrowserCache {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
+
+        [Parameter(Mandatory = $true)]
+        [object]$ProductInfo,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Revision
+    )
+
+    $cacheRoot = Join-Path $RepositoryRoot "artifacts\playwright-browsers"
+    $revisionRoot = Join-Path $cacheRoot "$($ProductInfo.PlaywrightCachePrefix)-$Revision"
+    if (-not (Test-Path -LiteralPath (Join-Path $revisionRoot "INSTALLATION_COMPLETE") -PathType Leaf)) {
+        return $null
+    }
+
+    $executable = Find-ChromeExecutable -Root $revisionRoot
+    if ([string]::IsNullOrWhiteSpace($executable)) {
+        return $null
+    }
+
+    $relativeExecutable = [IO.Path]::GetRelativePath($revisionRoot, $executable)
+    $topLevelName = @($relativeExecutable -split '[\\/]')[0]
+    $payloadRoot = Join-Path $revisionRoot $topLevelName
+    if (-not (Test-Path -LiteralPath $payloadRoot -PathType Container)) {
+        return $null
+    }
+
+    [PSCustomObject]@{
+        PayloadRoot = $payloadRoot
+        ExecutablePath = $executable
+    }
 }
 
 function Get-ChromeForTestingProductInfo {
@@ -121,6 +306,7 @@ function Get-ChromeForTestingProductInfo {
             MetadataDownloadKey = "chrome-headless-shell"
             InstallDirectory = "ChromeHeadlessShell"
             CachePrefix = "chrome-headless-shell"
+            PlaywrightCachePrefix = "chromium_headless_shell"
         }
     }
 
@@ -129,6 +315,7 @@ function Get-ChromeForTestingProductInfo {
         MetadataDownloadKey = "chrome"
         InstallDirectory = "Chrome"
         CachePrefix = "chrome"
+        PlaywrightCachePrefix = "chromium"
     }
 }
 
@@ -158,7 +345,6 @@ function Get-DefaultChromeForTestingPlatform {
 
 function Get-ChromeDownload {
     param(
-        [Parameter(Mandatory = $true)]
         [string]$Channel,
 
         [string]$Version,
@@ -181,6 +367,10 @@ function Get-ChromeDownload {
     $metadata = $metadataText | ConvertFrom-Json -Depth 100
 
     if ([string]::IsNullOrWhiteSpace($Version)) {
+        if ([string]::IsNullOrWhiteSpace($Channel)) {
+            throw "Chrome for Testing channel must be provided when no exact version is selected."
+        }
+
         $channelProperty = $metadata.channels.PSObject.Properties |
             Where-Object { $_.Name -ieq $Channel } |
             Select-Object -First 1
@@ -220,6 +410,8 @@ function Get-ChromeDownload {
     [PSCustomObject]@{
         Version = $selectedVersion.version
         Url = $chromeDownload.url
+        PayloadRoot = ""
+        SourceKind = "ChromeForTestingMetadata"
     }
 }
 

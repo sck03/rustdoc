@@ -9,6 +9,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$BootstrapToken,
     [int]$WebPort = 8080,
+    [string]$WebBindAddress = "127.0.0.1",
     [int]$HttpsPort = 8443,
     [string]$ContainerSubnet,
     [string]$ReverseProxyIp,
@@ -18,6 +19,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+$parsedWebBindAddress = $null
+if (-not [System.Net.IPAddress]::TryParse($WebBindAddress, [ref]$parsedWebBindAddress) -or
+    $parsedWebBindAddress.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork -or
+    $parsedWebBindAddress.ToString() -cne $WebBindAddress) {
+    throw "WebBindAddress 必须是 IPv4 地址，例如 127.0.0.1 或 0.0.0.0。"
+}
 
 function ConvertTo-IPv4Number {
     param([Parameter(Mandatory = $true)][System.Net.IPAddress]$Address)
@@ -519,6 +527,7 @@ $envLines = @(
     "POSTGRES_PASSWORD=$PostgreSqlPassword",
     "EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=$BootstrapToken",
     "EXPORTDOCMANAGER_WEB_PORT=$WebPort",
+    "EXPORTDOCMANAGER_WEB_BIND_ADDRESS=$WebBindAddress",
     "EXPORTDOCMANAGER_HTTPS_PORT=$HttpsPort",
     "EXPORTDOCMANAGER_TLS_CERTIFICATE=./secrets/tls/server.crt",
     "EXPORTDOCMANAGER_TLS_PRIVATE_KEY=./secrets/tls/server.key",

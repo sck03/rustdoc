@@ -8,6 +8,8 @@ namespace ExportDocManager.Services.Security
         private const int SaltSize = 16;
         private const int KeySize = 32;
         private const int Iterations = 210000;
+        internal const int MinimumAcceptedIterations = 100_000;
+        internal const int MaximumAcceptedIterations = 1_000_000;
 
         public static string HashPassword(string password)
         {
@@ -33,7 +35,8 @@ namespace ExportDocManager.Services.Security
                 var parts = hash.Split('.', 3);
                 if (parts.Length != 3 ||
                     !int.TryParse(parts[0], out var iterations) ||
-                    iterations <= 0)
+                    iterations < MinimumAcceptedIterations ||
+                    iterations > MaximumAcceptedIterations)
                 {
                     return false;
                 }

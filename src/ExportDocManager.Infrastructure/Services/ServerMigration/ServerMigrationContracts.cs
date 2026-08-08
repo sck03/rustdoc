@@ -7,6 +7,7 @@ namespace ExportDocManager.Services.Infrastructure
         public const string ManifestEntry = "manifest.json";
         public const string DatabaseEntry = "Database/postgresql.dump";
         public const string PendingMarkerFileName = "pending-server-migration.json";
+        public const string LockFileName = "server-migration.lock";
         public const string StatusFileName = "server-migration-status.json";
         public const string ControlDirectoryName = "ServerMigration";
         public const string PackageDirectoryName = "ServerMigration";
@@ -74,6 +75,7 @@ namespace ExportDocManager.Services.Infrastructure
         public string RemoteAddress { get; set; } = string.Empty;
         public string ValidationDatabaseName { get; set; } = string.Empty;
         public string LastError { get; set; } = string.Empty;
+        public bool ManualRecoveryRequired { get; set; }
         public ServerMigrationManifest Manifest { get; set; } = new();
     }
 

@@ -67,7 +67,7 @@ services:
       dockerfile: deploy/container/Dockerfile.web
     restart: unless-stopped
     ports:
-      - "${EXPORTDOCMANAGER_WEB_PORT:-8080}:8080"
+      - "${EXPORTDOCMANAGER_WEB_BIND_ADDRESS:-127.0.0.1}:${EXPORTDOCMANAGER_WEB_PORT:-8080}:8080"
     depends_on:
       api:
         condition: service_healthy

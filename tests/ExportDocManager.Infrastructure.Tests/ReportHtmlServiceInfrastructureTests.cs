@@ -693,10 +693,29 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("--no-sandbox", explicitlyUnsandboxed);
             Assert.Contains("--disable-dev-shm-usage", sandboxed);
             Assert.DoesNotContain("--disable-dev-shm-usage", sharedMemoryEnabled);
+            Assert.Contains("--remote-debugging-address=127.0.0.1", sandboxed);
             Assert.Contains("--allow-file-access-from-files", sandboxed);
             Assert.Contains("--allow-file-access-from-files", explicitlyUnsandboxed);
             Assert.Equal(sandboxed.Count + 1, explicitlyUnsandboxed.Count);
             Assert.Equal(sandboxed.Count - 1, sharedMemoryEnabled.Count);
+        }
+
+        [Theory]
+        [InlineData(17763, true)]
+        [InlineData(18363, true)]
+        [InlineData(19041, false)]
+        [InlineData(22631, false)]
+        public void ChromiumSandboxPolicy_ShouldUseCompatibilityModeOnlyForLegacyWindowsBuilds(
+            int build,
+            bool expected)
+        {
+            var version = new Version(10, 0, build);
+
+            Assert.Equal(
+                expected,
+                ChromiumSandboxPolicy.RequiresLegacyWindowsCompatibilityMode(isWindows: true, version));
+            Assert.False(
+                ChromiumSandboxPolicy.RequiresLegacyWindowsCompatibilityMode(isWindows: false, version));
         }
 
         [Fact]

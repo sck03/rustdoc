@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
 import { CdpClient } from "./lib/chromium-cdp.mjs";
 import { buildChromeLaunchArguments } from "./lib/web-runtime-browser-session.mjs";
+import {
+  parseWindowsBuild,
+  shouldDisableChromiumSandbox,
+} from "./lib/chromium-sandbox-policy.mjs";
 
 assert.equal(
   typeof globalThis.WebSocket,
@@ -23,6 +27,7 @@ assert(linuxCiArguments.includes("--remote-debugging-address=127.0.0.1"));
 assert(linuxCiArguments.includes("--remote-debugging-port=0"));
 assert(linuxCiArguments.includes("--disable-dev-shm-usage"));
 assert(linuxCiArguments.includes("--no-sandbox"));
+assert(linuxCiArguments.includes("--force-device-scale-factor=1"));
 assert(!linuxCiArguments.includes("--headless=new"));
 
 const linuxDeveloperArguments = buildChromeLaunchArguments(options, {
@@ -35,11 +40,31 @@ assert(!linuxDeveloperArguments.includes("--no-sandbox"));
 
 const windowsChromeArguments = buildChromeLaunchArguments(
   { ...options, browserExecutable: "C:\\repo\\chrome.exe" },
-  { platform: "win32", isCi: true, isRoot: false },
+  { platform: "win32", isCi: true, isRoot: false, windowsBuild: 22631 },
 );
 assert(windowsChromeArguments.includes("--headless=new"));
 assert(!windowsChromeArguments.includes("--disable-dev-shm-usage"));
 assert(!windowsChromeArguments.includes("--no-sandbox"));
+
+const legacyWindowsArguments = buildChromeLaunchArguments(options, {
+  platform: "win32",
+  isCi: false,
+  isRoot: false,
+  windowsBuild: 17763,
+});
+assert(legacyWindowsArguments.includes("--no-sandbox"));
+assert.equal(parseWindowsBuild("10.0.17763"), 17763);
+assert.equal(parseWindowsBuild("invalid"), null);
+assert.equal(shouldDisableChromiumSandbox({
+  platform: "win32",
+  windowsBuild: 17763,
+  noSandboxSetting: "false",
+}), false);
+assert.equal(shouldDisableChromiumSandbox({
+  platform: "win32",
+  windowsBuild: 22631,
+  noSandboxSetting: "true",
+}), true);
 
 class FakeSocket extends EventTarget {
   constructor({ respond }) {
@@ -93,7 +118,7 @@ const descendantPid = await new Promise((resolve, reject) => {
   processTree.once("error", reject);
 });
 await stopProcessTree(processTree, 3000);
-assert(processTree.exitCode !== null || processTree.signalCode !== null, "Process tree root must exit during cleanup.");
+assert.equal(isProcessAlive(processTree.pid), false, "Process tree root must exit during cleanup.");
 assert.equal(isProcessAlive(descendantPid), false, "Process tree descendants must exit during cleanup.");
 
 process.stdout.write("web-runtime-browser-session tests passed\n");

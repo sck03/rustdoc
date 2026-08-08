@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { assert, locateChromeForTesting, parsePng, toImportSpecifier } from "./lib/report-regression-common.mjs";
+import { buildChromiumSandboxArguments } from "./lib/chromium-sandbox-policy.mjs";
 import {
   CdpClient,
   closeChrome,
@@ -492,6 +493,7 @@ async function inspectWithChrome(chromePath, target = {}) {
   const child = spawn(
     chromePath,
     [
+      ...buildChromiumSandboxArguments(),
       "--headless",
       "--disable-gpu",
       "--disable-extensions",

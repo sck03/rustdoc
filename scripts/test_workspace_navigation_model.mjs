@@ -126,7 +126,12 @@ assert(product.getProductEditionPresentation("Full").displayName === "外贸业�
 assert(new Set(["Document", "Sales", "Full"].map((edition) => product.getProductEditionPresentation(edition).productName)).size === 1, "all editions share the same product brand");
 assert(device.getWorkspaceDeviceCapabilities("phone").canUseDenseWorkbench === false, "phone blocks dense workbench");
 assert(device.getWorkspaceDeviceCapabilities("tablet").canImportExport === false, "tablet blocks full import and export");
+assert(device.getWorkspaceDeviceCapabilities("tablet", true).canImportExport === true, "tablet with fine pointer enables import and export");
+assert(device.getWorkspaceDeviceCapabilities("tablet", true).canUseAdvancedTools === true, "tablet with fine pointer enables advanced tools");
+assert(device.getWorkspaceDeviceCapabilities("tablet", true).canUseDenseWorkbench === false, "tablet width still blocks dense workbench");
 assert(device.getWorkspaceDeviceCapabilities("desktop").canUseBatchOperations === true, "desktop enables batch operations");
+assert(device.resolveWorkspaceDeviceProfile(false, false, true).capabilities.canImportExport === true, "medium fine-pointer profile enables file operations");
+assert(device.resolveWorkspaceDeviceProfile(true, false, true).capabilities.canImportExport === false, "phone profile remains restricted with a fine pointer");
 assert(device.resolveWorkspaceDeviceMode(false, false, true) === "tablet", "medium viewport remains tablet even with a fine pointer");
 assert(device.resolveWorkspaceDeviceMode(true, false, true) === "phone", "phone width remains phone even with a fine pointer");
 assert(device.resolveWorkspaceDeviceMode(false, true, false) === "desktop", "desktop width remains desktop on touch hardware");

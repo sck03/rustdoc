@@ -634,7 +634,7 @@ pub(crate) fn confirm_app_exit() {
 fn pick_file(title: &str, filters: &[(&str, &[&str])]) -> Option<String> {
     let mut dialog = rfd::FileDialog::new().set_title(title);
     for (name, extensions) in filters {
-        dialog = dialog.add_filter(*name, *extensions);
+        dialog = dialog.add_filter(*name, extensions);
     }
 
     dialog.pick_file().map(path_to_string)

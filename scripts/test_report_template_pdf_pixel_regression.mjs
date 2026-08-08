@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -14,13 +14,8 @@ import {
   roundRatio,
 } from "./lib/report-regression-common.mjs";
 import { createReportRegressionTemplateCases } from "./lib/report-regression-template-cases.mjs";
-import {
-  CdpClient,
-  closeChrome,
-  delay,
-  getPageWebSocketUrl,
-  waitForDevToolsUrl,
-} from "./lib/chromium-cdp.mjs";
+import { buildChromiumSandboxArguments } from "./lib/chromium-sandbox-policy.mjs";
+import { capturePdfViewerPages } from "./lib/pdf-viewer-page-capture.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -28,6 +23,7 @@ const workspaceRoot = path.join(repoRoot, ".codex-runtime", "report-template-pdf
 const pdfRoot = path.join(workspaceRoot, "pdf");
 const screenshotRoot = path.join(workspaceRoot, "screenshots");
 const baselinePath = path.join(repoRoot, "tests", "ReportTemplateFixtures", "report_template_pdf_pixel_baselines.json");
+const updateBaseline = process.argv.includes("--update");
 const fingerprintGrid = {
   columns: 24,
   rows: 32,
@@ -68,6 +64,7 @@ function renderPdf(chromePath, testCase) {
   const result = spawnSync(
     chromePath,
     [
+      ...buildChromiumSandboxArguments(),
       "--headless",
       "--disable-gpu",
       "--disable-extensions",
@@ -105,92 +102,6 @@ function countPdfPages(pdfPath) {
   const content = fs.readFileSync(pdfPath).toString("latin1");
   return (content.match(/\/Type\s*\/Page\b/g) || []).length;
 }
-
-async function capturePdfScreenshots(chromePath, renderedCases) {
-  const profilePath = path.join(workspaceRoot, "PdfViewerProfile");
-  fs.rmSync(profilePath, { recursive: true, force: true });
-  fs.mkdirSync(profilePath, { recursive: true });
-  fs.mkdirSync(screenshotRoot, { recursive: true });
-
-  const child = spawn(
-    chromePath,
-    [
-      "--headless=new",
-      "--disable-gpu",
-      "--disable-extensions",
-      "--disable-background-networking",
-      "--no-first-run",
-      "--hide-scrollbars",
-      "--force-device-scale-factor=1",
-      "--font-render-hinting=none",
-      "--remote-debugging-port=0",
-      `--user-data-dir=${profilePath}`,
-      "--window-size=900,1270",
-      "about:blank",
-    ],
-    {
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    },
-  );
-
-  let browserWebSocketUrl;
-  const results = [];
-  try {
-    browserWebSocketUrl = await waitForDevToolsUrl(child, "pdf-pixel-regression");
-    const pageWebSocketUrl = await getPageWebSocketUrl(browserWebSocketUrl, "pdf-pixel-regression");
-    const page = await CdpClient.connect(pageWebSocketUrl);
-    try {
-      await page.send("Page.enable");
-      await page.send("Runtime.enable");
-
-      for (const renderedCase of renderedCases) {
-        const { testCase, pdfPath } = renderedCase;
-        await page.send("Emulation.setDeviceMetricsOverride", {
-          width: testCase.viewport.width,
-          height: testCase.viewport.height,
-          deviceScaleFactor: 1,
-          mobile: false,
-        });
-
-        for (let pageNumber = 1; pageNumber <= testCase.expectedPages; pageNumber += 1) {
-          const screenshotPath = path.join(screenshotRoot, `${testCase.slug}.page-${pageNumber}.pdf-viewer.png`);
-          const loadEvent = page.waitForEvent("Page.loadEventFired", () => true, 15000).catch(() => null);
-          const pdfUrl = `${pathToFileURL(pdfPath).href}#page=${pageNumber}&zoom=page-fit`;
-          const navigation = await page.send("Page.navigate", { url: pdfUrl });
-          assert(!navigation.isDownload, `${testCase.slug} page ${pageNumber}: PDF unexpectedly started as a download.`);
-          await loadEvent;
-          await delay(2500);
-
-          const location = await page.send("Runtime.evaluate", {
-            expression: "location.href",
-            returnByValue: true,
-          });
-          assert(
-            String(location?.result?.value || "").toLowerCase().includes(`${testCase.slug}.pdf`.toLowerCase()),
-            `${testCase.slug} page ${pageNumber}: PDF viewer did not navigate to the expected file.`,
-          );
-
-          const screenshot = await page.send("Page.captureScreenshot", {
-            format: "png",
-            fromSurface: true,
-            captureBeyondViewport: false,
-          });
-          assert(screenshot.data, `${testCase.slug} page ${pageNumber}: Chrome did not return screenshot data.`);
-          fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, "base64"));
-          results.push({ ...renderedCase, pageNumber, screenshotPath });
-        }
-      }
-    } finally {
-      page.close();
-    }
-  } finally {
-    await closeChrome(browserWebSocketUrl, child);
-  }
-
-  return results;
-}
-
 function analyzePdfViewerScreenshot(screenshotPath) {
   const image = parsePng(fs.readFileSync(screenshotPath));
   const paper = findLargestWhiteComponent(image);
@@ -402,31 +313,35 @@ function isWhitePixel(pixels, pixelIndex) {
 
 function assertPdfPixelMetrics(testCase, pageNumber, metrics) {
   const label = `${testCase.slug} page ${pageNumber}`;
+  const minimums = {
+    ...testCase,
+    ...(testCase.pageMetricMinimums?.[pageNumber] ?? {}),
+  };
   assert(metrics.width === testCase.viewport.width, `${label}: PDF screenshot width mismatch.`);
   assert(metrics.height === testCase.viewport.height, `${label}: PDF screenshot height mismatch.`);
   assert(
-    metrics.paperBounds.whiteRatio >= testCase.minPaperWhiteRatio,
-    `${label}: paper white ratio ${metrics.paperBounds.whiteRatio} below ${testCase.minPaperWhiteRatio}.`,
+    metrics.paperBounds.whiteRatio >= minimums.minPaperWhiteRatio,
+    `${label}: paper white ratio ${metrics.paperBounds.whiteRatio} below ${minimums.minPaperWhiteRatio}.`,
   );
   assert(
-    metrics.paperBounds.width >= testCase.viewport.width * testCase.minPaperWidthRatio,
-    `${label}: paper width ${metrics.paperBounds.width} below expected ratio ${testCase.minPaperWidthRatio}.`,
+    metrics.paperBounds.width >= testCase.viewport.width * minimums.minPaperWidthRatio,
+    `${label}: paper width ${metrics.paperBounds.width} below expected ratio ${minimums.minPaperWidthRatio}.`,
   );
   assert(
-    metrics.paperBounds.height >= testCase.viewport.height * testCase.minPaperHeightRatio,
-    `${label}: paper height ${metrics.paperBounds.height} below expected ratio ${testCase.minPaperHeightRatio}.`,
+    metrics.paperBounds.height >= testCase.viewport.height * minimums.minPaperHeightRatio,
+    `${label}: paper height ${metrics.paperBounds.height} below expected ratio ${minimums.minPaperHeightRatio}.`,
   );
   assert(
-    metrics.darkPixelsInsidePaper >= testCase.minDarkPixelsInsidePaper,
-    `${label}: dark pixels inside PDF paper ${metrics.darkPixelsInsidePaper} below ${testCase.minDarkPixelsInsidePaper}.`,
+    metrics.darkPixelsInsidePaper >= minimums.minDarkPixelsInsidePaper,
+    `${label}: dark pixels inside PDF paper ${metrics.darkPixelsInsidePaper} below ${minimums.minDarkPixelsInsidePaper}.`,
   );
   assert(
-    metrics.nonWhitePixelsInsidePaper >= testCase.minNonWhitePixelsInsidePaper,
-    `${label}: non-white pixels inside PDF paper ${metrics.nonWhitePixelsInsidePaper} below ${testCase.minNonWhitePixelsInsidePaper}.`,
+    metrics.nonWhitePixelsInsidePaper >= minimums.minNonWhitePixelsInsidePaper,
+    `${label}: non-white pixels inside PDF paper ${metrics.nonWhitePixelsInsidePaper} below ${minimums.minNonWhitePixelsInsidePaper}.`,
   );
   assert(
-    metrics.colorBucketCountInsidePaper >= testCase.minColorBucketsInsidePaper,
-    `${label}: PDF paper color buckets ${metrics.colorBucketCountInsidePaper} below ${testCase.minColorBucketsInsidePaper}.`,
+    metrics.colorBucketCountInsidePaper >= minimums.minColorBucketsInsidePaper,
+    `${label}: PDF paper color buckets ${metrics.colorBucketCountInsidePaper} below ${minimums.minColorBucketsInsidePaper}.`,
   );
   assert(metrics.inkBounds, `${label}: expected dark ink bounds inside PDF paper.`);
 }
@@ -508,6 +423,21 @@ function pdfPixelBaselineKey(slug, pageNumber) {
   return `${slug}#${pageNumber}`;
 }
 
+function assertDistinctMultiPageScreenshots(screenshotCases) {
+  for (const testCase of templateCases.filter((item) => item.expectedPages > 1)) {
+    const pages = screenshotCases.filter((item) => item.testCase.slug === testCase.slug);
+    assert(
+      pages.length === testCase.expectedPages,
+      `${testCase.slug}: expected ${testCase.expectedPages} PDF page screenshots, found ${pages.length}.`,
+    );
+    const distinctScreenshots = new Set(pages.map((item) => item.screenshotSha256));
+    assert(
+      distinctScreenshots.size > 1,
+      `${testCase.slug}: all ${pages.length} PDF page screenshots are identical; page navigation is not being exercised.`,
+    );
+  }
+}
+
 async function run() {
   fs.rmSync(workspaceRoot, { recursive: true, force: true });
   fs.mkdirSync(workspaceRoot, { recursive: true });
@@ -519,7 +449,13 @@ async function run() {
     ...renderPdf(pdfChromePath, testCase),
   }));
 
-  const screenshotCases = await capturePdfScreenshots(viewerChromePath, renderedCases);
+  const screenshotCases = await capturePdfViewerPages({
+    chromePath: viewerChromePath,
+    renderedCases,
+    workspaceRoot,
+    screenshotRoot,
+  });
+  assertDistinctMultiPageScreenshots(screenshotCases);
   const results = [];
   for (const screenshotCase of screenshotCases) {
     const metrics = analyzePdfViewerScreenshot(screenshotCase.screenshotPath);
@@ -530,6 +466,7 @@ async function run() {
       templatePath: screenshotCase.testCase.relativePath ?? screenshotCase.htmlPath,
       pdfPath: screenshotCase.pdfPath,
       screenshotPath: screenshotCase.screenshotPath,
+      screenshotSha256: screenshotCase.screenshotSha256,
       metrics,
     });
   }
@@ -537,6 +474,9 @@ async function run() {
   const actualBaseline = buildPdfPixelBaseline(results);
   const actualBaselinePath = path.join(workspaceRoot, "pdf-pixel-baseline.actual.json");
   fs.writeFileSync(actualBaselinePath, `${JSON.stringify(actualBaseline, null, 2)}\n`, "utf8");
+  if (updateBaseline) {
+    fs.copyFileSync(actualBaselinePath, baselinePath);
+  }
 
   const summaryPath = path.join(workspaceRoot, "pdf-pixel-regression-summary.json");
   fs.writeFileSync(
@@ -558,8 +498,13 @@ async function run() {
     assert(testCase, `${result.slug}: missing test case definition.`);
     assertPdfPixelMetrics(testCase, result.pageNumber, result.metrics);
   }
-  assertPdfPixelBaselines(results, loadPdfPixelBaselines());
+  if (!updateBaseline) {
+    assertPdfPixelBaselines(results, loadPdfPixelBaselines());
+  }
 
+  if (updateBaseline) {
+    process.stdout.write(`updated PDF pixel baseline: ${baselinePath}\n`);
+  }
   process.stdout.write(`report-template-pdf-pixel-regression test passed (${results.length} PDF page screenshots)\n`);
   process.stdout.write(`summary: ${summaryPath}\n`);
   process.stdout.write(`actual baseline: ${actualBaselinePath}\n`);

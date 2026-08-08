@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useMutation, type QueryClient } from "@tanstack/react-query";
-import type { ApiReportTemplateDto, BackgroundJobSnapshot, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { BackgroundJobSnapshot, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { downloadCompletedJobResult, downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { fileNameFromPath, isTerminalJob, readPathLines, readPositiveIntegerTokens } from "./jobPresentation.ts";
 
 type Options = {
   client: ExportDocManagerApiClient;
@@ -20,15 +20,6 @@ type Options = {
   focusJob(jobId: string, message: string): void;
   clearFocusedJob(): void;
 };
-
-function isTerminalJob(value?: string) {
-  return ["succeeded", "failed", "canceled"].includes((value || "").toLowerCase());
-}
-
-function fileNameFromPath(value: string) {
-  const normalized = value.trim().replace(/\\/g, "/");
-  return normalized.slice(normalized.lastIndexOf("/") + 1);
-}
 
 export function useJobCenterOperations({ client, queryClient, canOperate, canManage, canCreateInvoiceReportZip, desktopAvailable, defaultExportDirectory, jobsCount, focusJob, clearFocusedJob }: Options) {
   const requestConfirmation = useConfirmation();
@@ -119,6 +110,3 @@ export function useJobCenterOperations({ client, queryClient, canOperate, canMan
   const canStartReportZip = canCreateInvoiceReportZip && reportInvoiceIdList.length > 0 && (!desktopAvailable || Boolean(reportZipDestination.trim())) && !isBusy;
   return { message, messageTone, pdfSources, pdfDestination, pdfUploadFiles, reportInvoiceIds, reportZipDestination, reportTemplatePath, reportWithSeal, setPdfSources, setPdfDestination, setPdfUploadFiles, setReportInvoiceIds, setReportZipDestination, setReportTemplatePath, setReportWithSeal, clearFeedback, showSuccess, handleChildMessage, handleCancelJob, handleDeleteJob, handleClearFinishedJobs, cancelMutation, retryMutation, deleteMutation, clearFinishedMutation, pdfMergeMutation, reportZipMutation, downloadMutation, isBusy, canStartPdfMerge, canStartReportZip, reportInvoiceIdList, defaultExportDirectory };
 }
-
-function readPathLines(value: string) { return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean); }
-function readPositiveIntegerTokens(value: string) { return value.split(/[\s,;]+/).map((item) => Number(item)).filter((item) => Number.isInteger(item) && item > 0); }

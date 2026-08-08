@@ -244,6 +244,46 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
+        internal static async Task<long> ReadDeclaredPlaintextLengthAsync(
+            string packagePath,
+            CancellationToken cancellationToken = default)
+        {
+            await using var input = new FileStream(
+                packagePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                4096,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            byte[] magic = new byte[Magic.Length];
+            await input.ReadExactlyAsync(magic, cancellationToken).ConfigureAwait(false);
+            if (!CryptographicOperations.FixedTimeEquals(magic, Magic))
+            {
+                throw new InvalidDataException("不是受支持的灾难恢复包。");
+            }
+
+            int headerLength = await ReadInt32Async(input, cancellationToken).ConfigureAwait(false);
+            if (headerLength <= 0 || headerLength > MaximumHeaderBytes)
+            {
+                throw new InvalidDataException("灾难恢复包头长度无效。");
+            }
+
+            byte[] headerBytes = new byte[headerLength];
+            await input.ReadExactlyAsync(headerBytes, cancellationToken).ConfigureAwait(false);
+            PackageHeader header;
+            try
+            {
+                header = JsonSerializer.Deserialize<PackageHeader>(headerBytes, JsonOptions)
+                    ?? throw new InvalidDataException("灾难恢复包头为空。");
+            }
+            catch (JsonException ex)
+            {
+                throw new InvalidDataException("灾难恢复包头格式无效。", ex);
+            }
+            ValidateHeader(header);
+            return header.PlaintextLength;
+        }
+
         internal static void ValidatePassword(string password)
         {
             if (string.IsNullOrWhiteSpace(password) || password.Length < 12 || password.Length > 128)

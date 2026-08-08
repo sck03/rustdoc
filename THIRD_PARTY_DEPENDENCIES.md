@@ -129,7 +129,7 @@ Generated from committed npm/Cargo lock files, Cargo package metadata, restored 
 | css-line-break | 2.1.0 | MIT | web |
 | csstype | 3.2.3 | MIT | web |
 | debug | 4.4.3 | MIT | web |
-| dompurify | 3.4.12 | (MPL-2.0 OR Apache-2.0) | web |
+| dompurify | 3.4.13 | (MPL-2.0 OR Apache-2.0) | web |
 | electron-to-chromium | 1.5.376 | ISC | web |
 | esbuild | 0.28.1 | MIT | web |
 | escalade | 3.2.0 | MIT | web |
@@ -162,8 +162,8 @@ Generated from committed npm/Cargo lock files, Cargo package metadata, restored 
 | react | 18.3.1 | MIT | web |
 | react-dom | 18.3.1 | MIT | web |
 | react-refresh | 0.18.0 | MIT | web |
-| react-router | 7.18.1 | MIT | web |
-| react-router-dom | 7.18.1 | MIT | web |
+| react-router | 7.18.2 | MIT | web |
+| react-router-dom | 7.18.2 | MIT | web |
 | regenerator-runtime | 0.13.11 | MIT | web |
 | rgbcolor | 1.0.1 | MIT | web |
 | rollup | 4.62.2 | MIT | web |

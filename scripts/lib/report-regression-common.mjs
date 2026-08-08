@@ -13,10 +13,17 @@ export function toImportSpecifier(workspaceRoot, filePath) {
 }
 
 export function locateChromeForTesting(repoRoot, preference = "headless-shell") {
+  const playwrightCacheRoot = path.join(repoRoot, "artifacts", "playwright-browsers");
+  const playwrightChromiumRoots = fs.existsSync(playwrightCacheRoot)
+    ? fs.readdirSync(playwrightCacheRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith("chromium-"))
+      .map((entry) => path.join(playwrightCacheRoot, entry.name))
+    : [];
   const manifestRoots = [
     path.join(repoRoot, "Browsers", "ChromeForTesting"),
     path.join(repoRoot, "ExportDocManager", "Browsers", "ChromeForTesting"),
     path.join(repoRoot, "src", "ExportDocManager.Api", "bin"),
+    ...playwrightChromiumRoots,
   ];
 
   const candidates = [];
@@ -85,7 +92,7 @@ export function locateChromeForTesting(repoRoot, preference = "headless-shell") 
 
   throw new Error(
     preference === "full-chrome"
-      ? "Full Chrome for Testing was not found. PDF viewer pixel regression needs chrome.exe under program-root Browsers."
+      ? "Full Chromium for PDF viewer regression was not found under program-root Browsers or the repository Playwright cache."
       : "Chrome for Testing was not found. Run scripts/provision-chrome-for-testing.ps1 first.",
   );
 }

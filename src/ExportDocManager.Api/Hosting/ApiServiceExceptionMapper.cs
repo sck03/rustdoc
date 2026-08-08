@@ -77,6 +77,8 @@ internal static class ApiServiceExceptionMapper
                 (StatusCodes.Status404NotFound, notFound.Message),
             PermissionDeniedException permission =>
                 (StatusCodes.Status403Forbidden, permission.Message),
+            InsufficientStorageException storage =>
+                (StatusCodes.Status507InsufficientStorage, storage.Message),
             ServiceBusyException busy =>
                 (StatusCodes.Status429TooManyRequests, busy.Message),
             ServiceTimeoutException timeout =>

@@ -28,7 +28,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
-                IServerMigrationService migrationService) =>
+                IServerMigrationService migrationService,
+                ApiDesktopAccessOptions desktopAccessOptions) =>
             {
                 User user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null) return Results.Unauthorized();
@@ -42,7 +43,9 @@ namespace ExportDocManager.Api.Hosting
                     status.PostgreSqlConfigured,
                     status.ToolsReady,
                     status.PendingRestore,
-                    status.PackageRoot,
+                    ApiResponsePathPolicy.Reveal(
+                        status.PackageRoot,
+                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
                     status.Message,
                     status.StoragePolicy,
                     status.RestorePhase,
@@ -177,6 +180,7 @@ namespace ExportDocManager.Api.Hosting
                 ISharedDatabaseMaintenanceService maintenanceService,
                 IServerMigrationService migrationService,
                 IHostApplicationLifetime applicationLifetime,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 ApiPostgreSqlDatabaseRestoreRequest request,
                 CancellationToken cancellationToken) =>
             {
@@ -220,10 +224,14 @@ namespace ExportDocManager.Api.Hosting
                             stream,
                             backup.FileName,
                             BuildRequestContext(context, user),
-                            cancellationToken)
+                            cancellationToken,
+                            stream.Length)
                         .ConfigureAwait(false);
                     bool automaticRestart = ScheduleContainerRestart(context, applicationLifetime);
-                    return ToRestoreResponse(result, automaticRestart);
+                    return ToRestoreResponse(
+                        result,
+                        automaticRestart,
+                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions));
                 }
                 catch (Exception ex) when (IsExpectedMigrationException(ex))
                 {
@@ -239,6 +247,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiSensitiveOperationTicketService ticketService,
                 IServerMigrationService migrationService,
                 IHostApplicationLifetime applicationLifetime,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 CancellationToken cancellationToken) =>
             {
                 User user = ApiEndpointAuth.RequireUser(context, tokenService);
@@ -271,10 +280,14 @@ namespace ExportDocManager.Api.Hosting
                             context.Request.Body,
                             fileName,
                             BuildRequestContext(context, user),
-                            cancellationToken)
+                            cancellationToken,
+                            context.Request.ContentLength)
                         .ConfigureAwait(false);
                     bool automaticRestart = ScheduleContainerRestart(context, applicationLifetime);
-                    return ToRestoreResponse(result, automaticRestart);
+                    return ToRestoreResponse(
+                        result,
+                        automaticRestart,
+                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions));
                 }
                 catch (PayloadLimitExceededException ex)
                 {
@@ -367,6 +380,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiSensitiveOperationTicketService ticketService,
                 IServerMigrationService migrationService,
                 IHostApplicationLifetime applicationLifetime,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 CancellationToken cancellationToken) =>
             {
                 User user = ApiEndpointAuth.RequireUser(context, tokenService);
@@ -402,7 +416,8 @@ namespace ExportDocManager.Api.Hosting
                         fileName,
                         password,
                         BuildRequestContext(context, user),
-                        cancellationToken).ConfigureAwait(false);
+                        cancellationToken,
+                        context.Request.ContentLength).ConfigureAwait(false);
                     bool automaticRestart = ScheduleContainerRestart(context, applicationLifetime);
                     return Results.Ok(new ApiServerMigrationRestoreResponse(
                         result.Success,
@@ -412,7 +427,9 @@ namespace ExportDocManager.Api.Hosting
                             ? "迁移恢复已排队，容器即将自动重启。"
                             : result.Message,
                         result.PackageFileName,
-                        result.SafetyBackupRoot,
+                        ApiResponsePathPolicy.Reveal(
+                            result.SafetyBackupRoot,
+                            ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
                         result.StoragePolicy));
                 }
                 catch (PayloadLimitExceededException ex)
@@ -588,7 +605,8 @@ namespace ExportDocManager.Api.Hosting
 
         private static IResult ToRestoreResponse(
             ServerMigrationRestoreResult result,
-            bool automaticRestart) =>
+            bool automaticRestart,
+            bool revealPaths) =>
             Results.Ok(new ApiServerMigrationRestoreResponse(
                 result.Success,
                 result.RestartRequired,
@@ -597,7 +615,7 @@ namespace ExportDocManager.Api.Hosting
                     ? "数据库恢复已排队，容器即将自动重启。"
                     : result.Message,
                 result.PackageFileName,
-                result.SafetyBackupRoot,
+                ApiResponsePathPolicy.Reveal(result.SafetyBackupRoot, revealPaths),
                 result.StoragePolicy));
     }
 }

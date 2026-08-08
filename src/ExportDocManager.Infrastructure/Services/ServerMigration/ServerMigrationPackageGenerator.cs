@@ -13,6 +13,10 @@ namespace ExportDocManager.Services.Infrastructure;
 /// </summary>
 internal sealed class ServerMigrationPackageGenerator
 {
+    internal static readonly long MaximumSourceBytes =
+        ServerMigrationPackageValidator.ExtractionLimits.MaximumTotalBytes -
+        ServerMigrationPackageValidator.MaximumManifestBytes;
+
     private readonly IAppPathProvider _paths;
     private readonly ISharedDatabaseMaintenanceService _databaseMaintenance;
     private readonly string _packageRoot;
@@ -38,25 +42,32 @@ internal sealed class ServerMigrationPackageGenerator
         var databaseBackup = await _databaseMaintenance
             .CreatePostgreSqlPhysicalBackupAsync(cancellationToken)
             .ConfigureAwait(false);
-        var sources = new List<(string SourcePath, string EntryName)>
-        {
-            (databaseBackup.FullPath, ServerMigrationLayout.DatabaseEntry)
-        };
-        AddDirectoryFiles(sources, _paths.ConfigRoot, ServerMigrationLayout.ConfigEntry);
-        AddDirectoryFiles(sources, _paths.FileRoot, relative => ServerMigrationLayout.DataEntry("Files", relative));
-        AddDirectoryFiles(sources, _paths.UserTemplateRoot, relative => ServerMigrationLayout.DataEntry("Templates", relative));
-        AddDirectoryFiles(sources, _paths.SingleWindowRoot, relative => ServerMigrationLayout.DataEntry("SingleWindow", relative));
-        AddDirectoryFiles(sources, Path.Combine(_paths.DataRoot, "Marks"), relative => ServerMigrationLayout.DataEntry("Marks", relative));
+        var sources = new List<(string SourcePath, string EntryName)>();
+        long collectedBytes = 0;
+        AddSource(sources, databaseBackup.FullPath, ServerMigrationLayout.DatabaseEntry, ref collectedBytes);
+        AddDirectoryFiles(sources, _paths.ConfigRoot, ServerMigrationLayout.ConfigEntry, ref collectedBytes);
+        AddDirectoryFiles(sources, _paths.FileRoot, relative => ServerMigrationLayout.DataEntry("Files", relative), ref collectedBytes);
+        AddDirectoryFiles(sources, _paths.UserTemplateRoot, relative => ServerMigrationLayout.DataEntry("Templates", relative), ref collectedBytes);
+        AddDirectoryFiles(sources, _paths.SingleWindowRoot, relative => ServerMigrationLayout.DataEntry("SingleWindow", relative), ref collectedBytes);
+        AddDirectoryFiles(sources, Path.Combine(_paths.DataRoot, "Marks"), relative => ServerMigrationLayout.DataEntry("Marks", relative), ref collectedBytes);
 
         string masterKeyPath = Path.Combine(_paths.SecurityRoot, LocalSecretProtector.MasterKeyFileName);
         EnsureDirectoryRootIsNotLink(_paths.SecurityRoot);
         EnsureMasterKeyFile(masterKeyPath);
-        sources.Add((masterKeyPath, ServerMigrationLayout.SecurityEntry(LocalSecretProtector.MasterKeyFileName)));
+        AddSource(
+            sources,
+            masterKeyPath,
+            ServerMigrationLayout.SecurityEntry(LocalSecretProtector.MasterKeyFileName),
+            ref collectedBytes);
         string stationPath = Path.Combine(_paths.SecurityRoot, "SingleWindow", "station.id");
         if (File.Exists(stationPath))
         {
             EnsureFileIsNotLink(stationPath);
-            sources.Add((stationPath, ServerMigrationLayout.SecurityEntry("SingleWindow/station.id")));
+            AddSource(
+                sources,
+                stationPath,
+                ServerMigrationLayout.SecurityEntry("SingleWindow/station.id"),
+                ref collectedBytes);
         }
 
         var manifest = new ServerMigrationManifest
@@ -66,14 +77,17 @@ internal sealed class ServerMigrationPackageGenerator
             CreatedAtUtc = DateTimeOffset.UtcNow,
             SourceDataRoot = _paths.DataRoot
         };
-        foreach ((string sourcePath, string entryName) in sources)
+        long hashedBytes = 0;
+        for (int sourceIndex = 0; sourceIndex < sources.Count; sourceIndex++)
         {
+            (string sourcePath, string entryName) = sources[sourceIndex];
             var info = new FileInfo(sourcePath);
             bool allowsEmptyContent = entryName.StartsWith("Data/", StringComparison.OrdinalIgnoreCase);
             if (!info.Exists || !allowsEmptyContent && info.Length <= 0)
             {
                 throw new InvalidDataException($"迁移源文件不存在或为空：{sourcePath}");
             }
+            hashedBytes = ValidateNextSourceBudget(sourceIndex, hashedBytes, info.Length);
             manifest.Files.Add(new ServerMigrationFileManifest
             {
                 RelativePath = entryName,
@@ -88,6 +102,11 @@ internal sealed class ServerMigrationPackageGenerator
             JsonSerializer.Serialize(manifest, ServerMigrationService.JsonOptions),
             cancellationToken).ConfigureAwait(false);
         sources.Add((manifestPath, ServerMigrationLayout.ManifestEntry));
+        long manifestBytes = new FileInfo(manifestPath).Length;
+        ServerMigrationStorageBudget.EnsureAvailable(
+            _packageRoot,
+            ServerMigrationStorageBudget.WithSafetyMargin(collectedBytes, manifestBytes, collectedBytes),
+            "生成服务器迁移包");
         await ZipArchiveHelper.CreateFromFilesAsync(sources, payloadPath, cancellationToken).ConfigureAwait(false);
         await AtomicFileHelper.WriteFileAtomicAsync(
             packagePath,
@@ -108,7 +127,8 @@ internal sealed class ServerMigrationPackageGenerator
     private static void AddDirectoryFiles(
         ICollection<(string SourcePath, string EntryName)> sources,
         string root,
-        Func<string, string> entryFactory)
+        Func<string, string> entryFactory,
+        ref long collectedBytes)
     {
         if (!Directory.Exists(root)) return;
         string fullRoot = Path.GetFullPath(root);
@@ -131,9 +151,60 @@ internal sealed class ServerMigrationPackageGenerator
                     continue;
                 }
                 string relative = Path.GetRelativePath(fullRoot, entry);
-                sources.Add((entry, entryFactory(relative)));
+                AddSource(sources, entry, entryFactory(relative), ref collectedBytes);
             }
         }
+    }
+
+    private static void AddSource(
+        ICollection<(string SourcePath, string EntryName)> sources,
+        string sourcePath,
+        string entryName,
+        ref long collectedBytes)
+    {
+        var info = new FileInfo(sourcePath);
+        if (!info.Exists)
+        {
+            throw new FileNotFoundException("服务器迁移源文件不存在。", sourcePath);
+        }
+
+        collectedBytes = ValidateNextSourceBudget(sources.Count, collectedBytes, info.Length);
+        sources.Add((sourcePath, entryName));
+    }
+
+    internal static long ValidateNextSourceBudget(
+        int currentSourceCount,
+        long currentBytes,
+        long nextFileBytes)
+    {
+        if (currentSourceCount < 0 || currentBytes < 0 || nextFileBytes < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(currentSourceCount));
+        }
+
+        // Reserve one ZIP entry for manifest.json and reserve its maximum
+        // uncompressed size before performing any potentially expensive hash.
+        if (currentSourceCount >= ServerMigrationPackageValidator.ExtractionLimits.MaximumEntries - 1)
+        {
+            throw new InvalidDataException("服务器迁移源文件数量超过安全上限。");
+        }
+
+        long nextTotal;
+        try
+        {
+            nextTotal = checked(currentBytes + nextFileBytes);
+        }
+        catch (OverflowException)
+        {
+            throw new PayloadLimitExceededException(MaximumSourceBytes);
+        }
+        if (nextFileBytes > ServerMigrationPackageValidator.ExtractionLimits.MaximumEntryBytes ||
+            nextTotal > MaximumSourceBytes)
+        {
+            throw new PayloadLimitExceededException(MaximumSourceBytes);
+        }
+
+        return nextTotal;
     }
 
     private static void EnsureMasterKeyFile(string path)

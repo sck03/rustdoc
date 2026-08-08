@@ -55,7 +55,8 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 Content = new StreamContent(File.OpenRead(localFilePath))
             };
-            using var response = await client.SendAsync(
+            using var response = await SendWithoutRedirectAsync(
+                client,
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
                 operationToken);
@@ -78,7 +79,7 @@ namespace ExportDocManager.Services.Infrastructure
             CancellationToken operationToken = operationCancellation.Token;
             var config = Config;
             string baseUrl = NormalizeConfiguredBaseUrl(config, out string userName);
-            var url = BuildUri(baseUrl);
+            var url = BuildUri(baseUrl + "/");
 
             using var client = CreateClient(config, userName, TimeSpan.FromSeconds(30));
             using var request = new HttpRequestMessage(new HttpMethod("PROPFIND"), url);
@@ -88,7 +89,11 @@ namespace ExportDocManager.Services.Infrastructure
                 Encoding.UTF8,
                 "application/xml");
 
-            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, operationToken);
+            using var response = await SendWithoutRedirectAsync(
+                client,
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                operationToken);
             if (!response.IsSuccessStatusCode)
             {
                 string error = await ReadBoundedTextAsync(response.Content, MaximumErrorResponseBytes, operationToken);
@@ -114,7 +119,12 @@ namespace ExportDocManager.Services.Infrastructure
             var downloadUri = BuildUri($"{baseUrl}/{Uri.EscapeDataString(normalizedRemoteFileName)}");
 
             using var client = CreateClient(config, userName, TimeSpan.FromMinutes(10));
-            using var response = await client.GetAsync(downloadUri, HttpCompletionOption.ResponseHeadersRead, operationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Get, downloadUri);
+            using var response = await SendWithoutRedirectAsync(
+                client,
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                operationToken);
             if (!response.IsSuccessStatusCode)
             {
                 string error = await ReadBoundedTextAsync(response.Content, MaximumErrorResponseBytes, operationToken);
@@ -166,7 +176,7 @@ namespace ExportDocManager.Services.Infrastructure
             Uri url;
             try
             {
-                url = BuildUri(baseUrl);
+                url = BuildUri(baseUrl + "/");
             }
             catch
             {
@@ -178,7 +188,11 @@ namespace ExportDocManager.Services.Infrastructure
                 using var client = CreateClient(settings, userName, TimeSpan.FromSeconds(15));
 
                 using var request = new HttpRequestMessage(HttpMethod.Options, url);
-                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, operationToken);
+                using var response = await SendWithoutRedirectAsync(
+                    client,
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    operationToken);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -187,7 +201,11 @@ namespace ExportDocManager.Services.Infrastructure
 
                 using var propfindRequest = new HttpRequestMessage(new HttpMethod("PROPFIND"), url);
                 propfindRequest.Headers.TryAddWithoutValidation("Depth", "0");
-                using var propfindResponse = await client.SendAsync(propfindRequest, HttpCompletionOption.ResponseHeadersRead, operationToken);
+                using var propfindResponse = await SendWithoutRedirectAsync(
+                    client,
+                    propfindRequest,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    operationToken);
                 return propfindResponse.IsSuccessStatusCode;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -219,6 +237,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             var handler = new HttpClientHandler
             {
+                AllowAutoRedirect = false,
                 Credentials = new NetworkCredential(userName, config.Password ?? string.Empty)
             };
 
@@ -226,6 +245,28 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 Timeout = timeout
             };
+        }
+
+        internal static async Task<HttpResponseMessage> SendWithoutRedirectAsync(
+            HttpClient client,
+            HttpRequestMessage request,
+            HttpCompletionOption completionOption,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(client);
+            ArgumentNullException.ThrowIfNull(request);
+
+            HttpResponseMessage response = await client
+                .SendAsync(request, completionOption, cancellationToken)
+                .ConfigureAwait(false);
+            if ((int)response.StatusCode is >= 300 and < 400)
+            {
+                response.Dispose();
+                throw new ServiceValidationException(
+                    "WebDAV 服务返回了重定向。为防止账号凭据或大文件被转发，请把地址改为最终的 HTTPS WebDAV 目录。");
+            }
+
+            return response;
         }
 
         private static string NormalizeRemoteFileName(string remoteFileName)

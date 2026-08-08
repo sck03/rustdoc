@@ -32,12 +32,14 @@ namespace ExportDocManager.Api.Tests
         {
             string appRoot = Path.Combine(Path.GetTempPath(), $"edm-api-app-{Guid.NewGuid():N}");
             string dataRoot = Path.Combine(Path.GetTempPath(), $"edm-api-data-{Guid.NewGuid():N}");
+            string endpointFile = Path.Combine(dataRoot, "Cache", "Sidecar", "endpoint.json");
 
             var options = ApiRuntimeOptions.Parse(
             [
                 "--app-root", appRoot,
                 "--data-root", dataRoot,
                 "--urls", "http://127.0.0.1:5199",
+                "--endpoint-file", endpointFile,
                 "--network-mode", "true",
                 "--allowed-origins", "https://erp.example.com;http://192.168.1.20:8080",
                 "--trusted-proxies", "172.30.238.10;::1"
@@ -46,11 +48,59 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(Path.GetFullPath(appRoot).TrimEnd(Path.DirectorySeparatorChar), options.AppRoot);
             Assert.Equal(Path.GetFullPath(dataRoot).TrimEnd(Path.DirectorySeparatorChar), options.DataRoot);
             Assert.Equal("http://127.0.0.1:5199", options.ListenUrls);
+            Assert.Equal(Path.GetFullPath(endpointFile), options.EndpointFile);
             Assert.True(options.NetworkMode);
             Assert.Equal(2, options.AllowedOrigins.Count);
             Assert.Equal(2, options.TrustedProxies.Count);
             Assert.Contains(IPAddress.Parse("172.30.238.10"), options.TrustedProxies);
             Assert.Contains(IPAddress.IPv6Loopback, options.TrustedProxies);
+        }
+
+        [Fact]
+        public void EndpointPublication_ShouldRequireProcessBoundDynamicLoopbackConfiguration()
+        {
+            string appRoot = CreateTempDirectory("edm-api-endpoint-app");
+            string dataRoot = CreateTempDirectory("edm-api-endpoint-data");
+            try
+            {
+                var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
+                ApiStartupValidator.PrepareRuntimeDirectories(pathProvider);
+                string endpointFile = Path.Combine(pathProvider.CacheRoot, "Sidecar", "endpoint.json");
+                var valid = new ApiRuntimeOptions
+                {
+                    ListenUrls = "http://127.0.0.1:0",
+                    DesktopAccessToken = "desktop-secret",
+                    EndpointFile = endpointFile
+                };
+
+                ApiStartupValidator.ValidateEndpointPublication(pathProvider, valid);
+                Assert.Equal(
+                    "http://127.0.0.1:5199",
+                    ApiEndpointPublication.ResolveApiBaseUrl(["http://127.0.0.1:5199"]));
+                Assert.Throws<InvalidOperationException>(() => ApiEndpointPublication.ResolveApiBaseUrl(
+                    ["http://127.0.0.1:5199", "http://127.0.0.1:5200"]));
+                Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.ValidateEndpointPublication(
+                    pathProvider,
+                    new ApiRuntimeOptions
+                    {
+                        ListenUrls = "http://127.0.0.1:5188",
+                        DesktopAccessToken = valid.DesktopAccessToken,
+                        EndpointFile = valid.EndpointFile
+                    }));
+                Assert.ThrowsAny<UnauthorizedAccessException>(() => ApiStartupValidator.ValidateEndpointPublication(
+                    pathProvider,
+                    new ApiRuntimeOptions
+                    {
+                        ListenUrls = valid.ListenUrls,
+                        DesktopAccessToken = valid.DesktopAccessToken,
+                        EndpointFile = Path.Combine(dataRoot, "endpoint.json")
+                    }));
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
         }
 
         [Fact]

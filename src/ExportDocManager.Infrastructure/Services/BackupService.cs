@@ -5,11 +5,13 @@ using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.SingleWindow;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 using Microsoft.Data.Sqlite;
 using Serilog;
@@ -29,6 +31,7 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly string _databaseFileName;
         private readonly bool _usesSqlite;
         private readonly IAppPathProvider _pathProvider;
+        private readonly Regex _managedBackupNamePattern;
 
         public BackupService(
             DatabaseConnectionSettings databaseSettings,
@@ -55,6 +58,7 @@ namespace ExportDocManager.Services.Infrastructure
                     ? DbHelper.ResolveRuntimeSqliteDatabasePath(pathProvider, databaseSettings.SqliteDatabaseFileName)
                     : Path.GetFullPath(databasePath);
                 _databaseFileName = Path.GetFileName(_databasePath);
+                _managedBackupNamePattern = BuildManagedBackupNamePattern(_databaseFileName);
             }
             else
             {
@@ -124,20 +128,96 @@ namespace ExportDocManager.Services.Infrastructure
             }
         }
 
-        public void CleanOldBackups(int daysToKeep)
+        public async Task<DatabaseBackupImportResult> ImportBackupAsync(
+            string sourceFilePath,
+            string preferredFileName = null,
+            CancellationToken cancellationToken = default)
         {
+            if (!_usesSqlite)
+            {
+                throw new NotSupportedException("当前数据库类型为 PostgreSQL，不能导入 SQLite 数据库备份。");
+            }
+
+            string sourcePath = Path.GetFullPath(sourceFilePath ?? string.Empty);
+            if (!File.Exists(sourcePath))
+            {
+                throw new ResourceNotFoundException("找不到待导入的数据库备份文件。", new FileNotFoundException(sourcePath));
+            }
+
+            await SqliteMaintenanceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            string snapshotPath = Path.Combine(
+                _backupDirectory,
+                $".{BuildBackupNameToken(_databaseFileName)}.{Guid.NewGuid():N}.import.db");
+            string targetPath = string.Empty;
+            bool importSucceeded = false;
             try
             {
-                if (!_usesSqlite || daysToKeep <= 0 || !Directory.Exists(_backupDirectory))
+                if (sourcePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
                 {
-                    return;
+                    ValidateZipBackupStructure(sourcePath, _databaseFileName);
+                }
+                await ExtractDatabaseSnapshotAsync(sourcePath, snapshotPath, cancellationToken).ConfigureAwait(false);
+                await ValidateSqliteSnapshotAsync(snapshotPath, cancellationToken).ConfigureAwait(false);
+
+                targetPath = Path.Combine(_backupDirectory, BuildImportedBackupFileName(preferredFileName));
+                if (sourcePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    await FileCopyHelper.CopyAsync(
+                        sourcePath,
+                        targetPath,
+                        overwrite: false,
+                        sourceFileShare: FileShare.Read,
+                        cancellationToken: cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    await ZipArchiveHelper.CreateFromFilesAsync(
+                        new[] { (SourcePath: snapshotPath, EntryName: _databaseFileName) },
+                        targetPath,
+                        cancellationToken).ConfigureAwait(false);
+                }
+                if (!File.Exists(targetPath) || new FileInfo(targetPath).Length <= 0)
+                {
+                    throw new InfrastructureServiceException("导入的数据库备份未成功写入。 ");
                 }
 
-                var cutoffDate = DateTime.Now.AddDays(-daysToKeep);
+                RuntimeFilePermissionHelper.RestrictFile(targetPath);
+                importSucceeded = true;
+                return new DatabaseBackupImportResult(
+                    Success: true,
+                    Message: $"数据库备份已验证并导入：{Path.GetFileName(targetPath)}",
+                    FilePath: targetPath,
+                    SizeBytes: new FileInfo(targetPath).Length);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            finally
+            {
+                AtomicFileHelper.TryDeleteFile(snapshotPath);
+                if (!importSucceeded && !string.IsNullOrWhiteSpace(targetPath) && File.Exists(targetPath))
+                {
+                    AtomicFileHelper.TryDeleteFile(targetPath);
+                }
+                SqliteMaintenanceGate.Release();
+            }
+        }
+
+        public void CleanOldBackups(int daysToKeep)
+        {
+            if (!_usesSqlite || daysToKeep <= 0 || !Directory.Exists(_backupDirectory))
+            {
+                return;
+            }
+
+            try
+            {
+                var cutoffDate = DateTime.UtcNow.AddDays(-daysToKeep);
 
                 foreach (var file in GetCandidateBackupFiles())
                 {
-                    if (file.LastWriteTime < cutoffDate)
+                    if (file.LastWriteTimeUtc < cutoffDate)
                     {
                         file.Delete();
                         Log.Information("Deleted old backup: {FileName}", file.Name);
@@ -147,6 +227,7 @@ namespace ExportDocManager.Services.Infrastructure
             catch (Exception ex)
             {
                 Log.Error(ex, "Failed to clean old backups.");
+                throw new InfrastructureServiceException("清理旧数据库备份失败，请检查备份目录权限和磁盘状态。", ex);
             }
         }
 
@@ -168,7 +249,7 @@ namespace ExportDocManager.Services.Infrastructure
             catch (Exception ex)
             {
                 Log.Error(ex, "Failed to get available backups.");
-                return new List<string>();
+                throw new InfrastructureServiceException("读取数据库备份列表失败，请检查备份目录权限和磁盘状态。", ex);
             }
         }
 
@@ -302,7 +383,10 @@ namespace ExportDocManager.Services.Infrastructure
             await using var destination = new SqliteConnection(destinationBuilder.ToString());
             await source.OpenAsync(cancellationToken).ConfigureAwait(false);
             await destination.OpenAsync(cancellationToken).ConfigureAwait(false);
-            source.BackupDatabase(destination);
+            await Task.Run(
+                    () => source.BackupDatabase(destination),
+                    cancellationToken)
+                .ConfigureAwait(false);
             await ValidateOpenSqliteConnectionAsync(destination, cancellationToken).ConfigureAwait(false);
         }
 
@@ -355,6 +439,25 @@ namespace ExportDocManager.Services.Infrastructure
                     }
                 },
                 cancellationToken).ConfigureAwait(false);
+        }
+
+        private static void ValidateZipBackupStructure(string archivePath, string databaseFileName)
+        {
+            using var archive = ZipFile.OpenRead(archivePath);
+            var fileEntries = archive.Entries
+                .Where(entry => !string.IsNullOrWhiteSpace(entry.Name))
+                .ToArray();
+            if (fileEntries.Length != 1 ||
+                !string.Equals(fileEntries[0].FullName, databaseFileName, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ServiceValidationException(
+                    $"数据库备份压缩包必须且只能包含根目录数据库文件 '{databaseFileName}'。 ");
+            }
+
+            if (fileEntries[0].Length <= 0 || fileEntries[0].Length > 4L * 1024L * 1024L * 1024L)
+            {
+                throw new PayloadLimitExceededException(4L * 1024L * 1024L * 1024L);
+            }
         }
 
         private static async Task ValidateSqliteSnapshotAsync(
@@ -414,32 +517,28 @@ namespace ExportDocManager.Services.Infrastructure
 
             return directoryInfo
                 .EnumerateFiles("*.zip", SearchOption.TopDirectoryOnly)
-                .Where(ContainsCurrentDatabaseBackup)
+                .Where(file => _managedBackupNamePattern?.IsMatch(file.Name) == true)
                 .ToList();
         }
 
-        private bool ContainsCurrentDatabaseBackup(FileInfo file)
-        {
-            try
-            {
-                using var archive = ZipFile.OpenRead(file.FullName);
-                return archive.Entries.Any(entry =>
-                    entry.Name.Equals(_databaseFileName, StringComparison.OrdinalIgnoreCase));
-            }
-            catch (InvalidDataException)
-            {
-                return MatchesBackupNameFallback(file.Name);
-            }
-            catch (IOException)
-            {
-                return MatchesBackupNameFallback(file.Name);
-            }
-        }
+        private static Regex BuildManagedBackupNamePattern(string databaseFileName) =>
+            new(
+                $"^\\d{{8}}_\\d{{6}}_\\d{{3}}_(?:(?:pre-restore|imported)_)?{Regex.Escape(BuildBackupNameToken(databaseFileName))}_[0-9a-f]{{32}}\\.zip$",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
 
-        private bool MatchesBackupNameFallback(string fileName)
+        private string BuildImportedBackupFileName(string preferredFileName)
         {
-            string expectedSuffix = "_" + BuildBackupNameToken(_databaseFileName) + ".zip";
-            return fileName.EndsWith(expectedSuffix, StringComparison.OrdinalIgnoreCase);
+            string preferred = (preferredFileName ?? string.Empty).Trim();
+            if (_managedBackupNamePattern?.IsMatch(preferred) == true)
+            {
+                string preferredPath = Path.Combine(_backupDirectory, preferred);
+                if (!File.Exists(preferredPath))
+                {
+                    return preferred;
+                }
+            }
+
+            return $"{DateTimeOffset.Now:yyyyMMdd_HHmmss_fff}_imported_{BuildBackupNameToken(_databaseFileName)}_{Guid.NewGuid():N}.zip";
         }
 
         private static string BuildBackupNameToken(string databaseFileName)

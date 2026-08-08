@@ -1,6 +1,7 @@
 using ExportDocManager.Models;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -20,7 +21,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IBackupService backupService,
-                IAppPathProvider pathProvider) =>
+                IAppPathProvider pathProvider,
+                ApiDesktopAccessOptions desktopAccessOptions) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -33,7 +35,10 @@ namespace ExportDocManager.Api.Hosting
                     return WriteForbidden("只有管理员可以查看和管理数据库备份。");
                 }
 
-                return Results.Ok(CreateBackupListResponse(backupService, pathProvider));
+                return Results.Ok(CreateBackupListResponse(
+                    backupService,
+                    pathProvider,
+                    ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
             })
             .WithName("ListDatabaseBackups");
 
@@ -42,7 +47,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IBackupService backupService,
-                IAppPathProvider pathProvider) =>
+                IAppPathProvider pathProvider,
+                ApiDesktopAccessOptions desktopAccessOptions) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -56,7 +62,10 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 var backupResult = await backupService.BackupDatabaseAsync(context.RequestAborted);
-                var list = CreateBackupListResponse(backupService, pathProvider);
+                var list = CreateBackupListResponse(
+                    backupService,
+                    pathProvider,
+                    ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions));
                 var response = new ApiBackupCreateResponse(
                     backupResult.Success,
                     backupResult.Message,
@@ -77,6 +86,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 IBackupService backupService,
                 IAppPathProvider pathProvider,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 ApiBackupCleanupRequest request) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
@@ -101,7 +111,10 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 backupService.CleanOldBackups(request.DaysToKeep);
-                var list = CreateBackupListResponse(backupService, pathProvider);
+                var list = CreateBackupListResponse(
+                    backupService,
+                    pathProvider,
+                    ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions));
                 return Results.Ok(new ApiBackupCreateResponse(
                     true,
                     request.DaysToKeep == 0 ? "保留天数为 0，未清理备份。" : "旧备份清理完成。",
@@ -166,7 +179,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
-                ISingleWindowDisasterRecoveryService recoveryService) =>
+                ISingleWindowDisasterRecoveryService recoveryService,
+                ApiDesktopAccessOptions desktopAccessOptions) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -184,7 +198,9 @@ namespace ExportDocManager.Api.Hosting
                     status.Supported,
                     status.UsesSqlite,
                     status.PendingRestore,
-                    status.RecoveryRoot,
+                    ApiResponsePathPolicy.Reveal(
+                        status.RecoveryRoot,
+                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
                     status.Message,
                     status.StoragePolicy));
             })
@@ -315,7 +331,8 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
                 IBackupService backupService,
-                IAppPathProvider pathProvider) =>
+                IAppPathProvider pathProvider,
+                ApiDesktopAccessOptions desktopAccessOptions) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -338,7 +355,9 @@ namespace ExportDocManager.Api.Hosting
                     webDav.UserName?.Trim() ?? string.Empty,
                     latestBackup?.Name ?? string.Empty,
                     latestBackup?.Length ?? 0,
-                    pathProvider.BackupRoot,
+                    ApiResponsePathPolicy.Reveal(
+                        pathProvider.BackupRoot,
+                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
                     CloudBackupStoragePolicy));
             })
             .WithName("GetCloudBackupStatus");
@@ -396,6 +415,7 @@ namespace ExportDocManager.Api.Hosting
                 IBackupService backupService,
                 ICloudSyncService cloudSyncService,
                 IAppPathProvider pathProvider,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
@@ -434,9 +454,13 @@ namespace ExportDocManager.Api.Hosting
                         true,
                         $"已上传最新数据库备份：{latestBackup.Name}",
                         latestBackup.Name,
-                        latestBackup.FullName,
+                        ApiResponsePathPolicy.Reveal(
+                            latestBackup.FullName,
+                            ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
                         latestBackup.Length,
-                        pathProvider.BackupRoot,
+                        ApiResponsePathPolicy.Reveal(
+                            pathProvider.BackupRoot,
+                            ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
                         CloudBackupStoragePolicy));
                 }
                 catch (Exception ex) when (
@@ -456,7 +480,9 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
                 ICloudSyncService cloudSyncService,
+                IBackupService backupService,
                 IAppPathProvider pathProvider,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
@@ -487,7 +513,9 @@ namespace ExportDocManager.Api.Hosting
                     var remoteBackups = await cloudSyncService.ListBackupFilesAsync(cancellationToken);
                     return Results.Ok(new ApiCloudBackupListResponse(
                         remoteBackups.Select(ToCloudBackupItemDto).ToArray(),
-                        pathProvider.BackupRoot,
+                        ApiResponsePathPolicy.Reveal(
+                            pathProvider.BackupRoot,
+                            ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
                         CloudBackupStoragePolicy));
                 }
                 catch (Exception ex) when (
@@ -508,7 +536,9 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
                 ICloudSyncService cloudSyncService,
+                IBackupService backupService,
                 IAppPathProvider pathProvider,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 ApiCloudBackupDownloadRequest request,
                 CancellationToken cancellationToken) =>
             {
@@ -560,19 +590,40 @@ namespace ExportDocManager.Api.Hosting
                         return Results.BadRequest(new ApiErrorResponse("所选 WebDAV 备份超过 4 GiB 下载上限。"));
                     }
 
-                    string localBackupPath = BuildLocalBackupPath(pathProvider.BackupRoot, remoteFileName);
-                    await cloudSyncService.DownloadFileAsync(remoteFileName, localBackupPath, cancellationToken);
-                    var downloadedFile = new FileInfo(localBackupPath);
+                    string stagingRoot = Path.Combine(pathProvider.BackupRoot, ".cloud-downloads");
+                    Directory.CreateDirectory(stagingRoot);
+                    RuntimeFilePermissionHelper.RestrictDirectory(stagingRoot);
+                    string stagedPath = Path.Combine(stagingRoot, $"{Guid.NewGuid():N}.zip");
+                    DatabaseBackupImportResult imported;
+                    try
+                    {
+                        await cloudSyncService.DownloadFileAsync(remoteFileName, stagedPath, cancellationToken);
+                        imported = await backupService.ImportBackupAsync(
+                            stagedPath,
+                            remoteFileName,
+                            cancellationToken);
+                    }
+                    finally
+                    {
+                        AtomicFileHelper.TryDeleteFile(stagedPath);
+                    }
+
+                    var downloadedFile = new FileInfo(imported.FilePath);
                     return Results.Ok(new ApiCloudBackupCommandResponse(
                         true,
-                        $"已下载 WebDAV 云备份：{remoteFileName}",
+                        $"已下载并验证 WebDAV 云备份：{downloadedFile.Name}",
                         remoteFileName,
-                        downloadedFile.FullName,
-                        downloadedFile.Exists ? downloadedFile.Length : selectedBackup.SizeBytes,
-                        pathProvider.BackupRoot,
+                        ApiResponsePathPolicy.Reveal(
+                            downloadedFile.FullName,
+                            ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
+                        imported.SizeBytes,
+                        ApiResponsePathPolicy.Reveal(
+                            pathProvider.BackupRoot,
+                            ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
                         CloudBackupStoragePolicy));
                 }
                 catch (Exception ex) when (
+                    ex is ServiceException ||
                     ex is InvalidOperationException ||
                     ex is ArgumentException ||
                     ex is IOException ||
@@ -588,22 +639,25 @@ namespace ExportDocManager.Api.Hosting
 
         private static ApiBackupListResponse CreateBackupListResponse(
             IBackupService backupService,
-            IAppPathProvider pathProvider)
+            IAppPathProvider pathProvider,
+            bool revealPaths)
         {
             return new ApiBackupListResponse(
-                ListBackups(backupService),
-                pathProvider.BackupRoot,
+                ListBackups(backupService, revealPaths),
+                ApiResponsePathPolicy.Reveal(pathProvider.BackupRoot, revealPaths),
                 BackupStoragePolicy);
         }
 
-        private static IReadOnlyList<ApiBackupItemDto> ListBackups(IBackupService backupService)
+        private static IReadOnlyList<ApiBackupItemDto> ListBackups(
+            IBackupService backupService,
+            bool revealPaths)
         {
             return (backupService.GetAvailableBackups() ?? [])
                 .Select(path => new FileInfo(path))
                 .Where(file => file.Exists)
                 .Select(file => new ApiBackupItemDto(
                     file.Name,
-                    file.FullName,
+                    ApiResponsePathPolicy.Reveal(file.FullName, revealPaths),
                     file.Length,
                     file.CreationTime,
                     file.LastWriteTime))
@@ -696,18 +750,5 @@ namespace ExportDocManager.Api.Hosting
             return true;
         }
 
-        private static string BuildLocalBackupPath(string backupRoot, string fileName)
-        {
-            string fullBackupRoot = Path.GetFullPath(backupRoot);
-            Directory.CreateDirectory(fullBackupRoot);
-            string targetPath = Path.GetFullPath(Path.Combine(fullBackupRoot, fileName));
-            if (!PathBoundaryHelper.IsWithinRoot(targetPath, fullBackupRoot) ||
-                string.Equals(targetPath, fullBackupRoot, PathBoundaryHelper.PathComparison))
-            {
-                throw new ServiceValidationException("云备份下载目标必须位于运行数据根 Backups 目录内。");
-            }
-
-            return targetPath;
-        }
     }
 }

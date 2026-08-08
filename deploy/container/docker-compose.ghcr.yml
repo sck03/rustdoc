@@ -62,7 +62,7 @@ services:
     image: ${EXPORTDOCMANAGER_IMAGE_NAMESPACE:?请设置 EXPORTDOCMANAGER_IMAGE_NAMESPACE}/export-doc-manager-web:${EXPORTDOCMANAGER_IMAGE_TAG:?请设置精确的 EXPORTDOCMANAGER_IMAGE_TAG，禁止使用 latest}
     restart: unless-stopped
     ports:
-      - "${EXPORTDOCMANAGER_WEB_PORT:-8080}:8080"
+      - "${EXPORTDOCMANAGER_WEB_BIND_ADDRESS:-127.0.0.1}:${EXPORTDOCMANAGER_WEB_PORT:-8080}:8080"
     depends_on:
       api:
         condition: service_healthy

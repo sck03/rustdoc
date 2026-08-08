@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import type { ApiInvoiceDetailDto, ApiReportHtmlPreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission, usePermissionCapabilities } from "../../app/PermissionAccessContext.tsx";
-import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
+import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { PermissionNotice } from "../../ui/PageState.tsx";
@@ -51,8 +51,7 @@ export function InvoiceReportPreviewPanel({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [showExportAdvanced, setShowExportAdvanced] = useState(false);
-  const workspaceDeviceMode = useWorkspaceDeviceMode();
-  const workspaceDeviceCapabilities = getWorkspaceDeviceCapabilities(workspaceDeviceMode);
+  const workspaceDeviceCapabilities = useWorkspaceDeviceProfile().capabilities;
   const desktopAvailable = isDesktopBridgeAvailable();
   const hasSavedInvoice = invoiceId > 0;
   const canUseSavedInvoiceOutput = hasSavedInvoice

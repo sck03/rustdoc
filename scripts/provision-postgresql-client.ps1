@@ -12,7 +12,7 @@ $postgresVersion = "18.4"
 $windowsArchiveName = "postgresql-18.4-1-windows-x64-binaries.zip"
 $windowsArchiveUri = "https://get.enterprisedb.com/postgresql/$windowsArchiveName"
 $windowsArchiveSha256 = "7effe34c0bf89027b3f171447d351cbc460f4566c8d0f643daec67f140787858"
-$linuxImage = "postgres:18.4-bookworm"
+$linuxImage = "postgres:18.4-trixie"
 
 $destinationRoot = [System.IO.Path]::GetFullPath($Destination)
 $destinationParent = Split-Path -Parent $destinationRoot

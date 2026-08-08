@@ -22,6 +22,31 @@ public static class ServerMigrationManager
     public static string GetStatusPath(IAppPathProvider pathProvider) =>
         Path.Combine(GetControlRoot(pathProvider), ServerMigrationLayout.StatusFileName);
 
+    internal static FileStream AcquireExclusiveLock(IAppPathProvider pathProvider)
+    {
+        ArgumentNullException.ThrowIfNull(pathProvider);
+        string controlRoot = GetControlRoot(pathProvider);
+        Directory.CreateDirectory(controlRoot);
+        RuntimeFilePermissionHelper.RestrictDirectory(controlRoot);
+        string lockPath = Path.Combine(controlRoot, ServerMigrationLayout.LockFileName);
+        try
+        {
+            var stream = new FileStream(
+                lockPath,
+                FileMode.OpenOrCreate,
+                FileAccess.ReadWrite,
+                FileShare.None,
+                bufferSize: 1,
+                options: FileOptions.WriteThrough);
+            RuntimeFilePermissionHelper.RestrictFile(lockPath);
+            return stream;
+        }
+        catch (IOException ex)
+        {
+            throw new ResourceConflictException("已有另一个服务器迁移操作正在执行，请稍后重试。", ex);
+        }
+    }
+
     public static string GetSafetyBackupRoot(IAppPathProvider pathProvider, string packageId) =>
         Path.Combine(
             pathProvider.BackupRoot,

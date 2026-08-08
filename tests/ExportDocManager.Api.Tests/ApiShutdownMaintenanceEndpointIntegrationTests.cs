@@ -126,7 +126,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(1, result.DeletedTextLogsByAge);
             Assert.Equal(1, result.DeletedTextLogsByCount);
             Assert.Equal(2, result.DeletedTextLogs);
-            Assert.Equal(logRoot, result.LogRoot);
+            Assert.Equal(string.Empty, result.LogRoot);
             Assert.Contains("运行数据根 Logs", result.StoragePolicy, StringComparison.Ordinal);
             Assert.Contains("运行数据根数据库 AuditLogs", result.StoragePolicy, StringComparison.Ordinal);
             Assert.Contains("不读取发票/报关业务表", result.StoragePolicy, StringComparison.Ordinal);
@@ -134,6 +134,7 @@ namespace ExportDocManager.Api.Tests
             Assert.False(File.Exists(oldByAge));
             Assert.False(File.Exists(oldByCount));
             Assert.True(File.Exists(retained));
+
         }
 
         private static async Task SaveMaintenanceSettingsAsync(HttpClient adminClient)

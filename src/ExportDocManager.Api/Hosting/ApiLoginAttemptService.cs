@@ -8,6 +8,7 @@ namespace ExportDocManager.Api.Hosting
     public sealed class ApiLoginAttemptService
     {
         public const int MaximumFailures = 5;
+        public const int MaximumTrackedStates = 20_000;
         private static readonly TimeSpan FailureWindow = TimeSpan.FromMinutes(10);
         private static readonly TimeSpan LockDuration = TimeSpan.FromMinutes(2);
         private static readonly TimeSpan Retention = TimeSpan.FromHours(1);
@@ -50,6 +51,7 @@ namespace ExportDocManager.Api.Hosting
             DateTimeOffset now = _timeProvider.GetUtcNow();
             lock (_gate)
             {
+                CleanupIfNeeded(now);
                 TimeSpan accountRetry = RecordFailure(AccountKey(username), now);
                 TimeSpan ipRetry = RecordFailure(IpKey(remoteAddress), now);
                 TimeSpan retryAfter = accountRetry > ipRetry ? accountRetry : ipRetry;
@@ -72,6 +74,14 @@ namespace ExportDocManager.Api.Hosting
         {
             if (!_states.TryGetValue(key, out var state) || now - state.WindowStarted > FailureWindow)
             {
+                if (state == null && !EnsureCapacityForNewState(now))
+                {
+                    // When every retained entry is still locked, fail closed instead
+                    // of allowing attacker-controlled usernames to grow memory without
+                    // bound or bypass throttling by continuously rotating identities.
+                    return LockDuration;
+                }
+
                 state = new AttemptState(now);
                 _states[key] = state;
             }
@@ -107,12 +117,55 @@ namespace ExportDocManager.Api.Hosting
             }
 
             _operationsSinceCleanup = 0;
+            RemoveExpiredStates(now);
+        }
+
+        private bool EnsureCapacityForNewState(DateTimeOffset now)
+        {
+            if (_states.Count < MaximumTrackedStates)
+            {
+                return true;
+            }
+
+            RemoveExpiredStates(now);
+            if (_states.Count < MaximumTrackedStates)
+            {
+                return true;
+            }
+
+            string oldestUnlockedKey = _states
+                .Where(pair => pair.Value.LockedUntil <= now)
+                .OrderBy(pair => pair.Value.LastSeen)
+                .Select(pair => pair.Key)
+                .FirstOrDefault();
+            if (oldestUnlockedKey == null)
+            {
+                return false;
+            }
+
+            _states.Remove(oldestUnlockedKey);
+            return true;
+        }
+
+        private void RemoveExpiredStates(DateTimeOffset now)
+        {
             foreach (string key in _states
-                         .Where(pair => now - pair.Value.LastSeen > Retention && pair.Value.LockedUntil <= now)
-                         .Select(pair => pair.Key)
-                         .ToArray())
+                .Where(pair => now - pair.Value.LastSeen > Retention && pair.Value.LockedUntil <= now)
+                .Select(pair => pair.Key)
+                .ToArray())
             {
                 _states.Remove(key);
+            }
+        }
+
+        internal int TrackedStateCount
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _states.Count;
+                }
             }
         }
 
