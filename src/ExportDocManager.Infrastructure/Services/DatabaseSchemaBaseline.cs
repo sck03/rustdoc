@@ -29,14 +29,33 @@ namespace ExportDocManager.Services.Infrastructure
             int tableCount = await CountApplicationTablesAsync(context, usesPostgreSql).ConfigureAwait(false);
             if (tableCount == 0)
             {
-                bool created = await context.Database.EnsureCreatedAsync().ConfigureAwait(false);
-                if (!created)
+                await using var transaction = await context.Database
+                    .BeginTransactionAsync()
+                    .ConfigureAwait(false);
+                try
                 {
-                    throw new InvalidOperationException($"数据库不是空库，无法建立 ExportDocManager v{CurrentVersion} 基线。请使用新数据库重新初始化。");
+                    string createScript = context.Database.GenerateCreateScript();
+                    if (string.IsNullOrWhiteSpace(createScript))
+                    {
+                        throw new InvalidOperationException(
+                            $"无法生成 ExportDocManager v{CurrentVersion} 数据库基线脚本。");
+                    }
+
+                    await context.Database.ExecuteSqlRawAsync(createScript).ConfigureAwait(false);
+                    await CreateCorePerformanceIndexesAsync(context, usesPostgreSql).ConfigureAwait(false);
+                    await WriteVersionAsync(context, usesPostgreSql).ConfigureAwait(false);
+                    await transaction.CommitAsync().ConfigureAwait(false);
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                    throw;
                 }
 
-                await CreatePerformanceIndexesAsync(context, usesPostgreSql).ConfigureAwait(false);
-                await WriteVersionAsync(context, usesPostgreSql).ConfigureAwait(false);
+                if (usesPostgreSql)
+                {
+                    await CreatePostgreSqlTrigramIndexesAsync(context).ConfigureAwait(false);
+                }
                 return;
             }
 
@@ -47,7 +66,17 @@ namespace ExportDocManager.Services.Infrastructure
                 throw new InvalidOperationException(
                     $"当前数据库为{detected}，程序只接受正式 v{CurrentVersion} 基线。项目尚未投产，不执行旧结构兼容升级；请先备份需要保留的文件，再使用空数据库重新初始化。");
             }
+
+            if (usesPostgreSql)
+            {
+                await CreatePostgreSqlTrigramIndexesAsync(context).ConfigureAwait(false);
+            }
         }
+
+        internal static async Task<bool> IsDatabaseEmptyAsync(
+            AppDbContext context,
+            bool usesPostgreSql) =>
+            await CountApplicationTablesAsync(context, usesPostgreSql).ConfigureAwait(false) == 0;
 
         private static async Task<int> CountApplicationTablesAsync(AppDbContext context, bool usesPostgreSql)
         {
@@ -124,7 +153,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
         }
 
-        private static async Task CreatePerformanceIndexesAsync(AppDbContext context, bool usesPostgreSql)
+        private static async Task CreateCorePerformanceIndexesAsync(AppDbContext context, bool usesPostgreSql)
         {
             await context.Database.ExecuteSqlRawAsync(
                 """
@@ -187,7 +216,6 @@ namespace ExportDocManager.Services.Infrastructure
                     ON "CustomsCooItems" ("HSCode" text_pattern_ops);
                 """).ConfigureAwait(false);
 
-            await CreatePostgreSqlTrigramIndexesAsync(context).ConfigureAwait(false);
         }
 
         private static async Task CreatePostgreSqlTrigramIndexesAsync(AppDbContext context)

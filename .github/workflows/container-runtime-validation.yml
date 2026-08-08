@@ -81,6 +81,7 @@ jobs:
         shell: bash
         run: |
           bash -n deploy/container/install-container.sh
+          sh -n deploy/container/postgres-init-roles.sh
           bash deploy/container/install-container.sh --help >/dev/null
 
           installer_root="${{ runner.temp }}/container-installer-test"
@@ -92,6 +93,8 @@ jobs:
             --install-dir "$installer_root" \
             --no-start
           first_password="$(sudo sed -n 's/^POSTGRES_PASSWORD=//p' "$installer_root/.env")"
+          first_app_password="$(sudo sed -n 's/^EXPORTDOCMANAGER_POSTGRES_APP_PASSWORD=//p' "$installer_root/.env")"
+          first_maintenance_password="$(sudo sed -n 's/^EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_PASSWORD=//p' "$installer_root/.env")"
           first_token="$(sudo sed -n 's/^EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=//p' "$installer_root/.env")"
 
           sudo env EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE="file://${{ github.workspace }}/deploy/container" \
@@ -100,6 +103,8 @@ jobs:
             --install-dir "$installer_root" \
             --no-start
           test "$first_password" = "$(sudo sed -n 's/^POSTGRES_PASSWORD=//p' "$installer_root/.env")"
+          test "$first_app_password" = "$(sudo sed -n 's/^EXPORTDOCMANAGER_POSTGRES_APP_PASSWORD=//p' "$installer_root/.env")"
+          test "$first_maintenance_password" = "$(sudo sed -n 's/^EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_PASSWORD=//p' "$installer_root/.env")"
           test "$first_token" = "$(sudo sed -n 's/^EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=//p' "$installer_root/.env")"
           test "$(sudo sed -n 's/^EXPORTDOCMANAGER_IMAGE_TAG=//p' "$installer_root/.env")" = "validation"
           test "$(sudo sed -n 's/^EXPORTDOCMANAGER_WEB_PORT=//p' "$installer_root/.env")" = "18080"
@@ -123,6 +128,8 @@ jobs:
             --install-dir "$installer_root" \
             --no-start
           test "$first_password" = "$(sudo sed -n 's/^POSTGRES_PASSWORD=//p' "$installer_root/.env")"
+          test "$first_app_password" = "$(sudo sed -n 's/^EXPORTDOCMANAGER_POSTGRES_APP_PASSWORD=//p' "$installer_root/.env")"
+          test "$first_maintenance_password" = "$(sudo sed -n 's/^EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_PASSWORD=//p' "$installer_root/.env")"
           test "$first_token" = "$(sudo sed -n 's/^EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=//p' "$installer_root/.env")"
           test "$(sudo sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' "$installer_root/.env")" = "http"
           test "$(sudo sed -n 's/^EXPORTDOCMANAGER_ALLOW_INSECURE_DISASTER_RECOVERY=//p' "$installer_root/.env")" = "false"
@@ -135,6 +142,7 @@ jobs:
           cp deploy/container/docker-compose.ghcr.yml "$rollback_assets/"
           cp deploy/container/docker-compose.acme.yml "$rollback_assets/"
           cp deploy/container/nginx.acme.conf "$rollback_assets/"
+          cp deploy/container/postgres-init-roles.sh "$rollback_assets/"
           cp deploy/container/install-container.sh "$rollback_assets/"
           cp deploy/container/deployment-assets.sha256 "$rollback_assets/"
           printf 'services: [\n' > "$rollback_assets/docker-compose.ghcr.yml"
@@ -193,6 +201,7 @@ jobs:
           test "$symlink_previous_compose_hash" = "$(sudo sha256sum "$symlink_runtime_root/docker-compose.ghcr.yml" | awk '{print $1}')"
           sudo test ! -e "$symlink_runtime_root/docker-compose.acme.yml"
           sudo test ! -e "$symlink_runtime_root/nginx.acme.conf"
+          sudo test ! -e "$symlink_runtime_root/postgres-init-roles.sh"
           sudo test ! -e "$symlink_runtime_root/install-container.sh"
           test "$(sudo find "$symlink_runtime_root" -maxdepth 1 \( -name '.deployment-assets.*' -o -name '.env.previous.*' \) -print -quit)" = ""
 
@@ -560,6 +569,26 @@ jobs:
             sleep 2
           done
           test "$(docker compose exec -T postgres psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT marker FROM container_lifecycle_probe WHERE id = 1")" = "persisted-across-container-recreation"
+
+      - name: Validate separated PostgreSQL runtime roles
+        working-directory: deploy/container
+        shell: bash
+        run: |
+          set -a
+          . ./.env
+          set +a
+          role_flags="$(docker compose exec -T postgres psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -F '|' -c \
+            "SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname IN ('$EXPORTDOCMANAGER_POSTGRES_APP_USER', '$EXPORTDOCMANAGER_POSTGRES_OWNER_ROLE', '$EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_USER') ORDER BY rolname")"
+          grep -F "$EXPORTDOCMANAGER_POSTGRES_APP_USER|t|f|f|f" <<<"$role_flags"
+          grep -F "$EXPORTDOCMANAGER_POSTGRES_OWNER_ROLE|f|f|f|f" <<<"$role_flags"
+          grep -F "$EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_USER|t|f|t|f" <<<"$role_flags"
+          docker compose exec -T postgres sh -ec \
+            'PGPASSWORD="$EXPORTDOCMANAGER_POSTGRES_APP_PASSWORD" psql -v ON_ERROR_STOP=1 -U "$EXPORTDOCMANAGER_POSTGRES_APP_USER" -d "$POSTGRES_DB" -c '\''SELECT count(*) FROM "Users"'\'' >/dev/null'
+          if docker compose exec -T postgres sh -ec \
+            'PGPASSWORD="$EXPORTDOCMANAGER_POSTGRES_APP_PASSWORD" psql -v ON_ERROR_STOP=1 -U "$EXPORTDOCMANAGER_POSTGRES_APP_USER" -d "$POSTGRES_DB" -c '\''CREATE TABLE forbidden_app_ddl(id integer)'\'' >/dev/null 2>&1'; then
+            echo "The PostgreSQL application role unexpectedly has schema DDL privileges." >&2
+            exit 1
+          fi
 
       - name: Validate pg_dump and pg_restore recovery
         working-directory: deploy/container

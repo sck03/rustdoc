@@ -26,11 +26,11 @@ public static class ServerMigrationManager
     {
         ArgumentNullException.ThrowIfNull(pathProvider);
         string controlRoot = GetControlRoot(pathProvider);
-        Directory.CreateDirectory(controlRoot);
-        RuntimeFilePermissionHelper.RestrictDirectory(controlRoot);
         string lockPath = Path.Combine(controlRoot, ServerMigrationLayout.LockFileName);
         try
         {
+            Directory.CreateDirectory(controlRoot);
+            RuntimeFilePermissionHelper.RestrictDirectory(controlRoot);
             var stream = new FileStream(
                 lockPath,
                 FileMode.OpenOrCreate,
@@ -41,9 +41,19 @@ public static class ServerMigrationManager
             RuntimeFilePermissionHelper.RestrictFile(lockPath);
             return stream;
         }
-        catch (IOException ex)
+        catch (IOException ex) when (IsLockContention(ex))
         {
             throw new ResourceConflictException("已有另一个服务器迁移操作正在执行，请稍后重试。", ex);
+        }
+        catch (IOException ex) when (IsDiskFull(ex))
+        {
+            throw new InsufficientStorageException(
+                "服务器迁移控制目录所在磁盘空间不足。",
+                innerException: ex);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new InfrastructureServiceException("服务器迁移控制目录不可访问，请检查运行目录权限与磁盘状态。", ex);
         }
     }
 
@@ -74,18 +84,40 @@ public static class ServerMigrationManager
 
         Directory.CreateDirectory(Path.GetDirectoryName(markerPath)!);
         RuntimeFilePermissionHelper.RestrictDirectory(Path.GetDirectoryName(markerPath)!);
+        marker.StatusMessage = "服务器迁移恢复已排队，等待服务重启。";
+        marker.SafetyBackupRoot = GetSafetyBackupRoot(pathProvider, marker.PackageId);
         WriteMarker(markerPath, marker);
-        WriteStatus(
-            pathProvider,
-            marker,
-            "服务器迁移恢复已排队，等待服务重启。",
-            GetSafetyBackupRoot(pathProvider, marker.PackageId));
+        TryWriteStatusFile(pathProvider, BuildStatus(marker, marker.StatusMessage, marker.SafetyBackupRoot));
     }
 
     internal static ServerMigrationRestoreStatusSnapshot ReadStatus(IAppPathProvider pathProvider)
     {
         ArgumentNullException.ThrowIfNull(pathProvider);
         string path = GetStatusPath(pathProvider);
+        string markerPath = GetPendingMarkerPath(pathProvider);
+        if (File.Exists(markerPath))
+        {
+            try
+            {
+                PendingServerMigrationRestore marker = JsonSerializer.Deserialize<PendingServerMigrationRestore>(
+                    File.ReadAllText(markerPath),
+                    ServerMigrationService.JsonOptions);
+                if (marker != null)
+                {
+                    ValidateMarker(marker);
+                    return BuildStatus(
+                        marker,
+                        marker.StatusMessage,
+                        marker.SafetyBackupRoot);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
+            {
+                // The startup state machine quarantines an unreadable marker.
+                // Until then, fall back to the last durable terminal status.
+            }
+        }
+
         if (!File.Exists(path))
         {
             return null;
@@ -121,19 +153,18 @@ public static class ServerMigrationManager
     {
         string path = GetStatusPath(pathProvider);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var status = new ServerMigrationRestoreStatusSnapshot
+        marker.StatusMessage = message ?? string.Empty;
+        marker.SafetyBackupRoot = safetyBackupRoot ?? string.Empty;
+        string markerPath = GetPendingMarkerPath(pathProvider);
+        if (File.Exists(markerPath) && CanPersistMarker(marker))
         {
-            PackageId = marker.PackageId,
-            PackageFileName = marker.PackageFileName,
-            Phase = marker.Phase,
-            Attempt = marker.Attempt,
-            RequestedBy = marker.RequestedBy,
-            UpdatedAtUtc = marker.UpdatedAtUtc == default
-                ? DateTimeOffset.UtcNow
-                : marker.UpdatedAtUtc,
-            Message = message,
-            SafetyBackupRoot = safetyBackupRoot
-        };
+            WriteMarker(markerPath, marker);
+        }
+
+        ServerMigrationRestoreStatusSnapshot status = BuildStatus(
+            marker,
+            marker.StatusMessage,
+            marker.SafetyBackupRoot);
         AtomicFileHelper.WriteAllTextAtomic(
             path,
             JsonSerializer.Serialize(status, ServerMigrationService.JsonOptions));
@@ -184,5 +215,66 @@ public static class ServerMigrationManager
         {
             throw new InvalidDataException("服务器迁移恢复标记无效。");
         }
+    }
+
+    private static bool CanPersistMarker(PendingServerMigrationRestore marker)
+    {
+        try
+        {
+            ValidateMarker(marker);
+            return true;
+        }
+        catch (InvalidDataException)
+        {
+            return false;
+        }
+    }
+
+    private static ServerMigrationRestoreStatusSnapshot BuildStatus(
+        PendingServerMigrationRestore marker,
+        string message,
+        string safetyBackupRoot) => new()
+        {
+            PackageId = marker.PackageId,
+            PackageFileName = marker.PackageFileName,
+            Phase = marker.Phase,
+            Attempt = marker.Attempt,
+            RequestedBy = marker.RequestedBy,
+            UpdatedAtUtc = marker.UpdatedAtUtc == default
+                ? DateTimeOffset.UtcNow
+                : marker.UpdatedAtUtc,
+            Message = message ?? string.Empty,
+            SafetyBackupRoot = safetyBackupRoot ?? string.Empty
+        };
+
+    private static void TryWriteStatusFile(
+        IAppPathProvider pathProvider,
+        ServerMigrationRestoreStatusSnapshot status)
+    {
+        try
+        {
+            string path = GetStatusPath(pathProvider);
+            AtomicFileHelper.WriteAllTextAtomic(
+                path,
+                JsonSerializer.Serialize(status, ServerMigrationService.JsonOptions));
+            RuntimeFilePermissionHelper.RestrictFile(path);
+        }
+        catch
+        {
+            // The pending marker contains the same status payload and remains
+            // the authoritative atomic control record until restore completes.
+        }
+    }
+
+    private static bool IsLockContention(IOException exception)
+    {
+        int nativeCode = exception.HResult & 0xFFFF;
+        return nativeCode is 11 or 32 or 33;
+    }
+
+    private static bool IsDiskFull(IOException exception)
+    {
+        int nativeCode = exception.HResult & 0xFFFF;
+        return nativeCode is 28 or 39 or 112;
     }
 }

@@ -19,6 +19,7 @@ import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { ServerDraftUpdateNotice, useServerDraftSync } from "../../ui/serverDraftSync.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { CustomsCooProducerProfileDialog } from "./CustomsCooProducerProfileDialog.tsx";
@@ -143,16 +144,6 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
       }, { signal }),
     enabled: isInvoiceIdValid,
   });
-
-  useEffect(() => {
-    if (documentQuery.data) {
-      setDocument(documentQuery.data);
-      setPersistedDocumentSnapshot(buildCooDocumentSnapshot(documentQuery.data, parsedInvoiceId));
-      setUndoDocument(null);
-      setMessage(null);
-      authoritySelection.reset();
-    }
-  }, [documentQuery.data, parsedInvoiceId]);
 
   const buildDefaultsMutation = useMutation({
     mutationFn: (_snapshot: ApiCustomsCooDocumentDto) => client.buildCustomsCooDefaults({ invoiceId: parsedInvoiceId }),
@@ -346,6 +337,19 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
       currentDocumentSnapshot &&
       currentDocumentSnapshot !== persistedDocumentSnapshot,
   );
+  const serverDraftSync = useServerDraftSync({
+    resourceKey: parsedInvoiceId,
+    incomingValue: documentQuery.data,
+    isDirty: hasUnsavedDocumentChanges,
+    fingerprint: (serverDocument) => buildCooDocumentSnapshot(serverDocument, parsedInvoiceId),
+    applyIncoming: (serverDocument) => {
+      setDocument(serverDocument);
+      setPersistedDocumentSnapshot(buildCooDocumentSnapshot(serverDocument, parsedInvoiceId));
+      setUndoDocument(null);
+      setMessage(null);
+      authoritySelection.reset();
+    },
+  });
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: hasUnsavedDocumentChanges,
     message: "当前海关原产地证草稿有未保存的修改。",
@@ -752,6 +756,11 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
       />
 
       {loadMessage || message || catalogMessage ? <InlineNotice tone="error" title="原产地证操作未完成">{loadMessage || message || catalogMessage}</InlineNotice> : null}
+      {serverDraftSync.hasPendingServerVersion ? <ServerDraftUpdateNotice
+        entityLabel="海关原产地证草稿"
+        onKeepLocal={serverDraftSync.keepLocalDraft}
+        onLoadServer={serverDraftSync.loadServerVersion}
+      /> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {!permission.canOperate ? <PermissionNotice>当前权限模板仅允许查看单一窗口草稿和预检结果；修改、修复、保存与交接操作已禁用。</PermissionNotice> : null}
       {!document && isBusy ? <PageState tone="loading" title="正在加载原产地证草稿" description="正在读取表头、商品明细、附件和预检状态。" /> : null}

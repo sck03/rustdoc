@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ExportDocManager.Api.Tests
@@ -148,9 +149,12 @@ namespace ExportDocManager.Api.Tests
                 await ApiIntegrationTestHarness.ReadJsonAsync<ApiDownloadTicket>(ticketResponse);
             Assert.StartsWith("/downloads/jobs/", ticket.DownloadUrl, StringComparison.Ordinal);
 
+            using var stolenTicketResponse = await anonymousClient.GetAsync(ticket.DownloadUrl);
+            Assert.Equal(HttpStatusCode.NotFound, stolenTicketResponse.StatusCode);
+
             using var rangeRequest = new HttpRequestMessage(HttpMethod.Get, ticket.DownloadUrl);
             rangeRequest.Headers.Range = new RangeHeaderValue(0, 3);
-            var rangeResponse = await anonymousClient.SendAsync(rangeRequest);
+            var rangeResponse = await adminClient.SendAsync(rangeRequest);
             Assert.Equal(HttpStatusCode.PartialContent, rangeResponse.StatusCode);
             Assert.Equal(new byte[] { 10, 20, 30, 40 }, await rangeResponse.Content.ReadAsByteArrayAsync());
         }
@@ -185,20 +189,77 @@ namespace ExportDocManager.Api.Tests
         {
             var time = new MutableTimeProvider();
             var service = new ApiDownloadTicketService(time);
-            ApiDownloadTicket ticket = service.Issue("background-job", "job-1", "/downloads/jobs");
+            var issueContext = new DefaultHttpContext();
+            ApiDownloadTicket ticket = service.Issue(
+                issueContext,
+                "background-job",
+                "job-1",
+                "user-7",
+                "/downloads/jobs");
+            var boundContext = CreateDownloadContext(issueContext);
 
-            Assert.True(service.TryResolve(ticket.Token, "background-job", out string firstJobId));
+            Assert.True(service.TryResolve(boundContext, ticket.Token, "background-job", out string firstJobId));
             Assert.Equal("job-1", firstJobId);
-            Assert.True(service.TryResolve(ticket.Token, "background-job", out string secondJobId));
+            Assert.True(service.TryResolve(boundContext, ticket.Token, "background-job", out string secondJobId));
             Assert.Equal("job-1", secondJobId);
-            Assert.False(service.TryResolve(ticket.Token, "postgresql-physical-backup", out _));
+            Assert.False(service.TryResolve(boundContext, ticket.Token, "postgresql-physical-backup", out _));
+            Assert.False(service.TryResolve(new DefaultHttpContext(), ticket.Token, "background-job", out _));
             Assert.Throws<ArgumentException>(() => service.Issue(
+                boundContext,
                 "background-job",
                 "job-2",
+                "user-7",
                 "//external.example/downloads"));
 
             time.Advance(TimeSpan.FromMinutes(5));
-            Assert.False(service.TryResolve(ticket.Token, "background-job", out _));
+            Assert.False(service.TryResolve(boundContext, ticket.Token, "background-job", out _));
+        }
+
+        [Fact]
+        public void DesktopDownloadTickets_ShouldNotRequireBrowserCookiesAndCanBeRevokedBySubject()
+        {
+            var time = new MutableTimeProvider();
+            var service = new ApiDownloadTicketService(time);
+            var desktopContext = new DefaultHttpContext();
+            ApiDownloadTicket ticket = service.Issue(
+                desktopContext,
+                "background-job",
+                "desktop-job",
+                "user-9",
+                "/downloads/jobs",
+                requireSessionBinding: false);
+
+            Assert.True(service.TryResolve(
+                new DefaultHttpContext(),
+                ticket.Token,
+                "background-job",
+                out string jobId));
+            Assert.Equal("desktop-job", jobId);
+
+            service.RevokeSubject(new DefaultHttpContext(), "user-9");
+            Assert.False(service.TryResolve(
+                new DefaultHttpContext(),
+                ticket.Token,
+                "background-job",
+                out _));
+        }
+
+        [Fact]
+        public void ResetSession_ShouldInvalidateTicketsBoundToPreviousBrowserSession()
+        {
+            var time = new MutableTimeProvider();
+            var service = new ApiDownloadTicketService(time);
+            var issueContext = new DefaultHttpContext();
+            ApiDownloadTicket ticket = service.Issue(
+                issueContext,
+                "background-job",
+                "browser-job",
+                "user-10",
+                "/downloads/jobs");
+            var boundContext = CreateDownloadContext(issueContext);
+
+            service.ResetSession(boundContext);
+            Assert.False(service.TryResolve(boundContext, ticket.Token, "background-job", out _));
         }
 
         [Fact]
@@ -206,25 +267,40 @@ namespace ExportDocManager.Api.Tests
         {
             var time = new MutableTimeProvider();
             var service = new ApiDownloadTicketService(time);
+            var issueContext = new DefaultHttpContext();
             ApiDownloadTicket oldest = service.Issue(
+                issueContext,
                 "background-job",
                 "oldest-job",
+                "user-7",
                 "/downloads/jobs");
+            var boundContext = CreateDownloadContext(issueContext);
             time.Advance(TimeSpan.FromMilliseconds(1));
 
             ApiDownloadTicket latest = null;
             for (int index = 0; index < 4096; index++)
             {
                 latest = service.Issue(
+                    boundContext,
                     "background-job",
                     $"job-{index}",
+                    "user-7",
                     "/downloads/jobs");
             }
 
-            Assert.False(service.TryResolve(oldest.Token, "background-job", out _));
+            Assert.False(service.TryResolve(boundContext, oldest.Token, "background-job", out _));
             Assert.NotNull(latest);
-            Assert.True(service.TryResolve(latest.Token, "background-job", out string latestJobId));
+            Assert.True(service.TryResolve(boundContext, latest.Token, "background-job", out string latestJobId));
             Assert.Equal("job-4095", latestJobId);
+        }
+
+        private static DefaultHttpContext CreateDownloadContext(DefaultHttpContext issueContext)
+        {
+            string setCookie = issueContext.Response.Headers.SetCookie.ToString();
+            string cookie = setCookie.Split(';', 2)[0];
+            var context = new DefaultHttpContext();
+            context.Request.Headers.Cookie = cookie;
+            return context;
         }
 
         private static async Task<ApiLoginResponse> SetAdminPasswordAndLoginAsync(

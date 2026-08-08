@@ -841,29 +841,44 @@ namespace ExportDocManager.Infrastructure.Tests
             try
             {
                 Environment.SetEnvironmentVariable(ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable, null);
+                string platform = BrowserExecutableResolver.GetRuntimePlatform();
+                string headlessExecutable = OperatingSystem.IsWindows()
+                    ? "chrome-headless-shell.exe"
+                    : "chrome-headless-shell";
+                string chromeExecutable = OperatingSystem.IsWindows()
+                    ? "chrome.exe"
+                    : OperatingSystem.IsMacOS() ? "Google Chrome for Testing" : "chrome";
                 string headlessShellPath = Path.Combine(
                     appRoot,
                     "Browsers",
                     "ChromeForTesting",
-                    "win64",
+                    platform,
                     "ChromeHeadlessShell",
-                    "chrome-headless-shell-win64",
-                    "chrome-headless-shell.exe");
+                    $"chrome-headless-shell-{platform}",
+                    headlessExecutable);
                 string chromePath = Path.Combine(
                     appRoot,
                     "Browsers",
                     "ChromeForTesting",
-                    "win64",
+                    platform,
                     "Chrome",
-                    "chrome-win64",
-                    "chrome.exe");
-                Directory.CreateDirectory(Path.GetDirectoryName(headlessShellPath)!);
+                    $"chrome-{platform}",
+                    chromeExecutable);
+                WriteHeadlessShellBundle(headlessShellPath);
                 Directory.CreateDirectory(Path.GetDirectoryName(chromePath)!);
-                File.WriteAllText(headlessShellPath, string.Empty);
-                File.WriteAllText(chromePath, string.Empty);
+                File.WriteAllText(chromePath, "test-browser");
+                if (!OperatingSystem.IsWindows())
+                {
+                    File.SetUnixFileMode(
+                        chromePath,
+                        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+                }
 
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
-                var service = new ChromiumHtmlToPdfService(pathProvider);
+                var resolver = new BrowserExecutableResolver(pathProvider, _ => { });
+                var service = new ChromiumHtmlToPdfService(
+                    pathProvider,
+                    executableResolver: resolver);
 
                 string resolvedPath = service.ResolveRendererExecutablePath();
 
@@ -874,6 +889,89 @@ namespace ExportDocManager.Infrastructure.Tests
                 Environment.SetEnvironmentVariable(ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable, originalRendererPath);
                 DeleteDirectoryIfExists(appRoot);
                 DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        [Fact]
+        public void BrowserExecutableResolver_ShouldResolveRelativeManifestPathAndCacheVersionProbe()
+        {
+            string appRoot = CreateTempDirectory("browser-manifest-app");
+            string dataRoot = CreateTempDirectory("browser-manifest-data");
+            string originalRendererPath = Environment.GetEnvironmentVariable(
+                ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable);
+
+            try
+            {
+                Environment.SetEnvironmentVariable(
+                    ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable,
+                    null);
+                string browserRoot = Path.Combine(appRoot, "Browsers", "PortableChromium");
+                string executableName = OperatingSystem.IsWindows()
+                    ? "chrome.exe"
+                    : OperatingSystem.IsMacOS() ? "Chromium" : "chrome";
+                string executablePath = Path.Combine(browserRoot, "runtime", executableName);
+                Directory.CreateDirectory(Path.GetDirectoryName(executablePath)!);
+                File.WriteAllText(executablePath, "test-browser");
+                if (!OperatingSystem.IsWindows())
+                {
+                    File.SetUnixFileMode(
+                        executablePath,
+                        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+                }
+
+                File.WriteAllText(
+                    Path.Combine(browserRoot, "portable.manifest.json"),
+                    $$"""
+                    {
+                      "product": "PortableChromium",
+                      "architecture": "{{BrowserExecutableResolver.GetRuntimePlatform()}}",
+                      "executablePath": "runtime/{{executableName}}",
+                      "playwrightCompatible": true
+                    }
+                    """);
+                int probeCount = 0;
+                var resolver = new BrowserExecutableResolver(
+                    new RuntimeAppPathProvider(appRoot, dataRoot),
+                    _ => probeCount++);
+
+                Assert.Equal(Path.GetFullPath(executablePath), resolver.Resolve());
+                Assert.Equal(Path.GetFullPath(executablePath), resolver.Resolve());
+                Assert.Equal(1, probeCount);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(
+                    ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable,
+                    originalRendererPath);
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        private static void WriteHeadlessShellBundle(string executablePath)
+        {
+            string root = Path.GetDirectoryName(executablePath)!;
+            Directory.CreateDirectory(root);
+            File.WriteAllText(executablePath, "test-browser");
+            foreach (string fileName in new[]
+            {
+                "icudtl.dat",
+                "v8_context_snapshot.bin",
+                "headless_lib_data.pak",
+                "headless_lib_strings.pak"
+            })
+            {
+                File.WriteAllText(Path.Combine(root, fileName), "test-resource");
+            }
+
+            string localesRoot = Path.Combine(root, "locales");
+            Directory.CreateDirectory(localesRoot);
+            File.WriteAllText(Path.Combine(localesRoot, "en-US.pak"), "test-locale");
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(
+                    executablePath,
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
             }
         }
 

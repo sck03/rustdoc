@@ -102,7 +102,8 @@ namespace ExportDocManager.Api.Hosting
                     databaseSettings,
                     provider.GetRequiredService<DatabaseInitializationCoordinator>(),
                     runtimeOptions.NetworkMode && DatabaseModeHelper.UsesPostgreSql(databaseSettings),
-                    runtimeOptions.BootstrapToken));
+                    runtimeOptions.BootstrapToken,
+                    pathProvider));
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IPermissionTemplateService, PermissionTemplateService>();
             services.AddScoped<BusinessDataAccessScope>();
@@ -171,7 +172,8 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IHtmlToPdfService>(provider => new ChromiumHtmlToPdfService(
                 pathProvider,
                 provider.GetRequiredService<BrowserRuntimeManager>(),
-                provider.GetRequiredService<ManagedPlaywrightPdfBrowserHost>()));
+                provider.GetRequiredService<ManagedPlaywrightPdfBrowserHost>(),
+                provider.GetRequiredService<BrowserExecutableResolver>()));
             services.AddScoped<IReportPdfRenderService, ReportPdfRenderService>();
             services.AddScoped<SingleWindowTrackingService>();
             services.AddScoped<ISingleWindowTrackingService>(provider =>

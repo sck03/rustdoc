@@ -112,7 +112,8 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 ISharedDatabaseMaintenanceService maintenanceService,
                 IAppPathProvider pathProvider,
-                ApiDownloadTicketService ticketService) =>
+                ApiDownloadTicketService ticketService,
+                ApiDesktopAccessOptions desktopAccessOptions) =>
             {
                 User user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null) return Results.Unauthorized();
@@ -131,9 +132,12 @@ namespace ExportDocManager.Api.Hosting
                     !IsManagedPostgreSqlBackupPath(pathProvider, backup.FullPath)
                     ? Results.NotFound(new ApiErrorResponse("未找到指定 PostgreSQL 备份。"))
                     : Results.Ok(ticketService.Issue(
+                        context,
                         PostgreSqlBackupDownloadPurpose,
                         backup.FileName,
-                        "/downloads/postgresql-backups"));
+                        user.Id.ToString(),
+                        "/downloads/postgresql-backups",
+                        requireSessionBinding: !ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions)));
             })
             .WithName("CreatePostgreSqlPhysicalBackupDownloadTicket");
 
@@ -147,6 +151,7 @@ namespace ExportDocManager.Api.Hosting
                 IResult transportError = RequireSecureDisasterRecoveryTransport(context);
                 if (transportError != null) return transportError;
                 if (!ticketService.TryResolve(
+                    context,
                     token,
                     PostgreSqlBackupDownloadPurpose,
                     out string fileName))

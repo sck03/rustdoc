@@ -194,7 +194,9 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, supportTicketResponse.StatusCode);
             ApiDownloadTicket supportTicket =
                 await ApiIntegrationTestHarness.ReadJsonAsync<ApiDownloadTicket>(supportTicketResponse);
-            using var supportDownloadResponse = await anonymousClient.GetAsync(supportTicket.DownloadUrl);
+            using var stolenSupportTicketResponse = await anonymousClient.GetAsync(supportTicket.DownloadUrl);
+            Assert.Equal(HttpStatusCode.NotFound, stolenSupportTicketResponse.StatusCode);
+            using var supportDownloadResponse = await adminClient.GetAsync(supportTicket.DownloadUrl);
             Assert.Equal(HttpStatusCode.OK, supportDownloadResponse.StatusCode);
             await using var supportStream = await supportDownloadResponse.Content.ReadAsStreamAsync();
             using var archive = new ZipArchive(supportStream, ZipArchiveMode.Read);
@@ -284,9 +286,12 @@ namespace ExportDocManager.Api.Tests
                 await ApiIntegrationTestHarness.ReadJsonAsync<ApiDownloadTicket>(ticketResponse);
             Assert.StartsWith("/downloads/postgresql-backups/", ticket.DownloadUrl, StringComparison.Ordinal);
 
+            using var stolenTicketResponse = await anonymousClient.GetAsync(ticket.DownloadUrl);
+            Assert.Equal(HttpStatusCode.NotFound, stolenTicketResponse.StatusCode);
+
             using var rangeRequest = new HttpRequestMessage(HttpMethod.Get, ticket.DownloadUrl);
             rangeRequest.Headers.Range = new RangeHeaderValue(1, 4);
-            var rangeResponse = await anonymousClient.SendAsync(rangeRequest);
+            var rangeResponse = await adminClient.SendAsync(rangeRequest);
             Assert.Equal(HttpStatusCode.PartialContent, rangeResponse.StatusCode);
             Assert.Equal(new byte[] { 20, 30, 40, 50 }, await rangeResponse.Content.ReadAsByteArrayAsync());
 
@@ -313,7 +318,7 @@ namespace ExportDocManager.Api.Tests
 
             try
             {
-                var missingResponse = await anonymousClient.GetAsync(ticket.DownloadUrl);
+                var missingResponse = await adminClient.GetAsync(ticket.DownloadUrl);
                 Assert.Equal(HttpStatusCode.NotFound, missingResponse.StatusCode);
             }
             finally

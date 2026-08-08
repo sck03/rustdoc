@@ -27,22 +27,31 @@ namespace ExportDocManager.Services.Crm
 
             var columns = BuildColumnMap(table[0]);
             if (!columns.ContainsKey("name")) throw new InvalidDataException("导入文件缺少“客户名称”列。");
-            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            var existingNames = (await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking())
-                    .Select(item => item.Name).ToListAsync(cancellationToken))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var rows = new List<CrmCustomerImportRow>();
-            foreach (var values in table.Skip(1).Take(MaximumRows))
+            var parsedRows = new List<(int RowNumber, IReadOnlyList<string> Values, string Name)>();
+            for (int tableIndex = 1; tableIndex < Math.Min(table.Count, MaximumRows + 1); tableIndex++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                int rowNumber = rows.Count + 2;
-                string name = Read(values, columns, "name");
+                IReadOnlyList<string> values = table[tableIndex];
                 if (values.All(string.IsNullOrWhiteSpace)) continue;
+                parsedRows.Add((tableIndex + 1, values, Read(values, columns, "name")));
+            }
+
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var existingNames = await ScopedExistingNameLoader.LoadAsync(
+                _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking()).Select(item => item.Name),
+                parsedRows.Select(row => row.Name),
+                cancellationToken);
+            var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var rows = new List<CrmCustomerImportRow>();
+            foreach (var parsedRow in parsedRows)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                IReadOnlyList<string> values = parsedRow.Values;
+                string name = parsedRow.Name;
                 string error = name.Length == 0 ? "客户名称不能为空。" : string.Empty;
                 bool duplicate = name.Length > 0 && (existingNames.Contains(name) || !seenNames.Add(name));
                 rows.Add(new CrmCustomerImportRow(
-                    rowNumber, name, Read(values, columns, "country"), Read(values, columns, "website"),
+                    parsedRow.RowNumber, name, Read(values, columns, "country"), Read(values, columns, "website"),
                     Default(Read(values, columns, "status"), "潜在客户"), Read(values, columns, "source"),
                     Read(values, columns, "notes"), Read(values, columns, "contact"), Read(values, columns, "title"),
                     Read(values, columns, "email"), Read(values, columns, "phone"), duplicate, error));
@@ -61,14 +70,16 @@ namespace ExportDocManager.Services.Crm
             ArgumentNullException.ThrowIfNull(rows);
             return AppDbContextExecution.ExecuteInTransactionAsync(_contextFactory, async (context, token) =>
             {
-                var existingNames = (await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking())
-                        .Select(item => item.Name).ToListAsync(token))
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var importRows = rows.Take(MaximumRows).ToArray();
+                var existingNames = await ScopedExistingNameLoader.LoadAsync(
+                    _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking()).Select(item => item.Name),
+                    importRows.Select(row => row.Name),
+                    token);
                 int customers = 0;
                 int contacts = 0;
                 int skipped = 0;
                 var pendingContacts = new List<(CrmCustomer Customer, CrmCustomerImportRow Row)>();
-                foreach (var row in rows.Take(MaximumRows))
+                foreach (var row in importRows)
                 {
                     token.ThrowIfCancellationRequested();
                     string name = Clean(row.Name);

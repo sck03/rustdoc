@@ -49,7 +49,8 @@ Options:
 
 For private GHCR packages, export GHCR_USER and GHCR_TOKEN before running.
 Optional first-install secrets can be supplied through
-EXPORTDOCMANAGER_INSTALL_POSTGRES_PASSWORD and EXPORTDOCMANAGER_INSTALL_BOOTSTRAP_TOKEN.
+EXPORTDOCMANAGER_INSTALL_POSTGRES_PASSWORD, EXPORTDOCMANAGER_INSTALL_POSTGRES_APP_PASSWORD,
+EXPORTDOCMANAGER_INSTALL_POSTGRES_MAINTENANCE_PASSWORD and EXPORTDOCMANAGER_INSTALL_BOOTSTRAP_TOKEN.
 EOF
 }
 
@@ -143,7 +144,7 @@ fi
 
 ASSET_BASE=${EXPORTDOCMANAGER_DEPLOYMENT_ASSET_BASE:-"https://raw.githubusercontent.com/sck03/rustdoc/${REPOSITORY_REF}/deploy/container"}
 CHECKSUM_MANIFEST=deployment-assets.sha256
-DEPLOYMENT_ASSETS=(docker-compose.ghcr.yml docker-compose.acme.yml nginx.acme.conf install-container.sh)
+DEPLOYMENT_ASSETS=(docker-compose.ghcr.yml docker-compose.acme.yml nginx.acme.conf postgres-init-roles.sh install-container.sh)
 MANAGED_DEPLOYMENT_ASSETS=("$CHECKSUM_MANIFEST" "${DEPLOYMENT_ASSETS[@]}")
 ENVIRONMENT_FILE="$INSTALL_DIR/.env"
 for managed_file in "${MANAGED_DEPLOYMENT_ASSETS[@]}" .env; do
@@ -303,11 +304,17 @@ for asset in "${DEPLOYMENT_ASSETS[@]}"; do
 done
 verify_deployment_manifest
 bash -n "$ASSET_STAGE/install-container.sh"
+sh -n "$ASSET_STAGE/postgres-init-roles.sh"
 STAGED_VALIDATION_ENV="$ASSET_STAGE/.compose-validation.env"
 cat > "$STAGED_VALIDATION_ENV" <<EOF
 POSTGRES_DB=exportdoc
 POSTGRES_USER=exportdoc
 POSTGRES_PASSWORD=staged-compose-validation-password
+EXPORTDOCMANAGER_POSTGRES_APP_USER=exportdoc_app
+EXPORTDOCMANAGER_POSTGRES_APP_PASSWORD=staged-compose-validation-app-password
+EXPORTDOCMANAGER_POSTGRES_OWNER_ROLE=exportdoc_owner
+EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_USER=exportdoc_maintenance
+EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_PASSWORD=staged-compose-validation-maintenance-password
 EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=staged-compose-validation-bootstrap-token
 EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/sck03
 EXPORTDOCMANAGER_IMAGE_TAG=validation
@@ -358,6 +365,7 @@ for asset in "${MANAGED_DEPLOYMENT_ASSETS[@]}"; do
   ACTIVATION_FILE=""
 done
 chmod 700 "$INSTALL_DIR/install-container.sh"
+chmod 644 "$INSTALL_DIR/postgres-init-roles.sh"
 
 if ((ENVIRONMENT_FILE_WAS_PRESENT == 0)); then
   : > "$ENVIRONMENT_FILE"
@@ -468,11 +476,25 @@ random_hex() {
 POSTGRES_PASSWORD=$(env_value POSTGRES_PASSWORD)
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-${EXPORTDOCMANAGER_INSTALL_POSTGRES_PASSWORD:-}}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-$(random_hex 24)}
+POSTGRES_APP_PASSWORD=$(env_value EXPORTDOCMANAGER_POSTGRES_APP_PASSWORD)
+POSTGRES_APP_PASSWORD=${POSTGRES_APP_PASSWORD:-${EXPORTDOCMANAGER_INSTALL_POSTGRES_APP_PASSWORD:-}}
+POSTGRES_APP_PASSWORD=${POSTGRES_APP_PASSWORD:-$(random_hex 24)}
+POSTGRES_MAINTENANCE_PASSWORD=$(env_value EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_PASSWORD)
+POSTGRES_MAINTENANCE_PASSWORD=${POSTGRES_MAINTENANCE_PASSWORD:-${EXPORTDOCMANAGER_INSTALL_POSTGRES_MAINTENANCE_PASSWORD:-}}
+POSTGRES_MAINTENANCE_PASSWORD=${POSTGRES_MAINTENANCE_PASSWORD:-$(random_hex 24)}
 BOOTSTRAP_TOKEN=$(env_value EXPORTDOCMANAGER_BOOTSTRAP_TOKEN)
 BOOTSTRAP_TOKEN=${BOOTSTRAP_TOKEN:-${EXPORTDOCMANAGER_INSTALL_BOOTSTRAP_TOKEN:-}}
 BOOTSTRAP_TOKEN=${BOOTSTRAP_TOKEN:-$(random_hex 32)}
 (( ${#POSTGRES_PASSWORD} >= 12 )) && [[ "$POSTGRES_PASSWORD" =~ ^[A-Za-z0-9._~!@%+=:-]+$ ]] ||
-  fail "PostgreSQL password is invalid or shorter than 12 characters."
+  fail "PostgreSQL administrator password is invalid or shorter than 12 characters."
+(( ${#POSTGRES_APP_PASSWORD} >= 12 )) && [[ "$POSTGRES_APP_PASSWORD" =~ ^[A-Za-z0-9._~!@%+=:-]+$ ]] ||
+  fail "PostgreSQL application password is invalid or shorter than 12 characters."
+(( ${#POSTGRES_MAINTENANCE_PASSWORD} >= 12 )) && [[ "$POSTGRES_MAINTENANCE_PASSWORD" =~ ^[A-Za-z0-9._~!@%+=:-]+$ ]] ||
+  fail "PostgreSQL maintenance password is invalid or shorter than 12 characters."
+[[ "$POSTGRES_PASSWORD" != "$POSTGRES_APP_PASSWORD" &&
+   "$POSTGRES_PASSWORD" != "$POSTGRES_MAINTENANCE_PASSWORD" &&
+   "$POSTGRES_APP_PASSWORD" != "$POSTGRES_MAINTENANCE_PASSWORD" ]] ||
+  fail "PostgreSQL administrator, application, and maintenance passwords must be distinct."
 (( ${#BOOTSTRAP_TOKEN} >= 24 && ${#BOOTSTRAP_TOKEN} <= 512 )) && [[ "$BOOTSTRAP_TOKEN" =~ ^[A-Za-z0-9._~!@%+=:-]+$ ]] ||
   fail "Bootstrap token must contain 24-512 safe characters."
 
@@ -566,10 +588,25 @@ PROXY_NUMBER=$(ipv4_to_int "$REVERSE_PROXY_IP") || fail "Existing reverse proxy 
 
 POSTGRES_DATABASE=$(env_value POSTGRES_DB)
 POSTGRES_DATABASE=${POSTGRES_DATABASE:-exportdoc}
-POSTGRES_USERNAME=$(env_value POSTGRES_USER)
-POSTGRES_USERNAME=${POSTGRES_USERNAME:-exportdoc}
+POSTGRES_ADMIN_USERNAME=$(env_value POSTGRES_USER)
+POSTGRES_ADMIN_USERNAME=${POSTGRES_ADMIN_USERNAME:-exportdoc}
+POSTGRES_APP_USERNAME=$(env_value EXPORTDOCMANAGER_POSTGRES_APP_USER)
+POSTGRES_APP_USERNAME=${POSTGRES_APP_USERNAME:-exportdoc_app}
+POSTGRES_OWNER_ROLE=$(env_value EXPORTDOCMANAGER_POSTGRES_OWNER_ROLE)
+POSTGRES_OWNER_ROLE=${POSTGRES_OWNER_ROLE:-exportdoc_owner}
+POSTGRES_MAINTENANCE_USERNAME=$(env_value EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_USER)
+POSTGRES_MAINTENANCE_USERNAME=${POSTGRES_MAINTENANCE_USERNAME:-exportdoc_maintenance}
 [[ "$POSTGRES_DATABASE" =~ ^[A-Za-z0-9_]{1,63}$ ]] || fail "POSTGRES_DB must contain 1-63 letters, digits, or underscores."
-[[ "$POSTGRES_USERNAME" =~ ^[A-Za-z0-9_]{1,63}$ ]] || fail "POSTGRES_USER must contain 1-63 letters, digits, or underscores."
+for role_name in "$POSTGRES_ADMIN_USERNAME" "$POSTGRES_APP_USERNAME" "$POSTGRES_OWNER_ROLE" "$POSTGRES_MAINTENANCE_USERNAME"; do
+  [[ "$role_name" =~ ^[A-Za-z0-9_]{1,63}$ ]] || fail "PostgreSQL role names must contain 1-63 letters, digits, or underscores."
+done
+[[ "$POSTGRES_ADMIN_USERNAME" != "$POSTGRES_APP_USERNAME" &&
+   "$POSTGRES_ADMIN_USERNAME" != "$POSTGRES_OWNER_ROLE" &&
+   "$POSTGRES_ADMIN_USERNAME" != "$POSTGRES_MAINTENANCE_USERNAME" &&
+   "$POSTGRES_APP_USERNAME" != "$POSTGRES_OWNER_ROLE" &&
+   "$POSTGRES_APP_USERNAME" != "$POSTGRES_MAINTENANCE_USERNAME" &&
+   "$POSTGRES_OWNER_ROLE" != "$POSTGRES_MAINTENANCE_USERNAME" ]] ||
+  fail "PostgreSQL administrator, owner, application, and maintenance roles must be distinct."
 
 mkdir -p -- "$RUNTIME_ROOT"
 assert_safe_directory_path "$RUNTIME_ROOT" "Runtime data root"
@@ -610,7 +647,7 @@ if [[ ! -f "$SETTINGS_FILE" ]]; then
     "PostgreSqlHost": "postgres",
     "PostgreSqlPort": 5432,
     "PostgreSqlDatabase": "$POSTGRES_DATABASE",
-    "PostgreSqlUsername": "$POSTGRES_USERNAME",
+    "PostgreSqlUsername": "$POSTGRES_APP_USERNAME",
     "PostgreSqlPassword": "",
     "PostgreSqlAdditionalOptions": "Pooling=true;Maximum Pool Size=100;Timeout=15;Command Timeout=60"
   }
@@ -622,8 +659,13 @@ MASTER_KEY=$(env_value EXPORTDOCMANAGER_MASTER_KEY)
 ALLOWED_ORIGINS=$(env_value EXPORTDOCMANAGER_ALLOWED_ORIGINS)
 ADDITIONAL_TRUSTED_PROXIES=$(env_value EXPORTDOCMANAGER_ADDITIONAL_TRUSTED_PROXIES)
 set_env_value POSTGRES_DB "$POSTGRES_DATABASE"
-set_env_value POSTGRES_USER "$POSTGRES_USERNAME"
+set_env_value POSTGRES_USER "$POSTGRES_ADMIN_USERNAME"
 set_env_value POSTGRES_PASSWORD "$POSTGRES_PASSWORD"
+set_env_value EXPORTDOCMANAGER_POSTGRES_APP_USER "$POSTGRES_APP_USERNAME"
+set_env_value EXPORTDOCMANAGER_POSTGRES_APP_PASSWORD "$POSTGRES_APP_PASSWORD"
+set_env_value EXPORTDOCMANAGER_POSTGRES_OWNER_ROLE "$POSTGRES_OWNER_ROLE"
+set_env_value EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_USER "$POSTGRES_MAINTENANCE_USERNAME"
+set_env_value EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_PASSWORD "$POSTGRES_MAINTENANCE_PASSWORD"
 set_env_value EXPORTDOCMANAGER_BOOTSTRAP_TOKEN "$BOOTSTRAP_TOKEN"
 set_env_value EXPORTDOCMANAGER_MASTER_KEY "$MASTER_KEY"
 if [[ "$MODE" == "https" ]]; then

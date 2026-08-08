@@ -131,6 +131,7 @@ namespace ExportDocManager.Api.Hosting
                 IBackgroundJobService jobService,
                 IAppPathProvider pathProvider,
                 ApiDownloadTicketService ticketService,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 string jobId,
                 CancellationToken cancellationToken) =>
             {
@@ -153,9 +154,12 @@ namespace ExportDocManager.Api.Hosting
                 if (transportError != null) return transportError;
 
                 return Results.Ok(ticketService.Issue(
+                    context,
                     BackgroundJobDownloadPurpose,
                     job.JobId,
-                    "/downloads/jobs"));
+                    user.Id.ToString(),
+                    "/downloads/jobs",
+                    requireSessionBinding: !ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions)));
             })
             .WithName("CreateJobDownloadTicket");
 
@@ -167,7 +171,11 @@ namespace ExportDocManager.Api.Hosting
                 string token,
                 CancellationToken cancellationToken) =>
             {
-                if (!ticketService.TryResolve(token, BackgroundJobDownloadPurpose, out string jobId))
+                if (!ticketService.TryResolve(
+                    context,
+                    token,
+                    BackgroundJobDownloadPurpose,
+                    out string jobId))
                 {
                     return Results.NotFound();
                 }

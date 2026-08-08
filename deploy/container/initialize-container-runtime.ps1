@@ -3,9 +3,14 @@ param(
     [string]$RuntimeRoot = (Join-Path $PSScriptRoot "runtime"),
     [string]$EnvironmentFile = (Join-Path $PSScriptRoot ".env"),
     [string]$PostgreSqlDatabase = "exportdoc",
-    [string]$PostgreSqlUsername = "exportdoc",
+    [string]$PostgreSqlAdministratorUsername = "exportdoc",
+    [string]$PostgreSqlUsername = "exportdoc_app",
+    [string]$PostgreSqlOwnerRole = "exportdoc_owner",
+    [string]$PostgreSqlMaintenanceUsername = "exportdoc_maintenance",
     [Parameter(Mandatory = $true)]
     [string]$PostgreSqlPassword,
+    [string]$PostgreSqlApplicationPassword,
+    [string]$PostgreSqlMaintenancePassword,
     [Parameter(Mandatory = $true)]
     [string]$BootstrapToken,
     [int]$WebPort = 8080,
@@ -379,8 +384,74 @@ function Set-UnixRuntimeOwner {
     }
 }
 
-if ($PostgreSqlPassword.Length -lt 12 -or $PostgreSqlPassword -notmatch '^[A-Za-z0-9._~!@%+=:-]+$') {
-    throw "PostgreSQL 密码至少 12 位，且只能使用字母、数字和 . _ ~ ! @ % + = : -，避免 .env 转义歧义。"
+function New-RandomHexSecret {
+    param([int]$ByteCount = 24)
+
+    $bytes = [byte[]]::new($ByteCount)
+    [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+    return ([System.BitConverter]::ToString($bytes)).Replace("-", "").ToLowerInvariant()
+}
+
+$resolvedEnvironmentFile = [System.IO.Path]::GetFullPath($EnvironmentFile)
+$environmentRoot = Assert-SafeDirectoryPath (Split-Path -Parent $resolvedEnvironmentFile) "容器环境目录"
+Assert-SafeManagedFilePath $resolvedEnvironmentFile "容器环境文件"
+if (-not $PSBoundParameters.ContainsKey("PostgreSqlAdministratorUsername")) {
+    $existing = Get-EnvironmentFileValue $resolvedEnvironmentFile "POSTGRES_USER"
+    if (-not [string]::IsNullOrWhiteSpace($existing)) { $PostgreSqlAdministratorUsername = $existing }
+}
+if (-not $PSBoundParameters.ContainsKey("PostgreSqlUsername")) {
+    $existing = Get-EnvironmentFileValue $resolvedEnvironmentFile "EXPORTDOCMANAGER_POSTGRES_APP_USER"
+    if (-not [string]::IsNullOrWhiteSpace($existing)) { $PostgreSqlUsername = $existing }
+}
+if (-not $PSBoundParameters.ContainsKey("PostgreSqlOwnerRole")) {
+    $existing = Get-EnvironmentFileValue $resolvedEnvironmentFile "EXPORTDOCMANAGER_POSTGRES_OWNER_ROLE"
+    if (-not [string]::IsNullOrWhiteSpace($existing)) { $PostgreSqlOwnerRole = $existing }
+}
+if (-not $PSBoundParameters.ContainsKey("PostgreSqlMaintenanceUsername")) {
+    $existing = Get-EnvironmentFileValue $resolvedEnvironmentFile "EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_USER"
+    if (-not [string]::IsNullOrWhiteSpace($existing)) { $PostgreSqlMaintenanceUsername = $existing }
+}
+if ([string]::IsNullOrWhiteSpace($PostgreSqlApplicationPassword)) {
+    $PostgreSqlApplicationPassword = Get-EnvironmentFileValue $resolvedEnvironmentFile "EXPORTDOCMANAGER_POSTGRES_APP_PASSWORD"
+}
+if ([string]::IsNullOrWhiteSpace($PostgreSqlApplicationPassword)) {
+    $PostgreSqlApplicationPassword = New-RandomHexSecret
+}
+if ([string]::IsNullOrWhiteSpace($PostgreSqlMaintenancePassword)) {
+    $PostgreSqlMaintenancePassword = Get-EnvironmentFileValue $resolvedEnvironmentFile "EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_PASSWORD"
+}
+if ([string]::IsNullOrWhiteSpace($PostgreSqlMaintenancePassword)) {
+    $PostgreSqlMaintenancePassword = New-RandomHexSecret
+}
+
+foreach ($passwordEntry in @(
+    @{ Label = "PostgreSQL 管理员密码"; Value = $PostgreSqlPassword },
+    @{ Label = "PostgreSQL 应用密码"; Value = $PostgreSqlApplicationPassword },
+    @{ Label = "PostgreSQL 维护密码"; Value = $PostgreSqlMaintenancePassword }
+)) {
+    if ($passwordEntry.Value.Length -lt 12 -or $passwordEntry.Value -notmatch '^[A-Za-z0-9._~!@%+=:-]+$') {
+        throw "$($passwordEntry.Label)至少 12 位，且只能使用字母、数字和 . _ ~ ! @ % + = : -，避免 .env 转义歧义。"
+    }
+}
+$passwordCount = @($PostgreSqlPassword, $PostgreSqlApplicationPassword, $PostgreSqlMaintenancePassword) |
+    Sort-Object -Unique | Measure-Object | Select-Object -ExpandProperty Count
+if ($passwordCount -ne 3) {
+    throw "PostgreSQL 管理员、应用和维护密码必须互不相同。"
+}
+foreach ($roleEntry in @(
+    @{ Label = "PostgreSQL 管理员账号"; Value = $PostgreSqlAdministratorUsername },
+    @{ Label = "PostgreSQL 所有者角色"; Value = $PostgreSqlOwnerRole },
+    @{ Label = "PostgreSQL 应用账号"; Value = $PostgreSqlUsername },
+    @{ Label = "PostgreSQL 维护账号"; Value = $PostgreSqlMaintenanceUsername }
+)) {
+    if ($roleEntry.Value -notmatch '^[A-Za-z0-9_]{1,63}$') {
+        throw "$($roleEntry.Label)必须为 1-63 位字母、数字或下划线。"
+    }
+}
+$roleCount = @($PostgreSqlAdministratorUsername, $PostgreSqlOwnerRole, $PostgreSqlUsername, $PostgreSqlMaintenanceUsername) |
+    Sort-Object -Unique | Measure-Object | Select-Object -ExpandProperty Count
+if ($roleCount -ne 4) {
+    throw "PostgreSQL 管理员、所有者、应用和维护角色必须互不相同。"
 }
 if ($BootstrapToken.Length -lt 24 -or $BootstrapToken.Length -gt 512 -or $BootstrapToken -notmatch '^[A-Za-z0-9._~!@%+=:-]+$') {
     throw "首次部署令牌必须为 24-512 位，且只能使用字母、数字和 . _ ~ ! @ % + = : -，避免 .env 转义歧义。"
@@ -391,9 +462,6 @@ if ($WebPort -lt 1 -or $WebPort -gt 65535 -or
     throw "HTTP/HTTPS 端口必须在 1-65535 之间且不能相同。"
 }
 
-$resolvedEnvironmentFile = [System.IO.Path]::GetFullPath($EnvironmentFile)
-$environmentRoot = Assert-SafeDirectoryPath (Split-Path -Parent $resolvedEnvironmentFile) "容器环境目录"
-Assert-SafeManagedFilePath $resolvedEnvironmentFile "容器环境文件"
 $containerSubnetWasProvided = -not [string]::IsNullOrWhiteSpace($ContainerSubnet)
 $reverseProxyIpWasProvided = -not [string]::IsNullOrWhiteSpace($ReverseProxyIp)
 $networkWasReused = $false
@@ -523,8 +591,13 @@ $settings | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $settingsPath -En
 $relativeRuntimeRoot = [System.IO.Path]::GetRelativePath($PSScriptRoot, $resolvedRuntimeRoot).Replace("\", "/")
 $envLines = @(
     "POSTGRES_DB=$PostgreSqlDatabase",
-    "POSTGRES_USER=$PostgreSqlUsername",
+    "POSTGRES_USER=$PostgreSqlAdministratorUsername",
     "POSTGRES_PASSWORD=$PostgreSqlPassword",
+    "EXPORTDOCMANAGER_POSTGRES_APP_USER=$PostgreSqlUsername",
+    "EXPORTDOCMANAGER_POSTGRES_APP_PASSWORD=$PostgreSqlApplicationPassword",
+    "EXPORTDOCMANAGER_POSTGRES_OWNER_ROLE=$PostgreSqlOwnerRole",
+    "EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_USER=$PostgreSqlMaintenanceUsername",
+    "EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_PASSWORD=$PostgreSqlMaintenancePassword",
     "EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=$BootstrapToken",
     "EXPORTDOCMANAGER_WEB_PORT=$WebPort",
     "EXPORTDOCMANAGER_WEB_BIND_ADDRESS=$WebBindAddress",

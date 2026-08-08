@@ -15,16 +15,13 @@ namespace ExportDocManager.DataAccess
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
 
-            string passwordFile = Environment.GetEnvironmentVariable(PasswordFileEnvironmentVariable);
-            if (!string.IsNullOrWhiteSpace(passwordFile))
+            string environmentSecret = ResolveEnvironmentSecret(
+                PasswordEnvironmentVariable,
+                PasswordFileEnvironmentVariable,
+                pathProvider);
+            if (environmentSecret != null)
             {
-                return ReadPasswordFile(passwordFile.Trim(), pathProvider);
-            }
-
-            string environmentPassword = Environment.GetEnvironmentVariable(PasswordEnvironmentVariable);
-            if (environmentPassword != null)
-            {
-                return environmentPassword;
+                return environmentSecret;
             }
 
             if (string.IsNullOrEmpty(configuredValue))
@@ -43,7 +40,31 @@ namespace ExportDocManager.DataAccess
             return decrypted;
         }
 
-        private static string ReadPasswordFile(string configuredPath, IAppPathProvider pathProvider)
+        internal static string ResolveEnvironmentSecret(
+            string passwordEnvironmentVariable,
+            string passwordFileEnvironmentVariable,
+            IAppPathProvider pathProvider)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(passwordEnvironmentVariable);
+            ArgumentException.ThrowIfNullOrWhiteSpace(passwordFileEnvironmentVariable);
+            ArgumentNullException.ThrowIfNull(pathProvider);
+
+            string passwordFile = Environment.GetEnvironmentVariable(passwordFileEnvironmentVariable);
+            if (!string.IsNullOrWhiteSpace(passwordFile))
+            {
+                return ReadPasswordFile(
+                    passwordFile.Trim(),
+                    passwordFileEnvironmentVariable,
+                    pathProvider);
+            }
+
+            return Environment.GetEnvironmentVariable(passwordEnvironmentVariable);
+        }
+
+        private static string ReadPasswordFile(
+            string configuredPath,
+            string passwordFileEnvironmentVariable,
+            IAppPathProvider pathProvider)
         {
             bool relative = !Path.IsPathRooted(configuredPath);
             string path = relative
@@ -53,7 +74,7 @@ namespace ExportDocManager.DataAccess
             if (relative && !PathBoundaryHelper.IsWithinRoot(path, pathProvider.SecurityRoot))
             {
                 throw new ServiceValidationException(
-                    $"{PasswordFileEnvironmentVariable} 的相对路径必须位于运行数据 Security 目录内。");
+                    $"{passwordFileEnvironmentVariable} 的相对路径必须位于运行数据 Security 目录内。");
             }
             if (!File.Exists(path))
             {

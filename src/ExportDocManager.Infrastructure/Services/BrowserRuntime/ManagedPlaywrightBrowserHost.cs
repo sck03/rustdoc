@@ -19,6 +19,8 @@ namespace ExportDocManager.Services.BrowserRuntime
         private readonly IAppPathProvider _pathProvider;
         private readonly BrowserNavigationPolicy _navigationPolicy;
         private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
+        private readonly CancellationTokenSource _shutdownSource = new();
+        private readonly object _disposeSync = new();
         private IPlaywright _playwright;
         private IBrowser _browser;
         private Process _process;
@@ -29,7 +31,10 @@ namespace ExportDocManager.Services.BrowserRuntime
         private int _useCount;
         private int _activeOperations;
         private bool _recycleRequested;
+        private bool _stopping;
         private int _disposed;
+        private TaskCompletionSource<bool> _operationsDrained;
+        private Task _disposeTask;
 
         public ManagedPlaywrightBrowserHost(
             BrowserRuntimeManager runtime,
@@ -81,9 +86,17 @@ namespace ExportDocManager.Services.BrowserRuntime
         {
             ArgumentNullException.ThrowIfNull(operation);
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-            await using var workloadLease = await _runtime.AcquireAsync(workload, cancellationToken).ConfigureAwait(false);
+            using var acquireCts = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                _shutdownSource.Token);
+            await using var workloadLease = await _runtime
+                .AcquireAsync(workload, acquireCts.Token)
+                .ConfigureAwait(false);
             using var timeoutCts = new CancellationTokenSource(timeout);
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                timeoutCts.Token,
+                _shutdownSource.Token);
 
             IBrowserContext context = null;
             IPage page = null;
@@ -111,6 +124,15 @@ namespace ExportDocManager.Services.BrowserRuntime
                     .ConfigureAwait(false);
                 Interlocked.Increment(ref _useCount);
                 return result;
+            }
+            catch (OperationCanceledException) when (
+                _shutdownSource.IsCancellationRequested &&
+                !cancellationToken.IsCancellationRequested)
+            {
+                recycleBrowser = true;
+                throw new ObjectDisposedException(
+                    nameof(ManagedPlaywrightBrowserHost),
+                    "受控浏览器正在停止，当前任务已取消。");
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
             {
@@ -148,6 +170,9 @@ namespace ExportDocManager.Services.BrowserRuntime
             await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
+                ObjectDisposedException.ThrowIf(
+                    _stopping || Volatile.Read(ref _disposed) != 0,
+                    this);
                 if (_activeOperations == 0 && (_recycleRequested || ShouldRecycle()))
                 {
                     await StopBrowserCoreAsync().ConfigureAwait(false);
@@ -176,6 +201,7 @@ namespace ExportDocManager.Services.BrowserRuntime
 
         private async Task EndOperationAsync(bool requestRecycle)
         {
+            bool drained = false;
             await _lifecycleGate.WaitAsync().ConfigureAwait(false);
             try
             {
@@ -186,10 +212,16 @@ namespace ExportDocManager.Services.BrowserRuntime
                     await StopBrowserCoreAsync().ConfigureAwait(false);
                     _recycleRequested = false;
                 }
+                drained = _activeOperations == 0;
             }
             finally
             {
                 _lifecycleGate.Release();
+            }
+
+            if (drained)
+            {
+                _operationsDrained?.TrySetResult(true);
             }
         }
 
@@ -258,7 +290,8 @@ namespace ExportDocManager.Services.BrowserRuntime
                     UseShellExecute = false,
                     RedirectStandardError = true,
                     RedirectStandardOutput = true,
-                    CreateNoWindow = true
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.GetDirectoryName(executable)!
                 },
                 EnableRaisingEvents = true
             };
@@ -279,10 +312,13 @@ namespace ExportDocManager.Services.BrowserRuntime
             process.Exited += (_, _) => endpointSource.TrySetException(
                 new InfrastructureServiceException("受控 Chromium 在建立连接前退出。"));
             if (!process.Start()) throw new InfrastructureServiceException("无法启动受控 Chromium 进程。");
-            process.BeginErrorReadLine();
-            process.BeginOutputReadLine();
             _process = process;
             _registration = _runtime.RegisterOwnedProcess(process, workload, "Managed Chromium browser");
+            // Register ownership before starting asynchronous pipe readers. If
+            // reader initialization fails, StopBrowserCoreAsync can still find
+            // and terminate the exact process tree that was started here.
+            process.BeginErrorReadLine();
+            process.BeginOutputReadLine();
             string endpoint = await endpointSource.Task.WaitAsync(startupTimeout, cancellationToken).ConfigureAwait(false);
             _playwright = await Playwright.CreateAsync()
                 .WaitAsync(startupTimeout, cancellationToken)
@@ -417,13 +453,6 @@ namespace ExportDocManager.Services.BrowserRuntime
             return Volatile.Read(ref _useCount) >= maxUses || DateTimeOffset.Now - _startedAt >= TimeSpan.FromMinutes(maxMinutes);
         }
 
-        private async Task InvalidateAsync()
-        {
-            await _lifecycleGate.WaitAsync().ConfigureAwait(false);
-            try { await StopBrowserCoreAsync().ConfigureAwait(false); }
-            finally { _lifecycleGate.Release(); }
-        }
-
         private void CleanupStaleProfiles()
         {
             try
@@ -527,10 +556,77 @@ namespace ExportDocManager.Services.BrowserRuntime
             }
         }
 
-        public async ValueTask DisposeAsync()
+        public ValueTask DisposeAsync()
         {
-            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-            await InvalidateAsync().ConfigureAwait(false);
+            lock (_disposeSync)
+            {
+                _disposeTask ??= DisposeCoreAsync();
+                return new ValueTask(_disposeTask);
+            }
+        }
+
+        private async Task DisposeCoreAsync()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
+            _shutdownSource.Cancel();
+            Task operationsDrained;
+            await _lifecycleGate.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                _stopping = true;
+                if (_activeOperations == 0)
+                {
+                    operationsDrained = Task.CompletedTask;
+                }
+                else
+                {
+                    _operationsDrained ??= new TaskCompletionSource<bool>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    operationsDrained = _operationsDrained.Task;
+                }
+            }
+            finally
+            {
+                _lifecycleGate.Release();
+            }
+
+            try
+            {
+                await operationsDrained.WaitAsync(BrowserShutdownTimeout).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                await _lifecycleGate.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    await StopBrowserCoreAsync().ConfigureAwait(false);
+                }
+                finally
+                {
+                    _lifecycleGate.Release();
+                }
+
+                // ExecuteAsync links every page operation to _shutdownSource and
+                // bounds page/context cleanup, so force-stopping the process lets
+                // the remaining finally blocks drain without abandoning the gate.
+                await operationsDrained.ConfigureAwait(false);
+            }
+
+            await _lifecycleGate.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                await StopBrowserCoreAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                _lifecycleGate.Release();
+            }
+
+            _shutdownSource.Dispose();
             _lifecycleGate.Dispose();
         }
 

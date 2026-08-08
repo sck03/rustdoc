@@ -86,35 +86,70 @@ public sealed class ServerMigrationService : IServerMigrationService
             throw new ResourceConflictException("已有服务器迁移任务等待重启执行。请先完成恢复。");
         }
 
-        using FileStream migrationLock = ServerMigrationManager.AcquireExclusiveLock(_pathProvider);
         await MigrationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        string workingRoot = Path.Combine(_pathProvider.CacheRoot, "ServerMigration", Guid.NewGuid().ToString("N"));
-        string payloadPath = Path.Combine(workingRoot, "payload.zip");
+        string workingRoot = string.Empty;
+        string payloadPath = string.Empty;
         string packageId = Guid.NewGuid().ToString("N");
-        string packagePath = Path.Combine(
-            PackageRoot,
-            $"server-migration-{DateTime.Now:yyyyMMdd-HHmmss}-{packageId[..8]}{ServerMigrationLayout.PackageExtension}");
-        Directory.CreateDirectory(workingRoot);
-        RuntimeFilePermissionHelper.RestrictDirectory(workingRoot);
-        ServerMigrationSecurityAudit.Write(_pathProvider, "create-package", requestContext, packageId, null, "开始创建服务器迁移包。");
+        string packagePath = string.Empty;
         try
         {
-            ServerMigrationPackageResult result = await _packageGenerator
-                .CreateAsync(password, packageId, packagePath, workingRoot, payloadPath, cancellationToken)
-                .ConfigureAwait(false);
-            ServerMigrationSecurityAudit.Write(_pathProvider, "create-package", requestContext, packageId, true, "服务器迁移包创建成功。");
-            return result;
-        }
-        catch (Exception ex)
-        {
-            AtomicFileHelper.TryDeleteFile(packagePath);
-            ServerMigrationSecurityAudit.Write(_pathProvider, "create-package", requestContext, packageId, false, ex.Message);
-            throw;
+            using FileStream migrationLock = ServerMigrationManager.AcquireExclusiveLock(_pathProvider);
+            if (ServerMigrationManager.HasPendingRestore(_pathProvider))
+            {
+                throw new ResourceConflictException("已有服务器迁移任务等待重启执行。请先完成恢复。");
+            }
+
+            workingRoot = Path.Combine(
+                _pathProvider.CacheRoot,
+                "ServerMigration",
+                Guid.NewGuid().ToString("N"));
+            payloadPath = Path.Combine(workingRoot, "payload.zip");
+            packagePath = Path.Combine(
+                PackageRoot,
+                $"server-migration-{DateTime.Now:yyyyMMdd-HHmmss}-{packageId[..8]}{ServerMigrationLayout.PackageExtension}");
+            Directory.CreateDirectory(workingRoot);
+            RuntimeFilePermissionHelper.RestrictDirectory(workingRoot);
+            ServerMigrationSecurityAudit.Write(
+                _pathProvider,
+                "create-package",
+                requestContext,
+                packageId,
+                null,
+                "开始创建服务器迁移包。");
+            try
+            {
+                ServerMigrationPackageResult result = await _packageGenerator
+                    .CreateAsync(password, packageId, packagePath, workingRoot, payloadPath, cancellationToken)
+                    .ConfigureAwait(false);
+                ServerMigrationSecurityAudit.Write(
+                    _pathProvider,
+                    "create-package",
+                    requestContext,
+                    packageId,
+                    true,
+                    "服务器迁移包创建成功。");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                AtomicFileHelper.TryDeleteFile(packagePath);
+                TryWriteSecurityAudit(
+                    _pathProvider,
+                    "create-package",
+                    requestContext,
+                    packageId,
+                    false,
+                    ex.Message);
+                throw;
+            }
         }
         finally
         {
             MigrationGate.Release();
-            AtomicFileHelper.TryDeleteDirectory(workingRoot);
+            if (!string.IsNullOrWhiteSpace(workingRoot))
+            {
+                AtomicFileHelper.TryDeleteDirectory(workingRoot);
+            }
         }
     }
 
@@ -212,7 +247,7 @@ public sealed class ServerMigrationService : IServerMigrationService
                 RemoteAddress = requestContext.RemoteAddress?.Trim() ?? string.Empty,
                 Manifest = manifest
             });
-            ServerMigrationSecurityAudit.Write(_pathProvider, "stage-full-restore", requestContext, manifest.PackageId, true, "服务器迁移恢复已排队。");
+            TryWriteSecurityAudit(_pathProvider, "stage-full-restore", requestContext, manifest.PackageId, true, "服务器迁移恢复已排队。");
             return new ServerMigrationRestoreResult(true, true, "服务器迁移已安全排队。请重启 API 服务；恢复会在建立数据库连接前执行。", fileName, ServerMigrationManager.GetSafetyBackupRoot(_pathProvider, manifest.PackageId), ServerMigrationLayout.StoragePolicy);
         }
         catch (Exception ex)
@@ -221,7 +256,7 @@ public sealed class ServerMigrationService : IServerMigrationService
             {
                 AtomicFileHelper.TryDeleteDirectory(Path.Combine(ServerMigrationManager.GetControlRoot(_pathProvider), stagingDirectoryName));
             }
-            ServerMigrationSecurityAudit.Write(_pathProvider, "stage-full-restore", requestContext, packageId, false, ex.Message);
+            TryWriteSecurityAudit(_pathProvider, "stage-full-restore", requestContext, packageId, false, ex.Message);
             throw;
         }
         finally
@@ -289,6 +324,8 @@ public sealed class ServerMigrationService : IServerMigrationService
                 PackageId = packageId,
                 CreatedAtUtc = DateTimeOffset.UtcNow,
                 SourceDataRoot = _pathProvider.DataRoot,
+                SourcePlatform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "linux",
+                SourcePathCaseSensitive = !OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS(),
                 Files =
                 [
                     new ServerMigrationFileManifest
@@ -313,13 +350,13 @@ public sealed class ServerMigrationService : IServerMigrationService
                 RemoteAddress = requestContext.RemoteAddress?.Trim() ?? string.Empty,
                 Manifest = manifest
             });
-            ServerMigrationSecurityAudit.Write(_pathProvider, "stage-database-restore", requestContext, packageId, true, "PostgreSQL 数据库恢复已排队。");
+            TryWriteSecurityAudit(_pathProvider, "stage-database-restore", requestContext, packageId, true, "PostgreSQL 数据库恢复已排队。");
             return new ServerMigrationRestoreResult(true, true, "PostgreSQL 数据库恢复已排队。请重启 API 服务；恢复会在建立数据库连接前执行。", fileName, ServerMigrationManager.GetSafetyBackupRoot(_pathProvider, packageId), ServerMigrationLayout.StoragePolicy);
         }
         catch (Exception ex)
         {
             if (!string.IsNullOrWhiteSpace(stagingDirectoryName)) AtomicFileHelper.TryDeleteDirectory(Path.Combine(ServerMigrationManager.GetControlRoot(_pathProvider), stagingDirectoryName));
-            ServerMigrationSecurityAudit.Write(_pathProvider, "stage-database-restore", requestContext, packageId, false, ex.Message);
+            TryWriteSecurityAudit(_pathProvider, "stage-database-restore", requestContext, packageId, false, ex.Message);
             throw;
         }
         finally
@@ -375,6 +412,31 @@ public sealed class ServerMigrationService : IServerMigrationService
 
     internal static Task CopyBoundedAsync(Stream source, string destination, long maximumBytes, CancellationToken cancellationToken) =>
         ServerMigrationPackageValidator.CopyBoundedAsync(source, destination, maximumBytes, cancellationToken);
+
+    private static void TryWriteSecurityAudit(
+        IAppPathProvider pathProvider,
+        string action,
+        ServerMigrationRequestContext requestContext,
+        string packageId,
+        bool? success,
+        string message)
+    {
+        try
+        {
+            ServerMigrationSecurityAudit.Write(
+                pathProvider,
+                action,
+                requestContext,
+                packageId,
+                success,
+                message);
+        }
+        catch
+        {
+            // Preserve the original migration failure. Audit storage errors are
+            // diagnosed separately and must not replace the actionable cause.
+        }
+    }
 
     internal static byte[] ParseConfiguredMasterKey(string configured)
     {

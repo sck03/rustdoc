@@ -51,6 +51,8 @@ namespace ExportDocManager.Services.Infrastructure
         public string PackageId { get; set; } = string.Empty;
         public DateTimeOffset CreatedAtUtc { get; set; }
         public string SourceDataRoot { get; set; } = string.Empty;
+        public string SourcePlatform { get; set; } = string.Empty;
+        public bool? SourcePathCaseSensitive { get; set; }
         public List<ServerMigrationFileManifest> Files { get; set; } = [];
     }
 
@@ -76,6 +78,8 @@ namespace ExportDocManager.Services.Infrastructure
         public string ValidationDatabaseName { get; set; } = string.Empty;
         public string LastError { get; set; } = string.Empty;
         public bool ManualRecoveryRequired { get; set; }
+        public string StatusMessage { get; set; } = string.Empty;
+        public string SafetyBackupRoot { get; set; } = string.Empty;
         public ServerMigrationManifest Manifest { get; set; } = new();
     }
 

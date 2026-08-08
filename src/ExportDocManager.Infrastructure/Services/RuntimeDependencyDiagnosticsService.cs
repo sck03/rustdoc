@@ -9,10 +9,20 @@ namespace ExportDocManager.Services.Infrastructure
     public sealed class RuntimeDependencyDiagnosticsService : IRuntimeDependencyDiagnosticsService
     {
         private readonly IAppPathProvider _pathProvider;
+        private readonly BrowserExecutableResolver _browserExecutableResolver;
 
         public RuntimeDependencyDiagnosticsService(IAppPathProvider pathProvider)
+            : this(pathProvider, new BrowserExecutableResolver(pathProvider))
+        {
+        }
+
+        public RuntimeDependencyDiagnosticsService(
+            IAppPathProvider pathProvider,
+            BrowserExecutableResolver browserExecutableResolver)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            _browserExecutableResolver = browserExecutableResolver ??
+                throw new ArgumentNullException(nameof(browserExecutableResolver));
         }
 
         public IReadOnlyList<RuntimeDependencyDiagnostic> Inspect()
@@ -30,7 +40,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             try
             {
-                string executablePath = new BrowserExecutableResolver(_pathProvider).Resolve();
+                string executablePath = _browserExecutableResolver.Resolve();
                 return new RuntimeDependencyDiagnostic(
                     "browser-automation",
                     "受控网页自动化",
@@ -57,7 +67,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             try
             {
-                string executablePath = new ChromiumHtmlToPdfService(_pathProvider).ResolveRendererExecutablePath();
+                string executablePath = _browserExecutableResolver.Resolve();
                 return new RuntimeDependencyDiagnostic(
                     "report-renderer",
                     "报表 PDF 浏览器",

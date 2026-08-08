@@ -17,6 +17,7 @@ import {
 import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { ServerDraftUpdateNotice, useServerDraftSync } from "../../ui/serverDraftSync.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { useModalDialog } from "../../ui/useModalDialog.ts";
@@ -87,14 +88,6 @@ export function SingleWindowReferenceCatalogPage({
     queryKey: queryKeys.singleWindowReferenceCatalog(),
     queryFn: ({ signal }) => client.getSingleWindowReferenceCatalog({ signal }),
   });
-
-  useEffect(() => {
-    if (catalogQuery.data) {
-      setDraft(normalizeCatalog(catalogQuery.data.catalog));
-      setHasUnsavedChanges(false);
-      setMessage(null);
-    }
-  }, [catalogQuery.data]);
 
   useEffect(() => {
     if (catalogQuery.isError) {
@@ -197,6 +190,17 @@ export function SingleWindowReferenceCatalogPage({
   const isBusy = excelWorkspace.isBusy;
   const validationErrors = draft ? validateCatalog(draft) : [];
   const canSave = canManageReferenceCatalog && Boolean(draft) && validationErrors.length === 0 && !isBusy;
+  const serverDraftSync = useServerDraftSync({
+    resourceKey: "single-window-reference-catalog",
+    incomingValue: catalogQuery.data?.catalog,
+    isDirty: canManageReferenceCatalog && hasUnsavedChanges,
+    fingerprint: buildReferenceCatalogSnapshot,
+    applyIncoming: (serverCatalog) => {
+      setDraft(normalizeCatalog(serverCatalog));
+      setHasUnsavedChanges(false);
+      setMessage(null);
+    },
+  });
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: canManageReferenceCatalog && hasUnsavedChanges,
     message: "当前单一窗口参考词典有未保存的修改。",
@@ -550,6 +554,11 @@ export function SingleWindowReferenceCatalogPage({
 
       {!canManageReferenceCatalog ? <InlineNotice tone="info">当前账号只能查看申报词典，编辑和导入需要 Operate 权限。</InlineNotice> : null}
       {message ? <InlineNotice tone="error" title="参考词典操作失败">{message}</InlineNotice> : null}
+      {serverDraftSync.hasPendingServerVersion ? <ServerDraftUpdateNotice
+        entityLabel="单一窗口参考词典"
+        onKeepLocal={serverDraftSync.keepLocalDraft}
+        onLoadServer={serverDraftSync.loadServerVersion}
+      /> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {validationErrors.length > 0 ? <InlineNotice tone="warning" title="请检查待导入数据">{validationErrors.slice(0, 4).join("；")}</InlineNotice> : null}
 
@@ -843,6 +852,10 @@ export function SingleWindowReferenceCatalogPage({
       ) : null}
     </section>
   );
+}
+
+function buildReferenceCatalogSnapshot(catalog: SingleWindowReferenceCatalogModel) {
+  return JSON.stringify(normalizeCatalog(catalog));
 }
 
 function resolveCatalogCellPosition(target: EventTarget | null): CatalogCellPosition | null {

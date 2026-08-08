@@ -9,6 +9,7 @@ import { FieldShell, SelectField, TextAreaField, TextField } from "../../ui/Form
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { ServerDraftUpdateNotice, useServerDraftSync } from "../../ui/serverDraftSync.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { SingleWindowHandoffPanel } from "./SingleWindowHandoffPanel.tsx";
@@ -92,15 +93,6 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
     queryFn: ({ signal }) => client.getSingleWindowReferenceCatalog({ signal }),
     staleTime: 5 * 60 * 1000,
   });
-
-  useEffect(() => {
-    if (documentQuery.data) {
-      setDocument(documentQuery.data);
-      setPersistedDocumentSnapshot(buildAgentConsignmentDocumentSnapshot(documentQuery.data, parsedInvoiceId));
-      setUndoDocument(null);
-      setMessage(null);
-    }
-  }, [documentQuery.data, parsedInvoiceId]);
 
   const buildDefaultsMutation = useMutation({
     mutationFn: (_snapshot: ApiAgentConsignmentDocumentDto) => client.buildAgentConsignmentDefaults({ invoiceId: parsedInvoiceId }),
@@ -284,6 +276,18 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
       currentDocumentSnapshot &&
       currentDocumentSnapshot !== persistedDocumentSnapshot,
   );
+  const serverDraftSync = useServerDraftSync({
+    resourceKey: parsedInvoiceId,
+    incomingValue: documentQuery.data,
+    isDirty: hasUnsavedDocumentChanges,
+    fingerprint: (serverDocument) => buildAgentConsignmentDocumentSnapshot(serverDocument, parsedInvoiceId),
+    applyIncoming: (serverDocument) => {
+      setDocument(serverDocument);
+      setPersistedDocumentSnapshot(buildAgentConsignmentDocumentSnapshot(serverDocument, parsedInvoiceId));
+      setUndoDocument(null);
+      setMessage(null);
+    },
+  });
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: hasUnsavedDocumentChanges,
     message: "当前代理委托草稿有未保存的修改。",
@@ -464,6 +468,11 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
       />
 
       {loadMessage || message ? <InlineNotice tone="error" title="代理委托操作未完成">{loadMessage || message}</InlineNotice> : null}
+      {serverDraftSync.hasPendingServerVersion ? <ServerDraftUpdateNotice
+        entityLabel="代理委托草稿"
+        onKeepLocal={serverDraftSync.keepLocalDraft}
+        onLoadServer={serverDraftSync.loadServerVersion}
+      /> : null}
       {referenceMessage ? <InlineNotice tone="warning" title="候选资料未完整加载">报关代理委托候选项加载失败：{referenceMessage}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {!permission.canOperate ? <PermissionNotice>当前权限模板仅允许查看单一窗口草稿和预检结果；修改、修复、保存与交接操作已禁用。</PermissionNotice> : null}

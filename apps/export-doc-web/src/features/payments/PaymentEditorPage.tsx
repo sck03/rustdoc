@@ -8,6 +8,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { isConcurrencyConflict, normalizeText, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { ServerDraftUpdateNotice, useServerDraftSync } from "../../ui/serverDraftSync.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ConcurrencyConflictNotice, InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import {
@@ -82,17 +83,6 @@ export function PaymentEditorPage({
       setSuccessMessage(null);
     }
   }, [isNew, isPaymentIdValid, parsedPaymentId]);
-
-  useEffect(() => {
-    if (!isNew && paymentQuery.data) {
-      setPayment(paymentQuery.data);
-      setPersistedPaymentSnapshot(buildPaymentSnapshot(paymentQuery.data, parsedPaymentId));
-      setMessage(null);
-      if (routeSuccessMessage && !successMessage) {
-        setSuccessMessage(routeSuccessMessage);
-      }
-    }
-  }, [paymentQuery.data, isNew, routeSuccessMessage, successMessage]);
 
   useEffect(() => {
     if (!isNew && paymentQuery.isError) {
@@ -183,6 +173,20 @@ export function PaymentEditorPage({
       currentPaymentSnapshot &&
       currentPaymentSnapshot !== persistedPaymentSnapshot,
   );
+  const serverDraftSync = useServerDraftSync({
+    resourceKey: isNew ? "new" : parsedPaymentId,
+    incomingValue: isNew ? null : paymentQuery.data,
+    isDirty: hasUnsavedPaymentChanges,
+    fingerprint: (serverPayment) => buildPaymentSnapshot(serverPayment, parsedPaymentId),
+    applyIncoming: (serverPayment) => {
+      setPayment(serverPayment);
+      setPersistedPaymentSnapshot(buildPaymentSnapshot(serverPayment, parsedPaymentId));
+      setMessage(null);
+      if (routeSuccessMessage && !successMessage) {
+        setSuccessMessage(routeSuccessMessage);
+      }
+    },
+  });
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: hasUnsavedPaymentChanges,
     message: "当前付款/报销记录有未保存的修改。",
@@ -321,6 +325,11 @@ export function PaymentEditorPage({
       </div>
 
       {concurrencyMessage ? <ConcurrencyConflictNotice message={concurrencyMessage} isBusy={paymentQuery.isFetching} onReload={() => void handleReloadLatestPayment()} /> : null}
+      {serverDraftSync.hasPendingServerVersion ? <ServerDraftUpdateNotice
+        entityLabel="付款记录"
+        onKeepLocal={serverDraftSync.keepLocalDraft}
+        onLoadServer={serverDraftSync.loadServerVersion}
+      /> : null}
       {message ? <InlineNotice tone="error" title="操作未完成">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {!paymentPermission.canOperate ? (

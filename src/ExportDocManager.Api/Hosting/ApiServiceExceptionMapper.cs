@@ -46,6 +46,13 @@ internal static class ApiServiceExceptionMapper
             return (StatusCodes.Status404NotFound, FindNotFoundMessage(exception));
         }
 
+        if (Enumerate(exception).Any(current => current is UnauthorizedAccessException))
+        {
+            return (
+                StatusCodes.Status503ServiceUnavailable,
+                "运行目录或依赖资源暂时不可访问，请联系管理员检查权限。");
+        }
+
         // An infrastructure failure can be wrapped by an outer service/operation
         // exception. Preserve the transport contract (503) instead of allowing
         // the outer InvalidOperation/Conflict category to misreport a database,
@@ -89,8 +96,8 @@ internal static class ApiServiceExceptionMapper
                 (StatusCodes.Status409Conflict, conflict.Message),
             InfrastructureServiceException infrastructure =>
                 (StatusCodes.Status503ServiceUnavailable, infrastructure.Message),
-            UnauthorizedAccessException unauthorized =>
-                (StatusCodes.Status403Forbidden, unauthorized.Message),
+            UnauthorizedAccessException =>
+                (StatusCodes.Status503ServiceUnavailable, "运行目录或依赖资源暂时不可访问，请联系管理员检查权限。"),
             FileNotFoundException or DirectoryNotFoundException =>
                 (StatusCodes.Status404NotFound, exception.Message),
             KeyNotFoundException missing =>
@@ -117,7 +124,7 @@ internal static class ApiServiceExceptionMapper
         foreach (Exception current in Enumerate(exception))
         {
             if (current is DbException or TimeoutException or HttpRequestException or
-                SocketException or Win32Exception or
+                SocketException or Win32Exception or UnauthorizedAccessException or
                 (IOException and not FileNotFoundException and not DirectoryNotFoundException))
             {
                 return true;

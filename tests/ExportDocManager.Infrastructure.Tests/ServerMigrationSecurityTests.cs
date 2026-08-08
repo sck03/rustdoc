@@ -12,6 +12,43 @@ namespace ExportDocManager.Infrastructure.Tests;
 public sealed class ServerMigrationSecurityTests
 {
     [Fact]
+    public void SecurityAudit_ShouldRotateOversizedJsonLinesLogInsideDataRoot()
+    {
+        string root = CreateTestRoot("security-audit-rotation");
+        try
+        {
+            string appRoot = Path.Combine(root, "app");
+            string dataRoot = Path.Combine(root, "data");
+            Directory.CreateDirectory(appRoot);
+            Directory.CreateDirectory(dataRoot);
+            var paths = new RuntimeAppPathProvider(appRoot, dataRoot);
+            string auditRoot = Path.Combine(paths.LogRoot, "Security");
+            Directory.CreateDirectory(auditRoot);
+            string auditPath = Path.Combine(auditRoot, "server-migration.jsonl");
+            File.WriteAllBytes(auditPath, new byte[8 * 1024 * 1024 + 1]);
+
+            ServerMigrationSecurityAudit.Write(
+                paths,
+                "rotation-test",
+                new ServerMigrationRequestContext("tester", "127.0.0.1"),
+                "package-1",
+                success: true,
+                "completed");
+
+            string archivePath = Path.Combine(auditRoot, "server-migration.1.jsonl");
+            Assert.True(File.Exists(archivePath));
+            Assert.Equal(8 * 1024 * 1024 + 1, new FileInfo(archivePath).Length);
+            string current = File.ReadAllText(auditPath);
+            Assert.Contains("\"action\":\"rotation-test\"", current, StringComparison.Ordinal);
+            Assert.EndsWith(Environment.NewLine, current, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public void StorageBudget_ShouldUseActualPayloadSizesAndASmallSafetyMargin()
     {
         long budget = ServerMigrationStorageBudget.WithSafetyMargin(1_024, 2_048);
@@ -207,6 +244,34 @@ public sealed class ServerMigrationSecurityTests
                 "/srv/exportdoc/App_Data",
                 @"D:\ExportDoc\App_Data",
                 '\\'));
+
+        Assert.Equal(
+            "/srv/exportdoc/App_Data/Marks/mark.png",
+            ServerMigrationPathRewriter.RewriteManagedPath(
+                "/users/bridge/app_data/Marks/mark.png",
+                "/Users/bridge/App_Data",
+                "/srv/exportdoc/App_Data",
+                '/'));
+    }
+
+    [Theory]
+    [InlineData("/var/lib/exportdoc/file.bin", "/", "/srv/runtime", '/', "/srv/runtime/var/lib/exportdoc/file.bin")]
+    [InlineData(@"C:\data\file.bin", @"C:\", @"D:\", '\\', @"D:\data\file.bin")]
+    [InlineData(@"\\server\share\folder\file.bin", @"\\server\share\", @"D:\Data\", '\\', @"D:\Data\folder\file.bin")]
+    public void RewriteManagedPath_ShouldPreservePlatformRootSemantics(
+        string value,
+        string sourceRoot,
+        string targetRoot,
+        char separator,
+        string expected)
+    {
+        Assert.Equal(
+            expected,
+            ServerMigrationPathRewriter.RewriteManagedPath(
+                value,
+                sourceRoot,
+                targetRoot,
+                separator));
     }
 
     [Fact]

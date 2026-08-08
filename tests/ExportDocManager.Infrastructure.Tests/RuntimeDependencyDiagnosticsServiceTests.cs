@@ -1,4 +1,5 @@
 using ExportDocManager.Services;
+using ExportDocManager.Services.BrowserRuntime;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Tools;
@@ -14,7 +15,10 @@ namespace ExportDocManager.Infrastructure.Tests
             string root = Path.Combine(AppContext.BaseDirectory, "runtime-dependency-tests", Guid.NewGuid().ToString("N"));
             string appRoot = Path.Combine(root, "app");
             string dataRoot = Path.Combine(root, "data");
-            string browserPath = Path.Combine(appRoot, "Browsers", "chrome-headless-shell.exe");
+            string browserPath = Path.Combine(
+                appRoot,
+                "Browsers",
+                OperatingSystem.IsWindows() ? "chrome-headless-shell.exe" : "chrome-headless-shell");
             string modelRoot = Path.Combine(appRoot, "OcrModels", "PaddleOCR", "V6");
             string postgreSqlBin = Path.Combine(appRoot, "Tools", "PostgreSQL", "bin");
             string previousBrowser = Environment.GetEnvironmentVariable(ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable);
@@ -27,8 +31,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 Environment.SetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME", null);
                 Environment.SetEnvironmentVariable(PostgreSqlToolLocator.BinRootEnvironmentVariable, null);
 
-                Directory.CreateDirectory(Path.GetDirectoryName(browserPath)!);
-                File.WriteAllText(browserPath, string.Empty);
+                WriteHeadlessShellBundle(browserPath);
                 WriteOcrModelBundle(modelRoot);
                 string ocrSidecar = Path.Combine(appRoot, "sidecar", "ocr", OperatingSystem.IsWindows() ? "exportdoc-ocr.exe" : "exportdoc-ocr");
                 Directory.CreateDirectory(Path.GetDirectoryName(ocrSidecar)!);
@@ -37,7 +40,10 @@ namespace ExportDocManager.Infrastructure.Tests
                 File.WriteAllText(Path.Combine(postgreSqlBin, OperatingSystem.IsWindows() ? "pg_dump.exe" : "pg_dump"), string.Empty);
 
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
-                var diagnostics = new RuntimeDependencyDiagnosticsService(pathProvider).Inspect();
+                var browserResolver = new BrowserExecutableResolver(pathProvider, _ => { });
+                var diagnostics = new RuntimeDependencyDiagnosticsService(
+                    pathProvider,
+                    browserResolver).Inspect();
 
                 var renderer = Assert.Single(diagnostics, item => item.Key == "report-renderer");
                 Assert.True(renderer.Ready);
@@ -88,6 +94,33 @@ namespace ExportDocManager.Infrastructure.Tests
             File.WriteAllText(Path.Combine(detRoot, "inference.yml"), "detector: true");
             File.WriteAllText(Path.Combine(recRoot, "inference.onnx"), "model");
             File.WriteAllText(Path.Combine(recRoot, "inference.yml"), "character_dict:\n  - A\n  - B\n");
+        }
+
+        private static void WriteHeadlessShellBundle(string executablePath)
+        {
+            string root = Path.GetDirectoryName(executablePath)!;
+            Directory.CreateDirectory(root);
+            File.WriteAllText(executablePath, "test-browser");
+            foreach (string fileName in new[]
+            {
+                "icudtl.dat",
+                "v8_context_snapshot.bin",
+                "headless_lib_data.pak",
+                "headless_lib_strings.pak"
+            })
+            {
+                File.WriteAllText(Path.Combine(root, fileName), "test-resource");
+            }
+
+            string localesRoot = Path.Combine(root, "locales");
+            Directory.CreateDirectory(localesRoot);
+            File.WriteAllText(Path.Combine(localesRoot, "en-US.pak"), "test-locale");
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(
+                    executablePath,
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            }
         }
     }
 }

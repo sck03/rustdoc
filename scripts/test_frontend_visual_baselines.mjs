@@ -9,6 +9,7 @@ import { captureScreenshot, createPageSession, evaluate, getFreePort, startChrom
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const webRoot = path.join(repositoryRoot, "apps", "export-doc-web");
 const webRequire = createRequire(path.join(webRoot, "package.json"));
+const viteCli = path.join(path.dirname(webRequire.resolve("vite/package.json")), "bin", "vite.js");
 const { default: pixelmatch } = await import(pathToFileURL(webRequire.resolve("pixelmatch")).href);
 const { PNG } = webRequire("pngjs");
 const outputRoot = path.join(repositoryRoot, "artifacts", "frontend-visual-baseline");
@@ -38,11 +39,15 @@ rmSync(profileRoot, { recursive: true, force: true });
 mkdirSync(profileRoot, { recursive: true });
 
 const port = await getFreePort();
-const viteCommand = process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : "npm";
-const viteArguments = process.platform === "win32"
-  ? ["/d", "/s", "/c", `npm run dev -- --port ${port} --strictPort`]
-  : ["run", "dev", "--", "--port", String(port), "--strictPort"];
-const vite = spawnProcessTree(viteCommand, viteArguments, {
+// Launch Vite directly through the current Node runtime. On Windows, spawning
+// `cmd /c npm run ...` allows the outer cmd process to exit while npm/Vite keep
+// running, which makes process-tree cleanup lose the real server descendants.
+const vite = spawnProcessTree(process.execPath, [
+  viteCli,
+  "--host", "127.0.0.1",
+  "--port", String(port),
+  "--strictPort",
+], {
   cwd: webRoot,
   stdio: ["ignore", "pipe", "pipe"],
   windowsHide: true,

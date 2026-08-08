@@ -2,6 +2,7 @@ using ClosedXML.Excel;
 using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -9,6 +10,7 @@ namespace ExportDocManager.Services.Infrastructure
     public sealed class QueryResultExportService : IQueryResultExportService
     {
         private const int ExportPageSize = 500;
+        private const int MaximumExportRows = 50000;
 
         private static readonly IReadOnlyList<(string Header, double Width)> ExportColumns =
         [
@@ -59,15 +61,23 @@ namespace ExportDocManager.Services.Infrastructure
             var firstPage = await _queryReadRepository.QueryPageAsync(
                 BuildExportPageQuery(query, 1),
                 cancellationToken);
+            if (firstPage.TotalCount > MaximumExportRows)
+            {
+                throw new ServiceValidationException(
+                    $"当前查询结果有 {firstPage.TotalCount:N0} 条，超过单次 Excel 导出上限 {MaximumExportRows:N0} 条。请增加日期、客户或单据条件后重试。");
+            }
 
             int exportedCount = 0;
             await AtomicFileHelper.WriteFileAtomicAsync(
                 destinationPath,
                 async (tempFilePath, ct) =>
                 {
-                    exportedCount = await Task.Run(
-                        () => WriteWorkbook(tempFilePath, query, firstPage, progress, ct),
-                        ct);
+                    exportedCount = await WriteWorkbook(
+                        tempFilePath,
+                        query,
+                        firstPage,
+                        progress,
+                        ct).ConfigureAwait(false);
                 },
                 cancellationToken);
 

@@ -71,6 +71,8 @@ sed -n 's/^EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=//p' \
 
 在登录页展开“高级连接选项”，填写启用令牌，以 `admin` 登录，并输入要设置的应用管理员密码。数据库密码、启用令牌和应用管理员密码不能复用。
 
+首次安装会在 `.env` 中保存三份互不相同的 PostgreSQL 登录密码，并由 `postgres-init-roles.sh` 建立四角色最小权限模型：`POSTGRES_USER` 是数据库容器初始化管理员；`exportdoc_owner` 是不可登录的数据库/schema owner；`exportdoc_app` 是 API 普通业务连接，只具备表 DML、序列和例程权限，明确无 DDL、无 `CREATEDB`；`exportdoc_maintenance` 是独立维护连接，具备 `CREATEDB` 并可切换 owner，只用于首次建表、结构初始化和数据库恢复。应用登录页中的 `admin` 是 ExportDocManager 业务管理员，不是 PostgreSQL 管理员。
+
 Private GHCR Package 使用只有 `read:packages` 权限的 token：
 
 ```bash
@@ -127,7 +129,7 @@ MODE=$(sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' .env)
 ./install-container.sh --mode "$MODE" --tag 0.1.3
 ```
 
-安装器会保留 `.env`、数据库、API DataRoot 和证书。安装根、运行根和关键子目录必须是真实非根目录，不能经过符号链接；部署根会收紧为 root `700`。新部署资产会先完整下载到安装目录内的临时 staging，逐项核对 `deployment-assets.sha256`，再校验安装器语法及 HTTP/HTTPS Compose 双模式后原子替换；锁文件、环境更新、资产激活和首次令牌标记均拒绝链接或使用 `mktemp`。Compose 校验、镜像拉取、证书申请、容器启动或就绪检查任一步失败时，会恢复旧 `.env`、旧部署文件和本次可能改写的 Let's Encrypt 状态，并用 `--force-recreate` 重新创建原 HTTP/HTTPS 容器，确保恢复后的证书目录和配置重新挂载。`--no-start` 成功时只保留已校验的新文件，不改变容器。
+安装器会保留 `.env`、数据库、API DataRoot 和证书。安装根、运行根和关键子目录必须是真实非根目录，不能经过符号链接；部署根会收紧为 root `700`。新部署资产会先完整下载到安装目录内的临时 staging，对两份 Compose、Nginx、`postgres-init-roles.sh` 和安装器自身五项资产逐项核对 `deployment-assets.sha256`，再校验安装器/角色脚本语法及 HTTP/HTTPS Compose 双模式后原子替换；锁文件、环境更新、资产激活和首次令牌标记均拒绝链接或使用 `mktemp`。Compose 校验、镜像拉取、证书申请、容器启动或就绪检查任一步失败时，会恢复旧 `.env`、旧部署文件和本次可能改写的 Let's Encrypt 状态，并用 `--force-recreate` 重新创建原 HTTP/HTTPS 容器，确保恢复后的证书目录和配置重新挂载。`--no-start` 成功时只保留已校验的新文件，不改变容器。
 
 ## 4. 数据库备份
 
@@ -214,7 +216,7 @@ find "$BACKUP_ROOT" -maxdepth 1 -type f \
 
 同一页面还可以输入强迁移密码创建加密 `.edmmigration` 完整迁移包，或上传迁移包并输入 `MIGRATE` 排队恢复。完整包包含数据库、应用运行配置、印章、唛头图片和其它业务文件、用户模板、单一窗口数据及本地主密钥；部署目录的 `.env` 不在 API 可见范围内，迁移时必须另外保留并按新服务器网络参数复核。完整包不包含日志、缓存、临时导出文件、历史备份、许可证、机器绑定试用数据，也不包含 `runtime/letsencrypt/` 中的 TLS/Certbot 证书。目标服务器若显式设置 `EXPORTDOCMANAGER_MASTER_KEY`，必须与源服务器一致，否则恢复会在覆盖数据库前中止。
 
-网页恢复会创建临时验证数据库，因此 API 使用的 PostgreSQL 账号必须具备 `CREATEDB`；默认 Compose 初始化账号满足该要求。数据库密码解析优先级为密码文件、环境变量、程序生成的 AES-GCM 受保护配置；Compose 默认通过仅保存在部署目录权限受限 `.env` 中的 `POSTGRES_PASSWORD` 注入环境变量。迁移到新服务器后，让安装器重新探测容器网段并重新签发 TLS 证书；如需保留原证书，应由部署管理员在 API 迁移包之外单独安全处理 `runtime/letsencrypt/`。
+网页恢复会创建临时验证数据库，因此由独立 `exportdoc_maintenance` 账号执行建库和恢复；该账号具备 `CREATEDB`，并可切换不可登录的 `exportdoc_owner` 重新归属数据库对象。普通 API 业务账号 `exportdoc_app` 保持 `NOCREATEDB` 且没有 DDL 权限。数据库密码解析优先级为密码文件、环境变量、程序生成的 AES-GCM 受保护配置；Compose 默认把 app 与 maintenance 的独立密码从部署目录权限受限 `.env` 注入 API 环境，初始化管理员密码不会用于普通 API 连接。迁移到新服务器后，让安装器重新探测容器网段并重新签发 TLS 证书；如需保留原证书，应由部署管理员在 API 迁移包之外单独安全处理 `runtime/letsencrypt/`。
 
 ## 5. 在当前服务器恢复数据库
 
@@ -521,6 +523,7 @@ PostgreSQL 18 容器数据位于 `/var/lib/postgresql/18/docker`，因此宿主 
 - `docker-compose.acme.yml`：一键 HTTPS 和自动续期；
 - `docker-compose.https.yml`：手工证书 overlay；
 - `deployment-assets.sha256`：安装器下载资产的 SHA-256 完整性清单；
+- `postgres-init-roles.sh`：全新 PostgreSQL volume 的四角色最小权限初始化脚本；
 - `initialize-container-runtime.ps1`：克隆仓库后的 PowerShell 初始化工具；Windows 可直接运行，Linux/macOS 需使用 `sudo pwsh` 以设置固定容器 UID/GID；可信 HTTP 开发环境需显式设置 `-WebBindAddress 0.0.0.0`，并按需增加 `-AllowHttpDisasterRecovery`；
 - `install-container.sh`：Linux VPS 正式安装、升级和恢复入口。
 

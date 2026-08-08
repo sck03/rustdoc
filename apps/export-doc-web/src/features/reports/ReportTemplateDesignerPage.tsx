@@ -13,12 +13,10 @@ import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
-import { hasReportDesignerSchema } from "../report-designer/reportDesignerTemplateParser.ts";
 import {
   getReportDesignerPreviewSampleProfiles,
   type ReportDesignerPreviewSampleProfile,
 } from "../report-designer/reportDesignerPreviewSamples.ts";
-import { formatReportTemplateSource } from "./reportTemplateFormatter.ts";
 import { ReportTemplatePackagePanel } from "./ReportTemplatePackagePanel.tsx";
 import { ReportTemplatePreviewWorkspace } from "./ReportTemplatePreviewWorkspace.tsx";
 import { ReportTemplateWorkspaceHeader } from "./ReportTemplateWorkspaceHeader.tsx";
@@ -40,7 +38,6 @@ import {
   buildNewTemplateFileName,
   buildUserTemplateKey,
   fileNameFromPath,
-  normalizePreviewSampleProfile,
   readPreferredPreviewSampleProfile,
   readPreviewSourceIdFromSearch,
   readReportTypeFromSearch,
@@ -52,6 +49,7 @@ import {
   type TemplatePreviewMode,
   type TemplateWorkspaceMode,
 } from "./reportTemplateDesignerModel.ts";
+import { useReportTemplateEditingActions } from "./useReportTemplateEditingActions.ts";
 
 export function ReportTemplateDesignerPage({
   apiBaseUrl: _apiBaseUrl,
@@ -512,6 +510,46 @@ export function ReportTemplateDesignerPage({
     message,
     messageType,
   });
+  const {
+    handleApplyNewReportDesignerContent,
+    handleDesignerModeChange,
+    handleFormatSource,
+    handleRenderTemplatePreview,
+    handleSaveNewReportDesignerContent,
+    handleTemplatePreviewModeChange,
+    handleTemplatePreviewSampleProfileChange,
+  } = useReportTemplateEditingActions({
+    canDesignTemplates,
+    canFormatSource,
+    canManageTemplates,
+    canRenderTemplatePreview,
+    content,
+    currentUserTemplateCanEdit: currentUserTemplate?.canEdit === true,
+    designerDraftContent,
+    designerMode,
+    isLimitedReportView,
+    isLocalSamplePreview,
+    isUserTemplate,
+    reportType,
+    selectedTemplateContentActive,
+    selectedTemplatePath,
+    templatePreviewMode,
+    workspaceHasUnappliedDesignerChanges,
+    renderInvoicePreview: () => invoicePreviewMutation.mutate(),
+    renderPaymentPreview: () => paymentPreviewMutation.mutate(),
+    renderSamplePreview: () => samplePreviewMutation.mutate(previewContent),
+    saveDefaultTemplateContent: (nextContent) => saveMutation.mutate(nextContent),
+    saveUserTemplateContent: (nextContent) => saveUserTemplateMutation.mutate(nextContent),
+    setContent,
+    setContentTemplatePath,
+    setDesignerMode,
+    setMessage,
+    setMessageType,
+    setPreview,
+    setTemplatePreviewMode,
+    setTemplatePreviewSampleProfile,
+    setWorkspaceMode,
+  });
 
   function handleCreateTemplate() {
     if (canCreateTemplate) {
@@ -571,132 +609,11 @@ export function ReportTemplateDesignerPage({
     }
   }
 
-  function handleDesignerModeChange(mode: DesignerMode) {
-    if (isLimitedReportView) {
-      return;
-    }
-    if (mode === designerMode) {
-      return;
-    }
-    if (designerMode === "new" && workspaceHasUnappliedDesignerChanges) {
-      setContent(designerDraftContent);
-      setContentTemplatePath(selectedTemplatePath);
-      setPreview(null);
-    }
-    setWorkspaceMode("design");
-    setDesignerMode(mode);
-  }
-
   async function handleRefreshTemplates() {
     if (!await confirmDiscardChanges("刷新报表模板")) {
       return;
     }
     await Promise.all([templatesQuery.refetch(), userTemplatesQuery.refetch()]);
-  }
-
-  async function handleApplyNewReportDesignerContent(nextContent: string) {
-    if (!selectedTemplatePath || !selectedTemplateContentActive || (isUserTemplate && !currentUserTemplate?.canEdit)) {
-      return;
-    }
-
-    if (!await confirmStructuredTemplateOverwrite()) {
-      return;
-    }
-
-    setContent(nextContent);
-    setContentTemplatePath(selectedTemplatePath);
-    setPreview(null);
-    setMessage("可视化设计内容已应用到模板，保存后写入模板文件。");
-    setMessageType("success");
-  }
-
-  async function handleSaveNewReportDesignerContent(nextContent: string) {
-    if (!selectedTemplatePath || !selectedTemplateContentActive) {
-      return;
-    }
-
-    if (isUserTemplate ? !canDesignTemplates || !currentUserTemplate?.canEdit : !canManageTemplates) {
-      setMessage("当前账号没有保存模板权限。");
-      setMessageType("error");
-      return;
-    }
-
-    if (!await confirmStructuredTemplateOverwrite()) {
-      return;
-    }
-
-    setContent(nextContent);
-    setContentTemplatePath(selectedTemplatePath);
-    setPreview(null);
-    setMessage(null);
-    setMessageType(null);
-    if (isUserTemplate) {
-      saveUserTemplateMutation.mutate(nextContent);
-    } else {
-      saveMutation.mutate(nextContent);
-    }
-  }
-
-  async function confirmStructuredTemplateOverwrite() {
-    if (!content.trim() || hasReportDesignerSchema(content)) {
-      return true;
-    }
-
-    return requestConfirmation({ title: "启用可视化设计结构", description: "当前模板尚未包含可视化设计结构。继续后将使用当前布局覆盖原有高级 HTML。", details: ["建议在转换前导出模板包备份。"], confirmLabel: "确认启用" });
-  }
-
-  function handleFormatSource() {
-    if (!canFormatSource) {
-      return;
-    }
-
-    const formatted = formatReportTemplateSource(content);
-    setContent(formatted);
-    setContentTemplatePath(selectedTemplatePath);
-    setPreview(null);
-    setMessage("高级 HTML 已格式化，保存后写入模板文件。");
-    setMessageType("success");
-  }
-
-  function handleTemplatePreviewModeChange(nextMode: TemplatePreviewMode) {
-    setTemplatePreviewMode(nextMode);
-    setWorkspaceMode("preview");
-    setPreview(null);
-    setMessage(null);
-    setMessageType(null);
-  }
-
-  function handleTemplatePreviewSampleProfileChange(value: string) {
-    setTemplatePreviewSampleProfile(normalizePreviewSampleProfile(value, reportType));
-    setPreview(null);
-    setMessage(null);
-    setMessageType(null);
-  }
-
-  function handleRenderTemplatePreview() {
-    if (!canRenderTemplatePreview) {
-      return;
-    }
-
-    setWorkspaceMode("preview");
-
-    if (templatePreviewMode === "sample") {
-      if (isLocalSamplePreview) {
-        setPreview(null);
-        setMessage(null);
-        setMessageType(null);
-        return;
-      }
-
-      samplePreviewMutation.mutate(previewContent);
-      return;
-    }
-
-    if (reportType === "PaymentVoucher") {
-      paymentPreviewMutation.mutate();
-    } else {
-      invoicePreviewMutation.mutate();
-    }
   }
 
   return (

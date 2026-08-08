@@ -55,6 +55,23 @@ public sealed class SharedDatabaseMaintenanceServiceTests
     }
 
     [Fact]
+    public void PostRestoreOwnershipSql_ShouldKeepOwnerAndRuntimeApplicationRolesSeparated()
+    {
+        string sql = SharedDatabaseMaintenanceService.BuildPostRestoreOwnershipSql(
+            "team_db",
+            "team_owner",
+            "team_app",
+            ["legacy_owner"]);
+
+        Assert.Contains("-- Owner role: team_owner", sql, StringComparison.Ordinal);
+        Assert.Contains("REASSIGN OWNED BY \"legacy_owner\" TO \"team_owner\"", sql, StringComparison.Ordinal);
+        Assert.Contains("ALTER DATABASE \"team_db\" OWNER TO \"team_owner\"", sql, StringComparison.Ordinal);
+        Assert.Contains("ALTER DEFAULT PRIVILEGES FOR ROLE \"team_owner\"", sql, StringComparison.Ordinal);
+        Assert.Contains("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"team_app\"", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("GRANT USAGE, CREATE ON SCHEMA public TO \"team_app\"", sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PostRestoreOwnershipSql_ShouldKeepCommentMetadataOnSingleCommentLines()
     {
         Assert.Throws<ServiceValidationException>(() =>

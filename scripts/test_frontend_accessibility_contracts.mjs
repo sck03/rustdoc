@@ -54,6 +54,38 @@ for (const file of walk(root)) {
     }
   }
 
+  if (new Set([
+    "features/invoices/InvoiceEditorPage.tsx",
+    "features/payments/PaymentEditorPage.tsx",
+    "features/master-data/MasterDataEditorPage.tsx",
+    "features/single-window/AgentConsignmentPage.tsx",
+    "features/single-window/CustomsCooPage.tsx",
+    "features/single-window/SingleWindowReferenceCatalogPage.tsx",
+  ]).has(sourceRelativePath) && !sourceText.includes("useServerDraftSync")) {
+    failures.push(`${sourceRelativePath}: 长表单必须使用 useServerDraftSync 防止服务器刷新静默覆盖本地草稿`);
+  }
+
+  if (new Set([
+    "features/settings/UserManagementPanel.tsx",
+    "features/settings/PermissionTemplateManagementPanel.tsx",
+  ]).has(sourceRelativePath) && !sourceText.includes("useUnsavedChangesGuard")) {
+    failures.push(`${sourceRelativePath}: 管理编辑页必须保护切换、刷新和浏览器导航时的未保存修改`);
+  }
+
+  if (sourceRelativePath === "ui/unsavedChangesGuard.tsx") {
+    for (const historyGuardContract of [
+      "popstate",
+      "history.state",
+      ".idx",
+      "history.go(",
+      "confirmEntryDiscardChanges",
+    ]) {
+      if (!sourceText.includes(historyGuardContract)) {
+        failures.push(`${sourceRelativePath}: HashRouter 后退/前进保护缺少 ${historyGuardContract}`);
+      }
+    }
+  }
+
   if (["ui/ConfirmationDialog.tsx", "features/invoices/InvoiceStatusReasonDialog.tsx"].includes(sourceRelativePath)) {
     if (!sourceText.includes("useModalDialog")) {
       failures.push(`${sourceRelativePath}: 模态框必须复用公共焦点循环、Escape 关闭和焦点恢复 Hook`);
@@ -257,6 +289,16 @@ for (const file of walk(root)) {
 }
 
 const responsiveCss = readCssImportGraph(path.join(root, "responsiveOverrides.css"));
+
+for (const scriptName of ["test_frontend_visual_baselines.mjs", "test_frontend_scale_contracts.mjs"]) {
+  const scriptSource = fs.readFileSync(path.resolve(import.meta.dirname, scriptName), "utf8");
+  if (!scriptSource.includes("spawnProcessTree(process.execPath") || !scriptSource.includes("viteCli,")) {
+    failures.push(`${scriptName}: Windows Vite 必须由当前 Node 直接运行 vite.js，以便可靠回收进程树`);
+  }
+  if (/spawnProcessTree\([^)]*(?:npm|cmd(?:\.exe)?)/su.test(scriptSource)) {
+    failures.push(`${scriptName}: 不得通过 cmd/npm 外层进程启动 Vite`);
+  }
+}
 for (const motionContract of [
   "@keyframes login-ambient-sweep",
   "@keyframes login-grid-drift",

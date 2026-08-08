@@ -23,6 +23,7 @@ namespace ExportDocManager.Api.Hosting
         private readonly Lock _lifecycleSync = new();
         private int _reservedJobs;
         private int _stopping;
+        private Task _shutdownTask;
 
         public ApiBackgroundJobRunner(
             ApiBackgroundJobService jobs,

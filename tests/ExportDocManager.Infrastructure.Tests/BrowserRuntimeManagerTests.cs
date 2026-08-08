@@ -67,6 +67,43 @@ namespace ExportDocManager.Infrastructure.Tests
             }
         }
 
+        [Fact]
+        public async Task DisposeAsync_ShouldCancelQueuedAcquireAndWaitForActiveLease()
+        {
+            string previousAutomation = Environment.GetEnvironmentVariable(
+                BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable);
+            Environment.SetEnvironmentVariable(
+                BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable,
+                "1");
+            try
+            {
+                var runtime = new BrowserRuntimeManager();
+                BrowserWorkloadLease activeLease = await runtime.AcquireAsync(
+                    BrowserWorkloadKind.WebAutomation);
+                Task<BrowserWorkloadLease> queuedAcquire = runtime.AcquireAsync(
+                    BrowserWorkloadKind.WebAutomation);
+                await Task.Delay(100);
+                Assert.False(queuedAcquire.IsCompleted);
+
+                Task disposeTask = runtime.DisposeAsync().AsTask();
+                await Assert.ThrowsAsync<ObjectDisposedException>(
+                    async () => await queuedAcquire.WaitAsync(TimeSpan.FromSeconds(2)));
+                Assert.False(disposeTask.IsCompleted);
+
+                await activeLease.DisposeAsync();
+                await disposeTask.WaitAsync(TimeSpan.FromSeconds(2));
+                Assert.Equal(0, runtime.GetSnapshot().ActiveAutomationTasks);
+                await Assert.ThrowsAsync<ObjectDisposedException>(
+                    () => runtime.AcquireAsync(BrowserWorkloadKind.WebAutomation));
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(
+                    BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable,
+                    previousAutomation);
+            }
+        }
+
         [Theory]
         [InlineData("file:///runtime-data/report.html", BrowserNavigationPolicy.LocalFilesOnly, true)]
         [InlineData("data:text/html,ok", BrowserNavigationPolicy.LocalFilesOnly, true)]
@@ -176,6 +213,50 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 Environment.SetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable, previousConcurrency);
                 Environment.SetEnvironmentVariable(ManagedPlaywrightBrowserHost.RecycleUsesEnvironmentVariable, previousRecycleUses);
+                AtomicFileHelper.TryDeleteDirectory(dataRoot);
+            }
+        }
+
+        [Fact]
+        public async Task ManagedPlaywrightHost_DisposeAsync_ShouldCancelActivePageAndRejectNewWork()
+        {
+            string root = FindRepositoryRoot();
+            string dataRoot = Path.Combine(
+                root,
+                ".codex-runtime",
+                "BrowserRuntimeManagerTests",
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dataRoot);
+            var pathProvider = new RuntimeAppPathProvider(root, dataRoot);
+            await using var runtime = new BrowserRuntimeManager();
+            var host = new ManagedPlaywrightBrowserHost(
+                runtime,
+                new BrowserExecutableResolver(pathProvider),
+                pathProvider);
+            try
+            {
+                var started = new TaskCompletionSource<bool>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                Task<string> activeOperation = host.ExecuteAsync(async (page, cancellationToken) =>
+                {
+                    await page.SetContentAsync("<div>active</div>");
+                    started.TrySetResult(true);
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    return "unreachable";
+                });
+                await started.Task.WaitAsync(TimeSpan.FromSeconds(20));
+
+                Task disposeTask = host.DisposeAsync().AsTask();
+                await Assert.ThrowsAsync<ObjectDisposedException>(
+                    async () => await activeOperation.WaitAsync(TimeSpan.FromSeconds(20)));
+                await disposeTask.WaitAsync(TimeSpan.FromSeconds(20));
+                Assert.Empty(runtime.GetSnapshot().OwnedProcessIds);
+                await Assert.ThrowsAsync<ObjectDisposedException>(
+                    () => host.ExecuteAsync((_, _) => Task.FromResult("late")));
+            }
+            finally
+            {
+                await host.DisposeAsync();
                 AtomicFileHelper.TryDeleteDirectory(dataRoot);
             }
         }

@@ -66,13 +66,41 @@
       "name": "OpenAPI document modules",
       "directory": "src/ExportDocManager.Api/Hosting",
       "filePattern": "^OpenApiDocument(?:Paths|Schemas)\\..+\\.cs$",
-      "maximumLines": 1800
+      "maximumLines": 1200
+    },
+    {
+      "name": "OpenAPI document and system components",
+      "directory": "src/ExportDocManager.Api/Hosting",
+      "filePattern": "^OpenApiDocument(?:Paths|Schemas)\\.(?:Documents|System)(?:\\..+)?\\.cs$",
+      "maximumLines": 800
+    },
+    {
+      "name": "application shell orchestration",
+      "directory": "apps/export-doc-web/src",
+      "filePattern": "^(?:App|AppWorkspaceRoutes|webSessionStorage)\\.(?:tsx|ts)$",
+      "maximumLines": 700,
+      "maximumAggregateLines": 900
+    },
+    {
+      "name": "settings page orchestration",
+      "directory": "apps/export-doc-web/src/features/settings",
+      "filePattern": "^(?:SettingsPage|SettingsPagePanels|settingsDefaults|settingsIssuingAuthority)\\.(?:tsx|ts)$",
+      "maximumLines": 750,
+      "maximumAggregateLines": 950
     },
     {
       "name": "invoice editor orchestration",
       "directory": "apps/export-doc-web/src/features/invoices",
-      "filePattern": "^InvoiceEditorPage\\.tsx$",
-      "maximumLines": 950
+      "filePattern": "^(?:InvoiceEditorPage|useInvoicePersistenceOperations)\\.(?:tsx|ts)$",
+      "maximumLines": 800,
+      "maximumAggregateLines": 1100
+    },
+    {
+      "name": "report template designer orchestration",
+      "directory": "apps/export-doc-web/src/features/reports",
+      "filePattern": "^(?:ReportTemplateDesignerPage|useReportTemplateEditingActions)\\.(?:tsx|ts)$",
+      "maximumLines": 850,
+      "maximumAggregateLines": 1050
     },
     {
       "name": "report designer schema modules",

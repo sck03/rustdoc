@@ -75,7 +75,9 @@ internal sealed class ServerMigrationPackageGenerator
             SchemaVersion = ServerMigrationLayout.SchemaVersion,
             PackageId = packageId,
             CreatedAtUtc = DateTimeOffset.UtcNow,
-            SourceDataRoot = _paths.DataRoot
+            SourceDataRoot = _paths.DataRoot,
+            SourcePlatform = GetCurrentPlatformName(),
+            SourcePathCaseSensitive = !OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS()
         };
         long hashedBytes = 0;
         for (int sourceIndex = 0; sourceIndex < sources.Count; sourceIndex++)
@@ -254,6 +256,12 @@ internal sealed class ServerMigrationPackageGenerator
             throw new ServiceValidationException($"服务器迁移源目录不能是符号链接或重解析点：{path}");
         }
     }
+
+    private static string GetCurrentPlatformName() => OperatingSystem.IsWindows()
+        ? "windows"
+        : OperatingSystem.IsMacOS()
+            ? "macos"
+            : "linux";
 
     private static void EnsureFileIsNotLink(string path)
     {

@@ -26,9 +26,14 @@ namespace ExportDocManager.Services.BrowserRuntime
         private readonly SemaphoreSlim _pdfGate;
         private readonly SemaphoreSlim _automationGate;
         private readonly ConcurrentDictionary<int, OwnedBrowserProcess> _ownedProcesses = new();
+        private readonly CancellationTokenSource _shutdownSource = new();
+        private readonly object _lifecycleSync = new();
         private int _activePdfTasks;
         private int _activeAutomationTasks;
+        private int _activeLeases;
         private int _disposed;
+        private TaskCompletionSource<bool> _leasesDrained;
+        private Task _disposeTask;
 
         public BrowserRuntimeManager()
         {
@@ -43,20 +48,52 @@ namespace ExportDocManager.Services.BrowserRuntime
         {
             ThrowIfDisposed();
             SemaphoreSlim workloadGate = workload == BrowserWorkloadKind.PdfRendering ? _pdfGate : _automationGate;
+            using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                _shutdownSource.Token);
             // Acquire the specific workload slot first. Holding a global slot while
             // waiting for a saturated workload queue creates head-of-line blocking:
             // a queued automation request could otherwise prevent an available PDF
             // slot from being used. Every acquisition path uses this order and the
             // release path mirrors it.
-            await workloadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                await _globalGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                await workloadGate.WaitAsync(linkedSource.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (
+                _shutdownSource.IsCancellationRequested &&
+                !cancellationToken.IsCancellationRequested)
+            {
+                throw new ObjectDisposedException(nameof(BrowserRuntimeManager));
+            }
+
+            try
+            {
+                await _globalGate.WaitAsync(linkedSource.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (
+                _shutdownSource.IsCancellationRequested &&
+                !cancellationToken.IsCancellationRequested)
+            {
+                workloadGate.Release();
+                throw new ObjectDisposedException(nameof(BrowserRuntimeManager));
             }
             catch
             {
                 workloadGate.Release();
                 throw;
+            }
+
+            lock (_lifecycleSync)
+            {
+                if (Volatile.Read(ref _disposed) != 0)
+                {
+                    _globalGate.Release();
+                    workloadGate.Release();
+                    throw new ObjectDisposedException(nameof(BrowserRuntimeManager));
+                }
+
+                _activeLeases++;
             }
 
             if (workload == BrowserWorkloadKind.PdfRendering)
@@ -90,13 +127,48 @@ namespace ExportDocManager.Services.BrowserRuntime
                 Interlocked.Decrement(ref _activeAutomationTasks);
             workloadGate.Release();
             _globalGate.Release();
+            lock (_lifecycleSync)
+            {
+                _activeLeases = Math.Max(0, _activeLeases - 1);
+                if (_activeLeases == 0)
+                {
+                    _leasesDrained?.TrySetResult(true);
+                }
+            }
         }
 
         internal void Unregister(int processId) => _ownedProcesses.TryRemove(processId, out _);
 
-        public async ValueTask DisposeAsync()
+        public ValueTask DisposeAsync()
         {
-            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            lock (_lifecycleSync)
+            {
+                _disposeTask ??= DisposeCoreAsync();
+                return new ValueTask(_disposeTask);
+            }
+        }
+
+        private async Task DisposeCoreAsync()
+        {
+            Interlocked.Exchange(ref _disposed, 1);
+            _shutdownSource.Cancel();
+
+            Task leasesDrained;
+            lock (_lifecycleSync)
+            {
+                if (_activeLeases == 0)
+                {
+                    leasesDrained = Task.CompletedTask;
+                }
+                else
+                {
+                    _leasesDrained ??= new TaskCompletionSource<bool>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    leasesDrained = _leasesDrained.Task;
+                }
+            }
+
+            await leasesDrained.ConfigureAwait(false);
             foreach (var owned in _ownedProcesses.Values.OrderBy(item => item.Process.Id))
             {
                 await KillOwnedProcessAsync(owned.Process).ConfigureAwait(false);
@@ -105,6 +177,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             _globalGate.Dispose();
             _pdfGate.Dispose();
             _automationGate.Dispose();
+            _shutdownSource.Dispose();
         }
 
         public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();

@@ -87,6 +87,18 @@ public sealed class ApiServiceExceptionMapperTests
     }
 
     [Fact]
+    public void Map_ShouldTreatUnclassifiedUnauthorizedAccessAsInfrastructureAclFailure()
+    {
+        (int status, string message) = ApiServiceExceptionMapper.Map(
+            new UnauthorizedAccessException("sensitive path details"),
+            "correlation-test");
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, status);
+        Assert.Contains("权限", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("sensitive", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Map_ShouldTreatWrappedManagedMissingFileAsNotFound()
     {
         (int status, string message) = ApiServiceExceptionMapper.Map(

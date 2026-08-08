@@ -14,6 +14,7 @@ readApiError,
 readRouteSuccessMessage
 } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { ServerDraftUpdateNotice, useServerDraftSync } from "../../ui/serverDraftSync.tsx";
 import { ConcurrencyConflictNotice, InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import {
 hasCustomOptionValue,
@@ -162,19 +163,6 @@ export function MasterDataEditorPage({
   }, [config, isNew, isRecordKeyValid]);
 
   useEffect(() => {
-    if (!isNew && detailQuery.data) {
-      setRecord(detailQuery.data);
-      setPersistedRecordSnapshot(buildMasterDataSnapshot(config, detailQuery.data, numberValue(detailQuery.data.id)));
-      setMessage(null);
-      setProductUnitMessage(null);
-      setAutoFilledProductUnits({});
-      if (routeSuccessMessage && !successMessage) {
-        setSuccessMessage(routeSuccessMessage);
-      }
-    }
-  }, [detailQuery.data, isNew, routeSuccessMessage, successMessage]);
-
-  useEffect(() => {
     if (!isNew && detailQuery.isError) {
       setMessage(readApiError(detailQuery.error));
       setSuccessMessage(null);
@@ -317,6 +305,22 @@ export function MasterDataEditorPage({
       currentRecordSnapshot !== persistedRecordSnapshot,
   );
   const sealUploadBlocked = isNew || hasUnsavedRecordChanges;
+  const serverDraftSync = useServerDraftSync({
+    resourceKey: isNew ? `${config.key}:new` : `${config.key}:${effectiveRecordKey}`,
+    incomingValue: isNew ? null : detailQuery.data,
+    isDirty: hasUnsavedRecordChanges,
+    fingerprint: (serverRecord) => buildMasterDataSnapshot(config, serverRecord, numberValue(serverRecord.id)),
+    applyIncoming: (serverRecord) => {
+      setRecord(serverRecord);
+      setPersistedRecordSnapshot(buildMasterDataSnapshot(config, serverRecord, numberValue(serverRecord.id)));
+      setMessage(null);
+      setProductUnitMessage(null);
+      setAutoFilledProductUnits({});
+      if (routeSuccessMessage && !successMessage) {
+        setSuccessMessage(routeSuccessMessage);
+      }
+    },
+  });
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: hasUnsavedRecordChanges,
     message: `当前${config.label}有未保存的修改。`,
@@ -512,6 +516,11 @@ export function MasterDataEditorPage({
       </div>
 
       {message && hasConcurrencyConflict ? <ConcurrencyConflictNotice message={message} isBusy={detailQuery.isFetching} onReload={() => void loadLatestRecord()} /> : null}
+      {serverDraftSync.hasPendingServerVersion ? <ServerDraftUpdateNotice
+        entityLabel={config.label}
+        onKeepLocal={serverDraftSync.keepLocalDraft}
+        onLoadServer={serverDraftSync.loadServerVersion}
+      /> : null}
       {message && !hasConcurrencyConflict ? <InlineNotice tone="error" title="操作未完成">{message}</InlineNotice> : null}
       {productUnitLookupMessage ? <InlineNotice tone="warning" title="单位资料未能完整加载">{productUnitLookupMessage}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}

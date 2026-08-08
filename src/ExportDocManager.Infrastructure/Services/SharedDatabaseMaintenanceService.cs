@@ -23,7 +23,7 @@ namespace ExportDocManager.Services.Infrastructure
         private const string SupportPackageStoragePolicy =
             "支持包默认写入运行数据根 SupportPackages/，只收集脱敏运行诊断、任务快照、设置摘要和运行数据根 Logs 最近文本日志；默认不打包数据库正文或样张文件，管理员显式勾选并确认后才包含最近数据库备份或样张索引；不会打包授权私钥、邮件密码、WebDAV 密码或 PostgreSQL 密码。";
         private const string PostgreSqlPhysicalBackupStoragePolicy =
-            "PostgreSQL 团队版业务数据库物理备份默认写入运行数据根 Backups/PostgreSQL/，优先使用程序根 Tools/PostgreSQL/bin 下的 pg_dump/pg_restore/psql；不把 PostgreSQL 工具或备份默认放到系统 C 盘、AppData 或 ProgramData。";
+            "PostgreSQL 团队版业务数据库物理备份默认写入运行数据根 Backups/PostgreSQL/，优先使用程序根 Tools/PostgreSQL/bin 下的 pg_dump/pg_restore/psql；目录和文件会收紧为当前服务账号可访问。custom-format .dump 包含完整业务数据但本身不加密，复制到外部介质前必须使用受控加密存储；不把 PostgreSQL 工具或备份默认放到系统 C 盘、AppData 或 ProgramData。";
         private const string PostgreSqlRestorePlanStoragePolicy =
             "PostgreSQL 还原计划默认写入运行数据根 Backups/PostgreSQL/RestorePlans/，生成 pg_restore 脚本和 post_restore_ownership.sql；脚本包含 REASSIGN OWNED、ALTER OWNER、GRANT 和默认权限修复流程，执行前仍需管理员按目标服务器复核。";
 
@@ -35,6 +35,8 @@ namespace ExportDocManager.Services.Infrastructure
 
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly DatabaseConnectionSettings _databaseSettings;
+        private readonly DatabaseConnectionSettings _maintenanceDatabaseSettings;
+        private readonly string _postgreSqlOwnerRole;
         private readonly IAppPathProvider _pathProvider;
         private readonly IBackgroundJobService _backgroundJobs;
 
@@ -48,6 +50,18 @@ namespace ExportDocManager.Services.Infrastructure
             _databaseSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _backgroundJobs = backgroundJobs;
+            if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
+            {
+                PostgreSqlMaintenanceConnectionProfile profile =
+                    PostgreSqlMaintenanceConnectionResolver.Resolve(databaseSettings, pathProvider);
+                _maintenanceDatabaseSettings = profile.ConnectionSettings;
+                _postgreSqlOwnerRole = profile.OwnerRole;
+            }
+            else
+            {
+                _maintenanceDatabaseSettings = databaseSettings;
+                _postgreSqlOwnerRole = databaseSettings.PostgreSqlUsername;
+            }
         }
 
         public bool IsSharedDatabaseEnabled => DatabaseModeHelper.UsesSharedDatabase(_databaseSettings);

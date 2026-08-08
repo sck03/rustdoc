@@ -7,6 +7,7 @@ import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
 type UserDraft = {
   id: number;
@@ -39,9 +40,10 @@ export function UserManagementPanel({
   const queryClient = useQueryClient();
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [draft, setDraft] = useState<UserDraft>(() => createEmptyDraft("User"));
+  const [persistedDraftSnapshot, setPersistedDraftSnapshot] = useState(() => buildUserDraftSnapshot(createEmptyDraft("User")));
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [isDeleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ApiUserAccountDto | null>(null);
 
   const usersQuery = useQuery({
     queryKey: queryKeys.users(),
@@ -61,7 +63,7 @@ export function UserManagementPanel({
     }
 
     if (selectedUserId == null && usersQuery.data.users.length > 0) {
-      selectUser(usersQuery.data.users[0]);
+      applyUser(usersQuery.data.users[0]);
     }
   }, [canManageUsers, selectedUserId, usersQuery.data]);
 
@@ -78,8 +80,10 @@ export function UserManagementPanel({
         ? client.updateUserAccount({ id: draft.id, body })
         : client.createUserAccount({ body }),
     onSuccess: async (response) => {
+      const savedDraft = createDraftFromUser(response.user);
       setSelectedUserId(response.user.id);
-      setDraft(createDraftFromUser(response.user));
+      setDraft(savedDraft);
+      setPersistedDraftSnapshot(buildUserDraftSnapshot(savedDraft));
       setMessage(null);
       setSuccessMessage(response.message || "用户已保存。");
       queryClient.setQueryData<ApiUserListResponse | undefined>(queryKeys.users(), (current) =>
@@ -96,8 +100,10 @@ export function UserManagementPanel({
   const deleteMutation = useMutation({
     mutationFn: (id: number) => client.deleteUserAccount({ id }),
     onSuccess: async (response) => {
+      const emptyDraft = createEmptyDraft("User");
       setSelectedUserId(null);
-      setDraft(createEmptyDraft("User"));
+      setDraft(emptyDraft);
+      setPersistedDraftSnapshot(buildUserDraftSnapshot(emptyDraft));
       setMessage(null);
       setSuccessMessage(response.message || "用户已删除。");
       await queryClient.invalidateQueries({ queryKey: queryKeys.users() });
@@ -108,24 +114,65 @@ export function UserManagementPanel({
     },
   });
 
+  const currentDraftSnapshot = useMemo(() => buildUserDraftSnapshot(draft), [draft]);
+  const hasUnsavedUserChanges = Boolean(
+    canManageUsers &&
+    selectedUserId != null &&
+    currentDraftSnapshot !== persistedDraftSnapshot,
+  );
+  const { confirmDiscardChanges } = useUnsavedChangesGuard({
+    isDirty: hasUnsavedUserChanges,
+    message: "当前用户账号有未保存的修改。",
+  });
+
   if (!canManageUsers) {
     return null;
   }
 
   const isBusy = usersQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
 
-  function beginNew() {
+  async function beginNew() {
+    if (!await confirmDiscardChanges("新建用户")) {
+      return;
+    }
+
+    const emptyDraft = createEmptyDraft("User");
     setSelectedUserId(0);
-    setDraft(createEmptyDraft("User"));
+    setDraft(emptyDraft);
+    setPersistedDraftSnapshot(buildUserDraftSnapshot(emptyDraft));
     setMessage(null);
     setSuccessMessage(null);
   }
 
-  function selectUser(user: ApiUserAccountDto) {
+  function applyUser(user: ApiUserAccountDto) {
+    const nextDraft = createDraftFromUser(user);
     setSelectedUserId(user.id);
-    setDraft(createDraftFromUser(user));
+    setDraft(nextDraft);
+    setPersistedDraftSnapshot(buildUserDraftSnapshot(nextDraft));
     setMessage(null);
     setSuccessMessage(null);
+  }
+
+  async function selectUser(user: ApiUserAccountDto) {
+    if (user.id === selectedUserId || !await confirmDiscardChanges(`切换到用户“${user.username}”`)) {
+      return;
+    }
+
+    applyUser(user);
+  }
+
+  async function refreshUsers() {
+    if (!await confirmDiscardChanges("刷新用户列表")) {
+      return;
+    }
+
+    const result = await usersQuery.refetch();
+    if (selectedUserId && selectedUserId > 0) {
+      const refreshedUser = result.data?.users.find((user) => user.id === selectedUserId);
+      if (refreshedUser) {
+        applyUser(refreshedUser);
+      }
+    }
   }
 
   function patchDraft<K extends keyof UserDraft>(key: K, value: UserDraft[K]) {
@@ -174,14 +221,25 @@ export function UserManagementPanel({
     });
   }
 
-  function deleteSelectedUser() {
+  async function deleteSelectedUser() {
     if (draft.id <= 0) {
       setMessage("请选择要删除的用户。");
       setSuccessMessage(null);
       return;
     }
 
-    setDeleteConfirmationOpen(true);
+    if (!await confirmDiscardChanges("删除当前用户")) {
+      return;
+    }
+
+    const persistedUser = users.find((user) => user.id === draft.id);
+    if (!persistedUser) {
+      setMessage("当前用户已不在服务器列表中，请刷新后重试。");
+      setSuccessMessage(null);
+      return;
+    }
+
+    setDeleteTarget(persistedUser);
   }
 
   return (
@@ -192,17 +250,17 @@ export function UserManagementPanel({
           <p className="section-description">创建和维护登录账号，并通过岗位与权限模板控制界面导航和业务操作。</p>
         </div>
         <div className="toolbar-actions">
-          <button className="icon-button" type="button" title="刷新用户" aria-label="刷新用户" disabled={isBusy} onClick={() => void usersQuery.refetch()}>
+          <button className="icon-button" type="button" title="刷新用户" aria-label="刷新用户" disabled={isBusy} onClick={() => void refreshUsers()}>
             <RefreshCw size={18} aria-hidden="true" />
           </button>
-          <button className="icon-button" type="button" title="新建用户" aria-label="新建用户" disabled={isBusy} onClick={beginNew}>
+          <button className="icon-button" type="button" title="新建用户" aria-label="新建用户" disabled={isBusy} onClick={() => void beginNew()}>
             <Plus size={18} aria-hidden="true" />
           </button>
           <button className="command-button" type="button" disabled={isBusy} onClick={saveUser}>
             <Save size={17} aria-hidden="true" />
             <span>保存</span>
           </button>
-          <button className="icon-button" type="button" title="删除用户" aria-label="删除用户" disabled={isBusy || draft.id <= 0} onClick={deleteSelectedUser}>
+          <button className="icon-button" type="button" title="删除用户" aria-label="删除用户" disabled={isBusy || draft.id <= 0} onClick={() => void deleteSelectedUser()}>
             <Trash2 size={18} aria-hidden="true" />
           </button>
         </div>
@@ -236,11 +294,11 @@ export function UserManagementPanel({
                     key={user.id}
                     className={user.id === selectedUserId ? "clickable-row selected-row" : "clickable-row"}
                     tabIndex={0}
-                    onClick={() => selectUser(user)}
+                    onClick={() => void selectUser(user)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
-                        selectUser(user);
+                        void selectUser(user);
                       }
                     }}
                   >
@@ -329,21 +387,21 @@ export function UserManagementPanel({
         </div>
       </div>
 
-      {isDeleteConfirmationOpen ? (
+      {deleteTarget ? (
         <ConfirmationDialog
           title="删除账号"
-          description={`确定删除账号“${draft.username}”吗？`}
+          description={`确定删除账号“${deleteTarget.username}”吗？`}
           details={[
             "删除后该账号将立即无法登录。",
             "如果账号已有发票或付款等业务数据，系统会阻止删除并提示改为停用。",
           ]}
           confirmLabel="删除账号"
           isBusy={deleteMutation.isPending}
-          onCancel={() => setDeleteConfirmationOpen(false)}
+          onCancel={() => setDeleteTarget(null)}
           onConfirm={() => {
-            if (draft.id > 0) {
-              deleteMutation.mutate(draft.id, {
-                onSettled: () => setDeleteConfirmationOpen(false),
+            if (deleteTarget.id > 0) {
+              deleteMutation.mutate(deleteTarget.id, {
+                onSettled: () => setDeleteTarget(null),
               });
             }
           }}
@@ -381,6 +439,20 @@ function createEmptyDraft(role: string): UserDraft {
     isActive: true,
     resetPassword: "",
   };
+}
+
+function buildUserDraftSnapshot(draft: UserDraft) {
+  return JSON.stringify({
+    id: draft.id,
+    username: draft.username,
+    fullName: draft.fullName,
+    role: draft.role,
+    permissionTemplateId: draft.permissionTemplateId,
+    departmentId: draft.departmentId,
+    companyScope: draft.companyScope,
+    isActive: draft.isActive,
+    resetPassword: draft.resetPassword,
+  });
 }
 
 function getRolePresentation(role?: string) {

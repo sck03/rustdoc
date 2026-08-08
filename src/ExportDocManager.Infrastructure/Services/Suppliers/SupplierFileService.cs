@@ -2,6 +2,7 @@ using ClosedXML.Excel;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Data;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,6 +11,7 @@ namespace ExportDocManager.Services.Suppliers
     public sealed class SupplierFileService : ISupplierFileService
     {
         private const int MaximumRows = 5000;
+        private const int MaximumExportRows = 10000;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
 
@@ -25,17 +27,28 @@ namespace ExportDocManager.Services.Suppliers
             if (table.Count < 2) throw new InvalidDataException("导入文件至少需要表头和一行供应商数据。");
             var columns = BuildColumns(table[0]);
             if (!columns.ContainsKey("name")) throw new InvalidDataException("导入文件缺少“供应商名称”列。");
+            var parsedRows = new List<(int RowNumber, IReadOnlyList<string> Values, string Name)>();
+            for (int tableIndex = 1; tableIndex < Math.Min(table.Count, MaximumRows + 1); tableIndex++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                IReadOnlyList<string> values = table[tableIndex];
+                if (values.All(string.IsNullOrWhiteSpace)) continue;
+                parsedRows.Add((tableIndex + 1, values, Read(values, columns, "name")));
+            }
+
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            var existing = (await _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking())
-                .Select(item => item.Name).ToListAsync(cancellationToken)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var existing = await ScopedExistingNameLoader.LoadAsync(
+                _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking()).Select(item => item.Name),
+                parsedRows.Select(row => row.Name),
+                cancellationToken);
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var rows = new List<SupplierImportRow>();
-            foreach (var values in table.Skip(1).Take(MaximumRows))
+            foreach (var parsedRow in parsedRows)
             {
-                if (values.All(string.IsNullOrWhiteSpace)) continue;
-                string name = Read(values, columns, "name");
+                IReadOnlyList<string> values = parsedRow.Values;
+                string name = parsedRow.Name;
                 bool duplicate = name.Length > 0 && (existing.Contains(name) || !seen.Add(name));
-                rows.Add(new SupplierImportRow(rows.Count + 2, name, Read(values, columns, "country"),
+                rows.Add(new SupplierImportRow(parsedRow.RowNumber, name, Read(values, columns, "country"),
                     Read(values, columns, "category"), Read(values, columns, "website"),
                     Default(Read(values, columns, "status"), "合作中"), Read(values, columns, "products"),
                     Read(values, columns, "notes"), Read(values, columns, "contact"), Read(values, columns, "title"),
@@ -51,11 +64,14 @@ namespace ExportDocManager.Services.Suppliers
             ArgumentNullException.ThrowIfNull(rows);
             return AppDbContextExecution.ExecuteInTransactionAsync(_contextFactory, async (context, token) =>
             {
-                var existing = (await _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking())
-                    .Select(item => item.Name).ToListAsync(token)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var importRows = rows.Take(MaximumRows).ToArray();
+                var existing = await ScopedExistingNameLoader.LoadAsync(
+                    _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking()).Select(item => item.Name),
+                    importRows.Select(row => row.Name),
+                    token);
                 var pendingContacts = new List<(SupplierCompany Supplier, SupplierImportRow Row)>();
                 int suppliers = 0, contacts = 0, skipped = 0;
-                foreach (var row in rows.Take(MaximumRows))
+                foreach (var row in importRows)
                 {
                     string name = Clean(row.Name);
                     if (name.Length == 0 || row.Error.Length > 0 || row.IsDuplicate || !existing.Add(name)) { skipped++; continue; }
@@ -92,12 +108,17 @@ namespace ExportDocManager.Services.Suppliers
             var query = _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking());
             if (keyword.Length > 0) query = query.Where(item => item.Name.Contains(keyword) || item.Category.Contains(keyword) || item.MainProducts.Contains(keyword));
             if (status.Length > 0) query = query.Where(item => item.Status == status);
-            var rows = await query.OrderBy(item => item.Name).Select(item => new
+            var rows = await query.OrderBy(item => item.Name).Take(MaximumExportRows + 1).Select(item => new
             {
                 Supplier = item,
                 Contact = context.SupplierContacts.Where(contact => contact.SupplierCompanyId == item.Id)
                     .OrderByDescending(contact => contact.IsPrimary).ThenBy(contact => contact.Id).FirstOrDefault()
             }).ToListAsync(cancellationToken);
+            if (rows.Count > MaximumExportRows)
+            {
+                throw new ServiceValidationException(
+                    $"当前筛选结果超过 {MaximumExportRows:N0} 条。请缩小供应商名称、状态或其它筛选条件后再导出，系统不会静默截断数据。");
+            }
             using var workbook = new XLWorkbook();
             var sheet = workbook.AddWorksheet("供应商");
             string[] headers = ["供应商名称", "国家/地区", "分类", "网站", "状态", "主要产品", "备注", "联系人", "职位", "邮箱", "电话"];

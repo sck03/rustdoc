@@ -27,16 +27,22 @@ namespace ExportDocManager.Services.Reporting
         private readonly BrowserRuntimeManager _browserRuntime;
         private readonly ManagedPlaywrightBrowserHost _browserHost;
         private static readonly BrowserRuntimeManager StandaloneBrowserRuntime = new();
+        private static readonly Lock AbandonedDirectoryCleanupGate = new();
+        private static readonly HashSet<string> CleanedReportRoots = new(
+            OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
         public ChromiumHtmlToPdfService(
             IAppPathProvider pathProvider,
             BrowserRuntimeManager browserRuntime = null,
-            ManagedPlaywrightBrowserHost browserHost = null)
+            ManagedPlaywrightBrowserHost browserHost = null,
+            BrowserExecutableResolver executableResolver = null)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
-            _executableResolver = new BrowserExecutableResolver(pathProvider);
+            _executableResolver = executableResolver ?? new BrowserExecutableResolver(pathProvider);
             _browserRuntime = browserRuntime ?? StandaloneBrowserRuntime;
             _browserHost = browserHost;
+            CleanupAbandonedTemporaryDirectoriesOnce(
+                Path.Combine(_pathProvider.CacheRoot, "ReportPdf"));
         }
 
         public async Task<HtmlToPdfRenderResult> RenderAsync(
@@ -306,6 +312,46 @@ namespace ExportDocManager.Services.Reporting
                 if (Directory.Exists(path))
                 {
                     await Task.Delay(TemporaryDirectoryCleanupDelayMilliseconds).ConfigureAwait(false);
+                }
+            }
+        }
+
+        private static void CleanupAbandonedTemporaryDirectoriesOnce(string reportRoot)
+        {
+            string fullRoot = Path.GetFullPath(reportRoot);
+            lock (AbandonedDirectoryCleanupGate)
+            {
+                if (!CleanedReportRoots.Add(fullRoot) || !Directory.Exists(fullRoot))
+                {
+                    return;
+                }
+
+                try
+                {
+                    foreach (string directory in Directory.EnumerateDirectories(fullRoot, "*", SearchOption.TopDirectoryOnly))
+                    {
+                        string name = Path.GetFileName(directory);
+                        if (!Guid.TryParseExact(name, "N", out _))
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) == 0)
+                            {
+                                AtomicFileHelper.TryDeleteDirectory(directory);
+                            }
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                        {
+                            // Crash leftovers are opportunistic cleanup; a locked item must not block PDF rendering.
+                        }
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // The normal per-render cleanup remains authoritative when enumeration is unavailable.
                 }
             }
         }

@@ -47,7 +47,7 @@ public sealed class InfrastructureSqlSafetyPolicyTests
         string initialization = File.ReadAllText(Path.Combine(sourceRoot, "Services", "DatabaseSchemaBaseline.cs"));
         Assert.Contains("MetadataTableName", initialization, StringComparison.Ordinal);
         Assert.Contains("ExecuteSqlRawAsync", initialization, StringComparison.Ordinal);
-        Assert.Contains("CreatePerformanceIndexesAsync", initialization, StringComparison.Ordinal);
+        Assert.Contains("CreateCorePerformanceIndexesAsync", initialization, StringComparison.Ordinal);
 
         string sqliteMaintenance = File.ReadAllText(Path.Combine(sourceRoot, "Services", "SqliteMaintenanceGateway.cs"));
         Assert.Contains("QuickCheckCommandText", sqliteMaintenance, StringComparison.Ordinal);

@@ -21,12 +21,13 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly DatabaseInitializationCoordinator _coordinator;
         private readonly bool _requireBootstrapToken;
         private readonly string _expectedBootstrapToken;
+        private readonly IAppPathProvider _pathProvider;
 
         public DatabaseInitializationService(
             IDbContextFactory<AppDbContext> dbContextFactory,
             DatabaseConnectionSettings databaseSettings,
             DatabaseInitializationCoordinator coordinator)
-            : this(dbContextFactory, databaseSettings, coordinator, false, string.Empty)
+            : this(dbContextFactory, databaseSettings, coordinator, false, string.Empty, null)
         {
         }
 
@@ -36,12 +37,30 @@ namespace ExportDocManager.Services.Infrastructure
             DatabaseInitializationCoordinator coordinator,
             bool requireBootstrapToken,
             string expectedBootstrapToken)
+            : this(
+                dbContextFactory,
+                databaseSettings,
+                coordinator,
+                requireBootstrapToken,
+                expectedBootstrapToken,
+                null)
+        {
+        }
+
+        public DatabaseInitializationService(
+            IDbContextFactory<AppDbContext> dbContextFactory,
+            DatabaseConnectionSettings databaseSettings,
+            DatabaseInitializationCoordinator coordinator,
+            bool requireBootstrapToken,
+            string expectedBootstrapToken,
+            IAppPathProvider pathProvider)
         {
             _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
             _databaseSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
             _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
             _requireBootstrapToken = requireBootstrapToken;
             _expectedBootstrapToken = expectedBootstrapToken?.Trim() ?? string.Empty;
+            _pathProvider = pathProvider;
         }
 
         public Task<DatabaseInitializationResult> InitializeAsync(
@@ -61,16 +80,45 @@ namespace ExportDocManager.Services.Infrastructure
             bool usesPostgreSql = DatabaseModeHelper.UsesPostgreSql(_databaseSettings);
             bool advisoryLockAcquired = false;
             AppDbContext context = null;
+            PostgreSqlMaintenanceConnectionProfile maintenanceProfile = null;
 
             try
             {
-                context = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+                if (usesPostgreSql && _pathProvider != null)
+                {
+                    maintenanceProfile = PostgreSqlMaintenanceConnectionResolver.Resolve(
+                        _databaseSettings,
+                        _pathProvider);
+                }
+
+                context = maintenanceProfile?.UsesDedicatedCredentials == true
+                    ? CreatePostgreSqlContext(maintenanceProfile.ConnectionSettings, _pathProvider)
+                    : await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
                 if (usesPostgreSql)
                 {
                     await context.Database.OpenConnectionAsync().ConfigureAwait(false);
+                    if (maintenanceProfile?.UsesDedicatedCredentials == true)
+                    {
+                        await ExecutePostgreSqlCommandAsync(
+                            context,
+                            $"SET ROLE {QuotePostgreSqlIdentifier(maintenanceProfile.OwnerRole)};")
+                            .ConfigureAwait(false);
+                    }
                     await context.Database.ExecuteSqlRawAsync(
                         $"SELECT pg_advisory_lock({PostgreSqlInitializationLockId});").ConfigureAwait(false);
                     advisoryLockAcquired = true;
+
+                    bool databaseIsEmpty = await DatabaseSchemaBaseline
+                        .IsDatabaseEmptyAsync(context, usesPostgreSql: true)
+                        .ConfigureAwait(false);
+                    if (databaseIsEmpty && _requireBootstrapToken &&
+                        !FixedTimeEquals(_expectedBootstrapToken, bootstrapToken))
+                    {
+                        return DatabaseInitializationResult.Fail(
+                            "共享数据库首次初始化需要有效的部署初始化令牌。请联系部署管理员。",
+                            shouldResetPassword: false,
+                            isAuthenticationFailure: true);
+                    }
                 }
                 else
                 {
@@ -78,6 +126,14 @@ namespace ExportDocManager.Services.Infrastructure
                 }
 
                 await DatabaseSchemaBaseline.EnsureCurrentAsync(context, usesPostgreSql).ConfigureAwait(false);
+                if (maintenanceProfile?.UsesDedicatedCredentials == true)
+                {
+                    await GrantApplicationRolePrivilegesAsync(
+                        context,
+                        maintenanceProfile.OwnerRole,
+                        _databaseSettings.PostgreSqlUsername,
+                        _databaseSettings.PostgreSqlDatabase).ConfigureAwait(false);
+                }
 
                 bool requiresInitialAdministrator = usesPostgreSql &&
                     !await context.Users.AsNoTracking().AnyAsync().ConfigureAwait(false);
@@ -146,6 +202,60 @@ namespace ExportDocManager.Services.Infrastructure
             await context.Database.ExecuteSqlRawAsync("PRAGMA synchronous=NORMAL;").ConfigureAwait(false);
             await context.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout=10000;").ConfigureAwait(false);
             await context.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys=ON;").ConfigureAwait(false);
+        }
+
+        private static AppDbContext CreatePostgreSqlContext(
+            DatabaseConnectionSettings settings,
+            IAppPathProvider pathProvider)
+        {
+            var options = new DbContextOptionsBuilder<AppDbContext>();
+            DbHelper.ConfigureDbContextOptions(options, settings, pathProvider);
+            return new AppDbContext(options.Options);
+        }
+
+        private static Task GrantApplicationRolePrivilegesAsync(
+            AppDbContext context,
+            string ownerRole,
+            string applicationRole,
+            string databaseName)
+        {
+            string owner = QuotePostgreSqlIdentifier(ownerRole);
+            string app = QuotePostgreSqlIdentifier(applicationRole);
+            string database = QuotePostgreSqlIdentifier(databaseName);
+            return ExecutePostgreSqlCommandAsync(context, $$"""
+                GRANT CONNECT ON DATABASE {{database}} TO {{app}};
+                GRANT USAGE ON SCHEMA public TO {{app}};
+                GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {{app}};
+                GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {{app}};
+                GRANT EXECUTE ON ALL ROUTINES IN SCHEMA public TO {{app}};
+                ALTER DEFAULT PRIVILEGES FOR ROLE {{owner}} IN SCHEMA public
+                    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {{app}};
+                ALTER DEFAULT PRIVILEGES FOR ROLE {{owner}} IN SCHEMA public
+                    GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO {{app}};
+                ALTER DEFAULT PRIVILEGES FOR ROLE {{owner}} IN SCHEMA public
+                    GRANT EXECUTE ON ROUTINES TO {{app}};
+                """);
+        }
+
+        private static async Task ExecutePostgreSqlCommandAsync(
+            AppDbContext context,
+            string commandText)
+        {
+            DbConnection connection = context.Database.GetDbConnection();
+            await using DbCommand command = connection.CreateCommand();
+            command.CommandText = commandText;
+            await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+        }
+
+        private static string QuotePostgreSqlIdentifier(string value)
+        {
+            string normalized = (value ?? string.Empty).Trim();
+            if (normalized.Length == 0 || normalized.Any(char.IsControl) || Encoding.UTF8.GetByteCount(normalized) > 63)
+            {
+                throw new InvalidOperationException("PostgreSQL 角色或数据库标识无效。");
+            }
+
+            return '"' + normalized.Replace("\"", "\"\"", StringComparison.Ordinal) + '"';
         }
 
         internal static string ResolveInitialAdminPassword(

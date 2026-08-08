@@ -9,6 +9,10 @@ const loginPageSource = fs.readFileSync(
   path.join(repoRoot, "apps", "export-doc-web", "src", "features", "auth", "LoginPage.tsx"),
   "utf8",
 );
+const sessionStorageSource = fs.readFileSync(
+  path.join(repoRoot, "apps", "export-doc-web", "src", "app", "webSessionStorage.ts"),
+  "utf8",
+);
 
 assert.match(
   appSource,
@@ -26,11 +30,11 @@ assert.match(
   "successful login must clear the bootstrap token from memory",
 );
 
-const sessionStateStart = appSource.indexOf("type SessionState = {");
-const sessionStateEnd = appSource.indexOf("type LoadState", sessionStateStart);
-assert(sessionStateStart >= 0 && sessionStateEnd > sessionStateStart, "SessionState declaration must remain discoverable");
+const sessionStateStart = sessionStorageSource.indexOf("export type WebSessionState = {");
+const sessionStateEnd = sessionStorageSource.indexOf("};", sessionStateStart);
+assert(sessionStateStart >= 0 && sessionStateEnd > sessionStateStart, "persisted web session declaration must remain discoverable");
 assert.doesNotMatch(
-  appSource.slice(sessionStateStart, sessionStateEnd),
+  sessionStorageSource.slice(sessionStateStart, sessionStateEnd),
   /bootstrapToken/i,
   "bootstrap token must never become part of the persisted browser session",
 );

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -11,7 +12,9 @@ namespace ExportDocManager.Api.Hosting
     public sealed class ApiDownloadTicketService
     {
         private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan SessionLifetime = TimeSpan.FromHours(8);
         private const int MaximumTicketCount = 4096;
+        private const string DownloadSessionCookieName = "ExportDocManager.DownloadSession";
         private readonly ConcurrentDictionary<string, TicketState> _tickets =
             new(StringComparer.Ordinal);
         private readonly Lock _issueLock = new();
@@ -28,12 +31,17 @@ namespace ExportDocManager.Api.Hosting
         }
 
         public ApiDownloadTicket Issue(
+            HttpContext context,
             string purpose,
             string resourceId,
-            string downloadRoutePrefix)
+            string subject,
+            string downloadRoutePrefix,
+            bool requireSessionBinding = true)
         {
+            ArgumentNullException.ThrowIfNull(context);
             ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
             ArgumentException.ThrowIfNullOrWhiteSpace(resourceId);
+            ArgumentException.ThrowIfNullOrWhiteSpace(subject);
             ArgumentException.ThrowIfNullOrWhiteSpace(downloadRoutePrefix);
 
             string normalizedRoute = downloadRoutePrefix.Trim().TrimEnd('/');
@@ -57,7 +65,18 @@ namespace ExportDocManager.Api.Hosting
                     .Replace('+', '-')
                     .Replace('/', '_');
                 DateTimeOffset expiresAt = _timeProvider.GetUtcNow().Add(Lifetime);
-                _tickets[token] = new TicketState(purpose.Trim(), resourceId.Trim(), expiresAt);
+                string sessionBinding = requireSessionBinding
+                    ? GetOrCreateDownloadSession(context)
+                    : string.Empty;
+                _tickets[token] = new TicketState(
+                    purpose.Trim(),
+                    resourceId.Trim(),
+                    subject.Trim(),
+                    requireSessionBinding
+                        ? SHA256.HashData(Encoding.UTF8.GetBytes(sessionBinding))
+                        : [],
+                    requireSessionBinding,
+                    expiresAt);
                 return new ApiDownloadTicket(
                     token,
                     $"{normalizedRoute}/{Uri.EscapeDataString(token)}",
@@ -66,10 +85,12 @@ namespace ExportDocManager.Api.Hosting
         }
 
         public bool TryResolve(
+            HttpContext context,
             string token,
             string purpose,
             out string resourceId)
         {
+            ArgumentNullException.ThrowIfNull(context);
             resourceId = string.Empty;
             if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(purpose))
             {
@@ -90,10 +111,111 @@ namespace ExportDocManager.Api.Hosting
             {
                 return false;
             }
+            if (!ticket.RequiresSessionBinding)
+            {
+                resourceId = ticket.ResourceId;
+                return true;
+            }
+
+            if (!context.Request.Cookies.TryGetValue(DownloadSessionCookieName, out string sessionBinding) ||
+                !IsValidSessionBinding(sessionBinding))
+            {
+                return false;
+            }
+
+            byte[] presentedHash = SHA256.HashData(Encoding.UTF8.GetBytes(sessionBinding));
+            if (!CryptographicOperations.FixedTimeEquals(presentedHash, ticket.SessionBindingHash))
+            {
+                return false;
+            }
 
             resourceId = ticket.ResourceId;
             return true;
         }
+
+        public void ResetSession(HttpContext context, bool revokeUnboundDesktopTickets = false)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            string sessionBinding = context.Request.Cookies.TryGetValue(
+                DownloadSessionCookieName,
+                out string existing)
+                ? existing
+                : string.Empty;
+            byte[] sessionHash = IsValidSessionBinding(sessionBinding)
+                ? SHA256.HashData(Encoding.UTF8.GetBytes(sessionBinding))
+                : [];
+
+            foreach (KeyValuePair<string, TicketState> item in _tickets)
+            {
+                bool sameSession = sessionHash.Length > 0 &&
+                    item.Value.RequiresSessionBinding &&
+                    CryptographicOperations.FixedTimeEquals(sessionHash, item.Value.SessionBindingHash);
+                if (sameSession || (revokeUnboundDesktopTickets && !item.Value.RequiresSessionBinding))
+                {
+                    _tickets.TryRemove(item.Key, out _);
+                }
+            }
+
+            context.Response.Cookies.Delete(
+                DownloadSessionCookieName,
+                new CookieOptions
+                {
+                    Path = "/",
+                    SameSite = SameSiteMode.Strict,
+                    Secure = context.Request.IsHttps,
+                });
+        }
+
+        public void RevokeSubject(HttpContext context, string subject)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            string normalizedSubject = subject?.Trim() ?? string.Empty;
+            if (normalizedSubject.Length > 0)
+            {
+                foreach (KeyValuePair<string, TicketState> item in _tickets)
+                {
+                    if (string.Equals(item.Value.Subject, normalizedSubject, StringComparison.Ordinal))
+                    {
+                        _tickets.TryRemove(item.Key, out _);
+                    }
+                }
+            }
+
+            ResetSession(context);
+        }
+
+        private string GetOrCreateDownloadSession(HttpContext context)
+        {
+            if (context.Request.Cookies.TryGetValue(DownloadSessionCookieName, out string existing) &&
+                IsValidSessionBinding(existing))
+            {
+                return existing;
+            }
+
+            string binding = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+                .TrimEnd('=')
+                .Replace('+', '-')
+                .Replace('/', '_');
+            context.Response.Cookies.Append(
+                DownloadSessionCookieName,
+                binding,
+                new CookieOptions
+                {
+                    HttpOnly = true,
+                    IsEssential = true,
+                    MaxAge = SessionLifetime,
+                    Path = "/",
+                    SameSite = SameSiteMode.Strict,
+                    Secure = context.Request.IsHttps
+                });
+            return binding;
+        }
+
+        private static bool IsValidSessionBinding(string value) =>
+            !string.IsNullOrWhiteSpace(value) &&
+            value.Length == 43 &&
+            value.All(character =>
+                char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
 
         private void CleanupExpired()
         {
@@ -127,6 +249,9 @@ namespace ExportDocManager.Api.Hosting
         private sealed record TicketState(
             string Purpose,
             string ResourceId,
+            string Subject,
+            byte[] SessionBindingHash,
+            bool RequiresSessionBinding,
             DateTimeOffset ExpiresAtUtc);
     }
 }

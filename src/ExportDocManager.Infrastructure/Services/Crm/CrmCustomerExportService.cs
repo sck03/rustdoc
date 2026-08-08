@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,13 +28,18 @@ namespace ExportDocManager.Services.Crm
                 customers = customers.Where(item => item.Name.Contains(keyword) || item.CountryRegion.Contains(keyword) ||
                     item.Website.Contains(keyword) || item.Source.Contains(keyword) || item.Notes.Contains(keyword));
             if (status.Length > 0) customers = customers.Where(item => item.Status == status);
-            var rows = await customers.OrderBy(item => item.Name).Take(MaximumRows)
+            var rows = await customers.OrderBy(item => item.Name).Take(MaximumRows + 1)
                 .Select(item => new
                 {
                     Customer = item,
                     Contact = context.CrmContacts.Where(contact => contact.CrmCustomerId == item.Id)
                         .OrderByDescending(contact => contact.IsPrimary).ThenBy(contact => contact.Id).FirstOrDefault()
                 }).ToListAsync(cancellationToken);
+            if (rows.Count > MaximumRows)
+            {
+                throw new ServiceValidationException(
+                    $"当前筛选结果超过 {MaximumRows:N0} 条。请缩小客户名称、状态或其它筛选条件后再导出，系统不会静默截断数据。");
+            }
 
             using var workbook = new XLWorkbook();
             var sheet = workbook.Worksheets.Add("CRM客户");

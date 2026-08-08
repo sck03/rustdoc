@@ -57,9 +57,9 @@ namespace ExportDocManager.Services.Infrastructure
                 startInfo.ArgumentList.Add(argument);
             }
 
-            if (!string.IsNullOrEmpty(_databaseSettings.PostgreSqlPassword))
+            if (!string.IsNullOrEmpty(_maintenanceDatabaseSettings.PostgreSqlPassword))
             {
-                startInfo.Environment["PGPASSWORD"] = _databaseSettings.PostgreSqlPassword;
+                startInfo.Environment["PGPASSWORD"] = _maintenanceDatabaseSettings.PostgreSqlPassword;
             }
 
             using var process = new Process { StartInfo = startInfo };
@@ -206,13 +206,13 @@ namespace ExportDocManager.Services.Infrastructure
         private string BuildRestoreScript(
             string backupPath,
             string targetDatabase,
-            string appRole,
+            string restoreRole,
             string ownershipSqlPath,
             PostgreSqlToolPaths tools)
         {
-            string host = DbHelper.NormalizePostgreSqlText(_databaseSettings.PostgreSqlHost);
-            string port = DbHelper.NormalizePostgreSqlPort(_databaseSettings.PostgreSqlPort).ToString();
-            string username = DbHelper.NormalizePostgreSqlText(_databaseSettings.PostgreSqlUsername);
+            string host = DbHelper.NormalizePostgreSqlText(_maintenanceDatabaseSettings.PostgreSqlHost);
+            string port = DbHelper.NormalizePostgreSqlPort(_maintenanceDatabaseSettings.PostgreSqlPort).ToString();
+            string username = DbHelper.NormalizePostgreSqlText(_maintenanceDatabaseSettings.PostgreSqlUsername);
             string pgRestore = string.IsNullOrWhiteSpace(tools.PgRestorePath) ? "pg_restore" : tools.PgRestorePath;
             string psql = string.IsNullOrWhiteSpace(tools.PsqlPath) ? "psql" : tools.PsqlPath;
 
@@ -225,7 +225,7 @@ $ErrorActionPreference = 'Stop'
 $pgRestore = {{QuotePowerShellLiteral(pgRestore)}}
 $restoreArgs = @(
     '--clean', '--if-exists', '--no-owner',
-    '--role', {{QuotePowerShellLiteral(appRole)}},
+    '--role', {{QuotePowerShellLiteral(restoreRole)}},
     '--host', {{QuotePowerShellLiteral(host)}},
     '--port', {{QuotePowerShellLiteral(port)}},
     '--username', {{QuotePowerShellLiteral(username)}},
@@ -253,7 +253,7 @@ if ($LASTEXITCODE -ne 0) { throw "psql failed with exit code $LASTEXITCODE." }
 #!/usr/bin/env sh
 set -eu
 # PostgreSQL 团队版业务数据库还原计划。执行前请确认目标服务器、数据库名和应用账号。
-{QuotePosixShellArgument(pgRestore)} --clean --if-exists --no-owner --role {QuotePosixShellArgument(appRole)} --host {QuotePosixShellArgument(host)} --port {QuotePosixShellArgument(port)} --username {QuotePosixShellArgument(username)} --dbname {QuotePosixShellArgument(targetDatabase)} {QuotePosixShellArgument(backupPath)}
+{QuotePosixShellArgument(pgRestore)} --clean --if-exists --no-owner --role {QuotePosixShellArgument(restoreRole)} --host {QuotePosixShellArgument(host)} --port {QuotePosixShellArgument(port)} --username {QuotePosixShellArgument(username)} --dbname {QuotePosixShellArgument(targetDatabase)} {QuotePosixShellArgument(backupPath)}
 {QuotePosixShellArgument(psql)} --host {QuotePosixShellArgument(host)} --port {QuotePosixShellArgument(port)} --username {QuotePosixShellArgument(username)} --dbname {QuotePosixShellArgument(targetDatabase)} --set=ON_ERROR_STOP=1 --file {QuotePosixShellArgument(ownershipSqlPath)}
 """;
         }
@@ -261,28 +261,38 @@ set -eu
         internal static string BuildPostRestoreOwnershipSql(
             string targetDatabase,
             string appRole,
+            IReadOnlyList<string> oldOwnerRoles) =>
+            BuildPostRestoreOwnershipSql(targetDatabase, appRole, appRole, oldOwnerRoles);
+
+        internal static string BuildPostRestoreOwnershipSql(
+            string targetDatabase,
+            string ownerRole,
+            string appRole,
             IReadOnlyList<string> oldOwnerRoles)
         {
             targetDatabase = NormalizePostgreSqlIdentifier(targetDatabase, "目标数据库名");
+            ownerRole = NormalizePostgreSqlIdentifier(ownerRole, "所有者角色");
             appRole = NormalizePostgreSqlIdentifier(appRole, "应用账号");
-            string roleLiteral = ToSqlLiteral(appRole);
+            string ownerRoleLiteral = ToSqlLiteral(ownerRole);
             string targetDatabaseComment = NormalizeSqlCommentValue(targetDatabase);
+            string ownerRoleComment = NormalizeSqlCommentValue(ownerRole);
             string appRoleComment = NormalizeSqlCommentValue(appRole);
             IReadOnlyList<string> oldRoles = NormalizePostgreSqlOwnerRoles(oldOwnerRoles);
             string reassignBlock = oldRoles.Count == 0
-                ? "-- 如迁移后存在旧 owner 角色，可按需执行：REASSIGN OWNED BY old_role TO " + QuoteIdentifier(appRole) + ";" + Environment.NewLine
-                : string.Join(Environment.NewLine, oldRoles.Select(role => $"REASSIGN OWNED BY {QuoteIdentifier(role)} TO {QuoteIdentifier(appRole)};"));
+                ? "-- 如迁移后存在旧 owner 角色，可按需执行：REASSIGN OWNED BY old_role TO " + QuoteIdentifier(ownerRole) + ";" + Environment.NewLine
+                : string.Join(Environment.NewLine, oldRoles.Select(role => $"REASSIGN OWNED BY {QuoteIdentifier(role)} TO {QuoteIdentifier(ownerRole)};"));
 
             return $"""
 -- PostgreSQL 团队版业务数据库还原后 owner / schema / table / sequence / 权限改派脚本
 -- Target database: {targetDatabaseComment}
+-- Owner role: {ownerRoleComment}
 -- Application role: {appRoleComment}
 
 {reassignBlock}
 
 DO $$
 DECLARE
-    app_role text := {roleLiteral};
+    owner_role text := {ownerRoleLiteral};
     item record;
 BEGIN
     FOR item IN
@@ -291,8 +301,7 @@ BEGIN
         WHERE nspname NOT IN ('pg_catalog', 'information_schema')
           AND nspname NOT LIKE 'pg_toast%'
     LOOP
-        EXECUTE format('ALTER SCHEMA %I OWNER TO %I', item.nspname, app_role);
-        EXECUTE format('GRANT USAGE, CREATE ON SCHEMA %I TO %I', item.nspname, app_role);
+        EXECUTE format('ALTER SCHEMA %I OWNER TO %I', item.nspname, owner_role);
     END LOOP;
 
     FOR item IN
@@ -300,7 +309,7 @@ BEGIN
         FROM pg_tables
         WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
     LOOP
-        EXECUTE format('ALTER TABLE %I.%I OWNER TO %I', item.schemaname, item.tablename, app_role);
+        EXECUTE format('ALTER TABLE %I.%I OWNER TO %I', item.schemaname, item.tablename, owner_role);
     END LOOP;
 
     FOR item IN
@@ -308,7 +317,7 @@ BEGIN
         FROM information_schema.sequences
         WHERE sequence_schema NOT IN ('pg_catalog', 'information_schema')
     LOOP
-        EXECUTE format('ALTER SEQUENCE %I.%I OWNER TO %I', item.sequence_schema, item.sequence_name, app_role);
+        EXECUTE format('ALTER SEQUENCE %I.%I OWNER TO %I', item.sequence_schema, item.sequence_name, owner_role);
     END LOOP;
 
     FOR item IN
@@ -316,7 +325,7 @@ BEGIN
         FROM pg_views
         WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
     LOOP
-        EXECUTE format('ALTER VIEW %I.%I OWNER TO %I', item.schemaname, item.viewname, app_role);
+        EXECUTE format('ALTER VIEW %I.%I OWNER TO %I', item.schemaname, item.viewname, owner_role);
     END LOOP;
 
     FOR item IN
@@ -329,23 +338,25 @@ BEGIN
         WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
     LOOP
         IF item.routine_kind = 'p' THEN
-            EXECUTE format('ALTER PROCEDURE %I.%I(%s) OWNER TO %I', item.schema_name, item.routine_name, item.args, app_role);
+            EXECUTE format('ALTER PROCEDURE %I.%I(%s) OWNER TO %I', item.schema_name, item.routine_name, item.args, owner_role);
         ELSIF item.routine_kind = 'a' THEN
-            EXECUTE format('ALTER AGGREGATE %I.%I(%s) OWNER TO %I', item.schema_name, item.routine_name, item.args, app_role);
+            EXECUTE format('ALTER AGGREGATE %I.%I(%s) OWNER TO %I', item.schema_name, item.routine_name, item.args, owner_role);
         ELSE
-            EXECUTE format('ALTER FUNCTION %I.%I(%s) OWNER TO %I', item.schema_name, item.routine_name, item.args, app_role);
+            EXECUTE format('ALTER FUNCTION %I.%I(%s) OWNER TO %I', item.schema_name, item.routine_name, item.args, owner_role);
         END IF;
     END LOOP;
 END $$;
 
+ALTER DATABASE {QuoteIdentifier(targetDatabase)} OWNER TO {QuoteIdentifier(ownerRole)};
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT CONNECT, TEMPORARY ON DATABASE {QuoteIdentifier(targetDatabase)} TO {QuoteIdentifier(appRole)};
-GRANT USAGE, CREATE ON SCHEMA public TO {QuoteIdentifier(appRole)};
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO {QuoteIdentifier(appRole)};
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO {QuoteIdentifier(appRole)};
+GRANT USAGE ON SCHEMA public TO {QuoteIdentifier(appRole)};
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {QuoteIdentifier(appRole)};
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {QuoteIdentifier(appRole)};
 GRANT EXECUTE ON ALL ROUTINES IN SCHEMA public TO {QuoteIdentifier(appRole)};
-ALTER DEFAULT PRIVILEGES FOR ROLE {QuoteIdentifier(appRole)} IN SCHEMA public GRANT ALL ON TABLES TO {QuoteIdentifier(appRole)};
-ALTER DEFAULT PRIVILEGES FOR ROLE {QuoteIdentifier(appRole)} IN SCHEMA public GRANT ALL ON SEQUENCES TO {QuoteIdentifier(appRole)};
-ALTER DEFAULT PRIVILEGES FOR ROLE {QuoteIdentifier(appRole)} IN SCHEMA public GRANT EXECUTE ON ROUTINES TO {QuoteIdentifier(appRole)};
+ALTER DEFAULT PRIVILEGES FOR ROLE {QuoteIdentifier(ownerRole)} IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {QuoteIdentifier(appRole)};
+ALTER DEFAULT PRIVILEGES FOR ROLE {QuoteIdentifier(ownerRole)} IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO {QuoteIdentifier(appRole)};
+ALTER DEFAULT PRIVILEGES FOR ROLE {QuoteIdentifier(ownerRole)} IN SCHEMA public GRANT EXECUTE ON ROUTINES TO {QuoteIdentifier(appRole)};
 """;
         }
 

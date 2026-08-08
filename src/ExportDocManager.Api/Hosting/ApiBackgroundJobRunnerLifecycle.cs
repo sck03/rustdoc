@@ -8,27 +8,33 @@ namespace ExportDocManager.Api.Hosting
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            Task[] activeTasks;
+            Task shutdownTask;
+            bool initiateShutdown = false;
             lock (_lifecycleSync)
             {
-                if (Volatile.Read(ref _stopping) != 0)
+                if (_shutdownTask == null)
                 {
-                    return;
+                    Volatile.Write(ref _stopping, 1);
+                    Task[] activeTasks = _activeJobs.Values
+                        .Select(completion => completion.Task)
+                        .ToArray();
+                    _shutdownTask = activeTasks.Length == 0
+                        ? Task.CompletedTask
+                        : Task.WhenAll(activeTasks);
+                    initiateShutdown = true;
                 }
 
-                Volatile.Write(ref _stopping, 1);
-                activeTasks = _activeJobs.Values.Select(completion => completion.Task).ToArray();
+                shutdownTask = _shutdownTask;
             }
 
-            _applicationStopping.Cancel();
-            if (activeTasks.Length == 0)
+            if (initiateShutdown)
             {
-                return;
+                _applicationStopping.Cancel();
             }
 
             try
             {
-                await Task.WhenAll(activeTasks).WaitAsync(cancellationToken).ConfigureAwait(false);
+                await shutdownTask.WaitAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

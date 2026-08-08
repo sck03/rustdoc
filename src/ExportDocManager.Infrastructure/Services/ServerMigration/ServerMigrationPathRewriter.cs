@@ -26,16 +26,18 @@ namespace ExportDocManager.Services.Infrastructure
             DatabaseConnectionSettings settings,
             string sourceRoot,
             string targetRoot,
+            bool? sourcePathCaseSensitive,
             CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(sourceRoot) || string.IsNullOrWhiteSpace(targetRoot))
             {
                 return;
             }
-            sourceRoot = sourceRoot.TrimEnd('/', '\\');
-            targetRoot = targetRoot.TrimEnd('/', '\\');
-            bool sourcePathCaseSensitive = IsSourcePathCaseSensitive(sourceRoot);
-            StringComparison sourceComparison = sourcePathCaseSensitive
+            PathRootModel source = CreateRootModel(sourceRoot, sourcePathCaseSensitive);
+            PathRootModel target = CreateRootModel(targetRoot, null);
+            sourceRoot = source.Normalized;
+            targetRoot = target.Normalized;
+            StringComparison sourceComparison = source.CaseSensitive
                 ? StringComparison.Ordinal
                 : StringComparison.OrdinalIgnoreCase;
             if (string.Equals(sourceRoot, targetRoot, sourceComparison))
@@ -58,9 +60,16 @@ namespace ExportDocManager.Services.Infrastructure
                     string identifier = QuoteIdentifier(column);
                     string remainder = $"substring({identifier} from char_length(@source) + 1)";
                     string relative = $"ltrim({remainder}, '/' || chr(92))";
-                    string sourcePrefixPredicate = sourcePathCaseSensitive
+                    string sourcePrefixPredicate = source.CaseSensitive
                         ? $"left({identifier}, char_length(@source)) = @source"
                         : $"lower(left({identifier}, char_length(@source))) = lower(@source)";
+                    string sourceBoundaryPredicate = sourceRoot.EndsWith("/", StringComparison.Ordinal)
+                        ? "TRUE"
+                        : $"""
+char_length({identifier}) = char_length(@source)
+    OR substring({identifier} from char_length(@source) + 1 for 1) = '/'
+    OR ascii(nullif(substring({identifier} from char_length(@source) + 1 for 1), '')) = 92
+""";
                     update.CommandText = $"""
 UPDATE {QuoteIdentifier(table)}
 SET {identifier} = @target ||
@@ -70,11 +79,7 @@ SET {identifier} = @target ||
     END
 WHERE {identifier} IS NOT NULL
   AND {sourcePrefixPredicate}
-  AND (
-    char_length({identifier}) = char_length(@source)
-    OR substring({identifier} from char_length(@source) + 1 for 1) = '/'
-    OR ascii(nullif(substring({identifier} from char_length(@source) + 1 for 1), '')) = 92
-  );
+  AND ({sourceBoundaryPredicate});
 """;
                     update.Parameters.AddWithValue("source", sourceRoot);
                     update.Parameters.AddWithValue("target", targetRoot);
@@ -94,7 +99,8 @@ WHERE {identifier} IS NOT NULL
             string value,
             string sourceRoot,
             string targetRoot,
-            char targetSeparator)
+            char targetSeparator,
+            bool? sourcePathCaseSensitive = null)
         {
             if (string.IsNullOrWhiteSpace(value) ||
                 string.IsNullOrWhiteSpace(sourceRoot) ||
@@ -103,12 +109,15 @@ WHERE {identifier} IS NOT NULL
                 return value;
             }
 
-            string normalizedSource = NormalizeSeparators(sourceRoot).TrimEnd('/');
+            PathRootModel source = CreateRootModel(sourceRoot, sourcePathCaseSensitive);
+            PathRootModel target = CreateRootModel(targetRoot, null);
+            string normalizedSource = source.Normalized;
             string normalizedValue = NormalizeSeparators(value);
-            StringComparison sourceComparison = IsSourcePathCaseSensitive(normalizedSource)
+            StringComparison sourceComparison = source.CaseSensitive
                 ? StringComparison.Ordinal
                 : StringComparison.OrdinalIgnoreCase;
             if (!normalizedValue.StartsWith(normalizedSource, sourceComparison) ||
+                !normalizedSource.EndsWith("/", StringComparison.Ordinal) &&
                 normalizedValue.Length > normalizedSource.Length &&
                 normalizedValue[normalizedSource.Length] != '/')
             {
@@ -116,26 +125,58 @@ WHERE {identifier} IS NOT NULL
             }
 
             string relative = normalizedValue[normalizedSource.Length..].TrimStart('/');
-            string normalizedTarget = NormalizeSeparators(targetRoot).TrimEnd('/');
+            string normalizedTarget = target.Normalized;
             string combined = string.IsNullOrEmpty(relative)
                 ? normalizedTarget
-                : $"{normalizedTarget}/{relative}";
+                : normalizedTarget.EndsWith("/", StringComparison.Ordinal)
+                    ? $"{normalizedTarget}{relative}"
+                    : $"{normalizedTarget}/{relative}";
             return combined.Replace('/', targetSeparator);
         }
 
         private static string NormalizeSeparators(string value) =>
             value.Replace('\\', '/');
 
-        private static bool IsSourcePathCaseSensitive(string sourceRoot)
+        private static PathRootModel CreateRootModel(string value, bool? caseSensitive)
         {
-            string normalized = NormalizeSeparators(sourceRoot ?? string.Empty);
+            string normalized = NormalizeSeparators(value?.Trim() ?? string.Empty);
+            if (normalized == "/")
+            {
+                return new PathRootModel("/", caseSensitive ?? true);
+            }
+
             bool isWindowsDrivePath = normalized.Length >= 3 &&
                 char.IsAsciiLetter(normalized[0]) &&
                 normalized[1] == ':' &&
                 normalized[2] == '/';
             bool isWindowsUncPath = normalized.StartsWith("//", StringComparison.Ordinal);
-            return !isWindowsDrivePath && !isWindowsUncPath;
+            int minimumLength = isWindowsDrivePath ? 3 : isWindowsUncPath ? GetUncRootLength(normalized) : 1;
+            while (normalized.Length > minimumLength && normalized.EndsWith("/", StringComparison.Ordinal))
+            {
+                normalized = normalized[..^1];
+            }
+
+            bool inferredCaseSensitive = !isWindowsDrivePath &&
+                                         !isWindowsUncPath &&
+                                         !LooksLikeDefaultMacPath(normalized);
+            return new PathRootModel(normalized, caseSensitive ?? inferredCaseSensitive);
         }
+
+        private static int GetUncRootLength(string normalized)
+        {
+            string[] segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            return segments.Length < 2
+                ? 2
+                : 2 + segments[0].Length + 1 + segments[1].Length;
+        }
+
+        private static bool LooksLikeDefaultMacPath(string normalized) =>
+            normalized.Equals("/Users", StringComparison.OrdinalIgnoreCase) ||
+            normalized.StartsWith("/Users/", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("/Volumes", StringComparison.OrdinalIgnoreCase) ||
+            normalized.StartsWith("/Volumes/", StringComparison.OrdinalIgnoreCase);
+
+        private sealed record PathRootModel(string Normalized, bool CaseSensitive);
 
         private static string QuoteIdentifier(string value) =>
             $"\"{value.Replace("\"", "\"\"")}\"";

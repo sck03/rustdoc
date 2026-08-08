@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Errors;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -130,10 +131,12 @@ namespace ExportDocManager.Services.Infrastructure
                     dataRoot,
                     "受管维护目录不能包含符号链接或重解析点。");
                 Directory.CreateDirectory(fullPath);
-                return PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                fullPath = PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
                     fullPath,
                     dataRoot,
                     "受管维护目录不能包含符号链接或重解析点。");
+                RuntimeFilePermissionHelper.RestrictDirectory(fullPath);
+                return fullPath;
             }
             catch (UnauthorizedAccessException ex)
             {

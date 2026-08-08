@@ -15,6 +15,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ApiLoginAttemptService loginAttempts,
+                ApiDownloadTicketService downloadTicketService,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 ILogger<ApiLoginAttemptService> logger) =>
             {
                 if (string.IsNullOrWhiteSpace(request?.Username))
@@ -87,6 +89,9 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 loginAttempts.RecordSuccess(username, remoteAddress);
+                downloadTicketService.ResetSession(
+                    context,
+                    revokeUnboundDesktopTickets: ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions));
                 var token = await tokenService.IssueAsync(user, cancellationToken: context.RequestAborted);
                 return Results.Ok(new ApiLoginResponse(
                     "Bearer",
@@ -137,11 +142,23 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("RenewSession");
 
-            endpoints.MapPost("/api/auth/logout", async (HttpContext context, IApiSessionTokenService tokenService) =>
+            endpoints.MapPost("/api/auth/logout", async (
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                ApiDownloadTicketService downloadTicketService) =>
             {
+                var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 bool revoked = await tokenService.RevokeAsync(
                     ApiCurrentUserContext.GetBearerToken(context),
                     context.RequestAborted);
+                if (user != null)
+                {
+                    downloadTicketService.RevokeSubject(context, user.Id.ToString());
+                }
+                else
+                {
+                    downloadTicketService.ResetSession(context);
+                }
                 return Results.Ok(new ApiLogoutResponse(revoked));
             })
             .WithName("Logout");

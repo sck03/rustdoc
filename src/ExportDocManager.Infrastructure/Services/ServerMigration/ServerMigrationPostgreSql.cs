@@ -56,6 +56,7 @@ namespace ExportDocManager.Services.Infrastructure
                     throw new InvalidDataException("服务器迁移恢复前 PostgreSQL 安全备份为空。");
                 }
 
+                RuntimeFilePermissionHelper.RestrictFile(temporaryPath);
                 AtomicFileHelper.ReplaceFile(temporaryPath, destination);
                 RuntimeFilePermissionHelper.RestrictFile(destination);
             }
@@ -72,6 +73,8 @@ namespace ExportDocManager.Services.Infrastructure
             CancellationToken cancellationToken)
         {
             EnsureReady(tools);
+            string ownerRole = PostgreSqlMaintenanceConnectionResolver.ResolveOwnerRole(
+                settings.PostgreSqlUsername);
             return RunToolAsync(
                 tools.PgRestorePath,
                 [
@@ -81,6 +84,7 @@ namespace ExportDocManager.Services.Infrastructure
                     "--single-transaction",
                     "--no-owner",
                     "--no-privileges",
+                    "--role", ownerRole,
                     "--host", settings.PostgreSqlHost,
                     "--port", settings.PostgreSqlPort.ToString(),
                     "--username", settings.PostgreSqlUsername,
@@ -107,6 +111,8 @@ namespace ExportDocManager.Services.Infrastructure
                 .ConfigureAwait(false);
             try
             {
+                string ownerRole = PostgreSqlMaintenanceConnectionResolver.ResolveOwnerRole(
+                    settings.PostgreSqlUsername);
                 DatabaseConnectionSettings validationSettings = CloneWithDatabase(
                     settings,
                     validationDatabaseName);
@@ -117,6 +123,7 @@ namespace ExportDocManager.Services.Infrastructure
                         "--single-transaction",
                         "--no-owner",
                         "--no-privileges",
+                        "--role", ownerRole,
                         "--host", settings.PostgreSqlHost,
                         "--port", settings.PostgreSqlPort.ToString(),
                         "--username", settings.PostgreSqlUsername,
@@ -172,7 +179,10 @@ namespace ExportDocManager.Services.Infrastructure
                     DbHelper.BuildPostgreSqlConnectionString(settings));
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
                 await using NpgsqlCommand command = connection.CreateCommand();
-                command.CommandText = $"CREATE DATABASE {QuoteIdentifier(databaseName)} TEMPLATE template0 ENCODING 'UTF8';";
+                string ownerRole = PostgreSqlMaintenanceConnectionResolver.ResolveOwnerRole(
+                    settings.PostgreSqlUsername);
+                command.CommandText =
+                    $"CREATE DATABASE {QuoteIdentifier(databaseName)} OWNER {QuoteIdentifier(ownerRole)} TEMPLATE template0 ENCODING 'UTF8';";
                 await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (PostgresException ex) when (ex.SqlState == "42501")

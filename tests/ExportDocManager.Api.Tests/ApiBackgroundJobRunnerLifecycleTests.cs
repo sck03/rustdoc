@@ -40,6 +40,40 @@ public sealed class ApiBackgroundJobRunnerLifecycleTests
     }
 
     [Fact]
+    public async Task StopAsync_AfterCallerTimeout_ShouldAllowLaterCallerToAwaitSameDrain()
+    {
+        var jobService = new ApiBackgroundJobService();
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        var runner = new ApiBackgroundJobRunner(
+            jobService,
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            NullLogger<ApiBackgroundJobRunner>.Instance);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        runner.Enqueue(
+            "Test",
+            "重复等待停机任务",
+            string.Empty,
+            async (_, _) =>
+            {
+                started.TrySetResult();
+                await release.Task;
+                return string.Empty;
+            });
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        using var firstWait = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+        await runner.StopAsync(firstWait.Token);
+        Task secondWait = runner.StopAsync(CancellationToken.None);
+        await Task.Delay(100);
+        Assert.False(secondWait.IsCompleted);
+
+        release.TrySetResult();
+        await secondWait.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public async Task Enqueue_ShouldRejectNewJobsAfterShutdownBegins()
     {
         var jobService = new ApiBackgroundJobService();

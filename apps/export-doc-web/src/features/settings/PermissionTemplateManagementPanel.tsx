@@ -11,6 +11,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
+import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
 type TemplateDraft = {
   id: number;
@@ -46,6 +47,7 @@ export function PermissionTemplateManagementPanel({
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<TemplateDraft>(() => createEmptyDraft());
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [persistedDraftSnapshot, setPersistedDraftSnapshot] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -72,7 +74,7 @@ export function PermissionTemplateManagementPanel({
 
   useEffect(() => {
     if (selectedId == null && templates.length > 0) {
-      selectTemplate(templates[0]);
+      applyTemplate(templates[0]);
     }
   }, [selectedId, templates]);
 
@@ -89,8 +91,10 @@ export function PermissionTemplateManagementPanel({
         ? client.updatePermissionTemplate({ id: draft.id, body })
         : client.createPermissionTemplate({ body }),
     onSuccess: async (saved) => {
+      const savedDraft = createDraftFromTemplate(saved);
       setSelectedId(saved.id);
-      setDraft(createDraftFromTemplate(saved));
+      setDraft(savedDraft);
+      setPersistedDraftSnapshot(buildTemplateDraftSnapshot(savedDraft));
       setMessage(null);
       setSuccessMessage("权限模板已保存；已登录用户重新登录后生效。");
       await Promise.all([
@@ -109,6 +113,7 @@ export function PermissionTemplateManagementPanel({
     onSuccess: async (response) => {
       setSelectedId(null);
       setDraft(createEmptyDraft());
+      setPersistedDraftSnapshot(null);
       setMessage(null);
       setSuccessMessage(response.message || "权限模板已删除。");
       await Promise.all([
@@ -122,22 +127,49 @@ export function PermissionTemplateManagementPanel({
     },
   });
 
+  const currentDraftSnapshot = useMemo(() => buildTemplateDraftSnapshot(draft), [draft]);
+  const hasUnsavedTemplateChanges = Boolean(
+    canManageUsers &&
+    selectedId != null &&
+    (persistedDraftSnapshot == null || currentDraftSnapshot !== persistedDraftSnapshot),
+  );
+  const { confirmDiscardChanges } = useUnsavedChangesGuard({
+    isDirty: hasUnsavedTemplateChanges,
+    message: "当前权限模板有未保存的修改。",
+  });
+
   if (!canManageUsers) return null;
   const isAdminTemplate = draft.isSystem && draft.code.toLowerCase() === "admin";
   const isBusy = catalogQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
   const enabledBusinessModuleCount = Object.entries(draft.moduleAccess)
     .filter(([moduleKey, accessLevel]) => businessModuleKeys.has(moduleKey) && Boolean(accessLevel)).length;
 
-  function selectTemplate(template: ApiPermissionTemplateDto) {
+  function applyTemplate(template: ApiPermissionTemplateDto) {
+    const nextDraft = createDraftFromTemplate(template);
     setSelectedId(template.id);
-    setDraft(createDraftFromTemplate(template));
+    setDraft(nextDraft);
+    setPersistedDraftSnapshot(buildTemplateDraftSnapshot(nextDraft));
     setMessage(null);
     setSuccessMessage(null);
   }
 
-  function beginNew() {
+  async function selectTemplate(template: ApiPermissionTemplateDto) {
+    if (template.id === selectedId || !await confirmDiscardChanges(`切换到权限模板“${template.name}”`)) {
+      return;
+    }
+
+    applyTemplate(template);
+  }
+
+  async function beginNew() {
+    if (!await confirmDiscardChanges("新建权限模板")) {
+      return;
+    }
+
+    const emptyDraft = createEmptyDraft();
     setSelectedId(0);
-    setDraft(createEmptyDraft());
+    setDraft(emptyDraft);
+    setPersistedDraftSnapshot(buildTemplateDraftSnapshot(emptyDraft));
     setMessage(null);
     setSuccessMessage(null);
   }
@@ -153,6 +185,7 @@ export function PermissionTemplateManagementPanel({
       isSystem: false,
       isActive: true,
     }));
+    setPersistedDraftSnapshot(null);
     setMessage(null);
     setSuccessMessage(null);
   }
@@ -175,10 +208,28 @@ export function PermissionTemplateManagementPanel({
     });
   }
 
+  async function refreshTemplates() {
+    if (!await confirmDiscardChanges("刷新权限模板")) {
+      return;
+    }
+
+    const result = await catalogQuery.refetch();
+    if (selectedId && selectedId > 0) {
+      const refreshedTemplate = result.data?.templates.find((template) => template.id === selectedId);
+      if (refreshedTemplate) {
+        applyTemplate(refreshedTemplate);
+      }
+    }
+  }
+
   async function deleteSelected() {
     if (draft.id <= 0 || draft.isSystem) return;
-    if (!await requestConfirmation({ title: "删除权限模板", description: `确定删除权限模板“${draft.name}”吗？`, details: ["正在被账号使用的模板不会被删除。"], confirmLabel: "确认删除", tone: "danger" })) return;
-    deleteMutation.mutate(draft.id);
+    if (!await confirmDiscardChanges("删除当前权限模板")) return;
+    const persistedTemplate = templates.find((template) => template.id === draft.id);
+    if (!persistedTemplate) return;
+    if (!await requestConfirmation({ title: "删除权限模板", description: `确定删除权限模板“${persistedTemplate.name}”吗？`, details: ["正在被账号使用的模板不会被删除。"], confirmLabel: "确认删除", tone: "danger" })) return;
+    applyTemplate(persistedTemplate);
+    deleteMutation.mutate(persistedTemplate.id);
   }
 
   function patchAccess(moduleKey: string, accessLevel: string) {
@@ -197,8 +248,8 @@ export function PermissionTemplateManagementPanel({
           <p className="section-description">按岗位选择业务模块即可；未授权的页面和操作会自动隐藏或停用。</p>
         </div>
         <div className="toolbar-actions">
-          <button className="icon-button" type="button" title="刷新模板" aria-label="刷新模板" disabled={isBusy} onClick={() => void catalogQuery.refetch()}><RefreshCw size={18} /></button>
-          <button className="icon-button" type="button" title="新建模板" aria-label="新建模板" disabled={isBusy} onClick={beginNew}><Plus size={18} /></button>
+          <button className="icon-button" type="button" title="刷新模板" aria-label="刷新模板" disabled={isBusy} onClick={() => void refreshTemplates()}><RefreshCw size={18} /></button>
+          <button className="icon-button" type="button" title="新建模板" aria-label="新建模板" disabled={isBusy} onClick={() => void beginNew()}><Plus size={18} /></button>
           <button className="icon-button" type="button" title="复制当前模板" aria-label="复制当前模板" disabled={isBusy || draft.id <= 0} onClick={copySelected}><Copy size={18} /></button>
           <button className="command-button" type="button" disabled={isBusy || isAdminTemplate} onClick={saveTemplate}><Save size={17} /><span>保存模板</span></button>
           <button className="icon-button" type="button" title="删除模板" aria-label="删除模板" disabled={isBusy || draft.id <= 0 || draft.isSystem} onClick={deleteSelected}><Trash2 size={18} /></button>
@@ -219,7 +270,7 @@ export function PermissionTemplateManagementPanel({
               key={template.id}
               type="button"
               className={template.id === selectedId ? "permission-template-card selected" : "permission-template-card"}
-              onClick={() => selectTemplate(template)}
+              onClick={() => void selectTemplate(template)}
             >
               <span><strong>{template.name}</strong>{template.isSystem ? <small>内置</small> : null}</span>
               <small>{template.description || "自定义岗位权限"}</small>
@@ -298,6 +349,20 @@ function createEmptyDraft(): TemplateDraft {
     isActive: true,
     moduleAccess: {},
   };
+}
+
+function buildTemplateDraftSnapshot(draft: TemplateDraft) {
+  return JSON.stringify({
+    id: draft.id,
+    code: draft.code,
+    name: draft.name,
+    description: draft.description,
+    isSystem: draft.isSystem,
+    isActive: draft.isActive,
+    moduleAccess: Object.fromEntries(
+      Object.entries(draft.moduleAccess).sort(([left], [right]) => left.localeCompare(right)),
+    ),
+  });
 }
 
 function createCustomTemplateCode() {

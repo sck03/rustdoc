@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { useConfirmation } from "./ConfirmationProvider.tsx";
 
 const defaultUnsavedChangesMessage = "当前页面有未保存的修改。";
@@ -12,6 +13,7 @@ type UnsavedChangesEntry = {
 
 type UnsavedChangesContextValue = {
   confirmDiscardChanges: (actionLabel?: string) => Promise<boolean>;
+  confirmEntryDiscardChanges: (entry: UnsavedChangesEntry, actionLabel?: string) => Promise<boolean>;
   hasUnsavedChanges: boolean;
   removeEntry: (id: string) => void;
   setEntry: (entry: UnsavedChangesEntry) => void;
@@ -22,12 +24,22 @@ type UnsavedChangesGuardOptions = {
   message?: string;
 };
 
+type PendingHistoryNavigation = {
+  originIndex: number;
+  targetIndex: number;
+  delta: number;
+  phase: "restoring" | "confirming" | "leaving";
+};
+
 const UnsavedChangesContext = createContext<UnsavedChangesContextValue | null>(null);
 
 export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
   const requestConfirmation = useConfirmation();
+  const location = useLocation();
   const entriesRef = useRef<Map<string, UnsavedChangesEntry>>(new Map());
   const activeEntryRef = useRef<UnsavedChangesEntry | null>(null);
+  const historyIndexRef = useRef(readHistoryIndex(window.history.state));
+  const pendingHistoryNavigationRef = useRef<PendingHistoryNavigation | null>(null);
   const [activeEntry, setActiveEntry] = useState<UnsavedChangesEntry | null>(null);
 
   const publishActiveEntry = useCallback(() => {
@@ -61,9 +73,11 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
     [publishActiveEntry],
   );
 
-  const confirmDiscardChanges = useCallback(async (actionLabel?: string) => {
-    const entry = activeEntryRef.current;
-    if (!entry) {
+  const confirmEntryDiscardChanges = useCallback(async (
+    entry: UnsavedChangesEntry,
+    actionLabel?: string,
+  ) => {
+    if (!entry.isDirty) {
       return true;
     }
 
@@ -75,6 +89,11 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
       tone: "warning",
     });
   }, [requestConfirmation]);
+
+  const confirmDiscardChanges = useCallback(async (actionLabel?: string) => {
+    const entry = activeEntryRef.current;
+    return entry ? confirmEntryDiscardChanges(entry, actionLabel) : true;
+  }, [confirmEntryDiscardChanges]);
 
   useEffect(() => {
     function handleBeforeUnload(event: BeforeUnloadEvent) {
@@ -114,14 +133,80 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("click", handleDocumentClick, true);
   }, [confirmDiscardChanges]);
 
+  useEffect(() => {
+    // HashRouter records an `idx` value in history.state. Keep the last fully
+    // accepted entry so a browser Back/Forward action can be reversed before
+    // asking the asynchronous in-app confirmation question.
+    if (!pendingHistoryNavigationRef.current) {
+      historyIndexRef.current = readHistoryIndex(window.history.state);
+    }
+  }, [location.hash, location.key, location.pathname, location.search]);
+
+  useEffect(() => {
+    function handlePopState(event: PopStateEvent) {
+      const targetIndex = readHistoryIndex(event.state);
+      const pending = pendingHistoryNavigationRef.current;
+
+      if (pending) {
+        if (pending.phase === "restoring" && targetIndex === pending.originIndex) {
+          historyIndexRef.current = pending.originIndex;
+          pending.phase = "confirming";
+          void confirmDiscardChanges("离开当前编辑页").then((confirmed) => {
+            if (pendingHistoryNavigationRef.current !== pending) {
+              return;
+            }
+
+            if (!confirmed) {
+              pendingHistoryNavigationRef.current = null;
+              return;
+            }
+
+            pending.phase = "leaving";
+            window.history.go(pending.delta);
+          });
+          return;
+        }
+
+        if (pending.phase === "leaving" && targetIndex === pending.targetIndex) {
+          historyIndexRef.current = pending.targetIndex;
+          pendingHistoryNavigationRef.current = null;
+        }
+        return;
+      }
+
+      const originIndex = historyIndexRef.current;
+      if (!activeEntryRef.current || originIndex == null || targetIndex == null) {
+        historyIndexRef.current = targetIndex;
+        return;
+      }
+
+      const delta = targetIndex - originIndex;
+      if (delta === 0) {
+        return;
+      }
+
+      pendingHistoryNavigationRef.current = {
+        originIndex,
+        targetIndex,
+        delta,
+        phase: "restoring",
+      };
+      window.history.go(-delta);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [confirmDiscardChanges]);
+
   const value = useMemo(
     () => ({
       confirmDiscardChanges,
+      confirmEntryDiscardChanges,
       hasUnsavedChanges: Boolean(activeEntry),
       removeEntry,
       setEntry,
     }),
-    [activeEntry, confirmDiscardChanges, removeEntry, setEntry],
+    [activeEntry, confirmDiscardChanges, confirmEntryDiscardChanges, removeEntry, setEntry],
   );
 
   return <UnsavedChangesContext.Provider value={value}>{children}</UnsavedChangesContext.Provider>;
@@ -134,7 +219,7 @@ export function useUnsavedChangesGuard({ isDirty, message = defaultUnsavedChange
     throw new Error("useUnsavedChangesGuard must be used within UnsavedChangesProvider.");
   }
 
-  const { confirmDiscardChanges, removeEntry, setEntry } = context;
+  const { confirmEntryDiscardChanges, removeEntry, setEntry } = context;
 
   useEffect(() => {
     setEntry({
@@ -145,6 +230,11 @@ export function useUnsavedChangesGuard({ isDirty, message = defaultUnsavedChange
 
     return () => removeEntry(id);
   }, [id, isDirty, message, removeEntry, setEntry]);
+
+  const confirmDiscardChanges = useCallback(
+    (actionLabel?: string) => confirmEntryDiscardChanges({ id, isDirty, message }, actionLabel),
+    [confirmEntryDiscardChanges, id, isDirty, message],
+  );
 
   return {
     confirmDiscardChanges,
@@ -172,6 +262,15 @@ export function useHasUnsavedChanges() {
 
 function normalizeUnsavedChangesMessage(message: string) {
   return message.trim() || defaultUnsavedChangesMessage;
+}
+
+function readHistoryIndex(state: unknown) {
+  if (!state || typeof state !== "object" || !("idx" in state)) {
+    return null;
+  }
+
+  const index = (state as { idx?: unknown }).idx;
+  return typeof index === "number" && Number.isInteger(index) ? index : null;
 }
 
 function shouldCheckAnchorNavigation(event: MouseEvent) {

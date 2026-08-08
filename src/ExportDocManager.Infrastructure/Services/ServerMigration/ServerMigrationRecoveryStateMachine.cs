@@ -61,6 +61,15 @@ public static partial class ServerMigrationRecoveryStateMachine
                 return;
             }
 
+            ServerMigrationManager.WriteStatus(
+                pathProvider,
+                marker,
+                string.IsNullOrWhiteSpace(marker.StatusMessage)
+                    ? string.IsNullOrWhiteSpace(marker.LastError)
+                        ? "服务器迁移已结束。"
+                        : marker.LastError
+                    : marker.StatusMessage,
+                marker.SafetyBackupRoot);
             AtomicFileHelper.TryDeleteDirectory(stagingRoot);
             AtomicFileHelper.TryDeleteFile(markerPath);
             return;
@@ -83,6 +92,7 @@ public static partial class ServerMigrationRecoveryStateMachine
         string databaseDump = ServerMigrationPackageValidator.ResolvePath(
             stagingRoot,
             ServerMigrationLayout.DatabaseEntry);
+        DatabaseConnectionSettings applicationSettings = null;
         DatabaseConnectionSettings settings = null;
         PostgreSqlToolPaths tools = null;
         ServerMigrationFileTransactionState fileState = null;
@@ -103,12 +113,15 @@ public static partial class ServerMigrationRecoveryStateMachine
             }
             ValidateStagedManifest(stagingRoot, marker.Manifest);
             ValidateMasterKeyCompatibility(stagingRoot, marker.Manifest);
-            settings = DbHelper.LoadDatabaseSettings();
-            if (!DatabaseModeHelper.UsesSharedDatabase(settings))
+            applicationSettings = DbHelper.LoadDatabaseSettings();
+            if (!DatabaseModeHelper.UsesSharedDatabase(applicationSettings))
             {
                 throw new ServiceValidationException(
                     "服务器迁移恢复要求当前服务器已配置 PostgreSQL 连接。");
             }
+            settings = PostgreSqlMaintenanceConnectionResolver.Resolve(
+                applicationSettings,
+                pathProvider).ConnectionSettings;
             tools = PostgreSqlToolLocator.Resolve(pathProvider);
             if (!tools.ToolsReady)
             {
@@ -161,7 +174,7 @@ public static partial class ServerMigrationRecoveryStateMachine
                 stagingRoot,
                 safetyRoot,
                 marker,
-                settings);
+                applicationSettings);
 
             UpdatePhase(
                 pathProvider,
@@ -178,6 +191,7 @@ public static partial class ServerMigrationRecoveryStateMachine
                 settings,
                 marker.Manifest.SourceDataRoot,
                 pathProvider.DataRoot,
+                marker.Manifest.SourcePathCaseSensitive,
                 cancellationToken).ConfigureAwait(false);
 
             UpdatePhase(
@@ -193,7 +207,6 @@ public static partial class ServerMigrationRecoveryStateMachine
             marker.UpdatedAtUtc = DateTimeOffset.UtcNow;
             marker.LastError = string.Empty;
             marker.ManualRecoveryRequired = false;
-            ServerMigrationManager.WriteMarker(markerPath, marker);
             ServerMigrationManager.WriteStatus(
                 pathProvider,
                 marker,
@@ -250,7 +263,10 @@ public static partial class ServerMigrationRecoveryStateMachine
         PostgreSqlToolPaths tools = null;
         try
         {
-            settings = DbHelper.LoadDatabaseSettings();
+            DatabaseConnectionSettings applicationSettings = DbHelper.LoadDatabaseSettings();
+            settings = PostgreSqlMaintenanceConnectionResolver.Resolve(
+                applicationSettings,
+                pathProvider).ConnectionSettings;
             tools = PostgreSqlToolLocator.Resolve(pathProvider);
             if (!string.IsNullOrWhiteSpace(marker.ValidationDatabaseName) &&
                 DatabaseModeHelper.UsesSharedDatabase(settings))
@@ -316,7 +332,6 @@ public static partial class ServerMigrationRecoveryStateMachine
         marker.Phase = ServerMigrationRestorePhase.RollingBack;
         marker.UpdatedAtUtc = DateTimeOffset.UtcNow;
         marker.LastError = originalError.Message;
-        ServerMigrationManager.TryWriteMarker(markerPath, marker);
         ServerMigrationManager.WriteStatus(
             pathProvider,
             marker,
@@ -379,7 +394,6 @@ public static partial class ServerMigrationRecoveryStateMachine
         marker.UpdatedAtUtc = DateTimeOffset.UtcNow;
         marker.LastError = result;
         marker.ManualRecoveryRequired = rollbackErrors.Count > 0;
-        ServerMigrationManager.TryWriteMarker(markerPath, marker);
         ServerMigrationManager.WriteStatus(pathProvider, marker, result, safetyRoot);
         if (!marker.ManualRecoveryRequired)
         {
@@ -398,7 +412,6 @@ public static partial class ServerMigrationRecoveryStateMachine
         marker.Phase = phase;
         marker.UpdatedAtUtc = DateTimeOffset.UtcNow;
         marker.LastError = string.Empty;
-        ServerMigrationManager.WriteMarker(markerPath, marker);
         ServerMigrationManager.WriteStatus(
             pathProvider,
             marker,

@@ -1,6 +1,7 @@
 using System.Text;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Errors;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -21,7 +22,7 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 await ValidatePgDumpCompatibilityAsync(tools.PgDumpPath, cancellationToken).ConfigureAwait(false);
 
-                string database = DbHelper.NormalizePostgreSqlText(_databaseSettings.PostgreSqlDatabase);
+                string database = DbHelper.NormalizePostgreSqlText(_maintenanceDatabaseSettings.PostgreSqlDatabase);
                 string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd_HHmmss_fff");
                 string fileName = $"{timestamp}_{NormalizeFileToken(database)}_{Guid.NewGuid():N}.dump";
                 string outputPath = Path.Combine(PostgreSqlBackupRoot, fileName);
@@ -33,9 +34,9 @@ namespace ExportDocManager.Services.Infrastructure
                     "--verbose",
                     "--no-owner",
                     "--file", tempPath,
-                    "--host", DbHelper.NormalizePostgreSqlText(_databaseSettings.PostgreSqlHost),
-                    "--port", DbHelper.NormalizePostgreSqlPort(_databaseSettings.PostgreSqlPort).ToString(),
-                    "--username", DbHelper.NormalizePostgreSqlText(_databaseSettings.PostgreSqlUsername),
+                    "--host", DbHelper.NormalizePostgreSqlText(_maintenanceDatabaseSettings.PostgreSqlHost),
+                    "--port", DbHelper.NormalizePostgreSqlPort(_maintenanceDatabaseSettings.PostgreSqlPort).ToString(),
+                    "--username", DbHelper.NormalizePostgreSqlText(_maintenanceDatabaseSettings.PostgreSqlUsername),
                     "--dbname", database
                 };
 
@@ -51,7 +52,9 @@ namespace ExportDocManager.Services.Infrastructure
                         throw new InfrastructureServiceException("pg_dump 未生成有效的备份文件。");
                     }
 
+                    RuntimeFilePermissionHelper.RestrictFile(tempPath);
                     AtomicFileHelper.ReplaceFile(tempPath, outputPath);
+                    RuntimeFilePermissionHelper.RestrictFile(outputPath);
                     var file = new FileInfo(outputPath);
                     return new PostgreSqlPhysicalBackupResult(
                         true,
@@ -99,14 +102,25 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 await File.WriteAllTextAsync(
                     ownershipSqlPath,
-                    BuildPostRestoreOwnershipSql(targetDatabase, appRole, oldOwnerRoles),
+                    BuildPostRestoreOwnershipSql(
+                        targetDatabase,
+                        _postgreSqlOwnerRole,
+                        appRole,
+                        oldOwnerRoles),
                     Encoding.UTF8,
                     cancellationToken).ConfigureAwait(false);
                 await File.WriteAllTextAsync(
                     restoreScriptPath,
-                    BuildRestoreScript(backupPath, targetDatabase, appRole, ownershipSqlPath, tools),
+                    BuildRestoreScript(
+                        backupPath,
+                        targetDatabase,
+                        _postgreSqlOwnerRole,
+                        ownershipSqlPath,
+                        tools),
                     Encoding.UTF8,
                     cancellationToken).ConfigureAwait(false);
+                RuntimeFilePermissionHelper.RestrictFile(ownershipSqlPath);
+                RuntimeFilePermissionHelper.RestrictFile(restoreScriptPath);
 
                 return new PostgreSqlRestorePlanResult(
                     true,

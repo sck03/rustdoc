@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Edit3, Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
@@ -7,8 +7,9 @@ import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
-import { isConcurrencyConflict, normalizeText, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
+import { normalizeText, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { ServerDraftUpdateNotice, useServerDraftSync } from "../../ui/serverDraftSync.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ConcurrencyConflictNotice, InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
@@ -26,7 +27,6 @@ import {
   createEmptyInvoice,
   getCounterpartInvoiceType,
   getInvoiceStatusActionLabel,
-  getInvoiceStatusLabel,
   getNextInvoiceStatus,
   isInvoiceEditableStatus,
   normalizeInvoiceForSave,
@@ -47,7 +47,7 @@ import {
 import { calculateInvoiceTotals } from "./invoiceItemsEditorModel.ts";
 import { useInvoiceEditorReferenceData } from "./useInvoiceEditorReferenceData.ts";
 import { useInvoiceItemsWorkspace } from "./useInvoiceItemsWorkspace.ts";
-import type { ExporterSealType } from "../master-data/ExporterSealField.tsx";
+import { useInvoicePersistenceOperations } from "./useInvoicePersistenceOperations.ts";
 
 export function InvoiceEditorPage({
   client,
@@ -99,7 +99,6 @@ export function InvoiceEditorPage({
   const isInvoiceItemsWorkbenchMode = searchParams.get("workbench") === "items"
     && workspaceDeviceCapabilities.canUseDenseWorkbench;
   const isInvoiceIdValid = Number.isInteger(parsedInvoiceId) && parsedInvoiceId > 0;
-  const queryClient = useQueryClient();
   const routeInvoiceImportKey =
     !isNew && routeInvoiceDraft && routeInvoiceImportAction
       ? `${parsedInvoiceId}:${routeInvoiceImportAction}:${routeInvoiceDraft.invoiceNo}:${routeInvoiceDraft.type}:${
@@ -140,30 +139,29 @@ export function InvoiceEditorPage({
     customOptionsQuery,
   } = useInvoiceEditorReferenceData(client, selectedCustomerId, selectedExporterId);
 
-  const exporterSealMutation = useMutation({
-    mutationFn: async ({ sealType, file }: { sealType: ExporterSealType; file: File }) => {
-      const exporterId = invoice?.exporterId ?? 0;
-      if (exporterId <= 0) throw new Error("请先选择出口商档案，再设置印章。");
-
-      return client.uploadExporterSeal({
-        id: exporterId,
-        sealType,
-        fileName: file.name,
-        body: file,
-      });
-    },
-    onSuccess: async (_saved, variables) => {
-      setMessage(null);
-      setSuccessMessage(variables.sealType === "document" ? "出口商单证章已保存。" : "出口商报关章已保存。");
-      await Promise.all([
-        selectedExporterQuery.refetch(),
-        queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("exporters") }),
-      ]);
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
+  const {
+    cloneInvoiceTypeMutation,
+    deleteInvoiceMutation,
+    exporterSealMutation,
+    refreshParties,
+    saveCustomOptionMutation,
+    saveInvoiceMutation,
+    statusTransitionMutation,
+    unverifyInvoiceMutation,
+  } = useInvoicePersistenceOperations({
+    client,
+    invoice,
+    invoiceId: parsedInvoiceId,
+    isNew,
+    refreshSelectedExporter: async () => selectedExporterQuery.refetch(),
+    resetItemEditHistory: itemsWorkspace.resetEditHistory,
+    setConcurrencyMessage,
+    setInvoice,
+    setMessage,
+    setPendingHsFeedback,
+    setPersistedInvoiceSnapshot,
+    setPersistedInvoiceStatus,
+    setSuccessMessage,
   });
 
   useEffect(() => {
@@ -193,214 +191,12 @@ export function InvoiceEditorPage({
   }, [isNew, isInvoiceIdValid, parsedInvoiceId, routeInvoiceDraft, routeSuccessMessage]);
 
   useEffect(() => {
-    if (!isNew && invoiceQuery.data) {
-      if (routeInvoiceImportKey && appliedRouteInvoiceImportKey === routeInvoiceImportKey) {
-        return;
-      }
-
-      let nextInvoice = invoiceQuery.data;
-      let appliedImportAction: RouteInvoiceImportAction | null = null;
-      if (routeInvoiceDraft && routeInvoiceImportAction && routeInvoiceImportKey) {
-        nextInvoice = mergeRouteInvoiceImportDraft(invoiceQuery.data, routeInvoiceDraft, routeInvoiceImportAction, parsedInvoiceId);
-        appliedImportAction = routeInvoiceImportAction;
-      }
-
-      setInvoice(nextInvoice);
-      setPersistedInvoiceSnapshot(buildInvoiceSnapshot(invoiceQuery.data, parsedInvoiceId));
-      setPersistedInvoiceStatus(normalizeInvoiceStatus(invoiceQuery.data.status));
-      setPendingHsFeedback([]);
-      itemsWorkspace.reset();
-      setMessage(null);
-      if (appliedImportAction && routeInvoiceImportKey) {
-        setAppliedRouteInvoiceImportKey(routeInvoiceImportKey);
-        setSuccessMessage(
-          routeSuccessMessage ||
-            (appliedImportAction === "AppendItems" ? "Excel 明细已追加到当前发票草稿，请核对后保存。" : "Excel 内容已覆盖当前发票草稿，请核对后保存。"),
-        );
-      } else if (routeSuccessMessage) {
-        setSuccessMessage(routeSuccessMessage);
-      }
-    }
-  }, [
-    appliedRouteInvoiceImportKey,
-    invoiceQuery.data,
-    isNew,
-    parsedInvoiceId,
-    routeInvoiceDraft,
-    routeInvoiceImportAction,
-    routeInvoiceImportKey,
-    routeSuccessMessage,
-  ]);
-
-  useEffect(() => {
     if (!isNew && invoiceQuery.isError) {
       setMessage(readApiError(invoiceQuery.error));
       setSuccessMessage(null);
     }
   }, [invoiceQuery.error, invoiceQuery.isError, isNew]);
 
-  const saveInvoiceMutation = useMutation({
-    mutationFn: (body: ApiInvoiceDetailDto) =>
-      isNew
-        ? client.createInvoice({ body })
-        : client.updateInvoice({ id: parsedInvoiceId, body }),
-    onSuccess: async (response) => {
-      setInvoice(response.invoice);
-      setPendingHsFeedback([]);
-      setPersistedInvoiceSnapshot(buildInvoiceSnapshot(response.invoice, response.id));
-      setPersistedInvoiceStatus(normalizeInvoiceStatus(response.invoice.status));
-      itemsWorkspace.resetEditHistory();
-      setMessage(null);
-      setSuccessMessage(response.isUpdate ? "发票已保存。" : "发票已创建。");
-      queryClient.setQueryData(queryKeys.invoice(response.id), response.invoice);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.invoiceParties() }),
-      ]);
-      if (isNew) {
-        navigate(`/invoices/${response.id}`, {
-          replace: true,
-          state: { successMessage: "发票已创建。" },
-        });
-      }
-    },
-    onError: (error) => {
-      const nextMessage = readApiError(error);
-      setMessage(isConcurrencyConflict(error) ? null : nextMessage);
-      setConcurrencyMessage(isConcurrencyConflict(error) ? nextMessage : null);
-      setSuccessMessage(null);
-    },
-  });
-
-  const cloneInvoiceTypeMutation = useMutation({
-    mutationFn: ({ targetType }: { targetType: string }) =>
-      client.cloneInvoiceAsType({
-        id: parsedInvoiceId,
-        body: {
-          targetType,
-          options: {
-            copyHeader: true,
-            copyItems: true,
-            resetDates: false,
-            clearAmounts: false,
-          },
-        },
-      }),
-    onSuccess: async (response) => {
-      setMessage(null);
-      setSuccessMessage(null);
-      queryClient.setQueryData(queryKeys.invoice(response.id), response.invoice);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() }),
-      ]);
-      navigate(`/invoices/${response.id}`, {
-        state: { successMessage: response.message || `已生成同一发票号的${response.invoice.type}。` },
-      });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const unverifyInvoiceMutation = useMutation({
-    mutationFn: () => client.unverifyInvoice({
-      id: parsedInvoiceId,
-      body: {
-        rowVersion: invoice?.rowVersion ?? "",
-        note: "用户申请反审核，返回草稿后重新核对。",
-      },
-    }),
-    onSuccess: async (response) => {
-      setInvoice(response.invoice);
-      setPendingHsFeedback([]);
-      setPersistedInvoiceSnapshot(buildInvoiceSnapshot(response.invoice, response.id));
-      setPersistedInvoiceStatus(normalizeInvoiceStatus(response.invoice.status));
-      setMessage(null);
-      setSuccessMessage("发票已反审核，当前为草稿状态。");
-      queryClient.setQueryData(queryKeys.invoice(response.id), response.invoice);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.invoiceStatusHistory(response.id) }),
-      ]);
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const statusTransitionMutation = useMutation({
-    mutationFn: ({ targetStatus, note }: { targetStatus: string; note: string }) => client.transitionInvoiceStatus({
-      id: parsedInvoiceId,
-      body: {
-        targetStatus,
-        rowVersion: invoice?.rowVersion ?? "",
-        note,
-      },
-    }),
-    onSuccess: async (response) => {
-      setInvoice(response.invoice);
-      setPendingHsFeedback([]);
-      setPersistedInvoiceSnapshot(buildInvoiceSnapshot(response.invoice, response.id));
-      setPersistedInvoiceStatus(normalizeInvoiceStatus(response.invoice.status));
-      setMessage(null);
-      setSuccessMessage(`发票状态已更新为“${getInvoiceStatusLabel(response.invoice.status)}”。`);
-      queryClient.setQueryData(queryKeys.invoice(response.id), response.invoice);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.invoiceStatusHistory(response.id) }),
-      ]);
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const deleteInvoiceMutation = useMutation({
-    mutationFn: () => client.deleteInvoice({ id: parsedInvoiceId }),
-    onSuccess: async (response) => {
-      setMessage(null);
-      setSuccessMessage(null);
-      queryClient.removeQueries({ queryKey: queryKeys.invoice(parsedInvoiceId) });
-      queryClient.removeQueries({ queryKey: queryKeys.singleWindowCustomsCooDocument(parsedInvoiceId) });
-      queryClient.removeQueries({ queryKey: queryKeys.singleWindowCustomsCooExportReview(parsedInvoiceId) });
-      queryClient.removeQueries({ queryKey: queryKeys.singleWindowAgentConsignmentDocument(parsedInvoiceId) });
-      queryClient.removeQueries({ queryKey: queryKeys.singleWindowAgentConsignmentExportReview(parsedInvoiceId) });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() }),
-      ]);
-      navigate("/invoices", {
-        replace: true,
-        state: { successMessage: response.message || "发票已删除。" },
-      });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const saveCustomOptionMutation = useMutation({
-    mutationFn: ({ optionType, value }: { optionType: string; value: string }) =>
-      client.saveCustomOption({
-        optionType,
-        body: { value },
-      }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.customOptionsRoot() });
-    },
-  });
 
   const products = itemsWorkspace.products;
   const units: ApiUnitDto[] = unitsQuery.data ?? [];
@@ -446,15 +242,48 @@ export function InvoiceEditorPage({
       currentInvoiceSnapshot &&
       currentInvoiceSnapshot !== persistedInvoiceSnapshot,
   );
+  const serverDraftSync = useServerDraftSync({
+    resourceKey: isNew ? "new" : parsedInvoiceId,
+    incomingValue: isNew ? null : invoiceQuery.data,
+    isDirty: hasUnsavedInvoiceChanges,
+    fingerprint: (serverInvoice) => buildInvoiceSnapshot(serverInvoice, parsedInvoiceId),
+    applyIncoming: (serverInvoice) => {
+      let nextInvoice = serverInvoice;
+      let appliedImportAction: RouteInvoiceImportAction | null = null;
+      if (routeInvoiceDraft && routeInvoiceImportAction && routeInvoiceImportKey
+        && appliedRouteInvoiceImportKey !== routeInvoiceImportKey) {
+        nextInvoice = mergeRouteInvoiceImportDraft(
+          serverInvoice,
+          routeInvoiceDraft,
+          routeInvoiceImportAction,
+          parsedInvoiceId,
+        );
+        appliedImportAction = routeInvoiceImportAction;
+      }
+
+      setInvoice(nextInvoice);
+      setPersistedInvoiceSnapshot(buildInvoiceSnapshot(serverInvoice, parsedInvoiceId));
+      setPersistedInvoiceStatus(normalizeInvoiceStatus(serverInvoice.status));
+      setPendingHsFeedback([]);
+      itemsWorkspace.reset();
+      setMessage(null);
+      if (appliedImportAction && routeInvoiceImportKey) {
+        setAppliedRouteInvoiceImportKey(routeInvoiceImportKey);
+        setSuccessMessage(
+          routeSuccessMessage ||
+            (appliedImportAction === "AppendItems"
+              ? "Excel 明细已追加到当前发票草稿，请核对后保存。"
+              : "Excel 内容已覆盖当前发票草稿，请核对后保存。"),
+        );
+      } else if (routeSuccessMessage) {
+        setSuccessMessage(routeSuccessMessage);
+      }
+    },
+  });
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: hasUnsavedInvoiceChanges,
     message: "当前发票有未保存的修改。",
   });
-
-  function loadParties() {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("customers") });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("exporters") });
-  }
 
   function patchInvoice(next: Partial<ApiInvoiceDetailDto>) {
     if (!isInvoiceEditable) {
@@ -829,6 +658,11 @@ export function InvoiceEditorPage({
       </div>
 
       {concurrencyMessage ? <ConcurrencyConflictNotice message={concurrencyMessage} isBusy={invoiceQuery.isFetching} onReload={() => void handleReloadLatestInvoice()} /> : null}
+      {serverDraftSync.hasPendingServerVersion ? <ServerDraftUpdateNotice
+        entityLabel="发票"
+        onKeepLocal={serverDraftSync.keepLocalDraft}
+        onLoadServer={serverDraftSync.loadServerVersion}
+      /> : null}
       {message ? <InlineNotice tone="error" title="操作未完成">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {!invoicePermission.canOperate ? (
@@ -903,7 +737,7 @@ export function InvoiceEditorPage({
               onOpenCustomsCoo={handleOpenCustomsCoo}
               onOpenAgentConsignment={handleOpenAgentConsignment}
               onCommitCustomOption={commitInvoiceCustomOption}
-              onRefreshParties={() => void loadParties()}
+              onRefreshParties={() => void refreshParties()}
               onSealUpload={(sealType, file) => exporterSealMutation.mutate({ sealType, file })}
               onSealError={(error) => {
                 setMessage(readApiError(error));

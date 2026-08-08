@@ -1,5 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
@@ -8,6 +9,8 @@ import { captureScreenshot, createPageSession, evaluate, getFreePort, startChrom
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const webRoot = path.join(repositoryRoot, "apps", "export-doc-web");
+const webRequire = createRequire(path.join(webRoot, "package.json"));
+const viteCli = path.join(path.dirname(webRequire.resolve("vite/package.json")), "bin", "vite.js");
 const outputRoot = path.join(repositoryRoot, "artifacts", "frontend-scale-contracts");
 const profileRoot = path.join(repositoryRoot, ".codex-runtime", "frontend-scale-contracts-chrome");
 const browserExecutable = locateChromeForTesting(repositoryRoot, "headless-shell");
@@ -44,11 +47,12 @@ mkdirSync(outputRoot, { recursive: true });
 mkdirSync(profileRoot, { recursive: true });
 
 const port = await getFreePort();
-const viteCommand = process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : "npm";
-const viteArguments = process.platform === "win32"
-  ? ["/d", "/s", "/c", `npm run dev -- --port ${port} --strictPort`]
-  : ["run", "dev", "--", "--port", String(port), "--strictPort"];
-const vite = spawnProcessTree(viteCommand, viteArguments, { cwd: webRoot, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+const vite = spawnProcessTree(process.execPath, [
+  viteCli,
+  "--host", "127.0.0.1",
+  "--port", String(port),
+  "--strictPort",
+], { cwd: webRoot, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
 let viteOutput = "";
 vite.stdout.on("data", (chunk) => { viteOutput += chunk.toString(); });
 vite.stderr.on("data", (chunk) => { viteOutput += chunk.toString(); });

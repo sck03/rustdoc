@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
 using ExportDocManager.Services.Errors;
@@ -14,10 +15,12 @@ namespace ExportDocManager.Services.Tools
         private static readonly JsonSerializerOptions JsonOptions = JsonSerializerOptions.Web;
         private readonly IAppPathProvider _paths;
         private readonly SemaphoreSlim _gate = new(1, 1);
+        private readonly CancellationTokenSource _shutdownSource = new();
         private static readonly TimeSpan QueueWaitLimit = TimeSpan.FromSeconds(30);
         private Process _process;
         private StreamWriter _stdin;
         private BoundedTextLineReader _stdout;
+        private BoundedTextCollector _stderr;
         private int _disposed;
 
         public RustOcrSidecarHost(IAppPathProvider paths) => _paths = paths ?? throw new ArgumentNullException(nameof(paths));
@@ -38,7 +41,10 @@ namespace ExportDocManager.Services.Tools
 
         public async Task<OcrResult> RecognizeAsync(string imagePath, CancellationToken cancellationToken = default)
         {
-            using var queueTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            using var queueTimeout = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                _shutdownSource.Token);
             queueTimeout.CancelAfter(QueueWaitLimit);
             try
             {
@@ -46,16 +52,43 @@ namespace ExportDocManager.Services.Tools
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
+                if (_shutdownSource.IsCancellationRequested)
+                {
+                    throw new ObjectDisposedException(nameof(RustOcrSidecarHost));
+                }
                 throw new ServiceBusyException("OCR 当前任务较多，请稍后重试。");
             }
 
             try
             {
+                ObjectDisposedException.ThrowIf(
+                    Volatile.Read(ref _disposed) != 0 || _shutdownSource.IsCancellationRequested,
+                    this);
                 for (int attempt = 0; ; attempt++)
                 {
+                    using var operationTimeout = CancellationTokenSource.CreateLinkedTokenSource(
+                        cancellationToken,
+                        _shutdownSource.Token);
+                    operationTimeout.CancelAfter(TimeSpan.FromSeconds(90));
                     try
                     {
-                        return await RecognizeCoreAsync(imagePath, cancellationToken);
+                        return await RecognizeCoreAsync(imagePath, operationTimeout.Token);
+                    }
+                    catch (OperationCanceledException) when (
+                        _shutdownSource.IsCancellationRequested &&
+                        !cancellationToken.IsCancellationRequested)
+                    {
+                        await StopAsync();
+                        throw new ObjectDisposedException(
+                            nameof(RustOcrSidecarHost),
+                            "Rust OCR Sidecar 正在停止，当前识别已取消。");
+                    }
+                    catch (OperationCanceledException) when (
+                        !cancellationToken.IsCancellationRequested &&
+                        operationTimeout.IsCancellationRequested)
+                    {
+                        await StopAsync();
+                        throw new ServiceTimeoutException("OCR 识别超过 90 秒，任务已终止，请缩小图片后重试。");
                     }
                     catch (Exception ex) when (attempt == 0 && IsRecoverableTransportFailure(ex, cancellationToken))
                     {
@@ -63,10 +96,14 @@ namespace ExportDocManager.Services.Tools
                     }
                     catch (Exception ex)
                     {
+                        string stderr = _stderr?.GetText() ?? string.Empty;
                         await StopAsync();
                         if (IsTransportFailure(ex))
                         {
-                            throw new InfrastructureServiceException("Rust OCR Sidecar 通信失败或返回了无效响应。", ex);
+                            string detail = string.IsNullOrWhiteSpace(stderr) ? string.Empty : $" Sidecar 诊断：{stderr}";
+                            throw new InfrastructureServiceException(
+                                $"Rust OCR Sidecar 通信失败或返回了无效响应。{detail}",
+                                ex);
                         }
 
                         throw;
@@ -83,18 +120,8 @@ namespace ExportDocManager.Services.Tools
             string request = JsonSerializer.Serialize(new { id, command = "recognize", imagePath }, JsonOptions);
             await _stdin.WriteLineAsync(request.AsMemory(), cancellationToken);
             await _stdin.FlushAsync(cancellationToken);
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(TimeSpan.FromSeconds(90));
-            string line;
-            try
-            {
-                line = await _stdout.ReadLineAsync(MaximumResponseCharacters, timeout.Token)
-                    ?? throw new EndOfStreamException("Rust OCR Sidecar已退出且未返回结果。");
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                throw new ServiceTimeoutException("OCR 识别超过 90 秒，任务已终止，请缩小图片后重试。");
-            }
+            string line = await _stdout.ReadLineAsync(MaximumResponseCharacters, cancellationToken)
+                ?? throw new EndOfStreamException("Rust OCR Sidecar已退出且未返回结果。");
             var response = JsonSerializer.Deserialize<RustOcrResponse>(line, JsonOptions) ?? throw new InvalidDataException("Rust OCR Sidecar返回了无效响应。");
             if (!string.Equals(response.Id, id, StringComparison.Ordinal)) throw new InvalidDataException("Rust OCR Sidecar响应编号不匹配。");
             if (!response.Success) throw new RustOcrRecognitionException(TrimSidecarError(response.Error));
@@ -109,7 +136,8 @@ namespace ExportDocManager.Services.Tools
             !callerToken.IsCancellationRequested && IsTransportFailure(exception);
 
         private static bool IsTransportFailure(Exception exception) =>
-            exception is IOException or JsonException or InvalidDataException;
+            exception is IOException or JsonException or InvalidDataException or
+                Win32Exception or DllNotFoundException or BadImageFormatException;
 
         private static string TrimSidecarError(string error)
         {
@@ -122,6 +150,9 @@ namespace ExportDocManager.Services.Tools
 
         private Task EnsureStartedAsync(CancellationToken cancellationToken)
         {
+            ObjectDisposedException.ThrowIf(
+                Volatile.Read(ref _disposed) != 0 || _shutdownSource.IsCancellationRequested,
+                this);
             if (_process is { HasExited: false }) return Task.CompletedTask;
             string executable = ResolveExecutable();
             if (string.IsNullOrWhiteSpace(executable) || !File.Exists(executable))
@@ -136,7 +167,7 @@ namespace ExportDocManager.Services.Tools
                 UseShellExecute = false,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
-                RedirectStandardError = false,
+                RedirectStandardError = true,
                 CreateNoWindow = true,
                 WorkingDirectory = Path.GetDirectoryName(executable)!,
                 StandardInputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
@@ -146,11 +177,21 @@ namespace ExportDocManager.Services.Tools
             startInfo.ArgumentList.Add("--allowed-root"); startInfo.ArgumentList.Add(requestRoot);
             string runtime = FindOnnxRuntimeLibrary(_paths);
             if (!string.IsNullOrWhiteSpace(runtime)) startInfo.Environment["ORT_DYLIB_PATH"] = runtime;
-            _process = Process.Start(startInfo) ?? throw new InfrastructureServiceException("无法启动 Rust OCR Sidecar。");
-            _stdin = _process.StandardInput;
-            _stdout = new BoundedTextLineReader(_process.StandardOutput);
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.CompletedTask;
+            try
+            {
+                _process = Process.Start(startInfo) ?? throw new InfrastructureServiceException("无法启动 Rust OCR Sidecar。");
+                _stdin = _process.StandardInput;
+                _stdout = new BoundedTextLineReader(_process.StandardOutput);
+                _stderr = new BoundedTextCollector(16 * 1024);
+                _process.ErrorDataReceived += (_, args) => _stderr?.AppendLine(args.Data);
+                _process.BeginErrorReadLine();
+                cancellationToken.ThrowIfCancellationRequested();
+                return Task.CompletedTask;
+            }
+            catch (Exception ex) when (ex is not InfrastructureServiceException and not OperationCanceledException)
+            {
+                throw new InfrastructureServiceException("无法启动 Rust OCR Sidecar，运行包或本机原生依赖不可用。", ex);
+            }
         }
 
         private string ResolveExecutable()
@@ -184,8 +225,47 @@ namespace ExportDocManager.Services.Tools
 
         private async Task StopAsync()
         {
-            try { if (_process is { HasExited: false }) { await _stdin.WriteLineAsync("{\"id\":\"shutdown\",\"command\":\"shutdown\"}"); await _stdin.FlushAsync(); if (!await _process.WaitForExitAsync(TimeSpan.FromSeconds(2))) _process.Kill(true); } } catch { try { _process?.Kill(true); } catch { } }
-            _stdin?.Dispose(); _stdout?.Dispose(); _process?.Dispose(); _stdin = null; _stdout = null; _process = null;
+            Process process = _process;
+            try
+            {
+                if (process is { HasExited: false })
+                {
+                    using var gracefulTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                    await _stdin.WriteLineAsync(
+                        "{\"id\":\"shutdown\",\"command\":\"shutdown\"}".AsMemory(),
+                        gracefulTimeout.Token);
+                    await _stdin.FlushAsync(gracefulTimeout.Token);
+                    if (!await process.WaitForExitAsync(TimeSpan.FromSeconds(2)))
+                    {
+                        process.Kill(entireProcessTree: true);
+                        await process.WaitForExitAsync(TimeSpan.FromSeconds(5));
+                    }
+                }
+            }
+            catch
+            {
+                try
+                {
+                    if (process is { HasExited: false })
+                    {
+                        process.Kill(entireProcessTree: true);
+                        await process.WaitForExitAsync(TimeSpan.FromSeconds(5));
+                    }
+                }
+                catch
+                {
+                }
+            }
+            finally
+            {
+                _stdin?.Dispose();
+                _stdout?.Dispose();
+                process?.Dispose();
+                _stdin = null;
+                _stdout = null;
+                _stderr = null;
+                _process = null;
+            }
         }
 
         public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();
@@ -193,14 +273,71 @@ namespace ExportDocManager.Services.Tools
         public async ValueTask DisposeAsync()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            _shutdownSource.Cancel();
             await _gate.WaitAsync();
             try { await StopAsync(); }
-            finally { _gate.Release(); _gate.Dispose(); }
+            finally
+            {
+                _gate.Release();
+                _shutdownSource.Dispose();
+                _gate.Dispose();
+            }
         }
 
         private sealed record RustOcrResponse(string Id, bool Success, string FullText, List<RustOcrLine> Lines, string Error);
         private sealed record RustOcrLine(string Text, float Confidence, int X, int Y, int Width, int Height);
         private sealed class RustOcrRecognitionException(string error) : InfrastructureServiceException($"Rust OCR 识别失败：{error}");
+    }
+
+    internal sealed class BoundedTextCollector
+    {
+        private readonly int _maximumCharacters;
+        private readonly StringBuilder _buffer = new();
+        private readonly object _sync = new();
+
+        public BoundedTextCollector(int maximumCharacters)
+        {
+            _maximumCharacters = maximumCharacters > 0
+                ? maximumCharacters
+                : throw new ArgumentOutOfRangeException(nameof(maximumCharacters));
+        }
+
+        public void AppendLine(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            lock (_sync)
+            {
+                if (_buffer.Length >= _maximumCharacters)
+                {
+                    return;
+                }
+
+                if (_buffer.Length > 0)
+                {
+                    if (_maximumCharacters - _buffer.Length < 3)
+                    {
+                        return;
+                    }
+                    _buffer.Append(" | ");
+                }
+
+                int remaining = _maximumCharacters - _buffer.Length;
+                string normalized = value.Trim();
+                _buffer.Append(normalized.AsSpan(0, Math.Min(normalized.Length, remaining)));
+            }
+        }
+
+        public string GetText()
+        {
+            lock (_sync)
+            {
+                return _buffer.ToString();
+            }
+        }
     }
 
     internal sealed class BoundedTextLineReader : IDisposable

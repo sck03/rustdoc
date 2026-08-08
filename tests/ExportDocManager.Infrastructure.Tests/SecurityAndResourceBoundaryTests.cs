@@ -101,6 +101,20 @@ public sealed class SecurityAndResourceBoundaryTests
     }
 
     [Fact]
+    public void BoundedTextCollector_ShouldCapSidecarDiagnostics()
+    {
+        var collector = new BoundedTextCollector(maximumCharacters: 12);
+
+        collector.AppendLine("first");
+        collector.AppendLine("second-value");
+        collector.AppendLine("ignored");
+
+        string text = collector.GetText();
+        Assert.True(text.Length <= 12);
+        Assert.StartsWith("first | ", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ZipArchiveHelper_ShouldRejectTraversalEntries()
     {
         string root = CreateTempDirectory("zip-boundary");

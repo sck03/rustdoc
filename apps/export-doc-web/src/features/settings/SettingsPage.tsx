@@ -1,42 +1,36 @@
 import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Database,
-  Coins,
-  FileCog,
-  FileSpreadsheet,
   ListChecks,
-  Network,
   RefreshCw,
   RotateCcw,
   Save,
   Trash2,
-  Wrench,
-  type LucideIcon,
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import {
   ApiSettingsResponse,
   ApiSettingsValidationResponse,
-  ApiSingleWindowIssuingAuthorityOptionDto,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { SecretToggle, readSettingString } from "./SettingsFieldControls.tsx";
-import { exchangeRateAllSupportedCurrenciesPath, exchangeRateLastCurrencyListUpdateTimePath, singleWindowCustomsCooAplAddPath, singleWindowCustomsCooFetchPlacePath, singleWindowCustomsCooOrgCodePath, systemUpdaterEndpointPath } from "./settingsConfigurationPaths.ts";
+import { singleWindowCustomsCooAplAddPath, singleWindowCustomsCooFetchPlacePath, singleWindowCustomsCooOrgCodePath } from "./settingsConfigurationPaths.ts";
 import { cloneSettings, normalizeCurrencyList, normalizeSettingText, setNestedValue } from "./settingsValueUtils.ts";
 import type { SettingPatch, SettingsRecord } from "./settingsTypes.ts";
 import { isDesktopBridgeAvailable, selectDirectory } from "../../desktop/desktopBridge.ts";
-import { filterSettingsCategories, settingsCategories, type SettingsCategoryConfig, type SettingsCategoryKey } from "./settingsCategoryCatalog.ts";
+import { filterSettingsCategories, settingsCategories, type SettingsCategoryKey } from "./settingsCategoryCatalog.ts";
 import { readSettingsCategoryFromSearch, readSettingsPanelLabelFromSearch } from "./settingsNavigationModel.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
-import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { useSettingsMaintenanceActions } from "./useSettingsMaintenanceActions.ts";
 import { useSettingsDraftSync } from "./useSettingsDraftSync.ts";
+import { systemDefaultPatches } from "./settingsDefaults.ts";
+import { findIssuingAuthority, parseIssuingAuthorityCode } from "./settingsIssuingAuthority.ts";
+import { SettingsCategoryNav, SettingsValidationPanel } from "./SettingsPagePanels.tsx";
 
 const LazyMaintenanceSettingsPanels = lazy(() => import("./MaintenanceSettingsPanels.tsx"));
 const LazyRuntimeDatabaseSettingsPanel = lazy(() => import("./RuntimeDatabaseSettingsPanel.tsx"));
@@ -57,37 +51,6 @@ type SingleWindowAuthorityAutoState = {
   fetchPlace: string;
   aplAdd: string;
 };
-
-const systemDefaultPatches: SettingPatch[] = [
-  { path: systemUpdaterEndpointPath, value: "" },
-  { path: ["system", "defaultTemplateExporterNameCn"], value: "" },
-  { path: ["system", "backupRetentionDays"], value: 0 },
-  { path: ["system", "itemEntryBlankRowCount"], value: 20 },
-  { path: ["system", "auditLogRetentionDays"], value: 180 },
-  { path: ["system", "logRetentionDays"], value: 30 },
-  { path: ["system", "logRetainedFileCount"], value: 14 },
-  { path: ["system", "logFileSizeLimitMB"], value: 20 },
-  { path: ["system", "defaultExportDirectory"], value: "" },
-  { path: ["system", "databaseProvider"], value: "Sqlite" },
-  { path: ["system", "sqliteDatabaseFileName"], value: "data.db" },
-  { path: ["system", "postgreSqlAutoBackupEnabled"], value: false },
-  { path: ["system", "postgreSqlAutoBackupSchedule"], value: "Daily" },
-  { path: ["system", "postgreSqlAutoBackupTime"], value: "02:00" },
-  { path: ["system", "postgreSqlAutoBackupDayOfWeek"], value: 1 },
-  { path: ["system", "postgreSqlAutoBackupRetentionCount"], value: 14 },
-  { path: ["system", "postgreSqlHost"], value: "" },
-  { path: ["system", "postgreSqlPort"], value: 5432 },
-  { path: ["system", "postgreSqlDatabase"], value: "" },
-  { path: ["system", "postgreSqlUsername"], value: "" },
-  { path: ["system", "postgreSqlPassword"], value: "" },
-  { path: ["system", "postgreSqlAdditionalOptions"], value: "" },
-  { path: ["singleWindow", "customsCooDefaults", "applName"], value: "" },
-  { path: ["singleWindow", "customsCooDefaults", "applicant"], value: "" },
-  { path: ["singleWindow", "customsCooDefaults", "applTel"], value: "" },
-  { path: singleWindowCustomsCooOrgCodePath, value: "" },
-  { path: singleWindowCustomsCooFetchPlacePath, value: "" },
-  { path: singleWindowCustomsCooAplAddPath, value: "" },
-];
 
 export function SettingsPage({
   client,
@@ -747,144 +710,4 @@ export function SettingsPage({
 
 export function getSettingsTitle() {
   return "设置";
-}
-
-function SettingsCategoryNav({
-  categories,
-  activeCategory,
-  onSelect,
-}: {
-  categories: SettingsCategoryConfig[];
-  activeCategory: SettingsCategoryKey;
-  onSelect: (category: SettingsCategoryKey) => void;
-}) {
-  return (
-    <nav className="settings-category-nav" aria-label="设置分类">
-      {categories.map((category) => {
-        const Icon = category.icon;
-        const isActive = category.key === activeCategory;
-        return (
-          <button
-            key={category.key}
-            className={isActive ? "settings-category-item settings-category-item-active" : "settings-category-item"}
-            type="button"
-            aria-current={isActive ? "page" : undefined}
-            onClick={() => onSelect(category.key)}
-          >
-            <Icon size={17} aria-hidden="true" />
-            <span>{category.label}</span>
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
-function SettingsValidationPanel({
-  result,
-  disabled,
-  onApplyAutoFix,
-}: {
-  result: ApiSettingsValidationResponse;
-  disabled: boolean;
-  onApplyAutoFix: () => void;
-}) {
-  const messages = Array.isArray(result.messages) ? result.messages : [];
-  const errorCount = messages.filter((item) => item.level === "error").length;
-  const warningCount = messages.filter((item) => item.level === "warning").length;
-
-  return (
-    <div className="settings-validation-panel" aria-label="设置校验结果">
-      <div className="section-header">
-        <div>
-          <h2>设置校验结果</h2>
-          <span>{result.isValid ? "可保存" : "需处理"}</span>
-        </div>
-        <button
-          className="command-button secondary"
-          type="button"
-          disabled={disabled || !result.canAutoFix}
-          onClick={onApplyAutoFix}
-        >
-          <RotateCcw size={17} aria-hidden="true" />
-          <span>应用自动修复</span>
-        </button>
-      </div>
-      <InlineNotice tone={result.isValid ? "success" : "error"}>
-        {messages.length === 0
-          ? "未发现需要处理的设置项。"
-          : `错误 ${errorCount} 项，警告 ${warningCount} 项。`}
-      </InlineNotice>
-      {messages.length > 0 ? (
-        <ResponsiveTableFrame className="backup-table-frame" label="设置校验消息">
-          <table className="backup-table" aria-label="设置校验消息">
-            <thead>
-              <tr>
-                <th>级别</th>
-                <th>字段</th>
-                <th>信息</th>
-                <th>修复</th>
-              </tr>
-            </thead>
-            <tbody>
-              {messages.map((item, index) => (
-                <tr key={`${item.propertyName}-${index}`}>
-                  <td>{settingsValidationLevelLabel(item.level)}</td>
-                  <td>{item.propertyName || "-"}</td>
-                  <td>{item.message || "-"}</td>
-                  <td>{item.isAutoFixable ? "可自动修复" : "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </ResponsiveTableFrame>
-      ) : null}
-    </div>
-  );
-}
-
-function settingsValidationLevelLabel(value?: string) {
-  switch (value) {
-    case "error":
-      return "错误";
-    case "warning":
-      return "警告";
-    case "info":
-      return "信息";
-    default:
-      return value?.trim() || "-";
-  }
-}
-
-function parseIssuingAuthorityCode(value: string, options: ApiSingleWindowIssuingAuthorityOptionDto[]) {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return "";
-  }
-
-  const codeMatch = trimmed.match(/(?:^|\D)(\d{4})(?:\D|$)/);
-  if (codeMatch) {
-    return codeMatch[1];
-  }
-
-  const normalized = normalizeAuthorityLookupText(trimmed);
-  const matched = options.find((option) => {
-    const normalizedCode = normalizeAuthorityLookupText(option.code);
-    const normalizedLabel = normalizeAuthorityLookupText(option.label);
-    return normalizedCode === normalized || normalizedLabel === normalized || (normalized.length >= 2 && normalizedLabel.includes(normalized));
-  });
-
-  return matched?.code || trimmed;
-}
-
-function findIssuingAuthority(code: string, options: ApiSingleWindowIssuingAuthorityOptionDto[]) {
-  const normalizedCode = normalizeAuthorityLookupText(code);
-  return options.find((option) => normalizeAuthorityLookupText(option.code) === normalizedCode) ?? null;
-}
-
-function normalizeAuthorityLookupText(value: string) {
-  return value
-    .trim()
-    .replace(/[\s:：]/g, "")
-    .toUpperCase();
 }
