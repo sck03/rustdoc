@@ -12,6 +12,7 @@ import {
   parsePng,
   pickBounds,
   roundRatio,
+  stageReportHtmlWithBundledFonts,
 } from "./lib/report-regression-common.mjs";
 import { createReportRegressionTemplateCases } from "./lib/report-regression-template-cases.mjs";
 import { buildChromiumSandboxArguments } from "./lib/chromium-sandbox-policy.mjs";
@@ -54,7 +55,12 @@ function resolveHtmlPath(testCase) {
 
 function renderPdf(chromePath, testCase) {
   const profilePath = path.join(workspaceRoot, `PrintProfile-${testCase.slug}`);
-  const htmlPath = resolveHtmlPath(testCase);
+  const sourceHtmlPath = resolveHtmlPath(testCase);
+  const htmlPath = stageReportHtmlWithBundledFonts(
+    repoRoot,
+    sourceHtmlPath,
+    path.join(workspaceRoot, "staged-html", `${testCase.slug}.html`),
+  );
   const pdfPath = path.join(pdfRoot, `${testCase.slug}.pdf`);
 
   fs.rmSync(profilePath, { recursive: true, force: true });
@@ -66,10 +72,14 @@ function renderPdf(chromePath, testCase) {
     [
       ...buildChromiumSandboxArguments(),
       "--headless",
+      "--allow-file-access-from-files",
       "--disable-gpu",
       "--disable-extensions",
       "--disable-background-networking",
       "--no-first-run",
+      ...(htmlPath === sourceHtmlPath
+        ? []
+        : ["--run-all-compositor-stages-before-draw", "--virtual-time-budget=3000"]),
       `--user-data-dir=${profilePath}`,
       `--print-to-pdf=${pdfPath}`,
       "--print-to-pdf-no-header",

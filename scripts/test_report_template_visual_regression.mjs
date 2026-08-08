@@ -7,6 +7,7 @@ import {
   assert,
   assertTemplateSourcePageOrientation,
   locateChromeForTesting,
+  stageReportHtmlWithBundledFonts,
 } from "./lib/report-regression-common.mjs";
 import { createReportRegressionTemplateCases } from "./lib/report-regression-template-cases.mjs";
 import { buildChromiumSandboxArguments } from "./lib/chromium-sandbox-policy.mjs";
@@ -55,6 +56,11 @@ function renderScreenshot(chromePath, testCase) {
   const absoluteTemplatePath = path.join(repoRoot, ...testCase.relativePath.split("/"));
   assert(fs.existsSync(absoluteTemplatePath), `Expected template file to exist: ${absoluteTemplatePath}`);
   assertTemplateSourcePageOrientation(testCase, absoluteTemplatePath);
+  const htmlPath = stageReportHtmlWithBundledFonts(
+    repoRoot,
+    absoluteTemplatePath,
+    path.join(workspaceRoot, "staged-html", `${testCase.slug}.html`),
+  );
 
   const profilePath = path.join(workspaceRoot, `ChromeProfile-${testCase.slug}`);
   const screenshotPath = path.join(screenshotRoot, `${testCase.slug}.png`);
@@ -67,16 +73,20 @@ function renderScreenshot(chromePath, testCase) {
     [
       ...buildChromiumSandboxArguments(),
       "--headless",
+      "--allow-file-access-from-files",
       "--disable-gpu",
       "--disable-extensions",
       "--no-first-run",
+      ...(htmlPath === absoluteTemplatePath
+        ? []
+        : ["--run-all-compositor-stages-before-draw", "--virtual-time-budget=3000"]),
       "--hide-scrollbars",
       "--force-device-scale-factor=1",
       "--font-render-hinting=none",
       `--user-data-dir=${profilePath}`,
       `--window-size=${testCase.viewport.width},${testCase.viewport.height}`,
       `--screenshot=${screenshotPath}`,
-      pathToFileURL(absoluteTemplatePath).href,
+      pathToFileURL(htmlPath).href,
     ],
     {
       encoding: "utf8",

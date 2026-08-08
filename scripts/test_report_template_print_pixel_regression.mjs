@@ -10,6 +10,7 @@ import {
   hexHammingDistance,
   locateChromeForTesting,
   pickBounds,
+  stageReportHtmlWithBundledFonts,
 } from "./lib/report-regression-common.mjs";
 import { createReportRegressionTemplateCases } from "./lib/report-regression-template-cases.mjs";
 import { buildChromiumSandboxArguments } from "./lib/chromium-sandbox-policy.mjs";
@@ -56,7 +57,11 @@ function resolveHtmlPath(testCase) {
 }
 
 async function renderPrintScreenshot(chromePath, testCase) {
-  const htmlPath = resolveHtmlPath(testCase);
+  const htmlPath = stageReportHtmlWithBundledFonts(
+    repoRoot,
+    resolveHtmlPath(testCase),
+    path.join(workspaceRoot, "staged-html", `${testCase.slug}.html`),
+  );
   const profilePath = path.join(workspaceRoot, `ChromeProfile-${testCase.slug}`);
   const screenshotPath = path.join(screenshotRoot, `${testCase.slug}.png`);
   const fullPageScreenshotPath = path.join(screenshotRoot, `${testCase.slug}.full.png`);
@@ -69,6 +74,7 @@ async function renderPrintScreenshot(chromePath, testCase) {
     [
       ...buildChromiumSandboxArguments(),
       "--headless",
+      "--allow-file-access-from-files",
       "--disable-gpu",
       "--disable-extensions",
       "--disable-background-networking",

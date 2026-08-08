@@ -210,6 +210,17 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("$Product -eq \"ChromeHeadlessShell\" -and", chromeProvisioning, StringComparison.Ordinal);
         Assert.Contains("timeout-minutes: 10", typographyWorkflow, StringComparison.Ordinal);
         Assert.Contains("--logger \"console;verbosity=normal\"", typographyWorkflow, StringComparison.Ordinal);
+        Assert.Contains("scripts/test_report_template_pdf_regression.mjs", typographyWorkflow, StringComparison.Ordinal);
+        Assert.Contains("scripts/test_report_template_print_pixel_regression.mjs", typographyWorkflow, StringComparison.Ordinal);
+        Assert.Contains("scripts/test_report_template_visual_regression.mjs", typographyWorkflow, StringComparison.Ordinal);
+        string reportRegressionCommon = File.ReadAllText(Path.Combine(root, "scripts", "lib", "report-regression-common.mjs"));
+        Assert.Contains("NotoSansCJKsc-Regular.otf", reportRegressionCommon, StringComparison.Ordinal);
+        Assert.Contains("NotoSerifCJKsc-Regular.otf", reportRegressionCommon, StringComparison.Ordinal);
+        Assert.Contains("@font-face", reportRegressionCommon, StringComparison.Ordinal);
+        Assert.Contains("font-display: block", reportRegressionCommon, StringComparison.Ordinal);
+        string pdfPixelRegression = File.ReadAllText(Path.Combine(root, "scripts", "test_report_template_pdf_pixel_regression.mjs"));
+        Assert.Contains("stageReportHtmlWithBundledFonts", pdfPixelRegression, StringComparison.Ordinal);
+        Assert.Contains("--allow-file-access-from-files", pdfPixelRegression, StringComparison.Ordinal);
     }
 
     [Fact]

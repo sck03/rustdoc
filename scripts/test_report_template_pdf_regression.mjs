@@ -7,6 +7,7 @@ import {
   assert,
   assertTemplateSourcePageOrientation,
   locateChromeForTesting,
+  stageReportHtmlWithBundledFonts,
 } from "./lib/report-regression-common.mjs";
 import { createReportRegressionTemplateCases } from "./lib/report-regression-template-cases.mjs";
 import { buildChromiumSandboxArguments } from "./lib/chromium-sandbox-policy.mjs";
@@ -36,20 +37,29 @@ function renderPdf(chromePath, testCase) {
 
   assert(fs.existsSync(htmlPath), `${testCase.slug}: expected HTML source to exist: ${htmlPath}`);
   assertTemplateSourcePageOrientation(testCase, htmlPath);
+  const stagedHtmlPath = stageReportHtmlWithBundledFonts(
+    repoRoot,
+    htmlPath,
+    path.join(caseRoot, "staged.html"),
+  );
 
   const result = spawnSync(
     chromePath,
     [
       ...buildChromiumSandboxArguments(),
       "--headless",
+      "--allow-file-access-from-files",
       "--disable-gpu",
       "--disable-extensions",
       "--disable-background-networking",
       "--no-first-run",
+      ...(stagedHtmlPath === htmlPath
+        ? []
+        : ["--run-all-compositor-stages-before-draw", "--virtual-time-budget=3000"]),
       `--user-data-dir=${profilePath}`,
       `--print-to-pdf=${pdfPath}`,
       "--print-to-pdf-no-header",
-      pathToFileURL(htmlPath).href,
+      pathToFileURL(stagedHtmlPath).href,
     ],
     {
       encoding: "utf8",

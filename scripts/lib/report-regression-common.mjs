@@ -1,6 +1,25 @@
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import zlib from "node:zlib";
+
+const bundledReportFonts = Object.freeze([
+  {
+    fileName: "NotoSansCJKsc-Regular.otf",
+    family: "Noto Sans CJK SC",
+    weight: 400,
+  },
+  {
+    fileName: "NotoSansCJKsc-Bold.otf",
+    family: "Noto Sans CJK SC",
+    weight: 700,
+  },
+  {
+    fileName: "NotoSerifCJKsc-Regular.otf",
+    family: "Noto Serif CJK SC",
+    weight: 400,
+  },
+]);
 
 export function assert(condition, message) {
   if (!condition) {
@@ -10,6 +29,56 @@ export function assert(condition, message) {
 
 export function toImportSpecifier(workspaceRoot, filePath) {
   return path.relative(workspaceRoot, filePath).replaceAll(path.sep, "/");
+}
+
+/**
+ * Stage a report template with the same pinned font policy used by the .NET
+ * renderer. Raw fixture templates intentionally remain unchanged in source;
+ * the browser regression harness must not depend on whichever fonts happen to
+ * be installed on the host runner.
+ */
+export function stageReportHtmlWithBundledFonts(repoRoot, sourcePath, destinationPath) {
+  const source = path.resolve(sourcePath);
+  const html = fs.readFileSync(source, "utf8");
+  const destination = path.resolve(destinationPath);
+
+  if (!html.includes("data-edm-report-font") && !html.includes("var(--edm-report-font-")) {
+    return source;
+  }
+
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  const fontRoot = path.join(repoRoot, "Resources", "Fonts", "OpenSource");
+  const fontFaces = bundledReportFonts.map((font) => {
+    const fontPath = path.join(fontRoot, font.fileName);
+    assert(fs.existsSync(fontPath), `Pinned report font is missing: ${fontPath}`);
+    const fontUrl = JSON.stringify(pathToFileURL(fontPath).href);
+    return [
+      "@font-face {",
+      `  font-family: ${JSON.stringify(font.family)};`,
+      `  src: url(${fontUrl}) format(\"opentype\");`,
+      "  font-style: normal;",
+      `  font-weight: ${font.weight};`,
+      "  font-display: block;",
+      "}",
+    ].join("\n");
+  });
+  const style = [
+    '<style id="edm-report-font-policy">',
+    ...fontFaces,
+    ":root {",
+    '  --edm-report-font-sans: "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", Arial, sans-serif;',
+    '  --edm-report-font-serif: "Noto Serif CJK SC", "Noto Serif SC", "Songti SC", SimSun, "Times New Roman", serif;',
+    "}",
+    'body { font-family: var(--edm-report-font-sans) !important; }',
+    'body[data-edm-report-font="serif"] { font-family: var(--edm-report-font-serif) !important; }',
+    "</style>",
+  ].join("\n");
+
+  const stagedHtml = /<head\b[^>]*>/i.test(html)
+    ? html.replace(/<head\b[^>]*>/i, (head) => `${head}\n${style}`)
+    : `${style}\n${html}`;
+  fs.writeFileSync(destination, stagedHtml, "utf8");
+  return destination;
 }
 
 export function locateChromeForTesting(repoRoot, preference = "headless-shell") {
@@ -29,7 +98,7 @@ export function locateChromeForTesting(repoRoot, preference = "headless-shell") 
   const candidates = [];
   const seenExecutablePaths = new Set();
 
-  function addCandidate(manifestPath, executablePath, isHeadlessShell) {
+  function addCandidate(manifestPath, executablePath, isHeadlessShell, rootIndex) {
     if (!executablePath || !fs.existsSync(executablePath)) {
       return;
     }
@@ -40,10 +109,11 @@ export function locateChromeForTesting(repoRoot, preference = "headless-shell") 
     }
 
     seenExecutablePaths.add(normalizedPath);
-    candidates.push({ manifestPath, executablePath, isHeadlessShell });
+    candidates.push({ manifestPath, executablePath, isHeadlessShell, rootIndex });
   }
 
-  for (const root of manifestRoots) {
+  for (let rootIndex = 0; rootIndex < manifestRoots.length; rootIndex += 1) {
+    const root = manifestRoots[rootIndex];
     if (!fs.existsSync(root)) {
       continue;
     }
@@ -54,7 +124,7 @@ export function locateChromeForTesting(repoRoot, preference = "headless-shell") 
         const isHeadlessShell =
           manifest.product === "ChromeHeadlessShell" ||
           String(manifest.executablePath || manifestPath).toLowerCase().includes("headless");
-        addCandidate(manifestPath, manifest.executablePath, isHeadlessShell);
+        addCandidate(manifestPath, manifest.executablePath, isHeadlessShell, rootIndex);
 
         const expectedFileName = isHeadlessShell
           ? process.platform === "win32"
@@ -64,7 +134,7 @@ export function locateChromeForTesting(repoRoot, preference = "headless-shell") 
             ? "chrome.exe"
             : "chrome";
         for (const executablePath of findFiles(path.dirname(manifestPath), expectedFileName)) {
-          addCandidate(manifestPath, executablePath, isHeadlessShell);
+          addCandidate(manifestPath, executablePath, isHeadlessShell, rootIndex);
         }
       } catch {
         // Try the next manifest.
@@ -75,7 +145,7 @@ export function locateChromeForTesting(repoRoot, preference = "headless-shell") 
       ? ["chrome-headless-shell.exe", "chrome.exe"]
       : ["chrome-headless-shell", "chrome"]) {
       for (const executablePath of findFiles(root, fileName)) {
-        addCandidate(executablePath, executablePath, fileName.includes("headless"));
+        addCandidate(executablePath, executablePath, fileName.includes("headless"), rootIndex);
       }
     }
   }
@@ -83,7 +153,7 @@ export function locateChromeForTesting(repoRoot, preference = "headless-shell") 
   const ordered = candidates.sort((left, right) => {
     const leftRank = rankChromeCandidate(left, preference);
     const rightRank = rankChromeCandidate(right, preference);
-    return leftRank - rightRank || left.manifestPath.length - right.manifestPath.length;
+    return leftRank - rightRank || left.rootIndex - right.rootIndex || left.manifestPath.length - right.manifestPath.length;
   });
   const selected = ordered.find((candidate) => preference !== "full-chrome" || !candidate.isHeadlessShell);
   if (selected) {
