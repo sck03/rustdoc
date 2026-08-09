@@ -1,4 +1,5 @@
 using ExportDocManager.DataAccess;
+using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
@@ -173,7 +174,7 @@ namespace ExportDocManager.Services.MasterData
             }
             int totalCount = await query.CountAsync(cancellationToken);
             var items = await query.OrderByDescending(item => item.LastSeenAt)
-                .Skip((page - 1) * size)
+                .Skip(PagingHelper.CalculateOffset(page, size))
                 .Take(size)
                 .ToListAsync(cancellationToken);
             return new HsCodeRemoteCandidatePage(items, totalCount, page, size, status);

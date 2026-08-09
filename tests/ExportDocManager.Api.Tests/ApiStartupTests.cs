@@ -413,6 +413,7 @@ namespace ExportDocManager.Api.Tests
 
         [Theory]
         [InlineData("/readyz")]
+        [InlineData("/livez")]
         [InlineData("/healthz")]
         public async Task CorsPolicy_ShouldExposePublicProbesToTauriLocalhost(string path)
         {
@@ -444,6 +445,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("\"openapi\":\"3.0.1\"", json, StringComparison.Ordinal);
             Assert.Contains("/healthz", json, StringComparison.Ordinal);
             Assert.Contains("/readyz", json, StringComparison.Ordinal);
+            Assert.Contains("/livez", json, StringComparison.Ordinal);
             Assert.Contains("ApiHealthResponse", json, StringComparison.Ordinal);
             Assert.Contains("requirement", json, StringComparison.Ordinal);
             Assert.Contains("core, feature, or optional", json, StringComparison.Ordinal);

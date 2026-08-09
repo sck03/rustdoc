@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import "../../styles/routes/reports.css";
 import { useLocation } from "react-router-dom";
 import { ApiReportTemplatePreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";

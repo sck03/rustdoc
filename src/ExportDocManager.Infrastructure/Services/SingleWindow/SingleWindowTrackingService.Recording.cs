@@ -296,7 +296,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .ConfigureAwait(false);
             if (!canAccess)
             {
-                throw new UnauthorizedAccessException("无权限写入该发票的单一窗口跟踪记录。");
+                throw new PermissionDeniedException("无权限写入该发票的单一窗口跟踪记录。");
             }
         }
 

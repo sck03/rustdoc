@@ -1,15 +1,10 @@
 @import "./styles/base.css";
 @import "./styles/dashboard.css";
 @import "./styles/master-data.css";
-@import "./styles/single-window-core.css";
 @import "./styles/audit-query.css";
 @import "./styles/tools-ocr-exchange.css";
 @import "./styles/update-center.css";
 @import "./styles/email.css";
-@import "./styles/runtime-single-window.css";
 @import "./styles/jobs-excel.css";
-@import "./styles/container-packing.css";
-@import "./styles/single-window-documents.css";
-@import "./styles/coo-review.css";
 @import "./styles/auth-forms.css";
 @import "./styles/remote-select.css";

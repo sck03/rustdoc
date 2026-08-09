@@ -38,7 +38,7 @@ namespace ExportDocManager.Services.Opportunities
             int total = await query.CountAsync(cancellationToken);
             var rows = await query.OrderBy(item => item.Opportunity.Stage == "已成交" || item.Opportunity.Stage == "已失单")
                 .ThenByDescending(item => item.Opportunity.Id)
-                .Skip((pageNumber - 1) * pageSize).Take(pageSize)
+                .Skip(PagingHelper.CalculateOffset(pageNumber, pageSize)).Take(pageSize)
                 .Select(item => new SalesOpportunityRecord(item.Opportunity.Id, item.Opportunity.CrmCustomerId,
                     item.Customer.Name, item.Opportunity.ProductId, item.Product != null ? item.Product.ProductCode ?? string.Empty : string.Empty,
                     item.Product != null ? (item.Product.NameCN ?? item.Product.NameEN ?? string.Empty) : string.Empty,

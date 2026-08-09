@@ -42,7 +42,7 @@ namespace ExportDocManager.Services.Suppliers
                     item.Category.Contains(keyword) || item.MainProducts.Contains(keyword) || item.Notes.Contains(keyword));
             if (status.Length > 0) query = query.Where(item => item.Status == status);
             int total = await query.CountAsync(cancellationToken);
-            var items = await query.OrderBy(item => item.Name).Skip((pageNumber - 1) * pageSize).Take(pageSize)
+            var items = await query.OrderBy(item => item.Name).Skip(PagingHelper.CalculateOffset(pageNumber, pageSize)).Take(pageSize)
                 .Select(ToRecordExpression()).ToListAsync(cancellationToken);
             return new PagedResult<SupplierRecord>(items, total, pageNumber, pageSize);
         }

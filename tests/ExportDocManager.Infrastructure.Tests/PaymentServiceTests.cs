@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Core;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -63,7 +64,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 .SingleAsync();
 
             var deleted = await service.DeletePaymentAsync(foreignPaymentId);
-            var updateException = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            var updateException = await Assert.ThrowsAsync<PermissionDeniedException>(() =>
                 service.SavePaymentAsync(CreateValidPayment("FOREIGN-EDIT", foreignPaymentId, 8)));
 
             Assert.False(deleted);

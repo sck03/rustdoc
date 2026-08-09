@@ -258,6 +258,16 @@ namespace ExportDocManager.Api.Tests
             using (var templatesDocument = JsonDocument.Parse(await templatesResponse.Content.ReadAsStringAsync()))
             {
                 Assert.Equal(JsonValueKind.Array, templatesDocument.RootElement.ValueKind);
+                Assert.All(
+                    templatesDocument.RootElement.EnumerateArray(),
+                    template =>
+                    {
+                        string clientPath = template.GetProperty("templatePath").GetString() ?? string.Empty;
+                        Assert.True(clientPath.StartsWith("builtin:", StringComparison.OrdinalIgnoreCase) ||
+                                    clientPath.StartsWith("user:", StringComparison.OrdinalIgnoreCase));
+                        Assert.DoesNotContain(harness.AppRoot, clientPath, StringComparison.OrdinalIgnoreCase);
+                        Assert.DoesNotContain(harness.DataRoot, clientPath, StringComparison.OrdinalIgnoreCase);
+                    });
             }
 
             var createTemplateResponse = await adminClient.PostAsJsonAsync(
@@ -275,11 +285,9 @@ namespace ExportDocManager.Api.Tests
             Assert.DoesNotContain("EDM_DESIGNER_STATE", createdTemplate.Content, StringComparison.Ordinal);
             Assert.Contains("API Created Template", createdTemplate.Content, StringComparison.Ordinal);
             Assert.EndsWith(".html", createdTemplate.TemplatePath, StringComparison.OrdinalIgnoreCase);
-            Assert.True(File.Exists(createdTemplate.TemplatePath));
-            Assert.StartsWith(
-                Path.Combine(harness.DataRoot, "Templates", "Export"),
-                Path.GetFullPath(createdTemplate.TemplatePath),
-                StringComparison.OrdinalIgnoreCase);
+            Assert.StartsWith("user:Export/", createdTemplate.TemplatePath, StringComparison.OrdinalIgnoreCase);
+            string createdTemplateFile = ResolveClientTemplatePath(harness, createdTemplate.TemplatePath);
+            Assert.True(File.Exists(createdTemplateFile));
 
             var renamedTemplatePath = Path.Combine(harness.DataRoot, "Templates", "Export", "api_renamed_template.html");
             var renameTemplateResponse = await adminClient.PostAsJsonAsync(
@@ -292,8 +300,8 @@ namespace ExportDocManager.Api.Tests
                 });
             Assert.Equal(HttpStatusCode.OK, renameTemplateResponse.StatusCode);
             var renamedTemplate = await ApiIntegrationTestHarness.ReadJsonAsync<ApiReportTemplateContentDto>(renameTemplateResponse);
-            Assert.Equal(Path.GetFullPath(renamedTemplatePath), renamedTemplate.TemplatePath);
-            Assert.False(File.Exists(createdTemplate.TemplatePath));
+            Assert.Equal("user:Export/api_renamed_template.html", renamedTemplate.TemplatePath);
+            Assert.False(File.Exists(createdTemplateFile));
             Assert.True(File.Exists(renamedTemplatePath));
 
             var deleteTemplateResponse = await adminClient.DeleteAsync(
@@ -319,7 +327,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, saveContentResponse.StatusCode);
             var savedTemplate = await ApiIntegrationTestHarness.ReadJsonAsync<ApiReportTemplateContentDto>(saveContentResponse);
             Assert.Equal(savedHtml, savedTemplate.Content);
-            Assert.Equal(Path.GetFullPath(templatePath), savedTemplate.TemplatePath);
+            Assert.Equal("user:Export/designer_test.html", savedTemplate.TemplatePath);
             Assert.Contains("Templates/", savedTemplate.StoragePolicy, StringComparison.Ordinal);
             Assert.DoesNotContain(@"C:\", savedTemplate.StoragePolicy, StringComparison.OrdinalIgnoreCase);
             Assert.True(File.Exists(templatePath));
@@ -909,6 +917,30 @@ namespace ExportDocManager.Api.Tests
             Assert.DoesNotContain(paymentPayee, draftPreview.Html, StringComparison.Ordinal);
             Assert.DoesNotContain(invoiceCustomer, draftPreview.Html, StringComparison.Ordinal);
             Assert.DoesNotContain(invoiceContract, draftPreview.Html, StringComparison.Ordinal);
+        }
+
+        private static string ResolveClientTemplatePath(
+            ApiIntegrationTestHarness harness,
+            string clientPath)
+        {
+            const string builtInPrefix = "builtin:";
+            const string userPrefix = "user:";
+            if (clientPath.StartsWith(builtInPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return Path.Combine(
+                    harness.AppRoot,
+                    "Templates",
+                    clientPath[builtInPrefix.Length..].Replace('/', Path.DirectorySeparatorChar));
+            }
+            if (clientPath.StartsWith(userPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return Path.Combine(
+                    harness.DataRoot,
+                    "Templates",
+                    clientPath[userPrefix.Length..].Replace('/', Path.DirectorySeparatorChar));
+            }
+
+            throw new InvalidDataException($"Unexpected template client path: {clientPath}");
         }
 
         private static ApiInvoiceDetailDto CreateBoundaryInvoiceRequest(

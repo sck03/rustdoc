@@ -54,7 +54,7 @@ pwsh -File .\initialize-windows.ps1 `
 
 ## 网页端备份与完整迁移
 
-管理员登录后进入“系统设置 -> 维护 -> 团队库”。发布包已携带 PostgreSQL 18 的 `pg_dump`、`pg_restore` 和 `psql`，工具位于程序目录 `Tools/PostgreSQL/`，不要求把客户端安装到系统盘或使用全局 PATH。Linux 客户端从 `postgres:18.4-bookworm` 提取，正式兼容边界是 Debian 12/Bookworm 或兼容的 glibc 环境；其它发行版应在目标机完成工具启动与恢复演练。
+管理员登录后进入“系统设置 -> 维护 -> 团队库”。发布包已携带 PostgreSQL 18 的 `pg_dump`、`pg_restore` 和 `psql`，工具位于程序目录 `Tools/PostgreSQL/`，不要求把客户端安装到系统盘或使用全局 PATH。Linux 客户端从 `postgres:18.4-trixie` 提取，正式兼容边界是 Debian 13/Trixie 或兼容的 glibc 环境；发布工作流会在 Debian 13 容器内验证 .NET、Rust OCR、PostgreSQL 工具和浏览器可执行文件。其它发行版应在目标机完成工具启动与恢复演练。
 
 网页端支持：
 

@@ -19,6 +19,8 @@ public sealed class ChromiumArm64PackagingContractTests
         Assert.Contains("ubuntu-24.04-arm", server);
         Assert.Contains("Chromium ARM64", provision);
         Assert.Contains("Microsoft.Playwright trusted open-source Chromium build", provision);
+        Assert.Contains("Directory.Packages.props", provision);
+        Assert.DoesNotContain("$playwrightPackageVersion = \"1.61.0\"", provision, StringComparison.Ordinal);
         Assert.Contains("ExportDocManager.Api/ExportDocManager.Api.csproj", provision);
         Assert.Contains("Microsoft.Playwright.dll", provision);
         Assert.Contains("install --with-deps chromium", provision);
@@ -33,6 +35,8 @@ public sealed class ChromiumArm64PackagingContractTests
         Assert.Contains("ChromiumArm64", bundle);
         Assert.Contains("verify-bundled-browser-pdf.ps1", reusableDesktop);
         Assert.Contains("verify-bundled-browser-pdf.ps1", reusableServer);
+        Assert.Contains("Validate Linux package on Debian 13", reusableServer);
+        Assert.Contains("debian:13-slim", reusableServer);
     }
 
     [Fact]

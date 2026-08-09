@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -159,7 +160,7 @@ namespace ExportDocManager.Services.Core
         {
             if (!BusinessDataAccessScope.CanViewAllBusinessData(_currentUserContext.CurrentUser))
             {
-                throw new UnauthorizedAccessException("只有管理员可以使用发票数据清理功能。");
+                throw new PermissionDeniedException("只有管理员可以使用发票数据清理功能。");
             }
         }
 

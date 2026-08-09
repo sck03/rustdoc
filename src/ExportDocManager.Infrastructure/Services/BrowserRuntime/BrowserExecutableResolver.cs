@@ -267,7 +267,8 @@ namespace ExportDocManager.Services.BrowserRuntime
         private static void ValidateHeadlessShellBundle(string executablePath)
         {
             string root = Path.GetDirectoryName(executablePath)!;
-            IReadOnlyList<string> requiredFiles = GetRequiredHeadlessShellFiles(GetRuntimePlatform());
+            string runtimePlatform = GetRuntimePlatform();
+            IReadOnlyList<string> requiredFiles = GetRequiredHeadlessShellFiles(runtimePlatform);
             string missing = requiredFiles.FirstOrDefault(file =>
             {
                 string path = Path.Combine(root, file);
@@ -280,7 +281,8 @@ namespace ExportDocManager.Services.BrowserRuntime
             }
 
             string localesRoot = Path.Combine(root, "locales");
-            if (!Directory.Exists(localesRoot) || !Directory.EnumerateFiles(localesRoot).Any())
+            if (RequiresHeadlessShellLocales(runtimePlatform) &&
+                (!Directory.Exists(localesRoot) || !Directory.EnumerateFiles(localesRoot).Any()))
             {
                 throw new InfrastructureServiceException("Chrome Headless Shell 运行包缺少 locales 资源。");
             }
@@ -308,6 +310,14 @@ namespace ExportDocManager.Services.BrowserRuntime
                 "headless_lib_data.pak",
                 "headless_lib_strings.pak"
             ];
+        }
+
+        internal static bool RequiresHeadlessShellLocales(string runtimePlatform)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(runtimePlatform);
+            // The official macOS Headless Shell archive has no locales directory;
+            // its strings are carried by headless_lib_strings.pak instead.
+            return !runtimePlatform.StartsWith("mac-", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void ProbeVersion(string executablePath)

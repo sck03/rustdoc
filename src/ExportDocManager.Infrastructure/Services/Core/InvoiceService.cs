@@ -134,6 +134,12 @@ namespace ExportDocManager.Services.Core
                 result.FailureKind = SaveFailureKind.Conflict;
                 return result;
             }
+            catch (PermissionDeniedException ex)
+            {
+                result.ErrorMessage = ex.Message;
+                result.FailureKind = SaveFailureKind.Forbidden;
+                return result;
+            }
             catch (UnauthorizedAccessException ex)
             {
                 result.ErrorMessage = ex.Message;

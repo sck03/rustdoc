@@ -30,7 +30,7 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Ok(templates.Select(template => new ApiReportTemplateDto(
                     template.ReportType.ToString(),
                     template.DisplayName,
-                    template.TemplatePath,
+                    ToApiReportTemplatePath(context, template.TemplatePath),
                     template.WithSealDefault)));
             })
             .WithName("ListReportTemplates");
@@ -71,7 +71,7 @@ namespace ExportDocManager.Api.Hosting
                         request.TemplatePath,
                         request.DisplayName,
                         cancellationToken);
-                    return Results.Ok(ToApiReportTemplateContentDto(result));
+                    return Results.Ok(ToApiReportTemplateContentDto(context, result));
                 }
                 catch (UnauthorizedAccessException ex)
                 {
@@ -168,7 +168,7 @@ namespace ExportDocManager.Api.Hosting
                         parsedReportType,
                         templatePath,
                         cancellationToken);
-                    return Results.Ok(ToApiReportTemplateContentDto(result));
+                    return Results.Ok(ToApiReportTemplateContentDto(context, result));
                 }
                 catch (FileNotFoundException ex)
                 {
@@ -225,7 +225,7 @@ namespace ExportDocManager.Api.Hosting
                         request.TemplatePath,
                         request.Content ?? string.Empty,
                         cancellationToken);
-                    return Results.Ok(ToApiReportTemplateContentDto(result));
+                    return Results.Ok(ToApiReportTemplateContentDto(context, result));
                 }
                 catch (FileNotFoundException ex)
                 {
@@ -286,7 +286,7 @@ namespace ExportDocManager.Api.Hosting
                         request.TemplatePath,
                         request.NewTemplatePath,
                         cancellationToken);
-                    return Results.Ok(ToApiReportTemplateContentDto(result));
+                    return Results.Ok(ToApiReportTemplateContentDto(context, result));
                 }
                 catch (FileNotFoundException ex)
                 {
@@ -693,12 +693,14 @@ namespace ExportDocManager.Api.Hosting
             .WithName("PreviewReportTemplateContent");
         }
 
-        private static ApiReportTemplateContentDto ToApiReportTemplateContentDto(ReportTemplateContentResult result)
+        private static ApiReportTemplateContentDto ToApiReportTemplateContentDto(
+            HttpContext context,
+            ReportTemplateContentResult result)
         {
             return new ApiReportTemplateContentDto(
                 result.ReportType.ToString(),
                 result.DisplayName,
-                result.TemplatePath,
+                ToApiReportTemplatePath(context, result.TemplatePath),
                 result.WithSealDefault,
                 result.Content,
                 result.StoragePolicy);

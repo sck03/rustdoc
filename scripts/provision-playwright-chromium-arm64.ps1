@@ -7,8 +7,15 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "lib/build-script-support.ps1")
 
-$playwrightPackageVersion = "1.61.0"
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+$packagePropsPath = Join-Path $repoRoot "Directory.Packages.props"
+[xml]$packageProps = Get-Content -LiteralPath $packagePropsPath -Raw
+$playwrightPackageNode = $packageProps.SelectSingleNode(
+    "/Project/ItemGroup/PackageVersion[@Include='Microsoft.Playwright']")
+$playwrightPackageVersion = [string]$playwrightPackageNode.Version
+if ([string]::IsNullOrWhiteSpace($playwrightPackageVersion)) {
+    throw "Microsoft.Playwright version was not found in Directory.Packages.props."
+}
 $isWindowsPlatform = [Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
     [Runtime.InteropServices.OSPlatform]::Windows)
 $pathComparison = if ($isWindowsPlatform) {

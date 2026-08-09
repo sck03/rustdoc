@@ -1,3 +1,4 @@
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 
@@ -104,7 +105,7 @@ namespace ExportDocManager.Services.Reporting
             string targetPath = Path.GetFullPath(Path.Combine(GetUserTemplatesBaseDirectory(), relativePath));
             if (!IsUserTemplatePath(targetPath))
             {
-                throw new UnauthorizedAccessException("无法为内置模板创建安全的用户副本路径。");
+                throw new PermissionDeniedException("无法为内置模板创建安全的用户副本路径。");
             }
 
             return targetPath;
@@ -160,7 +161,7 @@ namespace ExportDocManager.Services.Reporting
             string candidate = Path.GetFullPath(Path.Combine(root, relativePath));
             if (!IsPathWithinDirectory(candidate, root))
             {
-                throw new UnauthorizedAccessException("模板路径不能离开受管模板目录。");
+                throw new PermissionDeniedException("模板路径不能离开受管模板目录。");
             }
 
             resolvedPath = candidate;

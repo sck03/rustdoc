@@ -1,3 +1,4 @@
+using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
@@ -12,9 +13,11 @@ namespace ExportDocManager.Services.MasterData
         {
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             var query = BuildExampleQuery(context, keyword);
+            int normalizedPageNumber = Math.Max(pageNumber, 1);
+            int normalizedPageSize = Math.Clamp(pageSize, 1, 200);
             return await query.OrderByDescending(item => item.IsManuallyVerified).ThenByDescending(item => item.UpdatedAt)
-                .Skip((Math.Max(pageNumber, 1) - 1) * Math.Clamp(pageSize, 1, 200))
-                .Take(Math.Clamp(pageSize, 1, 200)).ToListAsync(cancellationToken);
+                .Skip(PagingHelper.CalculateOffset(normalizedPageNumber, normalizedPageSize))
+                .Take(normalizedPageSize).ToListAsync(cancellationToken);
         }
 
         public async Task<int> CountExamplesAsync(string keyword, CancellationToken cancellationToken = default)

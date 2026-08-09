@@ -121,6 +121,13 @@ services:
     mem_limit: "${EXPORTDOCMANAGER_WEB_MEMORY_LIMIT:-256m}"
     pids_limit: ${EXPORTDOCMANAGER_WEB_PIDS_LIMIT:-128}
     stop_grace_period: 15s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=101,gid=101,mode=0750
     ports:
       - "${EXPORTDOCMANAGER_WEB_BIND_ADDRESS:-127.0.0.1}:${EXPORTDOCMANAGER_WEB_PORT:-8080}:8080"
     depends_on:

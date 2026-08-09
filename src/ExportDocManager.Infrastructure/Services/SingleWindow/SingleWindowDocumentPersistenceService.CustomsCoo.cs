@@ -147,7 +147,7 @@ namespace ExportDocManager.Services.SingleWindow
                             invoice.Id,
                             cancellationToken).ConfigureAwait(false))
                     {
-                        throw new UnauthorizedAccessException("无权限生成该发票的海关原产地证草稿。");
+                        throw new PermissionDeniedException("无权限生成该发票的海关原产地证草稿。");
                     }
 
                     var entity = await context.CustomsCooDocuments

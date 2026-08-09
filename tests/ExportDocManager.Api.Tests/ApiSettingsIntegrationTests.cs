@@ -62,6 +62,7 @@ namespace ExportDocManager.Api.Tests
             var requestedSettings = CloneSettings(settingsResponse.Settings);
             requestedSettings.System.AppName = "Settings Endpoint Smoke";
             requestedSettings.System.UpdaterEndpoint = "http://updates.internal:8080/desktop/latest.json";
+            requestedSettings.System.DefaultExportDirectory = Path.Combine(harness.DataRoot, "Exports", "Configured");
             requestedSettings.BatchExport.Items =
             [
                 new BatchExportItem
@@ -110,6 +111,7 @@ namespace ExportDocManager.Api.Tests
             Assert.False(saved.RequiresRestart);
             Assert.Equal("Settings Endpoint Smoke", saved.Settings.System.AppName);
             Assert.Equal("http://updates.internal:8080/desktop/latest.json", saved.Settings.System.UpdaterEndpoint);
+            Assert.Empty(saved.Settings.System.DefaultExportDirectory);
             Assert.True(File.Exists(settingsPath));
             Assert.StartsWith(
                 Path.Combine(harness.DataRoot, "Config"),
@@ -126,6 +128,7 @@ namespace ExportDocManager.Api.Tests
             }
             Assert.Contains("Settings Endpoint Smoke", settingsJson);
             Assert.Contains("http://updates.internal:8080/desktop/latest.json", settingsJson);
+            Assert.Contains("Configured", settingsJson, StringComparison.Ordinal);
             Assert.True(
                 settingsJson.IndexOf("Smoke Commercial Invoice", StringComparison.Ordinal) <
                 settingsJson.IndexOf("Smoke Packing List", StringComparison.Ordinal));
@@ -138,6 +141,7 @@ namespace ExportDocManager.Api.Tests
             var settingsAfterSave = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSettingsResponse>(getAfterSaveResponse);
             Assert.Equal("Settings Endpoint Smoke", settingsAfterSave.Settings.System.AppName);
             Assert.Equal("http://updates.internal:8080/desktop/latest.json", settingsAfterSave.Settings.System.UpdaterEndpoint);
+            Assert.Empty(settingsAfterSave.Settings.System.DefaultExportDirectory);
             Assert.Collection(
                 settingsAfterSave.Settings.BatchExport.Items,
                 item =>

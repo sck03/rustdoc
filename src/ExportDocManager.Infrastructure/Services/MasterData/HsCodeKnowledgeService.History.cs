@@ -1,4 +1,5 @@
 using ExportDocManager.DataAccess;
+using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
@@ -117,7 +118,7 @@ namespace ExportDocManager.Services.MasterData
                 .OrderByDescending(item => item.CanConfirm).ThenByDescending(item => item.SourceCount).ThenBy(item => item.ProductName)
                 .ToList();
             int totalCount = candidates.Count;
-            var items = candidates.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();
+            var items = candidates.Skip(PagingHelper.CalculateOffset(pageNumber, pageSize)).Take(pageSize).ToList();
             bool isTruncated = productRows.HasMore || itemRows.HasMore || customsRows.HasMore;
             string notice = isTruncated
                 ? $"历史资料量较大，本次按每类最多 {sourceLimit:N0} 条近期记录分析；请输入更具体的品名、款号或 HS 编码以缩小范围。"

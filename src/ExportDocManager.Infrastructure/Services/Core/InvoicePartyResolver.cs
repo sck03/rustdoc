@@ -2,6 +2,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.MasterData;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -50,7 +51,7 @@ namespace ExportDocManager.Services.Core
                 if (!await _accessScope.ApplyCustomerScope(context.Customers.AsNoTracking())
                     .AnyAsync(item => item.Id == customer.Id, cancellationToken))
                 {
-                    throw new UnauthorizedAccessException("客户不存在或不属于当前账号。");
+                    throw new PermissionDeniedException("客户不存在或不属于当前账号。");
                 }
                 return customer.Id;
             }
@@ -102,7 +103,7 @@ namespace ExportDocManager.Services.Core
                 if (!await _accessScope.ApplyExporterScope(context.Exporters.AsNoTracking())
                     .AnyAsync(item => item.Id == exporter.Id, cancellationToken))
                 {
-                    throw new UnauthorizedAccessException("出口商不存在或不属于当前账号。");
+                    throw new PermissionDeniedException("出口商不存在或不属于当前账号。");
                 }
                 return exporter.Id;
             }

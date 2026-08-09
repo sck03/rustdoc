@@ -13,6 +13,7 @@ namespace ExportDocManager.Api.Hosting
         private readonly ConcurrentDictionary<string, long> _lastPersistedUtcTicks = new(StringComparer.OrdinalIgnoreCase);
         private readonly IAppPathProvider _pathProvider;
         private readonly ApiBackgroundJobRetentionOptions _retentionOptions;
+        private readonly Lock _mutationLock = new();
         private readonly Lock _historyCleanupLock = new();
 
         internal int PersistThrottleEntryCount => _lastPersistedUtcTicks.Count;
@@ -72,13 +73,16 @@ namespace ExportDocManager.Api.Hosting
             }
 
             string key = jobId.Trim();
-            while (_jobs.TryGetValue(key, out var job))
+            bool accepted = false;
+            lock (_mutationLock)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!job.CanCancel || BackgroundJobStatusCatalog.IsTerminal(job.Status))
+                while (_jobs.TryGetValue(key, out var job))
                 {
-                    return Task.FromResult(false);
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!job.CanCancel || BackgroundJobStatusCatalog.IsTerminal(job.Status))
+                    {
+                        return Task.FromResult(false);
+                    }
 
                 // Move the job to Canceling before signaling the worker.  The
                 // worker may complete immediately after observing cancellation;
@@ -107,20 +111,32 @@ namespace ExportDocManager.Api.Hosting
                     RetryRequestJson = job.RetryRequestJson
                 };
 
-                if (!_jobs.TryUpdate(key, next, job))
-                {
-                    // Another status update won the race.  Re-read the latest
-                    // snapshot and decide whether this request is still valid.
-                    continue;
+                    if (!_jobs.TryUpdate(key, next, job))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        PersistJob(next);
+                    }
+                    catch
+                    {
+                        _jobs.TryUpdate(key, job, next);
+                        throw;
+                    }
+
+                    accepted = true;
+                    break;
                 }
-
-                PersistJob(next);
-                TryCancel(key);
-
-                return Task.FromResult(true);
             }
 
-            return Task.FromResult(false);
+            if (accepted)
+            {
+                TryCancel(key);
+            }
+
+            return Task.FromResult(accepted);
         }
 
         public Task<bool> DeleteAsync(
@@ -133,20 +149,39 @@ namespace ExportDocManager.Api.Hosting
             }
 
             string key = jobId.Trim();
-            if (!_jobs.TryGetValue(key, out var job) || !BackgroundJobStatusCatalog.IsTerminal(job.Status))
+            cancellationToken.ThrowIfCancellationRequested();
+            BackgroundJobSnapshot removedJob;
+            lock (_mutationLock)
             {
-                return Task.FromResult(false);
+                if (!_jobs.TryGetValue(key, out var job) || !BackgroundJobStatusCatalog.IsTerminal(job.Status))
+                {
+                    return Task.FromResult(false);
+                }
+
+                if (!_jobs.TryRemove(key, out removedJob))
+                {
+                    return Task.FromResult(false);
+                }
+
+                bool hadPersistedTick = _lastPersistedUtcTicks.TryGetValue(key, out long persistedTick);
+                try
+                {
+                    DeletePersistedJobs(new[] { key });
+                    _lastPersistedUtcTicks.TryRemove(key, out _);
+                }
+                catch
+                {
+                    _jobs[key] = removedJob;
+                    if (hadPersistedTick)
+                    {
+                        _lastPersistedUtcTicks[key] = persistedTick;
+                    }
+                    throw;
+                }
             }
 
-            bool removed = _jobs.TryRemove(key, out var removedJob);
-            if (removed)
-            {
-                _lastPersistedUtcTicks.TryRemove(key, out _);
-                TryDeleteControlledBrowserOutput(removedJob?.OutputPath);
-                DeletePersistedJobs(new[] { key });
-            }
-
-            return Task.FromResult(removed);
+            TryDeleteControlledBrowserOutput(removedJob.OutputPath);
+            return Task.FromResult(true);
         }
 
         public Task<int> ClearTerminalAsync(
@@ -154,37 +189,70 @@ namespace ExportDocManager.Api.Hosting
             CancellationToken cancellationToken = default)
         {
             requestedBy = requestedBy?.Trim() ?? string.Empty;
-            int removedCount = 0;
-            var removedJobIds = new List<string>();
-            foreach (var pair in _jobs.ToArray())
+            var removedJobs = new List<BackgroundJobSnapshot>();
+            var persistedTicks = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            lock (_mutationLock)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!BackgroundJobStatusCatalog.IsTerminal(pair.Value.Status))
+                var candidates = new List<KeyValuePair<string, BackgroundJobSnapshot>>();
+                foreach (var pair in _jobs.ToArray())
                 {
-                    continue;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!BackgroundJobStatusCatalog.IsTerminal(pair.Value.Status))
+                    {
+                        continue;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(requestedBy) &&
+                        !string.Equals(pair.Value.RequestedBy, requestedBy, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    candidates.Add(pair);
                 }
 
-                if (!string.IsNullOrWhiteSpace(requestedBy) &&
-                    !string.Equals(pair.Value.RequestedBy, requestedBy, StringComparison.OrdinalIgnoreCase))
+                foreach (var pair in candidates)
                 {
-                    continue;
+                    if (_jobs.TryRemove(pair.Key, out var removedJob))
+                    {
+                        removedJobs.Add(removedJob);
+                        if (_lastPersistedUtcTicks.TryGetValue(pair.Key, out long persistedTick))
+                        {
+                            persistedTicks[pair.Key] = persistedTick;
+                        }
+                    }
                 }
 
-                if (_jobs.TryRemove(pair.Key, out var removedJob))
+                if (removedJobs.Count > 0)
                 {
-                    _lastPersistedUtcTicks.TryRemove(pair.Key, out _);
-                    TryDeleteControlledBrowserOutput(removedJob?.OutputPath);
-                    removedJobIds.Add(pair.Key);
-                    removedCount++;
+                    try
+                    {
+                        DeletePersistedJobs(removedJobs.Select(job => job.JobId).ToArray());
+                        foreach (var removedJob in removedJobs)
+                        {
+                            _lastPersistedUtcTicks.TryRemove(removedJob.JobId, out _);
+                        }
+                    }
+                    catch
+                    {
+                        foreach (var removedJob in removedJobs)
+                        {
+                            _jobs[removedJob.JobId] = removedJob;
+                            if (persistedTicks.TryGetValue(removedJob.JobId, out long persistedTick))
+                            {
+                                _lastPersistedUtcTicks[removedJob.JobId] = persistedTick;
+                            }
+                        }
+                        throw;
+                    }
                 }
             }
 
-            if (removedCount > 0)
+            foreach (var removedJob in removedJobs)
             {
-                DeletePersistedJobs(removedJobIds);
+                TryDeleteControlledBrowserOutput(removedJob.OutputPath);
             }
-
-            return Task.FromResult(removedCount);
+            return Task.FromResult(removedJobs.Count);
         }
 
         public BackgroundJobSnapshot Upsert(BackgroundJobSnapshot job)
@@ -195,59 +263,62 @@ namespace ExportDocManager.Api.Hosting
                 throw new ArgumentException("任务 ID 不能为空。", nameof(job));
             }
 
-            string key = job.JobId.Trim();
-            bool hadPrevious = _jobs.TryGetValue(key, out var previous);
-            BackgroundJobSnapshot normalized = _jobs.AddOrUpdate(
-                key,
-                _ => NormalizeNewJob(job, key),
-                (_, current) => Normalize(job, current));
-            try
+            lock (_mutationLock)
             {
-                PersistJob(normalized);
-                if (BackgroundJobStatusCatalog.IsTerminal(normalized.Status))
-                {
-                    PruneTerminalHistory();
-                }
-
-                return normalized;
-            }
-            catch
-            {
-                // Enqueue callers reserve queue capacity before Upsert. Restore the
-                // in-memory snapshot when durable persistence fails so a rejected
-                // write cannot leave a phantom task consuming capacity forever.
-                if (hadPrevious)
-                {
-                    _jobs[key] = previous;
-                }
-                else
-                {
-                    _jobs.TryRemove(key, out _);
-                }
-
+                string key = job.JobId.Trim();
+                bool hadPrevious = _jobs.TryGetValue(key, out var previous);
+                BackgroundJobSnapshot normalized = _jobs.AddOrUpdate(
+                    key,
+                    _ => NormalizeNewJob(job, key),
+                    (_, current) => Normalize(job, current));
                 try
                 {
-                    if (hadPrevious)
+                    PersistJob(normalized);
+                    if (BackgroundJobStatusCatalog.IsTerminal(normalized.Status))
                     {
-                        PersistJob(previous);
+                        PruneTerminalHistory();
                     }
-                    else if (_useDatabaseStore)
-                    {
-                        DeleteDatabaseJobs(new[] { key });
-                    }
-                    else
-                    {
-                        PersistJobs();
-                    }
+
+                    return normalized;
                 }
                 catch
                 {
-                    // The original persistence exception is more useful to the
-                    // caller. A later retry/startup load will reconcile durable
-                    // state if the storage itself remains unavailable.
-                }
+                    // Enqueue callers reserve queue capacity before Upsert. Restore the
+                    // in-memory snapshot when durable persistence fails so a rejected
+                    // write cannot leave a phantom task consuming capacity forever.
+                    if (hadPrevious)
+                    {
+                        _jobs[key] = previous;
+                    }
+                    else
+                    {
+                        _jobs.TryRemove(key, out _);
+                    }
 
-                throw;
+                    try
+                    {
+                        if (hadPrevious)
+                        {
+                            PersistJob(previous);
+                        }
+                        else if (_useDatabaseStore)
+                        {
+                            DeleteDatabaseJobs(new[] { key });
+                        }
+                        else
+                        {
+                            PersistJobs();
+                        }
+                    }
+                    catch
+                    {
+                        // The original persistence exception is more useful to the
+                        // caller. A later retry/startup load will reconcile durable
+                        // state if the storage itself remains unavailable.
+                    }
+
+                    throw;
+                }
             }
         }
 
@@ -258,25 +329,36 @@ namespace ExportDocManager.Api.Hosting
             ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
             ArgumentNullException.ThrowIfNull(update);
 
-            string key = jobId.Trim();
-            while (_jobs.TryGetValue(key, out var current))
+            lock (_mutationLock)
             {
-                var next = Normalize(update(current), current);
-                if (_jobs.TryUpdate(key, next, current))
+                string key = jobId.Trim();
+                while (_jobs.TryGetValue(key, out var current))
                 {
-                    if (ShouldPersistUpdate(current, next))
+                    var next = Normalize(update(current), current);
+                    if (_jobs.TryUpdate(key, next, current))
                     {
-                        PersistJob(next);
+                        try
+                        {
+                            if (ShouldPersistUpdate(current, next))
+                            {
+                                PersistJob(next);
+                            }
+                            if (BackgroundJobStatusCatalog.IsTerminal(next.Status))
+                            {
+                                PruneTerminalHistory();
+                            }
+                            return next;
+                        }
+                        catch
+                        {
+                            _jobs.TryUpdate(key, current, next);
+                            throw;
+                        }
                     }
-                    if (BackgroundJobStatusCatalog.IsTerminal(next.Status))
-                    {
-                        PruneTerminalHistory();
-                    }
-                    return next;
                 }
-            }
 
-            return null;
+                return null;
+            }
         }
 
         public void RegisterCancellationSource(string jobId, CancellationTokenSource source)
@@ -339,7 +421,6 @@ namespace ExportDocManager.Api.Hosting
                 return false;
             }
 
-            _lastPersistedUtcTicks[next.JobId] = nowTicks;
             return true;
         }
 
@@ -385,18 +466,45 @@ namespace ExportDocManager.Api.Hosting
                     return;
                 }
 
-                var removedIds = new List<string>(removeIds.Count);
+                var removedJobs = new List<BackgroundJobSnapshot>(removeIds.Count);
+                var persistedTicks = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
                 foreach (string jobId in removeIds)
                 {
                     if (_jobs.TryRemove(jobId, out var removedJob))
                     {
-                        _lastPersistedUtcTicks.TryRemove(jobId, out _);
-                        TryDeleteControlledBrowserOutput(removedJob.OutputPath);
-                        removedIds.Add(jobId);
+                        removedJobs.Add(removedJob);
+                        if (_lastPersistedUtcTicks.TryGetValue(jobId, out long persistedTick))
+                        {
+                            persistedTicks[jobId] = persistedTick;
+                        }
                     }
                 }
 
-                DeletePersistedJobs(removedIds);
+                try
+                {
+                    DeletePersistedJobs(removedJobs.Select(job => job.JobId).ToArray());
+                    foreach (var removedJob in removedJobs)
+                    {
+                        _lastPersistedUtcTicks.TryRemove(removedJob.JobId, out _);
+                    }
+                }
+                catch
+                {
+                    foreach (var removedJob in removedJobs)
+                    {
+                        _jobs[removedJob.JobId] = removedJob;
+                        if (persistedTicks.TryGetValue(removedJob.JobId, out long persistedTick))
+                        {
+                            _lastPersistedUtcTicks[removedJob.JobId] = persistedTick;
+                        }
+                    }
+                    throw;
+                }
+
+                foreach (var removedJob in removedJobs)
+                {
+                    TryDeleteControlledBrowserOutput(removedJob.OutputPath);
+                }
             }
         }
 

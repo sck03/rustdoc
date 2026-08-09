@@ -51,14 +51,15 @@ public static partial class ServerMigrationRecoveryStateMachine
         {
             if (marker.ManualRecoveryRequired)
             {
+                string recoveryMessage = string.IsNullOrWhiteSpace(marker.LastError)
+                    ? "服务器迁移自动回滚未完整完成，需要管理员使用安全备份人工恢复。"
+                    : marker.LastError;
                 ServerMigrationManager.WriteStatus(
                     pathProvider,
                     marker,
-                    string.IsNullOrWhiteSpace(marker.LastError)
-                        ? "服务器迁移自动回滚未完整完成，需要管理员使用安全备份人工恢复。"
-                        : marker.LastError,
+                    recoveryMessage,
                     ServerMigrationManager.GetSafetyBackupRoot(pathProvider, marker.PackageId));
-                return;
+                throw new ManualRecoveryRequiredException(recoveryMessage);
             }
 
             ServerMigrationManager.WriteStatus(
@@ -213,17 +214,7 @@ public static partial class ServerMigrationRecoveryStateMachine
                 "服务器迁移恢复已完成。恢复前安全备份已保留。",
                 safetyRoot);
             AtomicFileHelper.TryDeleteFile(markerPath);
-            if (!marker.ManualRecoveryRequired)
-            {
-                AtomicFileHelper.TryDeleteDirectory(stagingRoot);
-            }
-            ServerMigrationSecurityAudit.Write(
-                pathProvider,
-                "apply-restore",
-                requestContext,
-                marker.PackageId,
-                success: true,
-                "服务器迁移恢复完成。");
+            AtomicFileHelper.TryDeleteDirectory(stagingRoot);
         }
         catch (Exception ex)
         {
@@ -240,7 +231,7 @@ public static partial class ServerMigrationRecoveryStateMachine
             {
                 AtomicFileHelper.TryDeleteDirectory(stagingRoot);
             }
-            ServerMigrationSecurityAudit.Write(
+            TryWriteSecurityAudit(
                 pathProvider,
                 "apply-restore",
                 requestContext,
@@ -248,7 +239,25 @@ public static partial class ServerMigrationRecoveryStateMachine
                 success: false,
                 rollbackMessage);
             Console.Error.WriteLine($"Server migration restore failed: {rollbackMessage}");
+            if (marker.ManualRecoveryRequired)
+            {
+                throw new ManualRecoveryRequiredException(rollbackMessage, ex);
+            }
+
+            return;
         }
+
+        // The restore is committed once the terminal status is durable and the
+        // pending marker has been removed. Security-audit IO is intentionally
+        // best effort after that point: a log permission or disk error must
+        // never roll back an already committed database/file switch.
+        TryWriteSecurityAudit(
+            pathProvider,
+            "apply-restore",
+            requestContext,
+            marker.PackageId,
+            success: true,
+            "服务器迁移恢复完成。");
     }
 
     private static async Task RecoverInterruptedRestoreAsync(
@@ -299,7 +308,7 @@ public static partial class ServerMigrationRecoveryStateMachine
                 ServerMigrationManager.GetControlRoot(pathProvider),
                 marker.StagingDirectoryName));
         }
-        ServerMigrationSecurityAudit.Write(
+        TryWriteSecurityAudit(
             pathProvider,
             "recover-interrupted-restore",
             requestContext,
@@ -307,6 +316,10 @@ public static partial class ServerMigrationRecoveryStateMachine
             success: false,
             message);
         Console.Error.WriteLine($"Interrupted server migration recovered: {message}");
+        if (marker.ManualRecoveryRequired)
+        {
+            throw new ManualRecoveryRequiredException(message, interruption);
+        }
     }
 
     private static async Task<string> TryRollbackAsync(
@@ -445,7 +458,7 @@ public static partial class ServerMigrationRecoveryStateMachine
         {
             AtomicFileHelper.TryDeleteFile(markerPath);
         }
-        ServerMigrationSecurityAudit.Write(
+        TryWriteSecurityAudit(
             pathProvider,
             "apply-restore",
             new ServerMigrationRequestContext(string.Empty, string.Empty),
@@ -453,6 +466,31 @@ public static partial class ServerMigrationRecoveryStateMachine
             success: false,
             marker.LastError);
         await Task.CompletedTask;
+    }
+
+    private static void TryWriteSecurityAudit(
+        IAppPathProvider pathProvider,
+        string action,
+        ServerMigrationRequestContext requestContext,
+        string packageId,
+        bool? success,
+        string message)
+    {
+        try
+        {
+            ServerMigrationSecurityAudit.Write(
+                pathProvider,
+                action,
+                requestContext,
+                packageId,
+                success,
+                message);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(
+                $"Server migration security audit write failed after state handling completed: {ex.Message}");
+        }
     }
 
 }

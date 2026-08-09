@@ -10,7 +10,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
-                ApiRuntimeOptions runtimeOptions,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 ISettingsService settingsService) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
@@ -23,7 +23,7 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Ok(ApiSettingsDtoFactory.FromSettingsForUser(
                     settingsService.Settings,
                     authorizationService.CanManageSettings(user),
-                    runtimeOptions.NetworkMode));
+                    ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
             })
             .WithName("GetSettings");
 
@@ -56,7 +56,8 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Ok(ApiSettingsDtoFactory.ValidateDraft(
                     request.Settings,
                     settingsService.Settings,
-                    request.UpdateSecrets));
+                    request.UpdateSecrets,
+                    revealLocalPaths: false));
             })
             .WithName("ValidateSettings");
 
@@ -64,6 +65,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
+                ApiDesktopAccessOptions desktopAccessOptions,
                 ISettingsService settingsService,
                 ApiSettingsSaveRequest request) =>
             {
@@ -91,7 +93,8 @@ namespace ExportDocManager.Api.Hosting
                     var validation = ApiSettingsDtoFactory.ValidateDraft(
                         request.Settings,
                         settingsService.Settings,
-                        request.UpdateSecrets);
+                        request.UpdateSecrets,
+                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions));
                     if (!validation.IsValid)
                     {
                         string errors = string.Join(
@@ -122,6 +125,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Ok(ApiSettingsDtoFactory.FromSavedSettings(
                         settingsService.Settings,
                         requiresRestart,
+                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions),
                         requiresRestart
                             ? "设置已保存，数据库连接变更需要重启 sidecar 后生效。"
                             : "设置已保存。"));

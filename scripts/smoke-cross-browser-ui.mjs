@@ -174,6 +174,7 @@ async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, v
         JSON.stringify(metrics),
       );
     }
+    const lazyRouteStyles = await validateLazyRouteStyles(page, browserName, viewport.name, baseUrl);
     if (pageErrors.length || serverErrors.length || accessibility.length) {
       throw new Error(
         `${browserName}/${viewport.name} acceptance failed: ` +
@@ -189,10 +190,71 @@ async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, v
       seriousAccessibilityViolations: accessibility.length,
       pageErrors: pageErrors.length,
       serverErrors: serverErrors.length,
+      lazyRouteStyles,
     };
   } finally {
     await context.close();
   }
+}
+
+async function validateLazyRouteStyles(page, browserName, viewportName, baseUrl) {
+  const routes = [
+    {
+      name: "single-window",
+      url: `${baseUrl}/#/single-window/operation-center`,
+      selector: ".single-window-surface",
+      expectedProperty: "overflowY",
+      expectedValue: "auto",
+    },
+    {
+      name: "reports",
+      url: `${baseUrl}/#/reports/templates`,
+      selector: ".report-template-layout",
+      expectedProperty: "display",
+      expectedValue: "grid",
+    },
+    {
+      name: "container-packing",
+      url: `${baseUrl}/#/tools/container-packing`,
+      selector: ".container-packing-surface",
+      expectedProperty: "overflowY",
+      expectedValue: "auto",
+    },
+  ];
+  const results = [];
+  for (const route of routes) {
+    await page.goto(route.url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await page.locator(route.selector).waitFor({ state: "visible", timeout: 30_000 });
+    await page.waitForFunction(
+      ({ selector, expectedProperty, expectedValue }) => {
+        const element = document.querySelector(selector);
+        return element instanceof HTMLElement && getComputedStyle(element)[expectedProperty] === expectedValue;
+      },
+      {
+        selector: route.selector,
+        expectedProperty: route.expectedProperty,
+        expectedValue: route.expectedValue,
+      },
+      { timeout: 30_000 },
+    );
+    const metrics = await page.evaluate(({ selector, expectedProperty }) => {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement)) return null;
+      const style = getComputedStyle(element);
+      return {
+        horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        computedValue: style[expectedProperty],
+      };
+    }, { selector: route.selector, expectedProperty: route.expectedProperty });
+    if (!metrics || metrics.computedValue !== route.expectedValue || metrics.horizontalOverflow > 1) {
+      throw new Error(
+        `${browserName}/${viewportName}/${route.name}: lazy route CSS contract failed: ` +
+        JSON.stringify({ route, metrics }),
+      );
+    }
+    results.push({ name: route.name, ...metrics });
+  }
+  return results;
 }
 
 function readBrowserArgument() {

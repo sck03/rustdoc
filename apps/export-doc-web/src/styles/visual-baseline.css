@@ -1,0 +1,27 @@
+/*
+ * Visual acceptance renders every representative workspace in one entry.
+ * Keep the historical production cascade here while real application routes
+ * load the heavy report, Single Window and container styles on demand.
+ */
+@import "./base.css";
+@import "./dashboard.css";
+@import "./master-data.css";
+@import "./single-window-core.css";
+@import "./audit-query.css";
+@import "./tools-ocr-exchange.css";
+@import "./update-center.css";
+@import "./email.css";
+@import "./runtime-single-window.css";
+@import "./jobs-excel.css";
+@import "./container-packing.css";
+@import "./single-window-documents.css";
+@import "./coo-review.css";
+@import "./auth-forms.css";
+@import "./remote-select.css";
+@import "../workspaceFeatures.css";
+@import "../reportWorkspace.css";
+@import "../businessFeatures.css";
+@import "../theme.css";
+@import "../ui/commercialComponents.css";
+@import "../features/master-data/hsKnowledge.css";
+@import "../responsiveOverrides.css";

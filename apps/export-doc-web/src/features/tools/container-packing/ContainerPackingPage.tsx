@@ -1,4 +1,5 @@
 import { ExportDocManagerApiClient } from "../../../api/index.ts";
+import "../../../styles/routes/container-packing.css";
 import { useModulePermission } from "../../../app/PermissionAccessContext.tsx";
 import { ContainerPackingPanel } from "./ContainerPackingPanel.tsx";
 

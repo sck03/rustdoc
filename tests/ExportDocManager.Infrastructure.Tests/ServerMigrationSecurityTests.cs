@@ -630,7 +630,8 @@ public sealed class ServerMigrationSecurityTests
                 markerPath,
                 JsonSerializer.Serialize(marker, ServerMigrationService.JsonOptions));
 
-            await ServerMigrationManager.ApplyPendingRestoreAsync(paths);
+            await Assert.ThrowsAsync<ManualRecoveryRequiredException>(() =>
+                ServerMigrationManager.ApplyPendingRestoreAsync(paths));
 
             Assert.True(File.Exists(markerPath));
             Assert.True(Directory.Exists(stagingRoot));
@@ -642,7 +643,8 @@ public sealed class ServerMigrationSecurityTests
             Assert.Equal(ServerMigrationRestorePhase.Failed, failedMarker.Phase);
             Assert.Contains("自动回滚未完全成功", failedMarker.LastError, StringComparison.Ordinal);
 
-            await ServerMigrationManager.ApplyPendingRestoreAsync(paths);
+            await Assert.ThrowsAsync<ManualRecoveryRequiredException>(() =>
+                ServerMigrationManager.ApplyPendingRestoreAsync(paths));
 
             Assert.True(File.Exists(markerPath));
             Assert.True(Directory.Exists(stagingRoot));

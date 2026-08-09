@@ -288,6 +288,36 @@ for (const file of walk(root)) {
   }
 }
 
+const globalFoundationManifest = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+const globalWorkspaceManifest = fs.readFileSync(path.join(root, "styles", "workspaces.css"), "utf8");
+for (const routeOnlyStyle of [
+  "single-window-core.css",
+  "runtime-single-window.css",
+  "single-window-documents.css",
+  "coo-review.css",
+  "container-packing.css",
+]) {
+  if (globalFoundationManifest.includes(routeOnlyStyle)) {
+    failures.push(`styles.css: 重型路由样式不得重新进入首屏清单：${routeOnlyStyle}`);
+  }
+}
+if (globalWorkspaceManifest.includes("reportWorkspace.css")) {
+  failures.push("styles/workspaces.css: 报表设计样式必须随 lazy route 加载");
+}
+for (const [sourceRelativePath, routeStyle] of [
+  ["features/reports/ReportTemplateDesignerPage.tsx", "../../styles/routes/reports.css"],
+  ["features/single-window/SingleWindowPages.tsx", "../../styles/routes/single-window.css"],
+  ["features/single-window/SingleWindowReferenceCatalogPage.tsx", "../../styles/routes/single-window.css"],
+  ["features/single-window/CustomsCooPage.tsx", "../../styles/routes/single-window.css"],
+  ["features/single-window/AgentConsignmentPage.tsx", "../../styles/routes/single-window.css"],
+  ["features/tools/container-packing/ContainerPackingPage.tsx", "../../../styles/routes/container-packing.css"],
+]) {
+  const sourceText = fs.readFileSync(path.join(root, sourceRelativePath), "utf8");
+  if (!sourceText.includes(routeStyle)) {
+    failures.push(`${sourceRelativePath}: 缺少按路由加载的样式入口 ${routeStyle}`);
+  }
+}
+
 const responsiveCss = readCssImportGraph(path.join(root, "responsiveOverrides.css"));
 
 for (const scriptName of ["test_frontend_visual_baselines.mjs", "test_frontend_scale_contracts.mjs"]) {

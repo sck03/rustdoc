@@ -52,7 +52,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Ok(new ApiReportHtmlPreviewResponse(
                         result.SourceId,
                         result.ReportType.ToString(),
-                        result.TemplatePath,
+                        ToApiReportTemplatePath(context, result.TemplatePath),
                         result.WithSeal ?? false,
                         result.Html));
                 }
@@ -119,7 +119,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Ok(new ApiReportHtmlPreviewResponse(
                         result.SourceId,
                         result.ReportType.ToString(),
-                        result.TemplatePath,
+                        ToApiReportTemplatePath(context, result.TemplatePath),
                         result.WithSeal ?? false,
                         result.Html,
                         InvoiceDraftPreviewStoragePolicy));
@@ -183,7 +183,7 @@ namespace ExportDocManager.Api.Hosting
                         previews.Add(new ApiInvoiceDocumentPackagePreviewItemResponse(
                             item.Name,
                             renderResult.ReportType.ToString(),
-                            renderResult.TemplatePath,
+                                ToApiReportTemplatePath(context, renderResult.TemplatePath),
                             renderResult.WithSeal ?? false,
                             renderResult.Html));
                     }
@@ -248,7 +248,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Ok(new ApiPaymentReportHtmlPreviewResponse(
                         result.SourceId,
                         result.ReportType.ToString(),
-                        result.TemplatePath,
+                        ToApiReportTemplatePath(context, result.TemplatePath),
                         result.Html,
                         PaymentDraftPreviewStoragePolicy));
                 }
@@ -300,7 +300,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Ok(new ApiPaymentReportHtmlPreviewResponse(
                         result.SourceId,
                         result.ReportType.ToString(),
-                        result.TemplatePath,
+                        ToApiReportTemplatePath(context, result.TemplatePath),
                         result.Html));
                 }
                 catch (KeyNotFoundException ex)

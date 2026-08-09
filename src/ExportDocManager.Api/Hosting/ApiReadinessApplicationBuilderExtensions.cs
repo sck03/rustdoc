@@ -15,7 +15,8 @@ namespace ExportDocManager.Api.Hosting
     public static class ApiReadinessApplicationBuilderExtensions
     {
         private const string ReadinessPath = "/readyz";
-        private const string ReadinessPayload = "{\"status\":\"ok\"}";
+        private const string LivenessPath = "/livez";
+        private const string LivenessPayload = "{\"status\":\"alive\"}";
         private const string HealthPath = "/healthz";
         private static readonly JsonSerializerOptions ProbeJsonOptions = JsonSerializerOptions.Web;
 
@@ -31,12 +32,20 @@ namespace ExportDocManager.Api.Hosting
 
             return app.Use(async (context, next) =>
             {
+                if (context.Request.Path.Equals(LivenessPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    await WriteLivenessAsync(context).ConfigureAwait(false);
+                    return;
+                }
+
                 if (context.Request.Path.Equals(ReadinessPath, StringComparison.OrdinalIgnoreCase))
                 {
                     // Readiness must cross the authentication service graph. This catches
                     // dependency cycles that a process-only health response would hide.
                     _ = context.RequestServices.GetService<ApiCurrentUserResolver>();
-                    await WriteReadinessAsync(context).ConfigureAwait(false);
+                    IApiReadinessProbe readinessProbe =
+                        context.RequestServices.GetRequiredService<IApiReadinessProbe>();
+                    await WriteReadinessAsync(context, readinessProbe).ConfigureAwait(false);
                     return;
                 }
 
@@ -73,13 +82,10 @@ namespace ExportDocManager.Api.Hosting
                 !ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions);
         }
 
-        private static async Task WriteReadinessAsync(HttpContext context)
+        private static async Task WriteLivenessAsync(HttpContext context)
         {
-            if (!HttpMethods.IsGet(context.Request.Method) &&
-                !HttpMethods.IsHead(context.Request.Method))
+            if (!EnsureProbeMethod(context))
             {
-                context.Response.Headers.Allow = "GET, HEAD";
-                context.Response.StatusCode = StatusCodes.Status405MethodNotAllowed;
                 return;
             }
 
@@ -87,9 +93,54 @@ namespace ExportDocManager.Api.Hosting
             context.Response.ContentType = "application/json; charset=utf-8";
             if (!HttpMethods.IsHead(context.Request.Method))
             {
-                await context.Response.WriteAsync(ReadinessPayload, context.RequestAborted)
+                await context.Response.WriteAsync(LivenessPayload, context.RequestAborted)
                     .ConfigureAwait(false);
             }
+        }
+
+        private static async Task WriteReadinessAsync(
+            HttpContext context,
+            IApiReadinessProbe readinessProbe)
+        {
+            if (!EnsureProbeMethod(context))
+            {
+                return;
+            }
+
+            ApiReadinessSnapshot snapshot =
+                await readinessProbe.CheckAsync(context.RequestAborted).ConfigureAwait(false);
+
+            context.Response.StatusCode = snapshot.Ready
+                ? StatusCodes.Status200OK
+                : StatusCodes.Status503ServiceUnavailable;
+            context.Response.ContentType = "application/json; charset=utf-8";
+            if (!HttpMethods.IsHead(context.Request.Method))
+            {
+                await JsonSerializer.SerializeAsync(
+                        context.Response.Body,
+                        new
+                        {
+                            status = snapshot.Ready ? "ready" : "not_ready",
+                            checkedAt = snapshot.CheckedAt,
+                            checks = snapshot.Checks
+                        },
+                        ProbeJsonOptions,
+                        context.RequestAborted)
+                    .ConfigureAwait(false);
+            }
+        }
+
+        private static bool EnsureProbeMethod(HttpContext context)
+        {
+            if (HttpMethods.IsGet(context.Request.Method) ||
+                HttpMethods.IsHead(context.Request.Method))
+            {
+                return true;
+            }
+
+            context.Response.Headers.Allow = "GET, HEAD";
+            context.Response.StatusCode = StatusCodes.Status405MethodNotAllowed;
+            return false;
         }
 
         private static async Task WritePublicHealthAsync(

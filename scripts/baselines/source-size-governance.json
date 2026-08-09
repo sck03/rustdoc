@@ -78,10 +78,24 @@
       "maximumAggregateLines": 1500
     },
     {
+      "name": "Excel analyzer Rust modules",
+      "directory": "tools/excel-analyzer-rs/src",
+      "filePattern": "^(?:main|workbook_analysis|document_fields|table_analysis|tests)\\.rs$",
+      "maximumLines": 1000,
+      "maximumAggregateLines": 3100
+    },
+    {
       "name": "OpenAPI document modules",
       "directory": "src/ExportDocManager.Api/Hosting",
       "filePattern": "^OpenApiDocument(?:Paths|Schemas)\\..+\\.cs$",
       "maximumLines": 1200
+    },
+    {
+      "name": "OpenAPI factory components",
+      "directory": "src/ExportDocManager.Api/Hosting",
+      "filePattern": "^OpenApiDocumentFactory(?:\\..+)?\\.cs$",
+      "maximumLines": 600,
+      "maximumAggregateLines": 1250
     },
     {
       "name": "OpenAPI document and system components",
@@ -109,6 +123,13 @@
       "filePattern": "^(?:InvoiceEditorPage|useInvoicePersistenceOperations)\\.(?:tsx|ts)$",
       "maximumLines": 800,
       "maximumAggregateLines": 1100
+    },
+    {
+      "name": "invoice form panels",
+      "directory": "apps/export-doc-web/src/features/invoices",
+      "filePattern": "^Invoice(?:FormPanels|BasicInfoPanel|PartiesPanel|ExtendedFieldsPanel|ShippingTermsPanel|MarksAndItemsPanel)\\.tsx$",
+      "maximumLines": 360,
+      "maximumAggregateLines": 950
     },
     {
       "name": "report template designer orchestration",

@@ -53,7 +53,7 @@ namespace ExportDocManager.Services.Infrastructure
 
             var totalCount = await invoiceQuery.CountAsync(cancellationToken);
             var items = await invoiceQuery
-                .Skip((normalizedQuery.PageNumber - 1) * normalizedQuery.PageSize)
+                .Skip(PagingHelper.CalculateOffset(normalizedQuery.PageNumber, normalizedQuery.PageSize))
                 .Take(normalizedQuery.PageSize)
                 .ToListAsync(cancellationToken);
 
@@ -71,7 +71,7 @@ namespace ExportDocManager.Services.Infrastructure
 
             var totalCount = await paymentQuery.CountAsync(cancellationToken);
             var items = await paymentQuery
-                .Skip((normalizedQuery.PageNumber - 1) * normalizedQuery.PageSize)
+                .Skip(PagingHelper.CalculateOffset(normalizedQuery.PageNumber, normalizedQuery.PageSize))
                 .Take(normalizedQuery.PageSize)
                 .ToListAsync(cancellationToken);
 
@@ -103,7 +103,7 @@ namespace ExportDocManager.Services.Infrastructure
 
             var totalCount = await invoiceQuery.CountAsync(cancellationToken);
             var items = await invoiceQuery
-                .Skip((normalizedQuery.PageNumber - 1) * normalizedQuery.PageSize)
+                .Skip(PagingHelper.CalculateOffset(normalizedQuery.PageNumber, normalizedQuery.PageSize))
                 .Take(normalizedQuery.PageSize)
                 .ToListAsync(cancellationToken);
 
@@ -129,7 +129,7 @@ namespace ExportDocManager.Services.Infrastructure
 
             var totalCount = await auditQuery.CountAsync(cancellationToken);
             var items = await auditQuery
-                .Skip((normalizedQuery.PageNumber - 1) * normalizedQuery.PageSize)
+                .Skip(PagingHelper.CalculateOffset(normalizedQuery.PageNumber, normalizedQuery.PageSize))
                 .Take(normalizedQuery.PageSize)
                 .ToListAsync(cancellationToken);
 

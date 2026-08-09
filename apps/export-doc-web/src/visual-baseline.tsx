@@ -10,9 +10,7 @@ import { getProductEditionPresentation } from "./app/productEdition.ts";
 import { applyInterfaceDensity, persistInterfaceDensity, readInterfaceDensity } from "./app/interfaceDensity.ts";
 import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "./app/workspaceDevice.ts";
 import { WorkspaceDeviceNotice } from "./ui/WorkspaceDeviceNotice.tsx";
-import "./styles/foundation.css";
-import "./styles/workspaces.css";
-import "./styles/responsive.css";
+import "./styles/visual-baseline.css";
 
 const visualSearch = new URLSearchParams(location.search);
 const page = visualSearch.get("page") ?? "dashboard";

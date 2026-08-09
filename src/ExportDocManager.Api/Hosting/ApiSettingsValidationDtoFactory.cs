@@ -14,7 +14,8 @@ namespace ExportDocManager.Api.Hosting
         public static ApiSettingsValidationResponse ValidateDraft(
             AppSettings requestSettings,
             AppSettings currentSettings,
-            bool updateSecrets)
+            bool updateSecrets,
+            bool revealLocalPaths = true)
         {
             var raw = CloneSettings(requestSettings ?? new AppSettings());
             var draft = CloneSettings(requestSettings ?? new AppSettings());
@@ -51,7 +52,7 @@ namespace ExportDocManager.Api.Hosting
                 hasWarnings,
                 messages.Any(message => message.IsAutoFixable),
                 messages,
-                CreateSanitizedSettings(prepared, canManageSettings: true, networkMode: false),
+                CreateSanitizedSettings(prepared, canManageSettings: true, revealLocalPaths),
                 ValidationStoragePolicy);
         }
 

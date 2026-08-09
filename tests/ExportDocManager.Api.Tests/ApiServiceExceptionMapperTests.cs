@@ -65,14 +65,15 @@ public sealed class ApiServiceExceptionMapperTests
     }
 
     [Fact]
-    public void Map_ShouldTreatMissingFileAsNotFound()
+    public void Map_ShouldTreatUnclassifiedMissingFileAsInfrastructureFailure()
     {
         (int status, string message) = ApiServiceExceptionMapper.Map(
             new FileNotFoundException("missing file"),
             "correlation-test");
 
-        Assert.Equal(StatusCodes.Status404NotFound, status);
-        Assert.Equal("missing file", message);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, status);
+        Assert.Equal("依赖服务暂时不可用，请稍后重试。", message);
+        Assert.DoesNotContain("missing file", message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -99,14 +100,14 @@ public sealed class ApiServiceExceptionMapperTests
     }
 
     [Fact]
-    public void Map_ShouldTreatWrappedManagedMissingFileAsNotFound()
+    public void Map_ShouldPreserveInfrastructureClassificationForWrappedMissingFile()
     {
         (int status, string message) = ApiServiceExceptionMapper.Map(
             new InfrastructureServiceException("file dependency failed", new FileNotFoundException("managed file missing")),
             "correlation-test");
 
-        Assert.Equal(StatusCodes.Status404NotFound, status);
-        Assert.Equal("managed file missing", message);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, status);
+        Assert.Equal("file dependency failed", message);
     }
 
     [Fact]

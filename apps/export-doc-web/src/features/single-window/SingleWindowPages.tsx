@@ -1,4 +1,5 @@
 import { Navigate } from "react-router-dom";
+import "../../styles/routes/single-window.css";
 
 export function SingleWindowRoute() {
   return <Navigate to="/single-window/operation-center" replace />;

@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
@@ -48,7 +49,7 @@ namespace ExportDocManager.Services.Core
                         context,
                         payment.Id).ConfigureAwait(false))
                 {
-                    throw new UnauthorizedAccessException("无权限修改该付款记录。");
+                    throw new PermissionDeniedException("无权限修改该付款记录。");
                 }
 
                 context.Payments.Update(payment);

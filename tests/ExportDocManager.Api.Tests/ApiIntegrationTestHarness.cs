@@ -133,6 +133,12 @@ namespace ExportDocManager.Api.Tests
                     builder.Services.AddSingleton(licenseSignatureVerifier);
                 }
                 builder.Services.AddExportDocManagerApiServices(pathProvider, databaseSettings, runtimeOptions);
+                // Integration tests exercise endpoint behavior with a deliberately
+                // isolated SQLite harness. Keep the real application's bounded
+                // dependency probe covered by its focused tests while making the
+                // generic HTTP harness deterministic and independent of startup
+                // directory creation order.
+                builder.Services.AddSingleton<IApiReadinessProbe>(new TestReadinessProbe());
                 configureServices?.Invoke(builder.Services);
 
                 var app = builder.Build();
@@ -284,6 +290,20 @@ namespace ExportDocManager.Api.Tests
                     Thread.Sleep(100);
                 }
             }
+        }
+
+        private sealed class TestReadinessProbe : IApiReadinessProbe
+        {
+            public Task<ApiReadinessSnapshot> CheckAsync(CancellationToken cancellationToken = default) =>
+                Task.FromResult(new ApiReadinessSnapshot(
+                    true,
+                    DateTimeOffset.UtcNow,
+                    new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["database"] = "ready",
+                        ["runtimeDirectories"] = "ready",
+                        ["browser"] = "ready"
+                    }));
         }
     }
 

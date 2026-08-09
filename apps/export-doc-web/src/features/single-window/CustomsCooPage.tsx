@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import "../../styles/routes/single-window.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileCheck2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";

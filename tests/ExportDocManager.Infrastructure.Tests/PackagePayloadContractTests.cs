@@ -103,12 +103,23 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("rust:1.96-trixie", dockerfile, StringComparison.Ordinal);
         Assert.Contains("node:24-trixie-slim", webDockerfile, StringComparison.Ordinal);
         Assert.Contains("nginx:1.30.4-alpine3.24", webDockerfile, StringComparison.Ordinal);
+        Assert.Contains("USER nginx", webDockerfile, StringComparison.Ordinal);
         Assert.Contains("postgres:18.4-trixie", compose, StringComparison.Ordinal);
         Assert.Contains("postgres:18.4-trixie", ghcrCompose, StringComparison.Ordinal);
         Assert.Contains("postgres:18.4-trixie", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("nginx:1.30.4-alpine3.24", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("nginx-main.conf", File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.web")), StringComparison.Ordinal);
+        Assert.Contains("read_only: true", compose, StringComparison.Ordinal);
+        Assert.Contains("no-new-privileges:true", compose, StringComparison.Ordinal);
+        Assert.Contains("ReadonlyRootfs", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("{{.Config.User}}", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("/livez", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("Validate isolated Chromium PDF runtime and capability boundary", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("--print-to-pdf", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("sudo test -d \"$installer_root/runtime/api-data/Cache/ReportPdf\"", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("sudo test -d \"$installer_root/runtime/browser\"", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("if [ ! -f .env ]; then", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("--env-file .env", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("EXPORTDOCMANAGER_BROWSER_CDP_ENDPOINT: http://browser:9222", compose, StringComparison.Ordinal);
         Assert.Contains("EXPORTDOCMANAGER_BROWSER_CDP_ENDPOINT: http://browser:9222", ghcrCompose, StringComparison.Ordinal);
         Assert.Contains("docker compose exec -T api sh -ec 'test ! -e /usr/bin/chromium'", containerRuntimeWorkflow, StringComparison.Ordinal);
@@ -383,6 +394,29 @@ public sealed class PackagePayloadContractTests
             Assert.Contains("location /downloads/postgresql-backups/", config, StringComparison.Ordinal);
             Assert.Contains("proxy_buffering off", config, StringComparison.Ordinal);
             Assert.Contains("client_max_body_size 128m", config, StringComparison.Ordinal);
+            int apiLocationStart = config.IndexOf("location /api/ {", StringComparison.Ordinal);
+            int healthLocationStart = config.IndexOf("location = /healthz", apiLocationStart, StringComparison.Ordinal);
+            Assert.True(apiLocationStart >= 0 && healthLocationStart > apiLocationStart);
+            Assert.Contains(
+                "proxy_request_buffering off",
+                config[apiLocationStart..healthLocationStart],
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void ContainerNginxConfigs_ShouldProxyPublicHealthProbesToApi()
+    {
+        string root = FindWorkspaceRoot();
+        foreach (string fileName in new[] { "nginx.conf", "nginx.https.conf", "nginx.acme.conf" })
+        {
+            string config = File.ReadAllText(Path.Combine(root, "deploy", "container", fileName));
+            Assert.Contains("location = /healthz", config, StringComparison.Ordinal);
+            Assert.Contains("proxy_pass http://api:5188/healthz", config, StringComparison.Ordinal);
+            Assert.Contains("location = /readyz", config, StringComparison.Ordinal);
+            Assert.Contains("proxy_pass http://api:5188/readyz", config, StringComparison.Ordinal);
+            Assert.Contains("location = /livez", config, StringComparison.Ordinal);
+            Assert.Contains("proxy_pass http://api:5188/livez", config, StringComparison.Ordinal);
         }
     }
 

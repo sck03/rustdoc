@@ -130,7 +130,7 @@ namespace ExportDocManager.Services.SingleWindow
                             invoice.Id,
                             cancellationToken).ConfigureAwait(false))
                     {
-                        throw new UnauthorizedAccessException("无权限生成该发票的报关代理委托草稿。");
+                        throw new PermissionDeniedException("无权限生成该发票的报关代理委托草稿。");
                     }
 
                     var entity = await context.AgentConsignmentDocuments

@@ -42,8 +42,11 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, readinessResponse.StatusCode);
             using (var readinessDocument = JsonDocument.Parse(await readinessResponse.Content.ReadAsStringAsync()))
             {
-                Assert.Equal("ok", readinessDocument.RootElement.GetProperty("status").GetString());
+                Assert.Equal("ready", readinessDocument.RootElement.GetProperty("status").GetString());
             }
+
+            var livenessResponse = await anonymousClient.GetAsync("/livez");
+            Assert.Equal(HttpStatusCode.OK, livenessResponse.StatusCode);
 
             using (var readinessHeadRequest = new HttpRequestMessage(HttpMethod.Head, "/readyz"))
             using (var readinessHeadResponse = await anonymousClient.SendAsync(readinessHeadRequest))

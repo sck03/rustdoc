@@ -19,6 +19,7 @@ namespace ExportDocManager.Api.Tests
                     authenticationGraphResolutionCount++;
                     return new ApiCurrentUserResolver(new InMemoryApiSessionTokenService());
                 })
+                .AddSingleton<IApiReadinessProbe>(new StubReadinessProbe(ready: true))
                 .BuildServiceProvider();
             var app = new ApplicationBuilder(services);
             app.UseExportDocManagerReadiness();
@@ -29,6 +30,47 @@ namespace ExportDocManager.Api.Tests
 
             Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
             Assert.Equal(1, authenticationGraphResolutionCount);
+            context.Response.Body.Position = 0;
+            using var document = await JsonDocument.ParseAsync(context.Response.Body);
+            Assert.Equal("ready", document.RootElement.GetProperty("status").GetString());
+        }
+
+        [Fact]
+        public async Task ReadinessProbe_WhenDependencyCheckFails_ShouldReturnServiceUnavailable()
+        {
+            using var services = new ServiceCollection()
+                .AddSingleton<IApiReadinessProbe>(new StubReadinessProbe(ready: false))
+                .BuildServiceProvider();
+            var app = new ApplicationBuilder(services);
+            app.UseExportDocManagerReadiness();
+
+            var context = CreateContext(HttpMethods.Get, "/readyz");
+            context.RequestServices = services;
+            await app.Build()(context);
+
+            Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
+            context.Response.Body.Position = 0;
+            using var document = await JsonDocument.ParseAsync(context.Response.Body);
+            Assert.Equal("not_ready", document.RootElement.GetProperty("status").GetString());
+        }
+
+        [Fact]
+        public async Task LivenessProbe_ShouldNotResolveDependencyProbe()
+        {
+            using var services = new ServiceCollection()
+                .AddSingleton<IApiReadinessProbe>(new ThrowingReadinessProbe())
+                .BuildServiceProvider();
+            var app = new ApplicationBuilder(services);
+            app.UseExportDocManagerReadiness();
+
+            var context = CreateContext(HttpMethods.Get, "/livez");
+            context.RequestServices = services;
+            await app.Build()(context);
+
+            Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+            context.Response.Body.Position = 0;
+            using var document = await JsonDocument.ParseAsync(context.Response.Body);
+            Assert.Equal("alive", document.RootElement.GetProperty("status").GetString());
         }
 
         [Fact]
@@ -108,6 +150,21 @@ namespace ExportDocManager.Api.Tests
             context.Request.Path = path;
             context.Response.Body = new MemoryStream();
             return context;
+        }
+
+        private sealed class StubReadinessProbe(bool ready) : IApiReadinessProbe
+        {
+            public Task<ApiReadinessSnapshot> CheckAsync(CancellationToken cancellationToken = default) =>
+                Task.FromResult(new ApiReadinessSnapshot(
+                    ready,
+                    DateTimeOffset.UtcNow,
+                    new Dictionary<string, string> { ["database"] = ready ? "ready" : "unavailable" }));
+        }
+
+        private sealed class ThrowingReadinessProbe : IApiReadinessProbe
+        {
+            public Task<ApiReadinessSnapshot> CheckAsync(CancellationToken cancellationToken = default) =>
+                throw new InvalidOperationException("Liveness must not resolve readiness dependencies.");
         }
     }
 }

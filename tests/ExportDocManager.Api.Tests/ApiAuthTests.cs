@@ -133,6 +133,7 @@ namespace ExportDocManager.Api.Tests
         {
             Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/healthz"));
             Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/readyz"));
+            Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/livez"));
             Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/openapi/v1.json"));
             Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/api/auth/login"));
             Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/api/system/shutdown-maintenance"));
@@ -145,6 +146,7 @@ namespace ExportDocManager.Api.Tests
         {
             Assert.False(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/healthz"));
             Assert.False(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/readyz"));
+            Assert.False(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/livez"));
             Assert.False(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/openapi/v1.json"));
             Assert.True(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/api/auth/login"));
             Assert.True(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/api/invoices"));
@@ -156,6 +158,7 @@ namespace ExportDocManager.Api.Tests
         {
             Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/healthz"));
             Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/readyz"));
+            Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/livez"));
             Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/openapi/v1.json"));
             Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/api/auth/login"));
             Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/api/auth/me"));

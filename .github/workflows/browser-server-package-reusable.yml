@@ -254,6 +254,29 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Remove-Item -LiteralPath $dataRoot -Recurse -Force -ErrorAction SilentlyContinue
 
+      - name: Validate Linux package on Debian 13
+        if: inputs.platform == 'linux'
+        shell: bash
+        run: |
+          package_root="$GITHUB_WORKSPACE/artifacts/browser-server/package"
+          docker run --rm \
+            --volume "$package_root:/package:ro" \
+            debian:13-slim \
+            sh -ec '
+              apt-get update
+              apt-get install -y --no-install-recommends ca-certificates chromium fonts-noto-cjk
+              /package/ExportDocManager.Api \
+                --app-root /package \
+                --data-root /tmp/exportdoc-data \
+                --verify-ocr-runtime
+              /package/Tools/PostgreSQL/bin/pg_dump --version
+              /package/Tools/PostgreSQL/bin/pg_restore --version
+              /package/Tools/PostgreSQL/bin/psql --version
+              browser="$(find /package/Browsers -type f \( -name chrome-headless-shell -o -name chrome \) -print -quit)"
+              test -n "$browser"
+              "$browser" --version
+            '
+
       - name: Create downloadable archive
         id: archive
         shell: pwsh

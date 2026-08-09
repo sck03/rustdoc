@@ -1,3 +1,4 @@
+import "../../styles/routes/single-window.css";
 import {
   ChangeEvent,
   ClipboardEvent as ReactClipboardEvent,

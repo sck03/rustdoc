@@ -7,18 +7,18 @@ namespace ExportDocManager.Api.Hosting
     {
         public static ApiSettingsResponse FromSettings(AppSettings settings)
         {
-            return FromSettingsForUser(settings, canManageSettings: true, networkMode: false);
+            return FromSettingsForUser(settings, canManageSettings: true, revealLocalPaths: true);
         }
 
         public static ApiSettingsResponse FromSettingsForUser(
             AppSettings settings,
             bool canManageSettings,
-            bool networkMode)
+            bool revealLocalPaths)
         {
             EnsureDefaults(settings);
 
             return new ApiSettingsResponse(
-                CreateSanitizedSettings(settings, canManageSettings, networkMode),
+                CreateSanitizedSettings(settings, canManageSettings, revealLocalPaths),
                 GetSecrets(settings, canManageSettings),
                 StoragePolicy);
         }
@@ -26,6 +26,7 @@ namespace ExportDocManager.Api.Hosting
         public static ApiSettingsSaveResponse FromSavedSettings(
             AppSettings settings,
             bool requiresRestart,
+            bool revealLocalPaths,
             string message)
         {
             EnsureDefaults(settings);
@@ -33,7 +34,7 @@ namespace ExportDocManager.Api.Hosting
             return new ApiSettingsSaveResponse(
                 true,
                 requiresRestart,
-                CreateSanitizedSettings(settings, canManageSettings: true, networkMode: false),
+                CreateSanitizedSettings(settings, canManageSettings: true, revealLocalPaths),
                 GetSecrets(settings, canManageSettings: true),
                 message ?? string.Empty);
         }
@@ -41,7 +42,7 @@ namespace ExportDocManager.Api.Hosting
         private static AppSettings CreateSanitizedSettings(
             AppSettings settings,
             bool canManageSettings,
-            bool networkMode)
+            bool revealLocalPaths)
         {
             var clone = CloneSettings(settings);
             EnsureDefaults(clone);
@@ -59,11 +60,6 @@ namespace ExportDocManager.Api.Hosting
                 clone.System.PostgreSqlDatabase = string.Empty;
                 clone.System.PostgreSqlUsername = string.Empty;
                 clone.System.PostgreSqlAdditionalOptions = string.Empty;
-                if (networkMode)
-                {
-                    clone.System.DefaultExportDirectory = string.Empty;
-                }
-
                 clone.Email.SmtpHost = string.Empty;
                 clone.Email.UserName = string.Empty;
                 clone.Email.FromAddress = string.Empty;
@@ -75,6 +71,11 @@ namespace ExportDocManager.Api.Hosting
                 clone.AI.ModelName = string.Empty;
                 clone.AI.SystemPrompt = string.Empty;
                 clone.SingleWindow.CustomsCooDefaults = new CustomsCooDefaultProfile();
+            }
+
+            if (!revealLocalPaths)
+            {
+                clone.System.DefaultExportDirectory = string.Empty;
             }
 
             return clone;

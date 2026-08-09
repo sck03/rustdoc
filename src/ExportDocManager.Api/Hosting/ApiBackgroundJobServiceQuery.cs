@@ -46,7 +46,7 @@ namespace ExportDocManager.Api.Hosting
                 .ThenByDescending(job => job.JobId, StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var page = ordered
-                .Skip((pageNumber - 1) * pageSize)
+                .Skip(PagingHelper.CalculateOffset(pageNumber, pageSize))
                 .Take(pageSize)
                 .ToList();
 

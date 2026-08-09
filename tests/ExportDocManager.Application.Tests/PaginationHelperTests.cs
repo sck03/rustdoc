@@ -23,5 +23,14 @@ namespace ExportDocManager.Application.Tests
             Assert.Equal(0, page.TotalPages);
             Assert.Empty(page.Items);
         }
+
+        [Fact]
+        public void CalculateOffset_ShouldRejectIntegerOverflow()
+        {
+            Assert.Equal(0, PagingHelper.CalculateOffset(1, 200));
+            Assert.Equal(200, PagingHelper.CalculateOffset(2, 200));
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                PagingHelper.CalculateOffset(int.MaxValue, 200));
+        }
     }
 }

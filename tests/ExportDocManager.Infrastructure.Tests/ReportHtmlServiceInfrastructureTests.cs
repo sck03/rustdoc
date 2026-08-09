@@ -959,9 +959,13 @@ namespace ExportDocManager.Infrastructure.Tests
                 File.WriteAllText(Path.Combine(root, fileName), "test-resource");
             }
 
-            string localesRoot = Path.Combine(root, "locales");
-            Directory.CreateDirectory(localesRoot);
-            File.WriteAllText(Path.Combine(localesRoot, "en-US.pak"), "test-locale");
+            if (BrowserExecutableResolver.RequiresHeadlessShellLocales(
+                    BrowserExecutableResolver.GetRuntimePlatform()))
+            {
+                string localesRoot = Path.Combine(root, "locales");
+                Directory.CreateDirectory(localesRoot);
+                File.WriteAllText(Path.Combine(localesRoot, "en-US.pak"), "test-locale");
+            }
             if (!OperatingSystem.IsWindows())
             {
                 File.SetUnixFileMode(

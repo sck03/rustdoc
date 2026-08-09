@@ -29,16 +29,19 @@ internal static class ApiServiceExceptionMapper
     public static (int StatusCode, string Message) Map(Exception exception, string correlationId)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        ServiceException explicitLoadSignal = Enumerate(exception)
+        // Explicit application classifications always win over nested system
+        // exceptions. For example, a missing managed DLL wrapped in an
+        // InfrastructureServiceException is a 503, not a business-resource 404.
+        ServiceException classified = Enumerate(exception)
             .OfType<ServiceException>()
-            .FirstOrDefault(current => current is ServiceBusyException or ServiceTimeoutException);
-        if (explicitLoadSignal is ServiceBusyException busySignal)
+            .FirstOrDefault();
+        if (classified != null)
         {
-            return (StatusCodes.Status429TooManyRequests, busySignal.Message);
-        }
-        if (explicitLoadSignal is ServiceTimeoutException timeoutSignal)
-        {
-            return (StatusCodes.Status504GatewayTimeout, timeoutSignal.Message);
+            if (classified is ResourceConflictException && ContainsInfrastructureFailure(exception))
+            {
+                return (StatusCodes.Status503ServiceUnavailable, "依赖服务暂时不可用，请稍后重试。");
+            }
+            return MapServiceException(classified);
         }
 
         if (ContainsNotFound(exception))
@@ -62,44 +65,14 @@ internal static class ApiServiceExceptionMapper
             return (StatusCodes.Status503ServiceUnavailable, "依赖服务暂时不可用，请稍后重试。");
         }
 
-        // Preserve a classified service error even when an adapter adds an
-        // generic wrapper or an AggregateException. This keeps the transport
-        // contract independent from the async/hosting boundary.
-        ServiceException nestedServiceException = Enumerate(exception)
-            .Skip(1)
-            .OfType<ServiceException>()
-            .FirstOrDefault();
-        if (nestedServiceException != null)
-        {
-            return Map(nestedServiceException, correlationId);
-        }
-
         return exception switch
         {
             PayloadLimitExceededException payload =>
                 (StatusCodes.Status413PayloadTooLarge, payload.Message),
-            ServiceValidationException validation =>
-                (StatusCodes.Status400BadRequest, validation.Message),
-            ResourceNotFoundException notFound =>
-                (StatusCodes.Status404NotFound, notFound.Message),
-            PermissionDeniedException permission =>
-                (StatusCodes.Status403Forbidden, permission.Message),
-            InsufficientStorageException storage =>
-                (StatusCodes.Status507InsufficientStorage, storage.Message),
-            ServiceBusyException busy =>
-                (StatusCodes.Status429TooManyRequests, busy.Message),
-            ServiceTimeoutException timeout =>
-                (StatusCodes.Status504GatewayTimeout, timeout.Message),
-            ServiceConcurrencyException concurrency =>
-                (StatusCodes.Status409Conflict, concurrency.Message),
-            ResourceConflictException conflict =>
-                (StatusCodes.Status409Conflict, conflict.Message),
-            InfrastructureServiceException infrastructure =>
-                (StatusCodes.Status503ServiceUnavailable, infrastructure.Message),
             UnauthorizedAccessException =>
                 (StatusCodes.Status503ServiceUnavailable, "运行目录或依赖资源暂时不可访问，请联系管理员检查权限。"),
             FileNotFoundException or DirectoryNotFoundException =>
-                (StatusCodes.Status404NotFound, exception.Message),
+                (StatusCodes.Status503ServiceUnavailable, "运行依赖或受管文件暂时不可用，请联系管理员检查安装包与运行目录。"),
             KeyNotFoundException missing =>
                 (StatusCodes.Status404NotFound, missing.Message),
             ArgumentException or FormatException or InvalidDataException or NotSupportedException =>
@@ -119,13 +92,38 @@ internal static class ApiServiceExceptionMapper
         };
     }
 
+    private static (int StatusCode, string Message) MapServiceException(
+        ServiceException exception) => exception switch
+        {
+            ServiceValidationException validation =>
+                (StatusCodes.Status400BadRequest, validation.Message),
+            ResourceNotFoundException notFound =>
+                (StatusCodes.Status404NotFound, notFound.Message),
+            PermissionDeniedException permission =>
+                (StatusCodes.Status403Forbidden, permission.Message),
+            InsufficientStorageException storage =>
+                (StatusCodes.Status507InsufficientStorage, storage.Message),
+            ServiceBusyException busy =>
+                (StatusCodes.Status429TooManyRequests, busy.Message),
+            ServiceTimeoutException timeout =>
+                (StatusCodes.Status504GatewayTimeout, timeout.Message),
+            ServiceConcurrencyException concurrency =>
+                (StatusCodes.Status409Conflict, concurrency.Message),
+            ResourceConflictException conflict =>
+                (StatusCodes.Status409Conflict, conflict.Message),
+            InfrastructureServiceException infrastructure =>
+                (StatusCodes.Status503ServiceUnavailable, infrastructure.Message),
+            _ =>
+                (StatusCodes.Status500InternalServerError, "服务器处理请求时发生错误，请稍后重试。")
+        };
+
     private static bool ContainsInfrastructureFailure(Exception exception)
     {
         foreach (Exception current in Enumerate(exception))
         {
             if (current is DbException or TimeoutException or HttpRequestException or
                 SocketException or Win32Exception or UnauthorizedAccessException or
-                (IOException and not FileNotFoundException and not DirectoryNotFoundException))
+                IOException)
             {
                 return true;
             }
@@ -137,8 +135,7 @@ internal static class ApiServiceExceptionMapper
     {
         foreach (Exception current in Enumerate(exception))
         {
-            if (current is FileNotFoundException or DirectoryNotFoundException or
-                ResourceNotFoundException or KeyNotFoundException)
+            if (current is ResourceNotFoundException or KeyNotFoundException)
             {
                 return true;
             }
@@ -150,8 +147,7 @@ internal static class ApiServiceExceptionMapper
     {
         foreach (Exception current in Enumerate(exception))
         {
-            if (current is ResourceNotFoundException or FileNotFoundException or
-                DirectoryNotFoundException or KeyNotFoundException)
+            if (current is ResourceNotFoundException or KeyNotFoundException)
             {
                 return current.Message;
             }

@@ -77,7 +77,7 @@ namespace ExportDocManager.Api.Tests
             var localResponse = ApiSettingsDtoFactory.FromSettingsForUser(
                 settings,
                 canManageSettings: false,
-                networkMode: false);
+                revealLocalPaths: true);
             Assert.Equal(@"E:\\Exports", localResponse.Settings.System.DefaultExportDirectory);
             Assert.Empty(localResponse.Settings.System.UpdaterEndpoint);
             Assert.Equal("data.db", localResponse.Settings.System.SqliteDatabaseFileName);
@@ -92,7 +92,7 @@ namespace ExportDocManager.Api.Tests
             var networkResponse = ApiSettingsDtoFactory.FromSettingsForUser(
                 settings,
                 canManageSettings: false,
-                networkMode: true);
+                revealLocalPaths: false);
             Assert.Empty(networkResponse.Settings.System.DefaultExportDirectory);
         }
 

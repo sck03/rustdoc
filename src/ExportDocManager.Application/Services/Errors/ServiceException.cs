@@ -60,6 +60,20 @@ public class InfrastructureServiceException : ServiceException
     }
 }
 
+/// <summary>
+/// Indicates that an interrupted server migration cannot be reconciled safely
+/// without an administrator restoring the retained safety backup. The API must
+/// fail closed instead of serving business requests against potentially mixed
+/// database and file state.
+/// </summary>
+public sealed class ManualRecoveryRequiredException : InfrastructureServiceException
+{
+    public ManualRecoveryRequiredException(string message, Exception innerException = null)
+        : base(message, innerException)
+    {
+    }
+}
+
 public sealed class InsufficientStorageException : ServiceException
 {
     public InsufficientStorageException(

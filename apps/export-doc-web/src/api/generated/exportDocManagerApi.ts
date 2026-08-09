@@ -5593,6 +5593,11 @@ export class ExportDocManagerApiClient {
     return this.request<ApiLicenseStatusResponse>("GET", path, { init });
   }
 
+  public getLiveness(init?: RequestInit): Promise<void> {
+    const path = "/livez";
+    return this.request<void>("GET", path, { init });
+  }
+
   public getOpenApiDocument(init?: RequestInit): Promise<OpenApiDocument> {
     const path = "/openapi/v1.json";
     return this.request<OpenApiDocument>("GET", path, { init });

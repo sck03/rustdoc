@@ -82,7 +82,7 @@ namespace ExportDocManager.Services.SingleWindow
                                 .ConfigureAwait(false);
                             if (!canAccess && _businessDataAccessScope.ShouldFilterBusinessData())
                             {
-                                throw new UnauthorizedAccessException("无权限为该发票预留单一窗口提交版本。");
+                                throw new PermissionDeniedException("无权限为该发票预留单一窗口提交版本。");
                             }
 
                             int submissionVersion = await ResolveNextSubmissionVersionCoreAsync(

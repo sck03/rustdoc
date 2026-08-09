@@ -1,4 +1,5 @@
 using ExportDocManager.DataAccess;
+using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
@@ -58,7 +59,7 @@ namespace ExportDocManager.Services.SingleWindow
             int totalCount = await batches.CountAsync(cancellationToken);
             var pagedRows = await batches
                 .OrderByDescending(batch => batch.UpdatedAt)
-                .Skip((normalizedQuery.PageNumber - 1) * normalizedQuery.PageSize)
+                .Skip(PagingHelper.CalculateOffset(normalizedQuery.PageNumber, normalizedQuery.PageSize))
                 .Take(normalizedQuery.PageSize)
                 .Select(batch => new SingleWindowOperationCenterRow
                 {

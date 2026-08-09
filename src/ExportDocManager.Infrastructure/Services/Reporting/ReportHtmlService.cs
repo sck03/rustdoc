@@ -136,7 +136,7 @@ namespace ExportDocManager.Services.Reporting
             var invoice = await _entityLoader.LoadInvoiceAsync(invoiceId, cancellationToken).ConfigureAwait(false);
             if (invoice == null)
             {
-                throw new KeyNotFoundException($"未找到发票：{invoiceId}");
+                throw new ResourceNotFoundException($"未找到发票：{invoiceId}");
             }
 
             var (resolvedTemplatePath, templateContent) = await LoadTemplateAsync(reportType, templatePath, cancellationToken).ConfigureAwait(false);
@@ -192,7 +192,7 @@ namespace ExportDocManager.Services.Reporting
             var payment = await _entityLoader.LoadPaymentAsync(paymentId, cancellationToken).ConfigureAwait(false);
             if (payment == null)
             {
-                throw new KeyNotFoundException($"未找到付款单：{paymentId}");
+                throw new ResourceNotFoundException($"未找到付款单：{paymentId}");
             }
 
             var (resolvedTemplatePath, templateContent) = await LoadTemplateAsync(
@@ -278,8 +278,8 @@ namespace ExportDocManager.Services.Reporting
                 Log.Warning(ex, "报表模板或内容校验失败, 类型 {ReportType}, 发票 {InvoiceId}", reportType, invoice?.Id);
                 throw new ServiceValidationException($"报表模板或内容无效：{ex.Message}", ex);
             }
-            catch (Exception ex) when (ex is KeyNotFoundException or FileNotFoundException or
-                                       UnauthorizedAccessException)
+            catch (Exception ex) when (ex is ServiceException or KeyNotFoundException or
+                                       FileNotFoundException or UnauthorizedAccessException)
             {
                 throw;
             }
@@ -329,8 +329,8 @@ namespace ExportDocManager.Services.Reporting
                 Log.Warning(ex, "付款单模板或渲染内容校验失败, 付款单 {PaymentId}", payment?.Id);
                 throw new ServiceValidationException($"付款单模板或内容无效：{ex.Message}", ex);
             }
-            catch (Exception ex) when (ex is KeyNotFoundException or FileNotFoundException or
-                                       UnauthorizedAccessException)
+            catch (Exception ex) when (ex is ServiceException or KeyNotFoundException or
+                                       FileNotFoundException or UnauthorizedAccessException)
             {
                 throw;
             }
@@ -364,12 +364,12 @@ namespace ExportDocManager.Services.Reporting
                 !_pathResolver.IsBuiltInTemplatePath(resolvedTemplatePath) &&
                 !_pathResolver.IsUserTemplatePath(resolvedTemplatePath))
             {
-                throw new UnauthorizedAccessException("报表模板必须位于内置模板目录或运行数据根用户模板目录。");
+                throw new PermissionDeniedException("报表模板必须位于内置模板目录或运行数据根用户模板目录。");
             }
 
             if (string.IsNullOrWhiteSpace(resolvedTemplatePath) || !File.Exists(resolvedTemplatePath))
             {
-                throw new FileNotFoundException($"Template not found: {resolvedTemplatePath}");
+                throw new ResourceNotFoundException("报表模板不存在或已被移除。");
             }
 
             var resolvedReportType = ReportTemplateCatalogLoader.ResolveCatalogReportType(null, resolvedTemplatePath);
@@ -398,7 +398,7 @@ namespace ExportDocManager.Services.Reporting
                     .ConfigureAwait(false);
                 if (template == null)
                 {
-                    throw new FileNotFoundException("用户报表模板不存在、已停用或无权访问。", templatePath);
+                    throw new ResourceNotFoundException("用户报表模板不存在、已停用或无权访问。");
                 }
 
                 return (templatePath, template.ContentHtml ?? string.Empty);

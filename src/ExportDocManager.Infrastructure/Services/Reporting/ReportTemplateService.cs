@@ -220,7 +220,7 @@ namespace ExportDocManager.Services.Reporting
             candidatePath = EnsureHtmlExtension(candidatePath);
             if (!ReportTemplatePathResolver.IsPathWithinDirectory(candidatePath, categoryDirectory))
             {
-                throw new UnauthorizedAccessException("只能在当前模板分类目录下新建或重命名模板。");
+                throw new PermissionDeniedException("只能在当前模板分类目录下新建或重命名模板。");
             }
 
             return candidatePath;
@@ -251,7 +251,7 @@ namespace ExportDocManager.Services.Reporting
                                               _pathResolver.IsUserTemplatePath(resolvedPath);
             if (!withinManagedTemplateRoots || matched == null && !_pathResolver.IsUserTemplatePath(resolvedPath) && !File.Exists(resolvedPath))
             {
-                throw new UnauthorizedAccessException("只能读取内置模板，或维护运行数据根 Templates/ 下的用户模板。");
+                throw new PermissionDeniedException("只能读取内置模板，或维护运行数据根 Templates/ 下的用户模板。");
             }
 
             var effectiveReportType = matched != null
@@ -264,7 +264,7 @@ namespace ExportDocManager.Services.Reporting
 
             if (mustExist && !File.Exists(resolvedPath))
             {
-                throw new FileNotFoundException("报表模板不存在。", resolvedPath);
+                throw new ResourceNotFoundException("报表模板不存在。");
             }
 
             string directory = Path.GetDirectoryName(resolvedPath);
@@ -433,7 +433,7 @@ namespace ExportDocManager.Services.Reporting
         {
             if (!_pathResolver.IsUserTemplatePath(templatePath))
             {
-                throw new UnauthorizedAccessException("内置模板为只读资源；请先保存为用户模板副本，再执行重命名或删除。");
+                throw new PermissionDeniedException("内置模板为只读资源；请先保存为用户模板副本，再执行重命名或删除。");
             }
         }
 

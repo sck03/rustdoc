@@ -49,7 +49,7 @@ namespace ExportDocManager.Services.Crm
 
             int totalCount = await query.CountAsync(cancellationToken);
             var items = await query.OrderBy(item => item.Name)
-                .Skip((pageNumber - 1) * pageSize)
+                .Skip(PagingHelper.CalculateOffset(pageNumber, pageSize))
                 .Take(pageSize)
                 .Select(item => new CrmCustomerRecord(item.Id, item.Name, item.CountryRegion, item.Website,
                     item.Status, item.Source, item.Notes, item.LinkedDocumentCustomerId, item.VersionNumber))
@@ -299,7 +299,7 @@ namespace ExportDocManager.Services.Crm
                 .ThenBy(item => item.NextFollowUpAt)
                 .ThenByDescending(item => item.FollowedUpAt)
                 .ThenByDescending(item => item.Id)
-                .Skip((pageNumber - 1) * pageSize)
+                .Skip(PagingHelper.CalculateOffset(pageNumber, pageSize))
                 .Take(pageSize)
                 .Select(item => new CrmFollowUpRecord(
                     item.Id, item.CrmCustomerId,

@@ -171,6 +171,19 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal(4, requiredFiles.Count);
         }
 
+        [Theory]
+        [InlineData("win64", true)]
+        [InlineData("linux64", true)]
+        [InlineData("mac-arm64", false)]
+        public void HeadlessShellLocalePolicy_ShouldMatchOfficialPlatformArchive(
+            string runtimePlatform,
+            bool expected)
+        {
+            Assert.Equal(
+                expected,
+                BrowserExecutableResolver.RequiresHeadlessShellLocales(runtimePlatform));
+        }
+
         private static void WriteOcrModelBundle(string modelRoot)
         {
             string detRoot = Path.Combine(modelRoot, "det");
@@ -194,9 +207,13 @@ namespace ExportDocManager.Infrastructure.Tests
                 File.WriteAllText(Path.Combine(root, fileName), "test-resource");
             }
 
-            string localesRoot = Path.Combine(root, "locales");
-            Directory.CreateDirectory(localesRoot);
-            File.WriteAllText(Path.Combine(localesRoot, "en-US.pak"), "test-locale");
+            if (BrowserExecutableResolver.RequiresHeadlessShellLocales(
+                    BrowserExecutableResolver.GetRuntimePlatform()))
+            {
+                string localesRoot = Path.Combine(root, "locales");
+                Directory.CreateDirectory(localesRoot);
+                File.WriteAllText(Path.Combine(localesRoot, "en-US.pak"), "test-locale");
+            }
             if (!OperatingSystem.IsWindows())
             {
                 File.SetUnixFileMode(

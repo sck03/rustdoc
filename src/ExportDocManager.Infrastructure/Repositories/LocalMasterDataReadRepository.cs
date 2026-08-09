@@ -66,7 +66,7 @@ namespace ExportDocManager.Services.Infrastructure
                     customer => customer.ContactPerson, customer => customer.Phone, customer => customer.Email, customer => customer.TaxId)
                 .OrderBy(customer => customer.CustomerNameEN).ThenBy(customer => customer.NotifyPartyName).ThenBy(customer => customer.Id);
             int totalCount = await rows.CountAsync(cancellationToken);
-            var items = await rows.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+            var items = await rows.Skip(PagingHelper.CalculateOffset(pageNumber, pageSize)).Take(pageSize).ToListAsync(cancellationToken);
             return new PagedResult<Customer>(items, totalCount, pageNumber, pageSize);
         }
 
@@ -109,7 +109,7 @@ namespace ExportDocManager.Services.Infrastructure
                     exporter => exporter.Phone, exporter => exporter.BankName)
                 .OrderBy(exporter => exporter.ExporterNameEN).ThenBy(exporter => exporter.ExporterNameCN).ThenBy(exporter => exporter.Id);
             int totalCount = await rows.CountAsync(cancellationToken);
-            var items = await rows.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+            var items = await rows.Skip(PagingHelper.CalculateOffset(pageNumber, pageSize)).Take(pageSize).ToListAsync(cancellationToken);
             return new PagedResult<Exporter>(items, totalCount, pageNumber, pageSize);
         }
 
@@ -168,7 +168,7 @@ namespace ExportDocManager.Services.Infrastructure
                     payee => payee.RMBAccount, payee => payee.USDAccount, payee => payee.ContactPerson, payee => payee.Phone, payee => payee.Notes)
                 .OrderBy(payee => payee.Category).ThenBy(payee => payee.Name).ThenBy(payee => payee.Id);
             int totalCount = await rows.CountAsync(cancellationToken);
-            var items = await rows.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+            var items = await rows.Skip(PagingHelper.CalculateOffset(pageNumber, pageSize)).Take(pageSize).ToListAsync(cancellationToken);
             return new PagedResult<Payee>(items, totalCount, pageNumber, pageSize);
         }
 
@@ -238,7 +238,7 @@ namespace ExportDocManager.Services.Infrastructure
 
             int totalCount = await productQuery.CountAsync(cancellationToken);
             var items = await productQuery
-                .Skip((pageNumber - 1) * pageSize)
+                .Skip(PagingHelper.CalculateOffset(pageNumber, pageSize))
                 .Take(pageSize)
                 .ToListAsync(cancellationToken);
             return new PagedResult<Product>(items, totalCount, pageNumber, pageSize);
@@ -273,7 +273,7 @@ namespace ExportDocManager.Services.Infrastructure
                 .ApplyKeywordSearch(keyword, port => port.NameEN, port => port.NameCN, port => port.Country, port => port.Code)
                 .OrderBy(port => port.NameEN).ThenBy(port => port.NameCN).ThenBy(port => port.Id);
             int totalCount = await rows.CountAsync(cancellationToken);
-            var items = await rows.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+            var items = await rows.Skip(PagingHelper.CalculateOffset(pageNumber, pageSize)).Take(pageSize).ToListAsync(cancellationToken);
             return new PagedResult<Port>(items, totalCount, pageNumber, pageSize);
         }
 
@@ -321,7 +321,7 @@ namespace ExportDocManager.Services.Infrastructure
                 .ApplyKeywordSearch(keyword, unit => unit.NameEN, unit => unit.NameCN, unit => unit.Code)
                 .OrderBy(unit => unit.NameEN).ThenBy(unit => unit.NameCN).ThenBy(unit => unit.Id);
             int totalCount = await rows.CountAsync(cancellationToken);
-            var items = await rows.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+            var items = await rows.Skip(PagingHelper.CalculateOffset(pageNumber, pageSize)).Take(pageSize).ToListAsync(cancellationToken);
             return new PagedResult<Unit>(items, totalCount, pageNumber, pageSize);
         }
 
@@ -364,7 +364,7 @@ namespace ExportDocManager.Services.Infrastructure
 
             var totalCount = await hsCodeQuery.CountAsync(cancellationToken);
             var items = await hsCodeQuery
-                .Skip((normalizedPageNumber - 1) * normalizedPageSize)
+                .Skip(PagingHelper.CalculateOffset(normalizedPageNumber, normalizedPageSize))
                 .Take(normalizedPageSize)
                 .ToListAsync(cancellationToken);
 

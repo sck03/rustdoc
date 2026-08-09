@@ -78,6 +78,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddSingleton<AuditInterceptor>();
             services.AddSingleton<ISettingsService>(_ => new SettingsService(pathProvider));
             services.AddSingleton<IRuntimeDependencyDiagnosticsService, RuntimeDependencyDiagnosticsService>();
+            services.AddSingleton<IApiReadinessProbe, ApiReadinessProbe>();
             services.TryAddSingleton<IRuntimeLicenseAnchorStore>(_ =>
                 RuntimeLicenseAnchorStoreFactory.CreateDefault(pathProvider));
             services.TryAddSingleton<ILicenseSignatureVerifier, EcdsaLicenseSignatureVerifier>();

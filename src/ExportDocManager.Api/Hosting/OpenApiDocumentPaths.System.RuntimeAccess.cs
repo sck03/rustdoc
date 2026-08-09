@@ -5,17 +5,36 @@ namespace ExportDocManager.Api.Hosting
         private static Dictionary<string, object> CreateRuntimeAccessSystemPaths() =>
             new Dictionary<string, object>
             {
+                    ["/livez"] = new
+                    {
+                        get = new
+                        {
+                            summary = "Process liveness check",
+                            operationId = "getLiveness",
+                            responses = new Dictionary<string, object>
+                            {
+                                ["200"] = new
+                                {
+                                    description = "The API process is alive."
+                                }
+                            }
+                        }
+                    },
                     ["/readyz"] = new
                     {
                         get = new
                         {
-                            summary = "Lightweight API readiness check",
+                            summary = "Dependency-aware API readiness check",
                             operationId = "getReadiness",
                             responses = new Dictionary<string, object>
                             {
                                 ["200"] = new
                                 {
                                     description = "The API process is ready to accept requests."
+                                },
+                                ["503"] = new
+                                {
+                                    description = "A required database, runtime directory, or configured browser dependency is unavailable."
                                 }
                             }
                         }

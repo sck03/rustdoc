@@ -230,7 +230,7 @@ namespace ExportDocManager.Services.Core
                         context,
                         invoice.Id).ConfigureAwait(false))
                 {
-                    throw new UnauthorizedAccessException("无权限修改该发票。");
+                    throw new PermissionDeniedException("无权限修改该发票。");
                 }
 
                 existingStatus = await _businessDataAccessScope
