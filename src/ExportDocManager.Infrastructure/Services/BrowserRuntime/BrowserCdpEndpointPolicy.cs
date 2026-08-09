@@ -41,6 +41,13 @@ public static class BrowserCdpEndpointPolicy
         return true;
     }
 
+    internal static bool ShouldResolveServiceName(Uri endpoint) =>
+        endpoint.Scheme == Uri.UriSchemeHttp &&
+        !string.Equals(endpoint.Host, "localhost", StringComparison.OrdinalIgnoreCase) &&
+        !IPAddress.TryParse(endpoint.Host, out _) &&
+        endpoint.Host.IndexOf('.') < 0 &&
+        endpoint.Host.IndexOf(':') < 0;
+
     private static bool IsTrustedHttpHost(string host)
     {
         if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
@@ -49,11 +56,11 @@ public static class BrowserCdpEndpointPolicy
             return true;
         }
 
-        if (!IPAddress.TryParse(host, out IPAddress address))
-        {
-            return false;
-        }
+        return IPAddress.TryParse(host, out IPAddress address) && IsTrustedHttpAddress(address);
+    }
 
+    internal static bool IsTrustedHttpAddress(IPAddress address)
+    {
         if (IPAddress.IsLoopback(address))
         {
             return true;
@@ -71,6 +78,10 @@ public static class BrowserCdpEndpointPolicy
 
         if (address.AddressFamily == AddressFamily.InterNetworkV6)
         {
+            if (address.IsIPv4MappedToIPv6)
+            {
+                return IsTrustedHttpAddress(address.MapToIPv4());
+            }
             return address.IsIPv6LinkLocal ||
                    address.IsIPv6SiteLocal ||
                    (address.GetAddressBytes()[0] & 0xfe) == 0xfc;

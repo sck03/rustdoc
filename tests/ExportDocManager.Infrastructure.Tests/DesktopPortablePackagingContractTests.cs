@@ -137,6 +137,7 @@ public sealed class DesktopPortablePackagingContractTests
         Assert.Contains("linux-x64", linux, StringComparison.Ordinal);
         Assert.Contains("linux-arm64", linux, StringComparison.Ordinal);
         Assert.Contains("runtime_identifier: osx-arm64", macos, StringComparison.Ordinal);
+        Assert.Contains("bundle_targets: app,dmg", macos, StringComparison.Ordinal);
         Assert.DoesNotContain("osx-x64", macos, StringComparison.Ordinal);
         Assert.DoesNotContain("macos-15-intel", macos, StringComparison.Ordinal);
     }

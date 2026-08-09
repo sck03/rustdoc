@@ -371,11 +371,26 @@ namespace ExportDocManager.Services.BrowserRuntime
             _profileRoot = null;
             _artifactsRoot = Path.Combine(_pathProvider.CacheRoot, "Ba", runDirectoryName);
             Directory.CreateDirectory(_artifactsRoot);
+            using var discoveryTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            discoveryTimeout.CancelAfter(startupTimeout);
+            Uri webSocketEndpoint;
+            try
+            {
+                webSocketEndpoint = await BrowserCdpConnectionResolver
+                    .ResolveWebSocketEndpointAsync(endpoint, discoveryTimeout.Token)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException ex) when (
+                !cancellationToken.IsCancellationRequested &&
+                discoveryTimeout.IsCancellationRequested)
+            {
+                throw new TimeoutException("连接隔离 Chromium 服务超时。", ex);
+            }
             _playwright = await Playwright.CreateAsync()
                 .WaitAsync(startupTimeout, cancellationToken)
                 .ConfigureAwait(false);
             _browser = await _playwright.Chromium.ConnectOverCDPAsync(
-                    endpoint.ToString(),
+                    webSocketEndpoint.ToString(),
                     new BrowserTypeConnectOverCDPOptions
                     {
                         ArtifactsDir = _artifactsRoot,

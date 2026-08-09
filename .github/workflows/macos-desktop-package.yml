@@ -35,7 +35,7 @@ jobs:
       runtime_identifier: osx-arm64
       rust_target: aarch64-apple-darwin
       chrome_platform: mac-arm64
-      bundle_targets: dmg
+      bundle_targets: app,dmg
       version: ${{ inputs.version }}
       architecture: arm64
       edition: ${{ inputs.edition }}

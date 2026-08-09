@@ -387,7 +387,7 @@ function buildNotices(items) {
     "- PaddleOCR/PP-OCRv6 model provenance and notices are shipped at `OcrModels/PaddleOCR/V6/THIRD_PARTY_NOTICES.md`.",
     "- The Rust Excel analyzer notice is shipped at `Tools/EXCEL_ANALYZER_NOTICES.md`.",
     "- Chrome Headless Shell or the reviewed Playwright Chromium ARM64 build is shipped with its upstream license/notice file under `Browsers/`; the clean-package gate rejects browser payloads without a corresponding notice.",
-    "- The container-only browser image installs Debian 13 `chromium`, `chromium-sandbox`, and `fonts-noto-cjk` from the official Debian repository. Their package copyright files remain available under `/usr/share/doc` in that image; the API and Web images do not embed a second Chromium copy.",
+    "- The container-only browser image installs Debian 13 `chromium`, `chromium-sandbox`, `socat`, and `fonts-noto-cjk` from the official Debian repository. `socat` exposes the loopback-only CDP socket solely on the isolated browser network. Their package copyright files remain available under `/usr/share/doc` in that image; the API and Web images do not embed a second Chromium copy.",
     "",
     "### Noto CJK font license",
     "",
@@ -424,7 +424,7 @@ function buildInventory(items) {
     "Generated from committed npm/Cargo lock files, Cargo package metadata, restored NuGet package metadata, and the solution package graph. " +
       "The exact application build version is recorded in the accompanying machine-readable SBOM files.",
     "",
-    "Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `fonts-noto-cjk`, `ca-certificates`, `curl`, `tini`, and PostgreSQL client packages are OS-level image inputs rather than npm/NuGet/Cargo components. The Browser image retains their Debian copyright files under `/usr/share/doc`; API/Web images do not embed Chromium or duplicate its notices.",
+    "Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `fonts-noto-cjk`, `ca-certificates`, `curl`, `tini`, and PostgreSQL client packages are OS-level image inputs rather than npm/NuGet/Cargo components. The Browser image retains their Debian copyright files under `/usr/share/doc`; API/Web images do not embed Chromium or duplicate its notices.",
     "",
   ];
   for (const ecosystem of ["npm", "nuget", "cargo"]) {

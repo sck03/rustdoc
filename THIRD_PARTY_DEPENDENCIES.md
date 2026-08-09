@@ -2,7 +2,7 @@
 
 Generated from committed npm/Cargo lock files, Cargo package metadata, restored NuGet package metadata, and the solution package graph. The exact application build version is recorded in the accompanying machine-readable SBOM files.
 
-Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `fonts-noto-cjk`, `ca-certificates`, `curl`, `tini`, and PostgreSQL client packages are OS-level image inputs rather than npm/NuGet/Cargo components. The Browser image retains their Debian copyright files under `/usr/share/doc`; API/Web images do not embed Chromium or duplicate its notices.
+Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `fonts-noto-cjk`, `ca-certificates`, `curl`, `tini`, and PostgreSQL client packages are OS-level image inputs rather than npm/NuGet/Cargo components. The Browser image retains their Debian copyright files under `/usr/share/doc`; API/Web images do not embed Chromium or duplicate its notices.
 
 ## npm (176)
 

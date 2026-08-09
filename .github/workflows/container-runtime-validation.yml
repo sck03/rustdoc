@@ -82,6 +82,7 @@ jobs:
         run: |
           bash -n deploy/container/install-container.sh
           sh -n deploy/container/postgres-init-roles.sh
+          sh -n deploy/container/start-browser-runtime.sh
           bash deploy/container/install-container.sh --help >/dev/null
 
           installer_root="${{ runner.temp }}/container-installer-test"
@@ -500,6 +501,7 @@ jobs:
               test -u /usr/lib/chromium/chrome-sandbox
               shm_bytes="$(df -B1 --output=size /dev/shm | tail -n 1 | tr -d " ")"
               test "$shm_bytes" -ge 500000000
+              test -n "$(curl --fail --silent http://127.0.0.1:9223/json/version)"
               test -n "$(curl --fail --silent http://127.0.0.1:9222/json/version)"
               probe_root="$(mktemp -d /browser-data/chromium-validation.XXXXXX)"
               cleanup() {

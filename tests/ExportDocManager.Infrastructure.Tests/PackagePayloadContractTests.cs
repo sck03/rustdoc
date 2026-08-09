@@ -79,7 +79,10 @@ public sealed class PackagePayloadContractTests
         Assert.DoesNotContain("        chromium-sandbox \\", dockerfile, StringComparison.Ordinal);
         Assert.Contains("FROM debian:trixie-slim", browserDockerfile, StringComparison.Ordinal);
         Assert.Contains("        chromium-sandbox \\", browserDockerfile, StringComparison.Ordinal);
+        Assert.Contains("        socat \\", browserDockerfile, StringComparison.Ordinal);
         Assert.Contains("test -u /usr/lib/chromium/chrome-sandbox", browserDockerfile, StringComparison.Ordinal);
+        Assert.Contains("start-browser-runtime.sh", browserDockerfile, StringComparison.Ordinal);
+        Assert.Contains("--remote-debugging-port=9223", browserDockerfile, StringComparison.Ordinal);
         Assert.Contains("USER 10001:10001", browserDockerfile, StringComparison.Ordinal);
         Assert.Contains("https://packages.microsoft.com/config/debian/13/packages-microsoft-prod.deb", dockerfile, StringComparison.Ordinal);
         Assert.Contains("dpkg -i /tmp/packages-microsoft-prod.deb", dockerfile, StringComparison.Ordinal);
@@ -491,6 +494,7 @@ public sealed class PackagePayloadContractTests
         string root = FindWorkspaceRoot();
         string apiDockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.api"));
         string browserDockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.browser"));
+        string browserEntrypoint = File.ReadAllText(Path.Combine(root, "deploy", "container", "start-browser-runtime.sh"));
         string localCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.yml"));
         string ghcrCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.ghcr.yml"));
 
@@ -498,6 +502,11 @@ public sealed class PackagePayloadContractTests
         Assert.DoesNotContain("chromium-sandbox", apiDockerfile, StringComparison.Ordinal);
         Assert.Contains("USER 10001:10001", browserDockerfile, StringComparison.Ordinal);
         Assert.Contains("chromium-sandbox", browserDockerfile, StringComparison.Ordinal);
+        Assert.Contains("socat", browserDockerfile, StringComparison.Ordinal);
+        Assert.Contains("--remote-debugging-address=127.0.0.1", browserDockerfile, StringComparison.Ordinal);
+        Assert.Contains("--remote-debugging-port=9223", browserDockerfile, StringComparison.Ordinal);
+        Assert.Contains("TCP-LISTEN:9222,bind=0.0.0.0,reuseaddr,fork", browserEntrypoint, StringComparison.Ordinal);
+        Assert.Contains("TCP:127.0.0.1:9223", browserEntrypoint, StringComparison.Ordinal);
         Assert.Contains("EXPORTDOCMANAGER_BROWSER_CDP_ENDPOINT: http://browser:9222", localCompose, StringComparison.Ordinal);
         Assert.Contains("EXPORTDOCMANAGER_BROWSER_CDP_ENDPOINT: http://browser:9222", ghcrCompose, StringComparison.Ordinal);
         Assert.Contains("shm_size: \"512mb\"", localCompose, StringComparison.Ordinal);

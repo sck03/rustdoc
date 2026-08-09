@@ -97,17 +97,14 @@ public sealed class ApiReadinessProbe : IApiReadinessProbe
 
         try
         {
-            using var handler = new SocketsHttpHandler { UseProxy = false };
-            using var client = new HttpClient(handler, disposeHandler: true);
-            using var request = new HttpRequestMessage(
-                HttpMethod.Get,
-                new Uri(endpoint, "/json/version"));
-            using HttpResponseMessage response =
-                await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
-                    .ConfigureAwait(false);
-            return response.IsSuccessStatusCode;
+            await BrowserCdpConnectionResolver
+                .ResolveWebSocketEndpointAsync(endpoint, cancellationToken)
+                .ConfigureAwait(false);
+            return true;
         }
-        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
+        catch (Exception ex) when (
+            ex is not OperationCanceledException ||
+            !cancellationToken.IsCancellationRequested)
         {
             return false;
         }

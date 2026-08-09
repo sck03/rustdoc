@@ -15,6 +15,7 @@ RUN apt-get update \
         chromium-sandbox \
         curl \
         fonts-noto-cjk \
+        socat \
         tini \
         tzdata \
     && test -u /usr/lib/chromium/chrome-sandbox \
@@ -27,6 +28,7 @@ RUN groupadd --system --gid 10001 exportdoc-browser \
         /runtime-data/Cache/ReportPdf \
         /app/Resources/Fonts/OpenSource
 COPY --from=report-fonts --chown=10001:10001 /src/Resources/Fonts/OpenSource/ /app/Resources/Fonts/OpenSource/
+COPY --chmod=0555 deploy/container/start-browser-runtime.sh /usr/local/bin/start-browser-runtime
 
 ENV HOME=/browser-data \
     XDG_CACHE_HOME=/browser-data/cache \
@@ -34,5 +36,5 @@ ENV HOME=/browser-data \
     TZ=Asia/Shanghai
 USER 10001:10001
 EXPOSE 9222
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/chromium"]
-CMD ["--headless", "--remote-debugging-address=0.0.0.0", "--remote-debugging-port=9222", "--remote-allow-origins=*", "--user-data-dir=/browser-data/profile", "--allow-file-access-from-files", "--disable-gpu", "--disable-background-networking", "--disable-background-timer-throttling", "--disable-backgrounding-occluded-windows", "--disable-breakpad", "--disable-component-update", "--disable-default-apps", "--disable-extensions", "--disable-sync", "--force-color-profile=srgb", "--metrics-recording-only", "--no-first-run", "--no-default-browser-check", "--password-store=basic", "--use-mock-keychain", "--export-tagged-pdf", "about:blank"]
+ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/local/bin/start-browser-runtime"]
+CMD ["--headless", "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=9223", "--remote-allow-origins=*", "--user-data-dir=/browser-data/profile", "--allow-file-access-from-files", "--disable-gpu", "--disable-background-networking", "--disable-background-timer-throttling", "--disable-backgrounding-occluded-windows", "--disable-breakpad", "--disable-component-update", "--disable-default-apps", "--disable-extensions", "--disable-sync", "--force-color-profile=srgb", "--metrics-recording-only", "--no-first-run", "--no-default-browser-check", "--password-store=basic", "--use-mock-keychain", "--export-tagged-pdf", "about:blank"]
