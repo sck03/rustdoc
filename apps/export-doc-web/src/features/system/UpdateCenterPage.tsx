@@ -32,6 +32,7 @@ export function UpdateCenterPage({ client }: { client: ExportDocManagerApiClient
   const canCheck = configurationReady && !isBusy;
   const canInstall = canCheck &&
     checkedEndpoint === updaterEndpoint &&
+    Boolean(checkResult?.installSupported) &&
     Boolean(checkResult?.updateAvailable);
 
   useEffect(() => {
@@ -128,7 +129,11 @@ export function UpdateCenterPage({ client }: { client: ExportDocManagerApiClient
           <DetailItem label="最新版本" value={formatVersion(checkResult?.latestVersion)} />
           <DetailItem
             label="检查结果"
-            value={checkResult ? (checkResult.updateAvailable ? "发现新版本" : "已是最新版本") : "-"}
+            value={checkResult
+              ? (checkResult.updateAvailable
+                ? (checkResult.installSupported ? "发现可安装的新版本" : "发现新版便携包")
+                : "已是最新版本")
+              : "-"}
           />
           <DetailItem label="发布时间" value={formatDateTime(checkResult?.date)} />
           <DetailItem label="安装版本" value={formatVersion(installResult?.installedVersion)} />

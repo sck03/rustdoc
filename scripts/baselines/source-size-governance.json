@@ -73,9 +73,9 @@
     {
       "name": "Tauri runtime path modules",
       "directory": "apps/export-doc-tauri/src-tauri/src",
-      "filePattern": "^runtime_(?:paths|paths_config|paths_tests|sidecar_path)\\.rs$",
+      "filePattern": "^runtime_(?:paths|paths_config|paths_tests|portable|sidecar_path)\\.rs$",
       "maximumLines": 900,
-      "maximumAggregateLines": 1500
+      "maximumAggregateLines": 1600
     },
     {
       "name": "Excel analyzer Rust modules",

@@ -54,6 +54,9 @@ for (const requiredWorkflowContract of [
   "Publish immutable edition release and update channel",
   "publish-tauri-updater-manifest.ps1",
   "-Edition ${{ inputs.edition }}",
+  "Build and verify portable desktop package",
+  "Upload portable desktop artifact",
+  "-PortableAssetRoot ./artifacts/desktop-portable/packages",
 ]) {
   assert.ok(releaseWorkflow.includes(requiredWorkflowContract), `desktop release workflow is missing ${requiredWorkflowContract}`);
 }
@@ -73,6 +76,9 @@ for (const manifestContract of [
   "releases/download",
   "Immutable release",
   "Publish-ChannelManifestAtomically",
+  "PortableAssetRoot",
+  "$assetBaseName-portable$portableArchiveSuffix",
+  "Portable release archive SHA-256 mismatch",
 ]) {
   assert.ok(manifestPublisher.includes(manifestContract), `updater manifest publisher is missing ${manifestContract}`);
 }

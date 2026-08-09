@@ -34,6 +34,54 @@ foreach ($rule in $requiredIgnoreRules) {
     }
 }
 
+$deploymentAssetRoot = Join-Path $repositoryRoot "deploy\container"
+$deploymentManifestPath = Join-Path $deploymentAssetRoot "deployment-assets.sha256"
+$expectedDeploymentAssets = @(
+    "docker-compose.ghcr.yml",
+    "docker-compose.acme.yml",
+    "nginx.acme.conf",
+    "postgres-init-roles.sh",
+    "install-container.sh"
+)
+$deploymentManifest = @{}
+if (-not (Test-Path -LiteralPath $deploymentManifestPath -PathType Leaf)) {
+    $errors.Add("Container deployment checksum manifest is missing: deploy/container/deployment-assets.sha256")
+} else {
+    foreach ($line in Get-Content -LiteralPath $deploymentManifestPath -Encoding UTF8) {
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+        if ($line -notmatch '^(?<hash>[0-9a-f]{64})  (?<name>[^/\\]+)$') {
+            $errors.Add("Invalid container deployment checksum line: $line")
+            continue
+        }
+        $name = [string]$Matches.name
+        if ($deploymentManifest.ContainsKey($name)) {
+            $errors.Add("Duplicate container deployment checksum entry: $name")
+            continue
+        }
+        $deploymentManifest[$name] = [string]$Matches.hash
+    }
+}
+foreach ($assetName in $expectedDeploymentAssets) {
+    $assetPath = Join-Path $deploymentAssetRoot $assetName
+    if (-not (Test-Path -LiteralPath $assetPath -PathType Leaf)) {
+        $errors.Add("Container deployment asset is missing: deploy/container/$assetName")
+        continue
+    }
+    if (-not $deploymentManifest.ContainsKey($assetName)) {
+        $errors.Add("Container deployment checksum is missing: $assetName")
+        continue
+    }
+    $actualHash = (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualHash -ne $deploymentManifest[$assetName]) {
+        $errors.Add("Container deployment checksum is stale: $assetName")
+    }
+}
+foreach ($unexpectedAsset in @($deploymentManifest.Keys | Where-Object { $_ -notin $expectedDeploymentAssets })) {
+    $errors.Add("Unexpected container deployment checksum entry: $unexpectedAsset")
+}
+
 $candidateFiles = @()
 & git -C $repositoryRoot rev-parse --is-inside-work-tree *> $null
 if ($LASTEXITCODE -eq 0) {

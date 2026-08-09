@@ -187,6 +187,29 @@ fn detects_valid_portable_runtime_marker() {
 }
 
 #[test]
+fn accepts_external_portable_root_for_appimage_and_app_bundle_layouts() {
+    let root = fresh_test_dir("external-portable-runtime-marker");
+    let app_root = root.join("packaged-resources");
+    let portable_root = root.join("ExportDocManager-portable");
+    fs::create_dir_all(&app_root).unwrap();
+    fs::create_dir_all(&portable_root).unwrap();
+    fs::write(app_root.join(RUNTIME_LAYOUT_MANIFEST_FILE_NAME), "{}").unwrap();
+    fs::write(
+        portable_root.join(PORTABLE_RUNTIME_MARKER_FILE_NAME),
+        r#"{"schemaVersion":1,"mode":"portable"}"#,
+    )
+    .unwrap();
+
+    validate_portable_runtime_marker(&portable_root, &app_root).unwrap();
+    let data_root = resolve_data_root(&portable_root, &portable_root, None, true).unwrap();
+
+    assert_eq!(data_root, portable_root.join("App_Data"));
+    assert!(data_root.join("Database").is_dir());
+    assert!(!app_root.join("App_Data").exists());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn accepts_writable_data_root_without_requiring_a_secondary_volume() {
     let data_root = env::temp_dir()
         .join("ExportDocManagerRuntimePathTests")

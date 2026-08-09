@@ -17,6 +17,7 @@ mod log_rotation;
 mod runtime_layout;
 mod runtime_paths;
 mod runtime_paths_config;
+mod runtime_portable;
 mod runtime_sidecar_path;
 mod runtime_tree_manifest;
 mod sidecar;

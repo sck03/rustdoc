@@ -11,17 +11,21 @@ use std::{
 use tauri::Manager;
 
 use crate::runtime_paths_config::{persist_runtime_data_root, read_persisted_data_root};
+use crate::runtime_portable::resolve_portable_runtime_root;
 use crate::runtime_sidecar_path::resolve_sidecar_path;
 use crate::runtime_tree_manifest::{collect_tree_manifest, TreeManifest};
 
 #[cfg(test)]
 use crate::runtime_paths_config::*;
 #[cfg(test)]
+use crate::runtime_portable::{
+    is_portable_runtime, validate_portable_runtime_marker, PORTABLE_RUNTIME_MARKER_FILE_NAME,
+    RUNTIME_LAYOUT_MANIFEST_FILE_NAME,
+};
+#[cfg(test)]
 use crate::runtime_sidecar_path::sidecar_file_name;
 
 const RUNTIME_CONFIG_ROOT_ENVIRONMENT_VARIABLE: &str = "EXPORTDOCMANAGER_RUNTIME_CONFIG_ROOT";
-const PORTABLE_RUNTIME_MARKER_FILE_NAME: &str = "portable-runtime.json";
-const RUNTIME_LAYOUT_MANIFEST_FILE_NAME: &str = "runtime-layout.json";
 const DATA_ROOT_MIGRATION_MARKER_FILE_NAME: &str = "pending-data-root-migration.json";
 const DATA_ROOT_MIGRATION_COMPLETE_FILE_NAME: &str = ".exportdoc-data-root-migration-complete";
 const DATA_ROOT_MIGRATION_SCHEMA_VERSION: u32 = 2;
@@ -43,13 +47,6 @@ struct CompletedDataRootMigration {
     target_root: String,
     requested_at_unix_seconds: u64,
     source_manifest: TreeManifest,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct PortableRuntimeMarker {
-    schema_version: u32,
-    mode: String,
 }
 
 #[derive(serde::Serialize)]
@@ -90,11 +87,14 @@ pub(crate) fn prepare_runtime_paths(app: &tauri::App) -> Result<RuntimePaths, Bo
     let app_root = app_root_argument
         .or_else(|| env::var_os("EXPORTDOCMANAGER_APP_ROOT").map(PathBuf::from))
         .unwrap_or(default_app_root);
-    let portable = is_portable_runtime(&app_root)?;
+    let portable_root =
+        resolve_portable_runtime_root(&app_root, runtime_arg_value("--portable-root"))?;
+    let portable = portable_root.is_some();
+    let storage_root = portable_root.as_deref().unwrap_or(&app_root);
     let explicit_data_root =
         data_root_argument.or_else(|| env::var_os("EXPORTDOCMANAGER_DATA_ROOT").map(PathBuf::from));
     let runtime_config_root = if portable {
-        app_root.clone()
+        storage_root.to_path_buf()
     } else {
         env::var_os(RUNTIME_CONFIG_ROOT_ENVIRONMENT_VARIABLE)
             .map(PathBuf::from)
@@ -104,7 +104,7 @@ pub(crate) fn prepare_runtime_paths(app: &tauri::App) -> Result<RuntimePaths, Bo
         apply_pending_data_root_migration(&runtime_config_root)?;
     }
     let data_root = resolve_data_root(
-        &app_root,
+        storage_root,
         &runtime_config_root,
         explicit_data_root,
         portable,
@@ -188,44 +188,6 @@ fn resolve_data_root(
     let selected = canonical_runtime_data_root(&selected, true)?;
     persist_runtime_data_root(runtime_config_root, &selected)?;
     Ok(selected)
-}
-
-fn is_portable_runtime(app_root: &Path) -> Result<bool, Box<dyn Error>> {
-    let marker_path = app_root.join(PORTABLE_RUNTIME_MARKER_FILE_NAME);
-    if !marker_path.exists() {
-        return Ok(false);
-    }
-
-    if !app_root.join(RUNTIME_LAYOUT_MANIFEST_FILE_NAME).is_file() {
-        return Err(format!(
-            "Portable runtime marker '{}' exists without '{}'.",
-            marker_path.display(),
-            RUNTIME_LAYOUT_MANIFEST_FILE_NAME
-        )
-        .into());
-    }
-
-    let marker_text = fs::read_to_string(&marker_path).map_err(|error| {
-        format!(
-            "Failed to read portable runtime marker '{}': {error}",
-            marker_path.display()
-        )
-    })?;
-    let marker: PortableRuntimeMarker = serde_json::from_str(&marker_text).map_err(|error| {
-        format!(
-            "Failed to parse portable runtime marker '{}': {error}",
-            marker_path.display()
-        )
-    })?;
-    if marker.schema_version != 1 || marker.mode != "portable" {
-        return Err(format!(
-            "Unsupported portable runtime marker '{}': expected schemaVersion=1 and mode='portable'.",
-            marker_path.display()
-        )
-        .into());
-    }
-
-    Ok(true)
 }
 
 pub(crate) fn runtime_storage_context(paths: &RuntimePaths) -> RuntimeStorageContext {

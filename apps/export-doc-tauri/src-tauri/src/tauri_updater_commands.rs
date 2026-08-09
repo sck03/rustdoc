@@ -1,13 +1,15 @@
 use serde::Serialize;
+use tauri::Manager;
 use tauri_plugin_updater::{Updater, UpdaterExt};
 use url::Url;
 
-use crate::{desktop_commands, sidecar};
+use crate::{desktop_commands, runtime_paths::RuntimePaths, sidecar};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TauriUpdaterCheckResult {
     supported: bool,
+    install_supported: bool,
     configured: bool,
     update_available: bool,
     current_version: String,
@@ -33,6 +35,8 @@ pub(crate) struct TauriUpdaterInstallResult {
 
 const TAURI_UPDATER_STORAGE_POLICY: &str =
     "软件更新只更新程序文件；业务数据库、授权文件和运行数据保持在运行数据目录。";
+const PORTABLE_UPDATER_STORAGE_POLICY: &str =
+    "便携版不执行安装器式自动更新；请退出程序后替换程序文件，并保留解包目录旁的 App_Data。";
 const MAX_UPDATER_ENDPOINT_LENGTH: usize = 2048;
 
 #[tauri::command]
@@ -40,10 +44,12 @@ pub(crate) async fn check_tauri_update(
     app: tauri::AppHandle,
     endpoint: Option<String>,
 ) -> Result<TauriUpdaterCheckResult, String> {
+    let portable = app.state::<RuntimePaths>().portable;
     let updater = build_tauri_updater(&app, endpoint)?;
     match updater.check().await.map_err(describe_updater_error)? {
         Some(update) => Ok(TauriUpdaterCheckResult {
             supported: true,
+            install_supported: !portable,
             configured: true,
             update_available: true,
             current_version: update.current_version,
@@ -55,14 +61,20 @@ pub(crate) async fn check_tauri_update(
                 .date
                 .map(|value| value.to_string())
                 .unwrap_or_default(),
-            status_text: "发现可安装的新版本。".to_owned(),
+            status_text: if portable {
+                "发现新版本。便携版请下载新的绿色便携包，退出程序后替换程序文件并保留 App_Data。"
+                    .to_owned()
+            } else {
+                "发现可安装的新版本。".to_owned()
+            },
             error_message: String::new(),
-            storage_policy: TAURI_UPDATER_STORAGE_POLICY.to_owned(),
+            storage_policy: updater_storage_policy(portable).to_owned(),
         }),
         None => {
             let version = app.package_info().version.to_string();
             Ok(TauriUpdaterCheckResult {
                 supported: true,
+                install_supported: !portable,
                 configured: true,
                 update_available: false,
                 current_version: version.clone(),
@@ -73,7 +85,7 @@ pub(crate) async fn check_tauri_update(
                 date: String::new(),
                 status_text: "检查完成，当前已是最新版本。".to_owned(),
                 error_message: String::new(),
-                storage_policy: TAURI_UPDATER_STORAGE_POLICY.to_owned(),
+                storage_policy: updater_storage_policy(portable).to_owned(),
             })
         }
     }
@@ -84,6 +96,7 @@ pub(crate) async fn install_tauri_update(
     app: tauri::AppHandle,
     endpoint: Option<String>,
 ) -> Result<TauriUpdaterInstallResult, String> {
+    ensure_updater_install_supported(app.state::<RuntimePaths>().portable)?;
     let updater = build_tauri_updater(&app, endpoint)?;
     let update = updater
         .check()
@@ -109,6 +122,24 @@ pub(crate) async fn install_tauri_update(
         restart_policy: "安装完成后自动重启程序。".to_owned(),
         storage_policy: TAURI_UPDATER_STORAGE_POLICY.to_owned(),
     })
+}
+
+fn ensure_updater_install_supported(portable: bool) -> Result<(), String> {
+    if portable {
+        return Err(
+            "绿色便携版不会启动系统安装器。请下载新的便携包，退出程序后替换程序文件，并保留原目录中的 App_Data。"
+                .to_owned(),
+        );
+    }
+    Ok(())
+}
+
+fn updater_storage_policy(portable: bool) -> &'static str {
+    if portable {
+        PORTABLE_UPDATER_STORAGE_POLICY
+    } else {
+        TAURI_UPDATER_STORAGE_POLICY
+    }
 }
 
 fn build_tauri_updater(
@@ -253,5 +284,17 @@ mod tests {
                 "endpoint should be rejected: {endpoint}"
             );
         }
+    }
+
+    #[test]
+    fn portable_runtime_rejects_installer_style_updates() {
+        assert!(ensure_updater_install_supported(false).is_ok());
+        let error = ensure_updater_install_supported(true).unwrap_err();
+        assert!(error.contains("绿色便携版"));
+        assert!(error.contains("App_Data"));
+        assert_eq!(
+            updater_storage_policy(true),
+            PORTABLE_UPDATER_STORAGE_POLICY
+        );
     }
 }

@@ -302,7 +302,7 @@ function Get-GeneratedArtifactCleanupPlan {
     # named delivery outputs and reusable download caches unless their explicit
     # cleanup switches are supplied. This prevents newly introduced test or
     # screenshot directories from accumulating indefinitely.
-    $releaseOutputNames = @("windows-desktop-run", "windows-installers", "license-keygen")
+    $releaseOutputNames = @("windows-desktop-run", "windows-installers", "desktop-portable", "license-keygen")
     $artifactCacheNames = @(
         "cargo-audit",
         "chrome-for-testing",

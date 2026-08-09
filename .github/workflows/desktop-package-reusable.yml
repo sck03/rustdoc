@@ -259,11 +259,34 @@ jobs:
         shell: pwsh
         run: ./scripts/verify-package-payload.ps1 -PackageRoot ./artifacts/tauri-bundle/resources -Profile Desktop -RuntimeIdentifier ${{ inputs.runtime_identifier }}
 
-      - name: Upload desktop package artifact
+      - name: Build and verify portable desktop package
+        shell: pwsh
+        run: >-
+          ./scripts/package-desktop-portable.ps1
+          -Platform ${{ inputs.platform }}
+          -RuntimeIdentifier ${{ inputs.runtime_identifier }}
+          -RustTarget ${{ inputs.rust_target }}
+          -Architecture ${{ inputs.architecture }}
+          -Edition ${{ inputs.edition }}
+          -Version ${{ steps.version.outputs.value }}
+          -CargoTargetRoot ${{ env.CARGO_TARGET_DIR }}
+          -ResourceRoot ./artifacts/tauri-bundle/resources
+          -OutputRoot ./artifacts/desktop-portable
+
+      - name: Upload desktop installer artifact
         uses: actions/upload-artifact@v7
         with:
-          name: export-doc-manager-${{ inputs.platform }}-${{ inputs.architecture }}-${{ inputs.edition }}-${{ steps.version.outputs.value }}
+          name: export-doc-manager-${{ inputs.platform }}-${{ inputs.architecture }}-${{ inputs.edition }}-${{ steps.version.outputs.value }}-installer
           path: artifacts/cargo-target-exportdoc/**/release/bundle/**
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload portable desktop artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: export-doc-manager-${{ inputs.platform }}-${{ inputs.architecture }}-${{ inputs.edition }}-${{ steps.version.outputs.value }}-portable
+          path: artifacts/desktop-portable/packages/*
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
@@ -280,6 +303,7 @@ jobs:
           -Edition ${{ inputs.edition }}
           -Version ${{ steps.version.outputs.value }}
           -BundleRoot ${{ env.CARGO_TARGET_DIR }}
+          -PortableAssetRoot ./artifacts/desktop-portable/packages
 
       - name: Write package summary
         shell: pwsh
@@ -291,6 +315,8 @@ jobs:
           - 版本：`${{ steps.version.outputs.value }}`
           - 产品版：`${{ inputs.edition }}`
           - 内置报表浏览器：`${{ inputs.include_browser }}`
+          - 安装版：`保留现有 Tauri bundle 产物`
+          - 绿色便携版：`${{ inputs.platform == 'windows' && 'ZIP' || 'tar.gz' }}`，首次运行在解包目录旁创建 `App_Data`
           - 发布到 GitHub Release：`${{ inputs.publish_release }}`
           - 更新签名：`${{ inputs.publish_release && '已启用，缺少构建密钥会直接失败' || '未启用，仅用于测试和人工验收' }}`
           - 系统商业签名：`本阶段暂不强制；Windows Authenticode 与 macOS Developer ID/公证列入正式商业发布前门禁`

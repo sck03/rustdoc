@@ -18,6 +18,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$BundleRoot,
 
+    [string]$PortableAssetRoot,
+
     [string]$Repository = $env:GITHUB_REPOSITORY
 )
 
@@ -37,6 +39,15 @@ if (-not $resolvedBundleRoot.StartsWith(
         $artifactsRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar,
         [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "BundleRoot must stay inside $artifactsRoot. Resolved path: $resolvedBundleRoot"
+}
+$resolvedPortableAssetRoot = $null
+if (-not [string]::IsNullOrWhiteSpace($PortableAssetRoot)) {
+    $resolvedPortableAssetRoot = (Resolve-Path -LiteralPath $PortableAssetRoot).Path
+    if (-not $resolvedPortableAssetRoot.StartsWith(
+            $artifactsRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar,
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "PortableAssetRoot must stay inside $artifactsRoot. Resolved path: $resolvedPortableAssetRoot"
+    }
 }
 
 $catalogPath = Join-Path $PSScriptRoot "product-editions.json"
@@ -122,6 +133,38 @@ foreach ($bundleFile in $bundleFiles) {
 }
 if ($null -eq $updaterPackageAsset) {
     throw "The updater package was not included in the staged release assets."
+}
+
+$portableAssets = New-Object System.Collections.Generic.List[System.IO.FileInfo]
+if ($null -ne $resolvedPortableAssetRoot) {
+    $portableArchiveSuffix = if ($Platform -eq "windows") { ".zip" } else { ".tar.gz" }
+    $portableArchiveName = "$assetBaseName-portable$portableArchiveSuffix"
+    $portableHashName = "$portableArchiveName.sha256"
+    $portableArchivePath = Join-Path $resolvedPortableAssetRoot $portableArchiveName
+    $portableHashPath = Join-Path $resolvedPortableAssetRoot $portableHashName
+    foreach ($portablePath in @($portableArchivePath, $portableHashPath)) {
+        if (-not (Test-Path -LiteralPath $portablePath -PathType Leaf) -or (Get-Item -LiteralPath $portablePath).Length -le 0) {
+            throw "Portable release asset is missing or empty: $portablePath"
+        }
+    }
+
+    $declaredPortableHash = ((Get-Content -LiteralPath $portableHashPath -Raw -Encoding ascii).Trim() -split '\s+')[0]
+    $actualPortableHash = (Get-FileHash -LiteralPath $portableArchivePath -Algorithm SHA256).Hash
+    if (-not [string]::Equals($declaredPortableHash, $actualPortableHash, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Portable release archive SHA-256 mismatch for '$portableArchiveName'."
+    }
+
+    foreach ($portablePath in @($portableArchivePath, $portableHashPath)) {
+        $portableName = Split-Path -Leaf $portablePath
+        if (-not $assetNames.Add($portableName)) {
+            throw "Duplicate release asset name '$portableName'."
+        }
+        $destination = Join-Path $fullStagingRoot $portableName
+        Copy-Item -LiteralPath $portablePath -Destination $destination
+        $stagedPortableAsset = Get-Item -LiteralPath $destination
+        $stagedAssets.Add($stagedPortableAsset)
+        $portableAssets.Add($stagedPortableAsset)
+    }
 }
 
 Ensure-Release -Tag $releaseTag -Title "$($metadata.productName) $normalizedVersion" -Notes "$($metadata.productName) $normalizedVersion 已生成 Tauri 更新签名；Windows Authenticode 与 macOS Developer ID/公证将在正式商业发布前另行启用。" -Prerelease:$isPrerelease
@@ -210,6 +253,7 @@ Publish-ChannelManifestAtomically `
     ChannelManifest = $channelManifestName
     Target = $target
     UpdaterPackageAsset = $updaterPackageAsset.Name
+    PortableAssets = @($portableAssets.Name)
     ReleaseAssets = @($stagedAssets.Name)
 } | ConvertTo-Json -Depth 5
 }

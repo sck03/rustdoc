@@ -25,6 +25,7 @@ export type DataRootMigrationScheduleResult = {
 
 export type TauriUpdaterCheckResult = {
   supported: boolean;
+  installSupported: boolean;
   configured: boolean;
   updateAvailable: boolean;
   currentVersion: string;

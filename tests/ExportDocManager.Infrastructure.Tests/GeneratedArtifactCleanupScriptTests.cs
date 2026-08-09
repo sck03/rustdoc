@@ -48,6 +48,7 @@ namespace ExportDocManager.Infrastructure.Tests
             int conditionalIndex = content.IndexOf("if ($IncludeReleaseOutputs)", StringComparison.Ordinal);
             int portableOutputIndex = content.IndexOf("windows-desktop-run", releaseNamesIndex, StringComparison.Ordinal);
             int installerOutputIndex = content.IndexOf("windows-installers", releaseNamesIndex, StringComparison.Ordinal);
+            int crossPlatformPortableOutputIndex = content.IndexOf("desktop-portable", releaseNamesIndex, StringComparison.Ordinal);
             int licenseOutputIndex = content.IndexOf("license-keygen", releaseNamesIndex, StringComparison.Ordinal);
 
             Assert.True(switchIndex >= 0, "Cleanup script should expose IncludeReleaseOutputs.");
@@ -55,6 +56,7 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.True(conditionalIndex > releaseNamesIndex, "Release output cleanup must use an explicit condition.");
             Assert.InRange(portableOutputIndex, releaseNamesIndex + 1, conditionalIndex - 1);
             Assert.InRange(installerOutputIndex, releaseNamesIndex + 1, conditionalIndex - 1);
+            Assert.InRange(crossPlatformPortableOutputIndex, releaseNamesIndex + 1, conditionalIndex - 1);
             Assert.InRange(licenseOutputIndex, releaseNamesIndex + 1, conditionalIndex - 1);
             Assert.DoesNotContain("Add-Target -Targets $targets -Path $artifactsRoot", content, StringComparison.Ordinal);
         }

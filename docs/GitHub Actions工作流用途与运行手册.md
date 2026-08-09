@@ -17,7 +17,7 @@
 | 真实共享数据库 | [`postgresql-integration-validation.yml`](../.github/workflows/postgresql-integration-validation.yml) | `main` 相关路径 push、PR、手工 | PostgreSQL 18 初始化、索引、容量、并发、岗位权限和 SQL 安全 |
 | 容器运行时 | [`container-runtime-validation.yml`](../.github/workflows/container-runtime-validation.yml) | `main` 相关路径 push、PR、手工 | HTTP/HTTPS Compose、镜像、探针、volume 持久化和备份恢复 |
 | 镜像发布 | [`container-images.yml`](../.github/workflows/container-images.yml) | 手工 | Linux amd64/arm64 API/Browser/Web 镜像并推送 GHCR |
-| 桌面打包 | 三个平台入口 + [`desktop-package-reusable.yml`](../.github/workflows/desktop-package-reusable.yml) | 手工 | Windows NSIS、Linux deb/AppImage、macOS dmg Artifact；可选 Release |
+| 桌面打包 | 三个平台入口 + [`desktop-package-reusable.yml`](../.github/workflows/desktop-package-reusable.yml) | 手工 | 安装版：Windows NSIS、Linux deb/AppImage、macOS dmg；便携版：Windows ZIP、Linux/macOS tar.gz；可选 Release |
 | 浏览器服务器打包 | 两个平台入口 + [`browser-server-package-reusable.yml`](../.github/workflows/browser-server-package-reusable.yml) | 手工 | Windows ZIP、Linux x64/ARM64 tar.gz Artifact；可选 Release |
 
 推荐的发布前顺序是：先运行公开源码和依赖门禁，再运行 PostgreSQL、容器和字体/报表门禁，确认结果后先以 `publish_release=false` 打包验收，最后才运行 GHCR 或带 Release 的发布入口。`cross-platform-validation.yml`、`container-images.yml` 和所有打包入口均为重型手工任务，不会因为普通文档提交自动启动。
@@ -124,8 +124,8 @@
 
 - **触发：** `workflow_call`，不能从 Actions 列表单独运行；由 Windows/Linux/macOS 三个平台入口调用。
 - **平台：** 由调用方传入 runner、平台、架构、产品版和 bundle 类型。
-- **做什么：** 安装 .NET 10 SDK `10.0.302`/Node 24/Rust，准备开源字体和 Chrome Headless Shell（Linux ARM64 使用明确的 Chromium ARM64 路径），构建 API/Web/Tauri、OCR 资源并验证精简 payload。桌面资源准备会在 release 依赖治理前还原完整 `ExportDocManager.sln`，保证全新 checkout 或清理过 `bin/obj` 后仍能扫描全部项目。`publish_release=false` 生成未签名验收包；`true` 才启用 updater 签名、上传安装包并合并 `latest.json`。
-- **输出：** `export-doc-manager-<platform>-<arch>-<edition>-<version>` Artifact，通常保留 14 天；发布模式另上传 GitHub Release 资产。
+- **做什么：** 安装 .NET 10 SDK `10.0.302`/Node 24/Rust，准备开源字体和 Chrome Headless Shell（Linux ARM64 使用明确的 Chromium ARM64 路径），构建 API/Web/Tauri、OCR 资源并验证精简 payload。桌面资源准备会在 release 依赖治理前还原完整 `ExportDocManager.sln`，保证全新 checkout 或清理过 `bin/obj` 后仍能扫描全部项目。随后复用同一构建生成绿色便携包：Windows 复制主程序与已审计资源树后压缩 ZIP；Linux 对生成的 AppImage 做无 FUSE 解包复验后封装 tar.gz；macOS 复制完整 `.app` 并验证 `Contents/Resources` 后封装 tar.gz。便携包不预置 `App_Data`、密码、许可证、日志或用户配置，并生成逐文件与归档 SHA-256。`publish_release=false` 生成未签名验收包；`true` 才启用 updater 签名、上传安装版和便携版并合并 `latest.json`。
+- **输出：** `...-installer` 与 `...-portable` 两个独立 Artifact，通常保留 14 天；发布模式把安装/Updater 资产、便携归档和 `.sha256` 一并上传到不可覆盖版本 Release。便携版只检查版本，不调用安装器式自动更新；人工替换程序文件时保留原目录 `App_Data`。
 - **Secrets/Variables：** 测试模式不需要签名材料；发布模式必须配置仓库 Variable `EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY`，以及带密码的 Secrets `TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。`EXPORTDOCMANAGER_UPDATER_ENDPOINT` 改为可选：留空时安装包只内置公钥，由管理员安装后在系统设置中配置 GitHub、自建服务器或公司内网地址。若构建时就要内置 HTTP 默认地址，还必须显式配置 `EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT=true`；公网默认地址仍应使用 HTTPS。调用方使用 `secrets: inherit`，不应把私钥写入仓库或日志。
 - **常见失败：** 版本格式、浏览器资源缺失/执行权限、OCR 运行时缺库、公钥或私钥缺失、未显式放行却尝试内置 HTTP endpoint、Release tag 已被其它版本占用。依赖清单校验不再因表单版本与仓库当前版本不同而失败；若旧提交在 `dotnet list package` 阶段提示项目没有 assets 文件，应从最新 `main` 新建运行，当前流程会先还原完整解决方案。若 Windows 日志显示 `spawnSync npm.cmd EINVAL`，同样说明运行的是旧提交；当前包装器由 Node 直接启动项目锁定的 Tauri CLI，不再调用 `.cmd`。若提示 stale，错误会指出首个真实差异行，应重新生成并审查依赖，而不是删除 `--verify-repository`。Linux AppImage 使用 Tauri 自带的无 FUSE 解压运行模式，不需要额外安装 `libfuse2`；工作流显式安装 `file`、`xdg-utils`，并设置 `NO_STRIP=1`，避免 `linuxdeploy` 内置旧版 `strip` 重复处理 Ubuntu 24.04 新 ELF 段时退出。桌面 sidecar 继续排除 CoreCLR 可选的 `libcoreclrtraceptprovider.so`，避免把宿主 LTTng ABI 作为应用启动依赖；不要用跨 ABI 软链接伪造兼容。桌面构建统一带 `--verbose`，后续 `linuxdeploy`、签名或公证失败会保留真实子进程输出。桌面摘要固定使用 PowerShell 字面量 here-string，避免 Markdown 行尾反引号被解释为续行；治理门禁会拒绝重新引入该 ParserError。
 - **耗时：** 15—40 分钟，首次下载浏览器和 Rust 依赖时更久。
@@ -149,7 +149,7 @@
 显示名称：`Build Windows desktop package`
 
 - **触发：** 仅 `workflow_dispatch`；输入版本、`Document/Sales/Full` 产品版和是否发布 Release。
-- **平台/产物：** `windows-latest`、Windows x64、NSIS 安装包；调用桌面可复用工作流并内置 Windows Chrome Headless Shell。
+- **平台/产物：** `windows-latest`、Windows x64；输出 NSIS 安装包和 ZIP 绿色便携包，二者都内置 Windows Chrome Headless Shell。
 - **发布：** 默认只生成未签名 Artifact；选择 `publish_release=true` 才要求 updater Variables/Secrets 并上传 Release。
 - **常见失败：** 版本或产品版输入、Windows 浏览器资源、Tauri bundle、签名配置和 Release 权限。
 
@@ -159,7 +159,7 @@
 显示名称：`Build Linux desktop package`
 
 - **触发：** 仅 `workflow_dispatch`；输入版本、产品版、x64/ARM64 和是否发布 Release。
-- **平台/产物：** x64 使用 `ubuntu-latest`，ARM64 使用 `ubuntu-24.04-arm`；输出 deb/AppImage。Linux ARM64 当前是应用编译合同，浏览器资源使用明确的 Chromium ARM64 供给路径，必须以工作流实际结果为准。
+- **平台/产物：** x64 使用 `ubuntu-latest`，ARM64 使用 `ubuntu-24.04-arm`；输出 deb/AppImage 安装产物和包含已复验 AppImage 的 tar.gz 绿色便携包。Linux ARM64 浏览器资源使用明确的 Chromium ARM64 供给路径，必须以工作流实际结果为准。
 - **发布：** 规则与 Windows 桌面入口相同，默认不签名、不发布。
 - **常见失败：** GTK/WebKit、`file`/`xdg-utils`、AppImage 打包、执行权限、ARM64 runner 可用性和签名配置。若日志停在 `failed to run linuxdeploy`，应查看同一步骤前面的 verbose stderr；若出现 `Could not find dependency: liblttng-ust.so.0`，先确认构建使用了已排除 `libcoreclrtraceptprovider.so` 的最新 `main`，不要 Re-run 旧提交，也不要用 `.so.1` 伪造旧 ABI 软链接。磁盘不足会有明确的 `No space left on device`，不需要把清理大量 runner 预装软件作为本工作流的固定前置步骤。
 
@@ -169,7 +169,7 @@
 显示名称：`Build macOS desktop package`
 
 - **触发：** 仅 `workflow_dispatch`；输入版本、产品版和是否发布 Release。
-- **平台/产物：** 固定 `macos-15` Apple Silicon ARM64，输出 dmg，并内置官方 `mac-arm64` Chrome Headless Shell。
+- **平台/产物：** 固定 `macos-15` Apple Silicon ARM64，输出 dmg 和包含完整 `.app` 的 tar.gz 绿色便携包，并内置官方 `mac-arm64` Chrome Headless Shell。
 - **发布：** 默认只生成 Artifact；发布模式要求同一套 updater Variables/Secrets。签名、公证和真机启动仍需单独验收，工作流成功不等于 Apple 发布合规完成。
 - **常见失败：** Apple Silicon runner、浏览器执行权限、Tauri bundle、签名/公证材料或 Release 权限。当前使用 ONNX Runtime `1.28.0`；其官方包只提供 `osx-arm64`，所以 Intel x64 入口已删除。若工作流仍出现 `osx-x64`、`mac-x64` 或 `macos-*-intel`，说明运行的是旧提交，不能用失败 job 的 Re-run 获取当前修复。
 
