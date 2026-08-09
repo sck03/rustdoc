@@ -112,6 +112,9 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("postgres:18.4-trixie", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.DoesNotContain("--remote-debugging-port=0", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("nginx:1.30.4-alpine3.24", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("sudo chown \"$(id -u):101\"", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("deploy/container/secrets/tls/server.key", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("chmod 0640 \\", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("nginx-main.conf", File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.web")), StringComparison.Ordinal);
         Assert.Contains("read_only: true", compose, StringComparison.Ordinal);
         Assert.Contains("no-new-privileges:true", compose, StringComparison.Ordinal);
@@ -348,8 +351,13 @@ public sealed class PackagePayloadContractTests
 
         Assert.Contains("chown -R 10001:10001 \"$API_DATA_ROOT\"", installer, StringComparison.Ordinal);
         Assert.Contains("chown -R 999:999 \"$POSTGRES_ROOT\"", installer, StringComparison.Ordinal);
+        Assert.Contains("chown root:101 \"$LETSENCRYPT_ROOT\"", installer, StringComparison.Ordinal);
         Assert.Contains("chmod 0700 \"$POSTGRES_ROOT\"", installer, StringComparison.Ordinal);
         Assert.Contains("chmod 0750 \"$API_DATA_ROOT\" \"$CONFIG_ROOT\"", installer, StringComparison.Ordinal);
+        Assert.Contains("chmod 0750 \"$LETSENCRYPT_ROOT\"", installer, StringComparison.Ordinal);
+        Assert.Contains("prepare_nginx_certificate_permissions", installer, StringComparison.Ordinal);
+        Assert.Contains("chown root:101 \"$certificate_path\"", installer, StringComparison.Ordinal);
+        Assert.Contains("chmod 0640 \"$certificate_path\"", installer, StringComparison.Ordinal);
         Assert.Contains("chmod 0600 \"$SETTINGS_FILE\"", installer, StringComparison.Ordinal);
         Assert.Contains("Assert-SafeDirectoryPath", initializer, StringComparison.Ordinal);
         Assert.Contains("ReparsePoint", initializer, StringComparison.Ordinal);
@@ -372,6 +380,9 @@ public sealed class PackagePayloadContractTests
         Assert.DoesNotContain("5188:5188", baseCompose, StringComparison.Ordinal);
         Assert.Contains("certbot/certbot:v5.7.0", acmeCompose, StringComparison.Ordinal);
         Assert.Contains("renew --webroot", acmeCompose, StringComparison.Ordinal);
+        Assert.Contains("grant_web_certificate_access", acmeCompose, StringComparison.Ordinal);
+        Assert.Contains("chown 0:101 \"$$certificate_file\"", acmeCompose, StringComparison.Ordinal);
+        Assert.Contains("chmod 0640 \"$$certificate_file\"", acmeCompose, StringComparison.Ordinal);
         Assert.DoesNotContain("proxy_pass", acmeCompose, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("listen 8443 ssl", nginxConfig, StringComparison.Ordinal);
         Assert.Contains("proxy_pass http://api:5188", nginxConfig, StringComparison.Ordinal);

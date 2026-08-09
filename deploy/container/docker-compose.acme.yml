@@ -20,8 +20,31 @@ services:
     command:
       - -c
       - >-
+        set -eu;
+        grant_web_certificate_access() {
+          for directory in
+            /etc/letsencrypt
+            /etc/letsencrypt/live
+            /etc/letsencrypt/live/exportdocmanager
+            /etc/letsencrypt/archive
+            /etc/letsencrypt/archive/exportdocmanager;
+          do
+            if [ -d "$$directory" ]; then
+              chown 0:101 "$$directory";
+              chmod 0750 "$$directory";
+            fi;
+          done;
+          for certificate_file in /etc/letsencrypt/archive/exportdocmanager/*.pem; do
+            if [ -f "$$certificate_file" ]; then
+              chown 0:101 "$$certificate_file";
+              chmod 0640 "$$certificate_file";
+            fi;
+          done;
+        };
+        grant_web_certificate_access;
         while :; do
           certbot renew --webroot --webroot-path /var/www/certbot --quiet || true;
+          grant_web_certificate_access;
           sleep 43200;
         done
     depends_on:

@@ -635,12 +635,13 @@ SETTINGS_FILE="$CONFIG_ROOT/appsettings.json"
 chown -R 10001:10001 "$API_DATA_ROOT"
 chown -R 10001:10001 "$BROWSER_ROOT"
 chown -R 999:999 "$POSTGRES_ROOT"
-chown root:root "$RUNTIME_ROOT" "$LETSENCRYPT_ROOT" "$ACME_WEB_ROOT"
+chown root:root "$RUNTIME_ROOT" "$ACME_WEB_ROOT"
+chown root:101 "$LETSENCRYPT_ROOT"
 chmod 700 "$RUNTIME_ROOT"
 chmod 0700 "$POSTGRES_ROOT"
 chmod 0750 "$API_DATA_ROOT" "$CONFIG_ROOT"
 chmod 0750 "$REPORT_PDF_ROOT" "$BROWSER_ROOT"
-chmod 0700 "$LETSENCRYPT_ROOT"
+chmod 0750 "$LETSENCRYPT_ROOT"
 chmod 0755 "$ACME_WEB_ROOT"
 if [[ ! -f "$SETTINGS_FILE" ]]; then
   cat > "$SETTINGS_FILE" <<EOF
@@ -734,6 +735,27 @@ if [[ "$MODE" == "https" ]]; then
   CERTIFICATE_ROOT="$RUNTIME_ROOT/letsencrypt"
   CERTIFICATE_FILE="$CERTIFICATE_ROOT/live/exportdocmanager/fullchain.pem"
   CERTIFICATE_KEY="$CERTIFICATE_ROOT/live/exportdocmanager/privkey.pem"
+  prepare_nginx_certificate_permissions() {
+    local certificate_directory
+    local certificate_path
+    for certificate_directory in \
+      "$CERTIFICATE_ROOT" \
+      "$CERTIFICATE_ROOT/live" \
+      "$CERTIFICATE_ROOT/live/exportdocmanager" \
+      "$CERTIFICATE_ROOT/archive" \
+      "$CERTIFICATE_ROOT/archive/exportdocmanager"; do
+      [[ ! -d "$certificate_directory" ]] || {
+        chown root:101 "$certificate_directory"
+        chmod 0750 "$certificate_directory"
+      }
+    done
+    for certificate_path in "$CERTIFICATE_ROOT/archive/exportdocmanager/"*.pem; do
+      [[ ! -f "$certificate_path" ]] || {
+        chown root:101 "$certificate_path"
+        chmod 0640 "$certificate_path"
+      }
+    done
+  }
   certificate_is_usable() {
     local certificate_public_key private_public_key
     [[ -f "$CERTIFICATE_FILE" && -f "$CERTIFICATE_KEY" ]] || return 1
@@ -777,6 +799,7 @@ if [[ "$MODE" == "https" ]]; then
       fail "Certificate request failed. Check DNS and inbound TCP 80; the installer will restore the previous deployment when possible."
     fi
   fi
+  prepare_nginx_certificate_permissions
 fi
 
 if ! "${COMPOSE[@]}" up -d --remove-orphans; then

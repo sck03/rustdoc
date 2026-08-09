@@ -278,6 +278,12 @@ jobs:
             -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" \
             -keyout deploy/container/secrets/tls/server.key \
             -out deploy/container/secrets/tls/server.crt
+          sudo chown "$(id -u):101" \
+            deploy/container/secrets/tls/server.key \
+            deploy/container/secrets/tls/server.crt
+          chmod 0640 \
+            deploy/container/secrets/tls/server.key \
+            deploy/container/secrets/tls/server.crt
 
       - name: Validate HTTP and HTTPS Compose models
         working-directory: deploy/container
