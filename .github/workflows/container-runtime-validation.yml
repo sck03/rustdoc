@@ -510,7 +510,6 @@ jobs:
               trap cleanup EXIT INT TERM
               if ! timeout 45s /usr/bin/chromium \
                 --headless=new \
-                --remote-debugging-port=0 \
                 --disable-background-networking \
                 --disable-default-apps \
                 --disable-extensions \

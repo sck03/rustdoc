@@ -110,6 +110,7 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("postgres:18.4-trixie", compose, StringComparison.Ordinal);
         Assert.Contains("postgres:18.4-trixie", ghcrCompose, StringComparison.Ordinal);
         Assert.Contains("postgres:18.4-trixie", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("--remote-debugging-port=0", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("nginx:1.30.4-alpine3.24", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("nginx-main.conf", File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.web")), StringComparison.Ordinal);
         Assert.Contains("read_only: true", compose, StringComparison.Ordinal);
@@ -500,6 +501,9 @@ public sealed class PackagePayloadContractTests
 
         Assert.Contains("USER 10001:10001", apiDockerfile, StringComparison.Ordinal);
         Assert.DoesNotContain("chromium-sandbox", apiDockerfile, StringComparison.Ordinal);
+        Assert.Contains("/app/.playwright/node/linux-*/node", apiDockerfile, StringComparison.Ordinal);
+        Assert.Contains("chmod 0755", apiDockerfile, StringComparison.Ordinal);
+        Assert.Contains("\"$playwright_node\" --version", apiDockerfile, StringComparison.Ordinal);
         Assert.Contains("USER 10001:10001", browserDockerfile, StringComparison.Ordinal);
         Assert.Contains("chromium-sandbox", browserDockerfile, StringComparison.Ordinal);
         Assert.Contains("socat", browserDockerfile, StringComparison.Ordinal);

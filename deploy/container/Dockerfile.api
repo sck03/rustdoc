@@ -131,7 +131,15 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:5188 \
     EXPORTDOCMANAGER_OCR_RUNTIME=enabled \
     EXPORTDOCMANAGER_POSTGRES_BIN=/usr/lib/postgresql/18/bin \
     TZ=Asia/Shanghai
-RUN chmod +x /app/sidecar/ocr/exportdoc-ocr /app/Tools/exportdoc-excel-analyzer
+RUN set -- /app/.playwright/node/linux-*/node \
+    && test "$#" -eq 1 \
+    && playwright_node="$1" \
+    && test -f "$playwright_node" \
+    && chmod 0755 \
+        "$playwright_node" \
+        /app/sidecar/ocr/exportdoc-ocr \
+        /app/Tools/exportdoc-excel-analyzer \
+    && "$playwright_node" --version
 RUN dotnet ExportDocManager.Api.dll --app-root /app --data-root /tmp/exportdoc-ocr-check --verify-ocr-runtime \
     && rm -rf /tmp/exportdoc-ocr-check
 USER 10001:10001
