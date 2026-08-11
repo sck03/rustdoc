@@ -2,9 +2,9 @@ using ExportDocManager.Services.Errors;
 
 namespace ExportDocManager.Services.Data;
 
-internal static class ExcelAnalysisExecutionGate
+internal static class ExcelWorkbookProcessingGate
 {
-    internal const string ConcurrencyEnvironmentVariable = "EXPORTDOCMANAGER_EXCEL_ANALYSIS_CONCURRENCY";
+    internal const string ConcurrencyEnvironmentVariable = "EXPORTDOCMANAGER_EXCEL_PROCESSING_CONCURRENCY";
     private static readonly TimeSpan QueueTimeout = TimeSpan.FromSeconds(15);
     private static readonly SemaphoreSlim Gate = new(ResolveMaximumConcurrency());
 
@@ -19,13 +19,13 @@ internal static class ExcelAnalysisExecutionGate
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new ServiceBusyException("Excel 分析任务较多，请稍后重试。");
+            throw new ServiceBusyException("Excel 导入任务较多，请稍后重试。");
         }
     }
 
     private static int ResolveMaximumConcurrency()
     {
-        string configured = Environment.GetEnvironmentVariable(ConcurrencyEnvironmentVariable);
+        string? configured = Environment.GetEnvironmentVariable(ConcurrencyEnvironmentVariable);
         if (int.TryParse(configured, out int value))
         {
             return Math.Clamp(value, 1, 8);

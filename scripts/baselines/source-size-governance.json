@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-11",
+  "capturedAt": "2026-08-12",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -11,7 +11,7 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 118514,
+      "baselineAggregateLines": 118934,
       "maximumAggregateGrowthLines": 250,
       "maximumAggregateLines": 119500,
       "reportFiles": false
@@ -22,7 +22,7 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 77910,
+      "baselineAggregateLines": 77685,
       "maximumAggregateGrowthLines": 200,
       "maximumAggregateLines": 78500,
       "reportFiles": false
@@ -36,7 +36,7 @@
       ],
       "filePattern": "^.+\\.rs$",
       "maximumLines": 1000,
-      "baselineAggregateLines": 8986,
+      "baselineAggregateLines": 9044,
       "maximumAggregateGrowthLines": 75,
       "maximumAggregateLines": 9200,
       "reportFiles": false
@@ -46,7 +46,7 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 37418,
+      "baselineAggregateLines": 37572,
       "maximumAggregateGrowthLines": 150,
       "maximumAggregateLines": 38500,
       "reportFiles": false
@@ -56,7 +56,7 @@
       "directories": ["scripts", "deploy", ".github/workflows"],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 38058,
+      "baselineAggregateLines": 38681,
       "maximumAggregateGrowthLines": 150,
       "maximumAggregateLines": 39000,
       "reportFiles": false
@@ -66,9 +66,9 @@
       "directory": ".github/workflows",
       "filePattern": "^.+\\.(?:yml|yaml)$",
       "maximumLines": 800,
-      "baselineAggregateLines": 2459,
+      "baselineAggregateLines": 2737,
       "maximumAggregateGrowthLines": 20,
-      "maximumAggregateLines": 2550,
+      "maximumAggregateLines": 2800,
       "reportFiles": false
     },
     {
@@ -241,6 +241,27 @@
       "filePattern": "^(?:ReportTemplateDesignerPage|useReportTemplateEditingActions)\\.(?:tsx|ts)$",
       "maximumLines": 830,
       "maximumAggregateLines": 1050
+    },
+    {
+      "name": "report template management composition",
+      "directory": "apps/export-doc-web/src/features/reports",
+      "filePattern": "^ReportTemplate(?:DesignerPage|ManagementSidebar)\\.tsx$",
+      "maximumLines": 830,
+      "maximumAggregateLines": 900
+    },
+    {
+      "name": "customs COO workspace components",
+      "directory": "apps/export-doc-web/src/features/single-window",
+      "filePattern": "^(?:CustomsCoo|customsCoo|useCustomsCoo).+\\.(?:tsx|ts)$",
+      "maximumLines": 780,
+      "maximumAggregateLines": 3350
+    },
+    {
+      "name": "container packing workspace components",
+      "directory": "apps/export-doc-web/src/features/tools/container-packing",
+      "filePattern": "^(?:ContainerPacking|containerPacking|useContainerPacking).+\\.(?:tsx|ts)$",
+      "maximumLines": 700,
+      "maximumAggregateLines": 4500
     },
     {
       "name": "single-window reference catalog components",

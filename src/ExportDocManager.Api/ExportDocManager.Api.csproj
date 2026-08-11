@@ -9,6 +9,7 @@
     <ExportDocIncludeTemplates Condition="'$(ExportDocIncludeTemplates)' == ''">true</ExportDocIncludeTemplates>
     <ExportDocIncludeOcrModels Condition="'$(ExportDocIncludeOcrModels)' == ''">true</ExportDocIncludeOcrModels>
     <ExportDocIncludeBusinessResources Condition="'$(ExportDocIncludeBusinessResources)' == ''">true</ExportDocIncludeBusinessResources>
+    <ExportDocIncludePlaywrightRuntime Condition="'$(ExportDocIncludePlaywrightRuntime)' == ''">true</ExportDocIncludePlaywrightRuntime>
     <ExportDocIncludeBundledBrowser Condition="'$(ExportDocIncludeBundledBrowser)' == '' and '$(ExportDocPackageProfile)' == 'Container'">false</ExportDocIncludeBundledBrowser>
     <ExportDocIncludeBundledBrowser Condition="'$(ExportDocIncludeBundledBrowser)' == ''">true</ExportDocIncludeBundledBrowser>
   </PropertyGroup>
@@ -66,8 +67,21 @@
       <_PlaywrightDeveloperUiPayload Include="$(PublishDir).playwright/package/lib/vite/dashboard" />
       <_PlaywrightDeveloperUiPayload Include="$(PublishDir).playwright/package/lib/vite/recorder" />
       <_PlaywrightDeveloperUiPayload Include="$(PublishDir).playwright/package/lib/vite/traceViewer" />
+      <_PlaywrightDeveloperScript Include="$(PublishDir)playwright.ps1;$(PublishDir)playwright.cmd;$(PublishDir)playwright.sh" />
     </ItemGroup>
     <RemoveDir Directories="@(_PlaywrightDeveloperUiPayload)" />
+    <Delete Files="@(_PlaywrightDeveloperScript)" />
+  </Target>
+
+  <Target Name="RemoveOptionalPlaywrightRuntime" AfterTargets="Publish" Condition="'$(PublishDir)' != '' and '$(ExportDocIncludePlaywrightRuntime)' != 'true'">
+    <RemoveDir Directories="$(PublishDir).playwright" />
+  </Target>
+
+  <Target Name="RemoveOptionalOcrRuntime" AfterTargets="Publish" Condition="'$(PublishDir)' != '' and '$(ExportDocIncludeOcrRuntime)' != 'true'">
+    <ItemGroup>
+      <_OptionalOcrRuntime Include="$(PublishDir)onnxruntime.dll;$(PublishDir)libonnxruntime.so;$(PublishDir)libonnxruntime.dylib" />
+    </ItemGroup>
+    <Delete Files="@(_OptionalOcrRuntime)" />
   </Target>
 
 </Project>

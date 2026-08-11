@@ -31,14 +31,15 @@ Docker 镜像和构建缓存由 Docker Engine 的全局 `data-root` 管理，不
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sck03/rustdoc/main/deploy/container/install-container.sh |
-  sudo bash -s -- --mode http --tag 0.1.2
+  sudo bash -s -- --mode http --tag 0.1.2 --revision 完整40位提交SHA
 ```
 
 访问：`http://127.0.0.1:8080`。需要在可信办公网/VPN 提供 HTTP 时，显式设置绑定地址；若要在 HTTP 上进行敏感恢复，还必须显式开启灾备开关：
 
 ```bash
 sudo /opt/export-doc-manager/install-container.sh \
-  --mode http --tag 0.1.2 --web-bind-address 0.0.0.0 \
+  --mode http --tag 0.1.2 --revision 完整40位提交SHA \
+  --web-bind-address 0.0.0.0 \
   --allow-insecure-disaster-recovery
 ```
 
@@ -54,10 +55,11 @@ curl -fsSL https://raw.githubusercontent.com/sck03/rustdoc/main/deploy/container
     --mode https \
     --domain docs.example.com \
     --email ops@example.com \
-    --tag 0.1.2
+    --tag 0.1.2 \
+    --revision 完整40位提交SHA
 ```
 
-把 `0.1.2` 换成 GHCR 中实际发布的精确版本。安装器拒绝可变的 `latest` 标签，也不执行联网下载后直接运行的 Docker 安装脚本；请先通过 Linux 发行版或 Docker 官方签名软件源安装并启动 Docker Engine 与 Compose v2。
+把 `0.1.2` 和 revision 换成同一次 `container-images.yml` 发布生成的不可变容器清单值。安装器拒绝可变的 `latest` 标签，并在拉取后核验 API、Browser、Web 三个镜像的 `org.opencontainers.image.revision` 必须完全一致；也不执行联网下载后直接运行的 Docker 安装脚本，请先通过 Linux 发行版或 Docker 官方签名软件源安装并启动 Docker Engine 与 Compose v2。
 
 安装器不会修改 UFW、云安全组、DNS 或 Docker Engine 全局配置。内网 HTTP 会明文传输登录和业务数据，不能直接暴露到公网。
 
@@ -82,7 +84,8 @@ sudo env \
   GHCR_TOKEN='只读Packages令牌' \
   /opt/export-doc-manager/install-container.sh \
     --mode http \
-    --tag 0.1.3
+    --tag 0.1.3 \
+    --revision 完整40位提交SHA
 ```
 
 Token 只通过进程环境传入，不写入安装参数或 `.env`。
@@ -127,7 +130,7 @@ HTTPS 证书续期日志：
 cd /opt/export-doc-manager
 MODE=$(sed -n 's/^EXPORTDOCMANAGER_DEPLOYMENT_MODE=//p' .env)
 
-./install-container.sh --mode "$MODE" --tag 0.1.3
+./install-container.sh --mode "$MODE" --tag 0.1.3 --revision 完整40位提交SHA
 ```
 
 安装器会保留 `.env`、数据库、API DataRoot 和证书。安装根、运行根和关键子目录必须是真实非根目录，不能经过符号链接；部署根会收紧为 root `700`。新部署资产会先完整下载到安装目录内的临时 staging，对两份 Compose、Nginx、`postgres-init-roles.sh` 和安装器自身五项资产逐项核对 `deployment-assets.sha256`，再校验安装器/角色脚本语法及 HTTP/HTTPS Compose 双模式后原子替换；锁文件、环境更新、资产激活和首次令牌标记均拒绝链接或使用 `mktemp`。Compose 校验、镜像拉取、证书申请、容器启动或就绪检查任一步失败时，会恢复旧 `.env`、旧部署文件和本次可能改写的 Let's Encrypt 状态，并用 `--force-recreate` 重新创建原 HTTP/HTTPS 容器，确保恢复后的证书目录和配置重新挂载。`--no-start` 成功时只保留已校验的新文件，不改变容器。

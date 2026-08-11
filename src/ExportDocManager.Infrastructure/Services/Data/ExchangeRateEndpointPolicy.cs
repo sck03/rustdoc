@@ -61,13 +61,30 @@ public static class ExchangeRateEndpointPolicy
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
-        DnsEndPoint target = context.DnsEndPoint;
+        return await ConnectPublicHostTransportAsync(
+                context.DnsEndPoint,
+                static (host, token) => Dns.GetHostAddressesAsync(host, token),
+                ConnectSocketAsync,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    internal static async ValueTask<Stream> ConnectPublicHostTransportAsync(
+        DnsEndPoint target,
+        Func<string, CancellationToken, Task<IPAddress[]>> resolveHostAsync,
+        Func<IPAddress, int, CancellationToken, ValueTask<Stream>> connectAsync,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(resolveHostAsync);
+        ArgumentNullException.ThrowIfNull(connectAsync);
+
         IPAddress[] addresses;
         try
         {
             addresses = await ResolvePublicAddressesAsync(
                     target.Host,
-                    static (host, token) => Dns.GetHostAddressesAsync(host, token),
+                    resolveHostAsync,
                     cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -79,33 +96,45 @@ public static class ExchangeRateEndpointPolicy
         Exception lastError = null;
         foreach (IPAddress address in addresses)
         {
-            var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
-            {
-                NoDelay = true
-            };
             try
             {
-                await socket.ConnectAsync(
-                        new IPEndPoint(address, target.Port),
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                return new NetworkStream(socket, ownsSocket: true);
+                return await connectAsync(address, target.Port, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
-                socket.Dispose();
                 throw;
             }
             catch (SocketException ex)
             {
                 lastError = ex;
-                socket.Dispose();
             }
         }
 
         throw new HttpRequestException(
             $"无法连接汇率源主机“{target.Host}”。",
             lastError);
+    }
+
+    private static async ValueTask<Stream> ConnectSocketAsync(
+        IPAddress address,
+        int port,
+        CancellationToken cancellationToken)
+    {
+        var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+        {
+            NoDelay = true
+        };
+        try
+        {
+            await socket.ConnectAsync(new IPEndPoint(address, port), cancellationToken)
+                .ConfigureAwait(false);
+            return new NetworkStream(socket, ownsSocket: true);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
     }
 
     public static bool IsDisallowedAddress(IPAddress address)

@@ -2,13 +2,11 @@
 param(
     [string]$CargoTargetDir,
     [string]$LicenseCargoTargetDir,
-    [string]$ExcelAnalyzerCargoTargetDir,
     [string]$OutputDir,
     [string]$LicenseOutputDir,
     [ValidateSet("Document", "Sales", "Full")]
     [string]$ProductEdition = "Full",
-    [switch]$IncludeLicenseKeygen,
-    [switch]$SkipExcelAnalyzer
+    [switch]$IncludeLicenseKeygen
 )
 
 $ErrorActionPreference = "Stop"
@@ -316,17 +314,12 @@ if ([string]::IsNullOrWhiteSpace($LicenseCargoTargetDir)) {
     $LicenseCargoTargetDir = Join-Path $artifactsRoot "cargo-target-license-keygen"
 }
 
-if ([string]::IsNullOrWhiteSpace($ExcelAnalyzerCargoTargetDir)) {
-    $ExcelAnalyzerCargoTargetDir = Join-Path $artifactsRoot "cargo-target-excel-analyzer"
-}
-
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     $OutputDir = Join-Path $artifactsRoot "windows-desktop-run\ExportDocManager"
 }
 
 $resolvedCargoTargetDir = Resolve-FullPath -Path $CargoTargetDir
 $resolvedLicenseCargoTargetDir = if ($IncludeLicenseKeygen) { Resolve-FullPath -Path $LicenseCargoTargetDir } else { $null }
-$resolvedExcelAnalyzerCargoTargetDir = Resolve-FullPath -Path $ExcelAnalyzerCargoTargetDir
 $resolvedOutputDir = Assert-Inside -Path $OutputDir -Root $artifactsRoot -Purpose "Windows desktop run output"
 if ($IncludeLicenseKeygen -and [string]::IsNullOrWhiteSpace($LicenseOutputDir)) {
     $LicenseOutputDir = Join-Path (Split-Path -Parent $resolvedOutputDir) "KEY"
@@ -341,9 +334,23 @@ if ($IncludeLicenseKeygen) {
 $resourcesRoot = Join-Path $artifactsRoot "tauri-bundle\resources"
 $mainExe = Join-Path $resolvedCargoTargetDir "release\export-doc-tauri.exe"
 $licenseExe = if ($IncludeLicenseKeygen) { Join-Path $resolvedLicenseCargoTargetDir "release\export-doc-license-keygen-tauri.exe" } else { $null }
-$excelAnalyzerExe = Join-Path $resolvedExcelAnalyzerCargoTargetDir "release\exportdoc-excel-analyzer.exe"
 $mainWebView2Loader = Join-Path $resourcesRoot "WebView2Loader.dll"
 $licenseWebView2Loader = if ($IncludeLicenseKeygen) { Join-Path $resolvedLicenseCargoTargetDir "release\WebView2Loader.dll" } else { $null }
+$sourceEditionManifestPath = Join-Path $resourcesRoot "product-edition.json"
+if (-not (Test-Path -LiteralPath $sourceEditionManifestPath -PathType Leaf)) {
+    throw "Tauri bundle product edition manifest was not found: $sourceEditionManifestPath"
+}
+$sourceEditionManifest = Get-Content -LiteralPath $sourceEditionManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+if ([string]$sourceEditionManifest.edition -ne $ProductEdition) {
+    throw "Tauri bundle edition mismatch. Expected '$ProductEdition', got '$($sourceEditionManifest.edition)'."
+}
+foreach ($profileKey in @("browserRenderer", "ocr", "documentResources", "excelAnalyzer")) {
+    $profileProperty = $sourceEditionManifest.resourceProfile.PSObject.Properties[$profileKey]
+    if ($null -eq $profileProperty -or $profileProperty.Value -isnot [bool]) {
+        throw "Tauri bundle edition $ProductEdition has an invalid resource profile '$profileKey'."
+    }
+}
+$resourceProfile = $sourceEditionManifest.resourceProfile
 
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
 
@@ -365,28 +372,6 @@ foreach ($runtimeEntryName in @("App_Data", "logs")) {
 
 Copy-RequiredFile -Source $mainExe -Destination (Join-Path $resolvedOutputDir "ExportDocManager.exe")
 
-$versionManifestPath = Join-Path $repoRoot "version.json"
-$productVersion = ""
-if (Test-Path -LiteralPath $versionManifestPath -PathType Leaf) {
-    $versionManifest = Get-Content -LiteralPath $versionManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    $productVersion = [string]$versionManifest.version
-}
-$editionMetadata = switch ($ProductEdition) {
-    "Document" { @{ displayName = "单证员版"; workspaces = @("document") } }
-    "Sales" { @{ displayName = "业务员版"; workspaces = @("sales") } }
-    default { @{ displayName = "全功能版"; workspaces = @("document", "sales") } }
-}
-[ordered]@{
-    schemaVersion = 1
-    product = "ExportDocManager"
-    productVersion = $productVersion
-    edition = $ProductEdition
-    displayName = $editionMetadata.displayName
-    enabledWorkspaces = $editionMetadata.workspaces
-    generatedAt = (Get-Date).ToUniversalTime().ToString("o")
-    runtimeDataPolicy = "Runtime business data defaults to App_Data beside this program directory."
-} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $resolvedOutputDir "product-edition.json") -Encoding UTF8
-
 [ordered]@{
     schemaVersion = 1
     mode = "portable"
@@ -394,8 +379,35 @@ $editionMetadata = switch ($ProductEdition) {
     storagePolicy = "Runtime business data stays beside the portable executable and is never redirected to AppData or ProgramData."
 } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $resolvedOutputDir "portable-runtime.json") -Encoding UTF8
 
-foreach ($entryName in @("sidecar", "Templates", "Resources", "OcrModels", "Browsers", "Legal", "runtime-layout.json", "WebView2Loader.dll")) {
+$includedEntries = @(
+    "sidecar",
+    "Legal",
+    "runtime-layout.json",
+    "product-edition.json",
+    "WebView2Loader.dll"
+)
+if ([bool]$resourceProfile.documentResources) {
+    $includedEntries += @("Templates", "Resources")
+}
+if ([bool]$resourceProfile.ocr) {
+    $includedEntries += "OcrModels"
+}
+if ([bool]$resourceProfile.browserRenderer) {
+    $includedEntries += "Browsers"
+}
+if ([bool]$resourceProfile.excelAnalyzer) {
+    $includedEntries += "Tools"
+}
+
+foreach ($entryName in @("sidecar", "Templates", "Resources", "OcrModels", "Browsers", "Tools", "Legal", "runtime-layout.json", "product-edition.json", "WebView2Loader.dll")) {
     $entryDestination = Join-Path $resolvedOutputDir $entryName
+    if (Test-Path -LiteralPath $entryDestination) {
+        Remove-GeneratedEntry -Path $entryDestination -Root $resolvedOutputDir -Purpose "stale packaged $entryName entry" -QuarantineRoot $cleanupQuarantineRoot
+    }
+
+    if ($entryName -notin $includedEntries) {
+        continue
+    }
 
     if ($entryName -eq "Browsers") {
         Copy-BrowserRuntimeResources -Source (Join-Path $resourcesRoot $entryName) -Destination $entryDestination -OutputRoot $resolvedOutputDir
@@ -403,31 +415,19 @@ foreach ($entryName in @("sidecar", "Templates", "Resources", "OcrModels", "Brow
     }
 
     $entrySource = Join-Path $resourcesRoot $entryName
-    if (Test-Path -LiteralPath $entryDestination) {
-        Remove-GeneratedEntry -Path $entryDestination -Root $resolvedOutputDir -Purpose "stale packaged $entryName entry" -QuarantineRoot $cleanupQuarantineRoot
-    }
-
     Copy-RequiredEntry -Source $entrySource -Destination $entryDestination
 }
 
 $toolsDir = Join-Path $resolvedOutputDir "Tools"
-New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null
-Remove-GeneratedEntry -Path (Join-Path $toolsDir "ExportDocLicenseKeyGen.exe") -Root $resolvedOutputDir -Purpose "stale packaged license key generator" -QuarantineRoot $cleanupQuarantineRoot
-Remove-GeneratedEntry -Path (Join-Path $toolsDir "WebView2Loader.dll") -Root $resolvedOutputDir -Purpose "stale packaged license key generator WebView2 loader" -QuarantineRoot $cleanupQuarantineRoot
+if (Test-Path -LiteralPath $toolsDir -PathType Container) {
+    Remove-GeneratedEntry -Path (Join-Path $toolsDir "ExportDocLicenseKeyGen.exe") -Root $resolvedOutputDir -Purpose "stale packaged license key generator" -QuarantineRoot $cleanupQuarantineRoot
+    Remove-GeneratedEntry -Path (Join-Path $toolsDir "WebView2Loader.dll") -Root $resolvedOutputDir -Purpose "stale packaged license key generator WebView2 loader" -QuarantineRoot $cleanupQuarantineRoot
+}
 
 if ($IncludeLicenseKeygen) {
     Remove-GeneratedEntry -Path $resolvedLicenseOutputDir -Root $artifactsRoot -Purpose "stale internal license key generator output" -QuarantineRoot $cleanupQuarantineRoot
     New-Item -ItemType Directory -Path $resolvedLicenseOutputDir -Force | Out-Null
     Copy-RequiredFile -Source $licenseExe -Destination (Join-Path $resolvedLicenseOutputDir "ExportDocLicenseKeyGen.exe")
-}
-$packagedExcelAnalyzer = Join-Path $toolsDir "exportdoc-excel-analyzer.exe"
-if ($SkipExcelAnalyzer) {
-    Remove-GeneratedEntry -Path $packagedExcelAnalyzer -Root $resolvedOutputDir -Purpose "optional external Excel analyzer" -QuarantineRoot $cleanupQuarantineRoot
-    Write-Host "External Rust Excel analyzer skipped; the API sidecar will use the built-in .NET module."
-} elseif (Test-Path -LiteralPath $excelAnalyzerExe -PathType Leaf) {
-    Copy-RequiredFile -Source $excelAnalyzerExe -Destination (Join-Path $toolsDir "exportdoc-excel-analyzer.exe")
-} else {
-    Write-Warning "Rust Excel analyzer was not found at $excelAnalyzerExe. The API sidecar will use the built-in .NET module."
 }
 
 if ($IncludeLicenseKeygen) {
@@ -450,7 +450,7 @@ if ($IncludeLicenseKeygen) {
     Write-Host "License key generator:"
     Write-Host "  $(Join-Path $resolvedLicenseOutputDir "ExportDocLicenseKeyGen.exe")"
 }
-if (-not $SkipExcelAnalyzer) {
+if ([bool]$resourceProfile.excelAnalyzer) {
     Write-Host "Rust Excel analyzer:"
     Write-Host "  $(Join-Path $toolsDir "exportdoc-excel-analyzer.exe")"
 }

@@ -18,17 +18,16 @@ import {
   getReportDesignerPreviewSampleProfiles,
   type ReportDesignerPreviewSampleProfile,
 } from "../report-designer/reportDesignerPreviewSamples.ts";
-import { ReportTemplatePackagePanel } from "./ReportTemplatePackagePanel.tsx";
 import { ReportTemplatePreviewWorkspace } from "./ReportTemplatePreviewWorkspace.tsx";
 import { ReportTemplateWorkspaceHeader } from "./ReportTemplateWorkspaceHeader.tsx";
-import { ReportTemplateAdminPanel } from "./ReportTemplateAdminPanel.tsx";
 import { ReportTemplateSelectionPanel } from "./ReportTemplateSelectionPanel.tsx";
 import { useReportTemplateSelectionSync } from "./useReportTemplateSelectionSync.ts";
 import { deriveReportTemplateFeedback, deriveReportTemplateWorkspaceState } from "./reportTemplateWorkspaceState.ts";
 import { ReportTemplateDesignWorkspace } from "./ReportTemplateDesignWorkspace.tsx";
 import { useReportTemplateSelectionActions } from "./useReportTemplateSelectionActions.ts";
 import { ReportTemplateFeedback } from "./ReportTemplateFeedback.tsx";
-import { ReportTemplateUserPanel, reportTemplateShareScopeLabel } from "./ReportTemplateUserPanel.tsx";
+import { reportTemplateShareScopeLabel } from "./ReportTemplateUserPanel.tsx";
+import { ReportTemplateManagementSidebar } from "./ReportTemplateManagementSidebar.tsx";
 import { useReportTemplateWorkspaceQueries } from "./useReportTemplateWorkspaceQueries.ts";
 import { useReportTemplateSaveMutations } from "./useReportTemplateSaveMutations.ts";
 import { useUserReportTemplateLifecycleMutations } from "./useUserReportTemplateLifecycleMutations.ts";
@@ -564,6 +563,32 @@ export function ReportTemplateDesignerPage({
     }
   }
 
+  async function handleToggleUserTemplateActive() {
+    if (!currentUserTemplate) {
+      return;
+    }
+
+    const action = currentUserTemplate.isActive ? "停用" : "重新启用";
+    if (await requestConfirmation({
+      title: `${action}模板`,
+      description: `确定${action}“${currentUserTemplate.name}”吗？`,
+      confirmLabel: `确认${action}`,
+    })) {
+      updateUserTemplateStatusMutation.mutate({ isActive: !currentUserTemplate.isActive });
+    }
+  }
+
+  async function handleRestoreUserTemplateVersion(versionNumber: number) {
+    if (await requestConfirmation({
+      title: `恢复到 V${versionNumber}`,
+      description: `确定恢复到 V${versionNumber} 吗？`,
+      details: ["当前未保存修改将被替换。", "现有历史版本仍会保留。"],
+      confirmLabel: "确认恢复",
+    })) {
+      restoreUserTemplateVersionMutation.mutate(versionNumber);
+    }
+  }
+
   async function handleRenameTemplate() {
     if (!canRenameTemplate) {
       return;
@@ -617,6 +642,19 @@ export function ReportTemplateDesignerPage({
     await Promise.all([templatesQuery.refetch(), userTemplatesQuery.refetch()]);
   }
 
+  const selectionPanelProps = {
+    reportType,
+    reportTypeOptions: availableReportTypeOptions,
+    templates,
+    userTemplates,
+    selectedTemplatePath,
+    selectedUserTemplateId,
+    isBusy,
+    onReportTypeChange: handleReportTypeChange,
+    onTemplateChange: handleTemplateChange,
+    onUserTemplateChange: handleUserTemplateChange,
+  };
+
   return (
     <section className="editor-surface report-template-surface" aria-label="报表模板设计">
       <form className="report-template-layout" onSubmit={handleSave} onKeyDownCapture={handleEnterAsTabFormKeyDown}>
@@ -644,18 +682,7 @@ export function ReportTemplateDesignerPage({
 
         {isLimitedReportView ? (
           <div className="report-template-mobile-selection">
-            <ReportTemplateSelectionPanel
-              reportType={reportType}
-              reportTypeOptions={availableReportTypeOptions}
-              templates={templates}
-              userTemplates={userTemplates}
-              selectedTemplatePath={selectedTemplatePath}
-              selectedUserTemplateId={selectedUserTemplateId}
-              isBusy={isBusy}
-              onReportTypeChange={handleReportTypeChange}
-              onTemplateChange={handleTemplateChange}
-              onUserTemplateChange={handleUserTemplateChange}
-            />
+            <ReportTemplateSelectionPanel {...selectionPanelProps} />
           </div>
         ) : null}
 
@@ -663,103 +690,74 @@ export function ReportTemplateDesignerPage({
 
         {workspaceMode === "design" ? (
         <div className={`report-template-grid report-template-grid-design report-template-grid-${designerMode}`}>
-          <aside className="report-template-sidebar">
-            <ReportTemplateSelectionPanel
-              reportType={reportType}
-              reportTypeOptions={availableReportTypeOptions}
-              templates={templates}
-              userTemplates={userTemplates}
-              selectedTemplatePath={selectedTemplatePath}
-              selectedUserTemplateId={selectedUserTemplateId}
-              isBusy={isBusy}
-              onReportTypeChange={handleReportTypeChange}
-              onTemplateChange={handleTemplateChange}
-              onUserTemplateChange={handleUserTemplateChange}
-            />
-            {canDesignTemplates ? (
-              <ReportTemplateUserPanel
-                currentTemplate={currentUserTemplate}
-                versions={userTemplateVersionsQuery.data ?? []}
-                versionsLoading={userTemplateVersionsQuery.isFetching}
-                newTemplateName={newUserTemplateName}
-                newTemplateShareScope={newUserTemplateShareScope}
-                isBusy={isBusy}
-                canCreate={canCreateUserTemplate}
-                isUserTemplate={isUserTemplate}
-                onNewTemplateNameChange={setNewUserTemplateName}
-                onNewTemplateShareScopeChange={setNewUserTemplateShareScope}
-                onCreate={handleCreateUserTemplate}
-                onShareScopeChange={(shareScope) => updateUserTemplateStatusMutation.mutate({ shareScope })}
-                onToggleActive={async () => {
-                  if (!currentUserTemplate) {
-                    return;
-                  }
-
-                  const action = currentUserTemplate.isActive ? "停用" : "重新启用";
-                  if (await requestConfirmation({ title: `${action}模板`, description: `确定${action}“${currentUserTemplate.name}”吗？`, confirmLabel: `确认${action}` })) {
-                    updateUserTemplateStatusMutation.mutate({ isActive: !currentUserTemplate.isActive });
-                  }
-                }}
-                onRestoreVersion={async (versionNumber) => {
-                  if (await requestConfirmation({ title: `恢复到 V${versionNumber}`, description: `确定恢复到 V${versionNumber} 吗？`, details: ["当前未保存修改将被替换。", "现有历史版本仍会保留。"], confirmLabel: "确认恢复" })) {
-                    restoreUserTemplateVersionMutation.mutate(versionNumber);
-                  }
-                }}
-              />
-            ) : null}
-            <ReportTemplateAdminPanel
-              currentTemplateLabel={
-                currentUserTemplate?.name || (selectedTemplatePath ? fileNameFromPath(selectedTemplatePath) : "未选择模板")
-              }
-              newTemplateFileName={newTemplateFileName}
-              newTemplateDisplayName={newTemplateDisplayName}
-              renameTemplateFileName={renameTemplateFileName}
-              renameLabel={isUserTemplate ? "模板名称" : "新文件名"}
-              canManageTemplates={canManageTemplates}
-              canCreate={canCreateTemplate}
-              canRename={canRenameTemplate}
-              canDelete={canDeleteTemplate}
-              canEditRename={
-                isUserTemplate
-                  ? Boolean(currentUserTemplate?.canEdit) && canDesignTemplates && !isBusy
-                  : canManageTemplates && Boolean(selectedTemplatePath) && !isBusy
-              }
-              isBusy={isBusy}
-              onNewTemplateFileNameChange={setNewTemplateFileName}
-              onNewTemplateDisplayNameChange={setNewTemplateDisplayName}
-              onRenameTemplateFileNameChange={setRenameTemplateFileName}
-              onCreate={handleCreateTemplate}
-              onRename={handleRenameTemplate}
-              onDelete={handleDeleteTemplate}
-            />
-            <ReportTemplatePackagePanel
-              desktopAvailable={packageWorkspace.desktopAvailable}
-              canManageTemplates={canManageTemplates}
-              isBusy={isBusy}
-              importStrategy={packageWorkspace.importStrategy}
-              exportPath={packageWorkspace.exportPath}
-              importPath={packageWorkspace.importPath}
-              uploadInputRef={packageWorkspace.uploadInputRef}
-              canExport={canExportPackage}
-              canExportByPath={canExportPackageByPath}
-              canDownload={canDownloadPackage}
-              canImport={canImportPackage}
-              canImportByPath={canImportPackageByPath}
-              canUpload={canUploadPackage}
-              onImportStrategyChange={packageWorkspace.setImportStrategy}
-              onExport={() => packageWorkspace.exportPackage(canExportPackage)}
-              onExportByPath={() => packageWorkspace.exportByPath(canExportPackageByPath)}
-              onDownload={() => packageWorkspace.downloadPackage(canDownloadPackage)}
-              onImport={() => packageWorkspace.importPackage(canImportPackage, hasUnsavedChanges)}
-              onImportByPath={() => packageWorkspace.importByPath(canImportPackageByPath, hasUnsavedChanges)}
-              onUpload={() => packageWorkspace.chooseUpload(canUploadPackage)}
-              onUploadFileChange={(event) => packageWorkspace.uploadFile(event, canUploadPackage, hasUnsavedChanges)}
-              onExportPathChange={packageWorkspace.setExportPath}
-              onImportPathChange={packageWorkspace.setImportPath}
-              onChooseExportPath={packageWorkspace.chooseExportPath}
-              onChooseImportPath={packageWorkspace.chooseImportPath}
-            />
-          </aside>
+          <ReportTemplateManagementSidebar
+            selectionPanel={selectionPanelProps}
+            userPanel={canDesignTemplates ? {
+              currentTemplate: currentUserTemplate,
+              versions: userTemplateVersionsQuery.data ?? [],
+              versionsLoading: userTemplateVersionsQuery.isFetching,
+              newTemplateName: newUserTemplateName,
+              newTemplateShareScope: newUserTemplateShareScope,
+              isBusy,
+              canCreate: canCreateUserTemplate,
+              isUserTemplate,
+              onNewTemplateNameChange: setNewUserTemplateName,
+              onNewTemplateShareScopeChange: setNewUserTemplateShareScope,
+              onCreate: handleCreateUserTemplate,
+              onShareScopeChange: (shareScope) => updateUserTemplateStatusMutation.mutate({ shareScope }),
+              onToggleActive: handleToggleUserTemplateActive,
+              onRestoreVersion: handleRestoreUserTemplateVersion,
+            } : null}
+            adminPanel={{
+              currentTemplateLabel: currentUserTemplate?.name
+                || (selectedTemplatePath ? fileNameFromPath(selectedTemplatePath) : "未选择模板"),
+              newTemplateFileName,
+              newTemplateDisplayName,
+              renameTemplateFileName,
+              renameLabel: isUserTemplate ? "模板名称" : "新文件名",
+              canManageTemplates,
+              canCreate: canCreateTemplate,
+              canRename: canRenameTemplate,
+              canDelete: canDeleteTemplate,
+              canEditRename: isUserTemplate
+                ? Boolean(currentUserTemplate?.canEdit) && canDesignTemplates && !isBusy
+                : canManageTemplates && Boolean(selectedTemplatePath) && !isBusy,
+              isBusy,
+              onNewTemplateFileNameChange: setNewTemplateFileName,
+              onNewTemplateDisplayNameChange: setNewTemplateDisplayName,
+              onRenameTemplateFileNameChange: setRenameTemplateFileName,
+              onCreate: handleCreateTemplate,
+              onRename: handleRenameTemplate,
+              onDelete: handleDeleteTemplate,
+            }}
+            packagePanel={{
+              desktopAvailable: packageWorkspace.desktopAvailable,
+              canManageTemplates,
+              isBusy,
+              importStrategy: packageWorkspace.importStrategy,
+              exportPath: packageWorkspace.exportPath,
+              importPath: packageWorkspace.importPath,
+              uploadInputRef: packageWorkspace.uploadInputRef,
+              canExport: canExportPackage,
+              canExportByPath: canExportPackageByPath,
+              canDownload: canDownloadPackage,
+              canImport: canImportPackage,
+              canImportByPath: canImportPackageByPath,
+              canUpload: canUploadPackage,
+              onImportStrategyChange: packageWorkspace.setImportStrategy,
+              onExport: () => packageWorkspace.exportPackage(canExportPackage),
+              onExportByPath: () => packageWorkspace.exportByPath(canExportPackageByPath),
+              onDownload: () => packageWorkspace.downloadPackage(canDownloadPackage),
+              onImport: () => packageWorkspace.importPackage(canImportPackage, hasUnsavedChanges),
+              onImportByPath: () => packageWorkspace.importByPath(canImportPackageByPath, hasUnsavedChanges),
+              onUpload: () => packageWorkspace.chooseUpload(canUploadPackage),
+              onUploadFileChange: (event) => packageWorkspace.uploadFile(event, canUploadPackage, hasUnsavedChanges),
+              onExportPathChange: packageWorkspace.setExportPath,
+              onImportPathChange: packageWorkspace.setImportPath,
+              onChooseExportPath: packageWorkspace.chooseExportPath,
+              onChooseImportPath: packageWorkspace.chooseImportPath,
+            }}
+          />
 
           <ReportTemplateDesignWorkspace
             designerMode={designerMode}

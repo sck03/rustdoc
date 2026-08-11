@@ -61,16 +61,55 @@ for (const requiredWorkflowContract of [
 ]) {
   assert.ok(releaseWorkflow.includes(requiredWorkflowContract), `desktop release workflow is missing ${requiredWorkflowContract}`);
 }
+for (const [edition, metadata] of editionEntries) {
+  assert.equal(typeof metadata.resourceProfile?.browserRenderer, "boolean", `${edition} browser resource capability is missing`);
+  assert.equal(typeof metadata.resourceProfile?.ocr, "boolean", `${edition} OCR resource capability is missing`);
+  assert.equal(typeof metadata.resourceProfile?.documentResources, "boolean", `${edition} document resource capability is missing`);
+  assert.equal(typeof metadata.resourceProfile?.excelAnalyzer, "boolean", `${edition} Excel analyzer capability is missing`);
+}
+assert.deepEqual(editionCatalog.editions.Sales.resourceProfile, {
+  browserRenderer: false,
+  ocr: false,
+  documentResources: false,
+  excelAnalyzer: false,
+});
 for (const requiredPortableContract of [
   "smoke-tauri-desktop.ps1",
-  "-UseDefaultAppRoot",
-  "-UsePortableDataRoot",
+  "UsePortableDataRoot = $true",
+  "$smokeArguments.UseDefaultAppRoot = $true",
+  "PortableRoot = $portableRoot",
+  "Resolve-MacOsBundleExecutable",
+  "bundledReportBrowser = [bool]$editionMetadata.resourceProfile.browserRenderer",
   "Remove-ExportDocDirectoryWithRetry",
   "Portable launch smoke data cleanup",
 ]) {
   assert.ok(portablePackager.includes(requiredPortableContract), `portable package script is missing ${requiredPortableContract}`);
 }
 assert.doesNotMatch(releaseWorkflow, /WINDOWS_SIGNING_CERTIFICATE|APPLE_CERTIFICATE/u, "commercial OS signing is not mandatory before commercial release");
+assert.doesNotMatch(
+  releaseWorkflow.match(/jobs:\s*[\s\S]*?steps:/u)?.[0] ?? "",
+  /TAURI_SIGNING_PRIVATE_KEY/u,
+  "updater private keys must not be exposed through the reusable job environment",
+);
+assert.match(
+  releaseWorkflow,
+  /name:\s*Build signed updater package[\s\S]*?env:[\s\S]*?TAURI_SIGNING_PRIVATE_KEY:/u,
+  "updater private keys must be scoped to the signed updater build step",
+);
+for (const callerName of [
+  "windows-desktop-package.yml",
+  "linux-desktop-package.yml",
+  "macos-desktop-package.yml",
+]) {
+  const caller = read(`.github/workflows/${callerName}`);
+  assert.doesNotMatch(caller, /secrets:\s*inherit/u, `${callerName} must explicitly pass updater secrets`);
+  assert.match(caller, /package:[\s\S]*?permissions:\s*\n\s*contents:\s*read/u);
+  const releasePermissions = caller.match(
+    /^  release:\s*\r?\n[\s\S]*?^    permissions:\s*\r?\n(?<permissions>(?:^      [a-z-]+:\s*[a-z]+\s*\r?\n)+)/mu,
+  )?.groups?.permissions ?? "";
+  assert.match(releasePermissions, /\s+actions:\s*read/u, `${callerName} release caller must pass actions: read`);
+  assert.match(releasePermissions, /\s+contents:\s*write/u, `${callerName} release caller must pass contents: write`);
+}
 assert.doesNotMatch(releaseWorkflow, /gh release upload[^\r\n]*--clobber/iu, "immutable desktop release assets must never be overwritten");
 assert.doesNotMatch(serverReleaseWorkflow, /gh release upload[^\r\n]*--clobber/iu, "immutable server release assets must never be overwritten");
 for (const signaturePattern of ["*-setup.exe.sig", "*.AppImage.sig", "*.app.tar.gz.sig"]) {

@@ -135,7 +135,33 @@ function Invoke-PayloadVerification {
     & (Join-Path $PSScriptRoot "verify-package-payload.ps1") `
         -PackageRoot $PayloadRoot `
         -Profile Desktop `
-        -RuntimeIdentifier $RuntimeIdentifier
+        -RuntimeIdentifier $RuntimeIdentifier `
+        -Edition $Edition
+}
+
+function Resolve-MacOsBundleExecutable {
+    param([Parameter(Mandatory = $true)][string]$AppBundle)
+
+    $infoPlist = Join-Path $AppBundle "Contents/Info.plist"
+    if (-not (Test-Path -LiteralPath $infoPlist -PathType Leaf)) {
+        throw "macOS portable app is missing Contents/Info.plist: $AppBundle"
+    }
+
+    $bundleExecutable = & /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" $infoPlist
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to read CFBundleExecutable from '$infoPlist'."
+    }
+
+    $executableName = ([string]($bundleExecutable | Select-Object -First 1)).Trim()
+    if ([string]::IsNullOrWhiteSpace($executableName)) {
+        throw "CFBundleExecutable is empty in '$infoPlist'."
+    }
+
+    $executablePath = Join-Path $AppBundle "Contents/MacOS/$executableName"
+    if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
+        throw "macOS portable executable was not found: $executablePath"
+    }
+    return $executablePath
 }
 
 $normalizedVersion = $Version.Trim().TrimStart("v", "V")
@@ -210,6 +236,8 @@ $releaseRoot = Join-Path (Join-Path $cargoTargetRoot $RustTarget) "release"
 $bundleRoot = Join-Path $releaseRoot "bundle"
 $entryPoint = ""
 $payloadVerificationRoot = $resourceRoot
+$launchExecutablePath = $null
+$portableRoot = $stagingRoot
 $archiveExtension = if ($Platform -eq "windows") { ".zip" } else { ".tar.gz" }
 
 switch ($Platform) {
@@ -222,6 +250,7 @@ switch ($Platform) {
         Copy-Item -LiteralPath $sourceExecutable -Destination (Join-Path $stagingRoot $entryPoint) -Force
         Copy-DirectoryContents -Source $resourceRoot -Destination $stagingRoot
         $payloadVerificationRoot = $stagingRoot
+        $launchExecutablePath = Join-Path $stagingRoot $entryPoint
     }
     "linux" {
         $appImageRoot = Join-Path $bundleRoot "appimage"
@@ -247,6 +276,11 @@ switch ($Platform) {
             throw "Expected exactly one runtime-layout.json inside the AppImage, found $($layoutManifests.Count)."
         }
         $payloadVerificationRoot = $layoutManifests[0].Directory.FullName
+        $launchExecutablePath = Join-Path (Join-Path $inspectionRoot "squashfs-root") "AppRun"
+        if (-not (Test-Path -LiteralPath $launchExecutablePath -PathType Leaf)) {
+            throw "Extracted Linux AppImage is missing AppRun: $launchExecutablePath"
+        }
+        Invoke-NativeCommand -Command "chmod" -Arguments @("+x", $launchExecutablePath)
     }
     "macos" {
         $macOsBundleRoot = Join-Path $bundleRoot "macos"
@@ -261,6 +295,7 @@ switch ($Platform) {
         if (-not (Test-Path -LiteralPath (Join-Path $payloadVerificationRoot "runtime-layout.json") -PathType Leaf)) {
             throw "macOS portable app is missing Contents/Resources/runtime-layout.json."
         }
+        $launchExecutablePath = Resolve-MacOsBundleExecutable -AppBundle $portableAppBundle
     }
 }
 
@@ -279,7 +314,7 @@ Copy-Item -LiteralPath $versionManifestPath -Destination (Join-Path $stagingRoot
     entryPoint = $entryPoint
     archiveFormat = $archiveExtension.TrimStart('.')
     selfContainedApi = $true
-    bundledReportBrowser = $true
+    bundledReportBrowser = [bool]$editionMetadata.resourceProfile.browserRenderer
     systemSigned = $false
     notarized = $false
     dataRoot = "App_Data"
@@ -304,22 +339,28 @@ ExportDocManager 绿色便携版
 "@ | Set-Content -LiteralPath (Join-Path $stagingRoot "PORTABLE_README.txt") -Encoding utf8
 
 Invoke-PayloadVerification -PayloadRoot $payloadVerificationRoot
-Remove-GeneratedPath -Path $inspectionRoot -Purpose "Portable inspection cleanup"
 
-if ($Platform -eq "windows" -and -not $SkipLaunchSmoke) {
+if (-not $SkipLaunchSmoke) {
     $portableDataRoot = Join-Path $stagingRoot "App_Data"
     try {
-        & (Join-Path $PSScriptRoot "smoke-tauri-desktop.ps1") `
-            -ExecutablePath (Join-Path $stagingRoot $entryPoint) `
-            -AppRoot $stagingRoot `
-            -UseDefaultAppRoot `
-            -UsePortableDataRoot `
-            -SkipVite `
-            -TimeoutSeconds 60
+        $smokeArguments = @{
+            ExecutablePath = $launchExecutablePath
+            AppRoot = $payloadVerificationRoot
+            PortableRoot = $portableRoot
+            UsePortableDataRoot = $true
+            SkipVite = $true
+            TimeoutSeconds = 60
+        }
+        if ($Platform -eq "windows") {
+            $smokeArguments.UseDefaultAppRoot = $true
+        }
+        & (Join-Path $PSScriptRoot "smoke-tauri-desktop.ps1") @smokeArguments
     } finally {
         Remove-GeneratedPath -Path $portableDataRoot -Purpose "Portable launch smoke data cleanup"
     }
 }
+
+Remove-GeneratedPath -Path $inspectionRoot -Purpose "Portable inspection cleanup"
 
 if (Test-Path -LiteralPath (Join-Path $stagingRoot "App_Data")) {
     throw "Portable release staging must not contain App_Data."

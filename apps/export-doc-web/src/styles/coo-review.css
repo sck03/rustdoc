@@ -32,9 +32,9 @@
   gap: 12px;
   min-width: 0;
   padding: 12px;
-  background: #fbfcfd;
-  border: 1px solid #d8e0e6;
-  border-radius: 8px;
+  background: var(--edm-surface-muted);
+  border: 1px solid var(--edm-line);
+  border-radius: var(--edm-radius-md);
 }
 
 .agent-consignment-card-header {

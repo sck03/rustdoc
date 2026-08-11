@@ -29,13 +29,14 @@
   </ItemGroup>
 
   <PropertyGroup>
+    <ExportDocIncludeOcrRuntime Condition="'$(ExportDocIncludeOcrRuntime)' == ''">true</ExportDocIncludeOcrRuntime>
     <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win-'))">onnxruntime.dll</_ExportDocOnnxRuntimeFile>
     <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('linux-'))">libonnxruntime.so</_ExportDocOnnxRuntimeFile>
     <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('osx-'))">libonnxruntime.dylib</_ExportDocOnnxRuntimeFile>
     <_ExportDocOnnxRuntimeSource Condition="'$(_ExportDocOnnxRuntimeFile)' != ''">$(PkgMicrosoft_ML_OnnxRuntime)\runtimes\$(RuntimeIdentifier)\native\$(_ExportDocOnnxRuntimeFile)</_ExportDocOnnxRuntimeSource>
   </PropertyGroup>
 
-  <ItemGroup Condition="Exists('$(_ExportDocOnnxRuntimeSource)')">
+  <ItemGroup Condition="'$(ExportDocIncludeOcrRuntime)' == 'true' and Exists('$(_ExportDocOnnxRuntimeSource)')">
     <None Include="$(_ExportDocOnnxRuntimeSource)" Link="$(_ExportDocOnnxRuntimeFile)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 

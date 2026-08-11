@@ -12,6 +12,7 @@ fi
 INSTALL_DIR=$DEFAULT_INSTALL_DIR
 IMAGE_NAMESPACE=""
 IMAGE_TAG=""
+IMAGE_REVISION=""
 WEB_PORT=""
 WEB_BIND_ADDRESS=""
 PUBLIC_DOMAIN=""
@@ -33,6 +34,7 @@ Usage:
 Options:
   --mode http|https          Internal HTTP or public Nginx + automatic HTTPS
   --tag TAG                  Required exact GHCR image tag (latest is rejected)
+  --revision SHA             Required 40-character source revision from the release manifest
   --image-namespace VALUE    Image namespace (default: ghcr.io/sck03)
   --install-dir PATH         Deployment and runtime root (default: /opt/export-doc-manager)
   --web-port PORT            Internal HTTP host port (default: 8080)
@@ -84,6 +86,7 @@ while (($# > 0)); do
   case "$1" in
     --mode) MODE=${2:?Missing value for --mode}; shift 2 ;;
     --tag) IMAGE_TAG=${2:?Missing value for --tag}; shift 2 ;;
+    --revision) IMAGE_REVISION=${2:?Missing value for --revision}; shift 2 ;;
     --image-namespace) IMAGE_NAMESPACE=${2:?Missing value for --image-namespace}; shift 2 ;;
     --install-dir) INSTALL_DIR=${2:?Missing value for --install-dir}; shift 2 ;;
     --web-port) WEB_PORT=${2:?Missing value for --web-port}; shift 2 ;;
@@ -318,6 +321,7 @@ EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_PASSWORD=staged-compose-validation-mainten
 EXPORTDOCMANAGER_BOOTSTRAP_TOKEN=staged-compose-validation-bootstrap-token
 EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/sck03
 EXPORTDOCMANAGER_IMAGE_TAG=validation
+EXPORTDOCMANAGER_IMAGE_REVISION=0000000000000000000000000000000000000000
 EXPORTDOCMANAGER_RUNTIME_ROOT=$INSTALL_DIR/.compose-validation-runtime
 EXPORTDOCMANAGER_WEB_PORT=18080
 EXPORTDOCMANAGER_WEB_BIND_ADDRESS=127.0.0.1
@@ -415,7 +419,9 @@ MODE=${MODE:-http}
 IMAGE_NAMESPACE=${IMAGE_NAMESPACE:-$(env_value EXPORTDOCMANAGER_IMAGE_NAMESPACE)}
 IMAGE_NAMESPACE=${IMAGE_NAMESPACE:-ghcr.io/sck03}
 IMAGE_TAG=${IMAGE_TAG:-$(env_value EXPORTDOCMANAGER_IMAGE_TAG)}
+IMAGE_REVISION=${IMAGE_REVISION:-$(env_value EXPORTDOCMANAGER_IMAGE_REVISION)}
 [[ -n "$IMAGE_TAG" ]] || fail "First installation requires --tag with an exact published image version."
+[[ -n "$IMAGE_REVISION" ]] || fail "First installation requires --revision from the immutable container release manifest."
 if [[ -z "$WEB_PORT" && "$MODE" == "http" && "$EXISTING_MODE" == "http" ]]; then
   EXISTING_WEB_PORT=$(env_value EXPORTDOCMANAGER_WEB_PORT)
   [[ "$EXISTING_WEB_PORT" =~ ^[0-9]+$ ]] && WEB_PORT=$EXISTING_WEB_PORT
@@ -440,6 +446,8 @@ fi
   fail "--image-namespace must look like ghcr.io/account."
 [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || fail "Invalid container image tag."
 [[ "$IMAGE_TAG" != "latest" ]] || fail "The mutable latest tag is not accepted; use an exact published image version."
+[[ "$IMAGE_REVISION" =~ ^[0-9a-fA-F]{40}$ ]] || fail "--revision must be a complete 40-character Git commit SHA."
+IMAGE_REVISION=${IMAGE_REVISION,,}
 
 RUNTIME_ROOT=$(env_value EXPORTDOCMANAGER_RUNTIME_ROOT)
 RUNTIME_ROOT=${RUNTIME_ROOT:-$INSTALL_DIR/runtime}
@@ -697,6 +705,7 @@ set_env_value EXPORTDOCMANAGER_CONTAINER_SUBNET "$CONTAINER_SUBNET"
 set_env_value EXPORTDOCMANAGER_REVERSE_PROXY_IP "$REVERSE_PROXY_IP"
 set_env_value EXPORTDOCMANAGER_IMAGE_NAMESPACE "$IMAGE_NAMESPACE"
 set_env_value EXPORTDOCMANAGER_IMAGE_TAG "$IMAGE_TAG"
+set_env_value EXPORTDOCMANAGER_IMAGE_REVISION "$IMAGE_REVISION"
 set_env_value EXPORTDOCMANAGER_DEPLOYMENT_MODE "$MODE"
 set_env_value EXPORTDOCMANAGER_PUBLIC_DOMAIN "$PUBLIC_DOMAIN"
 set_env_value EXPORTDOCMANAGER_ACME_EMAIL "$ACME_EMAIL"
@@ -720,6 +729,7 @@ COMPOSE+=(--env-file "$ENVIRONMENT_FILE")
 note "Deployment files prepared in $INSTALL_DIR"
 note "Runtime data root: $RUNTIME_ROOT"
 note "Image tag: $IMAGE_TAG"
+note "Image revision: $IMAGE_REVISION"
 note "Container subnet: $CONTAINER_SUBNET"
 if ((NO_START == 1)); then
   note "--no-start selected; images were not pulled and containers were not changed."
@@ -730,6 +740,14 @@ fi
 if ! "${COMPOSE[@]}" pull; then
   fail "Image pull failed. Confirm the tag and package visibility; private packages require GHCR_USER and GHCR_TOKEN."
 fi
+
+for component in api browser web; do
+  image_reference="$IMAGE_NAMESPACE/export-doc-manager-$component:$IMAGE_TAG"
+  actual_revision=$(docker image inspect "$image_reference" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')
+  actual_revision=${actual_revision,,}
+  [[ "$actual_revision" == "$IMAGE_REVISION" ]] ||
+    fail "Image revision mismatch for $image_reference: expected $IMAGE_REVISION, received ${actual_revision:-<missing>}."
+done
 
 if [[ "$MODE" == "https" ]]; then
   CERTIFICATE_ROOT="$RUNTIME_ROOT/letsencrypt"

@@ -36,7 +36,7 @@ export function InvoiceEditorFormShell({
     <form className={formClassName} onSubmit={onSubmit} onKeyDownCapture={onKeyDownCapture}>
       {isWorkbench ? (
         <div className="invoice-items-focus-shell" aria-label="商品明细工作台">
-          <div className="invoice-items-focus-header">
+          <div className="invoice-items-focus-header workspace-surface-card">
             <button className="command-button secondary" type="button" onClick={onCloseWorkbench}>
               <Minimize2 size={17} aria-hidden="true" />
               <span>返回发票</span>

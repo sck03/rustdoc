@@ -2,7 +2,6 @@
 param(
     [string]$CargoTargetDir,
     [string]$LicenseCargoTargetDir,
-    [string]$ExcelAnalyzerCargoTargetDir,
     [string]$OutputDir,
     [string]$LicenseOutputDir,
     [string]$CargoBinDir,
@@ -12,7 +11,6 @@ param(
     [switch]$AllowSystemDrive,
     [switch]$SkipMainBuild,
     [switch]$IncludeLicenseKeygen,
-    [switch]$SkipExcelAnalyzerBuild,
     [switch]$SkipLaunchSmoke,
     [switch]$PreflightOnly,
     [switch]$NoPause
@@ -90,8 +88,21 @@ $mainBuildScript = Join-Path $scriptRoot "run-tauri-local.ps1"
 $prepareScript = Join-Path $scriptRoot "prepare-windows-desktop-run.ps1"
 $smokeScript = Join-Path $scriptRoot "smoke-tauri-desktop.ps1"
 $licenseRoot = Join-Path $repoRoot "apps\license-keygen-tauri"
-$excelAnalyzerRoot = Join-Path $repoRoot "tools\excel-analyzer-rs"
 . (Join-Path $scriptRoot "lib\initialize-local-build-environment.ps1") -RepositoryRoot $repoRoot
+
+$editionCatalogPath = Join-Path $scriptRoot "product-editions.json"
+$editionCatalog = Get-Content -LiteralPath $editionCatalogPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$editionMetadataProperty = $editionCatalog.editions.PSObject.Properties[$ProductEdition]
+if ($null -eq $editionMetadataProperty) {
+    throw "Product edition metadata was not found for $ProductEdition in $editionCatalogPath."
+}
+$editionMetadata = $editionMetadataProperty.Value
+foreach ($profileKey in @("browserRenderer", "ocr", "documentResources", "excelAnalyzer")) {
+    $profileProperty = $editionMetadata.resourceProfile.PSObject.Properties[$profileKey]
+    if ($null -eq $profileProperty -or $profileProperty.Value -isnot [bool]) {
+        throw "Product edition $ProductEdition has an invalid resource profile '$profileKey'."
+    }
+}
 
 $permissionVerifier = Join-Path $scriptRoot "assert-tauri-command-permissions.ps1"
 Invoke-ExportDocExternal -FilePath (Resolve-ExportDocPowerShellExecutable) -Arguments @(
@@ -114,10 +125,6 @@ if ([string]::IsNullOrWhiteSpace($LicenseCargoTargetDir)) {
     $LicenseCargoTargetDir = Join-Path $artifactsRoot "cargo-target-license-keygen"
 }
 
-if ([string]::IsNullOrWhiteSpace($ExcelAnalyzerCargoTargetDir)) {
-    $ExcelAnalyzerCargoTargetDir = Join-Path $artifactsRoot "cargo-target-excel-analyzer"
-}
-
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     $editionFolder = switch ($ProductEdition) {
         "Document" { "ExportDocManager-Document" }
@@ -129,7 +136,6 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
 
 $resolvedCargoTargetDir = Get-FullPath -Path $CargoTargetDir
 $resolvedLicenseCargoTargetDir = if ($IncludeLicenseKeygen) { Get-FullPath -Path $LicenseCargoTargetDir } else { $null }
-$resolvedExcelAnalyzerCargoTargetDir = Get-FullPath -Path $ExcelAnalyzerCargoTargetDir
 $resolvedOutputDir = Get-FullPath -Path $OutputDir
 if ($IncludeLicenseKeygen -and [string]::IsNullOrWhiteSpace($LicenseOutputDir)) {
     $LicenseOutputDir = Join-Path (Split-Path -Parent $resolvedOutputDir) "KEY"
@@ -144,7 +150,6 @@ if ($IncludeLicenseKeygen) {
     }
     Assert-NonSystemDrivePath -Path $resolvedLicenseCargoTargetDir -Purpose "License keygen Cargo target directory"
 }
-Assert-NonSystemDrivePath -Path $resolvedExcelAnalyzerCargoTargetDir -Purpose "Excel analyzer Cargo target directory"
 Assert-NonSystemDrivePath -Path $resolvedOutputDir -Purpose "Windows desktop output directory"
 if ($IncludeLicenseKeygen) {
     Assert-NonSystemDrivePath -Path $resolvedLicenseOutputDir -Purpose "License key generator output directory"
@@ -188,10 +193,10 @@ if ($PreflightOnly) {
         RustupHome = $env:RUSTUP_HOME
         CargoTargetDir = $resolvedCargoTargetDir
         LicenseCargoTargetDir = $resolvedLicenseCargoTargetDir
-        ExcelAnalyzerCargoTargetDir = $resolvedExcelAnalyzerCargoTargetDir
         OutputDir = $resolvedOutputDir
         LicenseOutputDir = $resolvedLicenseOutputDir
         IncludesLicenseKeygen = [bool]$IncludeLicenseKeygen
+        ResourceProfile = $editionMetadata.resourceProfile
         RuntimeDataCleanup = "unconditional"
     } | ConvertTo-Json -Depth 4
     Wait-ExportDocInteractiveExit -Enabled $interactiveLaunch
@@ -236,29 +241,12 @@ if ($IncludeLicenseKeygen) {
     }
 }
 
-if (-not $SkipExcelAnalyzerBuild) {
-    New-Item -ItemType Directory -Path $resolvedExcelAnalyzerCargoTargetDir -Force | Out-Null
-    $previousCargoTargetDir = $env:CARGO_TARGET_DIR
-    try {
-        $env:CARGO_TARGET_DIR = $resolvedExcelAnalyzerCargoTargetDir
-        if ([string]::IsNullOrWhiteSpace($env:CARGO_REGISTRIES_CRATES_IO_PROTOCOL)) {
-            $env:CARGO_REGISTRIES_CRATES_IO_PROTOCOL = "sparse"
-        }
-
-        Invoke-ExportDocExternal -FilePath "cargo" -Arguments @("build", "--release", "--manifest-path", (Join-Path $excelAnalyzerRoot "Cargo.toml")) -WorkingDirectory $repoRoot
-    } finally {
-        $env:CARGO_TARGET_DIR = $previousCargoTargetDir
-    }
-}
-
 $prepareArgs = @(
     "-NoProfile",
     "-File",
     $prepareScript,
     "-CargoTargetDir",
     $resolvedCargoTargetDir,
-    "-ExcelAnalyzerCargoTargetDir",
-    $resolvedExcelAnalyzerCargoTargetDir,
     "-OutputDir",
     $resolvedOutputDir,
     "-ProductEdition",
@@ -273,9 +261,6 @@ if ($IncludeLicenseKeygen) {
         $resolvedLicenseOutputDir
     )
 }
-if ($SkipExcelAnalyzerBuild) {
-    $prepareArgs += "-SkipExcelAnalyzer"
-}
 Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments $prepareArgs
 
 $payloadVerifier = Join-Path $scriptRoot "verify-package-payload.ps1"
@@ -284,7 +269,8 @@ Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments @(
     "-File", $payloadVerifier,
     "-PackageRoot", $resolvedOutputDir,
     "-Profile", "Desktop",
-    "-RuntimeIdentifier", "win-x64"
+    "-RuntimeIdentifier", "win-x64",
+    "-Edition", $ProductEdition
 )
 
 if (-not $SkipLaunchSmoke) {

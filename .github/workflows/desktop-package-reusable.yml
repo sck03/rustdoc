@@ -54,13 +54,14 @@ concurrency:
   group: ${{ inputs.publish_release && format('desktop-release-{0}', inputs.edition) || format('desktop-{0}-{1}-{2}-{3}', inputs.edition, inputs.platform, inputs.architecture, inputs.version) }}
   cancel-in-progress: ${{ !inputs.publish_release }}
 
-permissions:
-  contents: write
-
 jobs:
   package:
     name: ${{ inputs.platform }} ${{ inputs.architecture }} package
     runs-on: ${{ inputs.runner }}
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    permissions:
+      contents: read
     env:
       DOTNET_CLI_HOME: ${{ github.workspace }}/.codex-runtime/dotnet-cli
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
@@ -79,12 +80,10 @@ jobs:
       EXPORTDOCMANAGER_UPDATER_ENDPOINT: ${{ inputs.edition == 'Document' && vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT_DOCUMENT || inputs.edition == 'Sales' && vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT_SALES || vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT_FULL }}
       EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY: ${{ inputs.edition == 'Document' && vars.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_DOCUMENT || inputs.edition == 'Sales' && vars.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_SALES || vars.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_FULL }}
       EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT: ${{ vars.EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT }}
-      TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.edition == 'Document' && secrets.TAURI_SIGNING_PRIVATE_KEY_DOCUMENT || inputs.edition == 'Sales' && secrets.TAURI_SIGNING_PRIVATE_KEY_SALES || secrets.TAURI_SIGNING_PRIVATE_KEY_FULL }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.edition == 'Document' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_DOCUMENT || inputs.edition == 'Sales' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_SALES || secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_FULL }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Verify public repository boundary
         shell: pwsh
@@ -95,15 +94,15 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y file xdg-utils libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y file xdg-utils libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xvfb
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: 10.0.302
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24
           cache: npm
@@ -112,8 +111,9 @@ jobs:
             apps/export-doc-tauri/package-lock.json
 
       - name: Set up Rust target
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable action
         with:
+          toolchain: 1.96.0
           targets: ${{ inputs.rust_target }}
 
       - name: Initialize workspace build directories
@@ -208,6 +208,9 @@ jobs:
       - name: Build signed updater package
         if: inputs.publish_release
         shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.edition == 'Document' && secrets.TAURI_SIGNING_PRIVATE_KEY_DOCUMENT || inputs.edition == 'Sales' && secrets.TAURI_SIGNING_PRIVATE_KEY_SALES || secrets.TAURI_SIGNING_PRIVATE_KEY_FULL }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.edition == 'Document' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_DOCUMENT || inputs.edition == 'Sales' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_SALES || secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_FULL }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY)) { throw "请配置仓库变量 EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY。" }
           if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) { throw "请配置仓库 Secret TAURI_SIGNING_PRIVATE_KEY。" }
@@ -239,6 +242,7 @@ jobs:
           Write-Host "Chrome Headless Shell bundled from $($browser.FullName)"
 
       - name: Verify bundled Rust PP-OCRv6 runtime
+        if: inputs.edition != 'Sales'
         shell: pwsh
         run: |
           $resourceRoot = Join-Path $env:GITHUB_WORKSPACE "artifacts/tauri-bundle/resources"
@@ -258,7 +262,22 @@ jobs:
 
       - name: Verify lean desktop payload
         shell: pwsh
-        run: ./scripts/verify-package-payload.ps1 -PackageRoot ./artifacts/tauri-bundle/resources -Profile Desktop -RuntimeIdentifier ${{ inputs.runtime_identifier }}
+        run: ./scripts/verify-package-payload.ps1 -PackageRoot ./artifacts/tauri-bundle/resources -Profile Desktop -RuntimeIdentifier ${{ inputs.runtime_identifier }} -Edition ${{ inputs.edition }}
+
+      - name: Start Linux virtual display for native launch smoke
+        if: inputs.platform == 'linux'
+        shell: bash
+        run: |
+          Xvfb :99 -screen 0 1280x720x24 -nolisten tcp > "$RUNNER_TEMP/exportdoc-xvfb.log" 2>&1 &
+          for attempt in {1..20}; do
+            if [ -S /tmp/.X11-unix/X99 ]; then
+              echo "DISPLAY=:99" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 0.25
+          done
+          cat "$RUNNER_TEMP/exportdoc-xvfb.log"
+          exit 1
 
       - name: Build, launch-smoke and verify portable desktop package
         shell: pwsh
@@ -275,7 +294,7 @@ jobs:
           -OutputRoot ./artifacts/desktop-portable
 
       - name: Upload desktop installer artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: export-doc-manager-${{ inputs.platform }}-${{ inputs.architecture }}-${{ inputs.edition }}-${{ steps.version.outputs.value }}-installer
           path: artifacts/cargo-target-exportdoc/**/release/bundle/**
@@ -284,27 +303,13 @@ jobs:
           compression-level: 0
 
       - name: Upload portable desktop artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: export-doc-manager-${{ inputs.platform }}-${{ inputs.architecture }}-${{ inputs.edition }}-${{ steps.version.outputs.value }}-portable
           path: artifacts/desktop-portable/packages/*
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
-
-      - name: Publish immutable edition release and update channel
-        if: inputs.publish_release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: >-
-          ./scripts/publish-tauri-updater-manifest.ps1
-          -Platform ${{ inputs.platform }}
-          -Architecture ${{ inputs.architecture }}
-          -Edition ${{ inputs.edition }}
-          -Version ${{ steps.version.outputs.value }}
-          -BundleRoot ${{ env.CARGO_TARGET_DIR }}
-          -PortableAssetRoot ./artifacts/desktop-portable/packages
 
       - name: Write package summary
         shell: pwsh
@@ -323,3 +328,40 @@ jobs:
           - 系统商业签名：`本阶段暂不强制；Windows Authenticode 与 macOS Developer ID/公证列入正式商业发布前门禁`
           - 默认更新地址：`${{ inputs.publish_release && '产品版专属 GitHub Release 通道；配置对应产品版变量时使用自定义地址' || '不适用' }}`
           '@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+
+  publish:
+    name: Publish immutable desktop release
+    if: inputs.publish_release
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Checkout release scripts
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Download signed installer bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: export-doc-manager-${{ inputs.platform }}-${{ inputs.architecture }}-${{ inputs.edition }}-${{ needs.package.outputs.version }}-installer
+          path: artifacts/release-bundle
+
+      - name: Download verified portable package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: export-doc-manager-${{ inputs.platform }}-${{ inputs.architecture }}-${{ inputs.edition }}-${{ needs.package.outputs.version }}-portable
+          path: artifacts/desktop-portable/packages
+
+      - name: Publish immutable edition release and update channel
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          ./scripts/publish-tauri-updater-manifest.ps1
+          -Platform ${{ inputs.platform }}
+          -Architecture ${{ inputs.architecture }}
+          -Edition ${{ inputs.edition }}
+          -Version ${{ needs.package.outputs.version }}
+          -BundleRoot ./artifacts/release-bundle
+          -PortableAssetRoot ./artifacts/desktop-portable/packages

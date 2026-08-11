@@ -71,7 +71,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Verify public repository boundary
         shell: pwsh
@@ -90,6 +90,7 @@ jobs:
             bash deploy/container/install-container.sh \
             --mode http \
             --tag validation \
+            --revision "$GITHUB_SHA" \
             --web-port 18080 \
             --install-dir "$installer_root" \
             --no-start
@@ -155,6 +156,7 @@ jobs:
               bash deploy/container/install-container.sh \
               --mode http \
               --tag validation \
+              --revision "$GITHUB_SHA" \
               --install-dir "$rollback_root" \
               --no-start; then
             echo "Installer rollback probe unexpectedly succeeded." >&2
@@ -172,6 +174,7 @@ jobs:
               bash deploy/container/install-container.sh \
               --mode http \
               --tag validation \
+              --revision "$GITHUB_SHA" \
               --install-dir "$symlink_install_path" \
               --no-start; then
             echo "Installer unexpectedly accepted a symlink installation root." >&2
@@ -192,6 +195,7 @@ jobs:
               bash deploy/container/install-container.sh \
               --mode http \
               --tag validation \
+              --revision "$GITHUB_SHA" \
               --install-dir "$symlink_runtime_root" \
               --no-start; then
             echo "Installer unexpectedly accepted a symlink runtime root." >&2
@@ -717,7 +721,7 @@ jobs:
 
       - name: Upload lifecycle evidence
         if: ${{ always() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: container-runtime-lifecycle
           path: artifacts/container-runtime/evidence

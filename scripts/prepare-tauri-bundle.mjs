@@ -38,18 +38,29 @@ const productEditionMetadata = productEditionCatalog.editions?.[productEdition];
 if (!productEditionMetadata) {
   throw new Error(`Product edition metadata is missing for ${productEdition}.`);
 }
+const resourceProfile = validateResourceProfile(productEditionMetadata.resourceProfile, productEdition);
+const includedStableResourceDirs = new Set([
+  "Legal",
+  ...(resourceProfile.documentResources ? ["Templates", "Resources"] : []),
+  ...(resourceProfile.ocr ? ["OcrModels"] : []),
+  ...(resourceProfile.browserRenderer ? ["Browsers"] : []),
+]);
 const allowMissingBrowser = (process.env.EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER || "").toLowerCase() === "true";
 
 run("node", [path.join(repoRoot, "scripts", "sync-version.mjs")], process.env);
-run("node", [path.join(repoRoot, "scripts", "provision-report-fonts.mjs")], process.env);
-run("node", [path.join(repoRoot, "scripts", "verify-font-license-policy.mjs"), "--require-files"], process.env);
+if (resourceProfile.documentResources) {
+  run("node", [path.join(repoRoot, "scripts", "provision-report-fonts.mjs")], process.env);
+  run("node", [path.join(repoRoot, "scripts", "verify-font-license-policy.mjs"), "--require-files"], process.env);
+}
 
 assertInsideRepo(bundleRoot, "Tauri bundle output");
 
 await rm(bundleRoot, { recursive: true, force: true });
 await mkdir(publishRoot, { recursive: true });
 await mkdir(sidecarRoot, { recursive: true });
-await mkdir(toolsRoot, { recursive: true });
+if (resourceProfile.excelAnalyzer) {
+  await mkdir(toolsRoot, { recursive: true });
+}
 
 const env = {
   ...process.env,
@@ -84,21 +95,33 @@ const args = [
   "/p:DebugType=None",
   "/p:DebugSymbols=false",
   "/p:ExportDocPackageProfile=Desktop",
+  `/p:ExportDocIncludeTemplates=${resourceProfile.documentResources}`,
+  `/p:ExportDocIncludeOcrModels=${resourceProfile.ocr}`,
+  `/p:ExportDocIncludeBusinessResources=${resourceProfile.documentResources}`,
+  `/p:ExportDocIncludeBundledBrowser=${resourceProfile.browserRenderer}`,
+  `/p:ExportDocIncludeOcrRuntime=${resourceProfile.ocr}`,
+  `/p:ExportDocIncludePlaywrightRuntime=${resourceProfile.browserRenderer}`,
 ];
 
 console.log(`Publishing API sidecar for Tauri bundle (${rid}, self-contained=${selfContained})...`);
 run("dotnet", args, env);
-await buildRustOcrSidecar(env);
-await buildRustExcelAnalyzer(env);
+if (resourceProfile.ocr) {
+  await buildRustOcrSidecar(env);
+}
+if (resourceProfile.excelAnalyzer) {
+  await buildRustExcelAnalyzer(env);
+}
 
 const entries = await readdir(publishRoot, { withFileTypes: true });
 for (const entry of entries) {
   const source = path.join(publishRoot, entry.name);
   if (entry.isDirectory() && stableResourceDirs.has(entry.name)) {
-    if (entry.name === "Browsers") {
-      await copyBrowserRuntimeResources(source, path.join(resourcesRoot, entry.name));
-    } else {
-      await cp(source, path.join(resourcesRoot, entry.name), { recursive: true, force: true });
+    if (includedStableResourceDirs.has(entry.name)) {
+      if (entry.name === "Browsers") {
+        await copyBrowserRuntimeResources(source, path.join(resourcesRoot, entry.name));
+      } else {
+        await cp(source, path.join(resourcesRoot, entry.name), { recursive: true, force: true });
+      }
     }
     continue;
   }
@@ -125,7 +148,9 @@ for (const fileName of rootConfigFiles) {
 }
 
 await copyWindowsWebView2LoaderIfNeeded();
-await copyExcelAnalyzerIfAvailable();
+if (resourceProfile.excelAnalyzer) {
+  await copyExcelAnalyzerIfAvailable();
+}
 await generateDependencyGovernance(env);
 const productEditionManifest = await createProductEditionManifest();
 await writeFile(
@@ -145,12 +170,12 @@ console.log("Prepared Tauri resources:");
 console.log(`  ${resourcesRoot}`);
 console.log("Runtime layout:");
 console.log("  resources/sidecar/        API executable and self-contained runtime");
-console.log("  resources/sidecar/ocr/    Rust PP-OCRv6 sidecar without OpenCV");
-console.log("  resources/Templates/      report templates");
-console.log("  resources/OcrModels/      OCR models");
-console.log("  resources/Resources/      Excel and Single Window built-in resources");
-console.log("  resources/Browsers/       optional current-platform Chrome Headless Shell renderer");
-console.log("  resources/Tools/          optional platform-native helper tools such as Excel analyzer");
+if (resourceProfile.ocr) console.log("  resources/sidecar/ocr/    Rust PP-OCRv6 sidecar without OpenCV");
+if (resourceProfile.documentResources) console.log("  resources/Templates/      report templates");
+if (resourceProfile.ocr) console.log("  resources/OcrModels/      OCR models");
+if (resourceProfile.documentResources) console.log("  resources/Resources/      Excel and Single Window built-in resources");
+if (resourceProfile.browserRenderer) console.log("  resources/Browsers/       current-platform Chrome Headless Shell renderer");
+if (resourceProfile.excelAnalyzer) console.log("  resources/Tools/          platform-native Excel analyzer");
 console.log("  resources/Legal/          unified third-party notices, dependency inventory and SBOM files");
 if (rid.startsWith("win-")) {
   console.log("  resources/WebView2Loader.dll  Tauri WebView2 loader beside the desktop exe");
@@ -191,6 +216,7 @@ async function createProductEditionManifest() {
     identifier: productEditionMetadata.identifier,
     displayName: productEditionMetadata.displayName,
     enabledWorkspaces: productEditionMetadata.enabledWorkspaces,
+    resourceProfile,
     releaseTagPrefix: productEditionMetadata.releaseTagPrefix,
     stableUpdaterManifest: productEditionMetadata.stableManifestAsset,
     generatedAt: new Date().toISOString(),
@@ -204,6 +230,15 @@ function normalizeProductEdition(value) {
   if (normalized === "sales") return "Sales";
   if (normalized === "full" || normalized === "") return "Full";
   throw new Error(`Unsupported product edition: ${value}`);
+}
+
+function validateResourceProfile(value, edition) {
+  const keys = ["browserRenderer", "ocr", "documentResources", "excelAnalyzer"];
+  if (!value || keys.some((key) => typeof value[key] !== "boolean")) {
+    throw new Error(`Product edition ${edition} has an invalid resource profile.`);
+  }
+
+  return Object.fromEntries(keys.map((key) => [key, value[key]]));
 }
 
 async function generateDependencyGovernance(buildEnv) {
@@ -280,7 +315,7 @@ async function createRuntimeLayoutManifest() {
     await inspectProgramRootEntry("api-sidecar", path.join(sidecarRoot, sidecarFileName()), "file", true),
   ];
 
-  for (const directoryName of stableResourceDirs) {
+  for (const directoryName of includedStableResourceDirs) {
     programRootResources.push(
       await inspectProgramRootEntry(
         directoryName,
@@ -332,7 +367,7 @@ async function createRuntimeLayoutManifest() {
     runtimeIdentifier: rid,
     selfContained,
     storagePolicy: {
-      programRoot: "Program root carries the Tauri executable, API sidecar, stable templates, OCR models, browser renderer assets and built-in resources.",
+      programRoot: "Program root carries the Tauri executable, API sidecar and only the immutable resources declared by the product edition resource profile.",
       dataRoot: "Portable builds use App_Data beside the program. Installed builds persist an explicitly selected writable DataRoot and can migrate it through the verified restart workflow.",
       userSelectedOutput: "User-selected import and export paths remain outside the managed data root by explicit request.",
     },

@@ -3,6 +3,7 @@ using ExcelDataReader;
 using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 using System.Globalization;
@@ -52,37 +53,16 @@ namespace ExportDocManager.Services.Data
         public async Task<ImportResult> ImportFromExcelAsync(string filePath, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            using IDisposable processingLease = await ExcelWorkbookProcessingGate
+                .EnterAsync(cancellationToken)
+                .ConfigureAwait(false);
             ExcelWorkbookResourcePolicy.Validate(filePath);
 
-            ExcelImportAnalysisReport analysisReport = null;
             var settings = _settingsService.Settings.ExcelImport ?? new ExcelImportSettings();
-            try
-            {
-                analysisReport = await _analyzer
-                    .AnalyzeAsync(filePath, settings, cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                analysisReport = new ExcelImportAnalysisReport
-                {
-                    AnalyzerId = "analysis-unavailable",
-                    SourcePath = filePath,
-                    Issues =
-                    [
-                        new ExcelImportAnalysisIssue
-                        {
-                            Severity = "Warning",
-                            Code = "AnalyzerFailed",
-                            Message = $"Excel 智能分析层未能完成，已回退到传统导入解析: {ex.Message}"
-                        }
-                    ]
-                };
-            }
+            ExcelImportAnalysisReport analysisReport = await _analyzer
+                .AnalyzeAsync(filePath, settings, cancellationToken)
+                .ConfigureAwait(false)
+                ?? throw new InfrastructureServiceException("Excel 分析器返回了空结果。");
 
             return await Task.Run(() => ImportFromExcelInternal(filePath, analysisReport, cancellationToken), cancellationToken);
         }
@@ -137,10 +117,13 @@ namespace ExportDocManager.Services.Data
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is InvalidDataException or FormatException or ArgumentException or NotSupportedException)
             {
-                result.Errors.Add($"导入Excel时发生严重错误: {ex.Message}");
-                return result;
+                throw new ServiceValidationException($"Excel 工作簿格式或内容无效：{ex.Message}", ex);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                throw new InfrastructureServiceException("Excel 工作簿暂时无法读取，请检查文件是否仍然存在、未被独占锁定且运行账号具有读取权限。", ex);
             }
         }
 

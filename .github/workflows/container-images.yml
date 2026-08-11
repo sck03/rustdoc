@@ -8,21 +8,44 @@ on:
         required: true
         type: string
       publish_latest:
-        description: '同时更新 latest 标签'
+        description: '全部组件验证成功后同时更新 latest 标签'
         required: true
         default: true
         type: boolean
 
 concurrency:
   group: container-images-${{ inputs.version }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
   packages: write
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    steps:
+      - name: Validate requested version
+        id: version
+        shell: bash
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="${REQUESTED_VERSION#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "版本格式无效：$REQUESTED_VERSION。请使用 0.1.2 或 0.1.2-beta.1。" >&2
+            exit 1
+          fi
+          if (( ${#VERSION} > 80 )); then
+            echo "版本字符串过长，最多允许 80 个字符。" >&2
+            exit 1
+          fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+
   images:
+    needs: prepare
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -40,35 +63,28 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Verify public repository boundary
         shell: pwsh
         run: ./scripts/github/verify-public-source.ps1
 
       - name: Set up Node.js for version synchronization
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24
 
-      - name: Validate and apply requested version
-        id: version
+      - name: Apply requested version
         shell: bash
-        env:
-          REQUESTED_VERSION: ${{ inputs.version }}
-        run: |
-          VERSION="${REQUESTED_VERSION#v}"
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "版本格式无效：$REQUESTED_VERSION。请使用 0.1.2 或 0.1.2-beta.1。" >&2
-            exit 1
-          fi
-          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
-          node scripts/sync-version.mjs "$VERSION"
+        run: node scripts/sync-version.mjs "${{ needs.prepare.outputs.version }}"
 
-      - name: Set image name
+      - name: Set immutable image reference
         id: image
         shell: bash
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/export-doc-manager-${{ matrix.component }}" >> "$GITHUB_OUTPUT"
+        run: |
+          NAME="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/export-doc-manager-${{ matrix.component }}"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "reference=$NAME:sha-${GITHUB_SHA}-${{ needs.prepare.outputs.version }}" >> "$GITHUB_OUTPUT"
 
       - name: Reclaim unused hosted-runner tool space
         if: matrix.component == 'api'
@@ -83,49 +99,180 @@ jobs:
           df -h /
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
       - name: Log in to GHCR
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate image metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ steps.image.outputs.name }}
-          tags: |
-            type=raw,value=${{ steps.version.outputs.value }}
-            type=raw,value=latest,enable=${{ inputs.publish_latest }}
-            type=sha,prefix=sha-
-          labels: |
-            org.opencontainers.image.version=${{ steps.version.outputs.value }}
-
-      - name: Build and optionally publish
-        uses: docker/build-push-action@v7
+      - name: Build and publish immutable revision image
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.image.outputs.reference }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,mode=${{ matrix.cache_mode }},scope=${{ matrix.component }}
           provenance: true
           sbom: true
 
+      - name: Record component digest
+        shell: bash
+        env:
+          COMPONENT: ${{ matrix.component }}
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          mkdir -p artifacts/container-digests
+          jq -n \
+            --arg component "$COMPONENT" \
+            --arg name "$IMAGE_NAME" \
+            --arg digest "$IMAGE_DIGEST" \
+            --arg version "$VERSION" \
+            --arg revision "$GITHUB_SHA" \
+            '{schemaVersion:1, component:$component, name:$name, digest:$digest, version:$version, revision:$revision}' \
+            > "artifacts/container-digests/$COMPONENT.json"
+
+      - name: Upload component digest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: container-digest-${{ matrix.component }}
+          path: artifacts/container-digests/${{ matrix.component }}.json
+          if-no-files-found: error
+          retention-days: 14
+
+  promote:
+    needs: [prepare, images]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download verified component digests
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: container-digest-*
+          path: artifacts/container-digests
+          merge-multiple: true
+
+      - name: Validate release set and promote version aliases
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          PUBLISH_LATEST: ${{ inputs.publish_latest }}
+        run: |
+          set -Eeuo pipefail
+          for component in api browser web; do
+            file="artifacts/container-digests/$component.json"
+            [[ -s "$file" ]] || { echo "Missing digest record: $file" >&2; exit 1; }
+            [[ "$(jq -r .revision "$file")" == "$GITHUB_SHA" ]] || { echo "Revision mismatch in $file" >&2; exit 1; }
+            [[ "$(jq -r .version "$file")" == "$VERSION" ]] || { echo "Version mismatch in $file" >&2; exit 1; }
+          done
+
+          inspect_digest() {
+            local reference=$1 output
+            output=$(docker buildx imagetools inspect "$reference") || return 1
+            awk '$1 == "Digest:" { print $2; exit }' <<< "$output"
+          }
+
+          for component in api browser web; do
+            file="artifacts/container-digests/$component.json"
+            name=$(jq -r .name "$file")
+            digest=$(jq -r .digest "$file")
+            source_reference="$name@$digest"
+            actual_source_digest=$(inspect_digest "$source_reference")
+            [[ "$actual_source_digest" == "$digest" ]] || { echo "Source digest mismatch for $component" >&2; exit 1; }
+
+            target="$name:$VERSION"
+            if existing_digest=$(inspect_digest "$target" 2>/dev/null); then
+              [[ "$existing_digest" == "$digest" ]] || {
+                echo "Immutable version tag $target already points to $existing_digest instead of $digest." >&2
+                exit 1
+              }
+            fi
+          done
+
+          for component in api browser web; do
+            file="artifacts/container-digests/$component.json"
+            name=$(jq -r .name "$file")
+            digest=$(jq -r .digest "$file")
+            target="$name:$VERSION"
+            existing_digest=$(inspect_digest "$target" 2>/dev/null || true)
+            if [[ -z "$existing_digest" ]]; then
+              docker buildx imagetools create --tag "$target" "$name@$digest"
+            fi
+            [[ "$(inspect_digest "$target")" == "$digest" ]] || { echo "Version promotion failed for $target" >&2; exit 1; }
+          done
+
+          if [[ "$PUBLISH_LATEST" == "true" ]]; then
+            for component in api browser web; do
+              file="artifacts/container-digests/$component.json"
+              name=$(jq -r .name "$file")
+              digest=$(jq -r .digest "$file")
+              docker buildx imagetools create --tag "$name:latest" "$name@$digest"
+            done
+          fi
+
+      - name: Create immutable release manifest
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          jq -n \
+            --arg version "$VERSION" \
+            --arg revision "$GITHUB_SHA" \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --slurpfile api artifacts/container-digests/api.json \
+            --slurpfile browser artifacts/container-digests/browser.json \
+            --slurpfile web artifacts/container-digests/web.json \
+            '{
+              schemaVersion: 1,
+              version: $version,
+              revision: $revision,
+              generatedAt: $generatedAt,
+              images: {
+                api: { reference: ($api[0].name + ":" + $version), digest: $api[0].digest, immutableReference: ($api[0].name + "@" + $api[0].digest) },
+                browser: { reference: ($browser[0].name + ":" + $version), digest: $browser[0].digest, immutableReference: ($browser[0].name + "@" + $browser[0].digest) },
+                web: { reference: ($web[0].name + ":" + $version), digest: $web[0].digest, immutableReference: ($web[0].name + "@" + $web[0].digest) }
+              }
+            }' > "artifacts/export-doc-manager-container-$VERSION.json"
+
+      - name: Upload immutable container release manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: export-doc-manager-container-${{ needs.prepare.outputs.version }}-manifest
+          path: artifacts/export-doc-manager-container-${{ needs.prepare.outputs.version }}.json
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Write release summary
         shell: bash
         run: |
-          echo "## ExportDocManager Docker 镜像" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 版本：\`${{ steps.version.outputs.value }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 组件：\`${{ matrix.component }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "## ExportDocManager 容器发布" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 版本：\`${{ needs.prepare.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 源码 revision：\`${GITHUB_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 组件：\`api / browser / web\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- 架构：\`linux/amd64, linux/arm64\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- latest：\`${{ inputs.publish_latest }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 部署时必须同时提供版本和上述完整 revision，安装器会核验三个镜像标签。" >> "$GITHUB_STEP_SUMMARY"

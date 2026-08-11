@@ -42,18 +42,20 @@ public sealed class BocExchangeRateServiceTests
     [Fact]
     public async Task ProductionConnectCallback_ShouldBlockPrivateTransportTarget()
     {
-        using var handler = new SocketsHttpHandler
-        {
-            ConnectCallback = ExchangeRateEndpointPolicy.ConnectPublicHostAsync,
-            UseProxy = false
-        };
-        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(2) };
+        bool transportReached = false;
+        var error = await Assert.ThrowsAsync<HttpRequestException>(async () =>
+            await ExchangeRateEndpointPolicy.ConnectPublicHostTransportAsync(
+                new DnsEndPoint("127.0.0.1", 443),
+                (_, _) => throw new InvalidOperationException("Literal addresses must not use DNS."),
+                (_, _, _) =>
+                {
+                    transportReached = true;
+                    throw new InvalidOperationException("Blocked addresses must not reach the socket transport.");
+                },
+                CancellationToken.None));
 
-        var error = await Assert.ThrowsAsync<HttpRequestException>(() =>
-            client.GetAsync("https://127.0.0.1/rates"));
-
-        var callbackError = Assert.IsType<HttpRequestException>(error.InnerException);
-        Assert.IsType<ServiceValidationException>(callbackError.InnerException);
+        Assert.IsType<ServiceValidationException>(error.InnerException);
+        Assert.False(transportReached);
     }
 
     [Fact]
@@ -184,6 +186,25 @@ public sealed class BocExchangeRateServiceTests
             (_, _) => Task.FromResult(new[] { IPAddress.Parse("93.184.216.34") }));
 
         await Assert.ThrowsAsync<InfrastructureServiceException>(() => service.GetExchangeRatesAsync());
+    }
+
+    [Fact]
+    public async Task Service_ShouldReturnAnEmptyListWithoutNetworkAccessWhenNoCurrencyIsConfigured()
+    {
+        var handler = new SequenceHandler(_ => throw new InvalidOperationException("HTTP should not be reached."));
+        var settings = new StubSettingsService("https://rates.example/start");
+        settings.Settings.ExchangeRate.SelectedCurrencies = [];
+        settings.Settings.ExchangeRate.AllSupportedCurrencies = [];
+        using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+        using var service = new BocExchangeRateService(
+            settings,
+            client,
+            (_, _) => Task.FromResult(new[] { IPAddress.Parse("93.184.216.34") }));
+
+        var rates = await service.GetExchangeRatesAsync();
+
+        Assert.Empty(rates);
+        Assert.Equal(0, handler.RequestCount);
     }
 
     private sealed class StubSettingsService : ISettingsService

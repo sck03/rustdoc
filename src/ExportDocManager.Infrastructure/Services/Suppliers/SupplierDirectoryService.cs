@@ -10,6 +10,8 @@ namespace ExportDocManager.Services.Suppliers
 {
     public sealed class SupplierDirectoryService : ISupplierDirectoryService
     {
+        private const int MaximumContactsPerSupplier = 500;
+        private const int MaximumProductLinksPerSupplier = 1_000;
         private const int LegacyListLimit = 200;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
@@ -188,6 +190,7 @@ namespace ExportDocManager.Services.Suppliers
             return await context.SupplierContacts.AsNoTracking()
                 .Where(item => item.SupplierCompanyId == supplierCompanyId && suppliers.Any(supplier => supplier.Id == item.SupplierCompanyId))
                 .OrderByDescending(item => item.IsPrimary).ThenBy(item => item.Name)
+                .Take(MaximumContactsPerSupplier)
                 .Select(item => new SupplierContactRecord(item.Id, item.SupplierCompanyId, item.Name, item.Title,
                     item.Email, item.Phone, item.InstantMessaging, item.IsPrimary, item.VersionNumber))
                 .ToListAsync(cancellationToken);
@@ -280,10 +283,12 @@ namespace ExportDocManager.Services.Suppliers
                 join product in context.Products.AsNoTracking() on link.ProductId equals product.Id
                 where link.SupplierCompanyId == supplierCompanyId
                 orderby product.ProductCode, product.NameCN
-                select new SupplierProductLinkRecord(link.Id, link.SupplierCompanyId, link.ProductId,
-                    product.ProductCode ?? string.Empty, product.NameCN ?? string.Empty, product.NameEN ?? string.Empty,
-                    link.SupplierProductCode, link.ReferencePrice, link.Currency, link.LeadTimeDays, link.Status,
-                    link.VersionNumber))
+                select new { Link = link, Product = product })
+                .Take(MaximumProductLinksPerSupplier)
+                .Select(row => new SupplierProductLinkRecord(row.Link.Id, row.Link.SupplierCompanyId, row.Link.ProductId,
+                    row.Product.ProductCode ?? string.Empty, row.Product.NameCN ?? string.Empty, row.Product.NameEN ?? string.Empty,
+                    row.Link.SupplierProductCode, row.Link.ReferencePrice, row.Link.Currency, row.Link.LeadTimeDays, row.Link.Status,
+                    row.Link.VersionNumber))
                 .ToListAsync(cancellationToken);
         }
 

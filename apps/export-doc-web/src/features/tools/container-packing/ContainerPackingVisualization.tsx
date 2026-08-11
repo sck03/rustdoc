@@ -3,6 +3,10 @@ import type { ApiContainerPackingAnalysisDto, ApiPackedCargoItemDto } from "../.
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
 import type { ContainerPackingRenderModeValue } from "./containerPackingModel.ts";
 import { signedArgbToColorHex, shadeHexColor } from "./containerPackingModel.ts";
+import type {
+  ContainerPackingRenderBlockSource,
+  ContainerPackingVisualizationDimensions,
+} from "./containerPackingVisualizationModel.ts";
 import {
  buildPseudo3dPackedItems, buildPseudo3dProjection, formatSvgNumber, pointsToString,
 } from "./containerPackingPseudo3dModel.ts";
@@ -109,14 +113,6 @@ export function ContainerPackingVisualization({
   );
 }
 
-export type ContainerPackingVisualizationDimensions = {
-  length: number;
-
-  width: number;
-
-  height: number;
-};
-
 type ContainerPackingViewKind = "top" | "side" | "door";
 
 type ContainerPackingPseudo3dPoint = {
@@ -136,46 +132,6 @@ type ContainerPackingPseudo3dFaceGridLines = {
   side: ContainerPackingPseudo3dLine[];
 
   top: ContainerPackingPseudo3dLine[];
-};
-
-export type ContainerPackingRenderBlockSource = {
-  key: string;
-
-  name: string;
-
-  colorArgb: number;
-
-  isRotated: boolean;
-
-  isPalletized: boolean;
-
-  x: number;
-
-  y: number;
-
-  length: number;
-
-  width: number;
-
-  baseHeight: number;
-
-  occupiedHeight: number;
-
-  unitsRepresented: number;
-
-  loadCount: number;
-
-  totalWeight: number;
-
-  priorityGroup: string;
-
-  preferredZone: string;
-
-  lengthSegments: number;
-
-  widthSegments: number;
-
-  heightSegments: number;
 };
 
 function ContainerPackingPseudo3dView({
@@ -532,4 +488,3 @@ function ContainerPackingProjectionView({
     </div>
   );
 }
-

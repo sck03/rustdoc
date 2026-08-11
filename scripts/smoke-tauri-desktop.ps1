@@ -8,6 +8,8 @@ param(
 
     [string]$DataRoot,
 
+    [string]$PortableRoot,
+
     [string]$Username = "admin",
 
     [string]$Password = "",
@@ -1130,9 +1132,23 @@ if ([string]::IsNullOrWhiteSpace($AppRoot)) {
 }
 
 $resolvedAppRoot = Get-FullPath -Path $AppRoot
+if (-not [string]::IsNullOrWhiteSpace($PortableRoot) -and -not $UsePortableDataRoot) {
+    throw "PortableRoot requires -UsePortableDataRoot."
+}
+
+$resolvedPortableRoot = if ($UsePortableDataRoot) {
+    if ([string]::IsNullOrWhiteSpace($PortableRoot)) {
+        $resolvedAppRoot
+    } else {
+        Get-FullPath -Path $PortableRoot
+    }
+} else {
+    $null
+}
+
 if ([string]::IsNullOrWhiteSpace($DataRoot)) {
     $DataRoot = if ($UsePortableDataRoot) {
-        Join-Path $resolvedAppRoot "App_Data"
+        Join-Path $resolvedPortableRoot "App_Data"
     } elseif ($VerifySalesWorkspace) {
         Join-Path $resolvedAppRoot ("App_Data\SalesWorkspaceSmoke-{0:yyyyMMdd-HHmmss}-{1}" -f (Get-Date), $PID)
     } elseif ($VerifySingleWindowOperationCenter) {
@@ -1147,11 +1163,15 @@ Assert-NonSystemDrivePath -Path $resolvedAppRoot -Purpose "Tauri smoke app root"
 Assert-NonSystemDrivePath -Path $resolvedDataRoot -Purpose "Tauri smoke data root"
 
 if ($UsePortableDataRoot) {
-    $portableMarker = Join-Path $resolvedAppRoot "portable-runtime.json"
+    Assert-NonSystemDrivePath -Path $resolvedPortableRoot -Purpose "Tauri smoke portable root"
+    $portableMarker = Join-Path $resolvedPortableRoot "portable-runtime.json"
     if (-not (Test-Path -LiteralPath $portableMarker -PathType Leaf)) {
         throw "Portable runtime marker was not found: $portableMarker"
     }
-    Assert-SamePath -Actual $resolvedDataRoot -Expected (Join-Path $resolvedAppRoot "App_Data") -Purpose "Portable smoke data root"
+    if (-not (Test-Path -LiteralPath (Join-Path $resolvedAppRoot "runtime-layout.json") -PathType Leaf)) {
+        throw "Portable packaged resource root is missing runtime-layout.json: $resolvedAppRoot"
+    }
+    Assert-SamePath -Actual $resolvedDataRoot -Expected (Join-Path $resolvedPortableRoot "App_Data") -Purpose "Portable smoke data root"
 }
 
 $tauriExe = if ([string]::IsNullOrWhiteSpace($ExecutablePath)) {
@@ -1233,6 +1253,10 @@ try {
     if (-not $UseDefaultAppRoot) {
         $tauriArgumentList += @("--app-root", $resolvedAppRoot)
         $tauriEnvironment["EXPORTDOCMANAGER_APP_ROOT"] = $resolvedAppRoot
+    }
+    if ($UsePortableDataRoot) {
+        $tauriArgumentList += @("--portable-root", $resolvedPortableRoot)
+        $tauriEnvironment["EXPORTDOCMANAGER_PORTABLE_ROOT"] = $resolvedPortableRoot
     }
     if (-not $usesRuntimePathsConfig -and -not $UsePortableDataRoot) {
         $tauriArgumentList += @("--data-root", $resolvedDataRoot)

@@ -145,6 +145,7 @@ namespace ExportDocManager.Services.Data
                 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
                 var worksheets = new List<IExcelImportWorksheet>();
+                ExcelWorkbookResourceBudget workbookBudget = ExcelWorkbookResourcePolicy.CreateLogicalBudget();
                 using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 using var reader = ExcelReaderFactory.CreateReader(stream);
 
@@ -152,11 +153,15 @@ namespace ExportDocManager.Services.Data
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
+                    ExcelWorksheetResourceBudget worksheetBudget = workbookBudget.StartWorksheet(reader.Name);
                     var rows = new List<object[]>();
+                    int rowNumber = 0;
                     while (reader.Read())
                     {
                         cancellationToken.ThrowIfCancellationRequested();
 
+                        rowNumber++;
+                        worksheetBudget.RegisterRow(rowNumber, reader.FieldCount, reader.FieldCount);
                         var values = new object[reader.FieldCount];
                         for (int index = 0; index < reader.FieldCount; index++)
                         {
@@ -249,4 +254,3 @@ namespace ExportDocManager.Services.Data
             }
         }    }
 }
-

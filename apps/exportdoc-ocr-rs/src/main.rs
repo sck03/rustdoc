@@ -1,28 +1,30 @@
 use anyhow::{anyhow, bail, Context, Result};
-use image::{imageops, DynamicImage, GrayImage, Rgb, RgbImage};
-use ndarray::Array4;
+use image::{imageops, RgbImage};
 use ort::{session::Session, value::Tensor};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::VecDeque,
     env, fs,
     io::{self, BufRead, Write},
     path::{Path, PathBuf},
 };
 
-const DET_MAX_SIDE: u32 = 960;
-const DET_BINARY_THRESHOLD: f32 = 0.20;
+mod image_processing;
+mod recognition;
+
+use image_processing::{
+    box_score, component_rects, det_size, expand_ratio, merge_lines, pad_rect, pixel_count,
+    recognition_candidates, rgb_tensor, validate_image_dimensions, Rect,
+};
+use recognition::{decode_ctc, load_labels, text_quality};
+
 const DET_BOX_THRESHOLD: f32 = 0.45;
 const DET_UNCLIP_RATIO: f32 = 1.40;
 const REC_HEIGHT: u32 = 48;
 const REC_MAX_WIDTH: u32 = 3200;
 const MAX_IMAGE_BYTES: u64 = 25 * 1024 * 1024;
-const MAX_IMAGE_SIDE: u32 = 16_384;
-const MAX_IMAGE_PIXELS: u64 = 40_000_000;
 const MAX_DETECTED_BOXES: usize = 2_000;
 const MAX_MERGED_LINES: usize = 1_000;
 const MAX_FALLBACK_RECOGNITION_PIXELS: u64 = 4_000_000;
-const MAX_RECOGNITION_CANDIDATE_PIXELS: u64 = 4_000_000;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,14 +50,6 @@ struct Response {
 struct OcrLine {
     text: String,
     confidence: f32,
-    x: u32,
-    y: u32,
-    width: u32,
-    height: u32,
-}
-
-#[derive(Clone, Copy)]
-struct Rect {
     x: u32,
     y: u32,
     width: u32,
@@ -294,326 +288,6 @@ impl Engine {
     }
 }
 
-fn rgb_tensor(img: &RgbImage, detection: bool) -> Array4<f32> {
-    let (w, h) = img.dimensions();
-    let mut a = Array4::zeros((1, 3, h as usize, w as usize));
-    let mean = [0.485, 0.456, 0.406];
-    let std = [0.229, 0.224, 0.225];
-    for y in 0..h {
-        for x in 0..w {
-            let p = img.get_pixel(x, y);
-            let bgr = [p[2], p[1], p[0]];
-            for c in 0..3 {
-                let v = bgr[c] as f32 / 255.0;
-                a[[0, c, y as usize, x as usize]] = if detection {
-                    (v - mean[c]) / std[c]
-                } else {
-                    (v - 0.5) / 0.5
-                };
-            }
-        }
-    }
-    a
-}
-fn component_rects(map: &[f32], w: usize, h: usize) -> Vec<Rect> {
-    let mut seen = vec![false; w * h];
-    let mut out = vec![];
-    for i in 0..w * h {
-        if seen[i] || map[i] <= DET_BINARY_THRESHOLD {
-            continue;
-        }
-        let mut q = VecDeque::from([i]);
-        seen[i] = true;
-        let (mut minx, mut maxx, mut miny, mut maxy) = (w, 0, h, 0);
-        while let Some(v) = q.pop_front() {
-            let x = v % w;
-            let y = v / w;
-            minx = minx.min(x);
-            maxx = maxx.max(x);
-            miny = miny.min(y);
-            maxy = maxy.max(y);
-            for (nx, ny) in [
-                (x.wrapping_sub(1), y),
-                (x + 1, y),
-                (x, y.wrapping_sub(1)),
-                (x, y + 1),
-            ] {
-                if nx < w && ny < h {
-                    let n = ny * w + nx;
-                    if !seen[n] && map[n] > DET_BINARY_THRESHOLD {
-                        seen[n] = true;
-                        q.push_back(n)
-                    }
-                }
-            }
-        }
-        let r = Rect {
-            x: minx as u32,
-            y: miny as u32,
-            width: (maxx - minx + 1) as u32,
-            height: (maxy - miny + 1) as u32,
-        };
-        if r.width >= 3 && r.height >= 3 {
-            out.push(r)
-        }
-    }
-    out
-}
-fn box_score(map: &[f32], w: usize, r: Rect) -> f32 {
-    let mut sum = 0.;
-    let mut n = 0;
-    for y in r.y..r.y + r.height {
-        for x in r.x..r.x + r.width {
-            let v = map[y as usize * w + x as usize];
-            if v > DET_BINARY_THRESHOLD {
-                sum += v;
-                n += 1
-            }
-        }
-    }
-    if n == 0 {
-        0.
-    } else {
-        sum / n as f32
-    }
-}
-fn det_size(w: u32, h: u32) -> (u32, u32) {
-    let s = (DET_MAX_SIDE as f64 / w.max(h) as f64).min(1.);
-    (
-        round32((w as f64 * s).round() as u32),
-        round32((h as f64 * s).round() as u32),
-    )
-}
-fn round32(v: u32) -> u32 {
-    (((v.max(32) + 16) / 32) * 32).max(32)
-}
-fn expand_ratio(r: Rect, mw: u32, mh: u32, ratio: f32) -> Rect {
-    let ex = r.width as f32 * (ratio - 1.) / 2.;
-    let ey = r.height as f32 * (ratio - 1.) / 2.;
-    let x = (r.x as f32 - ex).floor().max(0.) as u32;
-    let y = (r.y as f32 - ey).floor().max(0.) as u32;
-    let right = ((r.x + r.width) as f32 + ex).ceil().min(mw as f32) as u32;
-    let bottom = ((r.y + r.height) as f32 + ey).ceil().min(mh as f32) as u32;
-    Rect {
-        x,
-        y,
-        width: right.saturating_sub(x),
-        height: bottom.saturating_sub(y),
-    }
-}
-fn pad_rect(r: Rect, mw: u32, mh: u32, p: u32) -> Rect {
-    let x = r.x.saturating_sub(p);
-    let y = r.y.saturating_sub(p);
-    let right = (r.x + r.width + p).min(mw);
-    let bottom = (r.y + r.height + p).min(mh);
-    Rect {
-        x,
-        y,
-        width: right - x,
-        height: bottom - y,
-    }
-}
-fn merge_lines(mut rs: Vec<Rect>) -> Vec<Rect> {
-    rs.sort_by_key(|r| (r.y, r.x));
-    let mut out: Vec<Rect> = vec![];
-    for r in rs {
-        if let Some(i) = out.iter().position(|e| {
-            ((e.y + e.height / 2) as i64 - (r.y + r.height / 2) as i64).unsigned_abs()
-                <= 18.max(e.height.min(r.height)) as u64
-        }) {
-            let e = out[i];
-            let x = e.x.min(r.x);
-            let y = e.y.min(r.y);
-            let right = (e.x + e.width).max(r.x + r.width);
-            let bottom = (e.y + e.height).max(r.y + r.height);
-            out[i] = Rect {
-                x,
-                y,
-                width: right - x,
-                height: bottom - y,
-            }
-        } else {
-            out.push(r)
-        }
-    }
-    out.sort_by_key(|r| (r.y, r.x));
-    out
-}
-fn recognition_candidates(img: &RgbImage) -> Vec<RgbImage> {
-    let base = resize_to_pixel_limit(img, MAX_RECOGNITION_CANDIDATE_PIXELS);
-    let base_pixels = pixel_count(base.width(), base.height());
-    let mut out = vec![base.clone()];
-    if base_pixels <= MAX_RECOGNITION_CANDIDATE_PIXELS / 4 {
-        out.push(imageops::resize(
-            &base,
-            base.width() * 2,
-            base.height() * 2,
-            imageops::FilterType::CatmullRom,
-        ));
-    }
-    let gray = DynamicImage::ImageRgb8(base).to_luma8();
-    let t = otsu(&gray);
-    let binary = RgbImage::from_fn(gray.width(), gray.height(), |x, y| {
-        let v = if gray.get_pixel(x, y)[0] > t { 255 } else { 0 };
-        Rgb([v, v, v])
-    });
-    out.push(binary);
-    out
-}
-
-fn validate_image_dimensions(width: u32, height: u32) -> Result<()> {
-    if width == 0 || height == 0 {
-        bail!("image dimensions must be non-zero")
-    }
-    if width > MAX_IMAGE_SIDE || height > MAX_IMAGE_SIDE {
-        bail!("image width and height must not exceed {MAX_IMAGE_SIDE} pixels")
-    }
-    if pixel_count(width, height) > MAX_IMAGE_PIXELS {
-        bail!("image must not exceed {MAX_IMAGE_PIXELS} pixels")
-    }
-    Ok(())
-}
-
-fn resize_to_pixel_limit(img: &RgbImage, maximum_pixels: u64) -> RgbImage {
-    let pixels = pixel_count(img.width(), img.height());
-    if pixels <= maximum_pixels || maximum_pixels == 0 {
-        return img.clone();
-    }
-
-    let scale = (maximum_pixels as f64 / pixels as f64).sqrt();
-    let width = ((img.width() as f64 * scale).floor() as u32).max(1);
-    let height = ((img.height() as f64 * scale).floor() as u32).max(1);
-    imageops::resize(img, width, height, imageops::FilterType::Triangle)
-}
-
-fn pixel_count(width: u32, height: u32) -> u64 {
-    u64::from(width) * u64::from(height)
-}
-fn otsu(g: &GrayImage) -> u8 {
-    let mut hist = [0u64; 256];
-    for p in g.pixels() {
-        hist[p[0] as usize] += 1
-    }
-    let total = g.width() as u64 * g.height() as u64;
-    let sum: f64 = hist
-        .iter()
-        .enumerate()
-        .map(|(i, n)| i as f64 * (*n as f64))
-        .sum();
-    let (mut wb, mut sb, mut best, mut threshold) = (0u64, 0f64, -1f64, 0u8);
-    for (t, n) in hist.iter().enumerate() {
-        wb += *n;
-        if wb == 0 {
-            continue;
-        }
-        let wf = total - wb;
-        if wf == 0 {
-            break;
-        }
-        sb += t as f64 * (*n as f64);
-        let mb = sb / wb as f64;
-        let mf = (sum - sb) / wf as f64;
-        let between = wb as f64 * wf as f64 * (mb - mf).powi(2);
-        if between > best {
-            best = between;
-            threshold = t as u8
-        }
-    }
-    threshold
-}
-fn decode_ctc(data: Vec<f32>, shape: &[usize], labels: &[String]) -> Result<(String, f32)> {
-    if shape.len() != 2 && shape.len() != 3 {
-        bail!("invalid recognition output shape")
-    }
-    if shape.len() == 3 && shape[0] != 1 {
-        bail!("recognition output batch size must be one")
-    }
-    let seq = if shape.len() == 3 { shape[1] } else { shape[0] };
-    let classes = shape[shape.len() - 1];
-    if seq == 0 || classes == 0 {
-        bail!("recognition output dimensions must be non-zero")
-    }
-    let required_len = seq
-        .checked_mul(classes)
-        .context("recognition output dimensions overflow")?;
-    if data.len() != required_len {
-        bail!(
-            "recognition output data length mismatch: expected {required_len}, got {}",
-            data.len()
-        )
-    }
-    if classes != labels.len() && classes != labels.len() + 1 && classes != labels.len() + 2 {
-        bail!(
-            "unsupported recognition output class count: expected {}, {} or {}, got {classes}",
-            labels.len(),
-            labels.len() + 1,
-            labels.len() + 2
-        )
-    }
-    if data.iter().any(|value| !value.is_finite()) {
-        bail!("recognition output contains a non-finite score")
-    }
-    let blank = classes == labels.len() + 1 || classes == labels.len() + 2;
-    let (mut last, mut text, mut sum, mut n) = (usize::MAX, String::new(), 0f32, 0usize);
-    for t in 0..seq {
-        let row = &data[t * classes..(t + 1) * classes];
-        let (idx, score) = row
-            .iter()
-            .copied()
-            .enumerate()
-            .max_by(|a, b| a.1.total_cmp(&b.1))
-            .ok_or_else(|| anyhow!("recognition output row is empty"))?;
-        if idx == last {
-            continue;
-        }
-        last = idx;
-        if blank && idx == 0 {
-            continue;
-        }
-        let li = if blank { idx - 1 } else { idx };
-        if li == labels.len() && classes == labels.len() + 2 {
-            text.push(' ');
-            sum += score;
-            n += 1;
-        } else if let Some(label) = labels.get(li) {
-            text.push_str(label);
-            sum += score;
-            n += 1
-        }
-    }
-    Ok((text, if n == 0 { 0. } else { sum / n as f32 }))
-}
-fn load_labels(path: &Path) -> Result<Vec<String>> {
-    let text = fs::read_to_string(path)?;
-    let mut in_dict = false;
-    let mut out = vec![];
-    for raw in text.lines() {
-        let t = raw.trim();
-        if !in_dict {
-            in_dict = t == "character_dict:";
-            continue;
-        }
-        let lead = raw.trim_start();
-        if !lead.starts_with('-') {
-            if !lead.is_empty() && !lead.starts_with('#') {
-                break;
-            }
-            continue;
-        }
-        let mut v = lead[1..].trim_start().trim().to_string();
-        if v.len() >= 2
-            && ((v.starts_with('\'') && v.ends_with('\''))
-                || (v.starts_with('"') && v.ends_with('"')))
-        {
-            v = v[1..v.len() - 1].to_string()
-        }
-        out.push(v)
-    }
-    if out.is_empty() {
-        bail!("character_dict is missing in {}", path.display())
-    }
-    Ok(out)
-}
 fn validate_image_path(value: &str, root: &Path) -> Result<PathBuf> {
     let root = fs::canonicalize(root)?;
     let path = fs::canonicalize(value)?;
@@ -638,107 +312,4 @@ fn thread_count() -> usize {
     std::thread::available_parallelism()
         .map(|n| n.get().clamp(1, 4))
         .unwrap_or(2)
-}
-
-fn text_quality(s: &str) -> usize {
-    s.chars()
-        .filter(|c| c.is_alphanumeric() || ('\u{4e00}'..='\u{9fff}').contains(c))
-        .count()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn merge_lines_combines_nearby_boxes_but_keeps_separate_rows() {
-        let merged = merge_lines(vec![
-            Rect {
-                x: 10,
-                y: 10,
-                width: 40,
-                height: 20,
-            },
-            Rect {
-                x: 55,
-                y: 12,
-                width: 35,
-                height: 18,
-            },
-            Rect {
-                x: 12,
-                y: 70,
-                width: 30,
-                height: 18,
-            },
-        ]);
-        assert_eq!(merged.len(), 2);
-        assert_eq!((merged[0].x, merged[0].width), (10, 80));
-    }
-
-    #[test]
-    fn decode_ctc_collapses_duplicates_and_maps_extra_class_to_space() {
-        let labels = vec!["A".to_string(), "B".to_string()];
-        let data = vec![
-            0.01, 0.95, 0.02, 0.02, 0.01, 0.96, 0.02, 0.01, 0.98, 0.01, 0.01, 0.00, 0.01, 0.01,
-            0.02, 0.96, 0.01, 0.02, 0.95, 0.02,
-        ];
-        let (text, confidence) = decode_ctc(data, &[1, 5, 4], &labels).unwrap();
-        assert_eq!(text, "A B");
-        assert!(confidence > 0.9);
-    }
-
-    #[test]
-    fn decode_ctc_rejects_invalid_shapes_and_batch_sizes() {
-        let labels = vec!["A".to_string()];
-
-        assert!(decode_ctc(vec![0.1], &[1], &labels).is_err());
-        assert!(decode_ctc(vec![0.1, 0.9, 0.2, 0.8], &[2, 1, 2], &labels).is_err());
-        assert!(decode_ctc(Vec::new(), &[1, 0, 2], &labels).is_err());
-    }
-
-    #[test]
-    fn decode_ctc_rejects_mismatched_or_overflowing_data_lengths() {
-        let labels = vec!["A".to_string()];
-
-        assert!(decode_ctc(vec![0.1], &[1, 2], &labels).is_err());
-        assert!(decode_ctc(Vec::new(), &[usize::MAX, 2], &labels).is_err());
-    }
-
-    #[test]
-    fn decode_ctc_rejects_unsupported_class_counts_and_non_finite_scores() {
-        let labels = vec!["A".to_string()];
-
-        assert!(decode_ctc(vec![0.1, 0.2, 0.3, 0.4], &[1, 4], &labels).is_err());
-        assert!(decode_ctc(vec![f32::NAN, 0.2], &[1, 2], &labels).is_err());
-        assert!(decode_ctc(vec![0.1, f32::INFINITY], &[1, 2], &labels).is_err());
-    }
-
-    #[test]
-    fn otsu_separates_dark_and_light_pixels() {
-        let mut image = GrayImage::new(20, 10);
-        for (x, y, pixel) in image.enumerate_pixels_mut() {
-            pixel.0[0] = if x < 10 { 10 } else { 240 };
-            let _ = y;
-        }
-        let threshold = otsu(&image);
-        assert!((10..=240).contains(&threshold));
-    }
-
-    #[test]
-    fn image_dimensions_reject_decompression_bomb_boundaries() {
-        assert!(validate_image_dimensions(0, 100).is_err());
-        assert!(validate_image_dimensions(MAX_IMAGE_SIDE + 1, 1).is_err());
-        assert!(validate_image_dimensions(10_000, 5_000).is_err());
-        assert!(validate_image_dimensions(5_000, 7_000).is_ok());
-    }
-
-    #[test]
-    fn recognition_preprocessing_respects_pixel_limit() {
-        let image = RgbImage::new(100, 100);
-        let resized = resize_to_pixel_limit(&image, 2_500);
-
-        assert!(pixel_count(resized.width(), resized.height()) <= 2_500);
-        assert_eq!((resized.width(), resized.height()), (50, 50));
-    }
 }

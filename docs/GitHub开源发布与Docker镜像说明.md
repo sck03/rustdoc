@@ -39,7 +39,7 @@ pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
 - `public-source-guard.yml`：当前只允许手工运行，检查公开边界、Action Node 24/Artifact 版本政策和 updater 信任契约。
 - `cross-platform-validation.yml`：只手工运行，检查 Windows、Linux、macOS 的 .NET/Web/Tauri 契约。
 - `browser-compatibility.yml`：Web/API 相关 push、PR 或手工运行；在真实 Firefox、WebKit 的桌面和手机视口检查登录、响应式分类、横向溢出、页面异常、HTTP 500 和严重无障碍问题。
-- `container-images.yml`：只手工运行；启动时填写版本号并选择是否更新 `latest`，随后构建 `linux/amd64`、`linux/arm64` 的 API/Browser/Web 三个镜像并发布到 GHCR。
+- `container-images.yml`：只手工运行；启动时填写版本号并选择是否更新 `latest`，先分别构建 `linux/amd64`、`linux/arm64` 的 API/Browser/Web 三个不可变 revision 镜像，三者全部成功后才原子提升版本标签并生成带 digest/revision 的发布清单。
 - `windows-desktop-package.yml`：只手工运行；选择版本和 Document/Sales/Full，构建 Windows x64 NSIS 安装包和 ZIP 绿色便携包。
 - `linux-desktop-package.yml`：只手工运行；选择版本、产品版本和 x64/ARM64 架构，构建对应 deb/AppImage，并额外生成 tar.gz 绿色便携包。
 - `macos-desktop-package.yml`：只手工运行；选择版本和产品版本，固定构建 Apple Silicon ARM64 macOS dmg 和完整 `.app` tar.gz 绿色便携包，并内置官方 `mac-arm64` Chrome Headless Shell。
@@ -50,9 +50,9 @@ pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
 
 公开源码守卫、跨平台验证、容器发布和三个桌面打包入口当前都在仓库 Actions 页面点击 “Run workflow” 后执行；字体、PostgreSQL、容器生命周期和依赖治理另按各自路径/定时规则运行。项目当前不启用 Dependabot 自动版本 PR，避免多个依赖生态同时创建分支并放大 Actions 数量；依赖升级由维护者集中检查 package/lock 文件后人工提交。
 
-手工发布 Docker 镜像时：进入 Actions → Build and publish container images → Run workflow，填写 `version`，例如 `0.1.2` 或 `0.1.2-beta.1`；`publish_latest=true` 时同时覆盖 `latest`。工作流会在临时 runner 中同步 `.NET/Web/Tauri/Rust` 内部版本，不会反向修改或提交仓库源码。最终镜像同时带版本标签和 `sha-*` 标签。
+手工发布 Docker 镜像时：进入 Actions → Build and publish container images → Run workflow，填写 `version`，例如 `0.1.2` 或 `0.1.2-beta.1`；`publish_latest=true` 时只会在三个版本标签全部核验成功后更新 `latest`。工作流会在临时 runner 中同步 `.NET/Web/Tauri/Rust` 内部版本，不会反向修改或提交仓库源码。构建阶段只推送绑定“完整提交 + 版本”的 `sha-<完整提交>-<版本>` 候选标签，避免同一提交用不同版本参数运行时相互覆盖；版本标签已存在且 digest 不同会直接失败，不能覆盖。最终 Artifact `export-doc-manager-container-<版本>-manifest` 记录三个镜像的 digest、版本和完整源码 revision，部署时必须同时使用版本与该 revision。
 
-手工生成桌面包时，进入对应的 `Build Windows/Linux/macOS desktop package` → `Run workflow`，填写版本并选择产品版；macOS 固定为 Apple Silicon ARM64。默认会得到 `...-installer` 与 `...-portable` 两个 Artifact，保留 14 天。便携包按平台使用 Windows ZIP、Linux tar.gz（内含已解包复验的 AppImage）和 macOS tar.gz（内含完整 `.app`），解包目录旁的 `App_Data` 是唯一便携运行数据根；归档自带 `SHA256SUMS` 和独立 `.sha256`。只有把 `publish_release` 改为 `true` 才会发布：Document、Sales、Full 分别进入 `exportdocmanager-document-v<版本>`、`exportdocmanager-sales-v<版本>`、`exportdocmanager-full-v<版本>` 的不可覆盖版本 Release，并分别更新自己的稳定或预发布通道清单。三个入口都会自动下载当前平台的 Chrome Headless Shell，并在打包前后验证浏览器可执行文件已经进入 Tauri 资源目录，因此最终安装版和便携版都不要求普通用户另行下载浏览器。源码仓库仍不保存这些大体积二进制。虽然 Chrome for Testing 仍提供 `mac-x64`，ONNX Runtime `1.28.0` 官方包已不提供 Intel macOS native，因此项目不生成残缺的 Intel dmg 或 `.app` 便携包；Windows ARM64 没有对应官方 Chrome Headless Shell，仍只保留应用编译契约，不能把 x64 浏览器伪装成 ARM64 交付。
+手工生成桌面包时，进入对应的 `Build Windows/Linux/macOS desktop package` → `Run workflow`，填写版本并选择产品版；macOS 固定为 Apple Silicon ARM64。默认会得到 `...-installer` 与 `...-portable` 两个 Artifact，保留 14 天。便携包按平台使用 Windows ZIP、Linux tar.gz（内含已解包复验并真实启动的 AppImage）和 macOS tar.gz（内含已真实启动的完整 `.app`），解包目录旁的 `App_Data` 是唯一便携运行数据根；归档自带 `SHA256SUMS` 和独立 `.sha256`。只有把 `publish_release` 改为 `true` 才会发布：Document、Sales、Full 分别进入 `exportdocmanager-document-v<版本>`、`exportdocmanager-sales-v<版本>`、`exportdocmanager-full-v<版本>` 的不可覆盖版本 Release，并分别更新自己的稳定或预发布通道清单。Document 与 Full 会自动下载当前平台的 Chrome Headless Shell，并在打包前后验证浏览器可执行文件已经进入 Tauri 资源目录；Sales 不提供报表渲染、OCR、单证资源或 Excel 分析能力，因此明确裁剪这些运行时，不再携带数百 MiB 的无用浏览器和模型。三产品版都不要求普通用户另行补装其已启用能力所需的资源，源码仓库仍不保存大体积二进制。虽然 Chrome for Testing 仍提供 `mac-x64`，ONNX Runtime `1.28.0` 官方包已不提供 Intel macOS native，因此项目不生成残缺的 Intel dmg 或 `.app` 便携包；Windows ARM64 没有对应官方 Chrome Headless Shell，仍只保留应用编译契约，不能把 x64 浏览器伪装成 ARM64 交付。
 
 三产品版使用独立应用身份和更新信任材料：identifier 分别为 `com.exportdocmanager.desktop.document`、`com.exportdocmanager.desktop.sales`、`com.exportdocmanager.desktop.full`；仓库 Variables/Secrets 也按 `_DOCUMENT / _SALES / _FULL` 分开配置 updater 公钥、带密码私钥和私钥密码。`publish_release=false` 生成未签名验收 Artifact；`publish_release=true` 强制生成并校验 Tauri updater `.sig` 和独立 `latest-*.json`。Windows Authenticode、macOS Developer ID 和 Apple 公证按当前项目阶段暂缓，不是本轮 GitHub 构建门禁；正式商业分发前再配置并完成安装、升级、回滚和卸载验收。系统级代码签名暂缓不影响 updater 包签名继续强制。
 
@@ -75,6 +75,7 @@ ghcr.io/<github-owner>/export-doc-manager-web:<tag>
 ```dotenv
 EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/你的github账号
 EXPORTDOCMANAGER_IMAGE_TAG=0.1.2
+EXPORTDOCMANAGER_IMAGE_REVISION=与0.1.2发布清单一致的完整40位提交SHA
 ```
 
 初始化运行目录并启动（初始化脚本会自动选择不与宿主机接口、路由表和 Docker 网络重叠的紧凑 `/28`；企业 VPN 有大范围路由时可用 `-ContainerSubnet/-ReverseProxyIp` 显式指定 `/24` 至 `/28`）：
@@ -84,7 +85,7 @@ pwsh -NoProfile -File deploy/container/initialize-container-runtime.ps1
 docker compose -f deploy/container/docker-compose.ghcr.yml --env-file deploy/container/.env up -d
 ```
 
-数据库、配置、日志、缓存和导出任务全部位于 `EXPORTDOCMANAGER_RUNTIME_ROOT` 指定目录，默认是 `deploy/container/runtime/`，不会写入源码仓库，也不依赖系统 C 盘用户目录。隔离 Browser 的可重建 profile/缓存位于 `runtime/browser/`；API 临时报表目录以只读方式共享给 Browser，数据库 secrets 和 backend 网络不会进入 Browser 容器。正式部署应使用已发布的精确版本标签，不使用可变 `latest`。
+数据库、配置、日志、缓存和导出任务全部位于 `EXPORTDOCMANAGER_RUNTIME_ROOT` 指定目录，默认是 `deploy/container/runtime/`，不会写入源码仓库，也不依赖系统 C 盘用户目录。隔离 Browser 的可重建 profile/缓存位于 `runtime/browser/`；API 临时报表目录以只读方式共享给 Browser，数据库 secrets 和 backend 网络不会进入 Browser 容器。正式部署应使用已发布的精确版本标签和同一发布清单中的完整 revision，不使用可变 `latest`，也不要混合三次构建的组件标签。
 
 ## 5. 是否可从 GitHub 网页直接上传
 

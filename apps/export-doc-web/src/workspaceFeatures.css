@@ -57,9 +57,9 @@
   gap: 10px;
   min-width: 0;
   padding: 10px;
-  background: #ffffff;
-  border: 1px solid #dde3e8;
-  border-radius: 8px;
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line);
+  border-radius: var(--edm-radius-md);
 }
 
 .invoice-items-focus-title {

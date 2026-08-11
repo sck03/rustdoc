@@ -220,6 +220,59 @@ public sealed class SecurityAndResourceBoundaryTests
     }
 
     [Fact]
+    public void ExcelWorkbookResourcePolicy_ShouldRejectWorksheetBeyondLogicalBudget()
+    {
+        using var package = CreateZipStream((
+            "xl/worksheets/sheet1.xml",
+            "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"11\"><c r=\"A11\" /></row></sheetData></worksheet>"));
+        var limits = new ExcelWorkbookResourceLimits(
+            MaximumPackageBytes: 4096,
+            MaximumEntries: 4,
+            MaximumEntryBytes: 2048,
+            MaximumTotalExpandedBytes: 4096,
+            MaximumCompressionRatio: 500,
+            MaximumWorksheets: 1,
+            MaximumRowsPerWorksheet: 10,
+            MaximumColumnsPerWorksheet: 4,
+            MaximumTotalCells: 10);
+
+        var exception = Assert.Throws<InvalidDataException>(() =>
+            ExcelWorkbookResourcePolicy.ValidateOpenXmlPackage(package, limits));
+
+        Assert.Contains("行数超过", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExcelWorkbookResourcePolicy_ShouldRejectOverflowingCellRowReference()
+    {
+        using var package = CreateZipStream((
+            "xl/worksheets/sheet1.xml",
+            "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row><c r=\"A9999999999\" /></row></sheetData></worksheet>"));
+
+        var exception = Assert.Throws<InvalidDataException>(() =>
+            ExcelWorkbookResourcePolicy.ValidateOpenXmlPackage(package));
+
+        Assert.Contains("单元格行号无效", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExcelWorkbookResourceBudget_ShouldRejectCellCountBeforeAllocatingRows()
+    {
+        var limits = new ExcelWorkbookResourceLimits(
+            MaximumWorksheets: 1,
+            MaximumRowsPerWorksheet: 10,
+            MaximumColumnsPerWorksheet: 10,
+            MaximumTotalCells: 4);
+        var budget = new ExcelWorkbookResourceBudget(limits);
+        ExcelWorksheetResourceBudget worksheet = budget.StartWorksheet("LegacySheet");
+
+        var exception = Assert.Throws<InvalidDataException>(() =>
+            worksheet.RegisterRow(rowNumber: 1, maximumColumn: 5, cellCount: 5));
+
+        Assert.Contains("单元格总数", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TextLogCleanup_ShouldApplyRetentionCountAcrossLogAndTxtFiles()
     {
         string root = CreateTempDirectory("text-log-retention");

@@ -34,6 +34,7 @@ public sealed class DesktopPortablePackagingContractTests
 
         Assert.Contains("verify-package-payload.ps1", script, StringComparison.Ordinal);
         Assert.Contains("-Profile Desktop", script, StringComparison.Ordinal);
+        Assert.Contains("-Edition $Edition", script, StringComparison.Ordinal);
         Assert.Contains("portable-runtime.json", script, StringComparison.Ordinal);
         Assert.Contains("portable-package.json", script, StringComparison.Ordinal);
         Assert.Contains("version.json", script, StringComparison.Ordinal);
@@ -50,11 +51,23 @@ public sealed class DesktopPortablePackagingContractTests
         Assert.Contains("notarized = $false", script, StringComparison.Ordinal);
         Assert.Contains("must not contain App_Data", script, StringComparison.Ordinal);
         Assert.Contains("smoke-tauri-desktop.ps1", script, StringComparison.Ordinal);
-        Assert.Contains("-UseDefaultAppRoot", script, StringComparison.Ordinal);
-        Assert.Contains("-UsePortableDataRoot", script, StringComparison.Ordinal);
+        Assert.Contains("UsePortableDataRoot = $true", script, StringComparison.Ordinal);
+        Assert.Contains("$smokeArguments.UseDefaultAppRoot = $true", script, StringComparison.Ordinal);
+        Assert.Contains("PortableRoot = $portableRoot", script, StringComparison.Ordinal);
+        Assert.Contains("$launchExecutablePath = Join-Path (Join-Path $inspectionRoot \"squashfs-root\") \"AppRun\"", script, StringComparison.Ordinal);
+        Assert.Contains("Resolve-MacOsBundleExecutable", script, StringComparison.Ordinal);
+        Assert.Contains("bundledReportBrowser = [bool]$editionMetadata.resourceProfile.browserRenderer", script, StringComparison.Ordinal);
         Assert.Contains("Portable launch smoke data cleanup", script, StringComparison.Ordinal);
         Assert.DoesNotContain("signtool", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("codesign", script, StringComparison.OrdinalIgnoreCase);
+
+        string workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "desktop-package-reusable.yml"));
+        Assert.Contains("publish:", workflow, StringComparison.Ordinal);
+        Assert.Contains("permissions:\n      contents: read", workflow.Replace("\r\n", "\n"), StringComparison.Ordinal);
+        Assert.Contains("permissions:\n      actions: read\n      contents: write", workflow.Replace("\r\n", "\n"), StringComparison.Ordinal);
+        Assert.Contains("needs.package.outputs.version", workflow, StringComparison.Ordinal);
+        Assert.Contains("actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("permissions:\n  contents: write", workflow.Replace("\r\n", "\n"), StringComparison.Ordinal);
         Assert.DoesNotContain("notarytool", script, StringComparison.OrdinalIgnoreCase);
     }
 

@@ -1,7 +1,10 @@
 import type { ApiContainerPackingAnalysisDto, ApiPackedCargoItemDto } from "../../../api/index.ts";
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
 import { signedArgbToColorHex } from "./containerPackingModel.ts";
-import type { ContainerPackingRenderBlockSource, ContainerPackingVisualizationDimensions } from "./ContainerPackingVisualization.tsx";
+import type {
+  ContainerPackingRenderBlockSource,
+  ContainerPackingVisualizationDimensions,
+} from "./containerPackingVisualizationModel.ts";
 
 const maxContainerPackingGridSegments = 18;
 type ContainerPackingViewKind = "top" | "side" | "door";
@@ -430,4 +433,3 @@ function clampNumber(value: number, min: number, max: number) {
 
   return Math.min(Math.max(value, min), max);
 }
-

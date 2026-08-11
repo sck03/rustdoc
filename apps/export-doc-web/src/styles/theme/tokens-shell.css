@@ -525,9 +525,8 @@ h1 {
 .loading-panel,
 .settings-command-strip,
 .settings-category-nav,
-.detail-item,
-.agent-consignment-card,
-.invoice-items-focus-header {
+.workspace-surface-card,
+.detail-item {
   border-color: var(--edm-line);
   border-radius: var(--edm-radius-md);
   box-shadow: var(--edm-shadow-sm);

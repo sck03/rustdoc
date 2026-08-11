@@ -13,6 +13,7 @@ namespace ExportDocManager.Services.BrowserRuntime
         public const string StartupTimeoutEnvironmentVariable = "EXPORTDOCMANAGER_BROWSER_STARTUP_TIMEOUT_SECONDS";
         public const string RecycleUsesEnvironmentVariable = "EXPORTDOCMANAGER_BROWSER_AUTOMATION_RECYCLE_USES";
         public const string RecycleMinutesEnvironmentVariable = "EXPORTDOCMANAGER_BROWSER_AUTOMATION_RECYCLE_MINUTES";
+        public const string IdleTimeoutSecondsEnvironmentVariable = "EXPORTDOCMANAGER_BROWSER_IDLE_TIMEOUT_SECONDS";
         private static readonly TimeSpan BrowserShutdownTimeout = TimeSpan.FromSeconds(5);
 
         private readonly BrowserRuntimeManager _runtime;
@@ -21,6 +22,7 @@ namespace ExportDocManager.Services.BrowserRuntime
         private readonly BrowserNavigationPolicy _navigationPolicy;
         private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
         private readonly CancellationTokenSource _shutdownSource = new();
+        private readonly AsyncIdleActionScheduler _idleRecycleScheduler;
         private readonly object _disposeSync = new();
         private IPlaywright _playwright;
         private IBrowser _browser;
@@ -48,6 +50,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _navigationPolicy = navigationPolicy;
+            _idleRecycleScheduler = new AsyncIdleActionScheduler(RecycleIdleBrowserAsync);
             CleanupStaleProfiles();
         }
 
@@ -182,6 +185,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
+                _idleRecycleScheduler.Cancel();
                 ObjectDisposedException.ThrowIf(
                     _stopping || Volatile.Read(ref _disposed) != 0,
                     this);
@@ -225,6 +229,10 @@ namespace ExportDocManager.Services.BrowserRuntime
                 {
                     await StopBrowserCoreAsync().ConfigureAwait(false);
                     _recycleRequested = false;
+                }
+                else if (_activeOperations == 0)
+                {
+                    ScheduleIdleRecycle();
                 }
                 drained = _activeOperations == 0;
             }
@@ -527,6 +535,36 @@ namespace ExportDocManager.Services.BrowserRuntime
                    DateTimeOffset.UtcNow - _startedAt >= TimeSpan.FromMinutes(maxMinutes);
         }
 
+        private void ScheduleIdleRecycle()
+        {
+            if (_browser == null || _remoteBrowser || _stopping)
+            {
+                return;
+            }
+
+            int idleSeconds = ReadPositiveInt(IdleTimeoutSecondsEnvironmentVariable, 120, 1, 3600);
+            _idleRecycleScheduler.Schedule(TimeSpan.FromSeconds(idleSeconds));
+        }
+
+        private async Task RecycleIdleBrowserAsync(CancellationToken cancellationToken)
+        {
+            await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (_stopping || _activeOperations != 0 || _remoteBrowser || _browser == null)
+                {
+                    return;
+                }
+
+                await StopBrowserCoreAsync().ConfigureAwait(false);
+                _recycleRequested = false;
+            }
+            finally
+            {
+                _lifecycleGate.Release();
+            }
+        }
+
         private void CleanupStaleProfiles()
         {
             try
@@ -582,6 +620,7 @@ namespace ExportDocManager.Services.BrowserRuntime
 
         private async Task StopBrowserCoreAsync()
         {
+            _idleRecycleScheduler.Cancel();
             IBrowser browser = _browser;
             _browser = null;
             if (browser != null)
@@ -648,6 +687,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             }
 
             _shutdownSource.Cancel();
+            _idleRecycleScheduler.Cancel();
             Task operationsDrained;
             await _lifecycleGate.WaitAsync().ConfigureAwait(false);
             try
@@ -701,6 +741,7 @@ namespace ExportDocManager.Services.BrowserRuntime
                 _lifecycleGate.Release();
             }
 
+            await _idleRecycleScheduler.DisposeAsync().ConfigureAwait(false);
             _shutdownSource.Dispose();
             _lifecycleGate.Dispose();
         }

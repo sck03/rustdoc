@@ -177,7 +177,8 @@ foreach ($edition in $Editions) {
         "-File", (Join-Path $scriptRoot "verify-package-payload.ps1"),
         "-PackageRoot", (Join-Path $artifactsRoot "tauri-bundle\resources"),
         "-Profile", "Desktop",
-        "-RuntimeIdentifier", "win-x64"
+        "-RuntimeIdentifier", "win-x64",
+        "-Edition", $edition
     )
 
     $installers = @(Get-ChildItem -LiteralPath $bundleRoot -Filter "*-setup.exe" -File)

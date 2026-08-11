@@ -42,8 +42,7 @@ namespace ExportDocManager.Api.Hosting
 
                     var exchangeRateSettings = EnsureExchangeRateSettings(settingsService.Settings);
                     var selectedCurrencies = GetConfiguredCurrencies(exchangeRateSettings);
-                    var rateDtos = (rates ?? [])
-                        .Where(rate => rate != null)
+                    var rateDtos = rates
                         .Select(ToApiDto)
                         .ToList();
                     var fetchedAt = DateTimeOffset.Now;
@@ -96,7 +95,7 @@ namespace ExportDocManager.Api.Hosting
 
                     return Results.Ok(new ApiExchangeRateAvailableCurrenciesResponse
                     {
-                        Currencies = (currencies ?? [])
+                        Currencies = currencies
                             .Where(currency => !string.IsNullOrWhiteSpace(currency))
                             .Select(currency => currency.Trim())
                             .Distinct(StringComparer.Ordinal)

@@ -4,15 +4,22 @@ import { fileURLToPath } from "node:url";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const workflowRoot = path.join(repositoryRoot, ".github", "workflows");
-const requiredVersions = new Map([
-  ["actions/checkout", "v5"],
-  ["actions/setup-dotnet", "v5"],
-  ["actions/setup-node", "v5"],
-  ["actions/setup-python", "v6"],
-  ["actions/upload-artifact", "v7"],
-  ["actions/download-artifact", "v8"],
+const requiredActions = new Map([
+  ["actions/checkout", "fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09"],
+  ["actions/setup-dotnet", "26b0ec14cb23fa6904739307f278c14f94c95bf1"],
+  ["actions/setup-node", "a0853c24544627f65ddf259abe73b1d18a591444"],
+  ["actions/setup-python", "ece7cb06caefa5fff74198d8649806c4678c61a1"],
+  ["actions/upload-artifact", "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"],
+  ["actions/download-artifact", "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"],
+  ["docker/metadata-action", "dc802804100637a589fabce1cb79ff13a1411302"],
+  ["docker/build-push-action", "53b7df96c91f9c12dcc8a07bcb9ccacbed38856a"],
+  ["docker/setup-qemu-action", "96fe6ef7f33517b61c61be40b68a1882f3264fb8"],
+  ["docker/setup-buildx-action", "bb05f3f5519dd87d3ba754cc423b652a5edd6d2c"],
+  ["docker/login-action", "dbcb813823bdd20940b903addbd779551569679f"],
+  ["dtolnay/rust-toolchain", "4360b52568e2003a75bf9bc1d59f33a8e3fc893c"],
 ]);
 const requiredDotNetSdk = "10.0.302";
+const requiredRustToolchain = "1.96.0";
 const failures = [];
 let actionCount = 0;
 
@@ -30,10 +37,15 @@ for (const entry of readdirSync(workflowRoot, { withFileTypes: true })) {
     const match = lines[index].match(/\buses:\s*([^\s#]+)@([^\s#]+)/u);
     if (!match) continue;
     actionCount += 1;
-    const [, action, version] = match;
-    const required = requiredVersions.get(action);
-    if (required && version !== required) {
-      failures.push(`${entry.name}:${index + 1}: ${action} must use @${required}, found @${version}.`);
+    const [, action, revision] = match;
+    const required = requiredActions.get(action);
+    if (!required) {
+      failures.push(`${entry.name}:${index + 1}: unreviewed third-party action ${action}.`);
+    } else if (revision !== required) {
+      failures.push(`${entry.name}:${index + 1}: ${action} must use reviewed commit ${required}, found ${revision}.`);
+    }
+    if (!/^[0-9a-f]{40}$/u.test(revision)) {
+      failures.push(`${entry.name}:${index + 1}: ${action} must be pinned to a full commit SHA.`);
     }
     if (action === "actions/setup-node") {
       const localBlock = lines.slice(index + 1, index + 8).join("\n");
@@ -47,6 +59,15 @@ for (const entry of readdirSync(workflowRoot, { withFileTypes: true })) {
       if (!new RegExp(`dotnet-version:\\s*["']?${escapedSdk}["']?\\s*$`, "mu").test(localBlock)) {
         failures.push(
           `${entry.name}:${index + 1}: actions/setup-dotnet must explicitly select ${requiredDotNetSdk}.`,
+        );
+      }
+    }
+    if (action === "dtolnay/rust-toolchain") {
+      const localBlock = lines.slice(index + 1, index + 8).join("\n");
+      const escapedToolchain = requiredRustToolchain.replaceAll(".", "\\.");
+      if (!new RegExp(`toolchain:\\s*["']?${escapedToolchain}["']?\\s*$`, "mu").test(localBlock)) {
+        failures.push(
+          `${entry.name}:${index + 1}: Rust setup must explicitly select ${requiredRustToolchain}.`,
         );
       }
     }
@@ -82,11 +103,16 @@ for (const entry of readdirSync(workflowRoot, { withFileTypes: true })) {
   }
 }
 
+const rootToolchain = readFileSync(path.join(repositoryRoot, "rust-toolchain.toml"), "utf8");
+if (!new RegExp(`channel\\s*=\\s*["']${requiredRustToolchain.replaceAll(".", "\\.")}["']`, "u").test(rootToolchain)) {
+  failures.push(`rust-toolchain.toml must pin Rust ${requiredRustToolchain}.`);
+}
+
 const dependencyWorkflowPath = path.join(workflowRoot, "dependency-governance.yml");
 const dependencyWorkflow = readFileSync(dependencyWorkflowPath, "utf8");
 const cargoAuditInvocations = dependencyWorkflow
   .split(/\r?\n/u)
-  .filter((line) => line.includes("cargo-audit\"") && line.includes("--file"));
+  .filter((line) => line.includes('cargo-audit"') && line.includes("--file"));
 if (cargoAuditInvocations.length !== 3) {
   failures.push(`dependency-governance.yml: expected 3 cargo-audit lock-file invocations, found ${cargoAuditInvocations.length}.`);
 }

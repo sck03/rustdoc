@@ -3,6 +3,7 @@ using ExportDocManager.Models.DTOs;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -38,8 +39,6 @@ namespace ExportDocManager.Services.Data
             ExcelImportSettings settings,
             CancellationToken cancellationToken = default)
         {
-            using IDisposable lease = await ExcelAnalysisExecutionGate.EnterAsync(cancellationToken)
-                .ConfigureAwait(false);
             settings ??= new ExcelImportSettings();
             var analyzerMode = ResolveAnalyzerMode();
             if (analyzerMode != ExcelAnalyzerMode.BuiltIn)
@@ -49,7 +48,7 @@ namespace ExportDocManager.Services.Data
             }
 
             return await _fallbackAnalyzer
-                .AnalyzeWithoutExecutionGateAsync(filePath, settings, cancellationToken)
+                .AnalyzeAsync(filePath, settings, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -62,7 +61,7 @@ namespace ExportDocManager.Services.Data
             if (string.IsNullOrWhiteSpace(analyzerPath))
             {
                 return await _fallbackAnalyzer
-                    .AnalyzeWithoutExecutionGateAsync(filePath, settings, cancellationToken)
+                    .AnalyzeAsync(filePath, settings, cancellationToken)
                     .ConfigureAwait(false);
             }
 
@@ -77,7 +76,7 @@ namespace ExportDocManager.Services.Data
                 }
 
                 var builtInReport = await _fallbackAnalyzer
-                    .AnalyzeWithoutExecutionGateAsync(filePath, settings, cancellationToken)
+                    .AnalyzeAsync(filePath, settings, cancellationToken)
                     .ConfigureAwait(false);
                 return MergeReports(rustReport, builtInReport);
             }
@@ -85,10 +84,10 @@ namespace ExportDocManager.Services.Data
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (IsRecoverableExternalAnalyzerFailure(ex))
             {
                 var builtInReport = await _fallbackAnalyzer
-                    .AnalyzeWithoutExecutionGateAsync(filePath, settings, cancellationToken)
+                    .AnalyzeAsync(filePath, settings, cancellationToken)
                     .ConfigureAwait(false);
                 builtInReport.Issues.Insert(0, new ExcelImportAnalysisIssue
                 {
@@ -573,6 +572,17 @@ namespace ExportDocManager.Services.Data
             catch
             {
             }
+        }
+
+        private static bool IsRecoverableExternalAnalyzerFailure(Exception exception)
+        {
+            return exception is ServiceException
+                or IOException
+                or UnauthorizedAccessException
+                or InvalidOperationException
+                or NotSupportedException
+                or JsonException
+                or Win32Exception;
         }
 
         private enum ExcelAnalyzerMode

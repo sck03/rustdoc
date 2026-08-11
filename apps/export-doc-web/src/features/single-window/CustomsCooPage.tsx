@@ -4,19 +4,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileCheck2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ApiCustomsCooAttachmentDto,
   ApiCustomsCooDocumentDto,
   ApiCustomsCooEditorOptionsResponse,
-  ApiCustomsCooItemDto,
-  ApiCustomsCooNonpartyCorpDto,
   ApiCustomsCooOptionDto,
   ApiSingleWindowIssuingAuthorityOptionDto,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { selectCustomsCooAttachmentFiles } from "../../desktop/desktopBridge.ts";
-import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
@@ -38,6 +33,7 @@ import { SingleWindowTabs } from "./SingleWindowNavigation.tsx";
 import { useSingleWindowLockedFields } from "./useSingleWindowLockedFields.ts";
 import { useCustomsCooProducerProfiles } from "./useCustomsCooProducerProfiles.ts";
 import { useCustomsCooAuthoritySelection } from "./useCustomsCooAuthoritySelection.ts";
+import { useCustomsCooDocumentEditor } from "./useCustomsCooDocumentEditor.ts";
 import {
   applyCooDefaultsForScope,
   applyCooDefaultsToEmptyFields,
@@ -48,21 +44,8 @@ import {
 } from "./singleWindowEditorTools.ts";
 import {
   buildCooDocumentSnapshot,
-  buildCooGoodsDescription,
-  copyCooOriginAndEnterpriseFields,
-  createAttachmentFromPath,
-  createEmptyCooItem,
-  createEmptyNonpartyCorp,
   formatScopedClearResultMessage,
-  getCooGoodsDescriptionFailureMessage,
-  isMeaningfulCooItem,
-  isMeaningfulNonpartyCorp,
-  normalizeAttachment,
   normalizeCooDocumentForSave,
-  normalizeCooItem,
-  normalizeNonpartyCorp,
-  normalizeText,
-  numberOrZero,
   toIssuingAuthorityOptions,
   type CooScopedClearRequest,
 } from "./customsCooModel.ts";
@@ -115,6 +98,28 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [persistedDocumentSnapshot, setPersistedDocumentSnapshot] = useState<string | null>(null);
+  const {
+    addAttachmentsFromDialog,
+    addItem,
+    addNonpartyCorp,
+    copyOriginAndEnterpriseToFollowingRows: handleCopyOriginAndEnterpriseToFollowingRows,
+    generateGoodsDescription: handleGenerateGoodsDescription,
+    patchAttachment,
+    patchDocument,
+    patchItem,
+    patchNonpartyCorp,
+    removeAttachment,
+    removeItem,
+    removeNonpartyCorp,
+    undoToolAction: handleUndoToolAction,
+  } = useCustomsCooDocumentEditor({
+    document,
+    undoDocument,
+    setDocument,
+    setUndoDocument,
+    setMessage,
+    setSuccessMessage,
+  });
 
   const documentQuery = useQuery({
     queryKey: documentQueryKey,
@@ -380,172 +385,6 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     });
   }
 
-  function patchDocument(next: Partial<ApiCustomsCooDocumentDto>) {
-    setDocument((current) => (current ? { ...current, ...next } : current));
-    setUndoDocument(null);
-    setSuccessMessage(null);
-  }
-
-  function patchItem(index: number, next: Partial<ApiCustomsCooItemDto>) {
-    setDocument((current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        items: current.items.map((item, itemIndex) => (itemIndex === index ? { ...item, ...next } : item)),
-      };
-    });
-    setUndoDocument(null);
-    setSuccessMessage(null);
-  }
-
-  function addItem() {
-    setDocument((current) => {
-      if (!current) {
-        return current;
-      }
-
-      const nextGNo = Math.max(0, ...current.items.map((item) => numberOrZero(item.gNo))) + 1;
-      return {
-        ...current,
-        items: [...current.items, createEmptyCooItem(current.id, nextGNo, current.invNo)],
-      };
-    });
-    setUndoDocument(null);
-    setSuccessMessage(null);
-  }
-
-  function removeItem(index: number) {
-    setDocument((current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        items: current.items.filter((_, itemIndex) => itemIndex !== index),
-      };
-    });
-    setUndoDocument(null);
-    setSuccessMessage(null);
-  }
-
-  function patchNonpartyCorp(index: number, next: Partial<ApiCustomsCooNonpartyCorpDto>) {
-    setDocument((current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        nonpartyCorps: current.nonpartyCorps.map((corp, corpIndex) => (corpIndex === index ? { ...corp, ...next } : corp)),
-      };
-    });
-    setUndoDocument(null);
-    setSuccessMessage(null);
-  }
-
-  function addNonpartyCorp() {
-    setDocument((current) => {
-      if (!current) {
-        return current;
-      }
-
-      const nextSortNo = Math.max(0, ...current.nonpartyCorps.map((corp) => numberOrZero(corp.sortNo))) + 1;
-      return {
-        ...current,
-        nonpartyCorps: [...current.nonpartyCorps, createEmptyNonpartyCorp(current.id, nextSortNo)],
-      };
-    });
-    setUndoDocument(null);
-    setSuccessMessage(null);
-  }
-
-  function removeNonpartyCorp(index: number) {
-    setDocument((current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        nonpartyCorps: current.nonpartyCorps.filter((_, corpIndex) => corpIndex !== index),
-      };
-    });
-    setUndoDocument(null);
-    setSuccessMessage(null);
-  }
-
-  async function addAttachmentsFromDialog() {
-    try {
-      const selectedFiles = await selectCustomsCooAttachmentFiles();
-      if (!selectedFiles.length) {
-        return;
-      }
-
-      setDocument((current) => {
-        if (!current) {
-          return current;
-        }
-
-        let nextSortOrder = Math.max(0, ...current.attachments.map((attachment) => numberOrZero(attachment.sortOrder))) + 1;
-        const newAttachments = selectedFiles
-          .map((filePath) => filePath.trim())
-          .filter(Boolean)
-          .map((filePath) => createAttachmentFromPath(current, filePath, nextSortOrder++));
-
-        if (!newAttachments.length) {
-          return current;
-        }
-
-        return {
-          ...current,
-          attachments: [...current.attachments, ...newAttachments],
-        };
-      });
-      setUndoDocument(null);
-      setMessage(null);
-      setSuccessMessage(`已添加 ${selectedFiles.length} 个附件，保存后写入草稿。`);
-    } catch (error) {
-      setMessage(readDesktopError(error));
-      setSuccessMessage(null);
-    }
-  }
-
-  function patchAttachment(index: number, next: Partial<ApiCustomsCooAttachmentDto>) {
-    setDocument((current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        attachments: current.attachments.map((attachment, attachmentIndex) =>
-          attachmentIndex === index ? { ...attachment, ...next } : attachment,
-        ),
-      };
-    });
-    setUndoDocument(null);
-    setSuccessMessage(null);
-  }
-
-  function removeAttachment(index: number) {
-    setDocument((current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        attachments: current.attachments.filter((_, attachmentIndex) => attachmentIndex !== index),
-      };
-    });
-    setUndoDocument(null);
-    setSuccessMessage(null);
-  }
-
   async function handleRestoreDefaults() {
     if (!document || !isInvoiceIdValid) {
       return;
@@ -622,83 +461,6 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
       categoryKey,
       categoryLabel,
     });
-  }
-
-  function handleGenerateGoodsDescription(index: number) {
-    if (!document || !document.items[index]) {
-      return;
-    }
-
-    const item = document.items[index];
-    const generated = buildCooGoodsDescription(item);
-    if (!generated) {
-      setMessage(getCooGoodsDescriptionFailureMessage(item));
-      setSuccessMessage(null);
-      return;
-    }
-
-    if (normalizeText(item.goodsDesc) === generated) {
-      setMessage(null);
-      setSuccessMessage(`第 ${index + 1} 行货物描述已是当前生成内容。`);
-      return;
-    }
-
-    const snapshot = cloneEditorDocument(document);
-    setDocument({
-      ...document,
-      items: document.items.map((currentItem, itemIndex) =>
-        itemIndex === index ? { ...currentItem, goodsDesc: generated } : currentItem,
-      ),
-    });
-    setUndoDocument(snapshot);
-    setMessage(null);
-    setSuccessMessage(`已生成第 ${index + 1} 行货物描述，保存后写入草稿。`);
-  }
-
-  function handleCopyOriginAndEnterpriseToFollowingRows(index: number) {
-    if (!document || !document.items[index] || index >= document.items.length - 1) {
-      return;
-    }
-
-    const source = document.items[index];
-    let changedRows = 0;
-    const nextItems = document.items.map((item, itemIndex) => {
-      if (itemIndex <= index) {
-        return item;
-      }
-
-      const { item: nextItem, changed } = copyCooOriginAndEnterpriseFields(source, item);
-      if (changed) {
-        changedRows++;
-      }
-
-      return nextItem;
-    });
-
-    if (changedRows === 0) {
-      setMessage(null);
-      setSuccessMessage("后续货项没有需要复制的原产标准或生产企业字段。");
-      return;
-    }
-
-    setUndoDocument(cloneEditorDocument(document));
-    setDocument({
-      ...document,
-      items: nextItems,
-    });
-    setMessage(null);
-    setSuccessMessage(`已复制当前行原产标准和生产企业字段到后续 ${changedRows} 行，保存后写入草稿。`);
-  }
-
-  function handleUndoToolAction() {
-    if (!undoDocument) {
-      return;
-    }
-
-    setDocument(cloneEditorDocument(undoDocument));
-    setUndoDocument(null);
-    setMessage(null);
-    setSuccessMessage("已撤销上一次工具动作，保存后写入草稿。");
   }
 
   async function handleBackToInvoice() {

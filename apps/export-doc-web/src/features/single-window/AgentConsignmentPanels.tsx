@@ -266,7 +266,7 @@ function AgentConsignmentCard({
   children: ReactNode;
 }) {
   return (
-    <section className="agent-consignment-card">
+    <section className="agent-consignment-card workspace-surface-card">
       <div className="agent-consignment-card-header">
         <h3>{title}</h3>
         {meta ? <span>{meta}</span> : null}

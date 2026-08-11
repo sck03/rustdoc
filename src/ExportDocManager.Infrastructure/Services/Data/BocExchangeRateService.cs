@@ -26,7 +26,7 @@ namespace ExportDocManager.Services.Data
         private readonly Lock _cacheSync = new();
 
         // 缓存结果以避免频繁请求
-        private List<ExchangeRateInfo> _cachedRates;
+        private List<ExchangeRateInfo>? _cachedRates;
         private string _cachedRatesSignature = string.Empty;
         private DateTime _lastFetchTime = DateTime.MinValue;
         private readonly Func<string, CancellationToken, Task<IPAddress[]>> _resolveHostAsync;
@@ -35,7 +35,7 @@ namespace ExportDocManager.Services.Data
         public BocExchangeRateService(
             ISettingsService settingsService,
             HttpClient httpClient,
-            Func<string, CancellationToken, Task<IPAddress[]>> resolveHostAsync = null,
+            Func<string, CancellationToken, Task<IPAddress[]>>? resolveHostAsync = null,
             TimeSpan? requestTimeout = null)
         {
             ArgumentNullException.ThrowIfNull(settingsService);
@@ -64,8 +64,6 @@ namespace ExportDocManager.Services.Data
         public async Task<decimal?> GetUsdCnyBuyingRateAsync(CancellationToken cancellationToken = default)
         {
             var rates = await GetExchangeRatesAsync(cancellationToken);
-            if (rates == null) return null;
-            
             var usdRate = rates.FirstOrDefault(r => r.CurrencyName == "美元");
             return usdRate?.BuyingRate;
         }
@@ -102,7 +100,7 @@ namespace ExportDocManager.Services.Data
             var configuredCurrencies = GetConfiguredCurrencies();
             if (configuredCurrencies.Count == 0)
             {
-                return null;
+                return [];
             }
 
             var cacheSignature = BuildCacheSignature(GetExchangeRateUrl(), configuredCurrencies);
@@ -299,7 +297,10 @@ namespace ExportDocManager.Services.Data
         private static InfrastructureServiceException CreateProtocolFailure() =>
             new("汇率源返回的页面结构或数据格式已变化，暂时无法可靠解析汇率。");
 
-        private bool TryGetCachedRates(int cacheDurationMinutes, string cacheSignature, out List<ExchangeRateInfo> rates)
+        private bool TryGetCachedRates(
+            int cacheDurationMinutes,
+            string cacheSignature,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out List<ExchangeRateInfo>? rates)
         {
             lock (_cacheSync)
             {
@@ -321,7 +322,7 @@ namespace ExportDocManager.Services.Data
             lock (_cacheSync)
             {
                 _cachedRates = CloneRates(rates);
-                _cachedRatesSignature = cacheSignature ?? string.Empty;
+                _cachedRatesSignature = cacheSignature;
                 _lastFetchTime = DateTime.UtcNow;
             }
         }
@@ -334,7 +335,7 @@ namespace ExportDocManager.Services.Data
         private static string BuildCacheSignature(string url, IEnumerable<string> currencies)
         {
             var normalizedUrl = ExchangeRateEndpointPolicy.Normalize(url).ToString();
-            var normalizedCurrencies = (currencies ?? Enumerable.Empty<string>())
+            var normalizedCurrencies = currencies
                 .Where(currency => !string.IsNullOrWhiteSpace(currency))
                 .Select(currency => currency.Trim())
                 .Distinct(StringComparer.Ordinal);
@@ -344,16 +345,16 @@ namespace ExportDocManager.Services.Data
 
         private static List<ExchangeRateInfo> CloneRates(IEnumerable<ExchangeRateInfo> rates)
         {
-            return (rates ?? Enumerable.Empty<ExchangeRateInfo>())
+            return rates
                 .Select(rate => new ExchangeRateInfo
                 {
-                    CurrencyName = rate?.CurrencyName,
-                    BuyingRate = rate?.BuyingRate,
-                    CashBuyingRate = rate?.CashBuyingRate,
-                    SellingRate = rate?.SellingRate,
-                    CashSellingRate = rate?.CashSellingRate,
-                    MiddleRate = rate?.MiddleRate,
-                    PublishTime = rate?.PublishTime
+                    CurrencyName = rate.CurrencyName,
+                    BuyingRate = rate.BuyingRate,
+                    CashBuyingRate = rate.CashBuyingRate,
+                    SellingRate = rate.SellingRate,
+                    CashSellingRate = rate.CashSellingRate,
+                    MiddleRate = rate.MiddleRate,
+                    PublishTime = rate.PublishTime
                 })
                 .ToList();
         }

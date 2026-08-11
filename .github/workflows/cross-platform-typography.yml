@@ -109,7 +109,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Install Linux Chromium runtime libraries
         if: runner.os == 'Linux'
@@ -118,17 +118,17 @@ jobs:
           sudo apt-get install -y libasound2t64 libatk-bridge2.0-0 libatk1.0-0 libcups2 libdrm2 libgbm1 libgtk-3-0 libnss3 libx11-xcb1 libxcomposite1 libxdamage1 libxfixes3 libxrandr2
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: 10.0.302
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24
 
       - name: Set up Python for PDF layout evidence
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
 
@@ -176,7 +176,7 @@ jobs:
 
       - name: Upload PDF viewer regression evidence
         if: runner.os == 'Windows' && always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: report-pdf-viewer-${{ matrix.slug }}
           path: .codex-runtime/report-template-pdf-pixel-regression
@@ -190,7 +190,7 @@ jobs:
         run: npm --prefix apps/export-doc-web run test:scale-contracts
 
       - name: Upload frontend scale evidence
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: frontend-scale-${{ matrix.slug }}
           path: artifacts/frontend-scale-contracts
@@ -217,7 +217,7 @@ jobs:
         run: python scripts/extract-report-pdf-layout.py .codex-runtime/ExportDocManager.Infrastructure.Tests
 
       - name: Upload rendered PDFs and metrics
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cross-platform-report-${{ matrix.slug }}
           path: |
@@ -233,15 +233,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24
 
       - name: Download platform report artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: cross-platform-report-*
           path: artifacts/cross-platform-report-metrics
@@ -253,7 +253,7 @@ jobs:
 
       - name: Upload comparison summary
         if: ${{ always() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cross-platform-report-comparison
           path: artifacts/cross-platform-report-metrics/cross-platform-report-summary.json

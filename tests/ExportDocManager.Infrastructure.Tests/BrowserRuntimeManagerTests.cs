@@ -234,6 +234,51 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task ManagedPlaywrightHost_ShouldRecycleLocalBrowserAfterIdleTimeout()
+        {
+            string previousIdleTimeout = Environment.GetEnvironmentVariable(
+                ManagedPlaywrightBrowserHost.IdleTimeoutSecondsEnvironmentVariable);
+            Environment.SetEnvironmentVariable(
+                ManagedPlaywrightBrowserHost.IdleTimeoutSecondsEnvironmentVariable,
+                "1");
+            string root = FindRepositoryRoot();
+            string dataRoot = Path.Combine(
+                root,
+                ".codex-runtime",
+                "BrowserRuntimeManagerTests",
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dataRoot);
+            var pathProvider = new RuntimeAppPathProvider(root, dataRoot);
+            try
+            {
+                await using var runtime = new BrowserRuntimeManager();
+                await using var host = new ManagedPlaywrightBrowserHost(
+                    runtime,
+                    new BrowserExecutableResolver(pathProvider),
+                    pathProvider);
+
+                string value = await host.ExecuteAsync(async (page, _) =>
+                {
+                    await page.SetContentAsync("<div id='idle'>ready</div>");
+                    return await page.Locator("#idle").InnerTextAsync();
+                });
+
+                Assert.Equal("ready", value);
+                Assert.Single(runtime.GetSnapshot().OwnedProcessIds);
+                await WaitUntilAsync(
+                    () => runtime.GetSnapshot().OwnedProcessIds.Count == 0,
+                    TimeSpan.FromSeconds(15));
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(
+                    ManagedPlaywrightBrowserHost.IdleTimeoutSecondsEnvironmentVariable,
+                    previousIdleTimeout);
+                AtomicFileHelper.TryDeleteDirectory(dataRoot);
+            }
+        }
+
+        [Fact]
         public async Task ManagedPlaywrightHost_DisposeAsync_ShouldCancelActivePageAndRejectNewWork()
         {
             string root = FindRepositoryRoot();
@@ -451,6 +496,15 @@ namespace ExportDocManager.Infrastructure.Tests
                 directory = directory.Parent;
             }
             throw new DirectoryNotFoundException("Repository root not found.");
+        }
+
+        private static async Task WaitUntilAsync(Func<bool> predicate, TimeSpan timeout)
+        {
+            using var timeoutSource = new CancellationTokenSource(timeout);
+            while (!predicate())
+            {
+                await Task.Delay(100, timeoutSource.Token);
+            }
         }
     }
 }

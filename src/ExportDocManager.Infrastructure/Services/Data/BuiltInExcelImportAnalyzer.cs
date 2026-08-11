@@ -33,18 +33,7 @@ namespace ExportDocManager.Services.Data
             new("ShippingMarks", "唛头", ["唛头", "箱唛", "唛头信息", "shipping mark", "shipping marks", "marks", "marks and numbers"], MultiLine: true, PreferBelow: true)
         ];
 
-        public async Task<ExcelImportAnalysisReport> AnalyzeAsync(
-            string filePath,
-            ExcelImportSettings settings,
-            CancellationToken cancellationToken = default)
-        {
-            using IDisposable lease = await ExcelAnalysisExecutionGate.EnterAsync(cancellationToken)
-                .ConfigureAwait(false);
-            return await AnalyzeWithoutExecutionGateAsync(filePath, settings, cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        internal Task<ExcelImportAnalysisReport> AnalyzeWithoutExecutionGateAsync(
+        public Task<ExcelImportAnalysisReport> AnalyzeAsync(
             string filePath,
             ExcelImportSettings settings,
             CancellationToken cancellationToken = default)

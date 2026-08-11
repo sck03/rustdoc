@@ -2,12 +2,17 @@
 param(
     [Parameter(Mandatory = $true)][string]$PackageRoot,
     [Parameter(Mandatory = $true)][ValidateSet("Desktop", "Server", "Container")][string]$Profile,
-    [Parameter(Mandatory = $true)][string]$RuntimeIdentifier
+    [Parameter(Mandatory = $true)][string]$RuntimeIdentifier,
+    [ValidateSet("Document", "Sales", "Full")][string]$Edition = "Full"
 )
 
 $ErrorActionPreference = "Stop"
 $root = [IO.Path]::GetFullPath($PackageRoot)
 if (-not (Test-Path -LiteralPath $root -PathType Container)) { throw "Package root does not exist: $root" }
+$requiresDocumentResources = $true
+$requiresOcrRuntime = $true
+$requiresBrowserRuntime = $Profile -ne "Container"
+$requiresExcelAnalyzer = $true
 
 $allEntries = @(Get-ChildItem -LiteralPath $root -Force -Recurse)
 $forbiddenTopLevelDirectories = @("App_Data", "Database", "Security", "Backups", "Cache", "Config", "Logs", "WebView")
@@ -58,6 +63,59 @@ if ($Profile -eq "Desktop" -and $RuntimeIdentifier.StartsWith("linux-", [StringC
     }
 }
 
+if ($Profile -eq "Desktop") {
+    $editionManifestPath = Join-Path $root "product-edition.json"
+    if (-not (Test-Path -LiteralPath $editionManifestPath -PathType Leaf)) {
+        throw "Desktop payload is missing product-edition.json."
+    }
+
+    $editionManifest = Get-Content -LiteralPath $editionManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([string]$editionManifest.edition -ne $Edition) {
+        throw "Desktop payload edition mismatch: expected $Edition, received $($editionManifest.edition)."
+    }
+
+    foreach ($profileKey in @("browserRenderer", "ocr", "documentResources", "excelAnalyzer")) {
+        $profileProperty = $editionManifest.resourceProfile.PSObject.Properties[$profileKey]
+        if ($null -eq $profileProperty -or $profileProperty.Value -isnot [bool]) {
+            throw "Desktop payload resource profile '$profileKey' is missing or invalid."
+        }
+    }
+
+    $requiresDocumentResources = [bool]$editionManifest.resourceProfile.documentResources
+    $requiresOcrRuntime = [bool]$editionManifest.resourceProfile.ocr
+    $requiresBrowserRuntime = [bool]$editionManifest.resourceProfile.browserRenderer
+    $requiresExcelAnalyzer = [bool]$editionManifest.resourceProfile.excelAnalyzer
+    $directoryCapabilities = [ordered]@{
+        Templates = $requiresDocumentResources
+        Resources = $requiresDocumentResources
+        OcrModels = $requiresOcrRuntime
+        Browsers = $requiresBrowserRuntime
+        Tools = $requiresExcelAnalyzer
+    }
+    foreach ($directoryName in $directoryCapabilities.Keys) {
+        $directoryExists = Test-Path -LiteralPath (Join-Path $root $directoryName) -PathType Container
+        if ($directoryExists -ne [bool]$directoryCapabilities[$directoryName]) {
+            throw "Desktop/$Edition payload directory '$directoryName' does not match the declared resource profile."
+        }
+    }
+
+    $ocrSidecars = @($allEntries | Where-Object { -not $_.PSIsContainer -and $_.Name -match '^exportdoc-ocr(?:\.exe)?$' })
+    $excelAnalyzers = @($allEntries | Where-Object { -not $_.PSIsContainer -and $_.Name -match '^exportdoc-excel-analyzer(?:\.exe)?$' })
+    $playwrightRoots = @($allEntries | Where-Object { $_.PSIsContainer -and $_.Name -eq ".playwright" })
+    $expectedOcrSidecarCount = if ($requiresOcrRuntime) { 1 } else { 0 }
+    $expectedExcelAnalyzerCount = if ($requiresExcelAnalyzer) { 1 } else { 0 }
+    $expectedPlaywrightRootCount = if ($requiresBrowserRuntime) { 1 } else { 0 }
+    if ($ocrSidecars.Count -ne $expectedOcrSidecarCount) {
+        throw "Desktop/$Edition payload expected $expectedOcrSidecarCount OCR sidecar, found $($ocrSidecars.Count)."
+    }
+    if ($excelAnalyzers.Count -ne $expectedExcelAnalyzerCount) {
+        throw "Desktop/$Edition payload expected $expectedExcelAnalyzerCount Excel analyzer, found $($excelAnalyzers.Count)."
+    }
+    if ($playwrightRoots.Count -ne $expectedPlaywrightRootCount) {
+        throw "Desktop/$Edition payload expected $expectedPlaywrightRootCount Playwright runtime root, found $($playwrightRoots.Count)."
+    }
+}
+
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $fontManifestPath = Join-Path $repositoryRoot "Resources/Fonts/OpenSource/font-manifest.json"
 if (-not (Test-Path -LiteralPath $fontManifestPath -PathType Leaf)) { throw "Approved font manifest is missing: $fontManifestPath" }
@@ -94,7 +152,7 @@ foreach ($fontFile in $fontFiles) {
     }
 }
 
-if ($Profile -ne "Container") {
+if ($Profile -ne "Container" -and $requiresDocumentResources) {
     foreach ($font in @($fontManifest.fonts)) {
         $matches = @($fontFiles | Where-Object Name -eq ([string]$font.fileName))
         if ($matches.Count -ne 1) {
@@ -150,21 +208,23 @@ if ($Profile -eq "Server") {
 
 $runtimeName = if ($RuntimeIdentifier.StartsWith("win-")) { "onnxruntime.dll" } elseif ($RuntimeIdentifier.StartsWith("osx-")) { "libonnxruntime.dylib" } else { "libonnxruntime.so" }
 $runtimeFiles = @(Get-ChildItem -LiteralPath $root -File -Recurse | Where-Object Name -eq $runtimeName)
-if ($runtimeFiles.Count -ne 1) { throw "Expected exactly one shared $runtimeName, found $($runtimeFiles.Count)." }
+if ($requiresOcrRuntime -and $runtimeFiles.Count -ne 1) { throw "Expected exactly one shared $runtimeName, found $($runtimeFiles.Count)." }
+if (-not $requiresOcrRuntime -and $runtimeFiles.Count -ne 0) { throw "Desktop/$Edition payload must not contain OCR runtime $runtimeName." }
 
 foreach ($relative in @("OcrModels/PaddleOCR/V6/det/inference.onnx", "OcrModels/PaddleOCR/V6/rec/inference.onnx")) {
     $matches = @(Get-ChildItem -LiteralPath $root -File -Recurse | Where-Object { $_.FullName.Replace('\','/').EndsWith($relative, [StringComparison]::OrdinalIgnoreCase) })
-    if ($matches.Count -ne 1) { throw "Expected exactly one OCR model '$relative', found $($matches.Count)." }
+    $expectedCount = if ($requiresOcrRuntime) { 1 } else { 0 }
+    if ($matches.Count -ne $expectedCount) { throw "Expected $expectedCount OCR model '$relative', found $($matches.Count)." }
 }
 
 $browserRoots = @(Get-ChildItem -LiteralPath $root -Directory -Recurse | Where-Object Name -eq "Browsers")
-if ($Profile -eq "Container") {
-    if ($browserRoots.Count -ne 0) { throw "Container payload must use system Chromium and must not bundle Browsers/." }
+if ($Profile -eq "Container" -or -not $requiresBrowserRuntime) {
+    if ($browserRoots.Count -ne 0) { throw "$Profile/$Edition payload must not bundle Browsers/." }
 } elseif ($browserRoots.Count -ne 1) {
     throw "$Profile payload must contain exactly one Browsers root, found $($browserRoots.Count)."
 }
 
-if ($Profile -ne "Container") {
+if ($Profile -ne "Container" -and $requiresBrowserRuntime) {
     $browserRoot = $browserRoots[0].FullName
     $expectedPlatform = switch ($RuntimeIdentifier) {
         "win-x64" { "win64" }
@@ -218,4 +278,5 @@ if ($forbiddenPrivateToolPayload.Count) {
 
 $files = @(Get-ChildItem -LiteralPath $root -File -Recurse)
 $bytes = ($files | Measure-Object Length -Sum).Sum
-Write-Host "Package payload verified: Profile=$Profile RID=$RuntimeIdentifier Files=$($files.Count) Bytes=$bytes Fonts=$($fontFiles.Count) SharedOnnxRuntime=$($runtimeFiles[0].FullName)"
+$sharedOnnxRuntime = if ($runtimeFiles.Count -eq 1) { $runtimeFiles[0].FullName } else { "not-included" }
+Write-Host "Package payload verified: Profile=$Profile Edition=$Edition RID=$RuntimeIdentifier Files=$($files.Count) Bytes=$bytes Fonts=$($fontFiles.Count) SharedOnnxRuntime=$sharedOnnxRuntime"

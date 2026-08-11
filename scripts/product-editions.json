@@ -9,6 +9,12 @@
       "enabledWorkspaces": [
         "document"
       ],
+      "resourceProfile": {
+        "browserRenderer": true,
+        "ocr": true,
+        "documentResources": true,
+        "excelAnalyzer": true
+      },
       "releaseTagPrefix": "exportdocmanager-document",
       "stableChannelTag": "exportdocmanager-document-stable",
       "prereleaseChannelTag": "exportdocmanager-document-prerelease",
@@ -23,6 +29,12 @@
       "enabledWorkspaces": [
         "sales"
       ],
+      "resourceProfile": {
+        "browserRenderer": false,
+        "ocr": false,
+        "documentResources": false,
+        "excelAnalyzer": false
+      },
       "releaseTagPrefix": "exportdocmanager-sales",
       "stableChannelTag": "exportdocmanager-sales-stable",
       "prereleaseChannelTag": "exportdocmanager-sales-prerelease",
@@ -38,6 +50,12 @@
         "document",
         "sales"
       ],
+      "resourceProfile": {
+        "browserRenderer": true,
+        "ocr": true,
+        "documentResources": true,
+        "excelAnalyzer": true
+      },
       "releaseTagPrefix": "exportdocmanager-full",
       "stableChannelTag": "exportdocmanager-full-stable",
       "prereleaseChannelTag": "exportdocmanager-full-prerelease",

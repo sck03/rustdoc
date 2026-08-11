@@ -110,9 +110,9 @@
 
 - **触发：** 仅 `workflow_dispatch`；表单要求版本号，可选择是否更新 `latest`。
 - **平台：** `ubuntu-latest`，Docker Buildx + QEMU；矩阵构建 `api`、`browser` 和 `web` 三个组件的 `linux/amd64`、`linux/arm64`。
-- **做什么：** 校验版本并同步 runner 工作区版本，构建带 provenance/SBOM 的多架构镜像，写入版本、`latest`（可选）和 SHA 标签。
+- **做什么：** 校验版本并同步 runner 工作区版本，矩阵只发布带 provenance/SBOM 与 OCI version/revision/source 标签的 `sha-<完整提交>-<版本>` 候选镜像，确保同一提交的不同版本参数不会覆盖同一候选标签；三个组件全部成功后再核验 digest、拒绝覆盖已有不同内容的版本标签、补齐精确版本别名，最后才可选更新 `latest`，并上传包含三组件 digest 与完整 revision 的不可变发布清单。
 - **输出：** 推送到 `ghcr.io/<仓库所有者>/export-doc-manager-api`、`...-browser` 和 `...-web`；不上传普通 Artifact、不创建 GitHub Release。
-- **部署：** 镜像发布后，Linux x64/ARM64 VPS 可直接运行 `deploy/container/install-container.sh`，无需克隆或重新构建源码。`--mode http` 用于受控内网；`--mode https --domain ... --email ...` 保留 Nginx 为唯一业务代理，并由 Certbot 自动申请和续期证书。生产环境建议传精确版本 tag；完整命令、升级、Private Package 登录和数据目录见 [`deploy/container/README.md`](../deploy/container/README.md)。
+- **部署：** 镜像发布后，Linux x64/ARM64 VPS 可直接运行 `deploy/container/install-container.sh`，无需克隆或重新构建源码。必须同时传精确 `--tag` 和发布清单中的完整 `--revision`；安装器会核验三个已拉取镜像的 OCI revision 完全一致。`--mode http` 用于受控内网；`--mode https --domain ... --email ...` 保留 Nginx 为唯一业务代理，并由 Certbot 自动申请和续期证书。完整命令、升级、Private Package 登录和数据目录见 [`deploy/container/README.md`](../deploy/container/README.md)。
 - **Secrets/Variables：** 使用 GitHub 自动 `GITHUB_TOKEN`，工作流权限为 `packages: write`；不需要额外私钥。
 - **常见失败：** GHCR 权限/包可见性、版本格式错误、QEMU 或 Buildx 构建失败、Dockerfile 公开源码边界检查失败。API 镜像会先回收一次性 Ubuntu runner 上明确无关的 Android、宿主 .NET SDK、GHC/Haskell 和 Swift 工具空间；该 job 的 .NET 发布在 Docker SDK 镜像内完成。NuGet/Cargo 使用 BuildKit cache mount，GHA cache 使用 `mode=min`；若仍出现 `No space left on device`，先确认这些步骤实际执行并查看 `df -h /`，不要通过关闭 provenance/SBOM 或删除随包 OCR/字体绕过交付契约。工作流只在手工确认后推送，不能把测试分支镜像误当生产版本。
 - **耗时：** 多架构 API/Browser/Web 通常 10—35 分钟，首次无缓存时可能更久。
@@ -124,7 +124,7 @@
 
 - **触发：** `workflow_call`，不能从 Actions 列表单独运行；由 Windows/Linux/macOS 三个平台入口调用。
 - **平台：** 由调用方传入 runner、平台、架构、产品版和 bundle 类型。
-- **做什么：** 安装 .NET 10 SDK `10.0.302`/Node 24/Rust，准备开源字体和 Chrome Headless Shell（Linux ARM64 使用明确的 Chromium ARM64 路径），构建 API/Web/Tauri、OCR 资源并验证精简 payload。桌面资源准备会在 release 依赖治理前还原完整 `ExportDocManager.sln`，保证全新 checkout 或清理过 `bin/obj` 后仍能扫描全部项目。随后复用同一构建生成绿色便携包：Windows 复制主程序与已审计资源树后压缩 ZIP；Linux 对生成的 AppImage 做无 FUSE 解包复验后封装 tar.gz；macOS 复制完整 `.app` 并验证 `Contents/Resources` 后封装 tar.gz。便携包不预置 `App_Data`、密码、许可证、日志或用户配置，并生成逐文件与归档 SHA-256。`publish_release=false` 生成未签名验收包；`true` 才启用 updater 签名、上传安装版和便携版并合并 `latest.json`。
+- **做什么：** 安装 .NET 10 SDK `10.0.302`/Node 24/固定 Rust `1.96.0`，按产品版准备资源：Document/Full 携带开源字体、Chrome Headless Shell、OCR、单证资源和 Excel 分析器，Sales 明确裁剪这些不可用能力。桌面资源准备会在 release 依赖治理前还原完整 `ExportDocManager.sln`，保证全新 checkout 或清理过 `bin/obj` 后仍能扫描全部项目。随后复用同一构建生成绿色便携包：Windows 复制主程序与已审计资源树后压缩 ZIP；Linux 对 AppImage 解包后在 Xvfb 中真实启动、登录并复验；macOS 从 `Info.plist` 解析 `.app` 真实入口后直接启动、登录并复验，再分别封装 tar.gz。便携包不预置 `App_Data`、密码、许可证、日志或用户配置，并生成逐文件与归档 SHA-256。`publish_release=false` 生成未签名验收包；`true` 才启用 updater 签名、上传安装版和便携版并合并 `latest.json`。
 - **输出：** `...-installer` 与 `...-portable` 两个独立 Artifact，通常保留 14 天；发布模式把安装/Updater 资产、便携归档和 `.sha256` 一并上传到不可覆盖版本 Release。便携版只检查版本，不调用安装器式自动更新；人工替换程序文件时保留原目录 `App_Data`。
 - **Secrets/Variables：** 测试模式不需要签名材料；发布模式必须配置仓库 Variable `EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY`，以及带密码的 Secrets `TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。`EXPORTDOCMANAGER_UPDATER_ENDPOINT` 改为可选：留空时安装包只内置公钥，由管理员安装后在系统设置中配置 GitHub、自建服务器或公司内网地址。若构建时就要内置 HTTP 默认地址，还必须显式配置 `EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT=true`；公网默认地址仍应使用 HTTPS。调用方使用 `secrets: inherit`，不应把私钥写入仓库或日志。
 - **常见失败：** 版本格式、浏览器资源缺失/执行权限、OCR 运行时缺库、公钥或私钥缺失、未显式放行却尝试内置 HTTP endpoint、Release tag 已被其它版本占用。依赖清单校验不再因表单版本与仓库当前版本不同而失败；若旧提交在 `dotnet list package` 阶段提示项目没有 assets 文件，应从最新 `main` 新建运行，当前流程会先还原完整解决方案。若 Windows 日志显示 `spawnSync npm.cmd EINVAL`，同样说明运行的是旧提交；当前包装器由 Node 直接启动项目锁定的 Tauri CLI，不再调用 `.cmd`。若提示 stale，错误会指出首个真实差异行，应重新生成并审查依赖，而不是删除 `--verify-repository`。Linux AppImage 使用 Tauri 自带的无 FUSE 解压运行模式，不需要额外安装 `libfuse2`；工作流显式安装 `file`、`xdg-utils`，并设置 `NO_STRIP=1`，避免 `linuxdeploy` 内置旧版 `strip` 重复处理 Ubuntu 24.04 新 ELF 段时退出。桌面 sidecar 继续排除 CoreCLR 可选的 `libcoreclrtraceptprovider.so`，避免把宿主 LTTng ABI 作为应用启动依赖；不要用跨 ABI 软链接伪造兼容。桌面构建统一带 `--verbose`，后续 `linuxdeploy`、签名或公证失败会保留真实子进程输出。桌面摘要固定使用 PowerShell 字面量 here-string，避免 Markdown 行尾反引号被解释为续行；治理门禁会拒绝重新引入该 ParserError。
@@ -205,14 +205,13 @@
 
 ## 3. Node、Action 和 Artifact 版本政策
 
-截至 2026-07-30，仓库的 15 个工作流已通过静态版本门禁：
+截至 2026-08-11，仓库的 15 个工作流已通过静态版本门禁：
 
-- 显式构建工具统一使用 `actions/setup-node@v5` 并指定 Node.js `24`；客户运行的 Web、Tauri、API 和容器不需要安装 Node.js。
-- `actions/checkout@v5`、`actions/setup-dotnet@v5`、`actions/setup-python@v6` 使用当前仓库允许的 Node 24 runtime 主版本。
-- Artifact 统一为 `actions/upload-artifact@v7` 和 `actions/download-artifact@v8`。新工作流不得重新引入 v3—v6。
-- Docker 工作流使用 `docker/setup-qemu-action@v4`、`docker/setup-buildx-action@v4`、`docker/login-action@v4`、`docker/metadata-action@v6`、`docker/build-push-action@v7`；这些引用已纳入 Action runtime 门禁。
-- `dtolnay/rust-toolchain@stable` 是 composite Action，不应误判成 Node 20/22/24 的 JavaScript Action；Rust 版本由工具链和 lock 文件门禁控制。
-- `scripts/verify-github-workflow-actions.mjs` 会阻止旧 Node runtime、旧 Artifact 主版本和未登记的 Action 引用。工作流改动后应先运行公开源码守卫或该脚本，再提交。
+- 显式构建工具统一指定 Node.js `24`；客户运行的 Web、Tauri、API 和容器不需要安装 Node.js。
+- 所有外部 Action 都固定到审核过的完整 40 位 commit SHA，行尾注释只保留便于人工识别的上游主版本；不得重新使用可变 `@v5`、`@v7` 或 `@stable` 引用。
+- Checkout、.NET、Node、Python、Artifact 与 Docker Action 都在白名单中逐项校验；新增 Action 必须先审核来源和目标 commit，再更新门禁。
+- Rust 由根 `rust-toolchain.toml` 和工作流共同固定 `1.96.0`，本地与 GitHub runner 不再随 `stable` 漂移。
+- `scripts/verify-github-workflow-actions.mjs` 会阻止旧 Node/.NET/macOS Intel 目标、未登记 Action、非完整 SHA 和 Rust 工具链漂移。工作流改动后应先运行公开源码守卫或该脚本，再提交。
 
 Action runtime 的升级只影响 GitHub 托管 runner；它不会把 Node、Python、Rust、Docker CLI 或 SBOM 工具安装到客户的运行目录，也不会改变 SQLite/PostgreSQL 数据路径。
 

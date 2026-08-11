@@ -10,6 +10,7 @@ namespace ExportDocManager.Services.Crm
 {
     public sealed class CrmService : ICrmService
     {
+        private const int MaximumContactsPerCustomer = 500;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
 
@@ -178,6 +179,7 @@ namespace ExportDocManager.Services.Crm
                 .Where(item => item.CrmCustomerId == crmCustomerId && customers.Any(customer => customer.Id == item.CrmCustomerId))
                 .OrderByDescending(item => item.IsPrimary)
                 .ThenBy(item => item.Name)
+                .Take(MaximumContactsPerCustomer)
                 .Select(item => new CrmContactRecord(item.Id, item.CrmCustomerId, item.Name, item.Title,
                     item.Email, item.Phone, item.InstantMessaging, item.IsPrimary, item.VersionNumber))
                 .ToListAsync(cancellationToken);

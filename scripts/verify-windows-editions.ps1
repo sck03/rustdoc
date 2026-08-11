@@ -40,8 +40,7 @@ foreach ($edition in @("Document", "Sales", "Full")) {
         (Join-Path $editionRoot "sidecar\ExportDocManager.Api.exe"),
         (Join-Path $editionRoot "runtime-layout.json"),
         (Join-Path $editionRoot "portable-runtime.json"),
-        $editionManifestPath,
-        (Join-Path $editionRoot "Tools\exportdoc-excel-analyzer.exe")
+        $editionManifestPath
     )
     foreach ($requiredFile in $requiredFiles) {
         if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
@@ -53,6 +52,14 @@ foreach ($edition in @("Document", "Sales", "Full")) {
     if ($editionManifest.edition -ne $edition) {
         throw "Edition manifest mismatch in '$editionManifestPath'. Expected '$edition', got '$($editionManifest.edition)'."
     }
+    Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments @(
+        "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $scriptRoot "verify-package-payload.ps1"),
+        "-PackageRoot", $editionRoot,
+        "-Profile", "Desktop",
+        "-RuntimeIdentifier", "win-x64",
+        "-Edition", $edition
+    )
     $portableManifestPath = Join-Path $editionRoot "portable-runtime.json"
     $portableManifest = Get-Content -LiteralPath $portableManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($portableManifest.schemaVersion -ne 1 -or $portableManifest.mode -ne "portable" -or $portableManifest.dataRoot -ne "App_Data") {

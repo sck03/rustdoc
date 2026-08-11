@@ -63,6 +63,7 @@ public sealed class PackagePayloadContractTests
         string compose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.yml"));
         string ghcrCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.ghcr.yml"));
         string containerRuntimeWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "container-runtime-validation.yml"));
+        string containerImageWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "container-images.yml"));
         string verifier = File.ReadAllText(Path.Combine(root, "scripts", "verify-package-payload.ps1"));
 
         Assert.Contains("ExportDocPackageProfile=Desktop", desktopScript, StringComparison.Ordinal);
@@ -112,6 +113,11 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("postgres:18.4-trixie", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.DoesNotContain("--remote-debugging-port=0", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("nginx:1.30.4-alpine3.24", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("sha-${GITHUB_SHA}", containerImageWorkflow, StringComparison.Ordinal);
+        Assert.Contains("org.opencontainers.image.revision=${{ github.sha }}", containerImageWorkflow, StringComparison.Ordinal);
+        Assert.Contains("promote:", containerImageWorkflow, StringComparison.Ordinal);
+        Assert.Contains("Create immutable release manifest", containerImageWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("type=raw,value=${{ steps.version.outputs.value }}", containerImageWorkflow, StringComparison.Ordinal);
         Assert.Contains("sudo chown \"$(id -u):101\"", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("deploy/container/secrets/tls/server.key", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("chmod 0640 \\", containerRuntimeWorkflow, StringComparison.Ordinal);
@@ -182,7 +188,10 @@ public sealed class PackagePayloadContractTests
         string extractor = File.ReadAllText(Path.Combine(root, "scripts", "extract-report-pdf-layout.py"));
         string comparer = File.ReadAllText(Path.Combine(root, "scripts", "compare-report-pdf-metrics.mjs"));
 
-        Assert.Contains("actions/setup-python@v6", workflow, StringComparison.Ordinal);
+        Assert.Contains(
+            "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6",
+            workflow,
+            StringComparison.Ordinal);
         Assert.Contains("extract-report-pdf-layout.py", workflow, StringComparison.Ordinal);
         Assert.Contains("*.layout.json", workflow, StringComparison.Ordinal);
         Assert.Contains("find_text_overlaps", extractor, StringComparison.Ordinal);
@@ -294,6 +303,9 @@ public sealed class PackagePayloadContractTests
         string nginxConfig = File.ReadAllText(Path.Combine(root, "deploy", "container", "nginx.acme.conf"));
 
         Assert.Contains("set -Eeuo pipefail", installer, StringComparison.Ordinal);
+        Assert.Contains("--revision SHA", installer, StringComparison.Ordinal);
+        Assert.Contains("EXPORTDOCMANAGER_IMAGE_REVISION", installer, StringComparison.Ordinal);
+        Assert.Contains("org.opencontainers.image.revision", installer, StringComparison.Ordinal);
         Assert.Contains("select_available_subnet", installer, StringComparison.Ordinal);
         Assert.Contains("docker-compose.ghcr.yml", installer, StringComparison.Ordinal);
         Assert.Contains("docker-compose.acme.yml", installer, StringComparison.Ordinal);
