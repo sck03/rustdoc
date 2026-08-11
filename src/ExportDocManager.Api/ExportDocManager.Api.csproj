@@ -8,6 +8,7 @@
     <ExportDocPackageProfile Condition="'$(ExportDocPackageProfile)' == ''">Desktop</ExportDocPackageProfile>
     <ExportDocIncludeTemplates Condition="'$(ExportDocIncludeTemplates)' == ''">true</ExportDocIncludeTemplates>
     <ExportDocIncludeOcrModels Condition="'$(ExportDocIncludeOcrModels)' == ''">true</ExportDocIncludeOcrModels>
+    <ExportDocIncludeOcrRuntime Condition="'$(ExportDocIncludeOcrRuntime)' == ''">true</ExportDocIncludeOcrRuntime>
     <ExportDocIncludeBusinessResources Condition="'$(ExportDocIncludeBusinessResources)' == ''">true</ExportDocIncludeBusinessResources>
     <ExportDocIncludePlaywrightRuntime Condition="'$(ExportDocIncludePlaywrightRuntime)' == ''">true</ExportDocIncludePlaywrightRuntime>
     <ExportDocIncludeBundledBrowser Condition="'$(ExportDocIncludeBundledBrowser)' == '' and '$(ExportDocPackageProfile)' == 'Container'">false</ExportDocIncludeBundledBrowser>
@@ -71,6 +72,15 @@
     </ItemGroup>
     <RemoveDir Directories="@(_PlaywrightDeveloperUiPayload)" />
     <Delete Files="@(_PlaywrightDeveloperScript)" />
+  </Target>
+
+  <Target Name="CopyOcrNativeRuntimeToPublish"
+          AfterTargets="Publish"
+          BeforeTargets="RemoveOptionalOcrRuntime"
+          Condition="'$(PublishDir)' != '' and '$(ExportDocIncludeOcrRuntime)' == 'true' and '$(_ExportDocOnnxRuntimeFile)' != ''">
+    <Copy SourceFiles="$([System.IO.Path]::Combine('$(TargetDir)', '$(_ExportDocOnnxRuntimeFile)'))"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true" />
   </Target>
 
   <Target Name="RemoveOptionalPlaywrightRuntime" AfterTargets="Publish" Condition="'$(PublishDir)' != '' and '$(ExportDocIncludePlaywrightRuntime)' != 'true'">

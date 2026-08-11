@@ -11,6 +11,12 @@ namespace ExportDocManager.Infrastructure.Tests
                 "src",
                 "ExportDocManager.Infrastructure",
                 "ExportDocManager.Infrastructure.csproj"));
+            string apiProject = File.ReadAllText(Path.Combine(
+                root,
+                "src",
+                "ExportDocManager.Api",
+                "ExportDocManager.Api.csproj"));
+            string buildProps = File.ReadAllText(Path.Combine(root, "Directory.Build.props"));
             string dockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.api"));
             string rustManifest = File.ReadAllText(Path.Combine(root, "apps", "exportdoc-ocr-rs", "Cargo.toml"));
             string workflow = File.ReadAllText(Path.Combine(
@@ -32,6 +38,11 @@ namespace ExportDocManager.Infrastructure.Tests
             string notices = Path.Combine(root, "OcrModels", "PaddleOCR", "V6", "THIRD_PARTY_NOTICES.md");
 
             Assert.DoesNotContain("OpenCvSharp", project, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("System.IO.Path]::Combine", project, StringComparison.Ordinal);
+            Assert.DoesNotContain("$(PkgMicrosoft_ML_OnnxRuntime)\\runtimes\\", project, StringComparison.Ordinal);
+            Assert.Contains("_ExportDocOnnxRuntimeFile", buildProps, StringComparison.Ordinal);
+            Assert.Contains("<ExportDocIncludeOcrRuntime Condition=\"'$(ExportDocIncludeOcrRuntime)' == ''\">true", apiProject, StringComparison.Ordinal);
+            Assert.Contains("CopyOcrNativeRuntimeToPublish", apiProject, StringComparison.Ordinal);
             Assert.Contains("EXPORTDOCMANAGER_OCR_RUNTIME=enabled", dockerfile, StringComparison.Ordinal);
             Assert.DoesNotContain("--verify-ocr-runtime", dockerfile, StringComparison.Ordinal);
             Assert.Contains("test -s /app/libonnxruntime.so", dockerfile, StringComparison.Ordinal);

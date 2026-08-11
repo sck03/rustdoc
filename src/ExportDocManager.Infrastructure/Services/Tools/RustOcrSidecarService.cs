@@ -193,7 +193,12 @@ namespace ExportDocManager.Services.Tools
             startInfo.ArgumentList.Add("--model-root"); startInfo.ArgumentList.Add(Path.Combine(_paths.OcrModelRoot, "PaddleOCR", "V6"));
             startInfo.ArgumentList.Add("--allowed-root"); startInfo.ArgumentList.Add(requestRoot);
             string runtime = FindOnnxRuntimeLibrary(_paths);
-            if (!string.IsNullOrWhiteSpace(runtime)) startInfo.Environment["ORT_DYLIB_PATH"] = runtime;
+            if (string.IsNullOrWhiteSpace(runtime))
+            {
+                throw new InfrastructureServiceException(
+                    "未找到 Rust OCR 所需的 ONNX Runtime 原生库，请重新安装完整 OCR 运行包。");
+            }
+            startInfo.Environment["ORT_DYLIB_PATH"] = runtime;
             try
             {
                 _process = Process.Start(startInfo) ?? throw new InfrastructureServiceException("无法启动 Rust OCR Sidecar。");

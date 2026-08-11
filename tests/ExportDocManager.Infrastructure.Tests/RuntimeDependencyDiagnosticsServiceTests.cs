@@ -44,6 +44,24 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
                 var browserResolver = new BrowserExecutableResolver(pathProvider, _ => { });
+                var missingRuntimeDiagnostics = new RuntimeDependencyDiagnosticsService(
+                    pathProvider,
+                    browserResolver).Inspect();
+                var incompleteOcr = Assert.Single(
+                    missingRuntimeDiagnostics,
+                    item => item.Key == "ocr-runtime");
+                Assert.False(incompleteOcr.Ready);
+                Assert.Equal("incomplete", incompleteOcr.Status);
+                Assert.Contains("ONNX Runtime", incompleteOcr.Message, StringComparison.Ordinal);
+
+                string onnxRuntime = Path.Combine(
+                    appRoot,
+                    OperatingSystem.IsWindows()
+                        ? "onnxruntime.dll"
+                        : OperatingSystem.IsMacOS()
+                            ? "libonnxruntime.dylib"
+                            : "libonnxruntime.so");
+                File.WriteAllBytes(onnxRuntime, [0x01]);
                 var diagnostics = new RuntimeDependencyDiagnosticsService(
                     pathProvider,
                     browserResolver).Inspect();

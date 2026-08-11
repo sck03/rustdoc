@@ -10,5 +10,8 @@
     <_ExportDocManagerHostOs Condition="$([System.OperatingSystem]::IsMacOS())">osx</_ExportDocManagerHostOs>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(_ExportDocManagerHostOs)' != ''">$(_ExportDocManagerHostOs)-$(_ExportDocManagerHostArchitecture)</RuntimeIdentifier>
     <SelfContained Condition="'$(SelfContained)' == ''">false</SelfContained>
+    <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win-'))">onnxruntime.dll</_ExportDocOnnxRuntimeFile>
+    <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('linux-'))">libonnxruntime.so</_ExportDocOnnxRuntimeFile>
+    <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('osx-'))">libonnxruntime.dylib</_ExportDocOnnxRuntimeFile>
   </PropertyGroup>
 </Project>

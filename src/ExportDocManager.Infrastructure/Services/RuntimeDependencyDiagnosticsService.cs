@@ -148,6 +148,15 @@ namespace ExportDocManager.Services.Infrastructure
                     "Rust OCR Sidecar已安装，但PP-OCRv6模型文件不完整。");
             }
 
+            string onnxRuntime = RustOcrSidecarHost.FindOnnxRuntimeLibrary(_pathProvider);
+            if (string.IsNullOrWhiteSpace(onnxRuntime) || !File.Exists(onnxRuntime))
+            {
+                return new RuntimeDependencyDiagnostic(
+                    "ocr-runtime", "智能 OCR", "optional", "incomplete", false,
+                    Path.GetFullPath(_pathProvider.AppRoot),
+                    "Rust OCR Sidecar和模型已安装，但缺少ONNX Runtime原生库。");
+            }
+
             if (File.Exists(rustExecutable))
             {
                 return new RuntimeDependencyDiagnostic(

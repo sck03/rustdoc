@@ -1,3 +1,4 @@
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Tools;
 
@@ -30,7 +31,7 @@ public sealed class RustOcrSidecarHostTests
     }
 
     [Fact]
-    public void FindOnnxRuntimeLibrary_ShouldResolvePackagedSidecarRoot()
+    public async Task FindOnnxRuntimeLibrary_ShouldResolvePackagedSidecarRootAndFailFastWhenMissing()
     {
         string root = Path.Combine(Path.GetTempPath(), "ExportDocManager.Tests", Guid.NewGuid().ToString("N"));
         string appRoot = Path.Combine(root, "resources");
@@ -49,6 +50,22 @@ public sealed class RustOcrSidecarHostTests
             var paths = new RuntimeAppPathProvider(appRoot, dataRoot);
 
             Assert.Equal(expected, RustOcrSidecarHost.FindOnnxRuntimeLibrary(paths));
+
+            string executable = Path.Combine(
+                appRoot,
+                "sidecar",
+                "ocr",
+                OperatingSystem.IsWindows() ? "exportdoc-ocr.exe" : "exportdoc-ocr");
+            Directory.CreateDirectory(Path.GetDirectoryName(executable)!);
+            File.WriteAllBytes(executable, [0x01]);
+            File.Delete(expected);
+            await using var host = new RustOcrSidecarHost(paths);
+
+            var exception = await Assert.ThrowsAsync<InfrastructureServiceException>(() =>
+                host.RecognizeAsync(
+                    Path.Combine(root, "verification.png"),
+                    TimeSpan.FromSeconds(1)));
+            Assert.Contains("ONNX Runtime", exception.Message, StringComparison.Ordinal);
         }
         finally
         {
