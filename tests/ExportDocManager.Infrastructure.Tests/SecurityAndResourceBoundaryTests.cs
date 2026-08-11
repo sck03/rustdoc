@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 using ExportDocManager.Services.Data;
+using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Tools;
@@ -77,6 +78,31 @@ public sealed class SecurityAndResourceBoundaryTests
         await using var destination = new MemoryStream();
 
         Assert.Equal(0, await BoundedStreamHelper.CopyToAsync(source, destination, maximumBytes: 0));
+    }
+
+    [Fact]
+    public void EmailAttachmentPolicy_ShouldRejectExcessiveAttachmentCount()
+    {
+        string root = CreateTempDirectory("email-attachment-limit");
+        try
+        {
+            var paths = Enumerable
+                .Range(1, EmailAttachmentPolicy.MaximumAttachmentCount + 1)
+                .Select(index =>
+                {
+                    string path = Path.Combine(root, $"attachment-{index}.txt");
+                    File.WriteAllText(path, "test");
+                    return path;
+                })
+                .ToList();
+
+            Assert.Throws<ExportDocManager.Services.Errors.ServiceValidationException>(() =>
+                EmailAttachmentPolicy.ValidateAndNormalize(paths));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
     }
 
     [Fact]

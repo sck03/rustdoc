@@ -93,7 +93,12 @@
   }
 
   .single-window-document-toolbar {
+    position: static;
     grid-template-columns: 1fr;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
   }
 
   .single-window-toolbar-head {
@@ -145,11 +150,11 @@
     width: auto;
   }
 
-  .single-window-lock-backdrop {
+  .workspace-modal-backdrop {
     padding: 10px;
   }
 
-  .single-window-lock-dialog {
+  .workspace-modal-dialog {
     width: calc(100vw - 20px);
     max-height: calc(100vh - 20px);
     max-height: calc(100dvh - 20px);
@@ -158,14 +163,14 @@
     padding: 12px;
   }
 
-  .single-window-lock-header,
-  .single-window-lock-toolbar,
-  .single-window-lock-footer {
+  .workspace-modal-header,
+  .workspace-modal-toolbar,
+  .workspace-modal-footer {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .single-window-lock-footer .command-button {
+  .workspace-modal-footer .command-button {
     justify-content: center;
     width: 100%;
   }

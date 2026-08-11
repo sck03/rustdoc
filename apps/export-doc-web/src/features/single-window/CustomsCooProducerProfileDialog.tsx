@@ -202,20 +202,20 @@ export function CustomsCooProducerProfileDialog({
   }
 
   return (
-    <div className="single-window-lock-backdrop" role="presentation" onMouseDown={(event) => {
+    <div className="workspace-modal-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !isBusy) {
         void handleClose();
       }
     }}>
       <div
         ref={dialogRef}
-        className="single-window-lock-dialog producer-profile-dialog"
+        className="workspace-modal-dialog producer-profile-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="producer-profile-title"
       >
-        <header className="single-window-lock-header producer-profile-header">
-          <div className="single-window-lock-title">
+        <header className="workspace-modal-header producer-profile-header">
+          <div className="workspace-modal-title">
             <Pencil size={18} aria-hidden="true" />
             <h2 id="producer-profile-title">生产企业资料</h2>
             <span>{profiles.length}</span>
@@ -347,7 +347,7 @@ export function CustomsCooProducerProfileDialog({
           </form>
         </div>
 
-        <footer className="single-window-lock-footer producer-profile-footer">
+        <footer className="workspace-modal-footer producer-profile-footer">
           <button className="command-button secondary" type="button" onClick={handleClose} disabled={isBusy}>
             <span>关闭</span>
           </button>

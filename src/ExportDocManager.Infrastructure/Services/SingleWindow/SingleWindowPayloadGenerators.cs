@@ -1,6 +1,9 @@
-using System.IO;
+using System.Buffers;
+using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 using ExportDocManager.Models.DTOs.SingleWindow;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.SingleWindow
 {
@@ -33,43 +36,113 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public IReadOnlyList<PayloadBuildResult> BuildAttachmentXmls(CooMappedDocument document)
+        public async Task WriteAttachmentXmlAsync(
+            CooMappedDocument document,
+            SingleWindowAttachmentSource attachment,
+            Stream destination,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(attachment);
+            ArgumentNullException.ThrowIfNull(destination);
+            if (!destination.CanWrite)
+            {
+                throw new ArgumentException("附件 XML 输出流不可写。", nameof(destination));
+            }
+            if (!attachment.Exists)
+            {
+                throw new FileNotFoundException("单一窗口附件不存在。", attachment.FilePath);
+            }
 
-            return document.Attachments
-                .Where(attachment => attachment.Exists)
-                .Select(attachment =>
+            var settings = new XmlWriterSettings
+            {
+                Async = true,
+                CloseOutput = false,
+                Encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                Indent = false
+            };
+            using var writer = XmlWriter.Create(destination, settings);
+            await writer.WriteStartDocumentAsync().ConfigureAwait(false);
+            await writer.WriteStartElementAsync(null, "File", null).ConfigureAwait(false);
+            await WriteElementAsync(writer, "CertNo",
+                string.IsNullOrWhiteSpace(attachment.CertNo) ? document.CertNo : attachment.CertNo).ConfigureAwait(false);
+            await WriteElementAsync(writer, "CertType",
+                string.IsNullOrWhiteSpace(attachment.CertType) ? document.CertType : attachment.CertType).ConfigureAwait(false);
+            await WriteElementAsync(writer, "AplRegNo",
+                string.IsNullOrWhiteSpace(attachment.AplRegNo) ? document.AplRegNo : attachment.AplRegNo).ConfigureAwait(false);
+            await WriteElementAsync(writer, "CiqRegNo",
+                string.IsNullOrWhiteSpace(attachment.CiqRegNo) ? document.CiqRegNo : attachment.CiqRegNo).ConfigureAwait(false);
+            await WriteElementAsync(
+                writer,
+                "FileType",
+                string.IsNullOrWhiteSpace(attachment.FileType)
+                    ? SingleWindowPayloadFileNameHelper.ResolveCooAttachmentFileType(attachment.FileName)
+                    : attachment.FileType).ConfigureAwait(false);
+            await WriteElementAsync(writer, "FileName", attachment.FileName).ConfigureAwait(false);
+            await WriteElementAsync(
+                writer,
+                "DocType",
+                string.IsNullOrWhiteSpace(attachment.DocType)
+                    ? SingleWindowPayloadFileNameHelper.ResolveDocType(attachment.FileName)
+                    : attachment.DocType).ConfigureAwait(false);
+
+            await writer.WriteStartElementAsync(null, "FileContent", null).ConfigureAwait(false);
+            await WriteFileAsBase64Async(writer, attachment.FilePath, cancellationToken).ConfigureAwait(false);
+            await writer.WriteEndElementAsync().ConfigureAwait(false);
+            await WriteElementAsync(writer, "IsDelay", attachment.IsDelay ? "1" : "0").ConfigureAwait(false);
+            await writer.WriteEndElementAsync().ConfigureAwait(false);
+            await writer.WriteEndDocumentAsync().ConfigureAwait(false);
+            await writer.FlushAsync().ConfigureAwait(false);
+        }
+
+        private static async Task WriteElementAsync(XmlWriter writer, string name, string value)
+        {
+            await writer.WriteStartElementAsync(null, name, null).ConfigureAwait(false);
+            await writer.WriteStringAsync(value ?? string.Empty).ConfigureAwait(false);
+            await writer.WriteEndElementAsync().ConfigureAwait(false);
+        }
+
+        private static async Task WriteFileAsBase64Async(
+            XmlWriter writer,
+            string filePath,
+            CancellationToken cancellationToken)
+        {
+            const int bufferSize = 64 * 1024;
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(bufferSize);
+            long totalBytes = 0;
+            try
+            {
+                await using var source = new FileStream(
+                    filePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    bufferSize,
+                    FileOptions.Asynchronous | FileOptions.SequentialScan);
+                while (true)
                 {
-                    var xml = new XDocument(
-                        new XDeclaration("1.0", "UTF-8", null),
-                        new XElement("File",
-                            new XElement("CertNo", string.IsNullOrWhiteSpace(attachment.CertNo) ? document.CertNo : attachment.CertNo),
-                            new XElement("CertType", string.IsNullOrWhiteSpace(attachment.CertType) ? document.CertType : attachment.CertType),
-                            new XElement("AplRegNo", string.IsNullOrWhiteSpace(attachment.AplRegNo) ? document.AplRegNo : attachment.AplRegNo),
-                            new XElement("CiqRegNo", string.IsNullOrWhiteSpace(attachment.CiqRegNo) ? document.CiqRegNo : attachment.CiqRegNo),
-                            new XElement(
-                                "FileType",
-                                string.IsNullOrWhiteSpace(attachment.FileType)
-                                    ? SingleWindowPayloadFileNameHelper.ResolveCooAttachmentFileType(attachment.FileName)
-                                    : attachment.FileType),
-                            new XElement("FileName", attachment.FileName),
-                            new XElement(
-                                "DocType",
-                                string.IsNullOrWhiteSpace(attachment.DocType)
-                                    ? SingleWindowPayloadFileNameHelper.ResolveDocType(attachment.FileName)
-                                    : attachment.DocType),
-                            new XElement("FileContent", Convert.ToBase64String(File.ReadAllBytes(attachment.FilePath))),
-                            new XElement("IsDelay", attachment.IsDelay ? "1" : "0")));
-
-                    return new PayloadBuildResult
+                    int read = await source.ReadAsync(
+                            buffer.AsMemory(0, bufferSize),
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    if (read == 0)
                     {
-                        FileName = SingleWindowPayloadFileNameHelper.BuildBaseFileName(Path.GetFileNameWithoutExtension(attachment.FileName), "coo-attachment", ".xml"),
-                        Content = xml.ToString(SaveOptions.DisableFormatting),
-                        Warnings = document.Warnings
-                    };
-                })
-                .ToList();
+                        break;
+                    }
+                    if (totalBytes > SingleWindowAttachmentResourcePolicy.MaximumSingleAttachmentBytes - read)
+                    {
+                        throw new PayloadLimitExceededException(
+                            SingleWindowAttachmentResourcePolicy.MaximumSingleAttachmentBytes);
+                    }
+
+                    await writer.WriteBase64Async(buffer, 0, read).ConfigureAwait(false);
+                    totalBytes += read;
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
+            }
         }
 
         private static XElement CreateCertificateHead(XNamespace ns, CooMappedDocument document)

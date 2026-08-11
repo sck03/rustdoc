@@ -461,7 +461,8 @@ fn read_endpoint_publication(
 
     let content = fs::read_to_string(endpoint_file)
         .map_err(|error| format!("Failed to read API endpoint file: {error}"))?;
-    let publication: SidecarEndpointPublication = serde_json::from_str(&content)
+    let json = content.strip_prefix('\u{feff}').unwrap_or(&content);
+    let publication: SidecarEndpointPublication = serde_json::from_str(json)
         .map_err(|error| format!("API endpoint file is invalid: {error}"))?;
     if publication.schema_version != 1 {
         return Err(format!(
@@ -712,6 +713,16 @@ mod tests {
         assert!(read_endpoint_publication(&path, 43)
             .unwrap_err()
             .contains("different process"));
+
+        fs::write(
+            &path,
+            b"\xef\xbb\xbf{\"schemaVersion\":1,\"apiBaseUrl\":\"http://127.0.0.1:5200\",\"processId\":42}",
+        )
+        .unwrap();
+        assert_eq!(
+            read_endpoint_publication(&path, 42).unwrap(),
+            Some("http://127.0.0.1:5200".to_owned())
+        );
 
         let _ = fs::remove_dir_all(root);
     }

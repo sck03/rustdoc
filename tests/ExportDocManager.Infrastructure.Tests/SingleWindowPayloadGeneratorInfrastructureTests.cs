@@ -35,7 +35,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public void BuildAttachmentXmls_ShouldReadAttachmentFileContent()
+        public async Task WriteAttachmentXmlAsync_ShouldStreamAttachmentFileContent()
         {
             string attachmentPath = Path.GetTempFileName();
             File.WriteAllText(attachmentPath, "invoice");
@@ -59,8 +59,13 @@ namespace ExportDocManager.Infrastructure.Tests
                     ]
                 };
 
-                var payload = Assert.Single(generator.BuildAttachmentXmls(document));
-                var xml = XDocument.Parse(payload.Content);
+                await using var output = new MemoryStream();
+                await generator.WriteAttachmentXmlAsync(
+                    document,
+                    Assert.Single(document.Attachments),
+                    output);
+                output.Position = 0;
+                var xml = XDocument.Load(output);
 
                 Assert.Equal("1", xml.Root?.Element("FileType")?.Value);
                 Assert.Equal(Convert.ToBase64String(File.ReadAllBytes(attachmentPath)), xml.Root?.Element("FileContent")?.Value);
@@ -71,6 +76,32 @@ namespace ExportDocManager.Infrastructure.Tests
                 {
                     File.Delete(attachmentPath);
                 }
+            }
+        }
+
+        [Fact]
+        public void AttachmentResourcePolicy_ShouldRejectExcessiveAttachmentCount()
+        {
+            string attachmentPath = Path.GetTempFileName();
+            File.WriteAllText(attachmentPath, "invoice");
+
+            try
+            {
+                var attachments = Enumerable
+                    .Range(1, SingleWindowAttachmentResourcePolicy.MaximumAttachmentCount + 1)
+                    .Select(index => new SingleWindowAttachmentSource
+                    {
+                        FileName = $"invoice-{index}.pdf",
+                        FilePath = attachmentPath
+                    })
+                    .ToList();
+
+                Assert.Throws<ExportDocManager.Services.Errors.ServiceValidationException>(() =>
+                    SingleWindowAttachmentResourcePolicy.ValidateAndSelect(attachments));
+            }
+            finally
+            {
+                File.Delete(attachmentPath);
             }
         }
     }

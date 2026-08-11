@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-07",
+  "capturedAt": "2026-08-10",
   "rules": [
     {
       "name": "HS knowledge partials",
@@ -74,7 +74,7 @@
       "name": "Tauri runtime path modules",
       "directory": "apps/export-doc-tauri/src-tauri/src",
       "filePattern": "^runtime_(?:paths|paths_config|paths_tests|portable|sidecar_path)\\.rs$",
-      "maximumLines": 900,
+      "maximumLines": 850,
       "maximumAggregateLines": 1600
     },
     {
@@ -125,6 +125,13 @@
       "maximumAggregateLines": 1100
     },
     {
+      "name": "invoice items editor orchestration",
+      "directory": "apps/export-doc-web/src/features/invoices",
+      "filePattern": "^(?:InvoiceItemsEditor|useInvoiceItemsGridInteraction)\\.(?:tsx|ts)$",
+      "maximumLines": 650,
+      "maximumAggregateLines": 1000
+    },
+    {
       "name": "invoice form panels",
       "directory": "apps/export-doc-web/src/features/invoices",
       "filePattern": "^Invoice(?:FormPanels|BasicInfoPanel|PartiesPanel|ExtendedFieldsPanel|ShippingTermsPanel|MarksAndItemsPanel)\\.tsx$",
@@ -135,8 +142,15 @@
       "name": "report template designer orchestration",
       "directory": "apps/export-doc-web/src/features/reports",
       "filePattern": "^(?:ReportTemplateDesignerPage|useReportTemplateEditingActions)\\.(?:tsx|ts)$",
-      "maximumLines": 850,
+      "maximumLines": 830,
       "maximumAggregateLines": 1050
+    },
+    {
+      "name": "single-window reference catalog components",
+      "directory": "apps/export-doc-web/src/features/single-window",
+      "filePattern": "^(?:SingleWindowReferenceCatalogPage|ReferenceCatalogWorkspaceView|useReferenceCatalogExcelWorkspace|referenceCatalogModel)\\.(?:tsx|ts)$",
+      "maximumLines": 680,
+      "maximumAggregateLines": 1550
     },
     {
       "name": "report designer schema modules",

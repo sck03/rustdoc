@@ -186,7 +186,8 @@ namespace ExportDocManager.Api.Hosting
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IInvoiceService invoiceService,
                 ApiBackgroundJobRunner jobRunner,
-                ApiInvoiceBookingSheetRequest request) =>
+                ApiInvoiceBookingSheetRequest request,
+                CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -218,7 +219,9 @@ namespace ExportDocManager.Api.Hosting
                     return destinationValidation;
                 }
 
-                var invoice = await invoiceService.GetInvoiceByIdAsync(request.InvoiceId);
+                var invoice = await invoiceService.GetInvoiceByIdAsync(
+                    request.InvoiceId,
+                    cancellationToken);
                 if (invoice == null)
                 {
                     return Results.NotFound(new ApiErrorResponse("未找到指定的发票。"));
@@ -239,7 +242,8 @@ namespace ExportDocManager.Api.Hosting
                 IInvoiceService invoiceService,
                 IAppPathProvider pathProvider,
                 ApiBackgroundJobRunner jobRunner,
-                int invoiceId) =>
+                int invoiceId,
+                CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -252,7 +256,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("发票ID必须大于0。"));
                 }
 
-                var invoice = await invoiceService.GetInvoiceByIdAsync(invoiceId);
+                var invoice = await invoiceService.GetInvoiceByIdAsync(invoiceId, cancellationToken);
                 if (invoice == null)
                 {
                     return Results.NotFound(new ApiErrorResponse("未找到指定的发票。"));

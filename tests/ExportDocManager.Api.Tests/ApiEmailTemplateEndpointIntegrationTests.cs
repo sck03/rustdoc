@@ -26,7 +26,7 @@ namespace ExportDocManager.Api.Tests
 
             var duplicateResponse = await client.PostAsJsonAsync("/api/email-templates", new ApiEmailTemplateSaveRequest(
                 0, "首次报价", "报价", "Duplicate", "Duplicate", true, false));
-            Assert.Equal(HttpStatusCode.BadRequest, duplicateResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
 
             var list = await client.GetFromJsonAsync<List<ApiEmailTemplateDto>>("/api/email-templates?keyword=报价&category=报价");
             Assert.Equal(template.Id, Assert.Single(list!).Id);

@@ -176,10 +176,11 @@ namespace ExportDocManager.Api.Hosting
 
                         var emailService = provider.GetRequiredService<IEmailService>();
                         await emailService.SendEmailAsync(
-                                recipient,
-                                emailSubject,
-                                emailBody,
-                                attachments)
+                            recipient,
+                            emailSubject,
+                            emailBody,
+                            attachments,
+                            jobContext.CancellationToken)
                             .ConfigureAwait(false);
 
                         jobContext.Report(

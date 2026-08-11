@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -82,7 +83,7 @@ namespace ExportDocManager.Services.EmailTemplates
             }
             bool duplicate = await _accessScope.ApplyOwnedEmailTemplateScope(context.EmailTemplates.AsNoTracking())
                 .AnyAsync(item => item.Id != entity.Id && item.Name == name && item.Category == category, cancellationToken);
-            if (duplicate) throw new ArgumentException("同一分类下已存在同名邮件模板。");
+            if (duplicate) throw new ResourceConflictException("同一分类下已存在同名邮件模板。");
             bool changed = isNew || HasChanges(entity, name, category, subject, bodyHtml, request.IsActive, request.IsShared);
             if (!changed) return ToRecord(entity);
             var now = DateTimeOffset.UtcNow;
@@ -140,7 +141,7 @@ namespace ExportDocManager.Services.EmailTemplates
             context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = expectedVersion;
             bool duplicate = await _accessScope.ApplyOwnedEmailTemplateScope(context.EmailTemplates.AsNoTracking())
                 .AnyAsync(item => item.Id != id && item.Name == source.Name && item.Category == source.Category, cancellationToken);
-            if (duplicate) throw new ArgumentException("恢复后的分类和名称与现有邮件模板重复。");
+            if (duplicate) throw new ResourceConflictException("恢复后的分类和名称与现有邮件模板重复。");
 
             entity.Name = source.Name;
             entity.Category = source.Category;

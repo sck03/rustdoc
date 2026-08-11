@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -119,7 +120,7 @@ namespace ExportDocManager.Services.Reporting
                                   item.Name == name && item.OwnerUserId == currentUserId, cancellationToken);
             if (duplicate)
             {
-                throw new ArgumentException("你已经拥有同名报表模板。");
+                throw new ResourceConflictException("你已经拥有同名报表模板。");
             }
 
             // Publishing is an explicit action. A normal user can share their own

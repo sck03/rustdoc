@@ -9,7 +9,7 @@ public sealed class DesktopPortablePackagingContractTests
         string workflow = Read(root, ".github", "workflows", "desktop-package-reusable.yml")
             .Replace("\r\n", "\n", StringComparison.Ordinal);
 
-        Assert.Contains("Build and verify portable desktop package", workflow, StringComparison.Ordinal);
+        Assert.Contains("Build, launch-smoke and verify portable desktop package", workflow, StringComparison.Ordinal);
         Assert.Contains("./scripts/package-desktop-portable.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("-ResourceRoot ./artifacts/tauri-bundle/resources", workflow, StringComparison.Ordinal);
         Assert.Contains("Upload desktop installer artifact", workflow, StringComparison.Ordinal);
@@ -20,7 +20,7 @@ public sealed class DesktopPortablePackagingContractTests
         Assert.Contains("-PortableAssetRoot ./artifacts/desktop-portable/packages", workflow, StringComparison.Ordinal);
 
         int payloadVerification = workflow.IndexOf("Verify lean desktop payload", StringComparison.Ordinal);
-        int portablePackaging = workflow.IndexOf("Build and verify portable desktop package", StringComparison.Ordinal);
+        int portablePackaging = workflow.IndexOf("Build, launch-smoke and verify portable desktop package", StringComparison.Ordinal);
         int artifactUpload = workflow.IndexOf("Upload portable desktop artifact", StringComparison.Ordinal);
         Assert.True(payloadVerification >= 0 && portablePackaging > payloadVerification);
         Assert.True(artifactUpload > portablePackaging);
@@ -49,6 +49,10 @@ public sealed class DesktopPortablePackagingContractTests
         Assert.Contains("systemSigned = $false", script, StringComparison.Ordinal);
         Assert.Contains("notarized = $false", script, StringComparison.Ordinal);
         Assert.Contains("must not contain App_Data", script, StringComparison.Ordinal);
+        Assert.Contains("smoke-tauri-desktop.ps1", script, StringComparison.Ordinal);
+        Assert.Contains("-UseDefaultAppRoot", script, StringComparison.Ordinal);
+        Assert.Contains("-UsePortableDataRoot", script, StringComparison.Ordinal);
+        Assert.Contains("Portable launch smoke data cleanup", script, StringComparison.Ordinal);
         Assert.DoesNotContain("signtool", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("codesign", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("notarytool", script, StringComparison.OrdinalIgnoreCase);
@@ -132,14 +136,48 @@ public sealed class DesktopPortablePackagingContractTests
         string windows = Read(root, ".github", "workflows", "windows-desktop-package.yml");
         string linux = Read(root, ".github", "workflows", "linux-desktop-package.yml");
         string macos = Read(root, ".github", "workflows", "macos-desktop-package.yml");
+        string localBuild = Read(root, "scripts", "run-tauri-local.ps1");
 
         Assert.Contains("runtime_identifier: win-x64", windows, StringComparison.Ordinal);
+        Assert.Contains("rust_target: x86_64-pc-windows-msvc", windows, StringComparison.Ordinal);
+        Assert.DoesNotContain("rust_target: x86_64-pc-windows-gnu", windows, StringComparison.Ordinal);
         Assert.Contains("linux-x64", linux, StringComparison.Ordinal);
         Assert.Contains("linux-arm64", linux, StringComparison.Ordinal);
         Assert.Contains("runtime_identifier: osx-arm64", macos, StringComparison.Ordinal);
         Assert.Contains("bundle_targets: app,dmg", macos, StringComparison.Ordinal);
         Assert.DoesNotContain("osx-x64", macos, StringComparison.Ordinal);
         Assert.DoesNotContain("macos-15-intel", macos, StringComparison.Ordinal);
+        Assert.Contains("$env:CARGO_BUILD_JOBS = \"1\"", localBuild, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DesktopLaunchSmoke_ShouldProbeAnEndpointAllowedByTheProductEdition()
+    {
+        string root = FindRepositoryRoot();
+        string smoke = Read(root, "scripts", "smoke-tauri-desktop.ps1");
+
+        Assert.Contains("Invoke-EditionWorkspacePageProbe", smoke, StringComparison.Ordinal);
+        Assert.Contains("$CurrentUser.capabilities.productEdition", smoke, StringComparison.Ordinal);
+        Assert.Contains("/api/crm/customers/page?pageNumber=1&pageSize=5", smoke, StringComparison.Ordinal);
+        Assert.Contains("/api/invoices?pageNumber=1&pageSize=5", smoke, StringComparison.Ordinal);
+        Assert.Contains("WorkspaceProbe = $workspaceProbe.Name", smoke, StringComparison.Ordinal);
+        Assert.Contains("WorkspacePageNumber = $workspaceProbe.Page.pageNumber", smoke, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DesktopLaunchSmoke_ShouldCleanOwnedWindowsProcessTreeWithoutRequiringCimAccess()
+    {
+        string root = FindRepositoryRoot();
+        string smoke = Read(root, "scripts", "smoke-tauri-desktop.ps1");
+
+        Assert.Contains("$isWindowsPlatform -and -not $Process.HasExited", smoke, StringComparison.Ordinal);
+        Assert.Contains("$Process.Kill($true)", smoke, StringComparison.Ordinal);
+        Assert.Contains("function Get-WindowsProcessInventory", smoke, StringComparison.Ordinal);
+        Assert.Contains("Get-CimInstance Win32_Process -ErrorAction Stop", smoke, StringComparison.Ordinal);
+        Assert.Contains("continuing with owned process-tree cleanup", smoke, StringComparison.Ordinal);
+        Assert.DoesNotContain("Get-Process msedgewebview2", smoke, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Stop-Process -Name msedgewebview2", smoke, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("taskkill /im msedgewebview2", smoke, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string Read(string root, params string[] segments) =>

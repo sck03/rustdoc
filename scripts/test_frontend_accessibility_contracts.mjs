@@ -292,7 +292,7 @@ const globalFoundationManifest = fs.readFileSync(path.join(root, "styles.css"), 
 const globalWorkspaceManifest = fs.readFileSync(path.join(root, "styles", "workspaces.css"), "utf8");
 for (const routeOnlyStyle of [
   "single-window-core.css",
-  "runtime-single-window.css",
+  "single-window-runtime.css",
   "single-window-documents.css",
   "coo-review.css",
   "container-packing.css",
@@ -319,6 +319,12 @@ for (const [sourceRelativePath, routeStyle] of [
 }
 
 const responsiveCss = readCssImportGraph(path.join(root, "responsiveOverrides.css"));
+if (!/@media\s*\(min-width:\s*861px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.field-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/u.test(responsiveCss)) {
+  failures.push("responsiveOverrides.css: 公共业务表单必须在 861—1180px 中等桌面宽度切换为双列");
+}
+if (!/@media\s*\(min-width:\s*861px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.invoice-party-group-exporter\s+\.field-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/u.test(responsiveCss)) {
+  failures.push("responsiveOverrides.css: 出口商资料在 861—1180px 仍应使用可容纳的专用四列布局，避免通用双列规则拉长页面");
+}
 
 for (const scriptName of ["test_frontend_visual_baselines.mjs", "test_frontend_scale_contracts.mjs"]) {
   const scriptSource = fs.readFileSync(path.resolve(import.meta.dirname, scriptName), "utf8");
@@ -342,6 +348,129 @@ for (const motionContract of [
 }
 
 const themeCss = readCssImportGraph(path.join(root, "theme.css"));
+const queryPageSource = fs.readFileSync(path.join(root, "features", "query", "QueryPage.tsx"), "utf8");
+for (const queryLayoutContract of ["query-filter-grid", "query-date-range", "query-filter-field"]) {
+  if (!queryPageSource.includes(queryLayoutContract)) {
+    failures.push(`features/query/QueryPage.tsx: 单据查询筛选区缺少响应式布局契约 ${queryLayoutContract}`);
+  }
+}
+for (const obsoleteQueryLayout of ['className="filter-bar query-filter-bar"', "inline-filter query-party-filter"]) {
+  if (queryPageSource.includes(obsoleteQueryLayout)) {
+    failures.push(`features/query/QueryPage.tsx: 单据查询筛选区不得回退到会压缩标签的旧行内布局 ${obsoleteQueryLayout}`);
+  }
+}
+const remoteSelectCss = fs.readFileSync(path.join(root, "styles", "remote-select.css"), "utf8");
+if (remoteSelectCss.includes(".query-party-filter")) {
+  failures.push("styles/remote-select.css: 公共远程选择器样式不得重新硬编码单据查询页面宽度");
+}
+const auditQueryCss = fs.readFileSync(path.join(root, "styles", "audit-query.css"), "utf8");
+for (const queryBreakpoint of [
+  "@media (min-width: 1720px)",
+  "@media (max-width: 1180px)",
+  "@media (max-width: 860px)",
+  "@media (max-width: 620px)",
+]) {
+  if (!auditQueryCss.includes(queryBreakpoint)) {
+    failures.push(`styles/audit-query.css: 单据查询筛选区缺少响应式断点 ${queryBreakpoint}`);
+  }
+}
+for (const queryGridContract of [
+  ".query-filter-grid {",
+  ".query-date-range {",
+  ".query-filter-field {",
+  "grid-template-columns: repeat(4, minmax(0, 1fr))",
+]) {
+  if (!auditQueryCss.includes(queryGridContract)) {
+    failures.push(`styles/audit-query.css: 单据查询筛选区缺少网格布局契约 ${queryGridContract}`);
+  }
+}
+for (const sharedWorkspacePrimitive of [
+  ".visually-hidden {",
+  ".danger-icon {",
+  ".section-header {",
+  ".section-header > div:first-child {",
+  ".section-header > div:first-child span {",
+  ".field-grid {",
+  "grid-template-columns: repeat(4, minmax(160px, 1fr))",
+  ".field-grid-span-all {",
+  ".field-grid-span-2 {",
+  ".textarea-field {",
+  ".filter-bar {",
+  ".inline-filter {",
+  ".inline-check {",
+  ".row-actions-cell {",
+  ".detail-grid {",
+  ".detail-item-wide {",
+  ".detail-value-row {",
+  ".detail-item-actions {",
+  ".workspace-modal-backdrop {",
+  ".workspace-modal-dialog {",
+  ".workspace-modal-header {",
+  ".workspace-modal-footer {",
+]) {
+  if (!themeCss.includes(sharedWorkspacePrimitive)) {
+    failures.push(`theme.css: 公共工作区原语不能依赖报表或单一窗口 lazy route 样式：${sharedWorkspacePrimitive}`);
+  }
+}
+const settingsPageSource = fs.readFileSync(path.join(root, "features", "settings", "SettingsPage.tsx"), "utf8");
+if (!settingsPageSource.includes('import "../../styles/runtime-diagnostics.css"')) {
+  failures.push("features/settings/SettingsPage.tsx: 运行诊断样式必须随设置路由加载，不能依赖 Single Window 或进入首屏 CSS");
+}
+const runtimeDiagnosticsCss = fs.readFileSync(path.join(root, "styles", "runtime-diagnostics.css"), "utf8");
+for (const settingsRuntimeStyle of [
+  ".runtime-detail-grid {",
+  ".runtime-diagnostics-section {",
+  ".runtime-dependency-grid {",
+  ".runtime-path-row {",
+  ".runtime-template-storage-result {",
+]) {
+  if (!runtimeDiagnosticsCss.includes(settingsRuntimeStyle)) {
+    failures.push(`runtime-diagnostics.css: 设置页运行诊断缺少独立样式 ${settingsRuntimeStyle}`);
+  }
+}
+const globalFoundationCss = readCssImportGraph(path.join(root, "styles.css"));
+if (!globalFoundationCss.includes(".job-title-cell {")) {
+  failures.push("styles.css: 任务中心标题布局不能依赖装柜 lazy route");
+}
+const globalBusinessCss = readCssImportGraph(path.join(root, "businessFeatures.css"));
+for (const globalBusinessStyle of [
+  ".invoice-single-window-action-buttons {",
+  ".review-severity {",
+  ".review-severity-error {",
+  ".review-severity-warning {",
+  ".review-severity-info {",
+]) {
+  if (!globalBusinessCss.includes(globalBusinessStyle)) {
+    failures.push(`businessFeatures.css: 发票与审核公共样式不能依赖单一窗口 lazy route：${globalBusinessStyle}`);
+  }
+}
+if (!/@media\s*\(max-width:\s*860px\)[\s\S]*?\.invoice-party-group:not\(\.invoice-party-group-exporter\)\s+\.field-grid\s*\{\s*grid-template-columns:\s*1fr/u.test(globalBusinessCss)) {
+  failures.push("businessFeatures.css: 发票客户与通知人专用双列布局必须在窄窗口退化为单列");
+}
+for (const [routeCssPath, forbiddenSharedDefinitions] of [
+  ["styles/single-window-core.css", [".visually-hidden {", ".danger-icon {", ".filter-bar {", ".inline-filter {", ".inline-check {"]],
+  ["styles/single-window-runtime.css", [".row-actions-cell {", ".detail-grid {", ".detail-item {", ".runtime-diagnostics-section {"]],
+  ["styles/single-window-documents.css", [".workspace-modal-backdrop {", ".workspace-modal-dialog {", ".workspace-modal-header {", ".workspace-modal-footer {"]],
+  ["styles/coo-review.css", [".review-severity {"]],
+  ["styles/container-packing.css", [".job-title-cell {"]],
+  ["styles/report/designer-canvas.css", [".section-header {", ".section-header > div:first-child {", ".section-header > div:first-child span {", ".field-grid {", ".field-grid-span-all {", ".field-grid-span-2 {", ".textarea-field {"]],
+]) {
+  const routeCss = fs.readFileSync(path.join(root, routeCssPath), "utf8");
+  for (const forbiddenSharedDefinition of forbiddenSharedDefinitions) {
+    if (routeCss.includes(forbiddenSharedDefinition)) {
+      failures.push(`${routeCssPath}: 公共样式不得重新由 lazy route 独占 ${forbiddenSharedDefinition}`);
+    }
+  }
+}
+for (const sharedDangerActionContract of [
+  ".command-button.danger-command",
+  ".command-button.danger-command:hover:not(:disabled)",
+  ".command-button.danger-command:disabled",
+]) {
+  if (!themeCss.includes(sharedDangerActionContract)) {
+    failures.push(`theme.css: 维护与恢复页面的危险操作样式不能依赖报表 lazy route：${sharedDangerActionContract}`);
+  }
+}
 for (const saveActionContract of [
   ".invoice-editor-sticky-actions > div > span",
   ".invoice-editor-sticky-actions .command-button:disabled",

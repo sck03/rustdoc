@@ -226,27 +226,29 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
   return (
     <section className="work-surface query-surface" aria-label="单据查询">
       <form className="toolbar query-toolbar" onSubmit={handleSearch} onKeyDown={handleQueryFormKeyDown}>
-        <div className="filter-bar query-filter-bar">
-          <label className="inline-filter query-date-filter">
-            <span>开始</span>
-            <input
-              type="date"
-              data-query-filter="startDate"
-              value={filters.startDate}
-              onChange={(event) => updateFilter("startDate", event.target.value)}
-            />
-          </label>
-          <label className="inline-filter query-date-filter">
-            <span>结束</span>
-            <input
-              type="date"
-              data-query-filter="endDate"
-              value={filters.endDate}
-              onChange={(event) => updateFilter("endDate", event.target.value)}
-            />
-          </label>
+        <div className="query-filter-grid">
+          <div className="query-date-range" role="group" aria-label="日期范围">
+            <label className="query-filter-field query-date-filter">
+              <span>开始日期</span>
+              <input
+                type="date"
+                data-query-filter="startDate"
+                value={filters.startDate}
+                onChange={(event) => updateFilter("startDate", event.target.value)}
+              />
+            </label>
+            <label className="query-filter-field query-date-filter">
+              <span>结束日期</span>
+              <input
+                type="date"
+                data-query-filter="endDate"
+                value={filters.endDate}
+                onChange={(event) => updateFilter("endDate", event.target.value)}
+              />
+            </label>
+          </div>
           <RemoteSelectField<ApiCustomerDto>
-            className="inline-filter query-party-filter"
+            className="query-filter-field query-party-filter query-customer-filter"
             label="客户"
             value={filters.customerId === "0" ? "" : filters.customerId}
             selectedOption={selectedCustomerQuery.data}
@@ -265,7 +267,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
             onChange={(customer) => updateFilter("customerId", customer ? String(customer.id) : "0")}
           />
           <RemoteSelectField<ApiExporterDto>
-            className="inline-filter query-party-filter"
+            className="query-filter-field query-party-filter query-exporter-filter"
             label="出口商"
             value={filters.exporterId === "0" ? "" : filters.exporterId}
             selectedOption={selectedExporterQuery.data}
@@ -283,8 +285,8 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
             dataQueryFilter="exporterId"
             onChange={(exporter) => updateFilter("exporterId", exporter ? String(exporter.id) : "0")}
           />
-          <label className="inline-filter">
-            <span>类型</span>
+          <label className="query-filter-field query-type-filter">
+            <span>业务类型</span>
             <select
               data-query-filter="invoiceType"
               value={filters.invoiceType}
@@ -298,8 +300,8 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
               ))}
             </select>
           </label>
-          <label className="inline-filter">
-            <span>运输</span>
+          <label className="query-filter-field query-transport-filter">
+            <span>运输方式</span>
             <select
               data-query-filter="transportMode"
               value={filters.transportMode}
@@ -313,18 +315,19 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
               ))}
             </select>
           </label>
-          <label className="inline-filter query-text-filter query-keyword-filter">
+          <label className="query-filter-field query-keyword-filter">
             <span>关键字</span>
             <input
               ref={keywordInputRef}
               data-query-filter="keyword"
               value={filters.keyword}
+              placeholder="发票号、合同号、客户等"
               onFocus={handleTextInputFocus}
               onChange={(event) => updateFilter("keyword", event.target.value)}
             />
           </label>
         </div>
-        <div className="toolbar-actions">
+        <div className="toolbar-actions query-toolbar-actions">
           <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void invoiceQuery.refetch()}>
             <RefreshCw size={18} aria-hidden="true" />
           </button>

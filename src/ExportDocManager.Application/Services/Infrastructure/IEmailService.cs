@@ -13,11 +13,18 @@ namespace ExportDocManager.Services.Infrastructure
         /// <param name="subject">Email subject</param>
         /// <param name="body">Email body content</param>
         /// <param name="attachments">List of file paths to attach</param>
-        Task SendEmailAsync(string to, string subject, string body, List<string> attachments = null);
+        Task SendEmailAsync(
+            string to,
+            string subject,
+            string body,
+            List<string> attachments = null,
+            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Tests the connection with current configuration.
         /// </summary>
-        Task TestConnectionAsync(EmailConfig config);
+        Task TestConnectionAsync(
+            EmailConfig config,
+            CancellationToken cancellationToken = default);
     }
 }

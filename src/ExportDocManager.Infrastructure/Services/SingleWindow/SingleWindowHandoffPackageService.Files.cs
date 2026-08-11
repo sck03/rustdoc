@@ -10,7 +10,8 @@ namespace ExportDocManager.Services.SingleWindow
             IReadOnlyList<SingleWindowAttachmentSource> attachments,
             CancellationToken cancellationToken)
         {
-            if (attachments == null || attachments.Count == 0)
+            var selectedAttachments = SingleWindowAttachmentResourcePolicy.ValidateAndSelect(attachments);
+            if (selectedAttachments.Count == 0)
             {
                 return [];
             }
@@ -20,8 +21,10 @@ namespace ExportDocManager.Services.SingleWindow
             var packageFiles = new List<SingleWindowPackageFile>();
             var usedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var attachment in attachments.Where(item => item?.Exists == true))
+            long copiedBytes = 0;
+            foreach (var attachment in selectedAttachments)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string fileName = string.IsNullOrWhiteSpace(attachment.FileName)
                     ? Path.GetFileName(attachment.FilePath)
                     : Path.GetFileName(attachment.FileName);
@@ -30,7 +33,30 @@ namespace ExportDocManager.Services.SingleWindow
                     usedFileNames,
                     fileName);
                 string destination = Path.Combine(attachmentDirectory, fileName);
-                await FileCopyHelper.CopyAsync(attachment.FilePath, destination, overwrite: true, cancellationToken);
+                await using (var source = new FileStream(
+                    attachment.FilePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    64 * 1024,
+                    FileOptions.Asynchronous | FileOptions.SequentialScan))
+                await using (var output = new FileStream(
+                    destination,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None,
+                    64 * 1024,
+                    FileOptions.Asynchronous | FileOptions.SequentialScan))
+                {
+                    long maximumRemainingBytes = Math.Min(
+                        SingleWindowAttachmentResourcePolicy.MaximumSingleAttachmentBytes,
+                        SingleWindowAttachmentResourcePolicy.MaximumTotalAttachmentBytes - copiedBytes);
+                    copiedBytes += await BoundedStreamHelper.CopyToAsync(
+                        source,
+                        output,
+                        maximumRemainingBytes,
+                        cancellationToken).ConfigureAwait(false);
+                }
                 packageFiles.Add(await SingleWindowPackageIntegrity.DescribeFileAsync(
                     destination,
                     PathBoundaryHelper.ToProtocolRelativePath("attachments", fileName),

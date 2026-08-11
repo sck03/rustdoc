@@ -149,6 +149,14 @@ $env:EXPORTDOCMANAGER_PRODUCT_EDITION = $ProductEdition
 if ([string]::IsNullOrWhiteSpace($env:CARGO_REGISTRIES_CRATES_IO_PROTOCOL)) {
     $env:CARGO_REGISTRIES_CRATES_IO_PROTOCOL = "sparse"
 }
+if ([string]::IsNullOrWhiteSpace($env:CARGO_BUILD_JOBS)) {
+    # The GNU Windows target can require several GiB per rustc process while
+    # compiling the Windows bindings and the final Tauri crate.  Keep local
+    # builds single-flight so the public three-edition entry remains reliable
+    # on ordinary 16 GiB development machines.  Hosted MSVC workflows set
+    # their own value explicitly.
+    $env:CARGO_BUILD_JOBS = "1"
+}
 
 $pathParts = New-Object System.Collections.Generic.List[string]
 $pathParts.Add($resolvedCargoBinDir)
@@ -163,6 +171,7 @@ Write-Host "  CargoBinDir     $resolvedCargoBinDir"
 Write-Host "  CARGO_HOME      $env:CARGO_HOME"
 Write-Host "  RUSTUP_HOME     $env:RUSTUP_HOME"
 Write-Host "  CARGO_TARGET_DIR $env:CARGO_TARGET_DIR"
+Write-Host "  CARGO_BUILD_JOBS $env:CARGO_BUILD_JOBS"
 Write-Host "  ProductEdition  $env:EXPORTDOCMANAGER_PRODUCT_EDITION"
 Invoke-ExportDocExternal -FilePath $cargoExe -Arguments @("--version")
 Invoke-ExportDocExternal -FilePath $rustcExe -Arguments @("--version")

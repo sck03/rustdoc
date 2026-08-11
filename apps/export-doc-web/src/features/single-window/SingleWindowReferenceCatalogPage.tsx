@@ -10,7 +10,6 @@ import {
   useState,
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardPaste, Download, FileSpreadsheet, Plus, RefreshCw, RotateCcw, Save, Trash2, Upload } from "lucide-react";
 import {
   ExportDocManagerApiClient,
   SingleWindowReferenceCatalogModel,
@@ -47,16 +46,15 @@ import { ReferenceCatalogSummary } from "./ReferenceCatalogSummary.tsx";
 import { SingleWindowTabs } from "./SingleWindowNavigation.tsx";
 import { useReferenceCatalogExcelWorkspace } from "./useReferenceCatalogExcelWorkspace.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
-
-type CatalogContextMenuState = {
-  x: number;
-  y: number;
-  cell: CatalogCellPosition | null;
-};
-
-type AliasEditorState = CatalogCellPosition & {
-  value: string;
-};
+import {
+  ReferenceCatalogAliasDialog,
+  ReferenceCatalogContextMenu,
+  ReferenceCatalogExcelPanel,
+  ReferenceCatalogTable,
+  ReferenceCatalogToolbar,
+  type AliasEditorState,
+  type CatalogContextMenuState,
+} from "./ReferenceCatalogWorkspaceView.tsx";
 
 export function SingleWindowReferenceCatalogPage({
   client,
@@ -563,293 +561,71 @@ export function SingleWindowReferenceCatalogPage({
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {validationErrors.length > 0 ? <InlineNotice tone="warning" title="请检查待导入数据">{validationErrors.slice(0, 4).join("；")}</InlineNotice> : null}
 
-      <div className="toolbar single-window-reference-toolbar">
-        <div className="reference-catalog-tabs" aria-label="参考词典分类">
-          {catalogPages.map((page) => (
-            <button
-              key={page.key}
-              className={page.key === activePage.key ? "reference-catalog-tab reference-catalog-tab-active" : "reference-catalog-tab"}
-              type="button"
-              onClick={() => setActiveKey(page.key)}
-            >
-              {page.label}
-            </button>
-          ))}
-        </div>
-        <div className="toolbar-actions">
-          <button
-            className="icon-button"
-            type="button"
-            title="刷新" aria-label="刷新"
-            disabled={isBusy}
-            onClick={handleRefreshCatalog}
-          >
-            <RefreshCw size={18} aria-hidden="true" />
-          </button>
-          <button className="command-button secondary" type="button" disabled={!draft || isBusy} onClick={handleExportJson}>
-            <Download size={17} aria-hidden="true" />
-            <span>导出配置</span>
-          </button>
-          <button className="command-button secondary" type="button" disabled={!canManageReferenceCatalog || isBusy} onClick={chooseJsonImportFile}>
-            <Upload size={17} aria-hidden="true" />
-            <span>导入配置</span>
-          </button>
-          <button className="command-button secondary" type="button" disabled={!canManageReferenceCatalog || isBusy} onClick={excelWorkspace.chooseFile}>
-            <FileSpreadsheet size={17} aria-hidden="true" />
-            <span>Excel导入</span>
-          </button>
-          <button className="command-button secondary" type="button" disabled={!canManageReferenceCatalog || isBusy} onClick={addRow}>
-            <Plus size={17} aria-hidden="true" />
-            <span>新增</span>
-          </button>
-          <button className="command-button secondary" type="button" disabled={!canManageReferenceCatalog || isBusy} onClick={() => void pasteFromSystemClipboard()}>
-            <ClipboardPaste size={17} aria-hidden="true" />
-            <span>批量粘贴</span>
-          </button>
-          <button className="command-button secondary" type="button" disabled={!canManageReferenceCatalog || rows.length === 0 || isBusy} onClick={deduplicateRows}>
-            <RefreshCw size={17} aria-hidden="true" />
-            <span>去重</span>
-          </button>
-          <button className="command-button" type="button" disabled={!canSave} onClick={handleSave}>
-            <Save size={17} aria-hidden="true" />
-            <span>保存</span>
-          </button>
-          <button className="command-button danger-command" type="button" disabled={!canResetReferenceCatalog || isBusy} onClick={handleReset}>
-            <RotateCcw size={17} aria-hidden="true" />
-            <span>恢复内置</span>
-          </button>
-        </div>
-      </div>
+      <ReferenceCatalogToolbar
+        activeKey={activePage.key}
+        draft={draft}
+        rows={rows}
+        canManage={canManageReferenceCatalog}
+        canReset={canResetReferenceCatalog}
+        canSave={canSave}
+        isBusy={isBusy}
+        onActiveKeyChange={setActiveKey}
+        onRefresh={() => void handleRefreshCatalog()}
+        onExportJson={handleExportJson}
+        onChooseJsonImport={chooseJsonImportFile}
+        onChooseExcelImport={excelWorkspace.chooseFile}
+        onAddRow={addRow}
+        onPaste={() => void pasteFromSystemClipboard()}
+        onDeduplicate={deduplicateRows}
+        onSave={handleSave}
+        onReset={() => void handleReset()}
+      />
 
       <ReferenceCatalogSummary catalog={draft} activeKey={activePage.key} hasUnsavedChanges={hasUnsavedChanges} />
 
-      {canManageReferenceCatalog && (excelWorkspace.file || excelWorkspace.preview) ? (
-        <div className="reference-catalog-excel-panel" aria-label="Excel 导入">
-          <div className="reference-catalog-excel-header">
-            <div>
-              <strong>{excelWorkspace.file?.name || "Excel 导入"}</strong>
-              <span>{excelWorkspace.preview ? `${excelWorkspace.preview.sheetName} / ${excelWorkspace.preview.rowCount} 行` : activePage.label}</span>
-            </div>
-            <div className="toolbar-actions">
-              <button className="command-button secondary" type="button" disabled={!excelWorkspace.canPreview} onClick={excelWorkspace.previewFile}>
-                <RefreshCw size={16} aria-hidden="true" />
-                <span>预览</span>
-              </button>
-              <button className="command-button" type="button" disabled={!excelWorkspace.canApply} onClick={excelWorkspace.applyPreview}>
-                <FileSpreadsheet size={16} aria-hidden="true" />
-                <span>应用到草稿</span>
-              </button>
-            </div>
-          </div>
-          <div className="reference-catalog-excel-grid">
-            <label>
-              <span>工作表</span>
-              <select
-                value={excelWorkspace.sheetName}
-                disabled={isBusy || !excelWorkspace.preview?.sheetNames?.length}
-                onChange={(event) => excelWorkspace.setSheetName(event.target.value)}
-              >
-                {excelWorkspace.preview?.sheetNames?.length ? (
-                  excelWorkspace.preview.sheetNames.map((sheetName) => (
-                    <option key={sheetName} value={sheetName}>
-                      {sheetName}
-                    </option>
-                  ))
-                ) : (
-                  <option value="">自动</option>
-                )}
-              </select>
-            </label>
-            <label>
-              <span>表头行</span>
-              <input
-                type="number"
-                min={1}
-                value={excelWorkspace.headerRowNumber}
-                disabled={isBusy}
-                onChange={(event) => excelWorkspace.setHeaderRowNumber(event.target.value)}
-              />
-            </label>
-            <label>
-              <span>数据起始行</span>
-              <input
-                type="number"
-                min={1}
-                value={excelWorkspace.dataStartRowNumber}
-                disabled={isBusy}
-                onChange={(event) => excelWorkspace.setDataStartRowNumber(event.target.value)}
-              />
-            </label>
-            <label>
-              <span>导入方式</span>
-              <select value={excelWorkspace.importMode} disabled={isBusy} onChange={(event) => excelWorkspace.setImportMode(event.target.value === "replace" ? "replace" : "append")}>
-                <option value="append">追加并去重</option>
-                <option value="replace">替换当前页</option>
-              </select>
-            </label>
-            {activePage.columns.map((column) => (
-              <label key={column.key}>
-                <span>{column.label}列号</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={excelWorkspace.columnMap[column.key] ?? ""}
-                  disabled={isBusy}
-                  onChange={(event) => excelWorkspace.updateColumn(column.key, event.target.value)}
-                />
-              </label>
-            ))}
-          </div>
-        </div>
+      {canManageReferenceCatalog ? (
+        <ReferenceCatalogExcelPanel activePage={activePage} workspace={excelWorkspace} />
       ) : null}
 
-      <div
-        className="table-frame reference-catalog-table-frame"
-        ref={tableFrameRef}
-        role="region"
-        aria-label="单一窗口参考目录编辑表"
-        aria-busy={isBusy}
-        tabIndex={0}
+      <ReferenceCatalogTable
+        activePage={activePage}
+        rows={rows}
+        canManage={canManageReferenceCatalog}
+        isBusy={isBusy}
+        tableFrameRef={tableFrameRef}
         onContextMenu={handleCatalogContextMenu}
         onKeyDown={handleCatalogKeyDown}
         onPaste={handleCatalogPaste}
-      >
-        <table className="reference-catalog-table">
-          <thead>
-            <tr>
-              {activePage.columns.map((column) => (
-                <th key={column.key}>{column.label}</th>
-              ))}
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length > 0 ? (
-              rows.map((row, index) => (
-                <tr key={`${activePage.key}-${index}`}>
-                  {activePage.columns.map((column, columnIndex) => (
-                    <td key={column.key} className={column.kind === "aliases" ? "reference-catalog-alias-cell" : undefined}>
-                      {column.kind === "aliases" ? (
-                        <textarea
-                          data-catalog-row={index}
-                          data-catalog-column={columnIndex}
-                          value={joinAliases(readAliases(row))}
-                          disabled={!canManageReferenceCatalog || isBusy}
-                          aria-label={`${activePage.label} 第 ${index + 1} 行 ${column.label}`}
-                          onFocus={() => setFocusedCell({ rowIndex: index, columnIndex })}
-                          onChange={(event) => updateRow(index, column, event.target.value)}
-                        />
-                      ) : (
-                        <input
-                          data-catalog-row={index}
-                          data-catalog-column={columnIndex}
-                          value={readRowString(row, column.key)}
-                          disabled={!canManageReferenceCatalog || isBusy}
-                          aria-label={`${activePage.label} 第 ${index + 1} 行 ${column.label}`}
-                          onFocus={() => setFocusedCell({ rowIndex: index, columnIndex })}
-                          onChange={(event) => updateRow(index, column, event.target.value)}
-                        />
-                      )}
-                    </td>
-                  ))}
-                  <td>
-                    <button
-                      className="icon-button danger-icon"
-                      type="button"
-                      title="删除" aria-label="删除"
-                      disabled={!canManageReferenceCatalog || isBusy}
-                      onClick={() => deleteRow(index)}
-                    >
-                      <Trash2 size={17} aria-hidden="true" />
-                    </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td className="empty-cell" colSpan={activePage.columns.length + 1}>
-                  {isBusy ? "加载中" : "暂无词典行"}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+        onFocusCell={setFocusedCell}
+        onUpdateRow={updateRow}
+        onDeleteRow={deleteRow}
+      />
 
       {contextMenu ? (
-        <div
-          className="reference-catalog-context-menu"
-          role="menu"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onClick={(event) => event.stopPropagation()}
-          onContextMenu={(event) => event.preventDefault()}
-          onMouseDown={(event) => event.stopPropagation()}
-        >
-          <button type="button" role="menuitem" disabled={!canManageReferenceCatalog || isBusy} onClick={addRow}>
-            新增一行
-          </button>
-          <button type="button" role="menuitem" disabled={!canManageReferenceCatalog || isBusy || !contextMenu.cell} onClick={deleteContextRow}>
-            删除当前行
-          </button>
-          <button type="button" role="menuitem" disabled={!canManageReferenceCatalog || isBusy} onClick={() => void pasteFromSystemClipboard()}>
-            批量粘贴
-          </button>
-          <button type="button" role="menuitem" disabled={!canManageReferenceCatalog || isBusy || rows.length === 0} onClick={deduplicateRows}>
-            批量去重
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            disabled={!canManageReferenceCatalog || isBusy || activePage.columns[contextMenu.cell?.columnIndex ?? -1]?.kind !== "aliases"}
-            onClick={() => openAliasEditor(contextMenu.cell)}
-          >
-            编辑别名...
-          </button>
-        </div>
+        <ReferenceCatalogContextMenu
+          contextMenu={contextMenu}
+          activePage={activePage}
+          rows={rows}
+          canManage={canManageReferenceCatalog}
+          isBusy={isBusy}
+          onAddRow={addRow}
+          onDeleteRow={deleteContextRow}
+          onPaste={() => void pasteFromSystemClipboard()}
+          onDeduplicate={deduplicateRows}
+          onOpenAliasEditor={() => openAliasEditor(contextMenu.cell)}
+        />
       ) : null}
 
       {aliasEditor ? (
-        <div className="single-window-lock-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) {
-            setAliasEditor(null);
-          }
-        }}>
-          <div ref={aliasDialogRef} className="single-window-lock-dialog reference-catalog-alias-dialog" role="dialog" aria-modal="true" aria-labelledby="reference-catalog-alias-title">
-            <div className="single-window-lock-header">
-              <div className="single-window-lock-title">
-                <h2 id="reference-catalog-alias-title">编辑别名</h2>
-                <span>{activePage.label}</span>
-              </div>
-            </div>
-            <div className="single-window-lock-toolbar">
-              <span>第 {aliasEditor.rowIndex + 1} 行</span>
-            </div>
-            <textarea
-              ref={aliasEditorInputRef}
-              value={aliasEditor.value}
-              onChange={(event) => setAliasEditor((current) => (current ? { ...current, value: event.target.value } : current))}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  setAliasEditor(null);
-                }
-
-                if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-                  event.preventDefault();
-                  applyAliasEditor();
-                }
-              }}
-            />
-            <div className="single-window-lock-footer">
-              <button className="command-button secondary" type="button" onClick={() => setAliasEditor(null)}>
-                取消
-              </button>
-              <button className="command-button" type="button" onClick={applyAliasEditor}>
-                应用
-              </button>
-            </div>
-          </div>
-        </div>
+        <ReferenceCatalogAliasDialog
+          activePage={activePage}
+          editor={aliasEditor}
+          dialogRef={aliasDialogRef}
+          inputRef={aliasEditorInputRef}
+          onClose={() => setAliasEditor(null)}
+          onChange={(value) => setAliasEditor((current) => current ? { ...current, value } : current)}
+          onApply={applyAliasEditor}
+        />
       ) : null}
     </section>
   );

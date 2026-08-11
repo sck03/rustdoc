@@ -99,7 +99,7 @@ namespace ExportDocManager.Api.Tests
 
             var duplicateLinkResponse = await client.PostAsJsonAsync($"/api/suppliers/{supplier.Id}/products",
                 new ApiSupplierProductLinkSaveRequest(0, supplier.Id, productId, "DUPLICATE", 1m, "CNY", 1, "备选"));
-            Assert.Equal(HttpStatusCode.BadRequest, duplicateLinkResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, duplicateLinkResponse.StatusCode);
 
             var updateLinkResponse = await client.PutAsJsonAsync($"/api/suppliers/{supplier.Id}/products/{productLink.Id}",
                 new ApiSupplierProductLinkSaveRequest(productLink.Id, supplier.Id, productId, "SUP-FAB-10", 13m,

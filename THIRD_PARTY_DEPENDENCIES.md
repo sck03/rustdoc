@@ -119,7 +119,7 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | @types/trusted-types | 2.0.7 | MIT | web |
 | @types/webxr | 0.5.24 | MIT | web |
 | @vitejs/plugin-react | 5.2.0 | MIT | web |
-| axe-core | 4.12.1 | MPL-2.0 | web |
+| axe-core | 4.13.0 | MPL-2.0 | web |
 | base64-arraybuffer | 1.0.2 | MIT | web |
 | baseline-browser-mapping | 2.10.38 | Apache-2.0 | web |
 | browserslist | 4.28.4 | MIT | web |

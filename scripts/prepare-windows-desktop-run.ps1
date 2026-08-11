@@ -12,6 +12,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $scriptRoot "lib\build-script-support.ps1")
 
 function Resolve-FullPath {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -124,7 +126,8 @@ function Remove-GeneratedEntry {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][string]$Root,
-        [Parameter(Mandatory = $true)][string]$Purpose
+        [Parameter(Mandatory = $true)][string]$Purpose,
+        [Parameter(Mandatory = $true)][string]$QuarantineRoot
     )
 
     if (-not (Test-Path -LiteralPath $Path)) {
@@ -136,6 +139,15 @@ function Remove-GeneratedEntry {
     if (-not $fullPath.StartsWith($fullRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase) -and
         -not [string]::Equals($fullPath, $fullRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "$Purpose must stay inside $fullRoot. Resolved path: $fullPath"
+    }
+
+    if (Test-Path -LiteralPath $fullPath -PathType Container) {
+        Remove-ExportDocDirectoryWithRetry `
+            -Path $fullPath `
+            -MaximumAttempts 8 `
+            -AllowedRoot $artifactsRoot `
+            -QuarantineRoot $QuarantineRoot
+        return
     }
 
     $maximumAttempts = 8
@@ -245,7 +257,7 @@ function Copy-BrowserRuntimeResources {
 
     # Browser assets are versioned as one unit. Reusing individual files can
     # retain an old platform or an obsolete Chromium directory after upgrades.
-    Remove-GeneratedEntry -Path $Destination -Root $OutputRoot -Purpose "stale packaged browser runtime"
+    Remove-GeneratedEntry -Path $Destination -Root $OutputRoot -Purpose "stale packaged browser runtime" -QuarantineRoot $cleanupQuarantineRoot
     New-Item -ItemType Directory -Path $Destination -Force | Out-Null
 
     $platform = Get-ChromeForTestingPlatform
@@ -288,9 +300,9 @@ function Copy-BrowserRuntimeResources {
     throw "Chrome Headless Shell for $platform was not found under $Source. Run scripts\provision-chrome-for-testing.ps1 -Product ChromeHeadlessShell before preparing the desktop run directory."
 }
 
-$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
 $artifactsRoot = Join-Path $repoRoot "artifacts"
+$cleanupQuarantineRoot = Join-Path $artifactsRoot "runtime-cleanup-quarantine"
 
 if ([string]::IsNullOrWhiteSpace($CargoTargetDir)) {
     if (-not [string]::IsNullOrWhiteSpace($env:CARGO_TARGET_DIR)) {
@@ -347,7 +359,8 @@ foreach ($runtimeEntryName in @("App_Data", "logs")) {
     Remove-GeneratedEntry `
         -Path (Join-Path $resolvedOutputDir $runtimeEntryName) `
         -Root $resolvedOutputDir `
-        -Purpose "stale customer runtime $runtimeEntryName directory"
+        -Purpose "stale customer runtime $runtimeEntryName directory" `
+        -QuarantineRoot $cleanupQuarantineRoot
 }
 
 Copy-RequiredFile -Source $mainExe -Destination (Join-Path $resolvedOutputDir "ExportDocManager.exe")
@@ -391,7 +404,7 @@ foreach ($entryName in @("sidecar", "Templates", "Resources", "OcrModels", "Brow
 
     $entrySource = Join-Path $resourcesRoot $entryName
     if (Test-Path -LiteralPath $entryDestination) {
-        Remove-GeneratedEntry -Path $entryDestination -Root $resolvedOutputDir -Purpose "stale packaged $entryName entry"
+        Remove-GeneratedEntry -Path $entryDestination -Root $resolvedOutputDir -Purpose "stale packaged $entryName entry" -QuarantineRoot $cleanupQuarantineRoot
     }
 
     Copy-RequiredEntry -Source $entrySource -Destination $entryDestination
@@ -399,17 +412,17 @@ foreach ($entryName in @("sidecar", "Templates", "Resources", "OcrModels", "Brow
 
 $toolsDir = Join-Path $resolvedOutputDir "Tools"
 New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null
-Remove-GeneratedEntry -Path (Join-Path $toolsDir "ExportDocLicenseKeyGen.exe") -Root $resolvedOutputDir -Purpose "stale packaged license key generator"
-Remove-GeneratedEntry -Path (Join-Path $toolsDir "WebView2Loader.dll") -Root $resolvedOutputDir -Purpose "stale packaged license key generator WebView2 loader"
+Remove-GeneratedEntry -Path (Join-Path $toolsDir "ExportDocLicenseKeyGen.exe") -Root $resolvedOutputDir -Purpose "stale packaged license key generator" -QuarantineRoot $cleanupQuarantineRoot
+Remove-GeneratedEntry -Path (Join-Path $toolsDir "WebView2Loader.dll") -Root $resolvedOutputDir -Purpose "stale packaged license key generator WebView2 loader" -QuarantineRoot $cleanupQuarantineRoot
 
 if ($IncludeLicenseKeygen) {
-    Remove-GeneratedEntry -Path $resolvedLicenseOutputDir -Root $artifactsRoot -Purpose "stale internal license key generator output"
+    Remove-GeneratedEntry -Path $resolvedLicenseOutputDir -Root $artifactsRoot -Purpose "stale internal license key generator output" -QuarantineRoot $cleanupQuarantineRoot
     New-Item -ItemType Directory -Path $resolvedLicenseOutputDir -Force | Out-Null
     Copy-RequiredFile -Source $licenseExe -Destination (Join-Path $resolvedLicenseOutputDir "ExportDocLicenseKeyGen.exe")
 }
 $packagedExcelAnalyzer = Join-Path $toolsDir "exportdoc-excel-analyzer.exe"
 if ($SkipExcelAnalyzer) {
-    Remove-GeneratedEntry -Path $packagedExcelAnalyzer -Root $resolvedOutputDir -Purpose "optional external Excel analyzer"
+    Remove-GeneratedEntry -Path $packagedExcelAnalyzer -Root $resolvedOutputDir -Purpose "optional external Excel analyzer" -QuarantineRoot $cleanupQuarantineRoot
     Write-Host "External Rust Excel analyzer skipped; the API sidecar will use the built-in .NET module."
 } elseif (Test-Path -LiteralPath $excelAnalyzerExe -PathType Leaf) {
     Copy-RequiredFile -Source $excelAnalyzerExe -Destination (Join-Path $toolsDir "exportdoc-excel-analyzer.exe")

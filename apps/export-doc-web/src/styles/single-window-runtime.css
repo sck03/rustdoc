@@ -1,0 +1,32 @@
+.single-window-operation-table {
+  min-width: 1400px;
+}
+
+.operation-center-list-actions {
+  gap: 12px;
+}
+
+.operation-center-list-action-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.operation-center-list-action-grid .path-field {
+  grid-column: span 2;
+}
+
+.operation-center-list-action-grid .detail-item-wide {
+  grid-column: span 2;
+}
+
+.single-window-detail-surface {
+  grid-template-rows: auto auto auto;
+}
+
+.section-count {
+  color: #58616a;
+  font-size: 13px;
+  font-weight: 700;
+}

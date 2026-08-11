@@ -11,6 +11,7 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet(
         "x86_64-pc-windows-msvc",
+        "x86_64-pc-windows-gnu",
         "x86_64-unknown-linux-gnu",
         "aarch64-unknown-linux-gnu",
         "aarch64-apple-darwin"
@@ -34,12 +35,15 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ResourceRoot,
 
-    [string]$OutputRoot
+    [string]$OutputRoot,
+
+    [switch]$SkipLaunchSmoke
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 $artifactsRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "artifacts"))
+. (Join-Path $PSScriptRoot "lib\build-script-support.ps1")
 
 function Test-ChildPath {
     param([string]$Path, [string]$Root)
@@ -66,8 +70,13 @@ function Remove-GeneratedPath {
     param([string]$Path, [string]$Purpose)
 
     $resolved = Assert-GeneratedPath -Path $Path -Purpose $Purpose
-    if (Test-Path -LiteralPath $resolved) {
-        Remove-Item -LiteralPath $resolved -Recurse -Force
+    if (Test-Path -LiteralPath $resolved -PathType Container) {
+        Remove-ExportDocDirectoryWithRetry `
+            -Path $resolved `
+            -AllowedRoot $artifactsRoot `
+            -QuarantineRoot (Join-Path $artifactsRoot "runtime-cleanup-quarantine")
+    } elseif (Test-Path -LiteralPath $resolved) {
+        Remove-Item -LiteralPath $resolved -Force -ErrorAction Stop
     }
 }
 
@@ -138,7 +147,7 @@ $supportedTarget = switch ($Platform) {
     "windows" {
         $RuntimeIdentifier -eq "win-x64" -and
         $Architecture -eq "x64" -and
-        $RustTarget -eq "x86_64-pc-windows-msvc"
+        $RustTarget -in @("x86_64-pc-windows-gnu", "x86_64-pc-windows-msvc")
     }
     "linux" {
         ($RuntimeIdentifier -eq "linux-x64" -and $Architecture -eq "x64" -and $RustTarget -eq "x86_64-unknown-linux-gnu") -or
@@ -296,6 +305,21 @@ ExportDocManager 绿色便携版
 
 Invoke-PayloadVerification -PayloadRoot $payloadVerificationRoot
 Remove-GeneratedPath -Path $inspectionRoot -Purpose "Portable inspection cleanup"
+
+if ($Platform -eq "windows" -and -not $SkipLaunchSmoke) {
+    $portableDataRoot = Join-Path $stagingRoot "App_Data"
+    try {
+        & (Join-Path $PSScriptRoot "smoke-tauri-desktop.ps1") `
+            -ExecutablePath (Join-Path $stagingRoot $entryPoint) `
+            -AppRoot $stagingRoot `
+            -UseDefaultAppRoot `
+            -UsePortableDataRoot `
+            -SkipVite `
+            -TimeoutSeconds 60
+    } finally {
+        Remove-GeneratedPath -Path $portableDataRoot -Purpose "Portable launch smoke data cleanup"
+    }
+}
 
 if (Test-Path -LiteralPath (Join-Path $stagingRoot "App_Data")) {
     throw "Portable release staging must not contain App_Data."

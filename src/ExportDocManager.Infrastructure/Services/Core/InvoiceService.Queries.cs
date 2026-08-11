@@ -9,7 +9,10 @@ namespace ExportDocManager.Services.Core
 {
     public partial class InvoiceService
     {
-        public async Task<Invoice> GetLatestInvoiceByPartiesAsync(int? customerId, int? exporterId)
+        public async Task<Invoice> GetLatestInvoiceByPartiesAsync(
+            int? customerId,
+            int? exporterId,
+            CancellationToken cancellationToken = default)
         {
             if ((!customerId.HasValue || customerId.Value <= 0) &&
                 (!exporterId.HasValue || exporterId.Value <= 0))
@@ -19,7 +22,7 @@ namespace ExportDocManager.Services.Core
 
             try
             {
-                using var context = await _contextFactory.CreateDbContextAsync();
+                await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 var query = _businessDataAccessScope
                     .ApplyInvoiceScope(context.Invoices.AsNoTracking());
 
@@ -36,7 +39,7 @@ namespace ExportDocManager.Services.Core
                 return await query
                     .OrderByDescending(x => x.InvoiceDate)
                     .ThenByDescending(x => x.Id)
-                    .FirstOrDefaultAsync();
+                    .FirstOrDefaultAsync(cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -44,21 +47,23 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> GetInvoiceByIdAsync(int id)
+        public async Task<Invoice> GetInvoiceByIdAsync(
+            int id,
+            CancellationToken cancellationToken = default)
         {
             try
             {
-                using var context = await _contextFactory.CreateDbContextAsync();
+                await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 var invoice = await _businessDataAccessScope
                     .ApplyInvoiceScope(context.Invoices.AsNoTracking())
                     .Include(i => i.Items)
-                    .FirstOrDefaultAsync(x => x.Id == id);
+                    .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
                 if (invoice == null)
                 {
                     return null;
                 }
 
-                await PopulateMissingInvoiceSnapshotsAsync(context, invoice);
+                await PopulateMissingInvoiceSnapshotsAsync(context, invoice, cancellationToken);
                 return invoice;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -67,11 +72,15 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string companyScope, string invoiceNo, string type)
+        public async Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(
+            string companyScope,
+            string invoiceNo,
+            string type,
+            CancellationToken cancellationToken = default)
         {
             try
             {
-                using var context = await _contextFactory.CreateDbContextAsync();
+                await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 string normalizedCompanyScope = companyScope?.Trim() ?? string.Empty;
                 string normalizedInvoiceNo = invoiceNo?.Trim() ?? string.Empty;
                 string normalizedType = InvoiceTypeCatalog.Normalize(type);
@@ -80,7 +89,8 @@ namespace ExportDocManager.Services.Core
                     .FirstOrDefaultAsync(x =>
                         x.CompanyScope == normalizedCompanyScope &&
                         x.InvoiceNo == normalizedInvoiceNo &&
-                        x.Type == normalizedType);
+                        x.Type == normalizedType,
+                        cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -88,18 +98,22 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<bool> InvoiceNoExistsAsync(string companyScope, string invoiceNo)
+        public async Task<bool> InvoiceNoExistsAsync(
+            string companyScope,
+            string invoiceNo,
+            CancellationToken cancellationToken = default)
         {
             try
             {
-                using var context = await _contextFactory.CreateDbContextAsync();
+                await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 string normalizedCompanyScope = companyScope?.Trim() ?? string.Empty;
                 string normalizedInvoiceNo = invoiceNo?.Trim() ?? string.Empty;
                 return await _businessDataAccessScope
                     .ApplyInvoiceScope(context.Invoices.AsNoTracking())
                     .AnyAsync(x =>
                         x.CompanyScope == normalizedCompanyScope &&
-                        x.InvoiceNo == normalizedInvoiceNo);
+                        x.InvoiceNo == normalizedInvoiceNo,
+                        cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -107,22 +121,23 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> GetLastInvoiceAsync()
+        public async Task<Invoice> GetLastInvoiceAsync(
+            CancellationToken cancellationToken = default)
         {
             try
             {
-                using var context = await _contextFactory.CreateDbContextAsync();
+                await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 var invoice = await _businessDataAccessScope
                     .ApplyInvoiceScope(context.Invoices.AsNoTracking())
                     .OrderByDescending(i => i.Id)
-                    .FirstOrDefaultAsync();
+                    .FirstOrDefaultAsync(cancellationToken);
 
                 if (invoice != null)
                 {
                     invoice.Items = await context.Items
                         .AsNoTracking()
                         .Where(x => x.InvoiceId == invoice.Id)
-                        .ToListAsync();
+                        .ToListAsync(cancellationToken);
                 }
 
                 return invoice;

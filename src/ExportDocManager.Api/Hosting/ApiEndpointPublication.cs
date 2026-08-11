@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
@@ -6,6 +7,9 @@ namespace ExportDocManager.Api.Hosting;
 
 internal static class ApiEndpointPublication
 {
+    private static readonly Encoding Utf8WithoutBom =
+        new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
@@ -26,7 +30,7 @@ internal static class ApiEndpointPublication
         string json = JsonSerializer.Serialize(
             new ApiEndpointPublicationRecord(1, apiBaseUrl, Environment.ProcessId),
             JsonOptions);
-        AtomicFileHelper.WriteAllTextAtomic(endpointFile, json);
+        AtomicFileHelper.WriteAllTextAtomic(endpointFile, json, Utf8WithoutBom);
         RuntimeFilePermissionHelper.RestrictFile(endpointFile);
     }
 

@@ -11,7 +11,9 @@ namespace ExportDocManager.Services.Core
 {
     public partial class InvoiceService
     {
-        public async Task<bool> DeleteInvoiceAsync(int id)
+        public async Task<bool> DeleteInvoiceAsync(
+            int id,
+            CancellationToken cancellationToken = default)
         {
             if (id <= 0)
             {
@@ -22,12 +24,12 @@ namespace ExportDocManager.Services.Core
             {
                 return await AppDbContextExecution.ExecuteInTransactionAsync(
                     _contextFactory,
-                    async (context, _) =>
+                    async (context, token) =>
                     {
                         var invoice = await _businessDataAccessScope
                             .ApplyInvoiceScope(
                                 context.Invoices.Include(item => item.Items))
-                            .FirstOrDefaultAsync(item => item.Id == id);
+                            .FirstOrDefaultAsync(item => item.Id == id, token);
                         if (invoice == null)
                         {
                             return false;
@@ -39,12 +41,16 @@ namespace ExportDocManager.Services.Core
                                 "只有草稿发票可以直接删除。已核对、已出运或已结汇发票只能作废；已作废发票必须保留审计记录，如确需清理请使用管理员数据维护功能。");
                         }
 
-                        await InvoiceDeletionSupport.TrackSingleWindowWorkspaceDeletionAsync(context, id);
+                        await InvoiceDeletionSupport.TrackSingleWindowWorkspaceDeletionAsync(
+                            context,
+                            id,
+                            token);
 
                         context.Invoices.Remove(invoice);
-                        await context.SaveChangesAsync();
+                        await context.SaveChangesAsync(token);
                         return true;
-                    });
+                    },
+                    cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -60,7 +66,9 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> TransitionInvoiceStatusAsync(InvoiceStatusTransitionRequest request)
+        public async Task<Invoice> TransitionInvoiceStatusAsync(
+            InvoiceStatusTransitionRequest request,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(request);
             if (request.InvoiceId <= 0)
@@ -76,11 +84,11 @@ namespace ExportDocManager.Services.Core
             {
                 return await AppDbContextExecution.ExecuteInTransactionAsync(
                     _contextFactory,
-                    async (context, _) =>
+                    async (context, token) =>
                     {
                         var invoice = await _businessDataAccessScope
                             .ApplyInvoiceScope(context.Invoices.Include(item => item.Items))
-                            .FirstOrDefaultAsync(item => item.Id == request.InvoiceId);
+                            .FirstOrDefaultAsync(item => item.Id == request.InvoiceId, token);
                         if (invoice == null)
                         {
                             return null;
@@ -104,17 +112,24 @@ namespace ExportDocManager.Services.Core
                             invoice.Items,
                             isNew: false,
                             existingStatus: invoice.Status,
-                            CancellationToken.None).ConfigureAwait(false);
+                            token).ConfigureAwait(false);
                         InvoiceBusinessValidator.ValidateForStatusTransition(invoice, targetStatus);
 
                         string fromStatus = invoice.Status;
                         invoice.Status = targetStatus;
-                        await PopulateMissingInvoiceSnapshotsAsync(context, invoice);
-                        await AddStatusHistoryAsync(context, invoice.Id, fromStatus, targetStatus, note);
-                        await context.SaveChangesAsync();
+                        await PopulateMissingInvoiceSnapshotsAsync(context, invoice, token);
+                        await AddStatusHistoryAsync(
+                            context,
+                            invoice.Id,
+                            fromStatus,
+                            targetStatus,
+                            note,
+                            token);
+                        await context.SaveChangesAsync(token);
 
                         return invoice;
-                    });
+                    },
+                    cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -122,7 +137,11 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> UnverifyInvoiceAsync(int id, byte[] expectedRowVersion, string note)
+        public async Task<Invoice> UnverifyInvoiceAsync(
+            int id,
+            byte[] expectedRowVersion,
+            string note,
+            CancellationToken cancellationToken = default)
         {
             if (id <= 0)
             {
@@ -136,11 +155,11 @@ namespace ExportDocManager.Services.Core
             {
                 return await AppDbContextExecution.ExecuteInTransactionAsync(
                     _contextFactory,
-                    async (context, _) =>
+                    async (context, token) =>
                     {
                         var invoice = await _businessDataAccessScope
                             .ApplyInvoiceScope(context.Invoices.Include(item => item.Items))
-                            .FirstOrDefaultAsync(item => item.Id == id);
+                            .FirstOrDefaultAsync(item => item.Id == id, token);
                         if (invoice == null)
                         {
                             return null;
@@ -164,17 +183,19 @@ namespace ExportDocManager.Services.Core
 
                         string fromStatus = invoice.Status;
                         invoice.Status = InvoiceStatusCatalog.Draft;
-                        await PopulateMissingInvoiceSnapshotsAsync(context, invoice);
+                        await PopulateMissingInvoiceSnapshotsAsync(context, invoice, token);
                         await AddStatusHistoryAsync(
                             context,
                             invoice.Id,
                             fromStatus,
                             InvoiceStatusCatalog.Draft,
-                            normalizedNote);
-                        await context.SaveChangesAsync();
+                            normalizedNote,
+                            token);
+                        await context.SaveChangesAsync(token);
 
                         return invoice;
-                    });
+                    },
+                    cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -182,15 +203,19 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<IReadOnlyList<InvoiceStatusHistory>> ListInvoiceStatusHistoryAsync(int invoiceId)
+        public async Task<IReadOnlyList<InvoiceStatusHistory>> ListInvoiceStatusHistoryAsync(
+            int invoiceId,
+            CancellationToken cancellationToken = default)
         {
             if (invoiceId <= 0)
             {
                 return [];
             }
 
-            await using var context = await _contextFactory.CreateDbContextAsync();
-            if (!await _businessDataAccessScope.CanAccessInvoiceAsync(context, invoiceId).ConfigureAwait(false))
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            if (!await _businessDataAccessScope
+                    .CanAccessInvoiceAsync(context, invoiceId, cancellationToken)
+                    .ConfigureAwait(false))
             {
                 return [];
             }
@@ -200,7 +225,7 @@ namespace ExportDocManager.Services.Core
                 .Where(item => item.InvoiceId == invoiceId)
                 .OrderByDescending(item => item.ChangedAt)
                 .ThenByDescending(item => item.Id)
-                .ToListAsync()
+                .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -208,7 +233,8 @@ namespace ExportDocManager.Services.Core
             AppDbContext context,
             Invoice invoice,
             IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback,
-            bool requireRowVersion = true)
+            bool requireRowVersion = true,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(context);
             ArgumentNullException.ThrowIfNull(invoice);
@@ -228,7 +254,8 @@ namespace ExportDocManager.Services.Core
 
                 if (!await _businessDataAccessScope.CanAccessInvoiceAsync(
                         context,
-                        invoice.Id).ConfigureAwait(false))
+                        invoice.Id,
+                        cancellationToken).ConfigureAwait(false))
                 {
                     throw new PermissionDeniedException("无权限修改该发票。");
                 }
@@ -237,7 +264,7 @@ namespace ExportDocManager.Services.Core
                     .ApplyInvoiceScope(context.Invoices.AsNoTracking())
                     .Where(item => item.Id == invoice.Id)
                     .Select(item => item.Status)
-                    .FirstOrDefaultAsync();
+                    .FirstOrDefaultAsync(cancellationToken);
                 if (!InvoiceStatusCatalog.IsEditable(existingStatus))
                 {
                     throw new InvoiceConflictException("当前发票已锁定，请先反审核后再编辑。");
@@ -250,13 +277,14 @@ namespace ExportDocManager.Services.Core
                 items,
                 isNew,
                 existingStatus,
-                CancellationToken.None).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false);
 
             if (await context.Invoices.AsNoTracking().AnyAsync(item =>
                     item.Id != invoice.Id &&
                     item.CompanyScope == invoice.CompanyScope &&
                     item.InvoiceNo == invoice.InvoiceNo &&
-                    item.Type == invoice.Type))
+                    item.Type == invoice.Type,
+                    cancellationToken))
             {
                 throw new InvoiceConflictException(
                     $"发票号“{invoice.InvoiceNo}”的{invoice.Type}已经存在，未覆盖原发票。请打开已有记录或使用复制功能创建新单号。");
@@ -267,21 +295,21 @@ namespace ExportDocManager.Services.Core
 
             try
             {
-                await PopulateMissingInvoiceSnapshotsAsync(context, invoice);
+                await PopulateMissingInvoiceSnapshotsAsync(context, invoice, cancellationToken);
                 if (invoice.Id > 0)
                 {
                     context.Invoices.Update(invoice);
                 }
                 else
                 {
-                    await context.Invoices.AddAsync(invoice);
+                    await context.Invoices.AddAsync(invoice, cancellationToken);
                 }
 
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken);
 
                 if (items != null)
                 {
-                    await _itemService.SaveItemsAsync(context, invoice.Id, items);
+                    await _itemService.SaveItemsAsync(context, invoice.Id, items, cancellationToken);
                 }
 
                 try
@@ -290,7 +318,7 @@ namespace ExportDocManager.Services.Core
                         context,
                         items,
                         pendingHsFeedback,
-                        CancellationToken.None).ConfigureAwait(false);
+                        cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
                 {
@@ -308,7 +336,8 @@ namespace ExportDocManager.Services.Core
             int invoiceId,
             string fromStatus,
             string toStatus,
-            string note)
+            string note,
+            CancellationToken cancellationToken)
         {
             var currentUser = _businessDataAccessScope.CurrentUser;
             await context.InvoiceStatusHistories.AddAsync(new InvoiceStatusHistory
@@ -320,7 +349,7 @@ namespace ExportDocManager.Services.Core
                 ChangedByUserId = currentUser?.Id > 0 ? currentUser.Id : null,
                 ChangedByUsername = currentUser?.Username?.Trim() ?? string.Empty,
                 ChangedAt = DateTime.UtcNow
-            });
+            }, cancellationToken);
         }
 
         private static void ValidateExpectedRowVersion(byte[] expectedRowVersion)
@@ -347,7 +376,10 @@ namespace ExportDocManager.Services.Core
             return normalized;
         }
 
-        private static async Task PopulateMissingInvoiceSnapshotsAsync(AppDbContext context, Invoice invoice)
+        private static async Task PopulateMissingInvoiceSnapshotsAsync(
+            AppDbContext context,
+            Invoice invoice,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(context);
             ArgumentNullException.ThrowIfNull(invoice);
@@ -356,7 +388,7 @@ namespace ExportDocManager.Services.Core
             {
                 var customer = await context.Customers
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(item => item.Id == invoice.CustomerId);
+                    .FirstOrDefaultAsync(item => item.Id == invoice.CustomerId, cancellationToken);
 
                 if (customer != null)
                 {
@@ -371,7 +403,7 @@ namespace ExportDocManager.Services.Core
             {
                 var exporter = await context.Exporters
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(item => item.Id == invoice.ExporterId);
+                    .FirstOrDefaultAsync(item => item.Id == invoice.ExporterId, cancellationToken);
 
                 if (exporter != null)
                 {

@@ -2,11 +2,48 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using ExportDocManager.Api.Hosting;
+using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Core;
+using ExportDocManager.Services.Errors;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace ExportDocManager.Api.Tests
 {
     public class ApiPaymentEndpointIntegrationTests
     {
+        [Theory]
+        [InlineData("permission", HttpStatusCode.Forbidden)]
+        [InlineData("infrastructure", HttpStatusCode.ServiceUnavailable)]
+        public async Task PaymentCreate_ShouldPreserveClassifiedServiceFailures(
+            string failureKind,
+            HttpStatusCode expectedStatusCode)
+        {
+            Exception failure = failureKind switch
+            {
+                "permission" => new PermissionDeniedException("无权限保存该付款记录。"),
+                "infrastructure" => new InfrastructureServiceException("付款数据库暂时不可用。"),
+                _ => throw new ArgumentOutOfRangeException(nameof(failureKind))
+            };
+            var paymentService = new ThrowingPaymentService(failure);
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                $"edm-api-payment-{failureKind}",
+                $"api-payment-{failureKind}.db",
+                configureServices: services =>
+                {
+                    services.RemoveAll<IPaymentService>();
+                    services.AddSingleton<IPaymentService>(paymentService);
+                });
+            using var anonymousClient = harness.CreateClient();
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+
+            var response = await adminClient.PostAsJsonAsync("/api/payments", new { });
+
+            Assert.Equal(expectedStatusCode, response.StatusCode);
+            Assert.True(paymentService.ReceivedCancellationToken.CanBeCanceled);
+        }
+
         [Fact]
         public async Task PaymentEndpoints_ShouldSupportAuthenticatedCrudAndPersistUnderRuntimeDataRoot()
         {
@@ -153,6 +190,24 @@ namespace ExportDocManager.Api.Tests
 
             var getAfterDeleteResponse = await adminClient.GetAsync($"/api/payments/{created.Id}");
             Assert.Equal(HttpStatusCode.NotFound, getAfterDeleteResponse.StatusCode);
+        }
+
+        private sealed class ThrowingPaymentService(Exception failure) : IPaymentService
+        {
+            public CancellationToken ReceivedCancellationToken { get; private set; }
+
+            public Task<int> SavePaymentAsync(
+                Payment payment,
+                CancellationToken cancellationToken = default)
+            {
+                ReceivedCancellationToken = cancellationToken;
+                return Task.FromException<int>(failure);
+            }
+
+            public Task<bool> DeletePaymentAsync(
+                int id,
+                CancellationToken cancellationToken = default) =>
+                Task.FromException<bool>(failure);
         }
     }
 }

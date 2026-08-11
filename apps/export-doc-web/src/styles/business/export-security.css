@@ -1,4 +1,31 @@
 
+.review-severity {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.review-severity-error {
+  color: #8a1f13;
+  background: #fff0ed;
+  border: 1px solid #f1b4aa;
+}
+
+.review-severity-warning {
+  color: #6b3d00;
+  background: #fff1d6;
+  border: 1px solid #f2ca7b;
+}
+
+.review-severity-info {
+  color: #315166;
+  background: #eef7fb;
+  border: 1px solid #b8dbe8;
+}
+
 .exchange-currency-list-heading strong,
 .exchange-currency-list-heading span {
   min-width: 0;
@@ -682,9 +709,12 @@
   .invoice-party-group-exporter { grid-column: auto; }
 }
 
+@media (max-width: 860px) {
+  .invoice-party-group:not(.invoice-party-group-exporter) .field-grid { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 560px) {
   .invoice-party-group { padding: 12px; }
-  .invoice-party-group:not(.invoice-party-group-exporter) .field-grid { grid-template-columns: 1fr; }
   .invoice-party-group-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
   .invoice-party-group-heading span { text-align: left; }
 }

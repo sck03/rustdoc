@@ -17,6 +17,15 @@ const modelPath = path.join(
   "reports",
   "printReportPreviewDocument.ts",
 );
+const runtimePath = path.join(
+  repoRoot,
+  "apps",
+  "export-doc-web",
+  "src",
+  "features",
+  "reports",
+  "printReportPreview.ts",
+);
 const modelImportSpecifier = `./${path.relative(workspaceRoot, modelPath).replaceAll("\\", "/")}`;
 
 fs.rmSync(workspaceRoot, { recursive: true, force: true });
@@ -90,6 +99,21 @@ const zeroBodyMarginHtml = buildPrintSourceHtml(`<!doctype html><html><head><sty
   body { margin: 0; padding: 15px; }
 </style></head><body>content</body></html>`);
 assert(zeroBodyMarginHtml.includes("body { margin: 0; padding: 15px; }"), "无 @page 的模板也应保留自身 body 版式");
+
+const runtimeSource = fs.readFileSync(runtimePath, "utf8");
+assert(runtimeSource.includes("let printStarted = false"), "打印运行时必须维护单航班状态");
+assert(
+  runtimeSource.indexOf("printStarted = true") < runtimeSource.indexOf("waitForPrintReady(frame)"),
+  "打印单航班状态必须在异步等待资源前锁定",
+);
+const printStartIndex = runtimeSource.indexOf("printStarted = true");
+assert(
+  runtimeSource.indexOf("window.clearTimeout(timeoutTimer)", printStartIndex) < runtimeSource.indexOf("waitForPrintReady(frame)", printStartIndex),
+  "进入打印准备后必须停止载入超时，避免系统打印框打开时提前清理 iframe",
+);
+assert(runtimeSource.includes('addEventListener("afterprint", finishAfterPrint'), "打印完成后应通过 afterprint 安全清理");
+assert(runtimeSource.includes('window.addEventListener("focus", finishAfterFocus'), "打印对话框关闭后应支持焦点回退清理");
+assert(runtimeSource.includes("if (!settled) {\n              printCompletionTimer"), "afterprint 已完成时不应遗留两分钟兜底计时器");
 
 console.log("print report preview document tests passed");
 

@@ -23,7 +23,7 @@ const updateApprovedBaselines = process.env.UPDATE_FRONTEND_VISUAL_BASELINES ===
 // fresh Windows processes even with the same pinned binary. Keep the default below 0.2%
 // so layout and component regressions still fail, while semantic checks guard critical text.
 const maximumPixelDifferenceRatio = Number(process.env.FRONTEND_VISUAL_MAX_DIFF_RATIO ?? "0.002");
-const pages = ["login", "login-expired", "dashboard", "invoice", "invoiceParties", "hs", "singleWindow", "report", "state-loading", "state-empty", "state-error", "state-fatal", "state-offline", "state-offline-local", "state-service-unavailable", "state-permission", "state-route-redirect", "state-conflict", "state-feedback", "dialog"];
+const pages = ["login", "login-expired", "dashboard", "query", "invoice", "invoiceParties", "hs", "singleWindow", "report", "state-loading", "state-empty", "state-error", "state-fatal", "state-offline", "state-offline-local", "state-service-unavailable", "state-permission", "state-route-redirect", "state-conflict", "state-feedback", "dialog"];
 const viewports = [
   { name: "desktop-1366", width: 1366, height: 768 },
   { name: "desktop-1920", width: 1920, height: 1080 },
@@ -126,6 +126,75 @@ try {
               return controlRect.left < groupRect.left - 1 || controlRect.right > groupRect.right + 1;
             }).length
           : 0;
+        const queryFilterContractDetails = (() => {
+          const grid = document.querySelector(".query-filter-grid");
+          if (!(grid instanceof HTMLElement)) return null;
+          const visibleElement = (element) => {
+            if (!(element instanceof HTMLElement)) return false;
+            const style = getComputedStyle(element);
+            const rect = element.getBoundingClientRect();
+            return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+          };
+          const dateRange = grid.querySelector(".query-date-range");
+          const actions = document.querySelector(".query-toolbar-actions");
+          const fields = [...grid.querySelectorAll(".query-filter-field")].filter(visibleElement);
+          const labels = [...grid.querySelectorAll(".query-filter-field > span, .query-filter-field > .form-field-label, .query-filter-field > .form-field-label > span:first-child")].filter(visibleElement);
+          const controls = [...grid.querySelectorAll("input, select")].filter(visibleElement);
+          const gridStyle = getComputedStyle(grid);
+          const dateRangeStyle = dateRange instanceof HTMLElement ? getComputedStyle(dateRange) : null;
+          const gridColumnCount = gridStyle.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length;
+          const dateRangeColumnCount = dateRangeStyle?.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length ?? 0;
+          const expectedGridColumnCount = innerWidth >= 1720 ? 6 : innerWidth > 1180 ? 4 : innerWidth > 620 ? 2 : 1;
+          const expectedDateRangeColumnCount = innerWidth <= 620 ? 1 : 2;
+          const labelClipping = labels.filter((label) => label.scrollWidth > label.clientWidth + 1 || label.scrollHeight > label.clientHeight + 1)
+            .map((label) => (label.textContent || "").trim());
+          const controlOverflow = controls.filter((control) => {
+            const field = control.closest(".query-filter-field");
+            if (!(field instanceof HTMLElement)) return true;
+            const controlRect = control.getBoundingClientRect();
+            const fieldRect = field.getBoundingClientRect();
+            return controlRect.left < fieldRect.left - 1 || controlRect.right > fieldRect.right + 1
+              || controlRect.top < fieldRect.top - 1 || controlRect.bottom > fieldRect.bottom + 1;
+          }).map((control) => ({ tag: control.tagName, className: control.className }));
+          const fieldRects = fields.map((field) => ({ className: field.className, rect: field.getBoundingClientRect() }));
+          const fieldOverlapCount = fieldRects.flatMap((entry, index) => fieldRects.slice(index + 1).map((other) => ({ entry, other })))
+            .filter(({ entry, other }) => Math.min(entry.rect.right, other.rect.right) - Math.max(entry.rect.left, other.rect.left) > 1
+              && Math.min(entry.rect.bottom, other.rect.bottom) - Math.max(entry.rect.top, other.rect.top) > 1).length;
+          const gridRect = grid.getBoundingClientRect();
+          const actionsRect = actions instanceof HTMLElement ? actions.getBoundingClientRect() : null;
+          const gridActionsOverlap = actionsRect
+            ? Math.min(gridRect.right, actionsRect.right) - Math.max(gridRect.left, actionsRect.left) > 1
+              && Math.min(gridRect.bottom, actionsRect.bottom) - Math.max(gridRect.top, actionsRect.top) > 1
+            : true;
+          const actionsPlacementMatches = actionsRect
+            ? innerWidth <= 860
+              ? actionsRect.top >= gridRect.bottom - 1
+              : actionsRect.left >= gridRect.right - 1
+            : false;
+          return {
+            gridColumnCount,
+            expectedGridColumnCount,
+            dateRangeColumnCount,
+            expectedDateRangeColumnCount,
+            fieldCount: fields.length,
+            labelClipping,
+            controlOverflow,
+            fieldOverlapCount,
+            gridActionsOverlap,
+            actionsPlacementMatches,
+            passed: gridStyle.display === "grid"
+              && dateRangeStyle?.display === "grid"
+              && gridColumnCount === expectedGridColumnCount
+              && dateRangeColumnCount === expectedDateRangeColumnCount
+              && fields.length === 7
+              && labelClipping.length === 0
+              && controlOverflow.length === 0
+              && fieldOverlapCount === 0
+              && !gridActionsOverlap
+              && actionsPlacementMatches,
+          };
+        })();
+        const queryFilterContractPassed = queryFilterContractDetails?.passed ?? true;
         const reportLayout = ${JSON.stringify(pageName)} === "report"
           ? (() => {
               const selectors = [".template-selection-panel", ".template-user-panel", ".template-admin-panel", ".template-package-panel"];
@@ -188,6 +257,8 @@ try {
           unlabeledInputs,
           truncatedCriticalText,
           partyControlOverflow,
+          queryFilterContractPassed,
+          queryFilterContractDetails,
           reportPanelOverlapCount: reportLayout.overlapCount,
           reportMinimumSelectionFieldWidth: reportLayout.minimumSelectionFieldWidth,
           reportResponsivePlacementMatches: reportLayout.responsivePlacementMatches,
@@ -313,6 +384,7 @@ try {
         && axeViolations.length === 0
         && value.truncatedCriticalText.length === 0
         && value.partyControlOverflow === 0
+        && (pageName !== "query" || value.queryFilterContractPassed)
         && value.reportPanelOverlapCount === 0
         && value.reportMinimumSelectionFieldWidth >= 128
         && value.reportResponsivePlacementMatches

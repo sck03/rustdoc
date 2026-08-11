@@ -7,6 +7,7 @@ import {
   rmSync,
 } from "node:fs";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { resolveDotnetCommand } from "./lib/dotnet-command.mjs";
@@ -17,6 +18,7 @@ const playwrightBrowsersPath = path.resolve(
 );
 process.env.PLAYWRIGHT_BROWSERS_PATH = playwrightBrowsersPath;
 const requestedBrowsers = readBrowserArgument();
+const legacyWindowsFirefoxSandboxDisabled = shouldDisableLegacyWindowsFirefoxSandbox();
 const runtimeIdentifier = `${platformPrefix()}-${architectureName()}`;
 const apiOutputRoot = path.join(
   repositoryRoot,
@@ -83,7 +85,14 @@ try {
   for (const browserName of requestedBrowsers) {
     const browserType = playwright[browserName];
     if (!browserType) throw new Error(`Unsupported Playwright browser: ${browserName}`);
-    const browser = await browserType.launch({ headless: true });
+    const launchOptions = { headless: true };
+    if (browserName === "firefox" && legacyWindowsFirefoxSandboxDisabled) {
+      // Firefox 151's content sandbox cannot spawn its tab process on the
+      // still-supported Windows 10 LTSC 2019 kernel. This acceptance worker
+      // only opens the loopback test server and is deleted after the run.
+      launchOptions.env = { ...process.env, MOZ_DISABLE_CONTENT_SANDBOX: "1" };
+    }
+    const browser = await browserType.launch(launchOptions);
     try {
       results.push(await runViewportAcceptance(browser, browserName, baseUrl, axeSource, {
         name: "desktop",
@@ -99,7 +108,13 @@ try {
       await browser.close();
     }
   }
-  process.stdout.write(`${JSON.stringify({ success: true, runtimeIdentifier, playwrightBrowsersPath, results }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({
+    success: true,
+    runtimeIdentifier,
+    playwrightBrowsersPath,
+    legacyWindowsFirefoxSandboxDisabled,
+    results,
+  }, null, 2)}\n`);
 } catch (error) {
   if (apiOutput.trim()) process.stderr.write(`API output:\n${apiOutput}\n`);
   throw error;
@@ -109,6 +124,7 @@ try {
 }
 
 async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, viewport) {
+  const operationTimeout = browserOperationTimeout(browserName);
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
     locale: "zh-CN",
@@ -116,6 +132,8 @@ async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, v
   });
   await context.addInitScript({ path: axeSource });
   const page = await context.newPage();
+  page.setDefaultTimeout(operationTimeout);
+  page.setDefaultNavigationTimeout(operationTimeout);
   const pageErrors = [];
   const serverErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -123,11 +141,11 @@ async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, v
     if (response.status() >= 500) serverErrors.push(`${response.status()} ${response.url()}`);
   });
   try {
-    await page.goto(baseUrl, { waitUntil: "networkidle", timeout: 30_000 });
+    await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: operationTimeout });
     await page.locator('input[autocomplete="username"]').fill("admin");
     await page.locator('input[autocomplete="current-password"]').fill("");
     await page.getByRole("button", { name: "登录" }).click();
-    await page.locator(".app-shell").waitFor({ state: "visible", timeout: 30_000 });
+    await page.locator(".app-shell").waitFor({ state: "visible", timeout: operationTimeout });
 
     const metrics = await page.evaluate(() => {
       const shell = document.querySelector(".app-shell");
@@ -174,7 +192,13 @@ async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, v
         JSON.stringify(metrics),
       );
     }
-    const lazyRouteStyles = await validateLazyRouteStyles(page, browserName, viewport.name, baseUrl);
+    const lazyRouteStyles = await validateLazyRouteStyles(
+      page,
+      browserName,
+      viewport.name,
+      baseUrl,
+      operationTimeout,
+    );
     if (pageErrors.length || serverErrors.length || accessibility.length) {
       throw new Error(
         `${browserName}/${viewport.name} acceptance failed: ` +
@@ -197,7 +221,7 @@ async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, v
   }
 }
 
-async function validateLazyRouteStyles(page, browserName, viewportName, baseUrl) {
+async function validateLazyRouteStyles(page, browserName, viewportName, baseUrl, operationTimeout) {
   const routes = [
     {
       name: "single-window",
@@ -223,8 +247,8 @@ async function validateLazyRouteStyles(page, browserName, viewportName, baseUrl)
   ];
   const results = [];
   for (const route of routes) {
-    await page.goto(route.url, { waitUntil: "domcontentloaded", timeout: 30_000 });
-    await page.locator(route.selector).waitFor({ state: "visible", timeout: 30_000 });
+    await page.goto(route.url, { waitUntil: "domcontentloaded", timeout: operationTimeout });
+    await page.locator(route.selector).waitFor({ state: "visible", timeout: operationTimeout });
     await page.waitForFunction(
       ({ selector, expectedProperty, expectedValue }) => {
         const element = document.querySelector(selector);
@@ -235,7 +259,7 @@ async function validateLazyRouteStyles(page, browserName, viewportName, baseUrl)
         expectedProperty: route.expectedProperty,
         expectedValue: route.expectedValue,
       },
-      { timeout: 30_000 },
+      { timeout: operationTimeout },
     );
     const metrics = await page.evaluate(({ selector, expectedProperty }) => {
       const element = document.querySelector(selector);
@@ -280,6 +304,18 @@ function architectureName() {
   if (process.arch === "x64") return "x64";
   if (process.arch === "arm64") return "arm64";
   throw new Error(`Unsupported architecture: ${process.arch}`);
+}
+
+function shouldDisableLegacyWindowsFirefoxSandbox() {
+  if (process.platform !== "win32") return false;
+  const build = Number.parseInt(os.release().split(".")[2] || "", 10);
+  return Number.isFinite(build) && build < 19041;
+}
+
+function browserOperationTimeout(browserName) {
+  return process.platform === "win32" && browserName === "webkit" && shouldDisableLegacyWindowsFirefoxSandbox()
+    ? 90_000
+    : 30_000;
 }
 
 async function getFreePort() {

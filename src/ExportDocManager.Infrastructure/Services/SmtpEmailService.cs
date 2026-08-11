@@ -12,6 +12,9 @@ namespace ExportDocManager.Services.Infrastructure
 {
     public class SmtpEmailService : IEmailService
     {
+        private static readonly TimeSpan SendTimeout = TimeSpan.FromSeconds(60);
+        private static readonly TimeSpan ConnectionTestTimeout = TimeSpan.FromSeconds(30);
+
         private readonly ISettingsService _settingsService;
         private readonly ILogger<SmtpEmailService> _logger;
 
@@ -23,58 +26,94 @@ namespace ExportDocManager.Services.Infrastructure
         
         private EmailConfig Config => _settingsService.Settings?.Email ?? new EmailConfig();
 
-        public async Task SendEmailAsync(string to, string subject, string body, List<string> attachments = null)
+        public async Task SendEmailAsync(
+            string to,
+            string subject,
+            string body,
+            List<string> attachments = null,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var config = Config;
             var smtpHost = RequireValue(config.SmtpHost, "SMTP 服务器未配置，请先到“系统设置 > 邮件设置”中填写。");
             var fromAddress = ResolveFromAddress(config);
             var recipientAddress = RequireValue(to, "收件人地址不能为空。");
+            var attachmentPaths = EmailAttachmentPolicy.ValidateAndNormalize(attachments);
 
-            using (var message = new MailMessage())
+            using var message = new MailMessage
             {
-                message.From = CreateMailAddress(fromAddress, config.FromDisplayName);
-                message.To.Add(CreateMailAddress(recipientAddress));
-                message.Subject = subject ?? string.Empty;
-                message.Body = body ?? string.Empty;
-                message.IsBodyHtml = true;
+                From = CreateMailAddress(fromAddress, config.FromDisplayName),
+                Subject = subject ?? string.Empty,
+                Body = body ?? string.Empty,
+                IsBodyHtml = true
+            };
+            message.To.Add(CreateMailAddress(recipientAddress));
 
-                if (attachments != null)
+            long attachedBytes = 0;
+            foreach (string path in attachmentPaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    64 * 1024,
+                    FileOptions.Asynchronous | FileOptions.SequentialScan);
+                try
                 {
-                    foreach (var path in attachments
-                        .Where(path => !string.IsNullOrWhiteSpace(path))
-                        .Distinct(StringComparer.OrdinalIgnoreCase))
+                    if (stream.Length > EmailAttachmentPolicy.MaximumSingleAttachmentBytes)
                     {
-                        if (System.IO.File.Exists(path))
-                        {
-                            message.Attachments.Add(new Attachment(path));
-                        }
+                        throw new ExportDocManager.Utils.PayloadLimitExceededException(
+                            EmailAttachmentPolicy.MaximumSingleAttachmentBytes);
                     }
-                }
+                    if (attachedBytes > EmailAttachmentPolicy.MaximumTotalAttachmentBytes - stream.Length)
+                    {
+                        throw new ExportDocManager.Utils.PayloadLimitExceededException(
+                            EmailAttachmentPolicy.MaximumTotalAttachmentBytes);
+                    }
 
-                using (var client = CreateSmtpClient(config, smtpHost))
-                {
-                    try
-                    {
-                        await client.SendMailAsync(message);
-                        _logger.LogInformation("Email sent to {Recipient} successfully.", recipientAddress);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to send email to {Recipient}", recipientAddress);
-                        throw MapSmtpInfrastructureFailure(ex);
-                    }
+                    message.Attachments.Add(new Attachment(stream, Path.GetFileName(path)));
+                    attachedBytes += stream.Length;
                 }
+                catch
+                {
+                    stream.Dispose();
+                    throw;
+                }
+            }
+
+            using var client = CreateSmtpClient(config, smtpHost, SendTimeout);
+            using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutSource.CancelAfter(SendTimeout);
+            try
+            {
+                await client.SendMailAsync(message, timeoutSource.Token).ConfigureAwait(false);
+                _logger.LogInformation("Email sent to {Recipient} successfully.", recipientAddress);
+            }
+            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogWarning(ex, "Sending email to {Recipient} timed out.", recipientAddress);
+                throw new ServiceTimeoutException("邮件发送超时，请稍后重试。", ex);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send email to {Recipient}", recipientAddress);
+                throw MapSmtpInfrastructureFailure(ex);
             }
         }
 
-        public async Task TestConnectionAsync(EmailConfig config)
+        public async Task TestConnectionAsync(
+            EmailConfig config,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(config);
+            cancellationToken.ThrowIfCancellationRequested();
 
             var smtpHost = RequireValue(config.SmtpHost, "SMTP 服务器未配置，请先填写后再测试。");
             var fromAddress = ResolveFromAddress(config);
 
-            using (var client = CreateSmtpClient(config, smtpHost))
+            using (var client = CreateSmtpClient(config, smtpHost, ConnectionTestTimeout))
             using (var message = new MailMessage())
             {
                 message.From = CreateMailAddress(fromAddress, config.FromDisplayName);
@@ -85,7 +124,13 @@ namespace ExportDocManager.Services.Infrastructure
 
                 try
                 {
-                    await client.SendMailAsync(message);
+                    using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    timeoutSource.CancelAfter(ConnectionTestTimeout);
+                    await client.SendMailAsync(message, timeoutSource.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+                {
+                    throw new ServiceTimeoutException("SMTP 连接测试超时，请稍后重试。", ex);
                 }
                 catch (Exception ex)
                 {
@@ -94,12 +139,16 @@ namespace ExportDocManager.Services.Infrastructure
             }
         }
 
-        private static SmtpClient CreateSmtpClient(EmailConfig config, string smtpHost)
+        private static SmtpClient CreateSmtpClient(
+            EmailConfig config,
+            string smtpHost,
+            TimeSpan timeout)
         {
             var client = new SmtpClient(smtpHost, config.SmtpPort)
             {
                 EnableSsl = config.EnableSsl,
-                UseDefaultCredentials = false
+                UseDefaultCredentials = false,
+                Timeout = checked((int)timeout.TotalMilliseconds)
             };
 
             if (!string.IsNullOrWhiteSpace(config.UserName) && !string.IsNullOrWhiteSpace(config.Password))

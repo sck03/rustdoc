@@ -1,5 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Download, FolderOpen, RefreshCw, Search } from "lucide-react";
 import { HashRouter } from "react-router-dom";
 import { WorkspaceShell } from "./app/WorkspaceShell.tsx";
 import { LoginPage } from "./features/auth/LoginPage.tsx";
@@ -15,6 +17,12 @@ import "./styles/visual-baseline.css";
 const visualSearch = new URLSearchParams(location.search);
 const page = visualSearch.get("page") ?? "dashboard";
 const fullProduct = getProductEditionPresentation("Full");
+const visualQueryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false },
+    mutations: { retry: false },
+  },
+});
 const requestedDensity = visualSearch.get("density");
 if (requestedDensity === "compact" || requestedDensity === "comfortable") {
   persistInterfaceDensity(requestedDensity);
@@ -23,6 +31,7 @@ if (requestedDensity === "compact" || requestedDensity === "comfortable") {
 }
 const pathnameByPage: Record<string, string> = {
   dashboard: "/dashboard",
+  query: "/query/invoices",
   invoice: "/invoices/new",
   invoiceParties: "/invoices/new",
   hs: "/master-data/hs-knowledge/online",
@@ -46,7 +55,7 @@ function BaselineApp() {
     capabilities: { canManageSettings: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, productEdition: "Full", enabledModules: undefined },
   } as never;
   return <HashRouter><WorkspaceShell pathname={pathnameByPage[page] ?? "/dashboard"} apiBaseUrl="http://127.0.0.1:5188" isDesktopRuntime={page === "state-offline-local"} user={user} onLogout={() => undefined} connectivityOverride={page === "state-offline" || page === "state-offline-local" ? "offline" : "online"} serviceAvailabilityOverride={page === "state-service-unavailable" ? "unreachable" : "available"} notice={page === "state-route-redirect" ? { id: "permission", tone: "warning", title: "当前页面不可用", message: "当前权限模板未启用报表设计，系统已返回当前账号可以使用的工作区。" } : null} onDismissNotice={() => undefined}>
-    {page === "invoice" ? <InvoiceBaseline/> : page === "invoiceParties" ? <InvoicePartiesBaseline/> : page === "hs" ? <HsBaseline/> : page === "singleWindow" ? <SingleWindowBaseline/> : page === "report" ? <ReportBaseline/> : page === "state-loading" ? <StateBaseline tone="loading"/> : page === "state-empty" ? <StateBaseline tone="empty"/> : page === "state-error" ? <StateBaseline tone="error"/> : page === "state-permission" ? <StateBaseline tone="permission"/> : page === "state-conflict" ? <ConflictBaseline/> : page === "state-feedback" ? <FeedbackBaseline/> : page === "dialog" ? <DialogBaseline/> : <DashboardBaseline/>}
+    {page === "query" ? <QueryBaseline/> : page === "invoice" ? <InvoiceBaseline/> : page === "invoiceParties" ? <InvoicePartiesBaseline/> : page === "hs" ? <HsBaseline/> : page === "singleWindow" ? <SingleWindowBaseline/> : page === "report" ? <ReportBaseline/> : page === "state-loading" ? <StateBaseline tone="loading"/> : page === "state-empty" ? <StateBaseline tone="empty"/> : page === "state-error" ? <StateBaseline tone="error"/> : page === "state-permission" ? <StateBaseline tone="permission"/> : page === "state-conflict" ? <ConflictBaseline/> : page === "state-feedback" ? <FeedbackBaseline/> : page === "dialog" ? <DialogBaseline/> : <DashboardBaseline/>}
   </WorkspaceShell></HashRouter>;
 }
 
@@ -71,6 +80,48 @@ function DialogBaseline() {
 }
 
 function DashboardBaseline() { return <section className="dashboard-page"><div className="dashboard-metric-grid">{["本月出口额","本月预估利润","本月退税额","待处理订单","已出运","总订单量"].map((label,index)=><div className="dashboard-metric dashboard-metric-teal" key={label}><div className="dashboard-metric-icon" aria-hidden="true">{index + 1}</div><div><span>{label}</span><strong data-visual-critical-text>{index < 3 ? "128,560.00" : String(12 + index)}</strong></div></div>)}</div><div className="dashboard-work-grid"><section className="form-section dashboard-recent-section"><div className="section-header"><h2>最新订单</h2></div><div className="table-frame" tabIndex={0} aria-label="最新订单表格"><table><thead><tr><th>发票号</th><th>状态</th><th>客户</th><th>日期</th><th>金额</th></tr></thead><tbody>{[1,2,3,4].map(i=><tr key={i}><td>YH2026-00{i}</td><td><span className="status-pill">处理中</span></td><td>BRIDGE GLOBAL LTD.</td><td>2026-07-{20+i}</td><td>32,140.00</td></tr>)}</tbody></table></div></section><section className="form-section dashboard-todo-section"><div className="section-header"><h2>待办事项</h2></div><div className="dashboard-todo-list">{["核对发票商品明细","审核联网 HS 候选","生成报关单证"].map(x=><button type="button" className="dashboard-todo-item" key={x}>{x}</button>)}</div></section></div></section>; }
+function QueryBaseline() {
+  return (
+    <section className="work-surface query-surface" aria-label="单据查询视觉基准">
+      <form className="toolbar query-toolbar">
+        <div className="query-filter-grid">
+          <div className="query-date-range" role="group" aria-label="日期范围">
+            <label className="query-filter-field query-date-filter"><span>开始日期</span><input type="date" defaultValue="2026-08-01" /></label>
+            <label className="query-filter-field query-date-filter"><span>结束日期</span><input type="date" defaultValue="2026-08-10" /></label>
+          </div>
+          <div className="remote-select-field query-filter-field query-party-filter query-customer-filter">
+            <span className="form-field-label"><span>客户</span></span>
+            <div className="remote-select-controls"><input type="search" aria-label="客户检索" placeholder="搜索客户" /><select aria-label="客户"><option>全部</option></select></div>
+          </div>
+          <div className="remote-select-field query-filter-field query-party-filter query-exporter-filter">
+            <span className="form-field-label"><span>出口商</span></span>
+            <div className="remote-select-controls"><input type="search" aria-label="出口商检索" placeholder="搜索出口商" /><select aria-label="出口商"><option>全部</option></select></div>
+          </div>
+          <label className="query-filter-field query-type-filter"><span>业务类型</span><select defaultValue=""><option value="">全部</option><option>实际数据</option></select></label>
+          <label className="query-filter-field query-transport-filter"><span>运输方式</span><select defaultValue=""><option value="">全部</option><option>BY SEA</option></select></label>
+          <label className="query-filter-field query-keyword-filter"><span>关键字</span><input placeholder="发票号、合同号、客户等" /></label>
+        </div>
+        <div className="toolbar-actions query-toolbar-actions">
+          <button className="icon-button" type="button" title="刷新" aria-label="刷新"><RefreshCw size={18} aria-hidden="true" /></button>
+          <button className="icon-button solid" type="submit" title="查询" aria-label="查询"><Search size={18} aria-hidden="true" /></button>
+        </div>
+      </form>
+      <section className="form-section query-export-panel" aria-label="查询结果导出">
+        <div className="section-header"><div><h2>导出</h2><span>0 条当前结果</span></div></div>
+        <div className="query-export-grid">
+          <label className="inline-filter query-export-path-filter"><span>输出路径</span><input defaultValue="QueryResults.xlsx" /></label>
+          <div className="query-inline-actions">
+            <button className="icon-button" type="button" title="选择 Excel 保存位置" aria-label="选择 Excel 保存位置"><FolderOpen size={16} aria-hidden="true" /></button>
+            <button className="icon-button solid" type="button" title="导出 Excel" aria-label="导出 Excel"><Download size={18} aria-hidden="true" /></button>
+          </div>
+        </div>
+      </section>
+      <div className="table-frame query-table-frame" tabIndex={0} aria-label="查询结果表格">
+        <table className="query-table"><thead><tr>{["发票号","日期","合同号","客户","出口商","目的国","贸易条款","船期/航期","运输方式","箱数","数量","金额","类型"].map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody><tr><td colSpan={13}><PageState tone="empty" title="暂无查询结果" description="调整筛选条件后执行查询。" /></td></tr></tbody></table>
+      </div>
+    </section>
+  );
+}
 function InvoiceBaseline() {
   const columns = ["操作", "PO", "款号", "英文品名", "中文品名", "成分", "品牌", "HS 编码", "原产地", "数量", "单位 EN", "每箱", "箱数", "长", "宽", "高", "毛重/箱", "总毛重", "净重/箱", "总净重", "单价", "金额", "采购价", "退税率", "备注 1"];
   const values = ["复制/移动", "PO-2026-024", "TS-M001", "MEN'S COTTON KNITTED T-SHIRT", "男式棉制针织T恤衫", "100% COTTON", "BRIDGE", "6109100000", "CHINA", "1000", "PCS", "50", "20", "60", "40", "35", "12.50", "250.00", "11.80", "236.00", "4.50", "4,500.00", "3.10", "13", "S/S 2026"];
@@ -85,7 +136,13 @@ function ReportBaseline() {
   return <section className="work-surface report-template-surface"><div className="report-template-sticky-header"><div className="editor-toolbar"><div className="editor-title">报表设计</div><div className="toolbar-actions"><button type="button" className="command-button secondary">刷新</button><button type="button" className="command-button secondary">预览</button><button type="button" className="command-button" disabled={!isDesktop}>保存</button></div></div><div className="report-template-workspace-tabs"><button type="button" className={isDesktop ? "segmented-active" : ""} disabled={!isDesktop}>设计</button><button type="button" className={isDesktop ? "" : "segmented-active"}>预览</button></div></div><WorkspaceDeviceNotice mode={deviceMode} phone="可选择模板、查看预览和进行轻量确认；完整设计与模板包导入导出请使用桌面端。" tablet="可选择模板、查看预览和进行现场确认；完整设计与模板包导入导出请使用桌面端。"/><div className={isDesktop ? "report-template-grid report-template-grid-design report-template-grid-new" : "report-template-mobile-selection"}><aside className="report-template-sidebar"><div className="template-selection-panel"><label>类型<select><option>出口单证</option></select></label><label>默认模板<select><option>invoice_template</option></select></label><label>我的 / 共享模板<select><option>未选择</option></select></label></div>{isDesktop ? <><details className="template-management-panel template-actions-panel template-user-panel" open><summary><span>我的模板</span><small>默认私有，可明确共享</small></summary><div className="template-management-content"><button type="button" className="secondary-button">复制当前模板</button></div></details><details className="template-management-panel template-actions-panel template-admin-panel"><summary><span>模板操作</span><small>invoice_template.html</small></summary></details><details className="template-management-panel template-package-panel"><summary><span>模板包</span><small>导入 / 导出</small></summary></details></> : null}</aside>{isDesktop ? <main className="report-template-new-designer"><div className="form-section" style={{minHeight:420}}><h2>模板画布</h2><div className="table-frame"><table><tbody><tr><td>EXPORTER</td><td>INVOICE NO.</td></tr><tr><td>CONSIGNEE</td><td>DATE</td></tr></tbody></table></div></div></main> : <main className="form-section report-template-preview-workspace" style={{minHeight:360}}><div className="section-header"><div><h2>模板预览</h2><p>当前设备保持查看和确认模式。</p></div></div><div className="report-preview-empty">选择模板后在此查看分页和换行效果</div></main>}</div></section>;
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode><BaselineApp/></React.StrictMode>);
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <QueryClientProvider client={visualQueryClient}>
+      <BaselineApp/>
+    </QueryClientProvider>
+  </React.StrictMode>,
+);
 requestAnimationFrame(() => requestAnimationFrame(() => {
   document.querySelectorAll(".knowledge-workflow, .table-frame").forEach((element) => {
     if (!element.hasAttribute("tabindex")) element.setAttribute("tabindex", "0");

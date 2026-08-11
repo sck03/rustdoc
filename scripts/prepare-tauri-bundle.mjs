@@ -514,9 +514,14 @@ async function findExcelAnalyzerBinary() {
 
   for (const targetRoot of targetRoots) {
     candidates.push(path.join(targetRoot, "release", fileName));
-    const rustTarget = process.env.CARGO_BUILD_TARGET || rustTargetTripleFromRid(rid);
-    if (rustTarget) {
-      candidates.push(path.join(targetRoot, rustTarget, "release", fileName));
+    const analyzerRustTarget = String(
+      process.env.EXPORTDOCMANAGER_RUST_TARGET ||
+      process.env.CARGO_BUILD_TARGET ||
+      rustTarget ||
+      rustTargetTripleFromRid(rid),
+    ).trim();
+    if (analyzerRustTarget) {
+      candidates.push(path.join(targetRoot, analyzerRustTarget, "release", fileName));
     }
   }
 

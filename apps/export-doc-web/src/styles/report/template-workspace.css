@@ -408,16 +408,6 @@
   border-top: 1px dashed #d8e0e6;
 }
 
-.danger-command {
-  color: #8a1f13;
-  border-color: #e8b4aa;
-}
-
-.danger-command:hover:not(:disabled) {
-  color: #8a1f13;
-  border-color: #c8493a;
-}
-
 .report-template-editor textarea {
   width: 100%;
   height: 100%;

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using ExportDocManager.Services.BrowserRuntime;
 using ExportDocManager.Services.Infrastructure;
@@ -119,6 +120,21 @@ namespace ExportDocManager.Infrastructure.Tests
             bool expected)
         {
             Assert.Equal(expected, ManagedPlaywrightBrowserHost.IsNavigationAllowed(url, policy));
+        }
+
+        [Theory]
+        [InlineData(5, true)]
+        [InlineData(32, true)]
+        [InlineData(33, true)]
+        [InlineData(2, false)]
+        [InlineData(193, false)]
+        public void BrowserStartupRetry_ShouldOnlyTreatTemporaryWindowsProcessErrorsAsTransient(
+            int nativeErrorCode,
+            bool expected)
+        {
+            Assert.Equal(
+                expected,
+                ManagedPlaywrightBrowserHost.IsTransientStartupFailure(new Win32Exception(nativeErrorCode)));
         }
 
         [Fact]

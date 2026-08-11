@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -300,7 +301,7 @@ namespace ExportDocManager.Services.Suppliers
                 ?? throw new KeyNotFoundException("产品不存在。");
             bool duplicate = await context.SupplierProductLinks.AnyAsync(item => item.SupplierCompanyId == request.SupplierCompanyId &&
                 item.ProductId == request.ProductId && item.Id != request.Id, cancellationToken);
-            if (duplicate) throw new ArgumentException("该供应商已经关联此产品。");
+            if (duplicate) throw new ResourceConflictException("该供应商已经关联此产品。");
 
             bool isNew = request.Id <= 0;
             var entity = request.Id > 0

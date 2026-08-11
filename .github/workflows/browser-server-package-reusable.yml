@@ -42,6 +42,7 @@ jobs:
       npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
       CARGO_HOME: ${{ github.workspace }}/.codex-runtime/cargo-home
       CARGO_TARGET_DIR: ${{ github.workspace }}/artifacts/cargo-target-ocr
+      CARGO_BUILD_JOBS: 2
 
     steps:
       - name: Checkout

@@ -14,7 +14,7 @@ const viteCli = path.join(path.dirname(webRequire.resolve("vite/package.json")),
 const outputRoot = path.join(repositoryRoot, "artifacts", "frontend-scale-contracts");
 const profileRoot = path.join(repositoryRoot, ".codex-runtime", "frontend-scale-contracts-chrome");
 const browserExecutable = locateChromeForTesting(repositoryRoot, "headless-shell");
-const pages = ["login", "dashboard", "invoice", "invoiceParties", "hs", "report", "singleWindow"];
+const pages = ["login", "dashboard", "query", "invoice", "invoiceParties", "hs", "report", "singleWindow", "globalStyles"];
 const densities = ["comfortable", "compact"];
 const allProfiles = [
   { name: "windows-125", width: 1366, height: 768, deviceScaleFactor: 1.25, mobile: false },
@@ -22,6 +22,7 @@ const allProfiles = [
   { name: "windows-4k", width: 3840, height: 2160, deviceScaleFactor: 1.5, mobile: false },
   { name: "macos-retina", width: 1440, height: 900, deviceScaleFactor: 2, mobile: false },
   { name: "linux-100", width: 1366, height: 768, deviceScaleFactor: 1, mobile: false },
+  { name: "tablet-1024", width: 1024, height: 768, deviceScaleFactor: 1, mobile: false },
   { name: "desktop-zoom-200", width: 683, height: 384, deviceScaleFactor: 2, mobile: false },
   { name: "mobile-320", width: 320, height: 568, deviceScaleFactor: 2, mobile: true },
   { name: "mobile-375", width: 375, height: 667, deviceScaleFactor: 3, mobile: true },
@@ -84,21 +85,28 @@ try {
         for (const pageName of pages) {
           const scene = `${profile.name}/${density}/${pageName}`;
           process.stdout.write(`[scale] Running ${scene}.\n`);
-          const url = `http://127.0.0.1:${port}/visual-baseline.html?page=${pageName}&density=${density}`;
+          const url = pageName === "globalStyles"
+            ? `http://127.0.0.1:${port}/global-style-contract.html?density=${density}`
+            : `http://127.0.0.1:${port}/visual-baseline.html?page=${pageName}&density=${density}`;
           await page.send("Page.navigate", { url });
           await waitForReady(page);
           await evaluate(page, "document.fonts?.ready ?? Promise.resolve()", false);
           const audit = await evaluate(page, buildAuditExpression(profile.mobile), true);
           const value = audit.value;
+          const expectedFieldGridColumns = profile.width <= 860 ? 1 : profile.width <= 1180 ? 2 : 4;
           const passed = !value.horizontalOverflow
             && value.truncatedCriticalText.length === 0
             && value.reportPanelOverlapCount === 0
             && value.reportMinimumSelectionFieldWidth >= (profile.mobile ? 180 : 128)
             && value.mobileInputFontFailures.length === 0
-            && value.mobileTouchTargetFailures.length === 0;
+            && value.mobileTouchTargetFailures.length === 0
+            && (pageName !== "globalStyles" || value.fieldGridMaximumColumnCount === expectedFieldGridColumns)
+            && (pageName !== "invoiceParties" || value.invoicePartyGridContractPassed)
+            && (pageName !== "query" || value.queryFilterContractPassed)
+            && (pageName !== "globalStyles" || value.globalStyleContractPassed);
 
           let screenshotPath = null;
-          if (pageName === "dashboard" || pageName === "report") {
+          if (pageName === "dashboard" || pageName === "query" || pageName === "report" || pageName === "globalStyles") {
             screenshotPath = path.join(outputRoot, `${pageName}-${profile.name}-${density}.png`);
             await captureScreenshot(page, screenshotPath, { captureBeyondViewport: false });
           }
@@ -153,8 +161,167 @@ function buildAuditExpression(isMobile) {
     const reportSelectionWidths = [...document.querySelectorAll(".template-selection-panel > label")]
       .filter(visible)
       .map((element) => element.getBoundingClientRect().width);
+    const fieldGridLayouts = [...document.querySelectorAll(".field-grid")]
+      .filter(visible)
+      .map((element) => {
+        const style = getComputedStyle(element);
+        const columns = style.gridTemplateColumns.split(/\\s+/u).filter(Boolean);
+        return {
+          className: element.className,
+          parentClassName: element.parentElement?.className || "",
+          display: style.display,
+          gridTemplateColumns: style.gridTemplateColumns,
+          columnCount: columns.length,
+        };
+      });
+    const fieldGridMaximumColumnCount = fieldGridLayouts.length
+      ? Math.max(...fieldGridLayouts.map((layout) => layout.columnCount))
+      : 0;
+    const invoicePartyGridLayouts = fieldGridLayouts.filter((layout) => layout.parentClassName.includes("invoice-party-group"));
+    const invoicePartyGridContractPassed = invoicePartyGridLayouts.length === 0 || invoicePartyGridLayouts.every((layout) => {
+      const exporter = layout.parentClassName.includes("invoice-party-group-exporter");
+      const expectedColumns = innerWidth <= 860 ? 1 : exporter ? 4 : 2;
+      return layout.display === "grid" && layout.columnCount === expectedColumns;
+    });
+    const queryFilterContractDetails = (() => {
+      const grid = document.querySelector(".query-filter-grid");
+      if (!(grid instanceof HTMLElement)) return null;
+      const dateRange = grid.querySelector(".query-date-range");
+      const actions = document.querySelector(".query-toolbar-actions");
+      const fields = [...grid.querySelectorAll(".query-filter-field")].filter(visible);
+      const labels = [...grid.querySelectorAll(".query-filter-field > span, .query-filter-field > .form-field-label, .query-filter-field > .form-field-label > span:first-child")].filter(visible);
+      const controls = [...grid.querySelectorAll("input, select")].filter(visible);
+      const gridStyle = getComputedStyle(grid);
+      const dateRangeStyle = dateRange instanceof HTMLElement ? getComputedStyle(dateRange) : null;
+      const gridColumnCount = gridStyle.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length;
+      const dateRangeColumnCount = dateRangeStyle?.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length ?? 0;
+      const expectedGridColumnCount = innerWidth >= 1720 ? 6 : innerWidth > 1180 ? 4 : innerWidth > 620 ? 2 : 1;
+      const expectedDateRangeColumnCount = innerWidth <= 620 ? 1 : 2;
+      const labelClipping = labels.filter((label) => label.scrollWidth > label.clientWidth + 1 || label.scrollHeight > label.clientHeight + 1)
+        .map((label) => (label.textContent || "").trim());
+      const controlOverflow = controls.filter((control) => {
+        const field = control.closest(".query-filter-field");
+        if (!(field instanceof HTMLElement)) return true;
+        const controlRect = control.getBoundingClientRect();
+        const fieldRect = field.getBoundingClientRect();
+        return controlRect.left < fieldRect.left - 1 || controlRect.right > fieldRect.right + 1
+          || controlRect.top < fieldRect.top - 1 || controlRect.bottom > fieldRect.bottom + 1;
+      }).map((control) => ({ tag: control.tagName, className: control.className }));
+      const fieldRects = fields.map((field) => ({
+        className: field.className,
+        rect: field.getBoundingClientRect(),
+      }));
+      const fieldOverlapCount = fieldRects.flatMap((entry, index) => fieldRects.slice(index + 1).map((other) => ({ entry, other })))
+        .filter(({ entry, other }) => Math.min(entry.rect.right, other.rect.right) - Math.max(entry.rect.left, other.rect.left) > 1
+          && Math.min(entry.rect.bottom, other.rect.bottom) - Math.max(entry.rect.top, other.rect.top) > 1).length;
+      const gridRect = grid.getBoundingClientRect();
+      const actionsRect = actions instanceof HTMLElement ? actions.getBoundingClientRect() : null;
+      const gridActionsOverlap = actionsRect
+        ? Math.min(gridRect.right, actionsRect.right) - Math.max(gridRect.left, actionsRect.left) > 1
+          && Math.min(gridRect.bottom, actionsRect.bottom) - Math.max(gridRect.top, actionsRect.top) > 1
+        : true;
+      const actionsPlacementMatches = actionsRect
+        ? innerWidth <= 860
+          ? actionsRect.top >= gridRect.bottom - 1
+          : actionsRect.left >= gridRect.right - 1
+        : false;
+      return {
+        gridColumnCount,
+        expectedGridColumnCount,
+        dateRangeColumnCount,
+        expectedDateRangeColumnCount,
+        fieldCount: fields.length,
+        labelClipping,
+        controlOverflow,
+        fieldOverlapCount,
+        gridActionsOverlap,
+        actionsPlacementMatches,
+        passed: gridStyle.display === "grid"
+          && dateRangeStyle?.display === "grid"
+          && gridColumnCount === expectedGridColumnCount
+          && dateRangeColumnCount === expectedDateRangeColumnCount
+          && fields.length === 7
+          && labelClipping.length === 0
+          && controlOverflow.length === 0
+          && fieldOverlapCount === 0
+          && !gridActionsOverlap
+          && actionsPlacementMatches,
+      };
+    })();
+    const queryFilterContractPassed = queryFilterContractDetails?.passed ?? true;
+    const contractStyle = (name) => {
+      const element = document.querySelector('[data-style-contract="' + name + '"]');
+      return element ? getComputedStyle(element) : null;
+    };
+    const contractGridColumnCount = (name) => {
+      const style = contractStyle(name);
+      return style ? style.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length : 0;
+    };
+    const sectionHeaderContract = (headerName, actionName) => {
+      const header = document.querySelector('[data-style-contract="' + headerName + '"]');
+      const action = document.querySelector('[data-style-contract="' + actionName + '"]');
+      const title = header?.querySelector("h2, h3");
+      if (!(header instanceof HTMLElement) || !(title instanceof HTMLElement) || !(action instanceof HTMLElement)) return null;
+      const style = getComputedStyle(header);
+      const headerRect = header.getBoundingClientRect();
+      const titleRect = title.getBoundingClientRect();
+      const actionRect = action.getBoundingClientRect();
+      const narrow = innerWidth <= 860;
+      return {
+        display: style.display,
+        justifyContent: style.justifyContent,
+        flexDirection: style.flexDirection,
+        actionRightGap: Math.abs(headerRect.right - actionRect.right),
+        actionSeparatedFromTitle: actionRect.left >= titleRect.right + 8,
+        actionStackedBelowTitle: actionRect.top >= titleRect.bottom - 1,
+        passed: style.display === "flex"
+          && style.justifyContent === "space-between"
+          && (narrow
+            ? style.flexDirection === "column" && actionRect.top >= titleRect.bottom - 1
+            : style.flexDirection === "row" && Math.abs(headerRect.right - actionRect.right) <= 1.5 && actionRect.left >= titleRect.right + 8),
+      };
+    };
+    const hiddenStyle = contractStyle("visually-hidden");
+    const expectedFieldGridColumns = innerWidth <= 860 ? 1 : innerWidth <= 1180 ? 2 : 4;
+    const expectedDetailGridColumns = innerWidth <= 860 ? 1 : 4;
+    const textSectionHeader = sectionHeaderContract("section-header-text", "section-header-text-action");
+    const iconSectionHeader = sectionHeaderContract("section-header-icon", "section-header-icon-action");
+    const globalStyleContractDetails = {
+      hiddenPosition: hiddenStyle?.position || null,
+      hiddenWidth: hiddenStyle?.width || null,
+      hiddenHeight: hiddenStyle?.height || null,
+      filterBarDisplay: contractStyle("filter-bar")?.display || null,
+      inlineFilterDisplay: contractStyle("inline-filter")?.display || null,
+      inlineCheckDisplay: contractStyle("inline-check")?.display || null,
+      fieldGridColumnCount: contractGridColumnCount("field-grid"),
+      expectedFieldGridColumns,
+      detailGridDisplay: contractStyle("detail-grid")?.display || null,
+      detailGridColumnCount: contractGridColumnCount("detail-grid"),
+      expectedDetailGridColumns,
+      rowActionsDisplay: contractStyle("row-actions-cell")?.display || null,
+      jobTitleDisplay: contractStyle("job-title-cell")?.display || null,
+      reviewSeverityDisplay: contractStyle("review-severity")?.display || null,
+      textSectionHeader,
+      iconSectionHeader,
+    };
+    const globalStyleContractPassed = !document.querySelector('[data-style-contract="field-grid"]') || (
+      globalStyleContractDetails.hiddenPosition === "absolute"
+      && Math.round(Number.parseFloat(globalStyleContractDetails.hiddenWidth)) === 1
+      && Math.round(Number.parseFloat(globalStyleContractDetails.hiddenHeight)) === 1
+      && globalStyleContractDetails.filterBarDisplay === "flex"
+      && globalStyleContractDetails.inlineFilterDisplay === "flex"
+      && ["flex", "inline-flex"].includes(globalStyleContractDetails.inlineCheckDisplay)
+      && globalStyleContractDetails.fieldGridColumnCount === expectedFieldGridColumns
+      && globalStyleContractDetails.detailGridDisplay === "grid"
+      && globalStyleContractDetails.detailGridColumnCount === expectedDetailGridColumns
+      && globalStyleContractDetails.rowActionsDisplay === "flex"
+      && globalStyleContractDetails.jobTitleDisplay === "grid"
+      && globalStyleContractDetails.reviewSeverityDisplay === "inline-flex"
+      && globalStyleContractDetails.textSectionHeader?.passed === true
+      && globalStyleContractDetails.iconSectionHeader?.passed === true
+    );
     const mobileInputFontFailures = ${isMobile}
-      ? [...document.querySelectorAll("input, select, textarea")].filter(visible)
+      ? [...document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]), select, textarea')].filter(visible)
         .filter((element) => Number.parseFloat(getComputedStyle(element).fontSize) < 16)
         .map((element) => ({ tag: element.tagName, className: element.className, fontSize: getComputedStyle(element).fontSize }))
       : [];
@@ -174,6 +341,15 @@ function buildAuditExpression(isMobile) {
       truncatedCriticalText,
       reportPanelOverlapCount,
       reportMinimumSelectionFieldWidth: reportSelectionWidths.length ? Math.min(...reportSelectionWidths) : 999,
+      fieldGridLayouts,
+      fieldGridMaximumColumnCount,
+      invoicePartyGridLayouts,
+      invoicePartyGridContractPassed,
+      queryFilterContractPassed,
+      queryFilterContractDetails,
+      globalStyleContractPassed,
+      globalStyleContractDetails,
+      narrowWorkspaceMediaMatched: matchMedia("(max-width: 860px)").matches,
       mobileInputFontFailures,
       mobileTouchTargetFailures,
       computedBodyFont: getComputedStyle(document.body).fontFamily,

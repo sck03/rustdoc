@@ -551,30 +551,3 @@
 .receipt-package-result-table table {
   min-width: 1080px;
 }
-
-.review-severity {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-weight: 700;
-}
-
-.review-severity-error {
-  color: #8a1f13;
-  background: #fff0ed;
-  border: 1px solid #f1b4aa;
-}
-
-.review-severity-warning {
-  color: #6b3d00;
-  background: #fff1d6;
-  border: 1px solid #f2ca7b;
-}
-
-.review-severity-info {
-  color: #315166;
-  background: #eef7fb;
-  border: 1px solid #b8dbe8;
-}

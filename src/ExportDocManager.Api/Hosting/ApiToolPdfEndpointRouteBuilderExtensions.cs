@@ -1,6 +1,7 @@
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Tools;
 using ExportDocManager.Utils;
 
@@ -58,9 +59,10 @@ namespace ExportDocManager.Api.Hosting
 
                 var form = await context.Request.ReadFormAsync(cancellationToken);
                 var files = form.Files.Where(file => file.Length > 0).ToArray();
-                if (files.Length < 2 || files.Length > 50)
+                if (files.Length < 2 || files.Length > ApiUploadLimits.PdfMergeMaximumFileCount)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("请选择 2 至 50 个 PDF 文件。"));
+                    return Results.BadRequest(new ApiErrorResponse(
+                        $"请选择 2 至 {ApiUploadLimits.PdfMergeMaximumFileCount} 个 PDF 文件。"));
                 }
 
                 if (files.Any(file => !string.Equals(Path.GetExtension(file.FileName), ".pdf", StringComparison.OrdinalIgnoreCase)))
@@ -68,7 +70,21 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("PDF 合并只接受 .pdf 文件。"));
                 }
 
-                if (files.Sum(file => file.Length) > ApiUploadLimits.PdfMergeBytes)
+                if (files.Any(file => file.Length > ApiUploadLimits.PdfMergeFileBytes))
+                {
+                    return WritePayloadTooLarge(ApiUploadLimits.PdfMergeFileBytes);
+                }
+
+                long uploadBytes = 0;
+                foreach (var file in files)
+                {
+                    if (uploadBytes > ApiUploadLimits.PdfMergeBytes - file.Length)
+                    {
+                        return WritePayloadTooLarge(ApiUploadLimits.PdfMergeBytes);
+                    }
+                    uploadBytes += file.Length;
+                }
+                if (uploadBytes > ApiUploadLimits.PdfMergeBytes)
                 {
                     return WritePayloadTooLarge(ApiUploadLimits.PdfMergeBytes);
                 }
@@ -86,7 +102,7 @@ namespace ExportDocManager.Api.Hosting
                         await ApiUploadLimits.CopyFormFileAsync(
                             files[index],
                             output,
-                            ApiUploadLimits.PdfMergeBytes,
+                            ApiUploadLimits.PdfMergeFileBytes,
                             cancellationToken);
                         sourceFiles.Add(sourcePath);
                     }
@@ -133,9 +149,10 @@ namespace ExportDocManager.Api.Hosting
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            if (files.Count == 0)
+            if (files.Count < 2 || files.Count > ApiUploadLimits.PdfMergeMaximumFileCount)
             {
-                return Results.BadRequest(new ApiErrorResponse("请至少选择一个 PDF 源文件。"));
+                return Results.BadRequest(new ApiErrorResponse(
+                    $"请选择 2 至 {ApiUploadLimits.PdfMergeMaximumFileCount} 个 PDF 源文件。"));
             }
 
             string invalidSourceExtension = files.FirstOrDefault(file =>
@@ -149,6 +166,25 @@ namespace ExportDocManager.Api.Hosting
             if (!string.IsNullOrWhiteSpace(missingFile))
             {
                 return Results.BadRequest(new ApiErrorResponse($"PDF 源文件不存在：{missingFile}"));
+            }
+
+            long totalBytes = 0;
+            foreach (string file in files)
+            {
+                long length = new FileInfo(file).Length;
+                if (length <= 0)
+                {
+                    return Results.BadRequest(new ApiErrorResponse($"PDF 源文件不能为空：{file}"));
+                }
+                if (length > ApiUploadLimits.PdfMergeFileBytes)
+                {
+                    return WritePayloadTooLarge(ApiUploadLimits.PdfMergeFileBytes);
+                }
+                if (totalBytes > ApiUploadLimits.PdfMergeBytes - length)
+                {
+                    return WritePayloadTooLarge(ApiUploadLimits.PdfMergeBytes);
+                }
+                totalBytes += length;
             }
 
             string output = request.DestinationPath?.Trim() ?? string.Empty;
@@ -166,6 +202,12 @@ namespace ExportDocManager.Api.Hosting
             {
                 destinationPath = Path.GetFullPath(output);
                 sourceFiles = files.Select(Path.GetFullPath).ToList();
+                if (sourceFiles.Contains(destinationPath, StringComparer.OrdinalIgnoreCase))
+                {
+                    sourceFiles = Array.Empty<string>();
+                    destinationPath = string.Empty;
+                    return Results.BadRequest(new ApiErrorResponse("PDF 输出文件不能覆盖任一源文件。"));
+                }
                 return null;
             }
             catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException)
@@ -190,6 +232,7 @@ namespace ExportDocManager.Api.Hosting
                 {
                     try
                     {
+                        EnsurePdfMergeResourceLimits(sourceFiles);
                         jobContext.Report(
                             10,
                             "正在合并 PDF",
@@ -219,6 +262,41 @@ namespace ExportDocManager.Api.Hosting
                     })
                     : string.Empty,
                 initialOutputPath: destinationPath);
+        }
+
+        private static void EnsurePdfMergeResourceLimits(IReadOnlyCollection<string> sourceFiles)
+        {
+            if (sourceFiles == null ||
+                sourceFiles.Count < 2 ||
+                sourceFiles.Count > ApiUploadLimits.PdfMergeMaximumFileCount)
+            {
+                throw new ServiceValidationException(
+                    $"PDF 合并必须包含 2 至 {ApiUploadLimits.PdfMergeMaximumFileCount} 个源文件。");
+            }
+
+            long totalBytes = 0;
+            foreach (string sourceFile in sourceFiles)
+            {
+                if (!File.Exists(sourceFile))
+                {
+                    throw new FileNotFoundException("PDF 源文件不存在。", sourceFile);
+                }
+
+                long length = new FileInfo(sourceFile).Length;
+                if (length <= 0)
+                {
+                    throw new ServiceValidationException($"PDF 源文件不能为空：{sourceFile}");
+                }
+                if (length > ApiUploadLimits.PdfMergeFileBytes)
+                {
+                    throw new PayloadLimitExceededException(ApiUploadLimits.PdfMergeFileBytes);
+                }
+                if (totalBytes > ApiUploadLimits.PdfMergeBytes - length)
+                {
+                    throw new PayloadLimitExceededException(ApiUploadLimits.PdfMergeBytes);
+                }
+                totalBytes += length;
+            }
         }
 
         private static void TryDeleteDirectory(string directoryPath)

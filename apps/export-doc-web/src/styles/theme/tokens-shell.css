@@ -670,15 +670,6 @@ h1 {
   padding: var(--edm-section-padding);
 }
 
-.section-header {
-  min-height: 40px;
-  padding-bottom: 2px;
-}
-
-.section-header h2 {
-  font-size: 17px;
-}
-
 .toolbar {
   min-height: 42px;
 }

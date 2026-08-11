@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ExportDocManager.Api.Tests
 {
@@ -102,6 +103,7 @@ namespace ExportDocManager.Api.Tests
         {
             string databasePath = Path.Combine(dataRoot, "Database", databaseFileName);
             string baseUrl = $"http://127.0.0.1:{GetAvailablePort()}";
+            WebApplication app = null;
 
             try
             {
@@ -123,6 +125,7 @@ namespace ExportDocManager.Api.Tests
                 ApiStartupValidator.Validate(pathProvider, databaseSettings, runtimeOptions);
 
                 var builder = WebApplication.CreateBuilder();
+                builder.Logging.ClearProviders();
                 builder.WebHost.UseUrls(baseUrl);
                 builder.Services.AddSingleton<IRuntimeLicenseAnchorStore>(
                     new FileRuntimeLicenseAnchorStore(
@@ -141,7 +144,7 @@ namespace ExportDocManager.Api.Tests
                 builder.Services.AddSingleton<IApiReadinessProbe>(new TestReadinessProbe());
                 configureServices?.Invoke(builder.Services);
 
-                var app = builder.Build();
+                app = builder.Build();
                 app.UseExportDocManagerApiSafety();
                 app.UseCors(ApiCorsPolicy.LocalFrontendPolicyName);
                 app.UseExportDocManagerReadiness(databaseSettings, runtimeOptions);
@@ -156,6 +159,27 @@ namespace ExportDocManager.Api.Tests
             }
             catch
             {
+                if (app != null)
+                {
+                    try
+                    {
+                        await app.StopAsync();
+                    }
+                    catch
+                    {
+                        // Startup may have failed before every hosted service was ready.
+                    }
+
+                    try
+                    {
+                        await app.DisposeAsync();
+                    }
+                    catch
+                    {
+                        // Preserve the original startup exception below.
+                    }
+                }
+
                 if (cleanupOnFailure)
                 {
                     DeleteDirectoryIfExists(appRoot);

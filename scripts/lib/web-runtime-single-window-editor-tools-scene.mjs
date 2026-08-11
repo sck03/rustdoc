@@ -159,7 +159,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
         const lockDialogCheck = await waitForPageExpression(
           page,
           `(() => {
-            const dialog = document.querySelector('.single-window-lock-dialog[role="dialog"]');
+            const dialog = document.querySelector('.workspace-modal-dialog[role="dialog"]');
             const text = dialog ? dialog.innerText || '' : '';
             return Boolean(dialog &&
               text.includes(${JSON.stringify(config.lockDialogTitle)}) &&
@@ -172,7 +172,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
         await evaluate(
           page,
           `(() => {
-            const dialog = document.querySelector('.single-window-lock-dialog[role="dialog"]');
+            const dialog = document.querySelector('.workspace-modal-dialog[role="dialog"]');
             const buttons = dialog ? Array.from(dialog.querySelectorAll('button')) : [];
             const button = buttons.find((element) => (element.title || '').includes('关闭')) ||
               buttons.find((element) => (element.innerText || '').trim() === '关闭');

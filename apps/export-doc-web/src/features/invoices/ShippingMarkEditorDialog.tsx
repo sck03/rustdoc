@@ -301,14 +301,14 @@ export function ShippingMarkEditorDialog({
   }
 
   return (
-    <div className="single-window-lock-backdrop shipping-mark-backdrop" onMouseDown={(event) => {
+    <div className="workspace-modal-backdrop shipping-mark-backdrop" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !isSaving) {
         onClose();
       }
     }}>
-      <div ref={dialogRef} className="single-window-lock-dialog shipping-mark-dialog" role="dialog" aria-modal="true" aria-labelledby="shipping-mark-editor-title">
-        <div className="single-window-lock-header">
-          <div className="single-window-lock-title">
+      <div ref={dialogRef} className="workspace-modal-dialog shipping-mark-dialog" role="dialog" aria-modal="true" aria-labelledby="shipping-mark-editor-title">
+        <div className="workspace-modal-header">
+          <div className="workspace-modal-title">
             <Square size={18} aria-hidden="true" />
             <h2 id="shipping-mark-editor-title">唛头图片</h2>
           </div>
@@ -386,7 +386,7 @@ export function ShippingMarkEditorDialog({
           />
         </div>
 
-        <div className="single-window-lock-footer shipping-mark-footer">
+        <div className="workspace-modal-footer shipping-mark-footer">
           <button className="command-button secondary" type="button" onClick={onClose} disabled={isSaving}>
             取消
           </button>

@@ -7,7 +7,7 @@
 - `github/verify-public-source.ps1`：上传前检查注册机、私钥、内部 `KEY/` 产物和 GitHub 大文件边界。
 - `github/initialize-github-repository.ps1`：初始化 `main` 分支、暂存公开文件，可选配置 origin、创建提交和推送；默认不会提交或联网推送。
 - `verify-github-workflow-actions.mjs`：检查官方 Action 主版本、Node 24、`upload-artifact@v7` 和 `download-artifact@v8`，防止工作流运行时回退。
-- `audit-npm-production.mjs`、`audit-dotnet-packages.mjs`：执行结构化 npm/NuGet 漏洞审计；Web 只允许已记录且由声明式路由契约约束的 React Router RSC 公告例外。
+- `audit-npm-production.mjs`、`audit-dotnet-packages.mjs`：执行结构化 npm/NuGet 漏洞审计；NuGet 优先读取官方源的 `dotnet --vulnerable` 结果，若宿主 TLS 无法访问漏洞元数据，则从已还原依赖图提取精确版本并使用 OSV NuGet 生态复核，依赖图本身不可读取时仍立即失败。
 - `generate-dependency-governance.mjs`：从 npm/Cargo 锁文件和还原后的 NuGet 图生成 SPDX、CycloneDX 和第三方依赖清单到显式 `artifacts/` 目录。
 - `check_frontend_style_governance.mjs`：阻止硬编码颜色、阴影、渐变、px 字号和 `!important` 债务继续增长。
 
@@ -26,7 +26,7 @@ Tauri 正式 updater 密钥不由仓库脚本或 CI 自动生成，也不需要�
 
 公开/客户构建默认不生成内部注册机。只有本机保留私有 `apps/license-keygen-tauri/` 源码并显式向 PowerShell 构建脚本传入 `-IncludeLicenseKeygen` 时，才会把内部工具整理到客户目录之外的 `KEY/`。
 
-构建输出按“一次生成、完整替换”处理：单版和三版便携包会在复制前清理旧稳定资源及整个浏览器目标目录；未传 `-IncludeLicenseKeygen` 的三版构建会删除旧 `KEY/`；安装器只清理本次请求版本的旧安装包与版本 manifest，未请求版本继续保留。单版便携和每一版安装器在进入交付目录前都会自动执行 `verify-package-payload.ps1`，禁止夹带未知字体、Playwright 开发 UI、重复 ONNX Runtime 或内部注册机。
+构建输出按“一次生成、完整替换”处理：单版和三版便携包会在复制前清理旧稳定资源及整个浏览器目标目录；未传 `-IncludeLicenseKeygen` 的三版构建会删除旧 `KEY/`；安装器只清理本次请求版本的旧安装包与版本 manifest，未请求版本继续保留。Windows 便携目录和 GitHub 便携 ZIP 在进入交付阶段前都会执行最终 `ExportDocManager.exe` 的零参数启动、动态 API 健康、空密码 `admin` 登录及基础分页冒烟检查，随后清理测试生成的 `App_Data`；载荷门禁继续禁止未知字体、Playwright 开发 UI、重复 ONNX Runtime 或内部注册机。本机 GNU 构建默认单并发，以控制普通 16 GiB 电脑上的 LLVM 峰值内存；GitHub Windows 发布仍使用 MSVC，并由工作流显式设置自己的并发度。
 
 桌面资源准备会在 release 依赖治理扫描前自动还原完整 `ExportDocManager.sln`。因此运行空间清理删除所有项目 `bin/obj` 后，可以直接执行上述构建入口，不需要先手工运行测试或 `dotnet restore`；.NET CLI 和 NuGet 缓存仍由构建环境定向到仓库 `.codex-runtime/`，不会新增系统 C 盘默认缓存。
 

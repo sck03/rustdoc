@@ -13,7 +13,11 @@ namespace ExportDocManager.Services.Core
 {
     public partial class InvoiceService
     {
-        public async Task<Invoice> CopyInvoiceAsync(int originalId, string newInvoiceNo, InvoiceCloneOptions options = null)
+        public async Task<Invoice> CopyInvoiceAsync(
+            int originalId,
+            string newInvoiceNo,
+            InvoiceCloneOptions options = null,
+            CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(newInvoiceNo);
 
@@ -22,11 +26,11 @@ namespace ExportDocManager.Services.Core
                 var cloneOptions = options ?? new InvoiceCloneOptions();
                 return await AppDbContextExecution.ExecuteInTransactionAsync(
                     _contextFactory,
-                    async (context, _) =>
+                    async (context, token) =>
                     {
                         var originalInvoice = await _businessDataAccessScope
                             .ApplyInvoiceScope(context.Invoices.AsNoTracking())
-                            .FirstOrDefaultAsync(x => x.Id == originalId);
+                            .FirstOrDefaultAsync(x => x.Id == originalId, token);
                         if (originalInvoice == null)
                         {
                             return null;
@@ -37,18 +41,23 @@ namespace ExportDocManager.Services.Core
                         _businessDataAccessScope.ApplyOwner(newInvoice);
                         if (cloneOptions.CopyItems)
                         {
-                            newInvoice.Items = await CreateItemClonesAsync(context, originalId, cloneOptions);
+                            newInvoice.Items = await CreateItemClonesAsync(
+                                context,
+                                originalId,
+                                cloneOptions,
+                                token);
                             if (cloneOptions.ClearAmounts)
                             {
                                 newInvoice.CalculateTotals();
                             }
                         }
 
-                        await context.Invoices.AddAsync(newInvoice);
-                        await context.SaveChangesAsync();
+                        await context.Invoices.AddAsync(newInvoice, token);
+                        await context.SaveChangesAsync(token);
 
                         return newInvoice;
-                    });
+                    },
+                    cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -57,7 +66,11 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> CopyInvoiceAsTypeAsync(int originalId, string targetType, InvoiceCloneOptions options = null)
+        public async Task<Invoice> CopyInvoiceAsTypeAsync(
+            int originalId,
+            string targetType,
+            InvoiceCloneOptions options = null,
+            CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(targetType);
 
@@ -68,11 +81,11 @@ namespace ExportDocManager.Services.Core
                 var cloneOptions = options ?? new InvoiceCloneOptions();
                 return await AppDbContextExecution.ExecuteInTransactionAsync(
                     _contextFactory,
-                    async (context, _) =>
+                    async (context, token) =>
                     {
                         var originalInvoice = await _businessDataAccessScope
                             .ApplyInvoiceScope(context.Invoices.AsNoTracking())
-                            .FirstOrDefaultAsync(x => x.Id == originalId);
+                            .FirstOrDefaultAsync(x => x.Id == originalId, token);
                         if (originalInvoice == null)
                         {
                             return null;
@@ -96,7 +109,8 @@ namespace ExportDocManager.Services.Core
                             .AsNoTracking()
                             .AnyAsync(x => x.CompanyScope == newInvoice.CompanyScope &&
                                 x.InvoiceNo == newInvoice.InvoiceNo &&
-                                x.Type == newInvoice.Type);
+                                x.Type == newInvoice.Type,
+                                token);
                         if (targetExists)
                         {
                             throw new ResourceConflictException($"同一发票号的{normalizedTargetType}已存在，未覆盖。");
@@ -104,18 +118,23 @@ namespace ExportDocManager.Services.Core
 
                         if (cloneOptions.CopyItems)
                         {
-                            newInvoice.Items = await CreateItemClonesAsync(context, originalId, cloneOptions);
+                            newInvoice.Items = await CreateItemClonesAsync(
+                                context,
+                                originalId,
+                                cloneOptions,
+                                token);
                             if (cloneOptions.ClearAmounts)
                             {
                                 newInvoice.CalculateTotals();
                             }
                         }
 
-                        await context.Invoices.AddAsync(newInvoice);
-                        await context.SaveChangesAsync();
+                        await context.Invoices.AddAsync(newInvoice, token);
+                        await context.SaveChangesAsync(token);
 
                         return newInvoice;
-                    });
+                    },
+                    cancellationToken);
             }
             catch (ServiceException)
             {
@@ -164,13 +183,14 @@ namespace ExportDocManager.Services.Core
         private static async Task<List<Item>> CreateItemClonesAsync(
             DbContext context,
             int originalInvoiceId,
-            InvoiceCloneOptions options)
+            InvoiceCloneOptions options,
+            CancellationToken cancellationToken)
         {
             var originalItems = await context.Set<Item>()
                 .AsNoTracking()
                 .Where(x => x.InvoiceId == originalInvoiceId)
                 .OrderBy(x => x.Id)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             return originalItems
                 .Select(item => CreateItemClone(item, options))

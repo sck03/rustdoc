@@ -86,14 +86,14 @@ export function ProductLibraryPickerDialog({
   }
 
   return (
-    <div className="single-window-lock-backdrop" onMouseDown={(event) => {
+    <div className="workspace-modal-backdrop" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !isBusy) {
         onClose();
       }
     }}>
-      <div ref={dialogRef} className="single-window-lock-dialog product-library-dialog" role="dialog" aria-modal="true" aria-labelledby="product-library-picker-title">
-        <div className="single-window-lock-header">
-          <div className="single-window-lock-title">
+      <div ref={dialogRef} className="workspace-modal-dialog product-library-dialog" role="dialog" aria-modal="true" aria-labelledby="product-library-picker-title">
+        <div className="workspace-modal-header">
+          <div className="workspace-modal-title">
             <PackageSearch size={18} aria-hidden="true" />
             <h2 id="product-library-picker-title">商品库选择</h2>
             <span>{totalCount} 条</span>
@@ -186,7 +186,7 @@ export function ProductLibraryPickerDialog({
         </ResponsiveTableFrame>
         <ListPaginationControls pageNumber={pageNumber} totalPages={totalPages} totalCount={totalCount} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={isBusy} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
 
-        <div className="single-window-lock-footer">
+        <div className="workspace-modal-footer">
           <span className="product-library-selection">{selectedProduct ? formatProductOptionLabel(selectedProduct) : "未选择商品"}</span>
           <button className="command-button secondary" type="button" onClick={onClose}>
             取消

@@ -164,3 +164,5 @@ export function useReferenceCatalogExcelWorkspace({
     updateColumn,
   };
 }
+
+export type ReferenceCatalogExcelWorkspace = ReturnType<typeof useReferenceCatalogExcelWorkspace>;

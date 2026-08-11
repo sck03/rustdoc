@@ -39,7 +39,8 @@ namespace ExportDocManager.Services.Core
             List<Item> items,
             Customer customer,
             Exporter exporter,
-            IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null)
+            IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null,
+            CancellationToken cancellationToken = default)
         {
             var result = new SaveResult();
 
@@ -47,14 +48,15 @@ namespace ExportDocManager.Services.Core
             {
                 return await AppDbContextExecution.ExecuteInTransactionAsync(
                     _contextFactory,
-                    async (context, _) =>
+                    async (context, token) =>
                     {
                         if (invoice.CustomerId > 0)
                         {
                             invoice.CustomerId = await _invoicePartyResolver.ResolveCustomerIdAsync(
                                 context,
                                 new Customer { Id = invoice.CustomerId },
-                                invoice.CustomerNameEN);
+                                invoice.CustomerNameEN,
+                                token);
                         }
                         else if (customer != null)
                         {
@@ -66,7 +68,8 @@ namespace ExportDocManager.Services.Core
                             invoice.CustomerId = await _invoicePartyResolver.ResolveCustomerIdAsync(
                                 context,
                                 customer,
-                                customerName);
+                                customerName,
+                                token);
 
                             if (invoice.CustomerId == 0)
                             {
@@ -80,7 +83,8 @@ namespace ExportDocManager.Services.Core
                                 context,
                                 new Exporter { Id = invoice.ExporterId },
                                 invoice.ExporterNameEN,
-                                invoice.ExporterNameCN);
+                                invoice.ExporterNameCN,
+                                token);
                         }
                         else if (exporter != null)
                         {
@@ -93,7 +97,8 @@ namespace ExportDocManager.Services.Core
                                 context,
                                 exporter,
                                 exporterName,
-                                invoice.ExporterNameCN);
+                                invoice.ExporterNameCN,
+                                token);
 
                             if (invoice.ExporterId == 0)
                             {
@@ -108,12 +113,17 @@ namespace ExportDocManager.Services.Core
                         {
                             IsUpdate = invoice.Id != 0
                         };
-                        await SaveInvoiceCoreAsync(context, invoice, pendingHsFeedback);
+                        await SaveInvoiceCoreAsync(
+                            context,
+                            invoice,
+                            pendingHsFeedback,
+                            cancellationToken: token);
 
                         saveResult.SavedInvoice = invoice;
                         saveResult.Success = true;
                         return saveResult;
-                    });
+                    },
+                    cancellationToken);
             }
             catch (DbUpdateConcurrencyException ex)
             {
@@ -155,7 +165,9 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<bool> SaveInvoiceAsync(Invoice invoice)
+        public async Task<bool> SaveInvoiceAsync(
+            Invoice invoice,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(invoice);
 
@@ -163,7 +175,7 @@ namespace ExportDocManager.Services.Core
             {
                 await AppDbContextExecution.ExecuteInTransactionAsync(
                     _contextFactory,
-                    async (context, _) =>
+                    async (context, token) =>
                     {
                         // This legacy application-service entry point has no request DTO
                         // carrying a concurrency token. Hydrate the token from the current
@@ -175,14 +187,16 @@ namespace ExportDocManager.Services.Core
                                 .AsNoTracking()
                                 .Where(item => item.Id == invoice.Id)
                                 .Select(item => item.RowVersion)
-                                .FirstOrDefaultAsync();
+                                .FirstOrDefaultAsync(token);
                         }
                         await SaveInvoiceCoreAsync(
                             context,
                             invoice,
                             pendingHsFeedback: null,
-                            requireRowVersion: false);
-                    });
+                            requireRowVersion: false,
+                            cancellationToken: token);
+                    },
+                    cancellationToken);
                 return true;
             }
             catch (DbUpdateConcurrencyException ex)

@@ -89,7 +89,8 @@ namespace ExportDocManager.Api.Hosting
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IEmailService emailService,
                 ISettingsService settingsService,
-                ApiEmailSendRequest request) =>
+                ApiEmailSendRequest request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -117,7 +118,8 @@ namespace ExportDocManager.Api.Hosting
                         normalizedRequest.ToAddress,
                         normalizedRequest.Subject,
                         normalizedRequest.Body,
-                        normalizedRequest.AttachmentPaths.ToList());
+                        normalizedRequest.AttachmentPaths.ToList(),
+                        cancellationToken);
 
                     return Results.Ok(new ApiEmailSendResponse
                     {
@@ -149,7 +151,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IEmailService emailService,
-                ISettingsService settingsService) =>
+                ISettingsService settingsService,
+                CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -173,7 +176,7 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    await emailService.TestConnectionAsync(email);
+                    await emailService.TestConnectionAsync(email, cancellationToken);
 
                     return Results.Ok(new ApiEmailTestResponse
                     {
@@ -235,35 +238,7 @@ namespace ExportDocManager.Api.Hosting
                 return WriteForbidden("局域网或容器浏览器不能读取服务器文件路径作为附件，请从受控单据输出入口发送附件。");
             }
 
-            var attachmentPaths = new List<string>();
-            foreach (string attachmentPath in requestedAttachmentPaths)
-            {
-                string trimmed = attachmentPath?.Trim() ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(trimmed))
-                {
-                    continue;
-                }
-
-                string fullPath;
-                try
-                {
-                    fullPath = Path.GetFullPath(trimmed);
-                }
-                catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException)
-                {
-                    return Results.BadRequest(new ApiErrorResponse($"附件路径无效：{ex.Message}"));
-                }
-
-                if (!File.Exists(fullPath))
-                {
-                    return Results.NotFound(new ApiErrorResponse($"附件文件不存在：{fullPath}"));
-                }
-
-                if (!attachmentPaths.Contains(fullPath, StringComparer.OrdinalIgnoreCase))
-                {
-                    attachmentPaths.Add(fullPath);
-                }
-            }
+            var attachmentPaths = EmailAttachmentPolicy.ValidateAndNormalize(requestedAttachmentPaths);
 
             normalizedRequest = new ApiEmailSendRequest
             {

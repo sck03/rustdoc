@@ -199,6 +199,7 @@ public sealed class PackagePayloadContractTests
         string root = FindWorkspaceRoot();
         string bundleScript = File.ReadAllText(Path.Combine(root, "scripts", "prepare-tauri-bundle.mjs"));
         string desktopWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "desktop-package-reusable.yml"));
+        string crossPlatformWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "cross-platform-validation.yml"));
         string macOsWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "macos-desktop-package.yml"));
         string typographyWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "cross-platform-typography.yml"));
         string chromeProvisioning = File.ReadAllText(Path.Combine(root, "scripts", "provision-chrome-for-testing.ps1"));
@@ -217,6 +218,9 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("\"api-23\"", ocrManifest, StringComparison.Ordinal);
         Assert.DoesNotContain("\"api-24\"", ocrManifest, StringComparison.Ordinal);
         Assert.Contains("EXPORTDOCMANAGER_RUST_TARGET: ${{ inputs.rust_target }}", desktopWorkflow, StringComparison.Ordinal);
+        Assert.Contains("rust_target: x86_64-pc-windows-msvc", crossPlatformWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("msys2/setup-msys2", crossPlatformWorkflow, StringComparison.Ordinal);
+        Assert.Contains("cargo test --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --target ${{ matrix.rust_target }}", crossPlatformWorkflow, StringComparison.Ordinal);
         Assert.Contains("runtime_identifier: osx-arm64", macOsWorkflow, StringComparison.Ordinal);
         Assert.DoesNotContain("osx-x64", macOsWorkflow, StringComparison.Ordinal);
         Assert.DoesNotContain("macos-15-intel", macOsWorkflow, StringComparison.Ordinal);

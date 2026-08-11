@@ -2,6 +2,8 @@
 param(
     [string]$CargoTargetDir,
 
+    [string]$ExecutablePath,
+
     [string]$AppRoot,
 
     [string]$DataRoot,
@@ -35,6 +37,8 @@ param(
     [switch]$UseExistingRuntimePathsConfig,
 
     [switch]$UseDefaultAppRoot,
+
+    [switch]$UsePortableDataRoot,
 
     [switch]$SkipVite,
 
@@ -333,6 +337,22 @@ function Stop-StartedProcess {
         return
     }
 
+    $isWindowsPlatform = [string]::Equals(
+        $env:OS,
+        "Windows_NT",
+        [System.StringComparison]::OrdinalIgnoreCase)
+
+    if ($isWindowsPlatform -and -not $Process.HasExited) {
+        try {
+            # Kill the owned process tree while the desktop parent is still
+            # alive. Closing the Tauri window first can orphan WebView2 and
+            # the API sidecar, leaving portable App_Data files locked.
+            $null = $Process.Kill($true)
+            $null = $Process.WaitForExit(5000)
+        } catch {
+        }
+    }
+
     if (-not $Process.HasExited) {
         try {
             if ($Process.CloseMainWindow()) {
@@ -353,6 +373,26 @@ function Stop-StartedProcess {
     Complete-LoggedProcess -Process $Process
 }
 
+$script:windowsProcessInventoryAvailable = $true
+
+function Get-WindowsProcessInventory {
+    if (-not [string]::Equals($env:OS, "Windows_NT", [System.StringComparison]::OrdinalIgnoreCase)) {
+        return @()
+    }
+
+    if (-not $script:windowsProcessInventoryAvailable) {
+        return @()
+    }
+
+    try {
+        return @(Get-CimInstance Win32_Process -ErrorAction Stop)
+    } catch {
+        $script:windowsProcessInventoryAvailable = $false
+        Write-Verbose "Windows process command-line inventory is unavailable; continuing with owned process-tree cleanup. $($_.Exception.Message)"
+        return @()
+    }
+}
+
 function Invoke-WebProductionBuild {
     Write-Host "Building web app for Tauri smoke preview."
     Push-Location -LiteralPath $repoRoot
@@ -368,7 +408,7 @@ function Invoke-WebProductionBuild {
 
 function Get-SmokeViteProcesses {
     $normalizedRepoRoot = (Get-FullPath -Path $repoRoot).Replace('/', '\')
-    return Get-CimInstance Win32_Process |
+    return Get-WindowsProcessInventory |
         Where-Object {
             $commandLine = if ($null -ne $_.CommandLine) { $_.CommandLine.Replace('/', '\') } else { '' }
             $_.Name -eq "node.exe" -and
@@ -394,7 +434,7 @@ function Stop-ApiSidecarsForDataRoot {
     param([Parameter(Mandatory = $true)][string]$DataRoot)
 
     $escapedDataRoot = [Regex]::Escape((Get-FullPath -Path $DataRoot).Replace('/', '\'))
-    Get-CimInstance Win32_Process |
+    Get-WindowsProcessInventory |
         Where-Object {
             $normalizedCommandLine = if ($null -ne $_.CommandLine) { $_.CommandLine.Replace('/', '\') } else { '' }
             $_.Name -eq "ExportDocManager.Api.exe" -and
@@ -423,13 +463,15 @@ function Read-LatestSidecarUrl {
         return $null
     }
 
-    $matches = Select-String -LiteralPath $LogPath -Pattern "Starting API sidecar at (http://127\.0\.0\.1:\d+)" -AllMatches
-    $last = $matches | Select-Object -Last 1
-    if ($null -eq $last) {
-        return $null
-    }
-
-    return $last.Matches[$last.Matches.Count - 1].Groups[1].Value
+    $urls = Select-String -LiteralPath $LogPath -Pattern "http://127\.0\.0\.1:(?<port>\d+)" -AllMatches |
+        ForEach-Object {
+            foreach ($match in $_.Matches) {
+                if ([int]$match.Groups["port"].Value -gt 0) {
+                    $match.Value
+                }
+            }
+        }
+    return $urls | Select-Object -Last 1
 }
 
 function Wait-SidecarHealth {
@@ -459,6 +501,39 @@ function Wait-SidecarHealth {
     }
 
     throw "Timed out waiting for API sidecar health. Last URL: $lastUrl"
+}
+
+function Invoke-EditionWorkspacePageProbe {
+    param(
+        [Parameter(Mandatory = $true)][string]$ApiBaseUrl,
+        [Parameter(Mandatory = $true)][hashtable]$Headers,
+        [Parameter(Mandatory = $true)]$CurrentUser,
+        [Parameter(Mandatory = $true)][string]$Purpose
+    )
+
+    $productEdition = [string]$CurrentUser.capabilities.productEdition
+    if ([string]::Equals($productEdition, "Sales", [System.StringComparison]::OrdinalIgnoreCase)) {
+        $probeName = "SalesCustomers"
+        $probePath = "/api/crm/customers/page?pageNumber=1&pageSize=5"
+    } else {
+        $probeName = "DocumentInvoices"
+        $probePath = "/api/invoices?pageNumber=1&pageSize=5"
+    }
+
+    $page = Invoke-RestMethod `
+        -Uri "$ApiBaseUrl$probePath" `
+        -Headers $Headers `
+        -TimeoutSec 10
+    if ($null -eq $page.items -or $null -eq $page.totalCount -or $null -eq $page.pageNumber) {
+        throw "$Purpose response from '$probePath' did not include paging fields."
+    }
+
+    return [pscustomobject]@{
+        Name = $probeName
+        Path = $probePath
+        ProductEdition = $productEdition
+        Page = $page
+    }
 }
 
 function Resolve-BrowserExecutablePath {
@@ -1017,6 +1092,10 @@ if ($UseRuntimePathsConfig -and $UseExistingRuntimePathsConfig) {
     throw "Use either -UseRuntimePathsConfig or -UseExistingRuntimePathsConfig, not both."
 }
 
+if ($UsePortableDataRoot -and ($UseRuntimePathsConfig -or $UseExistingRuntimePathsConfig)) {
+    throw "Portable data-root discovery cannot be combined with an explicit runtime-paths config."
+}
+
 if (($VerifyWebDiagnostics -or $VerifyWebReports -or $VerifySingleWindowOperationCenter -or $VerifyInvoiceItems -or $VerifyBackupRestore -or $VerifyContainerPacking -or $VerifySalesWorkspace) -and $SkipVite) {
     throw "Web smoke verification requires Vite; do not combine web verification switches with -SkipVite."
 }
@@ -1036,7 +1115,9 @@ if ([string]::IsNullOrWhiteSpace($AppRoot)) {
 
 $resolvedAppRoot = Get-FullPath -Path $AppRoot
 if ([string]::IsNullOrWhiteSpace($DataRoot)) {
-    $DataRoot = if ($VerifySalesWorkspace) {
+    $DataRoot = if ($UsePortableDataRoot) {
+        Join-Path $resolvedAppRoot "App_Data"
+    } elseif ($VerifySalesWorkspace) {
         Join-Path $resolvedAppRoot ("App_Data\SalesWorkspaceSmoke-{0:yyyyMMdd-HHmmss}-{1}" -f (Get-Date), $PID)
     } elseif ($VerifySingleWindowOperationCenter) {
         Join-Path $resolvedAppRoot ("App_Data\SingleWindowSmoke-{0:yyyyMMdd-HHmmss}-{1}" -f (Get-Date), $PID)
@@ -1049,10 +1130,28 @@ $resolvedDataRoot = Get-FullPath -Path $DataRoot
 Assert-NonSystemDrivePath -Path $resolvedAppRoot -Purpose "Tauri smoke app root"
 Assert-NonSystemDrivePath -Path $resolvedDataRoot -Purpose "Tauri smoke data root"
 
-$tauriExe = Join-Path $resolvedAppRoot "export-doc-tauri.exe"
-if (-not (Test-Path -LiteralPath $tauriExe)) {
-    throw "Tauri debug executable was not found: $tauriExe. Run npm --prefix apps/export-doc-tauri run tauri:compile:local first."
+if ($UsePortableDataRoot) {
+    $portableMarker = Join-Path $resolvedAppRoot "portable-runtime.json"
+    if (-not (Test-Path -LiteralPath $portableMarker -PathType Leaf)) {
+        throw "Portable runtime marker was not found: $portableMarker"
+    }
+    Assert-SamePath -Actual $resolvedDataRoot -Expected (Join-Path $resolvedAppRoot "App_Data") -Purpose "Portable smoke data root"
 }
+
+$tauriExe = if ([string]::IsNullOrWhiteSpace($ExecutablePath)) {
+    @(
+        (Join-Path $resolvedAppRoot "export-doc-tauri.exe"),
+        (Join-Path $resolvedAppRoot "ExportDocManager.exe")
+    ) |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+        Select-Object -First 1
+} else {
+    Get-FullPath -Path $ExecutablePath
+}
+if ([string]::IsNullOrWhiteSpace($tauriExe) -or -not (Test-Path -LiteralPath $tauriExe -PathType Leaf)) {
+    throw "Tauri executable was not found. Checked the explicit path and the default debug/portable names under: $resolvedAppRoot"
+}
+Assert-NonSystemDrivePath -Path $tauriExe -Purpose "Tauri smoke executable"
 
 $logRoot = Join-Path $resolvedDataRoot "Logs"
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
@@ -1118,7 +1217,7 @@ try {
         $tauriArgumentList += @("--app-root", $resolvedAppRoot)
         $tauriEnvironment["EXPORTDOCMANAGER_APP_ROOT"] = $resolvedAppRoot
     }
-    if (-not $usesRuntimePathsConfig) {
+    if (-not $usesRuntimePathsConfig -and -not $UsePortableDataRoot) {
         $tauriArgumentList += @("--data-root", $resolvedDataRoot)
         $tauriEnvironment["EXPORTDOCMANAGER_DATA_ROOT"] = $resolvedDataRoot
     }
@@ -1195,13 +1294,11 @@ try {
         throw "Unexpected current user: $($currentUser.username)"
     }
 
-    $invoices = Invoke-RestMethod `
-        -Uri "$apiBaseUrl/api/invoices?pageNumber=1&pageSize=5" `
+    $workspaceProbe = Invoke-EditionWorkspacePageProbe `
+        -ApiBaseUrl $apiBaseUrl `
         -Headers $headers `
-        -TimeoutSec 10
-    if ($null -eq $invoices.items -or $null -eq $invoices.totalCount) {
-        throw "Invoice list response did not include paging fields."
-    }
+        -CurrentUser $currentUser `
+        -Purpose "Workspace page probe"
 
     if (-not (Test-Path -LiteralPath $health.sqliteDatabasePath -PathType Leaf)) {
         throw "SQLite database file was not created under the Tauri smoke data root: $($health.sqliteDatabasePath)"
@@ -1365,13 +1462,11 @@ try {
             $cleanedBackupFile = -not (Test-Path -LiteralPath $backupFullPath -PathType Leaf)
         }
 
-        $invoices = Invoke-RestMethod `
-            -Uri "$apiBaseUrl/api/invoices?pageNumber=1&pageSize=5" `
+        $workspaceProbe = Invoke-EditionWorkspacePageProbe `
+            -ApiBaseUrl $apiBaseUrl `
             -Headers $headers `
-            -TimeoutSec 10
-        if ($null -eq $invoices.items -or $null -eq $invoices.totalCount) {
-            throw "Invoice list response after backup restore restart did not include paging fields."
-        }
+            -CurrentUser $currentUser `
+            -Purpose "Workspace page probe after backup restore restart"
 
         $sqliteDatabase = Get-Item -LiteralPath $health.sqliteDatabasePath
         $backupRestoreVerification = [pscustomobject]@{
@@ -1408,8 +1503,13 @@ try {
         ApiBaseUrl = $apiBaseUrl
         CurrentUser = $currentUser.username
         CurrentUserRole = $currentUser.role
-        InvoicePageNumber = $invoices.pageNumber
-        InvoiceTotalCount = $invoices.totalCount
+        ProductEdition = $workspaceProbe.ProductEdition
+        WorkspaceProbe = $workspaceProbe.Name
+        WorkspaceProbePath = $workspaceProbe.Path
+        WorkspacePageNumber = $workspaceProbe.Page.pageNumber
+        WorkspaceTotalCount = $workspaceProbe.Page.totalCount
+        InvoicePageNumber = $workspaceProbe.Page.pageNumber
+        InvoiceTotalCount = $workspaceProbe.Page.totalCount
         SQLiteDatabasePath = $sqliteDatabase.FullName
         SQLiteDatabaseLength = $sqliteDatabase.Length
         AppRoot = $health.appRoot

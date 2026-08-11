@@ -70,6 +70,7 @@ jobs:
       npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
       CARGO_HOME: ${{ github.workspace }}/.codex-runtime/cargo-home
       CARGO_TARGET_DIR: ${{ github.workspace }}/artifacts/cargo-target-exportdoc
+      CARGO_BUILD_JOBS: 2
       EXPORTDOCMANAGER_TAURI_RID: ${{ inputs.runtime_identifier }}
       EXPORTDOCMANAGER_RUST_TARGET: ${{ inputs.rust_target }}
       EXPORTDOCMANAGER_PRODUCT_EDITION: ${{ inputs.edition }}
@@ -259,7 +260,7 @@ jobs:
         shell: pwsh
         run: ./scripts/verify-package-payload.ps1 -PackageRoot ./artifacts/tauri-bundle/resources -Profile Desktop -RuntimeIdentifier ${{ inputs.runtime_identifier }}
 
-      - name: Build and verify portable desktop package
+      - name: Build, launch-smoke and verify portable desktop package
         shell: pwsh
         run: >-
           ./scripts/package-desktop-portable.ps1

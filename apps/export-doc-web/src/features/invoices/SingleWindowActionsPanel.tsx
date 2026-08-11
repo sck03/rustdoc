@@ -133,7 +133,7 @@ export function SingleWindowActionsPanel({
         </div>
       </div>
 
-      <div className="toolbar-actions single-window-list-action-buttons">
+      <div className="toolbar-actions invoice-single-window-action-buttons">
         <button className="command-button secondary" type="button" disabled={isBusy} onClick={() => onReviewCustomsCoo(invoice)}>
           <FileCheck2 size={17} aria-hidden="true" />
           <span>预检 COO</span>

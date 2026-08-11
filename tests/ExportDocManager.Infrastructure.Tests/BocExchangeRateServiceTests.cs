@@ -150,6 +150,42 @@ public sealed class BocExchangeRateServiceTests
         await Assert.ThrowsAsync<InfrastructureServiceException>(() => service.GetExchangeRatesAsync());
     }
 
+    [Fact]
+    public async Task Service_ShouldClassifyUnexpectedHtmlAsInfrastructureProtocolFailure()
+    {
+        var handler = new SequenceHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("<html><body><p>site redesigned</p></body></html>")
+        });
+        using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+        using var service = new BocExchangeRateService(
+            new StubSettingsService("https://rates.example/start"),
+            client,
+            (_, _) => Task.FromResult(new[] { IPAddress.Parse("93.184.216.34") }));
+
+        var error = await Assert.ThrowsAsync<InfrastructureServiceException>(() =>
+            service.GetExchangeRatesAsync());
+
+        Assert.Contains("页面结构", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Service_ShouldRejectRowsWithoutNumericRates()
+    {
+        var handler = new SequenceHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                "<table><tr><td>美元</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr></table>")
+        });
+        using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+        using var service = new BocExchangeRateService(
+            new StubSettingsService("https://rates.example/start"),
+            client,
+            (_, _) => Task.FromResult(new[] { IPAddress.Parse("93.184.216.34") }));
+
+        await Assert.ThrowsAsync<InfrastructureServiceException>(() => service.GetExchangeRatesAsync());
+    }
+
     private sealed class StubSettingsService : ISettingsService
     {
         public StubSettingsService(string url)

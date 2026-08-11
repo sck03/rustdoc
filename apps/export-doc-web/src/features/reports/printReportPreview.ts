@@ -9,14 +9,28 @@ export function printReportPreviewHtml(html: string, title: string) {
 
     const frame = document.createElement("iframe");
     let settled = false;
+    let printStarted = false;
     let cleanupTimer = 0;
     let timeoutTimer = 0;
     let fallbackLoadTimer = 0;
+    let printCompletionTimer = 0;
+    let focusCompletionTimer = 0;
+    let previewWindow: Window | null = null;
+
+    const finishAfterPrint = () => settle();
+    const finishAfterFocus = () => {
+      window.clearTimeout(focusCompletionTimer);
+      focusCompletionTimer = window.setTimeout(() => settle(), 150);
+    };
 
     function cleanup() {
       window.clearTimeout(cleanupTimer);
       window.clearTimeout(timeoutTimer);
       window.clearTimeout(fallbackLoadTimer);
+      window.clearTimeout(printCompletionTimer);
+      window.clearTimeout(focusCompletionTimer);
+      window.removeEventListener("focus", finishAfterFocus);
+      previewWindow?.removeEventListener("afterprint", finishAfterPrint);
       frame.remove();
     }
 
@@ -47,23 +61,29 @@ export function printReportPreviewHtml(html: string, title: string) {
     frame.style.pointerEvents = "none";
 
     const printLoadedFrame = () => {
-      if (settled) {
+      if (settled || printStarted) {
         return;
       }
 
+      printStarted = true;
+      window.clearTimeout(timeoutTimer);
       window.clearTimeout(fallbackLoadTimer);
       void withTimeout(waitForPrintReady(frame), 5000)
         .catch(() => delay(300))
         .then(() => {
           try {
-            const previewWindow = frame.contentWindow;
+            previewWindow = frame.contentWindow;
             if (!previewWindow) {
               throw new Error("无法打开打印窗口。");
             }
 
             previewWindow.focus();
+            previewWindow.addEventListener("afterprint", finishAfterPrint, { once: true });
+            window.addEventListener("focus", finishAfterFocus, { once: true });
             previewWindow.print();
-            settle();
+            if (!settled) {
+              printCompletionTimer = window.setTimeout(() => settle(), 120000);
+            }
           } catch (error) {
             settle(error);
           }

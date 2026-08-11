@@ -57,7 +57,7 @@ public sealed class InfrastructureSqlSafetyPolicyTests
     }
 
     [Fact]
-    public void PostgreSqlHsSearchIndexes_ShouldKeepPrefixAndOptionalTrigramFallbackContracts()
+    public void PostgreSqlSearchIndexes_ShouldMatchUpperContainsQueriesAndKeepPrefixFallbacks()
     {
         string sourceRoot = ResolveSourceRoot("src", "ExportDocManager.Infrastructure");
         string initialization = File.ReadAllText(
@@ -71,10 +71,15 @@ public sealed class InfrastructureSqlSafetyPolicyTests
             "IX_Products_HSCode_Prefix",
             "IX_Items_HSCode_Prefix",
             "CREATE EXTENSION IF NOT EXISTS pg_trgm",
-            "IX_HsCodes_TextSearch_Trgm",
-            "IX_HsCodeDeclarationExamples_TextSearch_Trgm",
-            "IX_HsCodeRemoteCandidates_TextSearch_Trgm",
-            "IX_Items_HistorySearch_Trgm",
+            "IX_HsCodes_TextSearch_Upper_Trgm",
+            "IX_HsCodeDeclarationExamples_TextSearch_Upper_Trgm",
+            "IX_HsCodeRemoteCandidates_TextSearch_Upper_Trgm",
+            "IX_Items_HistorySearch_Upper_Trgm",
+            "IX_Invoices_TextSearch_Upper_Trgm",
+            "IX_Payments_TextSearch_Upper_Trgm",
+            "IX_Customers_TextSearch_Upper_Trgm",
+            "IX_Exporters_TextSearch_Upper_Trgm",
+            "upper(\"Name\") gin_trgm_ops",
             "PostgreSQL pg_trgm indexes were not installed"
         })
         {

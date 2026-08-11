@@ -28,7 +28,9 @@ namespace ExportDocManager.Api.Hosting
             string fileNamePattern = settingsService.Settings?.BatchExport?.OutputFileNamePattern
                 ?? BatchExportPathHelper.DefaultFileNamePattern;
 
-            var invoice = await invoiceService.GetInvoiceByIdAsync(invoiceId).ConfigureAwait(false);
+            var invoice = await invoiceService
+                .GetInvoiceByIdAsync(invoiceId, jobContext.CancellationToken)
+                .ConfigureAwait(false);
             if (invoice == null)
             {
                 throw new KeyNotFoundException("未找到指定的发票。");

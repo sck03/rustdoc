@@ -31,14 +31,19 @@ namespace ExportDocManager.Services.Core
             _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(normalizedSettings);
         }
 
-        public async Task<int> SavePaymentAsync(Payment payment)
+        public async Task<int> SavePaymentAsync(
+            Payment payment,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(payment);
+            cancellationToken.ThrowIfCancellationRequested();
             NormalizePayment(payment);
             ValidatePayment(payment);
             _businessDataAccessScope.ApplyOwner(payment);
 
-            using var context = await _contextFactory.CreateDbContextAsync();
+            await using var context = await _contextFactory
+                .CreateDbContextAsync(cancellationToken)
+                .ConfigureAwait(false);
             if (payment.Id == 0)
             {
                 context.Payments.Add(payment);
@@ -47,7 +52,8 @@ namespace ExportDocManager.Services.Core
             {
                 if (!await _businessDataAccessScope.CanAccessPaymentAsync(
                         context,
-                        payment.Id).ConfigureAwait(false))
+                        payment.Id,
+                        cancellationToken).ConfigureAwait(false))
                 {
                     throw new PermissionDeniedException("无权限修改该付款记录。");
                 }
@@ -56,7 +62,7 @@ namespace ExportDocManager.Services.Core
             }
             try
             {
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (DbUpdateConcurrencyException exception)
             {
@@ -67,19 +73,24 @@ namespace ExportDocManager.Services.Core
             return payment.Id;
         }
 
-        public async Task<bool> DeletePaymentAsync(int id)
+        public async Task<bool> DeletePaymentAsync(
+            int id,
+            CancellationToken cancellationToken = default)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
+            await using var context = await _contextFactory
+                .CreateDbContextAsync(cancellationToken)
+                .ConfigureAwait(false);
             var entity = await _businessDataAccessScope
                 .ApplyPaymentScope(context.Payments)
-                .FirstOrDefaultAsync(payment => payment.Id == id);
+                .FirstOrDefaultAsync(payment => payment.Id == id, cancellationToken)
+                .ConfigureAwait(false);
             if (entity == null)
             {
                 return false;
             }
 
             context.Payments.Remove(entity);
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return true;
         }
 

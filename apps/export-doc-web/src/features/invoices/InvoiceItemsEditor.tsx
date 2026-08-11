@@ -1,48 +1,23 @@
 import {
   type ClipboardEvent,
-  type FormEvent,
   type KeyboardEvent,
-  memo,
-  type MouseEvent,
   useCallback,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
 } from "react";
-import {
-  ArrowDown,
-  ArrowDownToLine,
-  ArrowUp,
-  ClipboardCopy,
-  ClipboardPaste,
-  Columns3,
-  Copy,
-  Eraser,
-  PackageCheck,
-  PackagePlus,
-  PackageSearch,
-  Redo2,
-  RefreshCw,
-  Search,
-  Trash2,
-  Undo2,
-  X,
-} from "lucide-react";
-import { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
+import { ApiInvoiceItemDto, ApiProductDto } from "../../api/index.ts";
 import { normalizeText } from "../../ui/formUtils.ts";
 import { getClipboardPasteInstruction, readClipboardText, writeClipboardText } from "../../ui/clipboard.ts";
 import { InvoiceItemHistoryOptionCache } from "./invoiceItemHistory.ts";
 import { InvoiceItemShortcutGuide } from "./InvoiceItemShortcutGuide.tsx";
-import { formatProductOptionLabel, ProductLibraryPickerDialog } from "./InvoiceProductLibraryPickerDialog.tsx";
-import { InvoiceItemCellInput } from "./InvoiceItemCellInput.tsx";
 import { InvoiceItemsEditorToolbar } from "./InvoiceItemsEditorToolbar.tsx";
 import { InvoiceItemsTable } from "./InvoiceItemsTable.tsx";
 import { InvoiceItemsEditorDialogs } from "./InvoiceItemsEditorDialogs.tsx";
 import { useInvoiceItemsEditorInteraction } from "./useInvoiceItemsEditorInteraction.ts";
-import { invoiceItemHeaderHeightPx, invoiceItemRowHeightPx, invoiceItemUnitLookupTargets, invoiceItemVirtualizationThreshold, isInvoiceItemArrowNavigationKey, isInvoiceItemCellInputTarget, isInvoiceItemVerticalNavigationKey, shouldMoveInvoiceItemCellByArrow } from "./invoiceItemsEditorInteraction.ts";
-import { isUnitLookupSourceField, buildUnitCandidateLookup, findChineseUnitCandidates, normalizeUnitEnglishKey, createCellKey, parseCellKey, readSelectedCells, canFillDownSelectedCells, buildCellRangeKeys, getInvoiceItemColumnIndex, normalizeInvoiceItemBlankRowCount, calculateInvoiceItemVirtualRange, buildSelectedCellsClipboardText, calculateInvoiceItemTableMinWidth, getInvoiceItemColumnWidth, readItemClipboardValue, readItemTextValue, sanitizeClipboardCell, parseInvoiceItemClipboardRows, createEmptyInvoiceItem, calculateInvoiceTotals, isMeaningfulInvoiceItem } from "./invoiceItemsEditorModel.ts";
+import { invoiceItemUnitLookupTargets, isInvoiceItemArrowNavigationKey, isInvoiceItemCellInputTarget, isInvoiceItemVerticalNavigationKey, shouldMoveInvoiceItemCellByArrow } from "./invoiceItemsEditorInteraction.ts";
+import { isUnitLookupSourceField, buildUnitCandidateLookup, findChineseUnitCandidates, normalizeUnitEnglishKey, canFillDownSelectedCells, normalizeInvoiceItemBlankRowCount, buildSelectedCellsClipboardText, calculateInvoiceItemTableMinWidth, readItemTextValue, parseInvoiceItemClipboardRows, createEmptyInvoiceItem, calculateInvoiceTotals, isMeaningfulInvoiceItem } from "./invoiceItemsEditorModel.ts";
 import {
   EditableInvoiceItemField,
   firstEditableInvoiceItemField,
@@ -51,9 +26,9 @@ import {
 } from "./invoiceItemTableModel.ts";
 export { type EditableInvoiceItemField, type InvoiceItemColumnDefinition, invoiceItemEditableColumns } from "./invoiceItemTableModel.ts";
 export { calculateInvoiceTotals, createEmptyInvoiceItem, isMeaningfulInvoiceItem, normalizeInvoiceItemForSave, recalculateInvoiceItem } from "./invoiceItemsEditorModel.ts";
-import type { InvoiceItemCellSelection, InvoiceItemsEditorProps } from "./invoiceItemsEditorTypes.ts";
+import type { InvoiceItemsEditorProps } from "./invoiceItemsEditorTypes.ts";
+import { useInvoiceItemsGridInteraction } from "./useInvoiceItemsGridInteraction.ts";
 export type { InvoiceItemCellSelection } from "./invoiceItemsEditorTypes.ts";
-type FocusedInvoiceItemCell = InvoiceItemCellSelection;
 
 export function InvoiceItemsEditor({
   client,
@@ -96,15 +71,8 @@ export function InvoiceItemsEditor({
   unitLookupMessage,
   unitOptions,
 }: InvoiceItemsEditorProps) {
-  const [focusedCell, setFocusedCell] = useState<FocusedInvoiceItemCell | null>(null);
   const [editorMessage, setEditorMessage] = useState<string | null>(null);
   const { unitCandidateDialog, setUnitCandidateDialog, isProductPickerOpen, setIsProductPickerOpen, isHsKnowledgeOpen, setIsHsKnowledgeOpen, productKeyword, setProductKeyword, selectedProductId, setSelectedProductId, hiddenColumnFields, setHiddenColumnFields } = useInvoiceItemsEditorInteraction();
-  const [selectedCellKeys, setSelectedCellKeys] = useState<Set<string>>(new Set());
-  const [selectionAnchor, setSelectionAnchor] = useState<FocusedInvoiceItemCell | null>(null);
-  const [pendingFocusCell, setPendingFocusCell] = useState<FocusedInvoiceItemCell | null>(null);
-  const [tableViewport, setTableViewport] = useState({ scrollTop: 0, height: 0 });
-  const tableFrameRef = useRef<HTMLDivElement | null>(null);
-  const tableScrollFrameRef = useRef<number | null>(null);
   const historyOptionCacheRef = useRef(new InvoiceItemHistoryOptionCache());
   const historyItemsRef = useRef(items);
   const pendingHistoryInvalidationRef = useRef<number | null>(null);
@@ -113,8 +81,6 @@ export function InvoiceItemsEditor({
     [hiddenColumnFields],
   );
   const unitCandidateLookup = useMemo(() => buildUnitCandidateLookup(unitOptions ?? []), [unitOptions]);
-  const focusContextRef = useRef({ selectionAnchor, focusedCell, visibleColumns });
-  focusContextRef.current = { selectionAnchor, focusedCell, visibleColumns };
   const itemEditContextRef = useRef({ onChangeItem, readOnly, unitCandidateLookup });
   itemEditContextRef.current = { onChangeItem, readOnly, unitCandidateLookup };
 
@@ -137,56 +103,6 @@ export function InvoiceItemsEditor({
         ? normalizedRowIndex
         : Math.min(pendingHistoryInvalidationRef.current, normalizedRowIndex);
   }, []);
-
-  const focusItemCell = useCallback(
-    (cell: FocusedInvoiceItemCell, selectionMode: "replace" | "toggle" | "range" = "replace") => {
-      const context = focusContextRef.current;
-      setFocusedCell(cell);
-
-      if (selectionMode === "range") {
-        const anchor = context.selectionAnchor ?? context.focusedCell ?? cell;
-        setSelectionAnchor(anchor);
-        setSelectedCellKeys(buildCellRangeKeys(anchor, cell, context.visibleColumns));
-        return;
-      }
-
-      if (selectionMode === "toggle") {
-        setSelectionAnchor((current) => current ?? cell);
-        setSelectedCellKeys((current) => {
-          const next = new Set(current);
-          const key = createCellKey(cell);
-          if (next.has(key)) {
-            next.delete(key);
-          } else {
-            next.add(key);
-          }
-
-          return next.size > 0 ? next : new Set([key]);
-        });
-        return;
-      }
-
-      setSelectionAnchor(cell);
-      setSelectedCellKeys(new Set([createCellKey(cell)]));
-    },
-    [],
-  );
-
-  const handleCellMouseDown = useCallback(
-    (event: MouseEvent<HTMLInputElement>, cell: FocusedInvoiceItemCell) => {
-      if (event.shiftKey) {
-        event.preventDefault();
-        focusItemCell(cell, "range");
-        return;
-      }
-
-      if (event.ctrlKey || event.metaKey) {
-        event.preventDefault();
-        focusItemCell(cell, "toggle");
-      }
-    },
-    [focusItemCell],
-  );
 
   const updateItemField = useCallback(
     (index: number, column: InvoiceItemColumnDefinition, value: string | number | undefined) => {
@@ -248,28 +164,31 @@ export function InvoiceItemsEditor({
     () => (blankDisplayRows.length > 0 ? [...items, ...blankDisplayRows] : items),
     [blankDisplayRows, items],
   );
-  const displayRowCount = displayItems.length;
-  const shouldVirtualizeRows = displayRowCount > invoiceItemVirtualizationThreshold;
-  const virtualRowRange = useMemo(
-    () => calculateInvoiceItemVirtualRange(displayRowCount, tableViewport.scrollTop, tableViewport.height, shouldVirtualizeRows),
-    [displayRowCount, shouldVirtualizeRows, tableViewport.height, tableViewport.scrollTop],
-  );
-  const visibleDisplayItems = useMemo(
-    () => displayItems.slice(virtualRowRange.startIndex, virtualRowRange.endIndex),
-    [displayItems, virtualRowRange.endIndex, virtualRowRange.startIndex],
-  );
-  const visibleColumnFields = useMemo(() => new Set(visibleColumns.map((column) => column.field)), [visibleColumns]);
-  const activeFocusedCell = focusedCell && visibleColumnFields.has(focusedCell.field) ? focusedCell : null;
+  const {
+    activeFocusedCell,
+    focusItemCell,
+    focusItemCellAndInput,
+    handleCellMouseDown,
+    handleTableScroll,
+    moveFocusedCellByArrow,
+    moveFocusedCellVertically,
+    removeFieldFromSelection,
+    selectedCellKeys,
+    selectedCells,
+    tableFrameRef,
+    virtualRowRange,
+    visibleDisplayItems,
+  } = useInvoiceItemsGridInteraction({
+    displayItems,
+    itemsLength: items.length,
+    visibleColumns,
+  });
   const focusedRowIndex = activeFocusedCell?.rowIndex ?? null;
   const totals = useMemo(
     () => calculateInvoiceTotals(items, exchangeRate, currency),
     [currency, exchangeRate, items],
   );
   const meaningfulItemCount = useMemo(() => items.filter(isMeaningfulInvoiceItem).length, [items]);
-  const selectedCells = useMemo(
-    () => readSelectedCells(selectedCellKeys, items.length, visibleColumns),
-    [items.length, selectedCellKeys, visibleColumns],
-  );
   const hasFillDownSelection = canFillDownSelectedCells(selectedCells);
   const isFillDownAvailable =
     hasFillDownSelection || Boolean(activeFocusedCell && activeFocusedCell.rowIndex > 0 && activeFocusedCell.rowIndex < items.length);
@@ -290,34 +209,6 @@ export function InvoiceItemsEditor({
     activeFocusedCell && activeFocusedColumn
       ? historyOptionCacheRef.current.getOptions(items, activeFocusedCell.rowIndex, activeFocusedColumn)
       : [];
-
-  useEffect(() => {
-    const element = tableFrameRef.current;
-    if (!element) {
-      return;
-    }
-
-    updateTableViewportFromElement(element);
-
-    if (typeof ResizeObserver === "undefined") {
-      const handleResize = () => updateTableViewportFromElement(element);
-      window.addEventListener("resize", handleResize);
-      return () => window.removeEventListener("resize", handleResize);
-    }
-
-    const observer = new ResizeObserver(() => updateTableViewportFromElement(element));
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(
-    () => () => {
-      if (tableScrollFrameRef.current != null) {
-        window.cancelAnimationFrame(tableScrollFrameRef.current);
-      }
-    },
-    [],
-  );
 
   useEffect(() => {
     if (readOnly || visibleColumns.length === 0) {
@@ -348,36 +239,6 @@ export function InvoiceItemsEditor({
     };
   }, [items, readOnly, visibleColumns]);
 
-  useEffect(() => {
-    if (
-      !pendingFocusCell ||
-      pendingFocusCell.rowIndex < 0 ||
-      pendingFocusCell.rowIndex >= displayRowCount ||
-      !visibleColumnFields.has(pendingFocusCell.field)
-    ) {
-      return;
-    }
-
-    if (
-      shouldVirtualizeRows &&
-      (pendingFocusCell.rowIndex < virtualRowRange.startIndex || pendingFocusCell.rowIndex >= virtualRowRange.endIndex)
-    ) {
-      scrollInvoiceItemCellIntoView(pendingFocusCell);
-      return;
-    }
-
-    focusInvoiceItemInput(pendingFocusCell);
-    setPendingFocusCell(null);
-  }, [
-    displayRowCount,
-    pendingFocusCell,
-    shouldVirtualizeRows,
-    virtualRowRange.endIndex,
-    virtualRowRange.startIndex,
-    visibleColumnCount,
-    visibleColumnFields,
-  ]);
-
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const primaryModifier = event.ctrlKey || event.metaKey;
     if (primaryModifier && !event.shiftKey && event.key.toLowerCase() === "c" && selectedCellCount > 1) {
@@ -401,12 +262,14 @@ export function InvoiceItemsEditor({
     ) {
       event.preventDefault();
       moveFocusedCellByArrow(event.key, event.shiftKey);
+      setEditorMessage(null);
       return;
     }
 
     if (isInvoiceItemVerticalNavigationKey(event) && isInvoiceItemCellInputTarget(event.target)) {
       event.preventDefault();
       moveFocusedCellVertically(!event.shiftKey);
+      setEditorMessage(null);
       return;
     }
 
@@ -537,7 +400,7 @@ export function InvoiceItemsEditor({
       rows,
       visibleColumns.map((column) => column.field),
     );
-    setFocusedCell({ rowIndex: startRowIndex, field: startField });
+    focusItemCell({ rowIndex: startRowIndex, field: startField });
     setEditorMessage(`${rows.length} 行剪贴板内容已应用。`);
   }
 
@@ -560,125 +423,6 @@ export function InvoiceItemsEditor({
     markInvoiceItemMutationFrom(activeFocusedCell.rowIndex);
     onFillDownItemField(activeFocusedCell.rowIndex, activeFocusedCell.field);
     setEditorMessage("已向下填充当前单元格。");
-  }
-
-  function moveFocusedCellVertically(moveDown: boolean) {
-    if (!activeFocusedCell) {
-      return;
-    }
-
-    const targetRowIndex = moveDown ? activeFocusedCell.rowIndex + 1 : activeFocusedCell.rowIndex - 1;
-    if (targetRowIndex >= displayRowCount) {
-      return;
-    }
-
-    const nextCell = {
-      rowIndex: Math.max(0, targetRowIndex),
-      field: activeFocusedCell.field,
-    };
-    focusItemCellAndInput(nextCell);
-    setEditorMessage(null);
-  }
-
-  function moveFocusedCellByArrow(key: string, extendSelection: boolean) {
-    if (!activeFocusedCell || visibleColumns.length === 0 || displayRowCount === 0) {
-      return;
-    }
-
-    const currentColumnIndex = getInvoiceItemColumnIndex(activeFocusedCell.field, visibleColumns);
-    let nextRowIndex = activeFocusedCell.rowIndex;
-    let nextColumnIndex = currentColumnIndex;
-
-    if (key === "ArrowUp") {
-      nextRowIndex -= 1;
-    } else if (key === "ArrowDown") {
-      nextRowIndex += 1;
-    } else if (key === "ArrowLeft") {
-      nextColumnIndex -= 1;
-    } else if (key === "ArrowRight") {
-      nextColumnIndex += 1;
-    }
-
-    nextRowIndex = Math.max(0, Math.min(displayRowCount - 1, nextRowIndex));
-    nextColumnIndex = Math.max(0, Math.min(visibleColumns.length - 1, nextColumnIndex));
-
-    const nextField = visibleColumns[nextColumnIndex]?.field;
-    if (!nextField) {
-      return;
-    }
-
-    const nextCell = { rowIndex: nextRowIndex, field: nextField };
-    if (nextCell.rowIndex === activeFocusedCell.rowIndex && nextCell.field === activeFocusedCell.field) {
-      return;
-    }
-
-    focusItemCellAndInput(nextCell, extendSelection ? "range" : "replace");
-    setEditorMessage(null);
-  }
-
-  function focusItemCellAndInput(cell: FocusedInvoiceItemCell, selectionMode: "replace" | "range" = "replace") {
-    focusItemCell(cell, selectionMode);
-    setPendingFocusCell(cell);
-    scrollInvoiceItemCellIntoView(cell);
-    window.requestAnimationFrame(() => focusInvoiceItemInput(cell));
-  }
-
-  function focusInvoiceItemInput(cell: FocusedInvoiceItemCell) {
-    const input = tableFrameRef.current?.querySelector<HTMLInputElement>(
-      `input[data-invoice-item-row="${cell.rowIndex}"][data-invoice-item-field="${cell.field}"]`,
-    );
-    input?.focus();
-    if (input && input.type !== "number") {
-      input.select();
-    }
-  }
-
-  function updateTableViewportFromElement(element: HTMLDivElement) {
-    const nextViewport = {
-      scrollTop: element.scrollTop,
-      height: element.clientHeight,
-    };
-    setTableViewport((current) =>
-      Math.abs(current.scrollTop - nextViewport.scrollTop) < 1 && current.height === nextViewport.height
-        ? current
-        : nextViewport,
-    );
-  }
-
-  function handleTableScroll() {
-    const element = tableFrameRef.current;
-    if (!element || tableScrollFrameRef.current != null) {
-      return;
-    }
-
-    tableScrollFrameRef.current = window.requestAnimationFrame(() => {
-      tableScrollFrameRef.current = null;
-      updateTableViewportFromElement(element);
-    });
-  }
-
-  function scrollInvoiceItemCellIntoView(cell: FocusedInvoiceItemCell) {
-    const element = tableFrameRef.current;
-    if (!element || !shouldVirtualizeRows) {
-      return;
-    }
-
-    const rowTop = invoiceItemHeaderHeightPx + cell.rowIndex * invoiceItemRowHeightPx;
-    const rowBottom = rowTop + invoiceItemRowHeightPx;
-    const visibleTop = element.scrollTop + invoiceItemHeaderHeightPx;
-    const visibleBottom = element.scrollTop + element.clientHeight;
-    let nextScrollTop = element.scrollTop;
-
-    if (rowTop < visibleTop) {
-      nextScrollTop = Math.max(0, rowTop - invoiceItemHeaderHeightPx);
-    } else if (rowBottom > visibleBottom) {
-      nextScrollTop = Math.max(0, rowBottom - element.clientHeight);
-    }
-
-    if (Math.abs(nextScrollTop - element.scrollTop) >= 1) {
-      element.scrollTop = nextScrollTop;
-    }
-    updateTableViewportFromElement(element);
   }
 
   async function copySelectedCells() {
@@ -746,8 +490,7 @@ export function InvoiceItemsEditor({
     };
     markInvoiceItemMutationFrom(Math.max(0, nextCell.rowIndex - 1));
     onApplyProductLibraryItem(product, focusedRowIndex);
-    setFocusedCell(nextCell);
-    setPendingFocusCell(nextCell);
+    focusItemCellAndInput(nextCell);
     setEditorMessage(successMessage);
   }
 
@@ -805,18 +548,7 @@ export function InvoiceItemsEditor({
     });
 
     if (!isHidden) {
-      setSelectedCellKeys((current) => {
-        const next = new Set<string>();
-        current.forEach((key) => {
-          const cell = parseCellKey(key);
-          if (cell && cell.field !== field) {
-            next.add(key);
-          }
-        });
-        return next;
-      });
-      setSelectionAnchor((current) => (current?.field === field ? null : current));
-      setFocusedCell((current) => (current?.field === field ? null : current));
+      removeFieldFromSelection(field);
     }
 
     setEditorMessage(`${isHidden ? "已显示" : "已隐藏"}${column?.header ?? "明细"}列。`);

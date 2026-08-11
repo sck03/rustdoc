@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using ClosedXML.Excel;
 using ExportDocManager.Api.Hosting;
@@ -77,6 +78,23 @@ namespace ExportDocManager.Api.Tests
                 Assert.Equal(
                     "http://127.0.0.1:5199",
                     ApiEndpointPublication.ResolveApiBaseUrl(["http://127.0.0.1:5199"]));
+                ApiEndpointPublication.Publish(endpointFile, ["http://127.0.0.1:5199"]);
+                byte[] publicationBytes = File.ReadAllBytes(endpointFile);
+                Assert.NotEmpty(publicationBytes);
+                Assert.Equal((byte)'{', publicationBytes[0]);
+                Assert.False(publicationBytes.AsSpan().StartsWith(Encoding.UTF8.GetPreamble()));
+                using (JsonDocument publication = JsonDocument.Parse(publicationBytes))
+                {
+                    Assert.Equal(1, publication.RootElement.GetProperty("schemaVersion").GetInt32());
+                    Assert.Equal(
+                        "http://127.0.0.1:5199",
+                        publication.RootElement.GetProperty("apiBaseUrl").GetString());
+                    Assert.Equal(
+                        Environment.ProcessId,
+                        publication.RootElement.GetProperty("processId").GetInt32());
+                }
+                ApiEndpointPublication.Remove(endpointFile);
+                Assert.False(File.Exists(endpointFile));
                 Assert.Throws<InvalidOperationException>(() => ApiEndpointPublication.ResolveApiBaseUrl(
                     ["http://127.0.0.1:5199", "http://127.0.0.1:5200"]));
                 Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.ValidateEndpointPublication(
@@ -2324,11 +2342,13 @@ namespace ExportDocManager.Api.Tests
         {
             string tempRoot = CreateTempDirectory("edm-retry-dispatcher");
             string sourcePath = Path.Combine(tempRoot, "source.pdf");
+            string secondSourcePath = Path.Combine(tempRoot, "source-2.pdf");
             string destinationPath = Path.Combine(tempRoot, "merged.pdf");
 
             try
             {
                 await File.WriteAllTextAsync(sourcePath, "%PDF-1.4");
+                await File.WriteAllTextAsync(secondSourcePath, "%PDF-1.4");
                 var jobService = new ApiBackgroundJobService();
                 var services = new ServiceCollection();
                 services.AddSingleton<IPdfMergeService, TestPdfMergeService>();
@@ -2350,7 +2370,7 @@ namespace ExportDocManager.Api.Tests
                     RetryRequestJson = JsonSerializer.Serialize(
                         new ApiPdfMergeRequest
                         {
-                            SourceFiles = new List<string> { sourcePath },
+                            SourceFiles = new List<string> { sourcePath, secondSourcePath },
                             DestinationPath = destinationPath
                         },
                         new JsonSerializerOptions(JsonSerializerDefaults.Web))
@@ -3277,22 +3297,23 @@ namespace ExportDocManager.Api.Tests
                 List<Item> items,
                 Customer customer,
                 Exporter exporter,
-                IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null)
+                IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<bool> SaveInvoiceAsync(Invoice invoice)
+            public Task<bool> SaveInvoiceAsync(Invoice invoice, CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<bool> DeleteInvoiceAsync(int id)
+            public Task<bool> DeleteInvoiceAsync(int id, CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetInvoiceByIdAsync(int id)
+            public Task<Invoice> GetInvoiceByIdAsync(int id, CancellationToken cancellationToken = default)
             {
                 return Task.FromResult(new Invoice
                 {
@@ -3304,47 +3325,73 @@ namespace ExportDocManager.Api.Tests
                 });
             }
 
-            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string companyScope, string invoiceNo, string type)
+            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(
+                string companyScope,
+                string invoiceNo,
+                string type,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<bool> InvoiceNoExistsAsync(string companyScope, string invoiceNo)
+            public Task<bool> InvoiceNoExistsAsync(
+                string companyScope,
+                string invoiceNo,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> CopyInvoiceAsync(int originalId, string newInvoiceNo, InvoiceCloneOptions options = null)
+            public Task<Invoice> CopyInvoiceAsync(
+                int originalId,
+                string newInvoiceNo,
+                InvoiceCloneOptions options = null,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> CopyInvoiceAsTypeAsync(int originalId, string targetType, InvoiceCloneOptions options = null)
+            public Task<Invoice> CopyInvoiceAsTypeAsync(
+                int originalId,
+                string targetType,
+                InvoiceCloneOptions options = null,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> TransitionInvoiceStatusAsync(InvoiceStatusTransitionRequest request)
+            public Task<Invoice> TransitionInvoiceStatusAsync(
+                InvoiceStatusTransitionRequest request,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> UnverifyInvoiceAsync(int id, byte[] expectedRowVersion, string note)
+            public Task<Invoice> UnverifyInvoiceAsync(
+                int id,
+                byte[] expectedRowVersion,
+                string note,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<IReadOnlyList<InvoiceStatusHistory>> ListInvoiceStatusHistoryAsync(int invoiceId)
+            public Task<IReadOnlyList<InvoiceStatusHistory>> ListInvoiceStatusHistoryAsync(
+                int invoiceId,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetLatestInvoiceByPartiesAsync(int? customerId, int? exporterId)
+            public Task<Invoice> GetLatestInvoiceByPartiesAsync(
+                int? customerId,
+                int? exporterId,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetLastInvoiceAsync()
+            public Task<Invoice> GetLastInvoiceAsync(CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
@@ -3455,67 +3502,94 @@ namespace ExportDocManager.Api.Tests
                 List<Item> items,
                 Customer customer,
                 Exporter exporter,
-                IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null)
+                IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<bool> SaveInvoiceAsync(Invoice invoice)
+            public Task<bool> SaveInvoiceAsync(Invoice invoice, CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<bool> DeleteInvoiceAsync(int id)
+            public Task<bool> DeleteInvoiceAsync(int id, CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetInvoiceByIdAsync(int id)
+            public Task<Invoice> GetInvoiceByIdAsync(int id, CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string companyScope, string invoiceNo, string type)
+            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(
+                string companyScope,
+                string invoiceNo,
+                string type,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<bool> InvoiceNoExistsAsync(string companyScope, string invoiceNo)
+            public Task<bool> InvoiceNoExistsAsync(
+                string companyScope,
+                string invoiceNo,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> CopyInvoiceAsync(int originalId, string newInvoiceNo, InvoiceCloneOptions options = null)
+            public Task<Invoice> CopyInvoiceAsync(
+                int originalId,
+                string newInvoiceNo,
+                InvoiceCloneOptions options = null,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> CopyInvoiceAsTypeAsync(int originalId, string targetType, InvoiceCloneOptions options = null)
+            public Task<Invoice> CopyInvoiceAsTypeAsync(
+                int originalId,
+                string targetType,
+                InvoiceCloneOptions options = null,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> TransitionInvoiceStatusAsync(InvoiceStatusTransitionRequest request)
+            public Task<Invoice> TransitionInvoiceStatusAsync(
+                InvoiceStatusTransitionRequest request,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> UnverifyInvoiceAsync(int id, byte[] expectedRowVersion, string note)
+            public Task<Invoice> UnverifyInvoiceAsync(
+                int id,
+                byte[] expectedRowVersion,
+                string note,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<IReadOnlyList<InvoiceStatusHistory>> ListInvoiceStatusHistoryAsync(int invoiceId)
+            public Task<IReadOnlyList<InvoiceStatusHistory>> ListInvoiceStatusHistoryAsync(
+                int invoiceId,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetLatestInvoiceByPartiesAsync(int? customerId, int? exporterId)
+            public Task<Invoice> GetLatestInvoiceByPartiesAsync(
+                int? customerId,
+                int? exporterId,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetLastInvoiceAsync()
+            public Task<Invoice> GetLastInvoiceAsync(CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }

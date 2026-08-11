@@ -83,6 +83,7 @@ namespace ExportDocManager.Services.SingleWindow
                 string sourceDocumentType = string.Empty;
                 int draftRevision = 0;
                 string sourceBaselineHash = string.Empty;
+                CooMappedDocument customsCooDocument = null;
 
                 switch (businessType)
                 {
@@ -97,7 +98,7 @@ namespace ExportDocManager.Services.SingleWindow
                         warnings.AddRange(mapped.Warnings);
                         warnings.AddRange(_xmlValidator.ValidateForBuild(businessType, mapped));
                         payloads.Add(_customsCooPayloadGenerator.BuildCertificateXml(mapped));
-                        payloads.AddRange(_customsCooPayloadGenerator.BuildAttachmentXmls(mapped));
+                        customsCooDocument = mapped;
                         attachments = mapped.Attachments;
                         invoiceNo = source.Invoice?.InvoiceNo ?? string.Empty;
                         contractNo = source.Invoice?.ContractNo ?? string.Empty;
@@ -130,6 +131,7 @@ namespace ExportDocManager.Services.SingleWindow
                         throw new ServiceValidationException("不支持的单一窗口业务类型。");
                 }
 
+                attachments = SingleWindowAttachmentResourcePolicy.ValidateAndSelect(attachments);
                 EnsureAssignmentMatchesDocument(stationAssignment, businessType, companyScope);
 
                 var reservation = await _singleWindowTrackingService.ReserveSubmissionAsync(
@@ -168,6 +170,46 @@ namespace ExportDocManager.Services.SingleWindow
                         payload.FileName,
                         cancellationToken));
                     warnings.AddRange(payload.Warnings);
+                }
+
+                if (customsCooDocument != null && attachments.Count > 0)
+                {
+                    var usedPayloadFileNames = payloadFiles
+                        .Select(file => Path.GetFileName(file.RelativePath))
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    foreach (var attachment in attachments)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        string suggestedFileName = SingleWindowPayloadFileNameHelper.BuildBaseFileName(
+                            Path.GetFileNameWithoutExtension(attachment.FileName),
+                            "coo-attachment",
+                            ".xml");
+                        string payloadFileName = CopyFileToPackageDirectory(
+                            attachment.FilePath,
+                            usedPayloadFileNames,
+                            suggestedFileName);
+                        string payloadPath = Path.Combine(payloadDirectory, payloadFileName);
+                        await using (var output = new FileStream(
+                            payloadPath,
+                            FileMode.CreateNew,
+                            FileAccess.Write,
+                            FileShare.None,
+                            64 * 1024,
+                            FileOptions.Asynchronous | FileOptions.SequentialScan))
+                        {
+                            await _customsCooPayloadGenerator.WriteAttachmentXmlAsync(
+                                customsCooDocument,
+                                attachment,
+                                output,
+                                cancellationToken).ConfigureAwait(false);
+                        }
+                        payloadFiles.Add(await SingleWindowPackageIntegrity.DescribeFileAsync(
+                            payloadPath,
+                            PathBoundaryHelper.ToProtocolRelativePath("payloads", payloadFileName),
+                            "application/xml",
+                            attachment.Description,
+                            cancellationToken));
+                    }
                 }
 
                 var attachmentFiles = await CopyAttachmentsAsync(tempDirectory, attachments, cancellationToken);

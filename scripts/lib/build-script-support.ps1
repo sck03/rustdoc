@@ -40,6 +40,110 @@ function Invoke-ExportDocExternal {
     }
 }
 
+function Move-ExportDocGeneratedDirectoryToQuarantine {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$AllowedRoot,
+        [Parameter(Mandatory = $true)][string]$QuarantineRoot,
+        [string]$FailureMessage
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar)
+    $fullAllowedRoot = [System.IO.Path]::GetFullPath($AllowedRoot).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar)
+    $fullQuarantineRoot = [System.IO.Path]::GetFullPath($QuarantineRoot).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar)
+    $allowedPrefix = $fullAllowedRoot + [System.IO.Path]::DirectorySeparatorChar
+    $quarantinePrefix = $fullQuarantineRoot + [System.IO.Path]::DirectorySeparatorChar
+
+    if (-not $fullPath.StartsWith($allowedPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Generated cleanup source must stay below '$fullAllowedRoot'. Resolved path: $fullPath"
+    }
+    if (-not $fullQuarantineRoot.StartsWith($allowedPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Generated cleanup quarantine must stay below '$fullAllowedRoot'. Resolved path: $fullQuarantineRoot"
+    }
+    if ($fullPath.StartsWith($quarantinePrefix, [System.StringComparison]::OrdinalIgnoreCase) -or
+        [string]::Equals($fullPath, $fullQuarantineRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Generated cleanup source cannot already be inside the quarantine root: $fullPath"
+    }
+
+    New-Item -ItemType Directory -Path $fullQuarantineRoot -Force | Out-Null
+    $leafName = [System.IO.Path]::GetFileName($fullPath)
+    $quarantineName = "{0}-{1:yyyyMMdd-HHmmss-fff}-{2}-{3}" -f `
+        $leafName,
+        (Get-Date),
+        $PID,
+        ([Guid]::NewGuid().ToString("N"))
+    $destination = Join-Path $fullQuarantineRoot $quarantineName
+    Move-Item -LiteralPath $fullPath -Destination $destination -Force -ErrorAction Stop
+
+    if (Test-Path -LiteralPath $fullPath) {
+        throw "Generated directory remained at its original path after quarantine move: $fullPath"
+    }
+
+    $reason = if ([string]::IsNullOrWhiteSpace($FailureMessage)) {
+        "the directory could not be removed"
+    } else {
+        $FailureMessage
+    }
+    Write-Warning "Generated directory was moved out of the package after cleanup failed ($reason). Quarantine: $destination"
+}
+
+function Remove-ExportDocDirectoryWithRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [int]$MaximumAttempts = 12,
+        [int]$InitialDelayMilliseconds = 250,
+        [string]$AllowedRoot,
+        [string]$QuarantineRoot
+    )
+
+    if ($MaximumAttempts -lt 1) {
+        throw "MaximumAttempts must be at least 1."
+    }
+    if ($InitialDelayMilliseconds -lt 0) {
+        throw "InitialDelayMilliseconds must not be negative."
+    }
+    $hasAllowedRoot = -not [string]::IsNullOrWhiteSpace($AllowedRoot)
+    $hasQuarantineRoot = -not [string]::IsNullOrWhiteSpace($QuarantineRoot)
+    if ($hasAllowedRoot -ne $hasQuarantineRoot) {
+        throw "AllowedRoot and QuarantineRoot must be provided together."
+    }
+
+    for ($attempt = 1; $attempt -le $MaximumAttempts; $attempt++) {
+        if (-not (Test-Path -LiteralPath $Path)) {
+            return
+        }
+
+        try {
+            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+            return
+        } catch {
+            if ($attempt -ge $MaximumAttempts) {
+                if ($hasAllowedRoot) {
+                    Move-ExportDocGeneratedDirectoryToQuarantine `
+                        -Path $Path `
+                        -AllowedRoot $AllowedRoot `
+                        -QuarantineRoot $QuarantineRoot `
+                        -FailureMessage $_.Exception.Message
+                    return
+                }
+                throw "Directory could not be removed after $MaximumAttempts attempts: $Path. $($_.Exception.Message)"
+            }
+
+            # WebView2 can keep BrowserMetrics files open briefly after its
+            # parent process has exited. Let the runtime finish shutting down
+            # before treating portable smoke cleanup as a build failure.
+            $delayMilliseconds = [Math]::Min(2000, $InitialDelayMilliseconds * $attempt)
+            Start-Sleep -Milliseconds $delayMilliseconds
+        }
+    }
+}
+
 function Test-ExportDocPauseEnabled {
     param([bool]$NoPauseRequested = $false)
 

@@ -6,7 +6,11 @@ namespace ExportDocManager.Services.SingleWindow
     {
         PayloadBuildResult BuildCertificateXml(CooMappedDocument document);
 
-        IReadOnlyList<PayloadBuildResult> BuildAttachmentXmls(CooMappedDocument document);
+        Task WriteAttachmentXmlAsync(
+            CooMappedDocument document,
+            SingleWindowAttachmentSource attachment,
+            Stream destination,
+            CancellationToken cancellationToken = default);
     }
 
     public interface IAgentConsignmentPayloadGenerator

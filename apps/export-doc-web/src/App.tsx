@@ -47,7 +47,7 @@ function App() {
   const [desktopAccessToken, setDesktopAccessToken] = useState<string | undefined>(defaultDesktopAccessToken);
   const [desktopProductEdition, setDesktopProductEdition] = useState<ProductEdition>("Full");
   const [desktopContextLoading, setDesktopContextLoading] = useState(() => isDesktopBridgeAvailable() && !defaultDesktopAccessToken);
-  const [username, setUsername] = useState("admin");
+  const [username, setUsername] = useState(() => isDesktopBridgeAvailable() ? "admin" : "");
   const [password, setPassword] = useState("");
   const [bootstrapToken, setBootstrapToken] = useState("");
   const [session, setSession] = useState<SessionState | null>(() => readStoredSession());

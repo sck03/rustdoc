@@ -73,10 +73,6 @@ namespace ExportDocManager.Services.Data
         public async Task<List<string>> GetAvailableCurrenciesAsync(CancellationToken cancellationToken = default)
         {
             var rows = await LoadRowsAsync(GetExchangeRateUrl(), cancellationToken);
-            if (rows == null)
-            {
-                return [];
-            }
 
             var currencies = new HashSet<string>();
             foreach (var row in rows)
@@ -90,6 +86,11 @@ namespace ExportDocManager.Services.Data
                         currencies.Add(currencyName);
                     }
                 }
+            }
+
+            if (currencies.Count == 0)
+            {
+                throw CreateProtocolFailure();
             }
 
             return currencies.OrderBy(c => c).ToList();
@@ -119,10 +120,6 @@ namespace ExportDocManager.Services.Data
                 }
 
                 var rows = await LoadRowsAsync(GetExchangeRateUrl(), cancellationToken);
-                if (rows == null)
-                {
-                    return null;
-                }
 
                 var orderMap = configuredCurrencies
                     .Select((currency, index) => new { currency, index })
@@ -143,7 +140,7 @@ namespace ExportDocManager.Services.Data
                         continue;
                     }
 
-                    list.Add(new ExchangeRateInfo
+                    var rate = new ExchangeRateInfo
                     {
                         CurrencyName = currencyName,
                         BuyingRate = ParseRate(cells[1].InnerText),
@@ -152,7 +149,15 @@ namespace ExportDocManager.Services.Data
                         CashSellingRate = ParseRate(cells[4].InnerText),
                         MiddleRate = ParseRate(cells[5].InnerText),
                         PublishTime = cells.Count > 6 ? cells[6].InnerText.Trim() : DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                    });
+                    };
+                    if (rate.BuyingRate.HasValue ||
+                        rate.CashBuyingRate.HasValue ||
+                        rate.SellingRate.HasValue ||
+                        rate.CashSellingRate.HasValue ||
+                        rate.MiddleRate.HasValue)
+                    {
+                        list.Add(rate);
+                    }
                 }
 
                 if (list.Count > 0)
@@ -163,13 +168,13 @@ namespace ExportDocManager.Services.Data
                     UpdateCache(orderedRates, cacheSignature);
                     return CloneRates(orderedRates);
                 }
+
+                throw CreateProtocolFailure();
             }
             finally
             {
                 _cacheRefreshLock.Release();
             }
-
-            return null;
         }
 
         private string GetExchangeRateUrl()
@@ -242,7 +247,13 @@ namespace ExportDocManager.Services.Data
                     buffer.Position = 0;
                     var doc = new HtmlAgilityPack.HtmlDocument();
                     doc.Load(buffer, true);
-                    return doc.DocumentNode.SelectNodes("//table//tr") ?? doc.DocumentNode.SelectNodes("//tr");
+                    var rows = doc.DocumentNode.SelectNodes("//table//tr") ??
+                        doc.DocumentNode.SelectNodes("//tr");
+                    if (rows == null || !rows.Any(HasExpectedRateColumns))
+                    {
+                        throw CreateProtocolFailure();
+                    }
+                    return rows;
                 }
 
                 throw new InfrastructureServiceException("汇率源重定向次数超过安全上限。");
@@ -271,6 +282,22 @@ namespace ExportDocManager.Services.Data
                 throw new InfrastructureServiceException("无法读取汇率源，请检查网络、证书或远端服务状态。", ex);
             }
         }
+
+        private static bool HasExpectedRateColumns(HtmlNode row)
+        {
+            var cells = row?.SelectNodes("td");
+            if (cells == null || cells.Count < 6)
+            {
+                return false;
+            }
+
+            string currencyName = WebUtility.HtmlDecode(cells[0].InnerText).Trim();
+            return !string.IsNullOrWhiteSpace(currencyName) &&
+                !string.Equals(currencyName, "货币名称", StringComparison.Ordinal);
+        }
+
+        private static InfrastructureServiceException CreateProtocolFailure() =>
+            new("汇率源返回的页面结构或数据格式已变化，暂时无法可靠解析汇率。");
 
         private bool TryGetCachedRates(int cacheDurationMinutes, string cacheSignature, out List<ExchangeRateInfo> rates)
         {

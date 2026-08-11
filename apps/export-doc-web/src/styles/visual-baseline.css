@@ -11,9 +11,10 @@
 @import "./tools-ocr-exchange.css";
 @import "./update-center.css";
 @import "./email.css";
-@import "./runtime-single-window.css";
+@import "./runtime-diagnostics.css";
 @import "./jobs-excel.css";
 @import "./container-packing.css";
+@import "./single-window-runtime.css";
 @import "./single-window-documents.css";
 @import "./coo-review.css";
 @import "./auth-forms.css";

@@ -1,4 +1,5 @@
 import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
+import "../../styles/runtime-diagnostics.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ListChecks,

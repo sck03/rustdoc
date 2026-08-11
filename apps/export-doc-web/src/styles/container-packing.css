@@ -727,22 +727,3 @@
 .container-packing-result-table {
   min-width: 1180px;
 }
-
-.job-title-cell {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.job-title-cell strong,
-.job-title-cell span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.job-title-cell span {
-  color: #69737d;
-  font-size: 12px;
-}

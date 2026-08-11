@@ -28,14 +28,14 @@ export function SingleWindowLockedFieldsDialog({
   const dialogRef = useModalDialog<HTMLDivElement>(onClose, { canClose: !isBusy });
 
   return (
-    <div className="single-window-lock-backdrop" role="presentation" onMouseDown={(event) => {
+    <div className="workspace-modal-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !isBusy) {
         onClose();
       }
     }}>
-      <div ref={dialogRef} className="single-window-lock-dialog" role="dialog" aria-modal="true" aria-labelledby="single-window-lock-title">
-        <header className="single-window-lock-header">
-          <div className="single-window-lock-title">
+      <div ref={dialogRef} className="workspace-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="single-window-lock-title">
+        <header className="workspace-modal-header">
+          <div className="workspace-modal-title">
             <LockKeyholeOpen size={18} aria-hidden="true" />
             <h2 id="single-window-lock-title">{title}</h2>
             <span>{fields.length}</span>
@@ -45,7 +45,7 @@ export function SingleWindowLockedFieldsDialog({
           </button>
         </header>
 
-        <div className="single-window-lock-toolbar">
+        <div className="workspace-modal-toolbar">
           <label className="single-window-lock-select-all">
             <input type="checkbox" checked={allSelected} disabled={fields.length === 0 || isBusy} onChange={onToggleAll} />
             <span>全选</span>
@@ -92,7 +92,7 @@ export function SingleWindowLockedFieldsDialog({
           </ResponsiveTableFrame>
         )}
 
-        <footer className="single-window-lock-footer">
+        <footer className="workspace-modal-footer">
           <button className="command-button secondary" type="button" onClick={onClose} disabled={isBusy}>
             <span>关闭</span>
           </button>

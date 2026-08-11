@@ -121,7 +121,13 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("Test-PathInsideRoot -Path ([string]$_.ExecutablePath) -Root $OutputRoot", prepareScript, StringComparison.Ordinal);
             Assert.Contains("$process.Kill($true)", prepareScript, StringComparison.Ordinal);
             Assert.Contains("$maximumAttempts = 8", prepareScript, StringComparison.Ordinal);
+            Assert.Contains("runtime-cleanup-quarantine", prepareScript, StringComparison.Ordinal);
+            Assert.Contains("-AllowedRoot $artifactsRoot", prepareScript, StringComparison.Ordinal);
+            Assert.Contains("-QuarantineRoot $cleanupQuarantineRoot", prepareScript, StringComparison.Ordinal);
             Assert.Contains("RuntimeDataCleanup = \"unconditional\"", buildScript, StringComparison.Ordinal);
+            Assert.Contains("Remove-ExportDocDirectoryWithRetry", buildScript, StringComparison.Ordinal);
+            Assert.Contains("-Path $smokeRoot", buildScript, StringComparison.Ordinal);
+            Assert.Contains("runtime-cleanup-quarantine", buildScript, StringComparison.Ordinal);
             Assert.DoesNotContain("ExistingRuntimeEntries", buildScript, StringComparison.Ordinal);
             Assert.DoesNotContain("RuntimeDataWillBeCleaned", buildScript, StringComparison.Ordinal);
             Assert.DoesNotContain("customer package must not contain runtime entry", verifyScript, StringComparison.Ordinal);
@@ -224,6 +230,11 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("set \"EXIT_CODE=%ERRORLEVEL%\"", sharedHost, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("pause >nul", sharedHost, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("$env:ComSpec /d /c \"pause >nul\"", powerShellSupport, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("function Remove-ExportDocDirectoryWithRetry", powerShellSupport, StringComparison.Ordinal);
+            Assert.Contains("function Move-ExportDocGeneratedDirectoryToQuarantine", powerShellSupport, StringComparison.Ordinal);
+            Assert.Contains("Generated cleanup source must stay below", powerShellSupport, StringComparison.Ordinal);
+            Assert.Contains("AllowedRoot and QuarantineRoot must be provided together", powerShellSupport, StringComparison.Ordinal);
+            Assert.Contains("WebView2 can keep BrowserMetrics files open briefly", powerShellSupport, StringComparison.Ordinal);
 
             (string CommandFile, string PowerShellFile)[] entryPoints =
             {

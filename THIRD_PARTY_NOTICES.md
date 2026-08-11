@@ -684,7 +684,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | @types/trusted-types | 2.0.7 | MIT | web |
 | npm | @types/webxr | 0.5.24 | MIT | web |
 | npm | @vitejs/plugin-react | 5.2.0 | MIT | web |
-| npm | axe-core | 4.12.1 | MPL-2.0 | web |
+| npm | axe-core | 4.13.0 | MPL-2.0 | web |
 | npm | base64-arraybuffer | 1.0.2 | MIT | web |
 | npm | baseline-browser-mapping | 2.10.38 | Apache-2.0 | web |
 | npm | browserslist | 4.28.4 | MIT | web |

@@ -37,17 +37,3 @@
   min-height: 18px;
   font-size: 13px;
 }
-
-.query-party-filter.remote-select-field,
-.query-party-filter.remote-select-field input,
-.query-party-filter.remote-select-field select {
-  width: 220px;
-}
-
-@media (max-width: 760px) {
-  .query-party-filter.remote-select-field,
-  .query-party-filter.remote-select-field input,
-  .query-party-filter.remote-select-field select {
-    width: 100%;
-  }
-}

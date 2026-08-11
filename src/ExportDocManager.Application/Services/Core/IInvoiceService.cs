@@ -39,18 +39,45 @@ namespace ExportDocManager.Services.Core
             List<Item> items,
             Customer customer,
             Exporter exporter,
-            IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null);
-        Task<bool> SaveInvoiceAsync(Invoice invoice);
-        Task<bool> DeleteInvoiceAsync(int id);
-        Task<Invoice> GetInvoiceByIdAsync(int id);
-        Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(string companyScope, string invoiceNo, string type);
-        Task<bool> InvoiceNoExistsAsync(string companyScope, string invoiceNo);
-        Task<Invoice> CopyInvoiceAsync(int originalId, string newInvoiceNo, InvoiceCloneOptions options = null);
-        Task<Invoice> CopyInvoiceAsTypeAsync(int originalId, string targetType, InvoiceCloneOptions options = null);
-        Task<Invoice> TransitionInvoiceStatusAsync(InvoiceStatusTransitionRequest request);
-        Task<Invoice> UnverifyInvoiceAsync(int id, byte[] expectedRowVersion, string note);
-        Task<IReadOnlyList<InvoiceStatusHistory>> ListInvoiceStatusHistoryAsync(int invoiceId);
-        Task<Invoice> GetLatestInvoiceByPartiesAsync(int? customerId, int? exporterId);
-        Task<Invoice> GetLastInvoiceAsync();
+            IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null,
+            CancellationToken cancellationToken = default);
+        Task<bool> SaveInvoiceAsync(Invoice invoice, CancellationToken cancellationToken = default);
+        Task<bool> DeleteInvoiceAsync(int id, CancellationToken cancellationToken = default);
+        Task<Invoice> GetInvoiceByIdAsync(int id, CancellationToken cancellationToken = default);
+        Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(
+            string companyScope,
+            string invoiceNo,
+            string type,
+            CancellationToken cancellationToken = default);
+        Task<bool> InvoiceNoExistsAsync(
+            string companyScope,
+            string invoiceNo,
+            CancellationToken cancellationToken = default);
+        Task<Invoice> CopyInvoiceAsync(
+            int originalId,
+            string newInvoiceNo,
+            InvoiceCloneOptions options = null,
+            CancellationToken cancellationToken = default);
+        Task<Invoice> CopyInvoiceAsTypeAsync(
+            int originalId,
+            string targetType,
+            InvoiceCloneOptions options = null,
+            CancellationToken cancellationToken = default);
+        Task<Invoice> TransitionInvoiceStatusAsync(
+            InvoiceStatusTransitionRequest request,
+            CancellationToken cancellationToken = default);
+        Task<Invoice> UnverifyInvoiceAsync(
+            int id,
+            byte[] expectedRowVersion,
+            string note,
+            CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<InvoiceStatusHistory>> ListInvoiceStatusHistoryAsync(
+            int invoiceId,
+            CancellationToken cancellationToken = default);
+        Task<Invoice> GetLatestInvoiceByPartiesAsync(
+            int? customerId,
+            int? exporterId,
+            CancellationToken cancellationToken = default);
+        Task<Invoice> GetLastInvoiceAsync(CancellationToken cancellationToken = default);
     }
 }

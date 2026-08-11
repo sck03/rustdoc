@@ -349,28 +349,120 @@
 }
 
 .query-toolbar {
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 12px;
 }
 
-.query-filter-bar {
-  flex: 1;
+.query-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
 }
 
-.query-date-filter input {
-  width: 138px;
+.query-date-range {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-column: span 2;
+  gap: 12px;
+  min-width: 0;
 }
 
-.query-party-filter select {
-  width: 220px;
+.query-filter-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  color: var(--edm-ink-600);
+  font-size: var(--edm-font-size-sm);
+  font-weight: var(--edm-font-weight-semibold);
 }
 
-.query-text-filter input {
-  width: 154px;
+.query-filter-field > span,
+.query-filter-field > .form-field-label {
+  display: block;
+  min-width: 0;
+  min-height: 18px;
+  overflow: visible;
+  line-height: 1.35;
+  white-space: normal;
 }
 
-.query-keyword-filter input {
-  width: 260px;
+.query-filter-field > .form-field-label > span:first-child {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.query-filter-field input,
+.query-filter-field select {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  color: var(--edm-ink-950);
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line-strong);
+  border-radius: var(--edm-radius-sm);
+  outline: 0;
+}
+
+.query-keyword-filter {
+  grid-column: span 2;
+}
+
+.query-toolbar-actions {
+  align-self: start;
+  padding-top: 24px;
+}
+
+@media (min-width: 1720px) {
+  .query-filter-grid {
+    grid-template-columns:
+      minmax(300px, 1.4fr)
+      repeat(2, minmax(180px, 1fr))
+      repeat(2, minmax(125px, 0.7fr))
+      minmax(180px, 1fr);
+  }
+
+  .query-date-range,
+  .query-keyword-filter {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 1180px) {
+  .query-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .query-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .query-toolbar-actions {
+    justify-content: flex-end;
+    width: 100%;
+    padding-top: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .query-filter-grid,
+  .query-date-range {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .query-date-range,
+  .query-keyword-filter {
+    grid-column: auto;
+  }
 }
 
 .query-export-panel {

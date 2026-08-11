@@ -13,6 +13,7 @@ param(
     [switch]$SkipMainBuild,
     [switch]$IncludeLicenseKeygen,
     [switch]$SkipExcelAnalyzerBuild,
+    [switch]$SkipLaunchSmoke,
     [switch]$PreflightOnly,
     [switch]$NoPause
 )
@@ -87,6 +88,7 @@ $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
 $artifactsRoot = Join-Path $repoRoot "artifacts"
 $mainBuildScript = Join-Path $scriptRoot "run-tauri-local.ps1"
 $prepareScript = Join-Path $scriptRoot "prepare-windows-desktop-run.ps1"
+$smokeScript = Join-Path $scriptRoot "smoke-tauri-desktop.ps1"
 $licenseRoot = Join-Path $repoRoot "apps\license-keygen-tauri"
 $excelAnalyzerRoot = Join-Path $repoRoot "tools\excel-analyzer-rs"
 . (Join-Path $scriptRoot "lib\initialize-local-build-environment.ps1") -RepositoryRoot $repoRoot
@@ -284,6 +286,34 @@ Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments @(
     "-Profile", "Desktop",
     "-RuntimeIdentifier", "win-x64"
 )
+
+if (-not $SkipLaunchSmoke) {
+    $smokeRoot = Get-FullPath -Path (Join-Path $resolvedOutputDir "App_Data")
+    $resolvedOutputRoot = $resolvedOutputDir.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $smokeRoot.StartsWith($resolvedOutputRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Windows desktop launch smoke data directory escaped the portable output root: $smokeRoot"
+    }
+    Assert-NonSystemDrivePath -Path $smokeRoot -Purpose "Windows desktop launch smoke data directory"
+    try {
+        Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments @(
+            "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
+            "-File", $smokeScript,
+            "-ExecutablePath", (Join-Path $resolvedOutputDir "ExportDocManager.exe"),
+            "-AppRoot", $resolvedOutputDir,
+            "-UseDefaultAppRoot",
+            "-UsePortableDataRoot",
+            "-SkipVite",
+            "-TimeoutSeconds", "60"
+        )
+    } finally {
+        if (Test-Path -LiteralPath $smokeRoot) {
+            Remove-ExportDocDirectoryWithRetry `
+                -Path $smokeRoot `
+                -AllowedRoot $artifactsRoot `
+                -QuarantineRoot (Join-Path $artifactsRoot "runtime-cleanup-quarantine")
+        }
+    }
+}
 
 Write-Host "Complete Windows desktop run directory is ready:"
 Write-Host "  $resolvedOutputDir"

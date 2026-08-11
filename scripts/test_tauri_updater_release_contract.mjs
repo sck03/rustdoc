@@ -9,6 +9,7 @@ const baseConfig = JSON.parse(read("apps/export-doc-tauri/src-tauri/tauri.conf.j
 const editionCatalog = JSON.parse(read("scripts/product-editions.json"));
 const buildWrapper = read("scripts/run-tauri-build.mjs");
 const manifestPublisher = read("scripts/publish-tauri-updater-manifest.ps1");
+const portablePackager = read("scripts/package-desktop-portable.ps1");
 const releaseWorkflow = read(".github/workflows/desktop-package-reusable.yml");
 const serverReleaseWorkflow = read(".github/workflows/browser-server-package-reusable.yml");
 const updatePage = read("apps/export-doc-web/src/features/system/UpdateCenterPage.tsx");
@@ -54,11 +55,20 @@ for (const requiredWorkflowContract of [
   "Publish immutable edition release and update channel",
   "publish-tauri-updater-manifest.ps1",
   "-Edition ${{ inputs.edition }}",
-  "Build and verify portable desktop package",
+  "Build, launch-smoke and verify portable desktop package",
   "Upload portable desktop artifact",
   "-PortableAssetRoot ./artifacts/desktop-portable/packages",
 ]) {
   assert.ok(releaseWorkflow.includes(requiredWorkflowContract), `desktop release workflow is missing ${requiredWorkflowContract}`);
+}
+for (const requiredPortableContract of [
+  "smoke-tauri-desktop.ps1",
+  "-UseDefaultAppRoot",
+  "-UsePortableDataRoot",
+  "Remove-ExportDocDirectoryWithRetry",
+  "Portable launch smoke data cleanup",
+]) {
+  assert.ok(portablePackager.includes(requiredPortableContract), `portable package script is missing ${requiredPortableContract}`);
 }
 assert.doesNotMatch(releaseWorkflow, /WINDOWS_SIGNING_CERTIFICATE|APPLE_CERTIFICATE/u, "commercial OS signing is not mandatory before commercial release");
 assert.doesNotMatch(releaseWorkflow, /gh release upload[^\r\n]*--clobber/iu, "immutable desktop release assets must never be overwritten");

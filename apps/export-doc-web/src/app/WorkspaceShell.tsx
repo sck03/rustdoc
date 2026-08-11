@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type { ApiUserDto } from "../api/index.ts";
 import {
   createInitialWorkspaceNavGroupState,
@@ -86,6 +87,10 @@ export function WorkspaceShell({
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [interfaceDensity, setInterfaceDensity] = useState(readInterfaceDensity);
+  const queryClient = useQueryClient();
+  const [latestCacheTimestamp, setLatestCacheTimestamp] = useState(() =>
+    readLatestQueryCacheTimestamp(queryClient),
+  );
   const mobileNavToggleRef = useRef<HTMLButtonElement | null>(null);
   const mobileNavRef = useRef<HTMLElement | null>(null);
   const workspaceMainRef = useRef<HTMLElement | null>(null);
@@ -108,6 +113,18 @@ export function WorkspaceShell({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() =>
     createInitialWorkspaceNavGroupState(pathname, visibleGroups),
   );
+
+  useEffect(() => {
+    if (isDesktopRuntime || isOnline) {
+      return undefined;
+    }
+
+    const updateLatestCacheTimestamp = () => {
+      setLatestCacheTimestamp(readLatestQueryCacheTimestamp(queryClient));
+    };
+    updateLatestCacheTimestamp();
+    return queryClient.getQueryCache().subscribe(updateLatestCacheTimestamp);
+  }, [isDesktopRuntime, isOnline, queryClient]);
 
   useEffect(() => {
     setExpandedGroups((current) => {
@@ -373,7 +390,9 @@ export function WorkspaceShell({
           <WifiOff size={18} aria-hidden="true" />
           <div>
             <strong>设备当前离线</strong>
-            <span>已加载内容仍可查看；联网查询和服务器操作可能暂时不可用，恢复网络后请明确重试。</span>
+            <span>{latestCacheTimestamp > 0
+              ? `本次会话已加载内容最近更新于 ${formatCacheTimestamp(latestCacheTimestamp)}；联网查询和服务器操作暂时不可用。`
+              : "本次会话暂无已加载缓存；联网查询和服务器操作暂时不可用，恢复网络后请重试。"}</span>
           </div>
         </div> : null}
 
@@ -433,6 +452,24 @@ export function WorkspaceShell({
       </main>
     </div>
   );
+}
+
+function readLatestQueryCacheTimestamp(queryClient: QueryClient) {
+  return queryClient.getQueryCache().getAll().reduce(
+    (latest, query) => Math.max(latest, query.state.dataUpdatedAt || 0),
+    0,
+  );
+}
+
+function formatCacheTimestamp(timestamp: number) {
+  return new Date(timestamp).toLocaleString("zh-CN", {
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function renderUserWorkspaceLabel(user: ApiUserDto) {

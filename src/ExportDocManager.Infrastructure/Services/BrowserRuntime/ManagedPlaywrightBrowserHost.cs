@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using Microsoft.Playwright;
 using ExportDocManager.Services.Errors;
@@ -242,7 +243,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             BrowserWorkloadKind workload,
             CancellationToken cancellationToken)
         {
-            int maximumAttempts = BrowserCdpEndpointPolicy.TryResolve(out _) ? 5 : 2;
+            int maximumAttempts = BrowserCdpEndpointPolicy.TryResolve(out _) ? 5 : 3;
             Exception lastTransientError = null;
             for (int attempt = 1; attempt <= maximumAttempts; attempt++)
             {
@@ -280,8 +281,9 @@ namespace ExportDocManager.Services.BrowserRuntime
                 lastTransientError);
         }
 
-        private static bool IsTransientStartupFailure(Exception exception) =>
-            exception is TimeoutException or PlaywrightException or IOException;
+        internal static bool IsTransientStartupFailure(Exception exception) =>
+            exception is TimeoutException or PlaywrightException or IOException ||
+            exception is Win32Exception { NativeErrorCode: 5 or 32 or 33 };
 
         private async Task StartBrowserProcessCoreAsync(
             BrowserWorkloadKind workload,

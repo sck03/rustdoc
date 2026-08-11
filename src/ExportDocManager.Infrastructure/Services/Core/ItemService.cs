@@ -25,10 +25,13 @@ namespace ExportDocManager.Services.Core
             return context.Items.AsNoTracking().FirstOrDefault(i => i.Id == itemId);
         }
 
-        public async Task<Item> GetItemByIdAsync(int itemId)
+        public async Task<Item> GetItemByIdAsync(
+            int itemId,
+            CancellationToken cancellationToken = default)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.Items.AsNoTracking().FirstOrDefaultAsync(i => i.Id == itemId);
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.Items.AsNoTracking()
+                .FirstOrDefaultAsync(i => i.Id == itemId, cancellationToken);
         }
 
         public List<Item> GetItemsByInvoiceId(int invoiceId)
@@ -41,17 +44,21 @@ namespace ExportDocManager.Services.Core
                 .ToList();
         }
 
-        public async Task<List<Item>> GetItemsByInvoiceIdAsync(int invoiceId)
+        public async Task<List<Item>> GetItemsByInvoiceIdAsync(
+            int invoiceId,
+            CancellationToken cancellationToken = default)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             return await context.Items
                 .AsNoTracking()
                 .Where(i => i.InvoiceId == invoiceId)
                 .OrderBy(i => i.Id)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
         }
 
-        public async Task<List<Item>> GetItemsByInvoiceIdsAsync(IEnumerable<int> invoiceIds)
+        public async Task<List<Item>> GetItemsByInvoiceIdsAsync(
+            IEnumerable<int> invoiceIds,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(invoiceIds);
 
@@ -64,25 +71,33 @@ namespace ExportDocManager.Services.Core
                 return [];
             }
 
-            using var context = await _contextFactory.CreateDbContextAsync();
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             return await context.Items
                 .AsNoTracking()
                 .Where(i => normalizedInvoiceIds.Contains(i.InvoiceId))
                 .OrderBy(i => i.InvoiceId)
                 .ThenBy(i => i.Id)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
         }
 
-        public async Task<bool> SaveItemsAsync(int invoiceId, List<Item> items)
+        public async Task<bool> SaveItemsAsync(
+            int invoiceId,
+            List<Item> items,
+            CancellationToken cancellationToken = default)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            return await SaveItemsAsync(context, invoiceId, items);
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await SaveItemsAsync(context, invoiceId, items, cancellationToken);
         }
 
-        public async Task<bool> SaveItemsAsync(AppDbContext context, int invoiceId, List<Item> items)
+        public async Task<bool> SaveItemsAsync(
+            AppDbContext context,
+            int invoiceId,
+            List<Item> items,
+            CancellationToken cancellationToken = default)
         {
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 items ??= new List<Item>();
 
                 var seenIds = new HashSet<int>();
@@ -105,7 +120,7 @@ namespace ExportDocManager.Services.Core
                 var existingIdSet = await context.Items
                     .Where(x => x.InvoiceId == invoiceId)
                     .Select(x => x.Id)
-                    .ToListAsync();
+                    .ToListAsync(cancellationToken);
 
                 var existingIdHashSet = existingIdSet.ToHashSet();
 
@@ -134,7 +149,7 @@ namespace ExportDocManager.Services.Core
                     item.InvoiceId = invoiceId;
                     if (item.Id == 0)
                     {
-                        await context.Items.AddAsync(item);
+                        await context.Items.AddAsync(item, cancellationToken);
                     }
                     else
                     {
@@ -143,7 +158,7 @@ namespace ExportDocManager.Services.Core
                     }
                 }
 
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken);
                 return true;
             }
             catch (DbUpdateConcurrencyException ex)

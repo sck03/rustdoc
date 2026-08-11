@@ -1,4 +1,14 @@
 /* Invoice details, payments, settings and remaining business feature styles. */
+.invoice-single-window-action-buttons {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+
+.invoice-single-window-action-buttons .command-button {
+  min-width: 128px;
+}
+
 .invoice-custom-fields-json textarea {
   min-height: 132px;
   font-family: var(--edm-font-mono);

@@ -37,7 +37,7 @@ namespace ExportDocManager.Api.Tests
 
             var duplicateResponse = await client.PostAsJsonAsync("/api/crm/opportunities", new ApiSalesOpportunitySaveRequest(
                 0, customer.Id, null, "重复报价", "线索", "QT-OPP-001", 1m, "USD", 10, null, string.Empty, string.Empty, string.Empty));
-            Assert.Equal(HttpStatusCode.BadRequest, duplicateResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
 
             var updateResponse = await client.PutAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}",
                 new ApiSalesOpportunitySaveRequest(opportunity.Id, customer.Id, productId, "秋季订单", "谈判中", "QT-OPP-001",

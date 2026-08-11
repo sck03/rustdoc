@@ -69,9 +69,11 @@ namespace ExportDocManager.Api.Tests
                     "IX_HsCodes_Status_NormalizedCode_Prefix",
                     "IX_HsCodeDeclarationExamples_RawCode_Prefix",
                     "IX_HsCodeRemoteCandidates_Status_RawCode_Prefix",
-                    "IX_HsCodes_TextSearch_Trgm",
-                    "IX_HsCodeDeclarationExamples_TextSearch_Trgm",
-                    "IX_Items_HistorySearch_Trgm"
+                    "IX_HsCodes_TextSearch_Upper_Trgm",
+                    "IX_HsCodeDeclarationExamples_TextSearch_Upper_Trgm",
+                    "IX_Items_HistorySearch_Upper_Trgm",
+                    "IX_Invoices_TextSearch_Upper_Trgm",
+                    "IX_Payments_TextSearch_Upper_Trgm"
                 })
                 {
                     Assert.Contains(requiredIndex, indexNames);

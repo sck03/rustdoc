@@ -47,7 +47,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
-                int id) =>
+                int id,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -59,7 +60,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("发票ID必须大于0。"));
                 }
 
-                var invoice = await invoiceService.GetInvoiceByIdAsync(id);
+                var invoice = await invoiceService.GetInvoiceByIdAsync(id, cancellationToken);
                 return invoice == null
                     ? Results.NotFound()
                     : Results.Ok(ApiInvoiceDtoFactory.FromInvoiceDetail(invoice));
@@ -99,7 +100,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
-                ApiInvoiceDetailDto request) =>
+                ApiInvoiceDetailDto request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -141,7 +143,8 @@ namespace ExportDocManager.Api.Hosting
                     invoice.Items?.ToList() ?? new List<Item>(),
                     ApiInvoiceDtoFactory.CreateCustomerForAutoCreation(invoice),
                     ApiInvoiceDtoFactory.CreateExporterForAutoCreation(invoice),
-                    request.PendingHsFeedback);
+                    request.PendingHsFeedback,
+                    cancellationToken);
 
                 if (!result.Success || result.SavedInvoice == null)
                 {
@@ -162,7 +165,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
                 int id,
-                ApiInvoiceDetailDto request) =>
+                ApiInvoiceDetailDto request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -194,7 +198,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("更新发票必须提交版本号，请刷新后重试。"));
                 }
 
-                var existing = await invoiceService.GetInvoiceByIdAsync(id);
+                var existing = await invoiceService.GetInvoiceByIdAsync(id, cancellationToken);
                 if (existing == null)
                 {
                     return Results.NotFound();
@@ -218,7 +222,8 @@ namespace ExportDocManager.Api.Hosting
                     invoice.Items?.ToList() ?? new List<Item>(),
                     ApiInvoiceDtoFactory.CreateCustomerForAutoCreation(invoice),
                     ApiInvoiceDtoFactory.CreateExporterForAutoCreation(invoice),
-                    request.PendingHsFeedback);
+                    request.PendingHsFeedback,
+                    cancellationToken);
 
                 if (!result.Success || result.SavedInvoice == null)
                 {
@@ -237,7 +242,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
-                int id) =>
+                int id,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -252,7 +258,7 @@ namespace ExportDocManager.Api.Hosting
                 bool deleted;
                 try
                 {
-                    deleted = await invoiceService.DeleteInvoiceAsync(id);
+                    deleted = await invoiceService.DeleteInvoiceAsync(id, cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -271,7 +277,8 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 IInvoiceService invoiceService,
                 int id,
-                ApiInvoiceStatusTransitionRequest request) =>
+                ApiInvoiceStatusTransitionRequest request,
+                CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -310,7 +317,8 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     var invoice = await invoiceService.TransitionInvoiceStatusAsync(
-                        new InvoiceStatusTransitionRequest(id, targetStatus, rowVersion, request.Note));
+                        new InvoiceStatusTransitionRequest(id, targetStatus, rowVersion, request.Note),
+                        cancellationToken);
                     return invoice == null
                         ? Results.NotFound()
                         : Results.Ok(new ApiInvoiceSaveResponse(
@@ -340,7 +348,8 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 IInvoiceService invoiceService,
                 int id,
-                ApiInvoiceUnverifyRequest request) =>
+                ApiInvoiceUnverifyRequest request,
+                CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -370,7 +379,11 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    var invoice = await invoiceService.UnverifyInvoiceAsync(id, rowVersion, request.Note);
+                    var invoice = await invoiceService.UnverifyInvoiceAsync(
+                        id,
+                        rowVersion,
+                        request.Note,
+                        cancellationToken);
                     return invoice == null
                         ? Results.NotFound()
                         : Results.Ok(new ApiInvoiceSaveResponse(
@@ -398,7 +411,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
-                int id) =>
+                int id,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -410,7 +424,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("发票ID必须大于0。"));
                 }
 
-                var history = await invoiceService.ListInvoiceStatusHistoryAsync(id);
+                var history = await invoiceService.ListInvoiceStatusHistoryAsync(id, cancellationToken);
                 return Results.Ok(history.Select(item => new ApiInvoiceStatusHistoryDto(
                     item.Id,
                     item.InvoiceId,
@@ -428,7 +442,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
                 int id,
-                ApiInvoiceCloneRequest request) =>
+                ApiInvoiceCloneRequest request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -451,7 +466,8 @@ namespace ExportDocManager.Api.Hosting
                     copiedInvoice = await invoiceService.CopyInvoiceAsync(
                         id,
                         request.NewInvoiceNo.Trim(),
-                        request.Options ?? new InvoiceCloneOptions());
+                        request.Options ?? new InvoiceCloneOptions(),
+                        cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -473,7 +489,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
                 int id,
-                ApiInvoiceCloneTypeRequest request) =>
+                ApiInvoiceCloneTypeRequest request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -496,7 +513,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("目标发票类型只能是实际数据或报关数据。"));
                 }
 
-                var source = await invoiceService.GetInvoiceByIdAsync(id);
+                var source = await invoiceService.GetInvoiceByIdAsync(id, cancellationToken);
                 if (source == null)
                 {
                     return Results.NotFound();
@@ -510,7 +527,8 @@ namespace ExportDocManager.Api.Hosting
                 var existingTarget = await invoiceService.GetInvoiceByInvoiceNoAndTypeAsync(
                     source.CompanyScope,
                     source.InvoiceNo,
-                    targetType);
+                    targetType,
+                    cancellationToken);
                 if (existingTarget != null)
                 {
                     return Results.Conflict(new ApiErrorResponse($"同一发票号的{targetType}已存在，未覆盖。"));
@@ -527,7 +545,11 @@ namespace ExportDocManager.Api.Hosting
                 Invoice clonedInvoice;
                 try
                 {
-                    clonedInvoice = await invoiceService.CopyInvoiceAsTypeAsync(id, targetType, options);
+                    clonedInvoice = await invoiceService.CopyInvoiceAsTypeAsync(
+                        id,
+                        targetType,
+                        options,
+                        cancellationToken);
                 }
                 catch (InvalidOperationException ex)
                 {

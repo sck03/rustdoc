@@ -16,21 +16,24 @@
 /* Destructive actions use a dedicated high-contrast surface. The old rule
    only changed the text to red while retaining the teal command background,
    which made the 作废 label difficult to read in the invoice editor. */
-.command-button.danger {
+.command-button.danger,
+.command-button.danger-command {
   color: #ffffff;
   background: linear-gradient(135deg, #b4233f, #8f1d35);
   border-color: #8f1d35;
   box-shadow: 0 5px 13px rgba(143, 29, 53, 0.2);
 }
 
-.command-button.danger:hover:not(:disabled) {
+.command-button.danger:hover:not(:disabled),
+.command-button.danger-command:hover:not(:disabled) {
   color: #ffffff;
   background: linear-gradient(135deg, #9f1f3a, #74162c);
   border-color: #74162c;
   box-shadow: 0 8px 18px rgba(116, 22, 44, 0.24);
 }
 
-.command-button.danger:disabled {
+.command-button.danger:disabled,
+.command-button.danger-command:disabled {
   color: #fcebed;
   background: #79505a;
   border-color: #69434d;

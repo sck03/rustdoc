@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -75,7 +76,7 @@ namespace ExportDocManager.Services.Opportunities
             if (changeNote.Length > 1000) throw new ArgumentException("变更备注不能超过 1000 个字符。");
             if (quotationNo.Length > 0 && await _accessScope.ApplySalesOpportunityScope(context.SalesOpportunities.AsNoTracking())
                     .AnyAsync(item => item.Id != request.Id && item.QuotationNo == quotationNo, cancellationToken))
-                throw new ArgumentException("报价跟踪编号已存在。");
+                throw new ResourceConflictException("报价跟踪编号已存在。");
 
             SalesOpportunity entity;
             bool isNew = request.Id <= 0;

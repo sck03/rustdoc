@@ -103,6 +103,16 @@ if (reviewedRustSecExceptions.length !== 1 || reviewedRustSecExceptions[0] !== "
   failures.push("dependency-governance.yml: only the reviewed RUSTSEC-2024-0429 exception is permitted.");
 }
 
+for (const workflowName of ["windows-desktop-package.yml", "windows-browser-server-package.yml"]) {
+  const workflow = readFileSync(path.join(workflowRoot, workflowName), "utf8");
+  if (!workflow.includes("rust_target: x86_64-pc-windows-msvc")) {
+    failures.push(`${workflowName}: Windows release Rust target must use the GitHub runner MSVC toolchain.`);
+  }
+  if (workflow.includes("rust_target: x86_64-pc-windows-gnu")) {
+    failures.push(`${workflowName}: Windows release workflow must not replace the requested MSVC target with the local GNU target.`);
+  }
+}
+
 if (failures.length > 0) {
   process.stderr.write(`${failures.join("\n")}\n`);
   process.exit(1);

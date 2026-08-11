@@ -1,15 +1,3 @@
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .single-window-surface {
   grid-template-rows: none;
   grid-auto-rows: auto;
@@ -392,66 +380,4 @@
   border: 1px solid #cfd8df;
   border-radius: 8px;
   resize: vertical;
-}
-
-.danger-icon {
-  color: #b42318;
-}
-
-.filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  min-width: 0;
-}
-
-.inline-filter {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 38px;
-  color: #4d5963;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.inline-filter select,
-.inline-filter input {
-  width: 170px;
-  height: 38px;
-  padding: 0 9px;
-  color: #202124;
-  background: #ffffff;
-  border: 1px solid #cfd8df;
-  border-radius: 8px;
-  outline: 0;
-}
-
-.inline-filter select:focus,
-.inline-filter input:focus {
-  border-color: #0f766e;
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
-}
-
-.inline-check {
-  display: inline-flex;
-  grid-template-columns: none;
-  align-items: center;
-  gap: 7px;
-  min-height: 38px;
-  padding: 0 10px;
-  color: #4d5963;
-  background: #ffffff;
-  border: 1px solid #cfd8df;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.inline-check input {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: #0f766e;
 }
