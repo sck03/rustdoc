@@ -11,7 +11,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapGet("/api/suppliers", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a, ISupplierDirectoryService s, CancellationToken ct) =>
                 HasSalesAccess(c, t, a, out var denied) ? Results.Ok((await s.ListAsync(ct)).Select(ToApiDto)) : denied).WithName("ListSuppliers");
             endpoints.MapGet("/api/suppliers/page", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a, ISupplierDirectoryService s,
-                string keyword, string status, int? pageNumber, int? pageSize, CancellationToken ct) =>
+                string? keyword, string? status, int? pageNumber, int? pageSize, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(c, t, a, out var denied)) return denied;
                 var page = await s.QueryAsync(keyword, status, pageNumber ?? 1, pageSize ?? 20, ct);
@@ -88,14 +88,14 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Ok(new ApiSupplierImportResultDto(result.CreatedSuppliers, result.CreatedContacts, result.SkippedRows));
             }).WithName("ImportSuppliers");
             endpoints.MapGet("/api/suppliers/export", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
-                ISupplierFileService files, string keyword, string status, CancellationToken ct) =>
+                ISupplierFileService files, string? keyword, string? status, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(c, t, a, out var denied)) return denied;
                 byte[] content = await files.ExportAsync(keyword, status, ct);
                 return Results.File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"suppliers-{DateTime.UtcNow:yyyyMMdd-HHmmss}.xlsx");
             }).WithName("ExportSuppliers");
             endpoints.MapGet("/api/suppliers/product-options", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
-                ISupplierDirectoryService s, string keyword, CancellationToken ct) =>
+                ISupplierDirectoryService s, string? keyword, CancellationToken ct) =>
                 HasSalesAccess(c, t, a, out var denied)
                     ? Results.Ok((await s.SearchProductsAsync(keyword, ct)).Select(ToApiDto))
                     : denied).WithName("SearchSupplierProductOptions");

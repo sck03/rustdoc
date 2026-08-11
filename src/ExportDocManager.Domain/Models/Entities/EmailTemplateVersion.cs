@@ -6,7 +6,7 @@ namespace ExportDocManager.Models.Entities
     {
         public int Id { get; set; }
         public int EmailTemplateId { get; set; }
-        public EmailTemplate Template { get; set; }
+        public EmailTemplate? Template { get; set; }
         public int VersionNumber { get; set; }
         [MaxLength(30)] public string ChangeType { get; set; } = string.Empty;
         [Required, MaxLength(150)] public string Name { get; set; } = string.Empty;

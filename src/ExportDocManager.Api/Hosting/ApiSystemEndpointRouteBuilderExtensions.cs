@@ -20,7 +20,26 @@ namespace ExportDocManager.Api.Hosting
             string frontendIndexPath = Path.Combine(runtimeOptions.AppRoot, "wwwroot", "index.html");
             endpoints.MapGet("/", () => File.Exists(frontendIndexPath)
                 ? Results.File(frontendIndexPath, "text/html; charset=utf-8")
-                : Results.Redirect("/swagger"));
+                : Results.Redirect("/swagger"))
+                .ExcludeFromDescription();
+
+            endpoints.MapMethods("/livez", [HttpMethods.Get, HttpMethods.Head], async (HttpContext context) =>
+            {
+                await ApiReadinessApplicationBuilderExtensions.WriteLivenessAsync(context).ConfigureAwait(false);
+                return Results.Empty;
+            })
+                .WithName("Liveness");
+
+            endpoints.MapMethods("/readyz", [HttpMethods.Get, HttpMethods.Head], async (
+                HttpContext context,
+                IApiReadinessProbe readinessProbe) =>
+            {
+                _ = context.RequestServices.GetService<ApiCurrentUserResolver>();
+                await ApiReadinessApplicationBuilderExtensions.WriteReadinessAsync(context, readinessProbe)
+                    .ConfigureAwait(false);
+                return Results.Empty;
+            })
+                .WithName("Readiness");
 
             endpoints.MapGet("/healthz", async (
                 HttpContext context,
@@ -62,26 +81,24 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("Healthz");
 
-            endpoints.MapGet("/openapi/v1.json", async (
-                HttpContext context,
-                ApiCurrentUserResolver currentUserResolver,
-                ApiAuthorizationService authorizationService,
-                ApiDesktopAccessOptions desktopAccessOptions) =>
+            var officialOpenApi = endpoints.MapGroup(string.Empty);
+            officialOpenApi.AddEndpointFilter(async (invocationContext, next) =>
             {
+                var context = invocationContext.HttpContext;
                 var accessError = await GetApiDocumentationAccessErrorAsync(
                     context,
                     runtimeOptions,
-                    currentUserResolver,
-                    authorizationService,
-                    desktopAccessOptions);
+                    context.RequestServices.GetRequiredService<ApiCurrentUserResolver>(),
+                    context.RequestServices.GetRequiredService<ApiAuthorizationService>(),
+                    context.RequestServices.GetRequiredService<ApiDesktopAccessOptions>());
                 if (accessError != null)
                 {
                     return accessError;
                 }
 
-                return Results.Json(OpenApiDocumentFactory.Create(runtimeOptions));
-            })
-                .WithName("OpenApiJson");
+                return await next(invocationContext).ConfigureAwait(false);
+            });
+            officialOpenApi.MapOpenApi("/openapi/{documentName}.json");
 
             endpoints.MapGet("/swagger/v1/swagger.json", async (
                 HttpContext context,
@@ -102,7 +119,8 @@ namespace ExportDocManager.Api.Hosting
 
                 return Results.Json(OpenApiDocumentFactory.Create(runtimeOptions));
             })
-                .WithName("SwaggerJson");
+                .WithName("SwaggerJson")
+                .ExcludeFromDescription();
 
             endpoints.MapGet("/swagger", async (
                 HttpContext context,
@@ -125,7 +143,8 @@ namespace ExportDocManager.Api.Hosting
                     OpenApiDocumentFactory.CreateSwaggerLandingPage(),
                     "text/html; charset=utf-8");
             })
-                .WithName("Swagger");
+                .WithName("Swagger")
+                .ExcludeFromDescription();
 
             endpoints.MapPost("/api/system/shutdown-maintenance", async (
                 HttpContext context,

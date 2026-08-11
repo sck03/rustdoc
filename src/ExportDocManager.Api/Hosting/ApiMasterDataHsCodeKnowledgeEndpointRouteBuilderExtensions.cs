@@ -11,7 +11,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/master-data/hs-knowledge/search", async (
                 HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
-                string query, int? maxResults, CancellationToken cancellationToken) =>
+                string? query, int? maxResults, CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
                 try { return Results.Ok(await service.SearchAsync(query, maxResults ?? 20, cancellationToken)); }
@@ -21,7 +21,7 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/invoices/hs-knowledge/search", async (
                 HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
-                string query, int? maxResults, CancellationToken cancellationToken) =>
+                string? query, int? maxResults, CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
                 try { return Results.Ok(await service.SearchAsync(query, maxResults ?? 20, cancellationToken)); }
@@ -31,7 +31,7 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/master-data/hs-knowledge/examples", async (
                 HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
-                string keyword, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
+                string? keyword, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
                 int page = Math.Max(pageNumber ?? 1, 1);
@@ -97,7 +97,7 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/master-data/hs-knowledge/history-candidates", async (
                 HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
-                string keyword, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
+                string? keyword, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
                 try
@@ -111,7 +111,7 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/master-data/hs-knowledge/remote-candidates", async (
                 HttpContext context, IApiSessionTokenService tokenService, IHsCodeKnowledgeService service,
-                string status, string keyword, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
+                string? status, string? keyword, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
                 return Results.Ok(await service.ListRemoteCandidatesAsync(

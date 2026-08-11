@@ -60,6 +60,34 @@ fn document_field_detection_stops_multiline_address_at_blank_row() {
 }
 
 #[test]
+fn document_field_detection_keeps_company_name_containing_brand_separate_from_address() {
+    let cells = vec![
+        vec!["收货人".to_string(), "Reason Brand Inc".to_string()],
+        vec![
+            "consignee".to_string(),
+            "3 WEST 35TH STREET 10th FL., New York, NY 10001".to_string(),
+        ],
+    ];
+
+    let fields = detect_document_fields(&cells, "备货单");
+
+    assert_document_field(&fields, "CustomerNameEN", "Reason Brand Inc");
+    assert_document_field(
+        &fields,
+        "CustomerAddressEN",
+        "3 WEST 35TH STREET 10th FL., New York, NY 10001",
+    );
+}
+
+#[test]
+fn address_detection_uses_tokens_instead_of_substrings_inside_company_names() {
+    assert!(!looks_like_address_fragment("Reason Brand Inc"));
+    assert!(looks_like_address_fragment(
+        "3 WEST 35TH STREET 10th FL., New York, NY 10001"
+    ));
+}
+
+#[test]
 fn document_field_detection_does_not_use_next_label_as_empty_contract_value() {
     let cells = vec![
         vec!["合同号".to_string(), "信用证号".to_string()],

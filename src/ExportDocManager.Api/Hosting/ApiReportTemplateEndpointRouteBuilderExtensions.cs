@@ -13,7 +13,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IReportHtmlService reportHtmlService,
-                string reportType,
+                string? reportType,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -127,7 +127,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IReportTemplateFieldCatalogService fieldCatalogService,
-                string reportType) =>
+                string? reportType) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -148,8 +148,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IReportTemplateService reportTemplateService,
-                string reportType,
-                string templatePath,
+                string? reportType,
+                string? templatePath,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -316,8 +316,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IReportTemplateService reportTemplateService,
-                string reportType,
-                string templatePath,
+                string? reportType,
+                string? templatePath,
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);

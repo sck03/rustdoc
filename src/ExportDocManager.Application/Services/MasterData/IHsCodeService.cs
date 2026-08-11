@@ -10,7 +10,7 @@ namespace ExportDocManager.Services.MasterData
     public interface IHsCodeService
     {
         Task<List<HsCode>> SearchAsync(string keyword);
-        Task<HsCode> GetByCodeAsync(string code);
+        Task<HsCode?> GetByCodeAsync(string code);
         Task ImportAsync(string filePath);
 
         Task<HsCodeImportPreview> PreviewImportAsync(

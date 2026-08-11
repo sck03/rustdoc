@@ -19,13 +19,13 @@ namespace ExportDocManager.Services.Core
             _contextFactory = contextFactory;
         }
 
-        public Item GetItemById(int itemId)
+        public Item? GetItemById(int itemId)
         {
             using var context = _contextFactory.CreateDbContext();
             return context.Items.AsNoTracking().FirstOrDefault(i => i.Id == itemId);
         }
 
-        public async Task<Item> GetItemByIdAsync(
+        public async Task<Item?> GetItemByIdAsync(
             int itemId,
             CancellationToken cancellationToken = default)
         {

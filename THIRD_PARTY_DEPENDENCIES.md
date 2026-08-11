@@ -185,7 +185,7 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | vite | 7.3.6 | MIT | web |
 | yallist | 3.1.1 | ISC | web |
 
-## nuget (79)
+## nuget (81)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -203,6 +203,7 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | ExtendedNumerics.BigDecimal | 2025.1001.2.129 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
 | HtmlAgilityPack | 1.12.4 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | MathNet.Numerics.Signed | 5.0.0 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
+| Microsoft.AspNetCore.OpenApi | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj |
 | Microsoft.Bcl.AsyncInterfaces | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Microsoft.CodeCoverage | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | Microsoft.Data.Sqlite | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
@@ -227,6 +228,7 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | Microsoft.ML.OnnxRuntime | 1.28.0 | MIT | ExportDocManager.Infrastructure.csproj |
 | Microsoft.ML.OnnxRuntime.Managed | 1.28.0 | MIT | ExportDocManager.Infrastructure.csproj |
 | Microsoft.NET.Test.Sdk | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| Microsoft.OpenApi | 2.11.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj |
 | Microsoft.Playwright | 1.61.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Microsoft.TestPlatform.ObjectModel | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | Microsoft.TestPlatform.TestHost | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
@@ -269,7 +271,7 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | xunit.runner.visualstudio | 3.1.5 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | ZString | 2.6.0 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
 
-## cargo (567)
+## cargo (568)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -399,6 +401,7 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | foreign-types-macros | 0.2.3 | MIT OR Apache-2.0 | tauri |
 | foreign-types-shared | 0.3.1 | MIT OR Apache-2.0 | tauri |
 | form_urlencoded | 1.2.2 | MIT OR Apache-2.0 | tauri |
+| fs2 | 0.4.3 | MIT OR Apache-2.0 | tauri |
 | futures-channel | 0.3.32 | MIT OR Apache-2.0 | tauri |
 | futures-core | 0.3.32 | MIT OR Apache-2.0 | tauri |
 | futures-executor | 0.3.32 | MIT OR Apache-2.0 | tauri |

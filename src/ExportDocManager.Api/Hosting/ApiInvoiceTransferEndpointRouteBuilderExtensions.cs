@@ -174,7 +174,7 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 IAppPathProvider pathProvider,
                 IInvoiceTransferService transferService,
-                string fileName,
+                string? fileName,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -267,9 +267,9 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 IAppPathProvider pathProvider,
                 IInvoiceTransferService transferService,
-                string fileName,
-                string conflictAction,
-                string newInvoiceNo,
+                string? fileName,
+                string? conflictAction,
+                string? newInvoiceNo,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)

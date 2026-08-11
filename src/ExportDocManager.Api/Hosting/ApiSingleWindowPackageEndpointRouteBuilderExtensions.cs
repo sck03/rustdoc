@@ -79,9 +79,9 @@ namespace ExportDocManager.Api.Hosting
                 DatabaseConnectionSettings databaseSettings,
                 ISingleWindowHandoffPackageService handoffPackageService,
                 IAppPathProvider pathProvider,
-                string fileName,
-                string workingDirectory,
-                bool keepWorkingDirectory,
+                string? fileName,
+                string? workingDirectory,
+                bool? keepWorkingDirectory,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -106,7 +106,7 @@ namespace ExportDocManager.Api.Hosting
                     SingleWindowPackageType.SubmitPackage,
                     fileName,
                     workingDirectory,
-                    keepWorkingDirectory,
+                    keepWorkingDirectory ?? false,
                     cancellationToken);
             })
             .WithName("UploadSingleWindowSubmitPackage");
@@ -117,9 +117,9 @@ namespace ExportDocManager.Api.Hosting
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ISingleWindowHandoffPackageService handoffPackageService,
                 IAppPathProvider pathProvider,
-                string fileName,
-                string workingDirectory,
-                bool keepWorkingDirectory,
+                string? fileName,
+                string? workingDirectory,
+                bool? keepWorkingDirectory,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -134,7 +134,7 @@ namespace ExportDocManager.Api.Hosting
                     SingleWindowPackageType.ReceiptPackage,
                     fileName,
                     workingDirectory,
-                    keepWorkingDirectory,
+                    keepWorkingDirectory ?? false,
                     cancellationToken);
             })
             .WithName("UploadSingleWindowReceiptPackage");

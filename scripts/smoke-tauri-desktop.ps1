@@ -478,11 +478,27 @@ function Wait-SidecarHealth {
     param(
         [Parameter(Mandatory = $true)][string]$LogPath,
         [Parameter(Mandatory = $true)][datetime]$Deadline,
-        [Parameter(Mandatory = $true)][string]$DesktopAccessToken
+        [Parameter(Mandatory = $true)][string]$DesktopAccessToken,
+        [System.Diagnostics.Process]$DesktopProcess,
+        [string]$DesktopStderrPath
     )
 
     $lastUrl = $null
     while ((Get-Date) -lt $Deadline) {
+        if ($null -ne $DesktopProcess -and $DesktopProcess.HasExited) {
+            $stderrTail = if (-not [string]::IsNullOrWhiteSpace($DesktopStderrPath) -and (Test-Path -LiteralPath $DesktopStderrPath -PathType Leaf)) {
+                (Get-Content -LiteralPath $DesktopStderrPath -Tail 30 -ErrorAction SilentlyContinue) -join [Environment]::NewLine
+            } else {
+                ""
+            }
+            $details = if ([string]::IsNullOrWhiteSpace($stderrTail)) {
+                "No desktop stderr was captured."
+            } else {
+                "Desktop stderr tail:`n$stderrTail"
+            }
+            throw "Desktop process exited before the API sidecar became healthy (exit code $($DesktopProcess.ExitCode)). $details"
+        }
+
         $lastUrl = Read-LatestSidecarUrl -LogPath $LogPath
         if (-not [string]::IsNullOrWhiteSpace($lastUrl)) {
             try {
@@ -1212,6 +1228,7 @@ try {
     $tauriArgumentList = @()
     $tauriEnvironment = @{
         EXPORTDOCMANAGER_DESKTOP_TOKEN = $desktopAccessToken
+        EXPORTDOCMANAGER_DESKTOP_SMOKE = "1"
     }
     if (-not $UseDefaultAppRoot) {
         $tauriArgumentList += @("--app-root", $resolvedAppRoot)
@@ -1234,7 +1251,12 @@ try {
         -StderrPath $tauriStderr `
         -Environment $tauriEnvironment
 
-    $sidecar = Wait-SidecarHealth -LogPath $sidecarStdout -Deadline $deadline -DesktopAccessToken $desktopAccessToken
+    $sidecar = Wait-SidecarHealth `
+        -LogPath $sidecarStdout `
+        -Deadline $deadline `
+        -DesktopAccessToken $desktopAccessToken `
+        -DesktopProcess $tauri `
+        -DesktopStderrPath $tauriStderr
     $apiBaseUrl = $sidecar.BaseUrl
     $health = $sidecar.Health
 
@@ -1402,7 +1424,12 @@ try {
             -StderrPath $tauriStderr `
             -Environment $tauriEnvironment
 
-        $sidecar = Wait-SidecarHealth -LogPath $sidecarStdout -Deadline $deadline -DesktopAccessToken $desktopAccessToken
+        $sidecar = Wait-SidecarHealth `
+            -LogPath $sidecarStdout `
+            -Deadline $deadline `
+            -DesktopAccessToken $desktopAccessToken `
+            -DesktopProcess $tauri `
+            -DesktopStderrPath $tauriStderr
         $apiBaseUrl = $sidecar.BaseUrl
         $health = $sidecar.Health
         if ($health.status -ne "ok") {

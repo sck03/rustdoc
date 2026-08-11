@@ -14,7 +14,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductReadRepository repository,
-                string keyword,
+                string? keyword,
                 int? pageNumber,
                 int? pageSize,
                 CancellationToken cancellationToken) =>

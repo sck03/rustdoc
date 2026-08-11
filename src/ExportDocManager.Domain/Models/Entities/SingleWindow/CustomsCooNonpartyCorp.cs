@@ -22,6 +22,6 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(100)]
         public string EntCountryName { get; set; } = string.Empty;
 
-        public CustomsCooDocument Document { get; set; }
+        public CustomsCooDocument? Document { get; set; }
     }
 }

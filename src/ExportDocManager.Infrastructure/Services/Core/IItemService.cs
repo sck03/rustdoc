@@ -7,8 +7,8 @@ namespace ExportDocManager.Services.Core
 {
     public interface IItemService
     {
-        Item GetItemById(int itemId);
-        Task<Item> GetItemByIdAsync(int itemId, CancellationToken cancellationToken = default);
+        Item? GetItemById(int itemId);
+        Task<Item?> GetItemByIdAsync(int itemId, CancellationToken cancellationToken = default);
         List<Item> GetItemsByInvoiceId(int invoiceId);
         Task<List<Item>> GetItemsByInvoiceIdAsync(int invoiceId, CancellationToken cancellationToken = default);
         Task<List<Item>> GetItemsByInvoiceIdsAsync(

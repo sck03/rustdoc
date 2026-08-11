@@ -1,3 +1,5 @@
+#nullable enable
+
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
@@ -13,7 +15,7 @@ namespace ExportDocManager.Services.Security
     {
         string StorageDescription { get; }
 
-        Task<RuntimeLicenseAnchorData> LoadAsync(CancellationToken cancellationToken = default);
+        Task<RuntimeLicenseAnchorData?> LoadAsync(CancellationToken cancellationToken = default);
 
         Task SaveAsync(RuntimeLicenseAnchorData data, CancellationToken cancellationToken = default);
     }
@@ -81,7 +83,7 @@ namespace ExportDocManager.Services.Security
 
         public string StorageDescription { get; }
 
-        public async Task<RuntimeLicenseAnchorData> LoadAsync(CancellationToken cancellationToken = default)
+        public async Task<RuntimeLicenseAnchorData?> LoadAsync(CancellationToken cancellationToken = default)
         {
             if (!File.Exists(_path))
             {
@@ -118,7 +120,7 @@ namespace ExportDocManager.Services.Security
         public string StorageDescription =>
             @"Windows 注册表 HKLM/HKCU\SOFTWARE\ExportDocManager\RuntimeLicense\MachineTrialAnchor（DPAPI LocalMachine 密封）。";
 
-        public Task<RuntimeLicenseAnchorData> LoadAsync(CancellationToken cancellationToken = default)
+        public Task<RuntimeLicenseAnchorData?> LoadAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -127,14 +129,14 @@ namespace ExportDocManager.Services.Security
                 foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
                 {
                     string payload = ReadRegistryPayload(hive, view);
-                    if (TryDecodeProtectedPayload(payload, out RuntimeLicenseAnchorData data))
+                    if (TryDecodeProtectedPayload(payload, out RuntimeLicenseAnchorData? data))
                     {
                         return Task.FromResult(data);
                     }
                 }
             }
 
-            return Task.FromResult<RuntimeLicenseAnchorData>(null);
+            return Task.FromResult<RuntimeLicenseAnchorData?>(null);
         }
 
         public Task SaveAsync(RuntimeLicenseAnchorData data, CancellationToken cancellationToken = default)
@@ -192,7 +194,7 @@ namespace ExportDocManager.Services.Security
             return ProtectedPrefix + Convert.ToBase64String(protectedBytes);
         }
 
-        private static bool TryDecodeProtectedPayload(string payload, out RuntimeLicenseAnchorData data)
+        private static bool TryDecodeProtectedPayload(string payload, out RuntimeLicenseAnchorData? data)
         {
             data = null;
             if (string.IsNullOrWhiteSpace(payload) ||
@@ -235,11 +237,11 @@ namespace ExportDocManager.Services.Security
 
         public string StorageDescription { get; }
 
-        public Task<RuntimeLicenseAnchorData> LoadAsync(CancellationToken cancellationToken = default)
+        public Task<RuntimeLicenseAnchorData?> LoadAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string payload = _read();
-            return Task.FromResult(RuntimeLicenseAnchorCodec.Decode(payload));
+            return Task.FromResult<RuntimeLicenseAnchorData?>(RuntimeLicenseAnchorCodec.Decode(payload));
         }
 
         public Task SaveAsync(RuntimeLicenseAnchorData data, CancellationToken cancellationToken = default)
@@ -327,7 +329,7 @@ namespace ExportDocManager.Services.Security
         private static bool TryRunProcess(
             string fileName,
             IEnumerable<string> arguments,
-            string standardInput,
+            string? standardInput,
             out string output)
         {
             output = string.Empty;
@@ -413,7 +415,7 @@ namespace ExportDocManager.Services.Security
             return PayloadPrefix + Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
         }
 
-        public static RuntimeLicenseAnchorData Decode(string payload)
+        public static RuntimeLicenseAnchorData? Decode(string payload)
         {
             if (string.IsNullOrWhiteSpace(payload))
             {

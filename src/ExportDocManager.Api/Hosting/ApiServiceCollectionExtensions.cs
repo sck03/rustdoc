@@ -37,6 +37,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddSingleton(pathProvider);
             services.AddSingleton(databaseSettings);
             services.AddSingleton(runtimeOptions);
+            services.AddOpenApi("v1");
             services.AddSingleton(ApiDesktopAccessOptions.FromRuntimeOptions(runtimeOptions));
             services.AddLogging();
             services.AddHttpContextAccessor();

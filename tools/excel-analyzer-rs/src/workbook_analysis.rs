@@ -226,7 +226,7 @@ pub(super) fn find_document_field(
                 }
             } else if is_party_name_field(definition.field_key) {
                 value = normalize_party_name_candidate_value(&value);
-                if value.is_empty() {
+                if value.is_empty() || !is_plausible_party_name_candidate(&value) {
                     continue;
                 }
             }

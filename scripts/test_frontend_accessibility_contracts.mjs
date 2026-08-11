@@ -444,8 +444,9 @@ for (const globalBusinessStyle of [
     failures.push(`businessFeatures.css: 发票与审核公共样式不能依赖单一窗口 lazy route：${globalBusinessStyle}`);
   }
 }
-if (!/@media\s*\(max-width:\s*860px\)[\s\S]*?\.invoice-party-group:not\(\.invoice-party-group-exporter\)\s+\.field-grid\s*\{\s*grid-template-columns:\s*1fr/u.test(globalBusinessCss)) {
-  failures.push("businessFeatures.css: 发票客户与通知人专用双列布局必须在窄窗口退化为单列");
+const invoicePartiesCss = readCssImportGraph(path.join(root, "styles", "business", "invoice-parties.css"));
+if (!/@media\s*\(max-width:\s*860px\)[\s\S]*?\.invoice-party-group:not\(\.invoice-party-group-exporter\)\s+\.field-grid\s*,[\s\S]*?grid-template-columns:\s*1fr/u.test(invoicePartiesCss)) {
+  failures.push("invoice-parties.css: 发票客户与通知人专用双列布局必须在窄窗口退化为单列");
 }
 for (const [routeCssPath, forbiddenSharedDefinitions] of [
   ["styles/single-window-core.css", [".visually-hidden {", ".danger-icon {", ".filter-bar {", ".inline-filter {", ".inline-check {"]],

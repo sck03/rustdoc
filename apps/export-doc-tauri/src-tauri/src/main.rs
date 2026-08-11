@@ -30,6 +30,8 @@ mod tauri_updater_commands;
 mod window;
 
 static RUNTIME_DIAGNOSTIC_LOG_ROOT: OnceLock<PathBuf> = OnceLock::new();
+const DESKTOP_SMOKE_ENVIRONMENT_VARIABLE: &str = "EXPORTDOCMANAGER_DESKTOP_SMOKE";
+const DESKTOP_ACCESS_TOKEN_ENVIRONMENT_VARIABLE: &str = "EXPORTDOCMANAGER_DESKTOP_TOKEN";
 
 fn main() {
     install_panic_log_hook();
@@ -53,14 +55,18 @@ fn main() {
 }
 
 fn run_tauri_app() -> tauri::Result<()> {
-    let app = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let mut builder = tauri::Builder::default();
+    if !is_desktop_smoke_session() {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
             }
-        }))
+        }));
+    }
+
+    let app = builder
         .invoke_handler(tauri::generate_handler![
             desktop_file_dialog_commands::select_single_window_package_file,
             desktop_file_dialog_commands::select_invoice_transfer_package_file,
@@ -160,6 +166,24 @@ fn run_tauri_app() -> tauri::Result<()> {
         }
     });
     Ok(())
+}
+
+fn is_desktop_smoke_session() -> bool {
+    is_enabled_environment_value(
+        std::env::var_os(DESKTOP_SMOKE_ENVIRONMENT_VARIABLE)
+            .as_deref()
+            .and_then(|value| value.to_str()),
+    ) && std::env::var_os(DESKTOP_ACCESS_TOKEN_ENVIRONMENT_VARIABLE)
+        .is_some_and(|value| !value.is_empty())
+}
+
+fn is_enabled_environment_value(value: Option<&str>) -> bool {
+    value.is_some_and(|value| {
+        matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        )
+    })
 }
 
 fn set_runtime_diagnostic_log_root(log_root: &Path) {
@@ -288,6 +312,18 @@ mod tests {
         .is_none());
 
         let _ = fs::remove_dir_all(test_root);
+    }
+
+    #[test]
+    fn desktop_smoke_flag_accepts_only_explicit_enabled_values() {
+        for value in ["1", "true", "TRUE", " yes ", "On"] {
+            assert!(is_enabled_environment_value(Some(value)));
+        }
+
+        for value in ["", "0", "false", "disabled", "testing"] {
+            assert!(!is_enabled_environment_value(Some(value)));
+        }
+        assert!(!is_enabled_environment_value(None));
     }
 
     fn fresh_test_dir(name: &str) -> PathBuf {

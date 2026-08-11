@@ -517,7 +517,8 @@ namespace ExportDocManager.Infrastructure.Tests
 
             public Task<List<ExportDocManager.Models.Entities.AuditLog>> QueryAsync(
                 AuditLogQueryCriteria criteria,
-                int maxCount = 2000)
+                int maxCount = 2000,
+                CancellationToken cancellationToken = default)
             {
                 return Task.FromResult(new List<ExportDocManager.Models.Entities.AuditLog>());
             }
@@ -539,12 +540,18 @@ namespace ExportDocManager.Infrastructure.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<int> DeleteByCriteriaAsync(AuditLogQueryCriteria criteria, int maxCount = 50000)
+            public Task<int> DeleteByCriteriaAsync(
+                AuditLogQueryCriteria criteria,
+                int maxCount = 50000,
+                CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<int> DeleteOlderThanAsync(DateTime cutoffUtc, int maxCount = 200000)
+            public Task<int> DeleteOlderThanAsync(
+                DateTime cutoffUtc,
+                int maxCount = 200000,
+                CancellationToken cancellationToken = default)
             {
                 CutoffUtc = cutoffUtc;
                 Assert.Equal(_expectedMaxCount, maxCount);

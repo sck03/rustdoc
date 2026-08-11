@@ -152,6 +152,7 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<Customer>().HasIndex(c => c.CustomerNameEN);
             modelBuilder.Entity<Customer>().HasIndex(c => c.OwnerUserId);
             modelBuilder.Entity<Customer>().HasIndex(c => new { c.CompanyScope, c.DepartmentId });
+            modelBuilder.Entity<AuditLog>().HasIndex(log => new { log.Timestamp, log.Id });
             modelBuilder.Entity<CrmCustomer>().HasIndex(item => item.Name);
             modelBuilder.Entity<CrmCustomer>().HasIndex(item => item.OwnerUserId);
             modelBuilder.Entity<CrmCustomer>().HasIndex(item => item.LinkedDocumentCustomerId);
@@ -227,7 +228,15 @@ namespace ExportDocManager.DataAccess
                 .HasForeignKey(item => item.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<SupplierAssessment>()
-                .HasIndex(item => new { item.SupplierCompanyId, item.AssessedAt });
+                .HasIndex(item => new { item.SupplierCompanyId, item.AssessedAt, item.Id });
+            if (Database.IsSqlite())
+            {
+                modelBuilder.Entity<SupplierAssessment>()
+                    .Property(item => item.AssessedAt)
+                    .HasConversion(
+                        value => value.UtcDateTime.Ticks,
+                        value => new DateTimeOffset(value, TimeSpan.Zero));
+            }
             modelBuilder.Entity<SupplierAssessment>()
                 .HasOne<SupplierCompany>()
                 .WithMany()

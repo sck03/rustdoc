@@ -446,14 +446,18 @@ namespace ExportDocManager.Services.Reporting
                         _templateConfigLoaded = true;
                     }
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
-                    Log.Error(ex, "加载报表模板配置失败");
+                    Log.Warning(ex, "加载报表模板配置失败，本次使用内置模板并在下次请求时重试");
                     lock (_configLock)
                     {
                         _templatePathCache = new Dictionary<ReportDocumentType, string>();
                         _templateConfigs = new List<ReportTemplateConfig>();
-                        _templateConfigLoaded = true;
+                        _templateConfigLoaded = false;
                     }
                 }
             }

@@ -55,22 +55,6 @@ namespace ExportDocManager.Api.Hosting
                             }
                         }
                     },
-                    ["/openapi/v1.json"] = new
-                    {
-                        get = new
-                        {
-                            summary = "OpenAPI document",
-                            operationId = "getOpenApiDocument",
-                            responses = new Dictionary<string, object>
-                            {
-                                ["200"] = new
-                                {
-                                    description = "OpenAPI document for the sidecar API.",
-                                    content = JsonContent("OpenApiDocument")
-                                }
-                            }
-                        }
-                    },
                     ["/api/system/shutdown-maintenance"] = new
                     {
                         post = new

@@ -4,22 +4,22 @@ namespace ExportDocManager.Utils
 {
     public static class TextSearchHelper
     {
-        public static string NormalizeFilter(string value)
+        public static string NormalizeFilter(string? value)
         {
             return NormalizeValue(value);
         }
 
-        public static string NormalizeValue(string value)
+        public static string NormalizeValue(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
         }
 
-        public static string NormalizeUpperValue(string value)
+        public static string NormalizeUpperValue(string? value)
         {
             return NormalizeValue(value).ToUpperInvariant();
         }
 
-        public static string[] Tokenize(string keyword)
+        public static string[] Tokenize(string? keyword)
         {
             if (string.IsNullOrWhiteSpace(keyword))
             {
@@ -27,15 +27,15 @@ namespace ExportDocManager.Utils
             }
 
             return keyword
-                .Split((char[])null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
 
         public static IQueryable<T> ApplyKeywordSearch<T>(
             this IQueryable<T> query,
-            string keyword,
-            params Expression<Func<T, string>>[] selectors)
+            string? keyword,
+            params Expression<Func<T, string?>>[]? selectors)
         {
             ArgumentNullException.ThrowIfNull(query);
 
@@ -46,11 +46,11 @@ namespace ExportDocManager.Utils
             }
 
             var parameter = Expression.Parameter(typeof(T), "entity");
-            Expression combinedExpression = null;
+            Expression? combinedExpression = null;
 
             foreach (var token in tokens)
             {
-                Expression tokenExpression = null;
+                Expression? tokenExpression = null;
                 var normalizedToken = token.ToUpperInvariant();
                 var tokenConstant = Expression.Constant(normalizedToken);
 
@@ -93,7 +93,8 @@ namespace ExportDocManager.Utils
 
         private static Expression ReplaceParameter(Expression expression, ParameterExpression source, ParameterExpression target)
         {
-            return new ParameterReplaceVisitor(source, target).Visit(expression);
+            return new ParameterReplaceVisitor(source, target).Visit(expression)
+                ?? throw new InvalidOperationException("无法生成文本搜索表达式。");
         }
 
         private sealed class ParameterReplaceVisitor : ExpressionVisitor

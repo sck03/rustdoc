@@ -15,7 +15,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterReadRepository repository,
-                string keyword,
+                string? keyword,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -37,7 +37,7 @@ namespace ExportDocManager.Api.Hosting
                 IExporterReadRepository repository,
                 int pageNumber,
                 int pageSize,
-                string keyword,
+                string? keyword,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
@@ -81,7 +81,7 @@ namespace ExportDocManager.Api.Hosting
                 IExporterSealService sealService,
                 int id,
                 string sealType,
-                string fileName,
+                string? fileName,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)

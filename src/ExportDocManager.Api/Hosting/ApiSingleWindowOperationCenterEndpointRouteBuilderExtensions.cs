@@ -14,9 +14,9 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ISingleWindowOperationCenterService operationCenterService,
-                string businessType,
-                string status,
-                string keyword,
+                string? businessType,
+                string? status,
+                string? keyword,
                 int? pageNumber,
                 int? pageSize,
                 CancellationToken cancellationToken) =>

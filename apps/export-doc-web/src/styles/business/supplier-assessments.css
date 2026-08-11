@@ -1,0 +1,127 @@
+.supplier-assessment-analysis,
+.supplier-procurement-overview {
+  display: grid;
+  gap: 16px;
+}
+
+.supplier-overview-dimensions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+}
+
+.supplier-overview-filter { justify-content: flex-start; }
+
+.supplier-assessment-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.supplier-assessment-summary {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 16px;
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line);
+  border-top: 3px solid var(--edm-primary-500);
+  border-radius: var(--edm-radius-md);
+  box-shadow: var(--edm-shadow-sm);
+}
+
+.supplier-assessment-summary[data-tone="info"] { border-top-color: var(--edm-info); }
+.supplier-assessment-summary[data-tone="positive"] { border-top-color: var(--edm-success); }
+.supplier-assessment-summary[data-tone="warning"] { border-top-color: var(--edm-warning); }
+.supplier-assessment-summary > span,
+.supplier-assessment-summary small { color: var(--edm-ink-600); }
+.supplier-assessment-summary strong { color: var(--edm-ink-950); font-size: 1.45rem; }
+
+.supplier-assessment-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.supplier-analysis-card {
+  min-width: 0;
+  padding: 18px;
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line);
+  border-radius: var(--edm-radius-md);
+  box-shadow: var(--edm-shadow-sm);
+}
+
+.supplier-analysis-card-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.supplier-analysis-card-header h4,
+.supplier-analysis-card-header p { margin: 0; }
+.supplier-analysis-card-header p { margin-top: 3px; color: var(--edm-ink-600); font-size: .88rem; }
+
+.supplier-dimension-list,
+.supplier-conclusion-list { display: grid; gap: 13px; }
+
+.supplier-dimension-row {
+  display: grid;
+  grid-template-columns: 42px minmax(80px, 1fr) 42px;
+  gap: 10px;
+  align-items: center;
+}
+
+.supplier-score-track,
+.supplier-conclusion-track {
+  height: 9px;
+  overflow: hidden;
+  background: var(--edm-primary-100);
+  border-radius: 999px;
+}
+
+.supplier-score-track > span,
+.supplier-conclusion-track > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--edm-primary-600), var(--edm-primary-500));
+  border-radius: inherit;
+}
+
+.supplier-conclusion-row {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) minmax(70px, 1fr) 24px 38px;
+  gap: 9px;
+  align-items: center;
+}
+
+.supplier-conclusion-row > span:last-child { color: var(--edm-ink-600); text-align: right; }
+.supplier-latest-conclusion { display: flex; gap: 8px; align-items: center; color: var(--edm-ink-600); }
+.supplier-trend-chart { overflow-x: auto; }
+.supplier-trend-chart svg { display: block; width: 100%; min-width: 560px; height: 230px; }
+.supplier-trend-chart text { fill: var(--edm-ink-500); font-size: 12px; }
+.supplier-trend-grid-line { stroke: var(--edm-line); stroke-dasharray: 4 5; stroke-width: 1; }
+.supplier-trend-line { fill: none; stroke: var(--edm-primary-600); stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; }
+.supplier-trend-point { fill: var(--edm-surface); stroke: var(--edm-primary-600); stroke-width: 3; }
+.supplier-trend-labels { display: flex; justify-content: space-between; color: var(--edm-ink-600); font-size: .82rem; }
+.supplier-single-trend { display: flex; gap: 12px; align-items: baseline; padding: 28px 8px; }
+.supplier-single-trend strong { color: var(--edm-primary-700); font-size: 2rem; }
+.supplier-single-trend span { color: var(--edm-ink-600); }
+.supplier-assessment-analysis-empty { min-height: 250px; justify-content: center; }
+
+@media (max-width: 860px) {
+  .supplier-assessment-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .supplier-assessment-analysis-grid,
+  .supplier-overview-dimensions { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .supplier-assessment-summary-grid { grid-template-columns: 1fr; }
+  .supplier-analysis-card { padding: 14px; }
+  .supplier-analysis-card-header { display: grid; }
+  .supplier-conclusion-row { grid-template-columns: minmax(86px, auto) 1fr 22px; }
+  .supplier-conclusion-row > span:last-child { display: none; }
+  .supplier-single-trend { display: grid; gap: 4px; }
+}

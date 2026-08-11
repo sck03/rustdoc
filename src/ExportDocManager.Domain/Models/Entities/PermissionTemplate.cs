@@ -36,6 +36,6 @@ namespace ExportDocManager.Models.Entities
         [Required, MaxLength(20)]
         public string AccessLevel { get; set; } = "operate";
 
-        public PermissionTemplate PermissionTemplate { get; set; }
+        public PermissionTemplate? PermissionTemplate { get; set; }
     }
 }

@@ -9,14 +9,14 @@ namespace ExportDocManager.Models.Entities
 
         [Required]
         [MaxLength(50)]
-        public string Username { get; set; }
+        public string Username { get; set; } = string.Empty;
 
         [Required]
         [MaxLength(255)]
-        public string PasswordHash { get; set; }
+        public string PasswordHash { get; set; } = string.Empty;
 
         [MaxLength(100)]
-        public string FullName { get; set; }
+        public string? FullName { get; set; }
 
         [Required]
         [MaxLength(20)]
@@ -26,7 +26,7 @@ namespace ExportDocManager.Models.Entities
 
         public int? PermissionTemplateId { get; set; }
 
-        public PermissionTemplate PermissionTemplate { get; set; }
+        public PermissionTemplate? PermissionTemplate { get; set; }
 
         [NotMapped]
         public IReadOnlyDictionary<string, string> EffectiveModuleAccess { get; set; } =

@@ -46,27 +46,36 @@ namespace ExportDocManager.Services.Suppliers
                 return new SupplierAssessmentOverview(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, []);
 
             int[] supplierIds = suppliers.Select(item => item.Id).ToArray();
-            var assessments = await context.SupplierAssessments.AsNoTracking()
+            var assessmentSummaries = await context.SupplierAssessments.AsNoTracking()
                 .Where(item => supplierIds.Contains(item.SupplierCompanyId))
+                .GroupBy(item => item.SupplierCompanyId)
                 .Select(item => new
                 {
-                    item.Id, item.SupplierCompanyId, item.AssessedAt, item.AssessmentKind,
-                    item.QualityScore, item.DeliveryScore, item.ServiceScore, item.PriceScore,
-                    item.Conclusion, item.Notes
+                    SupplierCompanyId = item.Key,
+                    AssessmentCount = item.Count(),
+                    LatestAssessmentId = item
+                        .OrderByDescending(assessment => assessment.AssessedAt)
+                        .ThenByDescending(assessment => assessment.Id)
+                        .Select(assessment => assessment.Id)
+                        .First()
                 })
                 .ToListAsync(cancellationToken);
 
-            var groups = assessments.GroupBy(item => item.SupplierCompanyId)
-                .ToDictionary(group => group.Key, group => group
-                    .OrderByDescending(item => item.AssessedAt)
-                    .ThenByDescending(item => item.Id)
-                    .ToArray());
-            var items = suppliers.Where(item => groups.ContainsKey(item.Id)).Select(supplier =>
+            int[] latestAssessmentIds = assessmentSummaries
+                .Select(item => item.LatestAssessmentId)
+                .ToArray();
+            var latestAssessments = await context.SupplierAssessments.AsNoTracking()
+                .Where(item => latestAssessmentIds.Contains(item.Id))
+                .ToDictionaryAsync(item => item.Id, cancellationToken);
+            var summariesBySupplier = assessmentSummaries
+                .ToDictionary(item => item.SupplierCompanyId);
+
+            var items = suppliers.Where(item => summariesBySupplier.ContainsKey(item.Id)).Select(supplier =>
             {
-                var rows = groups[supplier.Id];
-                var latest = rows[0];
+                var summary = summariesBySupplier[supplier.Id];
+                var latest = latestAssessments[summary.LatestAssessmentId];
                 return new SupplierAssessmentOverviewItem(
-                    supplier.Id, supplier.Name, supplier.Status, supplier.Category, rows.Length,
+                    supplier.Id, supplier.Name, supplier.Status, supplier.Category, summary.AssessmentCount,
                     latest.AssessedAt, latest.AssessmentKind,
                     latest.QualityScore, latest.DeliveryScore, latest.ServiceScore, latest.PriceScore,
                     Average(latest.QualityScore, latest.DeliveryScore, latest.ServiceScore, latest.PriceScore),

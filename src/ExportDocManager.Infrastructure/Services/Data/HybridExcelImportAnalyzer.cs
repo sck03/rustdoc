@@ -343,7 +343,7 @@ namespace ExportDocManager.Services.Data
             return Math.Round((decimal)value, 4, MidpointRounding.AwayFromZero);
         }
 
-        private static bool NeedsDotNetFusion(ExcelImportAnalysisReport report)
+        internal static bool NeedsDotNetFusion(ExcelImportAnalysisReport report)
         {
             if (report == null || report.Confidence < 0.85m || report.ItemTable == null)
             {
@@ -354,7 +354,9 @@ namespace ExportDocManager.Services.Data
             [
                 "InvoiceNo",
                 "CustomerNameEN",
+                "CustomerAddressEN",
                 "ExporterNameEN",
+                "ExporterAddressEN",
                 "PortOfLoading",
                 "PortOfDestination"
             ];
@@ -367,10 +369,11 @@ namespace ExportDocManager.Services.Data
             return report.Fields?.Any(field =>
                 string.Equals(field.FieldKey, fieldKey, StringComparison.Ordinal)
                 && !string.IsNullOrWhiteSpace(field.Value)
-                && field.Confidence >= 0.65m) == true;
+                && field.Confidence >= 0.65m
+                && ExcelImportPartyTextClassifier.GetFieldQuality(field.FieldKey, field.Value) >= 0.5m) == true;
         }
 
-        private static ExcelImportAnalysisReport MergeReports(
+        internal static ExcelImportAnalysisReport MergeReports(
             ExcelImportAnalysisReport primary,
             ExcelImportAnalysisReport fallback)
         {
@@ -463,6 +466,13 @@ namespace ExportDocManager.Services.Data
             }
 
             if (current == null || string.IsNullOrWhiteSpace(current.Value))
+            {
+                return true;
+            }
+
+            decimal currentQuality = ExcelImportPartyTextClassifier.GetFieldQuality(current.FieldKey, current.Value);
+            decimal fallbackQuality = ExcelImportPartyTextClassifier.GetFieldQuality(fallback.FieldKey, fallback.Value);
+            if (fallbackQuality >= 0.5m && fallbackQuality >= currentQuality + 0.25m)
             {
                 return true;
             }

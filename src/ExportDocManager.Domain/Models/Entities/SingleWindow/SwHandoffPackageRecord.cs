@@ -55,6 +55,6 @@ namespace ExportDocManager.Models.Entities
 
         public string ManifestJson { get; set; } = string.Empty;
 
-        public SwSubmissionBatch Batch { get; set; }
+        public SwSubmissionBatch? Batch { get; set; }
     }
 }

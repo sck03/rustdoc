@@ -9,7 +9,7 @@ namespace ExportDocManager.Services.Core
 {
     public partial class InvoiceService
     {
-        public async Task<Invoice> GetLatestInvoiceByPartiesAsync(
+        public async Task<Invoice?> GetLatestInvoiceByPartiesAsync(
             int? customerId,
             int? exporterId,
             CancellationToken cancellationToken = default)
@@ -47,7 +47,7 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> GetInvoiceByIdAsync(
+        public async Task<Invoice?> GetInvoiceByIdAsync(
             int id,
             CancellationToken cancellationToken = default)
         {
@@ -72,7 +72,7 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(
+        public async Task<Invoice?> GetInvoiceByInvoiceNoAndTypeAsync(
             string companyScope,
             string invoiceNo,
             string type,
@@ -121,7 +121,7 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> GetLastInvoiceAsync(
+        public async Task<Invoice?> GetLastInvoiceAsync(
             CancellationToken cancellationToken = default)
         {
             try

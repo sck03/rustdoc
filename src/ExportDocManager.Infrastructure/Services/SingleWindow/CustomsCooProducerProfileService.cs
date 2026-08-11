@@ -45,7 +45,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .ConfigureAwait(false);
         }
 
-        public async Task<CustomsCooProducerProfile> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+        public async Task<CustomsCooProducerProfile?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
             return await context.CustomsCooProducerProfiles

@@ -146,7 +146,7 @@ namespace ExportDocManager.Services.Data
 
         private static bool LooksLikePartyRoleLabelOnly(string value)
         {
-            if (LooksLikeBusinessPartyValue(value))
+            if (ExcelImportPartyTextClassifier.LooksLikeBusinessPartyValue(value))
             {
                 return false;
             }
@@ -181,33 +181,9 @@ namespace ExportDocManager.Services.Data
                 .Any(label => IsSameOrNearShortLabel(normalized, label));
         }
 
-        private static bool LooksLikeBusinessPartyValue(string value)
-        {
-            string normalized = NormalizeExcelTextBlock(value);
-            if (string.IsNullOrWhiteSpace(normalized))
-            {
-                return false;
-            }
-
-            if (LooksLikeAddressFragment(normalized))
-            {
-                return true;
-            }
-
-            return Regex.IsMatch(
-                normalized,
-                @"\b(CO\.?\s*,?\s*LTD\.?|LTD\.?|LIMITED|LLC\.?|INC\.?|CORP\.?|COMPANY|GROUP)\b",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        }
-
         private static bool LooksLikeBusinessPartyNameValue(string value)
         {
-            string normalized = NormalizeExcelTextBlock(value);
-            return !string.IsNullOrWhiteSpace(normalized)
-                && Regex.IsMatch(
-                    normalized,
-                    @"\b(CO\.?\s*,?\s*LTD\.?|LTD\.?|LIMITED|LLC\.?|INC\.?|CORP\.?|COMPANY|GROUP)\b",
-                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            return ExcelImportPartyTextClassifier.LooksLikeCompanyName(value);
         }
 
         private static bool IsSameOrNearShortLabel(string value, string label)
@@ -390,7 +366,7 @@ namespace ExportDocManager.Services.Data
                     }
 
                     string rest = line[splitIndex..].Trim(" \t,;，；".ToCharArray());
-                    if (LooksLikeAddressFragment(rest))
+                    if (ExcelImportPartyTextClassifier.LooksLikePostalAddress(rest))
                     {
                         return (line[..splitIndex].Trim(), rest);
                     }
@@ -400,30 +376,5 @@ namespace ExportDocManager.Services.Data
             return (line, string.Empty);
         }
 
-        private static bool LooksLikeAddressFragment(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return false;
-            }
-
-            string normalized = value.ToLowerInvariant();
-            return normalized.Any(char.IsDigit)
-                || normalized.Contains("road", StringComparison.Ordinal)
-                || normalized.Contains("rd", StringComparison.Ordinal)
-                || normalized.Contains("street", StringComparison.Ordinal)
-                || normalized.Contains("st", StringComparison.Ordinal)
-                || normalized.Contains("avenue", StringComparison.Ordinal)
-                || normalized.Contains("ave", StringComparison.Ordinal)
-                || normalized.Contains("building", StringComparison.Ordinal)
-                || normalized.Contains("floor", StringComparison.Ordinal)
-                || normalized.Contains("china", StringComparison.Ordinal)
-                || normalized.Contains("united states", StringComparison.Ordinal)
-                || normalized.Contains("tel", StringComparison.Ordinal)
-                || normalized.Contains("mail", StringComparison.Ordinal)
-                || normalized.Contains("路", StringComparison.Ordinal)
-                || normalized.Contains("号", StringComparison.Ordinal);
-        }
     }
 }
-

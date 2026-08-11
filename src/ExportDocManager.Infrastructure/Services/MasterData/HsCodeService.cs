@@ -110,7 +110,7 @@ namespace ExportDocManager.Services.MasterData
             return DeduplicateByCode(rows).ToList();
         }
 
-        public async Task<HsCode> GetByCodeAsync(string code)
+        public async Task<HsCode?> GetByCodeAsync(string code)
         {
             var normalizedCode = HsCodeTextHelper.NormalizeCode(code);
             if (string.IsNullOrWhiteSpace(normalizedCode))

@@ -17,8 +17,8 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IBackgroundJobService jobService,
-                string status,
-                string keyword,
+                string? status,
+                string? keyword,
                 int? pageNumber,
                 int? pageSize,
                 CancellationToken cancellationToken) =>

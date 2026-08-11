@@ -1,7 +1,76 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-10",
+  "capturedAt": "2026-08-11",
   "rules": [
+    {
+      "name": "repository .NET production default",
+      "directories": [
+        "src",
+        "Shared",
+        "tools/ExportDocManager.ApiClientGenerator"
+      ],
+      "filePattern": "^.+\\.cs$",
+      "maximumLines": 850,
+      "baselineAggregateLines": 118514,
+      "maximumAggregateGrowthLines": 250,
+      "maximumAggregateLines": 119500,
+      "reportFiles": false
+    },
+    {
+      "name": "repository web production default",
+      "directory": "apps/export-doc-web/src",
+      "filePattern": "^.+\\.(?:ts|tsx|css)$",
+      "excludePattern": "^apps/export-doc-web/src/api/generated/",
+      "maximumLines": 900,
+      "baselineAggregateLines": 77910,
+      "maximumAggregateGrowthLines": 200,
+      "maximumAggregateLines": 78500,
+      "reportFiles": false
+    },
+    {
+      "name": "repository Rust production default",
+      "directories": [
+        "apps/export-doc-tauri/src-tauri/src",
+        "apps/exportdoc-ocr-rs/src",
+        "tools/excel-analyzer-rs/src"
+      ],
+      "filePattern": "^.+\\.rs$",
+      "maximumLines": 1000,
+      "baselineAggregateLines": 8986,
+      "maximumAggregateGrowthLines": 75,
+      "maximumAggregateLines": 9200,
+      "reportFiles": false
+    },
+    {
+      "name": "repository test source default",
+      "directory": "tests",
+      "filePattern": "^.+\\.cs$",
+      "maximumLines": 3700,
+      "baselineAggregateLines": 37418,
+      "maximumAggregateGrowthLines": 150,
+      "maximumAggregateLines": 38500,
+      "reportFiles": false
+    },
+    {
+      "name": "repository automation source default",
+      "directories": ["scripts", "deploy", ".github/workflows"],
+      "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
+      "maximumLines": 2300,
+      "baselineAggregateLines": 38058,
+      "maximumAggregateGrowthLines": 150,
+      "maximumAggregateLines": 39000,
+      "reportFiles": false
+    },
+    {
+      "name": "GitHub workflow default",
+      "directory": ".github/workflows",
+      "filePattern": "^.+\\.(?:yml|yaml)$",
+      "maximumLines": 800,
+      "baselineAggregateLines": 2459,
+      "maximumAggregateGrowthLines": 20,
+      "maximumAggregateLines": 2550,
+      "reportFiles": false
+    },
     {
       "name": "HS knowledge partials",
       "directory": "src/ExportDocManager.Infrastructure/Services/MasterData",
@@ -158,6 +227,13 @@
       "filePattern": "^Invoice(?:FormPanels|BasicInfoPanel|PartiesPanel|ExtendedFieldsPanel|ShippingTermsPanel|MarksAndItemsPanel)\\.tsx$",
       "maximumLines": 360,
       "maximumAggregateLines": 950
+    },
+    {
+      "name": "agent consignment components",
+      "directory": "apps/export-doc-web/src/features/single-window",
+      "filePattern": "^AgentConsignment(?:Page|Panels)\\.tsx$",
+      "maximumLines": 600,
+      "maximumAggregateLines": 930
     },
     {
       "name": "report template designer orchestration",

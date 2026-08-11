@@ -12,46 +12,46 @@ namespace ExportDocManager.Models.Entities
         public int Id { get; set; }
 
         [Display(Name = "货号")]
-        public string ProductCode { get; set; } // SKU or Style No
+        public string? ProductCode { get; set; } // SKU or Style No
 
         [Display(Name = "英文品名")]
-        public string NameEN { get; set; }
+        public string? NameEN { get; set; }
 
         [Display(Name = "中文品名")]
-        public string NameCN { get; set; }
+        public string? NameCN { get; set; }
 
         [Display(Name = "描述")]
-        public string Description { get; set; }
+        public string? Description { get; set; }
 
         [Display(Name = "HS编码")]
-        public string HSCode { get; set; }
+        public string? HSCode { get; set; }
 
         [Display(Name = "申报要素")]
-        public string Elements { get; set; } // Declaration Elements
+        public string? Elements { get; set; } // Declaration Elements
 
         [Display(Name = "监管条件")]
-        public string SupervisionConditions { get; set; } // Supervision Conditions
+        public string? SupervisionConditions { get; set; } // Supervision Conditions
 
         [Display(Name = "检验检疫")]
-        public string InspectionCategory { get; set; } // Inspection Category
+        public string? InspectionCategory { get; set; } // Inspection Category
 
         [Display(Name = "退税率(%)")]
         public decimal TaxRebateRate { get; set; }
 
         [Display(Name = "材质/成分")]
-        public string Material { get; set; } // FabricComposition
+        public string? Material { get; set; } // FabricComposition
 
         [Display(Name = "品牌")]
-        public string Brand { get; set; }
+        public string? Brand { get; set; }
 
         [Display(Name = "原产地")]
-        public string Origin { get; set; }
+        public string? Origin { get; set; }
 
         [Display(Name = "单位(英)")]
-        public string UnitEN { get; set; }
+        public string? UnitEN { get; set; }
 
         [Display(Name = "单位(中)")]
-        public string UnitCN { get; set; }
+        public string? UnitCN { get; set; }
 
         // Packing Details
         public decimal Length { get; set; }
@@ -68,10 +68,10 @@ namespace ExportDocManager.Models.Entities
         public decimal PcsPerCtn { get; set; } // Added for Smart Packing
 
         [Display(Name = "包装单位(英)")]
-        public string PackageUnitEN { get; set; }
+        public string? PackageUnitEN { get; set; }
 
         [Display(Name = "包装单位(中)")]
-        public string PackageUnitCN { get; set; }
+        public string? PackageUnitCN { get; set; }
 
         [Display(Name = "默认单价")]
         public decimal DefaultPrice { get; set; }
@@ -80,6 +80,6 @@ namespace ExportDocManager.Models.Entities
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
         [ConcurrencyCheck]
-        public byte[] RowVersion { get; set; }
+        public byte[]? RowVersion { get; set; }
     }
 }

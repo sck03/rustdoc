@@ -14,7 +14,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IUnitReadRepository repository,
-                string keyword,
+                string? keyword,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -43,7 +43,7 @@ namespace ExportDocManager.Api.Hosting
                 IUnitReadRepository repository,
                 int pageNumber,
                 int pageSize,
-                string keyword,
+                string? keyword,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();

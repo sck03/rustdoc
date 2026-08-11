@@ -31,13 +31,13 @@ namespace ExportDocManager.Services.MasterData
             return rows.ToList();
         }
 
-        public async Task<Product> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+        public async Task<Product?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             return await context.Products.FindAsync([id], cancellationToken);
         }
 
-        public async Task<Product> GetByCodeAsync(
+        public async Task<Product?> GetByCodeAsync(
             string productCode,
             CancellationToken cancellationToken = default)
         {

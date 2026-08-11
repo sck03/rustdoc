@@ -12,22 +12,22 @@ namespace ExportDocManager.Models.Entities
         public int? OwnerUserId { get; set; }
         public string DepartmentId { get; set; } = string.Empty;
         public string CompanyScope { get; set; } = string.Empty;
-        public string ExporterNameEN { get; set; }
-        public string ExporterNameCN { get; set; }
-        public string AddressEN { get; set; }
-        public string AddressCN { get; set; }
-        public string ContactPerson { get; set; }
-        public string CreditCode { get; set; }
-        public string CustomsCode { get; set; }
-        public string Phone { get; set; }
-        public string BankName { get; set; }
-        public string BankAccount { get; set; }
-        public string SwiftCode { get; set; }
-        public string Notes { get; set; }
-        public string DocSealPath { get; set; }
-        public string CustomsSealPath { get; set; }
+        public string? ExporterNameEN { get; set; }
+        public string? ExporterNameCN { get; set; }
+        public string? AddressEN { get; set; }
+        public string? AddressCN { get; set; }
+        public string? ContactPerson { get; set; }
+        public string? CreditCode { get; set; }
+        public string? CustomsCode { get; set; }
+        public string? Phone { get; set; }
+        public string? BankName { get; set; }
+        public string? BankAccount { get; set; }
+        public string? SwiftCode { get; set; }
+        public string? Notes { get; set; }
+        public string? DocSealPath { get; set; }
+        public string? CustomsSealPath { get; set; }
 
         [ConcurrencyCheck]
-        public byte[] RowVersion { get; set; }
+        public byte[]? RowVersion { get; set; }
     }
 }

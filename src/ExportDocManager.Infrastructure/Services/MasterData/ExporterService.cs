@@ -100,7 +100,7 @@ namespace ExportDocManager.Services.MasterData
             return rows.ToList();
         }
 
-        public async Task<Exporter> GetExporterByIdAsync(
+        public async Task<Exporter?> GetExporterByIdAsync(
             int id,
             CancellationToken cancellationToken = default)
         {
@@ -132,7 +132,7 @@ namespace ExportDocManager.Services.MasterData
             }
         }
 
-        public async Task<Exporter> GetExporterByNameAsync(
+        public async Task<Exporter?> GetExporterByNameAsync(
             string name,
             CancellationToken cancellationToken = default)
         {

@@ -362,33 +362,7 @@ namespace ExportDocManager.Services.Data
                 }
             }
 
-            return contactTokenCount >= 2 && !LooksLikePostalAddressFragment(normalized);
-        }
-
-        private static bool LooksLikePostalAddressFragment(string value)
-        {
-            string normalized = value?.ToLowerInvariant() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(normalized))
-            {
-                return false;
-            }
-
-            return normalized.Contains("road", StringComparison.Ordinal)
-                || normalized.Contains("rd", StringComparison.Ordinal)
-                || normalized.Contains("street", StringComparison.Ordinal)
-                || normalized.Contains("st", StringComparison.Ordinal)
-                || normalized.Contains("avenue", StringComparison.Ordinal)
-                || normalized.Contains("ave", StringComparison.Ordinal)
-                || normalized.Contains("building", StringComparison.Ordinal)
-                || normalized.Contains("floor", StringComparison.Ordinal)
-                || normalized.Contains("china", StringComparison.Ordinal)
-                || normalized.Contains("united states", StringComparison.Ordinal)
-                || normalized.Contains("netherlands", StringComparison.Ordinal)
-                || normalized.Contains("usa", StringComparison.Ordinal)
-                || normalized.Contains("路", StringComparison.Ordinal)
-                || normalized.Contains("号", StringComparison.Ordinal)
-                || Regex.IsMatch(normalized, @"\bno\.?\s*\d+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
-                || (normalized.Any(char.IsDigit) && normalized.Contains(',', StringComparison.Ordinal));
+            return contactTokenCount >= 2 && !ExcelImportPartyTextClassifier.LooksLikePostalAddress(normalized);
         }
 
         private static bool IsNumericOnly(string value)
@@ -436,6 +410,6 @@ namespace ExportDocManager.Services.Data
             }
 
             return normalized;
-        }    }
+        }
+    }
 }
-

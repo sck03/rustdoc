@@ -7,7 +7,7 @@ namespace ExportDocManager.Services.SingleWindow
     {
         Task<IReadOnlyList<CustomsCooProducerProfile>> SearchAsync(string keyword, CancellationToken cancellationToken = default);
 
-        Task<CustomsCooProducerProfile> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+        Task<CustomsCooProducerProfile?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
         Task<CustomsCooProducerProfile> SaveOrUpdateAsync(CustomsCooProducerProfileInput input, CancellationToken cancellationToken = default);
 

@@ -19,16 +19,6 @@ namespace ExportDocManager.Services.Crm
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
         }
 
-        public async Task<IReadOnlyList<CrmCustomerRecord>> ListCustomersAsync(CancellationToken cancellationToken = default)
-        {
-            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            return await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking())
-                .OrderBy(item => item.Name)
-                .Select(item => new CrmCustomerRecord(item.Id, item.Name, item.CountryRegion, item.Website,
-                    item.Status, item.Source, item.Notes, item.LinkedDocumentCustomerId, item.VersionNumber))
-                .ToListAsync(cancellationToken);
-        }
-
         public async Task<PagedResult<CrmCustomerRecord>> QueryCustomersAsync(
             string keyword, string status, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
         {
@@ -388,14 +378,16 @@ namespace ExportDocManager.Services.Crm
             int customerCount = await customers.CountAsync(cancellationToken);
             int contactCount = await context.CrmContacts.AsNoTracking()
                 .CountAsync(contact => customers.Any(customer => customer.Id == contact.CrmCustomerId), cancellationToken);
-            var pendingRows = await followUps
-                .Where(item => !item.IsCompleted)
-                .Select(item => item.NextFollowUpAt)
-                .ToListAsync(cancellationToken);
-            int pendingCount = pendingRows.Count;
-            int overdueCount = pendingRows.Count(value => value.HasValue && value.Value < now);
-            int dueNextSevenDays = pendingRows.Count(value =>
-                value.HasValue && value.Value >= now && value.Value <= sevenDaysLater);
+            var pendingFollowUps = followUps.Where(item => !item.IsCompleted);
+            int pendingCount = await pendingFollowUps.CountAsync(cancellationToken);
+            int overdueCount = await pendingFollowUps.CountAsync(
+                item => item.NextFollowUpAt.HasValue && item.NextFollowUpAt.Value < now,
+                cancellationToken);
+            int dueNextSevenDays = await pendingFollowUps.CountAsync(
+                item => item.NextFollowUpAt.HasValue &&
+                        item.NextFollowUpAt.Value >= now &&
+                        item.NextFollowUpAt.Value <= sevenDaysLater,
+                cancellationToken);
             var upcoming = await ListFollowUpsAsync(null, false, 8, cancellationToken);
 
             return new CrmDashboardRecord(

@@ -112,6 +112,6 @@ namespace ExportDocManager.Models.Entities
 
         public List<SwHandoffPackageRecord> PackageRecords { get; set; } = [];
 
-        public SwSubmitPackageArchive SubmitPackageArchive { get; set; }
+        public SwSubmitPackageArchive? SubmitPackageArchive { get; set; }
     }
 }

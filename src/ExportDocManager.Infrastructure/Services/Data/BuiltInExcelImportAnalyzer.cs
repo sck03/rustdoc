@@ -538,13 +538,8 @@ namespace ExportDocManager.Services.Data
                 return;
             }
 
-            string normalized = NormalizeText(name.Value);
-            if (!normalized.Contains("road", StringComparison.Ordinal)
-                && !normalized.Contains("street", StringComparison.Ordinal)
-                && !normalized.Contains("address", StringComparison.Ordinal)
-                && !normalized.Contains("大道", StringComparison.Ordinal)
-                && !normalized.Contains("路", StringComparison.Ordinal)
-                && !normalized.Contains("号", StringComparison.Ordinal))
+            if (!ExcelImportPartyTextClassifier.LooksLikePostalAddress(name.Value)
+                || ExcelImportPartyTextClassifier.LooksLikeCompanyName(name.Value))
             {
                 return;
             }

@@ -3,7 +3,7 @@ namespace ExportDocManager.Models.Entities
     public class ContainerTypeDefinition
     {
         public int Id { get; set; }
-        public string Name { get; set; } // e.g., "Maersk 20GP", "20GP"
+        public string Name { get; set; } = string.Empty; // e.g., "Maersk 20GP", "20GP"
         public int Length { get; set; } // cm
         public int Width { get; set; }  // cm
         public int Height { get; set; } // cm

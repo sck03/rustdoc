@@ -90,16 +90,6 @@ namespace ExportDocManager.Api.Hosting
                     },
                     ["/api/crm/customers"] = new
                     {
-                        get = new
-                        {
-                            summary = "List CRM customers", operationId = "listCrmCustomers", security = BearerSecurity(),
-                            responses = new Dictionary<string, object>
-                            {
-                                ["200"] = new { description = "CRM customers.", content = JsonArrayContent("ApiCrmCustomerDto") },
-                                ["401"] = new { description = "Missing or invalid bearer token." },
-                                ["403"] = new { description = "Sales workspace is not available." }
-                            }
-                        },
                         post = new
                         {
                             summary = "Create CRM customer", operationId = "createCrmCustomer", security = BearerSecurity(),

@@ -3452,8 +3452,6 @@ export interface SingleWindowReferenceTransportModeEntry {
   value: string;
 }
 
-export type OpenApiDocument = Record<string, unknown>;
-
 export interface ActivateSingleWindowClientProfileRequest {
   profileKey: string;
 }
@@ -5598,11 +5596,6 @@ export class ExportDocManagerApiClient {
     return this.request<void>("GET", path, { init });
   }
 
-  public getOpenApiDocument(init?: RequestInit): Promise<OpenApiDocument> {
-    const path = "/openapi/v1.json";
-    return this.request<OpenApiDocument>("GET", path, { init });
-  }
-
   public getPayee(request: GetPayeeRequest, init?: RequestInit): Promise<ApiPayeeDto> {
     const path = `/api/master-data/payees/${encodePath(request.id)}`;
     return this.request<ApiPayeeDto>("GET", path, { init });
@@ -5833,11 +5826,6 @@ export class ExportDocManagerApiClient {
   public listCrmContacts(request: ListCrmContactsRequest, init?: RequestInit): Promise<ApiCrmContactDto[]> {
     const path = `/api/crm/customers/${encodePath(request.customerId)}/contacts`;
     return this.request<ApiCrmContactDto[]>("GET", path, { init });
-  }
-
-  public listCrmCustomers(init?: RequestInit): Promise<ApiCrmCustomerDto[]> {
-    const path = "/api/crm/customers";
-    return this.request<ApiCrmCustomerDto[]>("GET", path, { init });
   }
 
   public listCrmFollowUps(request: ListCrmFollowUpsRequest = {}, init?: RequestInit): Promise<ApiCrmFollowUpDto[]> {

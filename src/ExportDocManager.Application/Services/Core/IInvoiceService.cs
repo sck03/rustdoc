@@ -21,8 +21,8 @@ namespace ExportDocManager.Services.Core
     {
         public bool Success { get; set; }
         public bool IsUpdate { get; set; }
-        public string ErrorMessage { get; set; }
-        public Invoice SavedInvoice { get; set; }
+        public string? ErrorMessage { get; set; }
+        public Invoice? SavedInvoice { get; set; }
         public SaveFailureKind FailureKind { get; set; }
     }
 
@@ -36,15 +36,15 @@ namespace ExportDocManager.Services.Core
     {
         Task<SaveResult> SaveInvoiceWithAutoCreationAsync(
             Invoice invoice,
-            List<Item> items,
-            Customer customer,
-            Exporter exporter,
-            IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null,
+            List<Item>? items,
+            Customer? customer,
+            Exporter? exporter,
+            IReadOnlyList<HsCodeKnowledgeFeedbackInput>? pendingHsFeedback = null,
             CancellationToken cancellationToken = default);
         Task<bool> SaveInvoiceAsync(Invoice invoice, CancellationToken cancellationToken = default);
         Task<bool> DeleteInvoiceAsync(int id, CancellationToken cancellationToken = default);
-        Task<Invoice> GetInvoiceByIdAsync(int id, CancellationToken cancellationToken = default);
-        Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(
+        Task<Invoice?> GetInvoiceByIdAsync(int id, CancellationToken cancellationToken = default);
+        Task<Invoice?> GetInvoiceByInvoiceNoAndTypeAsync(
             string companyScope,
             string invoiceNo,
             string type,
@@ -56,12 +56,12 @@ namespace ExportDocManager.Services.Core
         Task<Invoice> CopyInvoiceAsync(
             int originalId,
             string newInvoiceNo,
-            InvoiceCloneOptions options = null,
+            InvoiceCloneOptions? options = null,
             CancellationToken cancellationToken = default);
         Task<Invoice> CopyInvoiceAsTypeAsync(
             int originalId,
             string targetType,
-            InvoiceCloneOptions options = null,
+            InvoiceCloneOptions? options = null,
             CancellationToken cancellationToken = default);
         Task<Invoice> TransitionInvoiceStatusAsync(
             InvoiceStatusTransitionRequest request,
@@ -74,10 +74,10 @@ namespace ExportDocManager.Services.Core
         Task<IReadOnlyList<InvoiceStatusHistory>> ListInvoiceStatusHistoryAsync(
             int invoiceId,
             CancellationToken cancellationToken = default);
-        Task<Invoice> GetLatestInvoiceByPartiesAsync(
+        Task<Invoice?> GetLatestInvoiceByPartiesAsync(
             int? customerId,
             int? exporterId,
             CancellationToken cancellationToken = default);
-        Task<Invoice> GetLastInvoiceAsync(CancellationToken cancellationToken = default);
+        Task<Invoice?> GetLastInvoiceAsync(CancellationToken cancellationToken = default);
     }
 }

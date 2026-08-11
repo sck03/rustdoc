@@ -4,7 +4,7 @@ namespace ExportDocManager.Models.Entities
     {
         public int Id { get; set; }
         public int ProjectId { get; set; }
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
         public decimal Length { get; set; }
         public decimal Width { get; set; }
         public decimal Height { get; set; }

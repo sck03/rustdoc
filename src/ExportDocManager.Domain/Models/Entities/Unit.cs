@@ -9,15 +9,15 @@ namespace ExportDocManager.Models.Entities
 
         [Required]
         [MaxLength(20)]
-        public string NameEN { get; set; } // English Unit (e.g., PCS, SETS)
+        public string NameEN { get; set; } = string.Empty; // English Unit (e.g., PCS, SETS)
 
         [MaxLength(20)]
-        public string NameCN { get; set; } // Chinese Unit (e.g., 件, 套)
+        public string? NameCN { get; set; } // Chinese Unit (e.g., 件, 套)
 
         [MaxLength(10)]
-        public string Code { get; set; } // Optional Code
+        public string? Code { get; set; } // Optional Code
 
         [ConcurrencyCheck]
-        public byte[] RowVersion { get; set; }
+        public byte[]? RowVersion { get; set; }
     }
 }

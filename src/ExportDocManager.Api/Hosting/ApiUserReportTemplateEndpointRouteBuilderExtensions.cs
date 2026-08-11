@@ -12,8 +12,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IUserReportTemplateService service,
-                string reportType,
-                bool includeInactive,
+                string? reportType,
+                bool? includeInactive,
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
@@ -35,7 +35,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("报表类型无效。"));
                 }
 
-                var rows = await service.ListAsync(parsedReportType, includeInactive, cancellationToken);
+                var rows = await service.ListAsync(parsedReportType, includeInactive ?? false, cancellationToken);
                 return Results.Ok(rows.Select(ToApiDto));
             })
             .WithName("ListUserReportTemplates");

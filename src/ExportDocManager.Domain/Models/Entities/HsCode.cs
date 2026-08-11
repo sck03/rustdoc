@@ -14,25 +14,25 @@ namespace ExportDocManager.Models.Entities
         private string _code = string.Empty;
         private string _normalizedCode = string.Empty;
         private string _name = string.Empty;
-        private string _unit;
-        private string _description;
-        private string _elements;
-        private string _supervisionConditions;
-        private string _inspectionCategory;
-        private string _rebateRate;
+        private string? _unit;
+        private string? _description;
+        private string? _elements;
+        private string? _supervisionConditions;
+        private string? _inspectionCategory;
+        private string? _rebateRate;
         private DateTime? _updateTime = DateTime.Now;
-        private string _detailUrl;
+        private string? _detailUrl;
         private string _status = "ReferenceOnly";
-        private string _sourceName;
+        private string? _sourceName;
         private int? _effectiveYear;
         private DateTime? _lastVerifiedAt;
-        private string _replacedByCodes;
-        private string _normalTariffRate;
-        private string _preferentialTariffRate;
-        private string _exportTariffRate;
-        private string _consumptionTaxRate;
-        private string _valueAddedTaxRate;
-        private string _notes;
+        private string? _replacedByCodes;
+        private string? _normalTariffRate;
+        private string? _preferentialTariffRate;
+        private string? _exportTariffRate;
+        private string? _consumptionTaxRate;
+        private string? _valueAddedTaxRate;
+        private string? _notes;
 
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -89,46 +89,46 @@ namespace ExportDocManager.Models.Entities
         public string Name
         {
             get => _name;
-            set => SetProperty(ref _name, value);
+            set => SetProperty(ref _name, value ?? string.Empty);
         } // 商品名称
 
         [MaxLength(50)]
-        public string Unit
+        public string? Unit
         {
             get => _unit;
             set => SetProperty(ref _unit, value);
         } // 法定单位
 
         [MaxLength(500)]
-        public string Description
+        public string? Description
         {
             get => _description;
             set => SetProperty(ref _description, value);
         } // 描述
 
         [MaxLength(500)]
-        public string Elements
+        public string? Elements
         {
             get => _elements;
             set => SetProperty(ref _elements, value);
         } // 申报要素
 
         [MaxLength(50)]
-        public string SupervisionConditions
+        public string? SupervisionConditions
         {
             get => _supervisionConditions;
             set => SetProperty(ref _supervisionConditions, value);
         } // 监管条件 (e.g., A/B)
 
         [MaxLength(50)]
-        public string InspectionCategory
+        public string? InspectionCategory
         {
             get => _inspectionCategory;
             set => SetProperty(ref _inspectionCategory, value);
         } // 检验检疫类别 (e.g., M/N)
 
         [MaxLength(50)]
-        public string RebateRate
+        public string? RebateRate
         {
             get => _rebateRate;
             set => SetProperty(ref _rebateRate, value);
@@ -148,7 +148,7 @@ namespace ExportDocManager.Models.Entities
         }
 
         [MaxLength(200)]
-        public string SourceName
+        public string? SourceName
         {
             get => _sourceName;
             set => SetProperty(ref _sourceName, value?.Trim());
@@ -167,67 +167,67 @@ namespace ExportDocManager.Models.Entities
         }
 
         [MaxLength(500)]
-        public string ReplacedByCodes
+        public string? ReplacedByCodes
         {
             get => _replacedByCodes;
             set => SetProperty(ref _replacedByCodes, value?.Trim());
         }
 
         [MaxLength(50)]
-        public string NormalTariffRate
+        public string? NormalTariffRate
         {
             get => _normalTariffRate;
             set => SetProperty(ref _normalTariffRate, value?.Trim());
         }
 
         [MaxLength(50)]
-        public string PreferentialTariffRate
+        public string? PreferentialTariffRate
         {
             get => _preferentialTariffRate;
             set => SetProperty(ref _preferentialTariffRate, value?.Trim());
         }
 
         [MaxLength(50)]
-        public string ExportTariffRate
+        public string? ExportTariffRate
         {
             get => _exportTariffRate;
             set => SetProperty(ref _exportTariffRate, value?.Trim());
         }
 
         [MaxLength(50)]
-        public string ConsumptionTaxRate
+        public string? ConsumptionTaxRate
         {
             get => _consumptionTaxRate;
             set => SetProperty(ref _consumptionTaxRate, value?.Trim());
         }
 
         [MaxLength(50)]
-        public string ValueAddedTaxRate
+        public string? ValueAddedTaxRate
         {
             get => _valueAddedTaxRate;
             set => SetProperty(ref _valueAddedTaxRate, value?.Trim());
         }
 
         [MaxLength(1000)]
-        public string Notes
+        public string? Notes
         {
             get => _notes;
             set => SetProperty(ref _notes, value?.Trim());
         }
 
         [ConcurrencyCheck]
-        public byte[] RowVersion { get; set; }
+        public byte[]? RowVersion { get; set; }
 
         [NotMapped]
-        public string DetailUrl
+        public string? DetailUrl
         {
             get => _detailUrl;
             set => SetProperty(ref _detailUrl, value);
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
-        private void SetProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        private void SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
         {
             if (EqualityComparer<T>.Default.Equals(field, value))
             {

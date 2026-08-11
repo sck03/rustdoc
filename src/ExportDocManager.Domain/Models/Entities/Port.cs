@@ -9,18 +9,18 @@ namespace ExportDocManager.Models.Entities
 
         [Required]
         [MaxLength(100)]
-        public string NameEN { get; set; } // English Name (Primary)
+        public string NameEN { get; set; } = string.Empty; // English Name (Primary)
 
         [MaxLength(100)]
-        public string NameCN { get; set; } // Chinese Name
+        public string? NameCN { get; set; } // Chinese Name
 
         [MaxLength(50)]
-        public string Country { get; set; }
+        public string? Country { get; set; }
 
         [MaxLength(20)]
-        public string Code { get; set; } // Port Code (e.g., UN/LOCODE)
+        public string? Code { get; set; } // Port Code (e.g., UN/LOCODE)
 
         [ConcurrencyCheck]
-        public byte[] RowVersion { get; set; }
+        public byte[]? RowVersion { get; set; }
     }
 }

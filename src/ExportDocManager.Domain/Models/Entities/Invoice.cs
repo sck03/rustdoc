@@ -16,28 +16,29 @@ namespace ExportDocManager.Models.Entities
         public int? OwnerUserId { get; set; }
         public string DepartmentId { get; set; } = string.Empty;
         public string CompanyScope { get; set; } = string.Empty;
-        public string InvoiceNo { get; set; }
-        public string ContractNo { get; set; }
+        [Required]
+        public string InvoiceNo { get; set; } = string.Empty;
+        public string? ContractNo { get; set; }
         public DateTime InvoiceDate { get; set; }
-        public string LetterOfCreditNo { get; set; }
-        public string LetterOfCreditSourcePath { get; set; }
-        public string LetterOfCreditContent { get; set; }
-        public string IssuingBank { get; set; }
-        public string CustomsBrokerName { get; set; }
-        public string CustomsBrokerCode { get; set; }
-        public string Spare1 { get; set; }
-        public string Spare2 { get; set; }
-        public string Spare3 { get; set; }
-        public string CustomFieldsJson { get; set; }
-        public string PaymentTerms { get; set; }
-        public string PortOfLoading { get; set; }
-        public string PortOfDestination { get; set; }
-        public string DestinationCountry { get; set; }
-        public string ShippingMarks { get; set; }
+        public string? LetterOfCreditNo { get; set; }
+        public string? LetterOfCreditSourcePath { get; set; }
+        public string? LetterOfCreditContent { get; set; }
+        public string? IssuingBank { get; set; }
+        public string? CustomsBrokerName { get; set; }
+        public string? CustomsBrokerCode { get; set; }
+        public string? Spare1 { get; set; }
+        public string? Spare2 { get; set; }
+        public string? Spare3 { get; set; }
+        public string? CustomFieldsJson { get; set; }
+        public string? PaymentTerms { get; set; }
+        public string? PortOfLoading { get; set; }
+        public string? PortOfDestination { get; set; }
+        public string? DestinationCountry { get; set; }
+        public string? ShippingMarks { get; set; }
         public string ShippingMarksType { get; set; } = "Text"; // Text or Image
-        public string ShippingMarksImage { get; set; } // Path to image file relative to App_Data
-        public string TradeTerms { get; set; }
-        public string TransportMode { get; set; }
+        public string? ShippingMarksImage { get; set; } // Path to image file relative to App_Data
+        public string? TradeTerms { get; set; }
+        public string? TransportMode { get; set; }
         public DateTime ShipmentDate { get; set; } // 船期/航期字段
         public int ExporterId { get; set; }
         public int CustomerId { get; set; }
@@ -50,29 +51,29 @@ namespace ExportDocManager.Models.Entities
         public decimal TotalPurchaseAmount { get; set; } // 采购总价
         public decimal TotalTaxRefundAmount { get; set; } // 退税总额
         public decimal TotalProfit { get; set; } // 利润总额
-        public string Currency { get; set; }
-        public string SpecialTerms { get; set; }
-        public string Type { get; set; }
-        public string SupervisionMode { get; set; } // 监管方式
+        public string? Currency { get; set; }
+        public string? SpecialTerms { get; set; }
+        public string? Type { get; set; }
+        public string? SupervisionMode { get; set; } // 监管方式
 
         // Buyer Information Snapshot (买方快照)
-        public string CustomerNameEN { get; set; }
-        public string CustomerAddressEN { get; set; }
-        public string NotifyPartyName { get; set; } // 通知人名称，原 CustomerNameCN
-        public string NotifyPartyAddress { get; set; } // 通知人地址，原 AddressCN
+        public string? CustomerNameEN { get; set; }
+        public string? CustomerAddressEN { get; set; }
+        public string? NotifyPartyName { get; set; } // 通知人名称，原 CustomerNameCN
+        public string? NotifyPartyAddress { get; set; } // 通知人地址，原 AddressCN
 
         // Seller Information Snapshot (卖方快照)
-        public string ExporterNameEN { get; set; }
-        public string ExporterNameCN { get; set; }
-        public string ExporterAddressEN { get; set; }
-        public string ExporterAddressCN { get; set; }
-        public string ExporterCreditCode { get; set; }
-        public string ExporterCustomsCode { get; set; }
+        public string? ExporterNameEN { get; set; }
+        public string? ExporterNameCN { get; set; }
+        public string? ExporterAddressEN { get; set; }
+        public string? ExporterAddressCN { get; set; }
+        public string? ExporterCreditCode { get; set; }
+        public string? ExporterCustomsCode { get; set; }
 
         // Financial Information Snapshot (财务/银行快照)
-        public string BankName { get; set; }
-        public string BankAccount { get; set; }
-        public string SwiftCode { get; set; }
+        public string? BankName { get; set; }
+        public string? BankAccount { get; set; }
+        public string? SwiftCode { get; set; }
         public decimal? ExchangeRate { get; set; } // 汇率
 
         /// <summary>
@@ -81,7 +82,7 @@ namespace ExportDocManager.Models.Entities
         public string Status { get; set; } = InvoiceStatusCatalog.Draft;
 
         [ConcurrencyCheck]
-        public byte[] RowVersion { get; set; }
+        public byte[]? RowVersion { get; set; }
 
         public List<Item> Items { get; set; } = new List<Item>();
 

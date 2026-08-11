@@ -44,6 +44,6 @@ namespace ExportDocManager.Models.Entities
 
         public int SortOrder { get; set; }
 
-        public CustomsCooDocument Document { get; set; }
+        public CustomsCooDocument? Document { get; set; }
     }
 }

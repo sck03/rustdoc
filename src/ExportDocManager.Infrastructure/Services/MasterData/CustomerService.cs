@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -22,7 +24,7 @@ namespace ExportDocManager.Services.MasterData
         public CustomerService(
             IDbContextFactory<AppDbContext> contextFactory,
             ICustomerReadRepository customerReadRepository,
-            BusinessDataAccessScope accessScope = null)
+            BusinessDataAccessScope? accessScope = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _customerReadRepository = customerReadRepository ?? throw new ArgumentNullException(nameof(customerReadRepository));
@@ -74,7 +76,7 @@ namespace ExportDocManager.Services.MasterData
             return rows.ToList();
         }
 
-        public async Task<Customer> GetCustomerByIdAsync(
+        public async Task<Customer?> GetCustomerByIdAsync(
             int id,
             CancellationToken cancellationToken = default)
         {
@@ -105,7 +107,7 @@ namespace ExportDocManager.Services.MasterData
             }
         }
 
-        public async Task<Customer> GetCustomerByNameAsync(
+        public async Task<Customer?> GetCustomerByNameAsync(
             string name,
             CancellationToken cancellationToken = default)
         {

@@ -14,7 +14,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPortReadRepository repository,
-                string keyword,
+                string? keyword,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -36,7 +36,7 @@ namespace ExportDocManager.Api.Hosting
                 IPortReadRepository repository,
                 int pageNumber,
                 int pageSize,
-                string keyword,
+                string? keyword,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();

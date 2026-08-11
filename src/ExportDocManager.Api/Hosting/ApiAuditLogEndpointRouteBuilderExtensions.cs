@@ -21,13 +21,13 @@ namespace ExportDocManager.Api.Hosting
                 IAuditLogReadRepository auditLogReadRepository,
                 int? pageNumber,
                 int? pageSize,
-                string invoiceKeyword,
-                string entityName,
-                string action,
-                string userId,
+                string? invoiceKeyword,
+                string? entityName,
+                string? action,
+                string? userId,
                 DateTime? startTime,
                 DateTime? endTime,
-                string keyword,
+                string? keyword,
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
@@ -176,7 +176,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IAuditLogService auditLogService,
-                ApiAuditLogDeleteRequest request) =>
+                ApiAuditLogDeleteRequest request,
+                CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -197,7 +198,8 @@ namespace ExportDocManager.Api.Hosting
 
                 int deletedCount = await auditLogService.DeleteByCriteriaAsync(
                     ToAuditLogCriteria(request),
-                    NormalizeMaxCount(request.MaxCount, AuditLogDeleteMaxCount));
+                    NormalizeMaxCount(request.MaxCount, AuditLogDeleteMaxCount),
+                    cancellationToken);
 
                 return Results.Ok(new ApiAuditLogCommandResponse(
                     true,
@@ -213,7 +215,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IAuditLogService auditLogService,
-                ApiAuditLogCleanupRequest request) =>
+                ApiAuditLogCleanupRequest request,
+                CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
@@ -244,7 +247,8 @@ namespace ExportDocManager.Api.Hosting
                 var cutoffUtc = DateTime.UtcNow.AddDays(-request.DaysToKeep);
                 int deletedCount = await auditLogService.DeleteOlderThanAsync(
                     cutoffUtc,
-                    NormalizeMaxCount(request.MaxCount, AuditLogCleanupMaxCount));
+                    NormalizeMaxCount(request.MaxCount, AuditLogCleanupMaxCount),
+                    cancellationToken);
 
                 return Results.Ok(new ApiAuditLogCommandResponse(
                     true,

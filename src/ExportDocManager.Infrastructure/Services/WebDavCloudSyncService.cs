@@ -17,7 +17,9 @@ namespace ExportDocManager.Services.Infrastructure
 {
     public class WebDavCloudSyncService : ICloudSyncService
     {
+        public const long MaximumUploadBytes = 4L * 1024L * 1024L * 1024L;
         public const long MaximumDownloadBytes = 4L * 1024L * 1024L * 1024L;
+        private const int TransferBufferBytes = 128 * 1024;
         private const long MaximumPropFindResponseBytes = 2L * 1024L * 1024L;
         private const long MaximumErrorResponseBytes = 64L * 1024L;
         private readonly ISettingsService _settingsService;
@@ -43,18 +45,31 @@ namespace ExportDocManager.Services.Infrastructure
             var config = Config;
             string baseUrl = NormalizeConfiguredBaseUrl(config, out string userName);
 
-            if (!File.Exists(localFilePath))
+            var localFile = new FileInfo(localFilePath);
+            if (!localFile.Exists)
                 throw new ResourceNotFoundException("找不到要上传的本地备份文件。");
+            if (localFile.Length <= 0)
+                throw new ServiceValidationException("要上传的本地备份文件为空。");
+            if (localFile.Length > MaximumUploadBytes)
+                throw new PayloadLimitExceededException(MaximumUploadBytes);
 
             string normalizedRemoteFileName = NormalizeRemoteFileName(remoteFileName);
             string encodedFileName = Uri.EscapeDataString(normalizedRemoteFileName);
             var uploadUri = BuildUri($"{baseUrl}/{encodedFileName}");
 
             using var client = CreateClient(config, userName, TimeSpan.FromMinutes(10));
+            await using var sourceStream = new FileStream(
+                localFile.FullName,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                TransferBufferBytes,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
             using var request = new HttpRequestMessage(HttpMethod.Put, uploadUri)
             {
-                Content = new StreamContent(File.OpenRead(localFilePath))
+                Content = new StreamContent(sourceStream, TransferBufferBytes)
             };
+            request.Content.Headers.ContentLength = localFile.Length;
             using var response = await SendWithoutRedirectAsync(
                 client,
                 request,

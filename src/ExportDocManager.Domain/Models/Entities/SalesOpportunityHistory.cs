@@ -6,7 +6,7 @@ namespace ExportDocManager.Models.Entities
     {
         public int Id { get; set; }
         public int SalesOpportunityId { get; set; }
-        public SalesOpportunity Opportunity { get; set; }
+        public SalesOpportunity? Opportunity { get; set; }
         public int VersionNumber { get; set; }
         [MaxLength(30)] public string ChangeType { get; set; } = string.Empty;
         [MaxLength(30)] public string Stage { get; set; } = string.Empty;

@@ -577,8 +577,13 @@ pub(super) fn looks_like_business_party_value(value: &str) -> bool {
         return false;
     }
 
-    if looks_like_address_fragment(&normalized) {
-        return true;
+    looks_like_company_name(&normalized) || looks_like_address_fragment(&normalized)
+}
+
+pub(super) fn looks_like_company_name(value: &str) -> bool {
+    let normalized = normalize_field_value(value);
+    if normalized.is_empty() {
+        return false;
     }
 
     let upper = normalized.to_uppercase();
@@ -599,6 +604,10 @@ pub(super) fn looks_like_business_party_value(value: &str) -> bool {
     ]
     .iter()
     .any(|suffix| upper.contains(suffix))
+}
+
+pub(super) fn is_plausible_party_name_candidate(value: &str) -> bool {
+    looks_like_company_name(value) || !looks_like_address_fragment(value)
 }
 
 pub(super) fn is_same_or_near_short_label(value: &str, label: &str) -> bool {
@@ -729,7 +738,7 @@ pub(super) fn normalize_address_candidate_value(value: &str) -> String {
 
     let first_address_line = lines
         .iter()
-        .position(|line| looks_like_address_fragment(line))
+        .position(|line| looks_like_address_fragment(line) && !looks_like_company_name(line))
         .unwrap_or(0);
 
     let kept_lines = if first_address_line > 0 {
@@ -782,23 +791,57 @@ pub(super) fn looks_like_address_fragment(value: &str) -> bool {
     }
 
     let normalized = value.to_lowercase();
-    normalized.chars().any(|c| c.is_ascii_digit())
-        || normalized.contains("road")
-        || normalized.contains("rd")
-        || normalized.contains("street")
-        || normalized.contains("st")
-        || normalized.contains("avenue")
-        || normalized.contains("ave")
-        || normalized.contains("building")
-        || normalized.contains("floor")
-        || normalized.contains("fl")
-        || normalized.contains("china")
-        || normalized.contains("usa")
+    let tokens = normalized
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|token| !token.is_empty())
+        .collect::<Vec<_>>();
+    let has_numeric_token = tokens
+        .iter()
+        .any(|token| token.chars().any(|character| character.is_ascii_digit()));
+    let has_full_address_marker = tokens.iter().any(|token| {
+        matches!(
+            *token,
+            "road"
+                | "street"
+                | "avenue"
+                | "boulevard"
+                | "building"
+                | "floor"
+                | "suite"
+                | "room"
+                | "district"
+                | "province"
+                | "city"
+                | "postcode"
+                | "zipcode"
+                | "china"
+                | "usa"
+                | "netherlands"
+                | "kingdom"
+        )
+    });
+    let has_abbreviated_address_marker = has_numeric_token
+        && tokens
+            .iter()
+            .any(|token| matches!(*token, "rd" | "st" | "ave" | "blvd" | "fl" | "no"));
+    let has_contact_marker = tokens
+        .iter()
+        .any(|token| matches!(*token, "tel" | "telephone" | "fax" | "email" | "mail"));
+    let has_chinese_address_marker = normalized.contains('路')
+        || normalized.contains('街')
+        || normalized.contains('道')
+        || normalized.contains('区')
+        || normalized.contains('省')
+        || normalized.contains('市')
+        || (has_numeric_token && normalized.contains('号'));
+
+    has_full_address_marker
+        || has_abbreviated_address_marker
+        || has_contact_marker
+        || has_chinese_address_marker
+        || (has_numeric_token
+            && (tokens.len() >= 3 || normalized.contains(',') || normalized.contains('.')))
         || normalized.contains("united states")
-        || normalized.contains("tel")
-        || normalized.contains("mail")
-        || normalized.contains("路")
-        || normalized.contains("号")
 }
 
 pub(super) fn looks_like_known_document_label(value: &str) -> bool {
@@ -837,7 +880,8 @@ pub(super) fn extra_document_boundary_labels() -> [&'static str; 10] {
 pub(super) fn is_field_boundary_value(value: &str) -> bool {
     looks_like_known_document_label(value)
         || looks_like_service_code_option(value)
-        || detect_field(&normalize_text(value)).is_some()
+        || (!looks_like_business_party_value(value)
+            && detect_field(&normalize_text(value)).is_some())
 }
 
 pub(super) fn looks_like_service_code_option(value: &str) -> bool {

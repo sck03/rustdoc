@@ -8,7 +8,7 @@ namespace ExportDocManager.Services.Tools
             int limit,
             CancellationToken cancellationToken = default);
 
-        Task<ContainerProject> GetProjectAsync(
+        Task<ContainerProject?> GetProjectAsync(
             int projectId,
             CancellationToken cancellationToken = default);
 

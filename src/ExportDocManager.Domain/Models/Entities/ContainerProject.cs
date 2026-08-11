@@ -9,8 +9,8 @@ namespace ExportDocManager.Models.Entities
         public int? OwnerUserId { get; set; }
         public string DepartmentId { get; set; } = string.Empty;
         public string CompanyScope { get; set; } = string.Empty;
-        public string Name { get; set; }
-        public string ContainerType { get; set; } // 20GP, 40GP, etc.
+        public string Name { get; set; } = string.Empty;
+        public string? ContainerType { get; set; } // 20GP, 40GP, etc.
         
         // Custom Container Dimensions
         public int ContainerLength { get; set; } // cm

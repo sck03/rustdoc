@@ -36,11 +36,15 @@ namespace ExportDocManager.Services.Infrastructure
             _auditLogReadRepository = auditLogReadRepository ?? throw new ArgumentNullException(nameof(auditLogReadRepository));
         }
 
-        public async Task<List<AuditLog>> QueryAsync(AuditLogQueryCriteria criteria, int maxCount = 2000)
+        public async Task<List<AuditLog>> QueryAsync(
+            AuditLogQueryCriteria criteria,
+            int maxCount = 2000,
+            CancellationToken cancellationToken = default)
         {
             var rows = await _auditLogReadRepository.QueryAllAsync(
                 AuditLogQueryHelper.ToPageQuery(criteria),
-                maxCount);
+                maxCount,
+                cancellationToken);
             return rows.ToList();
         }
 
@@ -91,24 +95,33 @@ namespace ExportDocManager.Services.Infrastructure
             return output.ToArray();
         }
 
-        public async Task<int> DeleteByCriteriaAsync(AuditLogQueryCriteria criteria, int maxCount = 50000)
+        public async Task<int> DeleteByCriteriaAsync(
+            AuditLogQueryCriteria criteria,
+            int maxCount = 50000,
+            CancellationToken cancellationToken = default)
         {
             var normalizedCriteria = AuditLogQueryHelper.ToPageQuery(criteria);
             return await DeleteInBatchesAsync(
                 context => AuditLogQueryHelper.ApplyCriteria(context.AuditLogs.AsQueryable(), normalizedCriteria),
-                maxCount);
+                maxCount,
+                cancellationToken);
         }
 
-        public async Task<int> DeleteOlderThanAsync(DateTime cutoffUtc, int maxCount = 200000)
+        public async Task<int> DeleteOlderThanAsync(
+            DateTime cutoffUtc,
+            int maxCount = 200000,
+            CancellationToken cancellationToken = default)
         {
             return await DeleteInBatchesAsync(
                 context => context.AuditLogs.Where(x => x.Timestamp < cutoffUtc),
-                maxCount);
+                maxCount,
+                cancellationToken);
         }
 
         private async Task<int> DeleteInBatchesAsync(
             Func<AppDbContext, IQueryable<AuditLog>> buildQuery,
-            int maxCount)
+            int maxCount,
+            CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(buildQuery);
 
@@ -117,17 +130,18 @@ namespace ExportDocManager.Services.Infrastructure
 
             return await AppDbContextExecution.ExecuteInTransactionAsync(
                 _contextFactory,
-                async (context, _) =>
+                async (context, token) =>
                 {
                     while (remaining > 0)
                     {
+                        token.ThrowIfCancellationRequested();
                         int batchSize = Math.Min(DeleteBatchSize, remaining);
                         var ids = await buildQuery(context)
                             .OrderBy(log => log.Timestamp)
                             .ThenBy(log => log.Id)
                             .Select(log => log.Id)
                             .Take(batchSize)
-                            .ToListAsync();
+                            .ToListAsync(token);
 
                         if (ids.Count == 0)
                         {
@@ -136,13 +150,14 @@ namespace ExportDocManager.Services.Infrastructure
 
                         deletedCount += await context.AuditLogs
                             .Where(log => ids.Contains(log.Id))
-                            .ExecuteDeleteAsync();
+                            .ExecuteDeleteAsync(token);
 
                         remaining -= ids.Count;
                     }
 
                     return deletedCount;
-                });
+                },
+                cancellationToken);
         }
 
         private static void WriteAuditLogWorkbook(

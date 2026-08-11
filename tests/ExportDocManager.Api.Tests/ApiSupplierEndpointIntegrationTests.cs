@@ -160,7 +160,10 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(1, page?.TotalCount);
             Assert.Equal(supplier.Id, Assert.Single(page!.Items).Id);
 
-            Assert.Empty(await client.GetFromJsonAsync<List<ApiCrmCustomerDto>>("/api/crm/customers") ?? []);
+            var crmPage = await client.GetFromJsonAsync<ApiPagedResponse<ApiCrmCustomerDto>>(
+                "/api/crm/customers/page?pageNumber=1&pageSize=10");
+            Assert.NotNull(crmPage);
+            Assert.Empty(crmPage.Items);
             Assert.Empty(await client.GetFromJsonAsync<List<ApiCustomerDto>>("/api/master-data/customers") ?? []);
 
             const string csv = "供应商名称,国家/地区,分类,网站,状态,主要产品,联系人,职位,邮箱,电话\n" +

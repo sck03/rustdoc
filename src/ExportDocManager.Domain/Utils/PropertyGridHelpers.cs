@@ -24,10 +24,11 @@ namespace ExportDocManager.Utils
         {
         }
 
-        public override ICustomTypeDescriptor GetTypeDescriptor(Type objectType, object instance)
+        public override ICustomTypeDescriptor GetTypeDescriptor(Type objectType, object? instance)
         {
             var baseDescriptor = base.GetTypeDescriptor(objectType, instance);
-            return new OrderedTypeDescriptor(baseDescriptor);
+            return new OrderedTypeDescriptor(
+                baseDescriptor ?? throw new InvalidOperationException("无法获取类型描述器。"));
         }
     }
 
@@ -43,7 +44,7 @@ namespace ExportDocManager.Utils
             return GetProperties([]);
         }
 
-        public override PropertyDescriptorCollection GetProperties(Attribute[] attributes)
+        public override PropertyDescriptorCollection GetProperties(Attribute[]? attributes)
         {
             var pdc = base.GetProperties(attributes);
             var orderedProperties = pdc.Cast<PropertyDescriptor>()
@@ -80,15 +81,23 @@ namespace ExportDocManager.Utils
         public override Type ComponentType => _baseDescriptor.ComponentType;
         public override bool IsReadOnly => _baseDescriptor.IsReadOnly;
         public override Type PropertyType => _baseDescriptor.PropertyType;
-        public override bool CanResetValue(object component) => _baseDescriptor.CanResetValue(component);
-        public override object GetValue(object component) => _baseDescriptor.GetValue(component);
-        public override void ResetValue(object component) => _baseDescriptor.ResetValue(component);
-        public override void SetValue(object component, object value) => _baseDescriptor.SetValue(component, value);
-        public override bool ShouldSerializeValue(object component) => _baseDescriptor.ShouldSerializeValue(component);
+        public override bool CanResetValue(object? component) =>
+            component != null && _baseDescriptor.CanResetValue(component);
+        public override object? GetValue(object? component) => _baseDescriptor.GetValue(component);
+        public override void ResetValue(object? component)
+        {
+            if (component != null)
+            {
+                _baseDescriptor.ResetValue(component);
+            }
+        }
+        public override void SetValue(object? component, object? value) => _baseDescriptor.SetValue(component, value);
+        public override bool ShouldSerializeValue(object? component) =>
+            component != null && _baseDescriptor.ShouldSerializeValue(component);
         public override string Description => _baseDescriptor.Description;
         public override string Category => _baseDescriptor.Category;
         public override TypeConverter Converter => _baseDescriptor.Converter;
         public override AttributeCollection Attributes => _baseDescriptor.Attributes;
-        public override object GetEditor(Type editorBaseType) => _baseDescriptor.GetEditor(editorBaseType);
+        public override object? GetEditor(Type editorBaseType) => _baseDescriptor.GetEditor(editorBaseType);
     }
 }

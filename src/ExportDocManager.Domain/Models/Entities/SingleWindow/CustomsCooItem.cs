@@ -128,6 +128,6 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(10)]
         public string GoodsTaxRate { get; set; } = string.Empty;
 
-        public CustomsCooDocument Document { get; set; }
+        public CustomsCooDocument? Document { get; set; }
     }
 }

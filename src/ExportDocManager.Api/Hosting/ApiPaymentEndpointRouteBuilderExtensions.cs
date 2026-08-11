@@ -16,7 +16,7 @@ namespace ExportDocManager.Api.Hosting
                 IPaymentReadRepository paymentReadRepository,
                 int? pageNumber,
                 int? pageSize,
-                string keyword,
+                string? keyword,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)

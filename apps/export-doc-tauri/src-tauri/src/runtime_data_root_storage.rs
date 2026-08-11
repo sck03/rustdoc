@@ -124,7 +124,12 @@ pub(crate) fn probe_writable_directory(path: &Path) -> Result<(), Box<dyn Error>
             .read(true)
             .write(true)
             .open(&probe_path)
-            .map_err(|error| format!("Data root '{}' is not writable: {error}", path.display()))?;
+            .map_err(|error| {
+                format!(
+                    "无法写入数据目录 '{}'。请确认当前账号拥有该目录的读写和删除权限：{error}",
+                    path.display()
+                )
+            })?;
         file.write_all(&random_bytes)?;
         file.sync_all()?;
         file.rewind()?;
@@ -146,6 +151,49 @@ pub(crate) fn probe_writable_directory(path: &Path) -> Result<(), Box<dyn Error>
         let _ = fs::remove_file(&probe_path);
     }
     probe_result
+}
+
+pub(crate) fn directory_tree_size(root: &Path) -> Result<u64, Box<dyn Error>> {
+    let mut total_bytes = 0_u64;
+    collect_directory_tree_size(root, &mut total_bytes)?;
+    Ok(total_bytes)
+}
+
+fn collect_directory_tree_size(
+    directory: &Path,
+    total_bytes: &mut u64,
+) -> Result<(), Box<dyn Error>> {
+    for entry in fs::read_dir(directory).map_err(|error| {
+        format!(
+            "无法读取待迁移数据目录 '{}'。请确认当前账号拥有读取权限：{error}",
+            directory.display()
+        )
+    })? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        let metadata = fs::symlink_metadata(&entry_path)?;
+        if metadata.file_type().is_symlink() || is_windows_reparse_point(&metadata) {
+            return Err(format!(
+                "数据目录迁移不支持符号链接、目录联接或重解析点：'{}'.",
+                entry_path.display()
+            )
+            .into());
+        }
+        if metadata.is_dir() {
+            collect_directory_tree_size(&entry_path, total_bytes)?;
+        } else if metadata.is_file() {
+            *total_bytes = total_bytes
+                .checked_add(metadata.len())
+                .ok_or("待迁移数据总大小超过程序可处理的范围。")?;
+        } else {
+            return Err(format!(
+                "数据目录包含不支持的文件系统对象：'{}'.",
+                entry_path.display()
+            )
+            .into());
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn reject_link_like_path(path: &Path) -> Result<(), Box<dyn Error>> {

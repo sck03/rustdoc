@@ -19,7 +19,10 @@ namespace ExportDocManager.Services.Infrastructure
 
     public interface IAuditLogService
     {
-        Task<List<AuditLog>> QueryAsync(AuditLogQueryCriteria criteria, int maxCount = 2000);
+        Task<List<AuditLog>> QueryAsync(
+            AuditLogQueryCriteria criteria,
+            int maxCount = 2000,
+            CancellationToken cancellationToken = default);
         Task<int> ExportToExcelAsync(
             AuditLogQueryCriteria criteria,
             string filePath,
@@ -29,7 +32,13 @@ namespace ExportDocManager.Services.Infrastructure
             AuditLogQueryCriteria criteria,
             int maxCount = 50000,
             CancellationToken cancellationToken = default);
-        Task<int> DeleteByCriteriaAsync(AuditLogQueryCriteria criteria, int maxCount = 50000);
-        Task<int> DeleteOlderThanAsync(DateTime cutoffUtc, int maxCount = 200000);
+        Task<int> DeleteByCriteriaAsync(
+            AuditLogQueryCriteria criteria,
+            int maxCount = 50000,
+            CancellationToken cancellationToken = default);
+        Task<int> DeleteOlderThanAsync(
+            DateTime cutoffUtc,
+            int maxCount = 200000,
+            CancellationToken cancellationToken = default);
     }
 }

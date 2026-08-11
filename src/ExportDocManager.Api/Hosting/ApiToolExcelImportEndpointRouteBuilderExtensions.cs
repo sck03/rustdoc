@@ -63,7 +63,7 @@ namespace ExportDocManager.Api.Hosting
                 IAppPathProvider pathProvider,
                 ISettingsService settingsService,
                 IExcelImportService excelImportService,
-                string fileName,
+                string? fileName,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)

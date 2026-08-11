@@ -36,7 +36,7 @@ namespace ExportDocManager.Services.Tools
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<ContainerProject> GetProjectAsync(
+        public async Task<ContainerProject?> GetProjectAsync(
             int projectId,
             CancellationToken cancellationToken = default)
         {

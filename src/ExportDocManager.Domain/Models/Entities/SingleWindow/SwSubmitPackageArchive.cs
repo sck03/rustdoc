@@ -17,6 +17,6 @@ namespace ExportDocManager.Models.Entities
 
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
-        public SwSubmissionBatch Batch { get; set; }
+        public SwSubmissionBatch? Batch { get; set; }
     }
 }

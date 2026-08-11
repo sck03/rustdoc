@@ -4,7 +4,7 @@ namespace ExportDocManager.Utils
 {
     public static class AuxiliaryDataTextHelper
     {
-        public static void NormalizePort(Port port)
+        public static void NormalizePort(Port? port)
         {
             if (port == null)
             {
@@ -17,7 +17,7 @@ namespace ExportDocManager.Utils
             port.Country = TextSearchHelper.NormalizeValue(port.Country);
         }
 
-        public static void NormalizeUnit(Unit unit)
+        public static void NormalizeUnit(Unit? unit)
         {
             if (unit == null)
             {
@@ -29,17 +29,17 @@ namespace ExportDocManager.Utils
             unit.Code = TextSearchHelper.NormalizeUpperValue(unit.Code);
         }
 
-        public static string BuildPortDisplayName(Port port)
+        public static string BuildPortDisplayName(Port? port)
         {
             return BuildDisplayName(port?.Code, port?.NameEN, port?.NameCN);
         }
 
-        public static string BuildUnitDisplayName(Unit unit)
+        public static string BuildUnitDisplayName(Unit? unit)
         {
             return BuildDisplayName(unit?.Code, unit?.NameEN, unit?.NameCN);
         }
 
-        public static string BuildDisplayName(string code, string nameEn, string nameCn)
+        public static string BuildDisplayName(string? code, string? nameEn, string? nameCn)
         {
             var normalizedCode = TextSearchHelper.NormalizeValue(code);
             var normalizedNameEn = TextSearchHelper.NormalizeValue(nameEn);

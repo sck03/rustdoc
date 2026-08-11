@@ -10,6 +10,7 @@
 - `audit-npm-production.mjs`、`audit-dotnet-packages.mjs`：执行结构化 npm/NuGet 漏洞审计；NuGet 优先读取官方源的 `dotnet --vulnerable` 结果，若宿主 TLS 无法访问漏洞元数据，则从已还原依赖图提取精确版本并使用 OSV NuGet 生态复核，依赖图本身不可读取时仍立即失败。
 - `generate-dependency-governance.mjs`：从 npm/Cargo 锁文件和还原后的 NuGet 图生成 SPDX、CycloneDX 和第三方依赖清单到显式 `artifacts/` 目录。
 - `check_frontend_style_governance.mjs`：阻止硬编码颜色、阴影、渐变、px 字号和 `!important` 债务继续增长。
+- `check_source_size_governance.mjs`：对 .NET、Web、Rust、测试、自动化和 GitHub 工作流实行全仓库单文件上限、聚合上限与相对基线增量门禁；统一忽略 `bin/obj/dist/target/node_modules/artifacts/TestResults/.codex-runtime/.git` 等生成目录，避免构建产物污染统计。
 
 RustSec 工作流直接调用安装后的 `cargo-audit` 时必须保留 `audit` 子命令，并拒绝漏洞、新增 unsound 公告和 yanked crate。Tauri 当前 Linux WebKit/GTK3 传递栈只精确豁免 `RUSTSEC-2024-0429`；该例外不能扩展为通配忽略，也不代表其它停止维护告警已经消失。
 
@@ -28,7 +29,9 @@ Tauri 正式 updater 密钥不由仓库脚本或 CI 自动生成，也不需要�
 
 构建输出按“一次生成、完整替换”处理：单版和三版便携包会在复制前清理旧稳定资源及整个浏览器目标目录；未传 `-IncludeLicenseKeygen` 的三版构建会删除旧 `KEY/`；安装器只清理本次请求版本的旧安装包与版本 manifest，未请求版本继续保留。Windows 便携目录和 GitHub 便携 ZIP 在进入交付阶段前都会执行最终 `ExportDocManager.exe` 的零参数启动、动态 API 健康、空密码 `admin` 登录及基础分页冒烟检查，随后清理测试生成的 `App_Data`；载荷门禁继续禁止未知字体、Playwright 开发 UI、重复 ONNX Runtime 或内部注册机。本机 GNU 构建默认单并发，以控制普通 16 GiB 电脑上的 LLVM 峰值内存；GitHub Windows 发布仍使用 MSVC，并由工作流显式设置自己的并发度。
 
-桌面资源准备会在 release 依赖治理扫描前自动还原完整 `ExportDocManager.sln`。因此运行空间清理删除所有项目 `bin/obj` 后，可以直接执行上述构建入口，不需要先手工运行测试或 `dotnet restore`；.NET CLI 和 NuGet 缓存仍由构建环境定向到仓库 `.codex-runtime/`，不会新增系统 C 盘默认缓存。
+桌面资源准备会在 release 依赖治理扫描前自动还原完整 `ExportDocManager.sln`。本地 Tauri 构建入口也会在锁定依赖缺失时分别对 Web 与桌面项目执行一次 `npm ci`。因此运行空间清理删除项目 `bin/obj` 或显式删除 `node_modules` 后，可以直接执行上述构建入口，不需要先手工运行测试、`dotnet restore` 或 `npm ci`；.NET CLI、NuGet 和 npm 缓存仍由构建环境定向到仓库 `.codex-runtime/`，不会新增系统 C 盘默认缓存。
+
+同一工作区一次只允许一个本地 Tauri 构建占用共享 Cargo 与资源暂存目录。重复双击或同时从终端启动第二次构建时，后启动的入口会立即给出明确提示并停止，避免两个构建互相覆盖 `artifacts/tauri-bundle` 后出现 `EBUSY`、文件锁或不完整便携包。
 
 Tauri 构建包装器直接使用当前 Node 启动 `apps/export-doc-tauri/node_modules/@tauri-apps/cli/tauri.js`，不再从 Node 子进程调用 Windows `npm.cmd`。这是 Node 24 在 Windows 上的进程启动兼容要求，不改变 Tauri 版本、构建参数或安装包内容。
 

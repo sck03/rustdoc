@@ -36,10 +36,10 @@ namespace ExportDocManager.Services.Core
 
         public async Task<SaveResult> SaveInvoiceWithAutoCreationAsync(
             Invoice invoice,
-            List<Item> items,
-            Customer customer,
-            Exporter exporter,
-            IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null,
+            List<Item>? items,
+            Customer? customer,
+            Exporter? exporter,
+            IReadOnlyList<HsCodeKnowledgeFeedbackInput>? pendingHsFeedback = null,
             CancellationToken cancellationToken = default)
         {
             var result = new SaveResult();

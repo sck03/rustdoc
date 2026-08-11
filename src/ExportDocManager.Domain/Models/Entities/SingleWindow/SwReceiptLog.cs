@@ -38,6 +38,6 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(64)]
         public string ContentSha256 { get; set; } = string.Empty;
 
-        public SwSubmissionBatch Batch { get; set; }
+        public SwSubmissionBatch? Batch { get; set; }
     }
 }

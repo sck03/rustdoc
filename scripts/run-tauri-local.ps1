@@ -97,14 +97,95 @@ function Resolve-CargoBinDir {
     throw "cargo.exe was not found. Set -CargoBinDir or install Rust/Cargo outside the system drive."
 }
 
+function Ensure-NpmProjectDependencies {
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectRoot,
+        [Parameter(Mandatory = $true)][string[]]$RequiredRelativePaths,
+        [Parameter(Mandatory = $true)][string]$ProjectName
+    )
+
+    $missingPaths = @($RequiredRelativePaths | Where-Object {
+        -not (Test-Path -LiteralPath (Join-Path $ProjectRoot $_) -PathType Leaf)
+    })
+    if ($missingPaths.Count -eq 0) {
+        return
+    }
+
+    $packageLockPath = Join-Path $ProjectRoot "package-lock.json"
+    if (-not (Test-Path -LiteralPath $packageLockPath -PathType Leaf)) {
+        throw "$ProjectName dependencies are missing and package-lock.json was not found: $packageLockPath"
+    }
+
+    Write-Host "$ProjectName npm dependencies are missing; restoring the locked dependency tree..."
+    Invoke-ExportDocExternal `
+        -FilePath "npm" `
+        -Arguments @("ci", "--no-audit", "--no-fund") `
+        -WorkingDirectory $ProjectRoot
+
+    $unrestoredPaths = @($RequiredRelativePaths | Where-Object {
+        -not (Test-Path -LiteralPath (Join-Path $ProjectRoot $_) -PathType Leaf)
+    })
+    if ($unrestoredPaths.Count -gt 0) {
+        throw "$ProjectName dependency restore completed without required files: $($unrestoredPaths -join ', ')"
+    }
+}
+
+function Enter-TauriLocalBuildLock {
+    param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
+
+    $lockRoot = Join-Path $RepositoryRoot ".codex-runtime\locks"
+    New-Item -ItemType Directory -Path $lockRoot -Force | Out-Null
+    $lockPath = Join-Path $lockRoot "tauri-local-build.lock"
+
+    try {
+        $stream = [System.IO.File]::Open(
+            $lockPath,
+            [System.IO.FileMode]::OpenOrCreate,
+            [System.IO.FileAccess]::ReadWrite,
+            [System.IO.FileShare]::None)
+    } catch [System.IO.IOException] {
+        throw "Another local Tauri build is already using the shared Cargo and bundle output. Wait for that build to finish, then run this command once: $lockPath"
+    }
+
+    $metadata = "pid=$PID`nstarted=$([DateTimeOffset]::Now.ToString('O'))`n"
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($metadata)
+    $stream.SetLength(0)
+    $stream.Write($bytes, 0, $bytes.Length)
+    $stream.Flush($true)
+    return $stream
+}
+
 if ($RemainingArgs.Count -gt 0 -and $RemainingArgs[0] -eq "--") {
     $RemainingArgs = @($RemainingArgs | Select-Object -Skip 1)
 }
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
 $tauriRoot = Join-Path $repoRoot "apps\export-doc-tauri"
+$webRoot = Join-Path $repoRoot "apps\export-doc-web"
 $srcTauriRoot = Join-Path $tauriRoot "src-tauri"
 . (Join-Path $scriptRoot "lib\initialize-local-build-environment.ps1") -RepositoryRoot $repoRoot
+
+$tauriBuildLock = $null
+if ($Command -in @("dev", "build", "prepare-bundle")) {
+    $tauriBuildLock = Enter-TauriLocalBuildLock -RepositoryRoot $repoRoot
+}
+
+try {
+if ($Command -in @("info", "dev", "build")) {
+    Ensure-NpmProjectDependencies `
+        -ProjectRoot $tauriRoot `
+        -ProjectName "Tauri desktop" `
+        -RequiredRelativePaths @("node_modules\@tauri-apps\cli\tauri.js")
+}
+if ($Command -in @("dev", "build", "prepare-bundle")) {
+    Ensure-NpmProjectDependencies `
+        -ProjectRoot $webRoot `
+        -ProjectName "Web frontend" `
+        -RequiredRelativePaths @(
+            "node_modules\typescript\bin\tsc",
+            "node_modules\vite\bin\vite.js"
+        )
+}
 
 Invoke-ExportDocExternal -FilePath "node" -Arguments @((Join-Path $scriptRoot "sync-version.mjs"))
 
@@ -232,5 +313,10 @@ switch ($Command) {
             Pop-Location
         }
         break
+    }
+}
+} finally {
+    if ($null -ne $tauriBuildLock) {
+        $tauriBuildLock.Dispose()
     }
 }

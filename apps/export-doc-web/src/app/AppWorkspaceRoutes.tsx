@@ -1,9 +1,12 @@
-import { type ComponentType, lazy, Suspense } from "react";
+import { type ComponentType, lazy, type LazyExoticComponent, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../api/index.ts";
 import { hasModulePermission } from "./PermissionAccessContext.tsx";
 import { getDefaultWorkspaceRoute, type ProductEditionPresentation } from "./productEdition.ts";
 import { PageState } from "../ui/PageState.tsx";
+
+type NamedComponent<TModule, TExport extends keyof TModule> =
+  TModule[TExport] extends ComponentType<infer TProps> ? ComponentType<TProps> : never;
 
 const DashboardPage = lazyNamed(() => import("../features/dashboard/DashboardPage.tsx"), "DashboardPage");
 const CustomerFollowUpPage = lazyNamed(() => import("../features/crm/CustomerFollowUpPage.tsx"), "CustomerFollowUpPage");
@@ -183,8 +186,8 @@ function NoModuleAccessPage() {
 function lazyNamed<TModule extends Record<string, unknown>, TExport extends keyof TModule>(
   loader: () => Promise<TModule>,
   exportName: TExport,
-) {
+): LazyExoticComponent<NamedComponent<TModule, TExport>> {
   return lazy(async () => ({
-    default: (await loader())[exportName] as ComponentType<Record<string, unknown>>,
+    default: (await loader())[exportName] as NamedComponent<TModule, TExport>,
   }));
 }

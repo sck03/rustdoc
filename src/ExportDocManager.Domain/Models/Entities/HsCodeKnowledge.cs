@@ -9,9 +9,9 @@ namespace ExportDocManager.Models.Entities
         [Key] public int Id { get; set; }
         [Required, MaxLength(64)] public string Fingerprint { get; set; } = string.Empty;
         [Required, MaxLength(20)] public string RawReportedHsCode { get; set; } = string.Empty;
-        [MaxLength(20)] public string ResolvedCurrentHsCode { get; set; }
+        [MaxLength(20)] public string? ResolvedCurrentHsCode { get; set; }
         [Required, MaxLength(300)] public string ProductName { get; set; } = string.Empty;
-        [MaxLength(1500)] public string Specification { get; set; }
+        [MaxLength(1500)] public string? Specification { get; set; }
         [Required, MaxLength(2000)] public string SearchText { get; set; } = string.Empty;
         [Required, MaxLength(100)] public string Source { get; set; } = string.Empty;
         public int? SourceYear { get; set; }
@@ -44,8 +44,8 @@ namespace ExportDocManager.Models.Entities
         [Key] public int Id { get; set; }
         [Required, MaxLength(64)] public string Fingerprint { get; set; } = string.Empty;
         [Required, MaxLength(500)] public string QueryText { get; set; } = string.Empty;
-        [MaxLength(300)] public string ProductName { get; set; }
-        [MaxLength(1500)] public string Specification { get; set; }
+        [MaxLength(300)] public string? ProductName { get; set; }
+        [MaxLength(1500)] public string? Specification { get; set; }
         [Required, MaxLength(20)] public string CandidateCode { get; set; } = string.Empty;
         public int AcceptedCount { get; set; }
         public int RejectedCount { get; set; }
@@ -60,11 +60,11 @@ namespace ExportDocManager.Models.Entities
         [Required, MaxLength(64)] public string Fingerprint { get; set; } = string.Empty;
         [Required, MaxLength(500)] public string QueryText { get; set; } = string.Empty;
         [Required, MaxLength(20)] public string RawReportedHsCode { get; set; } = string.Empty;
-        [MaxLength(20)] public string SuggestedCurrentHsCode { get; set; }
+        [MaxLength(20)] public string? SuggestedCurrentHsCode { get; set; }
         [Required, MaxLength(300)] public string ProductName { get; set; } = string.Empty;
-        [MaxLength(1500)] public string Specification { get; set; }
+        [MaxLength(1500)] public string? Specification { get; set; }
         [Required, MaxLength(100)] public string Source { get; set; } = "i5a6";
-        [MaxLength(1000)] public string SourceUrl { get; set; }
+        [MaxLength(1000)] public string? SourceUrl { get; set; }
         [Required, MaxLength(30)] public string ReviewStatus { get; set; } = "Pending";
         [Required, MaxLength(30)] public string ResolutionStatus { get; set; } = "Unresolved";
         public int SeenCount { get; set; } = 1;

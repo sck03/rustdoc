@@ -132,6 +132,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | foreign-types-macros | 0.2.3 | MIT OR Apache-2.0 | tauri |
 | cargo | foreign-types-shared | 0.3.1 | MIT OR Apache-2.0 | tauri |
 | cargo | form_urlencoded | 1.2.2 | MIT OR Apache-2.0 | tauri |
+| cargo | fs2 | 0.4.3 | MIT OR Apache-2.0 | tauri |
 | cargo | futures-channel | 0.3.32 | MIT OR Apache-2.0 | tauri |
 | cargo | futures-core | 0.3.32 | MIT OR Apache-2.0 | tauri |
 | cargo | futures-executor | 0.3.32 | MIT OR Apache-2.0 | tauri |
@@ -763,6 +764,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | nuget | ExtendedNumerics.BigDecimal | 2025.1001.2.129 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
 | nuget | HtmlAgilityPack | 1.12.4 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | MathNet.Numerics.Signed | 5.0.0 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
+| nuget | Microsoft.AspNetCore.OpenApi | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj |
 | nuget | Microsoft.Bcl.AsyncInterfaces | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | Microsoft.CodeCoverage | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | nuget | Microsoft.Data.Sqlite | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
@@ -787,6 +789,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | nuget | Microsoft.ML.OnnxRuntime | 1.28.0 | MIT | ExportDocManager.Infrastructure.csproj |
 | nuget | Microsoft.ML.OnnxRuntime.Managed | 1.28.0 | MIT | ExportDocManager.Infrastructure.csproj |
 | nuget | Microsoft.NET.Test.Sdk | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| nuget | Microsoft.OpenApi | 2.11.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj |
 | nuget | Microsoft.Playwright | 1.61.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | nuget | Microsoft.TestPlatform.ObjectModel | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | nuget | Microsoft.TestPlatform.TestHost | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |

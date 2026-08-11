@@ -18,8 +18,8 @@ namespace ExportDocManager.Api.Hosting
                 IInvoiceListReadRepository invoiceListReadRepository,
                 int? pageNumber,
                 int? pageSize,
-                string keyword,
-                string sortColumn,
+                string? keyword,
+                string? sortColumn,
                 bool? ascending,
                 CancellationToken cancellationToken) =>
             {

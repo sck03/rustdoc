@@ -82,7 +82,7 @@ namespace ExportDocManager.Api.Hosting
                 !ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions);
         }
 
-        private static async Task WriteLivenessAsync(HttpContext context)
+        internal static async Task WriteLivenessAsync(HttpContext context)
         {
             if (!EnsureProbeMethod(context))
             {
@@ -98,7 +98,7 @@ namespace ExportDocManager.Api.Hosting
             }
         }
 
-        private static async Task WriteReadinessAsync(
+        internal static async Task WriteReadinessAsync(
             HttpContext context,
             IApiReadinessProbe readinessProbe)
         {

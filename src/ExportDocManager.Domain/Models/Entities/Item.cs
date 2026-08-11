@@ -11,21 +11,21 @@ namespace ExportDocManager.Models.Entities
         public int Id { get; set; }
         public int InvoiceId { get; set; }
         // public int? ProductId { get; set; } // Removed as per user request for loose coupling
-        public string PoNumber { get; set; }
-        public string StyleNo { get; set; }
-        public string StyleName { get; set; }
-        public string FabricComposition { get; set; }
-        public string StyleNameCN { get; set; }
-        public string Brand { get; set; }
-        public string HSCode { get; set; }
-        public string Origin { get; set; }
+        public string? PoNumber { get; set; }
+        public string? StyleNo { get; set; }
+        public string? StyleName { get; set; }
+        public string? FabricComposition { get; set; }
+        public string? StyleNameCN { get; set; }
+        public string? Brand { get; set; }
+        public string? HSCode { get; set; }
+        public string? Origin { get; set; }
         public decimal Quantity { get; set; }
-        public string UnitEN { get; set; }
-        public string UnitCN { get; set; }
+        public string? UnitEN { get; set; }
+        public string? UnitCN { get; set; }
         public decimal PcsPerCtn { get; set; } // Added for Smart Packing
         public decimal Cartons { get; set; }
-        public string CtnUnitEN { get; set; }
-        public string CtnUnitCN { get; set; } 
+        public string? CtnUnitEN { get; set; }
+        public string? CtnUnitCN { get; set; }
         public decimal Length { get; set; }
         public decimal Width { get; set; }
         public decimal Height { get; set; }
@@ -48,10 +48,10 @@ namespace ExportDocManager.Models.Entities
         [System.ComponentModel.DataAnnotations.Schema.NotMapped]
         public decimal TaxRefundAmount => PurchaseTotal / 1.13m * (TaxRebateRate / 100m);
 
-        public string Spare1 { get; set; }
-        public string Spare2 { get; set; }
-        public string Spare3 { get; set; }
-        public string CustomFieldsJson { get; set; }
+        public string? Spare1 { get; set; }
+        public string? Spare2 { get; set; }
+        public string? Spare3 { get; set; }
+        public string? CustomFieldsJson { get; set; }
 
         /// <summary>
         /// Recalculates Volume based on Length, Width, Height, and Cartons.
