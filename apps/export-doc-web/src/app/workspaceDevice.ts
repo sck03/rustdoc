@@ -22,14 +22,14 @@ const capabilities: Record<WorkspaceDeviceMode, WorkspaceDeviceCapabilities> = {
   phone: {
     canUseDenseWorkbench: false,
     canUseBatchOperations: false,
-    canImportExport: false,
-    canUseAdvancedTools: false,
+    canImportExport: true,
+    canUseAdvancedTools: true,
   },
   tablet: {
     canUseDenseWorkbench: false,
-    canUseBatchOperations: false,
-    canImportExport: false,
-    canUseAdvancedTools: false,
+    canUseBatchOperations: true,
+    canImportExport: true,
+    canUseAdvancedTools: true,
   },
   desktop: {
     canUseDenseWorkbench: true,
@@ -81,8 +81,7 @@ export function getWorkspaceDeviceCapabilities(
   if (mode !== "tablet" || !hasFinePointer) return capabilities[mode];
   return {
     ...capabilities.tablet,
-    canImportExport: true,
-    canUseAdvancedTools: true,
+    canUseDenseWorkbench: true,
   };
 }
 

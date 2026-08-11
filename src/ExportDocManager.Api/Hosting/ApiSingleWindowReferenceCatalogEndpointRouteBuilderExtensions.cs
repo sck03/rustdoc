@@ -57,18 +57,11 @@ namespace ExportDocManager.Api.Hosting
                         "单一窗口参考词典校验失败：" + string.Join("；", validationErrors.Take(8))));
                 }
 
-                try
-                {
-                    await referenceCatalogService.SaveOverrideCatalogAsync(request.Catalog, cancellationToken);
-                    var catalog = await referenceCatalogService.LoadEffectiveCatalogAsync(cancellationToken);
-                    return Results.Ok(ApiSingleWindowDtoFactory.FromSavedReferenceCatalog(
-                        catalog,
-                        "单一窗口参考词典覆盖文件已保存。"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await referenceCatalogService.SaveOverrideCatalogAsync(request.Catalog, cancellationToken);
+                var catalog = await referenceCatalogService.LoadEffectiveCatalogAsync(cancellationToken);
+                return Results.Ok(ApiSingleWindowDtoFactory.FromSavedReferenceCatalog(
+                    catalog,
+                    "单一窗口参考词典覆盖文件已保存。"));
             })
             .WithName("UpdateSingleWindowReferenceCatalog");
 
@@ -111,10 +104,6 @@ namespace ExportDocManager.Api.Hosting
                 catch (JsonException ex)
                 {
                     return Results.BadRequest(new ApiErrorResponse($"单一窗口参考词典 JSON 格式无效：{ex.Message}"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
                 }
             })
             .WithName("ImportSingleWindowReferenceCatalogJson");
@@ -195,18 +184,11 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Unauthorized();
                 }
 
-                try
-                {
-                    await referenceCatalogService.ResetToBundledCatalogAsync(cancellationToken);
-                    var catalog = await referenceCatalogService.LoadEffectiveCatalogAsync(cancellationToken);
-                    return Results.Ok(ApiSingleWindowDtoFactory.FromSavedReferenceCatalog(
-                        catalog,
-                        "单一窗口参考词典覆盖文件已清除，已恢复内置词典。"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await referenceCatalogService.ResetToBundledCatalogAsync(cancellationToken);
+                var catalog = await referenceCatalogService.LoadEffectiveCatalogAsync(cancellationToken);
+                return Results.Ok(ApiSingleWindowDtoFactory.FromSavedReferenceCatalog(
+                    catalog,
+                    "单一窗口参考词典覆盖文件已清除，已恢复内置词典。"));
             })
             .WithName("ResetSingleWindowReferenceCatalog");
         }

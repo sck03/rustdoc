@@ -19,7 +19,7 @@ export type ContainerPackingAnalyzeVariables = {
 
   sequence: number;
 
-  signature: string;
+  signal: AbortSignal;
 };
 
 export type ContainerPackingCargoRow = {

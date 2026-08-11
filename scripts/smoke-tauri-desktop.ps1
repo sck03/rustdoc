@@ -629,8 +629,8 @@ function Invoke-WebDiagnosticsSmoke {
         "运行检查",
         "问题诊断",
         "运行诊断",
-        "API 状态",
-        "ok",
+        "服务状态",
+        "正常",
         [string]$Health.appRoot,
         [string]$Health.dataRoot,
         [string]$Health.databaseRoot,
@@ -840,8 +840,8 @@ function Invoke-WebReportsSmoke {
 
     $expectedText = @(
         "报表设计",
-        "新版设计器",
-        "源码",
+        "可视化设计",
+        "高级 HTML",
         "预览",
         "保存",
         "设计",

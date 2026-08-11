@@ -22,7 +22,7 @@ namespace ExportDocManager.Api.Hosting
     public class ApiQueryInvoiceFilterRequest
     {
         public DateTime? StartDate { get; init; }
-        public DateTime? EndDate { get; init; }
+        public DateTime? EndDateExclusive { get; init; }
         public int? CustomerId { get; init; }
         public int? ExporterId { get; init; }
         public string Keyword { get; init; } = string.Empty;

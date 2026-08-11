@@ -45,6 +45,30 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public void ApiEndpoints_ShouldLetUnknownExceptionsReachTheLoggingMiddleware()
+        {
+            string hostingRoot = ResolveSourceRoot("src", "ExportDocManager.Api", "Hosting");
+            var genericForwarder = new System.Text.RegularExpressions.Regex(
+                @"catch\s*\(\s*Exception\s+\w+\s*\)\s*\{\s*return\s+WriteServiceException\(\w+\);\s*\}",
+                System.Text.RegularExpressions.RegexOptions.CultureInvariant |
+                System.Text.RegularExpressions.RegexOptions.Singleline,
+                TimeSpan.FromSeconds(1));
+            var violations = Directory
+                .EnumerateFiles(hostingRoot, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => new { Path = path, Content = File.ReadAllText(path) })
+                .Where(file => genericForwarder.IsMatch(file.Content))
+                .Select(file => Path.GetFileName(file.Path))
+                .OrderBy(file => file, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            Assert.True(
+                violations.Count == 0,
+                "Endpoint handlers must classify expected failures explicitly and let unknown exceptions reach ApiExceptionHandlingMiddleware for correlated logging."
+                + Environment.NewLine
+                + string.Join(Environment.NewLine, violations));
+        }
+
+        [Fact]
         public void ApiEndpointCompositionRoot_ShouldOnlyDelegateToEndpointModules()
         {
             string sourceRoot = ResolveSourceRoot("src", "ExportDocManager.Api");

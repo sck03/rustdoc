@@ -552,13 +552,22 @@ function toApiFilters(filters: QueryFilters) {
   const exporterId = Number(normalized.exporterId);
   return {
     startDate: normalized.startDate ? `${normalized.startDate}T00:00:00` : undefined,
-    endDate: normalized.endDate ? `${normalized.endDate}T23:59:59` : undefined,
+    endDateExclusive: normalized.endDate ? `${nextCalendarDate(normalized.endDate)}T00:00:00` : undefined,
     customerId: Number.isFinite(customerId) && customerId > 0 ? customerId : undefined,
     exporterId: Number.isFinite(exporterId) && exporterId > 0 ? exporterId : undefined,
     keyword: normalized.keyword || undefined,
     invoiceType: normalized.invoiceType || undefined,
     transportMode: normalized.transportMode || undefined,
   };
+}
+
+function nextCalendarDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return value;
+  }
+
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
 }
 
 function mergeQueryKeywords(...values: string[]) {

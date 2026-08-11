@@ -9,8 +9,7 @@ import type {
 import { queryKeys } from "../../api/queryKeys.ts";
 import { isConcurrencyConflict, readApiError } from "../../ui/formUtils.ts";
 import type { ExporterSealType } from "../master-data/ExporterSealField.tsx";
-import { buildInvoiceSnapshot } from "./invoiceEditorHelpers.ts";
-import { getInvoiceStatusLabel, normalizeInvoiceStatus } from "./invoiceModel.ts";
+import { getInvoiceStatusLabel, normalizeInvoiceForSave, normalizeInvoiceStatus } from "./invoiceModel.ts";
 
 type NullableTextSetter = Dispatch<SetStateAction<string | null>>;
 
@@ -25,7 +24,7 @@ export function useInvoicePersistenceOperations({
   setInvoice,
   setMessage,
   setPendingHsFeedback,
-  setPersistedInvoiceSnapshot,
+  setPersistedInvoiceDraft,
   setPersistedInvoiceStatus,
   setSuccessMessage,
 }: {
@@ -39,7 +38,7 @@ export function useInvoicePersistenceOperations({
   setInvoice: Dispatch<SetStateAction<ApiInvoiceDetailDto | null>>;
   setMessage: NullableTextSetter;
   setPendingHsFeedback: Dispatch<SetStateAction<HsCodeKnowledgeFeedbackInput[]>>;
-  setPersistedInvoiceSnapshot: NullableTextSetter;
+  setPersistedInvoiceDraft: Dispatch<SetStateAction<ApiInvoiceDetailDto | null>>;
   setPersistedInvoiceStatus: Dispatch<SetStateAction<string>>;
   setSuccessMessage: NullableTextSetter;
 }) {
@@ -80,7 +79,7 @@ export function useInvoicePersistenceOperations({
     onSuccess: async (response) => {
       setInvoice(response.invoice);
       setPendingHsFeedback([]);
-      setPersistedInvoiceSnapshot(buildInvoiceSnapshot(response.invoice, response.id));
+      setPersistedInvoiceDraft(normalizeInvoiceForSave(response.invoice, response.id));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(response.invoice.status));
       resetItemEditHistory();
       setMessage(null);
@@ -149,7 +148,7 @@ export function useInvoicePersistenceOperations({
     onSuccess: async (response) => {
       setInvoice(response.invoice);
       setPendingHsFeedback([]);
-      setPersistedInvoiceSnapshot(buildInvoiceSnapshot(response.invoice, response.id));
+      setPersistedInvoiceDraft(normalizeInvoiceForSave(response.invoice, response.id));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(response.invoice.status));
       setMessage(null);
       setSuccessMessage("发票已反审核，当前为草稿状态。");
@@ -179,7 +178,7 @@ export function useInvoicePersistenceOperations({
     onSuccess: async (response) => {
       setInvoice(response.invoice);
       setPendingHsFeedback([]);
-      setPersistedInvoiceSnapshot(buildInvoiceSnapshot(response.invoice, response.id));
+      setPersistedInvoiceDraft(normalizeInvoiceForSave(response.invoice, response.id));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(response.invoice.status));
       setMessage(null);
       setSuccessMessage(`发票状态已更新为“${getInvoiceStatusLabel(response.invoice.status)}”。`);

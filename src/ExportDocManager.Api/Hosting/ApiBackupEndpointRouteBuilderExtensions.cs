@@ -168,10 +168,6 @@ namespace ExportDocManager.Api.Hosting
                 {
                     throw;
                 }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
             })
             .WithName("RestoreDatabaseBackup");
 

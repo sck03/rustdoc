@@ -1,4 +1,2 @@
 /* Container-packing CSS is loaded only when the tool route is opened. */
-@import "../container-packing.css";
-/* Keep compact/tablet overrides later in the cascade for this lazy route. */
-@import "../../responsiveOverrides.css";
+@import "../container-packing.css" layer(route);

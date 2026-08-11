@@ -78,7 +78,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomerService customerService,
-                ApiCustomerDto request) =>
+                ApiCustomerDto request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -108,18 +109,11 @@ namespace ExportDocManager.Api.Hosting
                 customer.Id = 0;
                 customer.RowVersion = null;
 
-                try
-                {
-                    int savedId = await customerService.SaveCustomerAsync(customer);
-                    var saved = await customerService.GetCustomerByIdAsync(savedId) ?? customer;
-                    return Results.Created(
-                        $"/api/master-data/customers/{savedId}",
-                        ApiMasterDataDtoFactory.FromCustomer(saved));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                int savedId = await customerService.SaveCustomerAsync(customer, cancellationToken);
+                var saved = await customerService.GetCustomerByIdAsync(savedId, cancellationToken) ?? customer;
+                return Results.Created(
+                    $"/api/master-data/customers/{savedId}",
+                    ApiMasterDataDtoFactory.FromCustomer(saved));
             })
             .WithName("CreateCustomer");
 
@@ -128,7 +122,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ICustomerService customerService,
                 int id,
-                ApiCustomerDto request) =>
+                ApiCustomerDto request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -150,7 +145,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("请求体客户ID与路径ID不一致。"));
                 }
 
-                if (await customerService.GetCustomerByIdAsync(id) == null)
+                if (await customerService.GetCustomerByIdAsync(id, cancellationToken) == null)
                 {
                     return Results.NotFound();
                 }
@@ -167,16 +162,9 @@ namespace ExportDocManager.Api.Hosting
 
                 customer.Id = id;
 
-                try
-                {
-                    int savedId = await customerService.SaveCustomerAsync(customer);
-                    var saved = await customerService.GetCustomerByIdAsync(savedId) ?? customer;
-                    return Results.Ok(ApiMasterDataDtoFactory.FromCustomer(saved));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                int savedId = await customerService.SaveCustomerAsync(customer, cancellationToken);
+                var saved = await customerService.GetCustomerByIdAsync(savedId, cancellationToken) ?? customer;
+                return Results.Ok(ApiMasterDataDtoFactory.FromCustomer(saved));
             })
             .WithName("UpdateCustomer");
 
@@ -184,7 +172,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomerService customerService,
-                int id) =>
+                int id,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -196,20 +185,13 @@ namespace ExportDocManager.Api.Hosting
                     return BadMasterDataId("客户");
                 }
 
-                if (await customerService.GetCustomerByIdAsync(id) == null)
+                if (await customerService.GetCustomerByIdAsync(id, cancellationToken) == null)
                 {
                     return Results.NotFound();
                 }
 
-                try
-                {
-                    await customerService.DeleteCustomerAsync(id);
-                    return Results.Ok(new ApiCommandResponse(true, "客户已删除。"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await customerService.DeleteCustomerAsync(id, cancellationToken);
+                return Results.Ok(new ApiCommandResponse(true, "客户已删除。"));
             })
             .WithName("DeleteCustomer");
         }

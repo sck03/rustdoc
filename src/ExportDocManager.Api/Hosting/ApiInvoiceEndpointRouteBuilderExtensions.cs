@@ -255,15 +255,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("发票ID必须大于0。"));
                 }
 
-                bool deleted;
-                try
-                {
-                    deleted = await invoiceService.DeleteInvoiceAsync(id, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                bool deleted = await invoiceService.DeleteInvoiceAsync(id, cancellationToken);
 
                 return deleted
                     ? Results.Ok(new ApiCommandResponse(true, "发票已删除。"))
@@ -335,10 +327,6 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.Conflict(new ApiErrorResponse(ex.Message));
                 }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
             })
             .WithName("TransitionInvoiceStatus");
 
@@ -400,10 +388,6 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.Conflict(new ApiErrorResponse(ex.Message));
                 }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
             })
             .WithName("UnverifyInvoice");
 
@@ -460,19 +444,11 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("新发票号不能为空。"));
                 }
 
-                Invoice copiedInvoice;
-                try
-                {
-                    copiedInvoice = await invoiceService.CopyInvoiceAsync(
-                        id,
-                        request.NewInvoiceNo.Trim(),
-                        request.Options ?? new InvoiceCloneOptions(),
-                        cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                Invoice copiedInvoice = await invoiceService.CopyInvoiceAsync(
+                    id,
+                    request.NewInvoiceNo.Trim(),
+                    request.Options ?? new InvoiceCloneOptions(),
+                    cancellationToken);
 
                 return copiedInvoice == null
                     ? Results.NotFound()
@@ -552,10 +528,6 @@ namespace ExportDocManager.Api.Hosting
                         cancellationToken);
                 }
                 catch (InvalidOperationException ex)
-                {
-                    return WriteServiceException(ex);
-                }
-                catch (Exception ex)
                 {
                     return WriteServiceException(ex);
                 }

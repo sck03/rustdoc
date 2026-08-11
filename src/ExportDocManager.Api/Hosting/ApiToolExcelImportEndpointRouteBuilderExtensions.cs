@@ -54,10 +54,6 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return WriteServiceException(ex);
                 }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
             })
             .WithName("PreviewExcelImport");
 
@@ -133,10 +129,6 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound(new ApiErrorResponse(ex.Message));
                 }
                 catch (InvalidOperationException ex)
-                {
-                    return WriteServiceException(ex);
-                }
-                catch (Exception ex)
                 {
                     return WriteServiceException(ex);
                 }

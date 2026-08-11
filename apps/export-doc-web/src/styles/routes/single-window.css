@@ -1,7 +1,5 @@
 /* Single Window CSS is loaded only by its lazy document routes. */
-@import "../single-window-core.css";
-@import "../single-window-runtime.css";
-@import "../single-window-documents.css";
-@import "../coo-review.css";
-/* Dynamic CSS links are appended after the global responsive entry. */
-@import "../../responsiveOverrides.css";
+@import "../single-window-core.css" layer(route);
+@import "../single-window-runtime.css" layer(route);
+@import "../single-window-documents.css" layer(route);
+@import "../coo-review.css" layer(route);

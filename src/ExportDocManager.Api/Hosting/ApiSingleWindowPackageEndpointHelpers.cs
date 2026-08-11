@@ -49,10 +49,6 @@ namespace ExportDocManager.Api.Hosting
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
             }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
-            }
         }
 
         private static async Task<IResult> DownloadSingleWindowSubmitPackageAsync(
@@ -102,10 +98,6 @@ namespace ExportDocManager.Api.Hosting
             catch (ResourceNotFoundException ex)
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
-            }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
             }
             finally
             {
@@ -173,10 +165,6 @@ namespace ExportDocManager.Api.Hosting
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
             }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
-            }
         }
 
         private static async Task<IResult> DownloadSingleWindowReceiptPackageAsync(
@@ -234,10 +222,6 @@ namespace ExportDocManager.Api.Hosting
             catch (ArgumentException ex)
             {
                 return Results.BadRequest(new ApiErrorResponse(ex.Message));
-            }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
             }
             finally
             {
@@ -342,10 +326,6 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Json(
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
-            }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
             }
         }
 

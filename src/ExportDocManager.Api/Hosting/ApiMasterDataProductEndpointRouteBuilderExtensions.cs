@@ -45,7 +45,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductService productService,
-                int id) =>
+                int id,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -57,7 +58,7 @@ namespace ExportDocManager.Api.Hosting
                     return BadMasterDataId("商品");
                 }
 
-                var product = await productService.GetByIdAsync(id);
+                var product = await productService.GetByIdAsync(id, cancellationToken);
                 return product == null
                     ? Results.NotFound()
                     : Results.Ok(ApiMasterDataDtoFactory.FromProduct(product));
@@ -68,7 +69,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductService productService,
-                ApiProductDto request) =>
+                ApiProductDto request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -97,18 +99,11 @@ namespace ExportDocManager.Api.Hosting
                 product.Id = 0;
                 product.RowVersion = null;
 
-                try
-                {
-                    int savedId = await productService.AddProductAsync(product);
-                    var saved = await productService.GetByIdAsync(savedId) ?? product;
-                    return Results.Created(
-                        $"/api/master-data/products/{savedId}",
-                        ApiMasterDataDtoFactory.FromProduct(saved));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                int savedId = await productService.AddProductAsync(product, cancellationToken);
+                var saved = await productService.GetByIdAsync(savedId, cancellationToken) ?? product;
+                return Results.Created(
+                    $"/api/master-data/products/{savedId}",
+                    ApiMasterDataDtoFactory.FromProduct(saved));
             })
             .WithName("CreateProduct");
 
@@ -117,7 +112,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 IProductService productService,
                 int id,
-                ApiProductDto request) =>
+                ApiProductDto request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -139,7 +135,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("请求体商品ID与路径ID不一致。"));
                 }
 
-                var existing = await productService.GetByIdAsync(id);
+                var existing = await productService.GetByIdAsync(id, cancellationToken);
                 if (existing == null)
                 {
                     return Results.NotFound();
@@ -157,20 +153,13 @@ namespace ExportDocManager.Api.Hosting
                 product.Id = id;
                 product.CreatedAt = existing.CreatedAt;
 
-                try
+                if (!await productService.UpdateProductAsync(product, cancellationToken))
                 {
-                    if (!await productService.UpdateProductAsync(product))
-                    {
-                        return Results.NotFound();
-                    }
+                    return Results.NotFound();
+                }
 
-                    var saved = await productService.GetByIdAsync(id) ?? product;
-                    return Results.Ok(ApiMasterDataDtoFactory.FromProduct(saved));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                var updated = await productService.GetByIdAsync(id, cancellationToken) ?? product;
+                return Results.Ok(ApiMasterDataDtoFactory.FromProduct(updated));
             })
             .WithName("UpdateProduct");
 
@@ -178,7 +167,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductService productService,
-                int id) =>
+                int id,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -190,16 +180,9 @@ namespace ExportDocManager.Api.Hosting
                     return BadMasterDataId("商品");
                 }
 
-                try
-                {
-                    return await productService.DeleteAsync(id)
-                        ? Results.Ok(new ApiCommandResponse(true, "商品已删除。"))
-                        : Results.NotFound();
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                return await productService.DeleteAsync(id, cancellationToken)
+                    ? Results.Ok(new ApiCommandResponse(true, "商品已删除。"))
+                    : Results.NotFound();
             })
             .WithName("DeleteProduct");
         }

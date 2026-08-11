@@ -30,6 +30,8 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
       mobile: false,
     });
     await navigate(page, buildHashUrl(options.webUrl, "/crm/follow-ups?view=directory"));
+    await waitFor(async () => await readSelectedTask(page) === "客户目录" ? true : null,
+      timeoutMs, () => "Timed out waiting for the narrow customer directory task.");
     await waitForText(page, ["客户目录", "暂无销售客户"], timeoutMs);
     const narrowDirectory = await read(page, `(() => {
       const table = document.querySelector('.responsive-data-table');
@@ -45,7 +47,8 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
       };
     })()`);
     if (narrowDirectory.innerWidth !== 390 || narrowDirectory.documentWidth > 392) {
-      throw new Error(`Sales narrow viewport overflow: ${JSON.stringify(narrowDirectory)}`);
+      const overflow = await readViewportOverflowDiagnostics(page);
+      throw new Error(`Sales narrow viewport overflow: ${JSON.stringify({ ...narrowDirectory, overflow })}`);
     }
     if (!narrowDirectory.secondaryCount || narrowDirectory.hiddenSecondaryCount !== narrowDirectory.secondaryCount) {
       throw new Error(`Sales secondary columns were not hidden at 390px: ${JSON.stringify(narrowDirectory)}`);
@@ -705,6 +708,24 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
 
   async function readSelectedTask(page) {
     return read(page, "document.querySelector('[role=\"tab\"][aria-selected=\"true\"]')?.textContent?.trim() || ''");
+  }
+
+  async function readViewportOverflowDiagnostics(page) {
+    return read(page, `Array.from(document.querySelectorAll('body *'))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          tag: element.tagName.toLowerCase(),
+          className: typeof element.className === 'string' ? element.className : '',
+          left: Math.round(rect.left * 10) / 10,
+          right: Math.round(rect.right * 10) / 10,
+          width: Math.round(rect.width * 10) / 10,
+          scrollWidth: element.scrollWidth,
+          clientWidth: element.clientWidth,
+        };
+      })
+      .filter((item) => item.left < -2 || item.right > window.innerWidth + 2)
+      .slice(0, 12)`);
   }
 
   async function read(page, expression) {

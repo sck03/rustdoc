@@ -29,28 +29,30 @@ namespace ExportDocManager.Services.MasterData
 
         // --- Port Methods ---
 
-        public async Task<List<Port>> GetAllPortsAsync()
+        public async Task<List<Port>> GetAllPortsAsync(CancellationToken cancellationToken = default)
         {
-            var rows = await _portReadRepository.QueryAsync(new PortReadQuery());
+            var rows = await _portReadRepository.QueryAsync(new PortReadQuery(), cancellationToken);
             return rows.ToList();
         }
 
-        public async Task<List<Port>> SearchPortsAsync(string keyword)
+        public async Task<List<Port>> SearchPortsAsync(
+            string keyword,
+            CancellationToken cancellationToken = default)
         {
             var rows = await _portReadRepository.QueryAsync(new PortReadQuery
             {
                 Keyword = keyword ?? string.Empty
-            });
+            }, cancellationToken);
             return rows.ToList();
         }
 
-        public async Task SavePortAsync(Port port)
+        public async Task SavePortAsync(Port port, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(port);
             AuxiliaryDataTextHelper.NormalizePort(port);
             try
             {
-                using var context = await _contextFactory.CreateDbContextAsync();
+                using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 if (port.Id == 0)
                 {
                     context.Ports.Add(port);
@@ -59,7 +61,7 @@ namespace ExportDocManager.Services.MasterData
                 {
                     context.Ports.Update(port);
                 }
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException ex)
             {
@@ -67,41 +69,43 @@ namespace ExportDocManager.Services.MasterData
             }
         }
 
-        public async Task DeletePortAsync(int id)
+        public async Task DeletePortAsync(int id, CancellationToken cancellationToken = default)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var port = await context.Ports.FindAsync(id);
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var port = await context.Ports.FindAsync([id], cancellationToken);
             if (port != null)
             {
                 context.Ports.Remove(port);
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken);
             }
         }
 
         // --- Unit Methods ---
 
-        public async Task<List<Unit>> GetAllUnitsAsync()
+        public async Task<List<Unit>> GetAllUnitsAsync(CancellationToken cancellationToken = default)
         {
-            var rows = await _unitReadRepository.QueryAsync(new UnitReadQuery());
+            var rows = await _unitReadRepository.QueryAsync(new UnitReadQuery(), cancellationToken);
             return rows.ToList();
         }
 
-        public async Task<List<Unit>> SearchUnitsAsync(string keyword)
+        public async Task<List<Unit>> SearchUnitsAsync(
+            string keyword,
+            CancellationToken cancellationToken = default)
         {
             var rows = await _unitReadRepository.QueryAsync(new UnitReadQuery
             {
                 Keyword = keyword ?? string.Empty
-            });
+            }, cancellationToken);
             return rows.ToList();
         }
 
-        public async Task SaveUnitAsync(Unit unit)
+        public async Task SaveUnitAsync(Unit unit, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(unit);
             AuxiliaryDataTextHelper.NormalizeUnit(unit);
             try
             {
-                using var context = await _contextFactory.CreateDbContextAsync();
+                using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 if (unit.Id == 0)
                 {
                     context.Units.Add(unit);
@@ -110,7 +114,7 @@ namespace ExportDocManager.Services.MasterData
                 {
                     context.Units.Update(unit);
                 }
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException ex)
             {
@@ -118,17 +122,19 @@ namespace ExportDocManager.Services.MasterData
             }
         }
 
-        public async Task DeleteUnitAsync(int id)
+        public async Task DeleteUnitAsync(int id, CancellationToken cancellationToken = default)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var unit = await context.Units.FindAsync(id);
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var unit = await context.Units.FindAsync([id], cancellationToken);
             if (unit != null)
             {
                 context.Units.Remove(unit);
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken);
             }
         }
-        public async Task<List<string>> GetUnitsByEnglishNameAsync(string nameEn)
+        public async Task<List<string>> GetUnitsByEnglishNameAsync(
+            string nameEn,
+            CancellationToken cancellationToken = default)
         {
             var normalizedName = TextSearchHelper.NormalizeUpperValue(nameEn);
             if (string.IsNullOrWhiteSpace(normalizedName))
@@ -136,14 +142,14 @@ namespace ExportDocManager.Services.MasterData
                 return [];
             }
 
-            using var context = await _contextFactory.CreateDbContextAsync();
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             return await context.Units
                 .AsNoTracking()
                 .Where(unit => unit.NameEN != null && unit.NameEN.ToUpper() == normalizedName)
                 .Select(u => u.NameCN)
                 .Where(name => name != null && name != string.Empty)
                 .Distinct()
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
         }
     }
 }

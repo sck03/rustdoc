@@ -146,7 +146,7 @@ export function OperationCenterListActionsPanel({
       setDispatchResult(response);
       setMessage("申报文件已送入当前档案的待导入目录；这不代表官方客户端已经导入，请由操作员继续确认导入和提交。");
       setMessageKind("success");
-      await invalidateSingleWindowBatchQueries(queryClient, row.batchId);
+      await invalidateSingleWindowBatchQueries(queryClient);
     },
     onError: (error) => {
       setDispatchResult(null);
@@ -182,7 +182,7 @@ export function OperationCenterListActionsPanel({
         ? "回执包已导出，请交回办公室系统导入归档。"
         : "已找到回执文件，但未选择回执包保存位置。");
       setMessageKind("success");
-      await invalidateSingleWindowBatchQueries(queryClient, row.batchId);
+      await invalidateSingleWindowBatchQueries(queryClient);
     },
     onError: (error) => {
       setReceiptResult(null);
@@ -203,7 +203,13 @@ export function OperationCenterListActionsPanel({
   const inBoxPath = buildClientBoxPath(clientRoot, "InBox");
   const isBusy = dispatchMutation.isPending || receiptMutation.isPending;
   const canDispatch = isActiveProfileMatch && row.status === "SubmitPackageImported";
-  const canCollect = isActiveProfileMatch && !["SubmitPackageExported", "SubmitPackageImported", "Preparing"].includes(row.status);
+  const canCollect = isActiveProfileMatch && ![
+    "Preparing",
+    "SubmitPackageExported",
+    "SubmitPackageImported",
+    "ClientDispatching",
+    "ClientDispatchFailed",
+  ].includes(row.status);
 
   return (
     <section className="form-section operation-center-list-actions" aria-label="选中批次快捷操作">

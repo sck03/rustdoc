@@ -85,6 +85,7 @@ export function createSystemToolsSmokeScene(runtime) {
             return true;
           })(${JSON.stringify({
             supported: true,
+            installSupported: true,
             configured: true,
             updateAvailable: true,
             currentVersion: "0.1.0",
@@ -171,21 +172,23 @@ export function createSystemToolsSmokeScene(runtime) {
 
   async function waitForUpdateStageCheck(page, options, updateSource, timeoutMs) {
     const checkAction = await runUpdateCenterUiAction(page, "检查更新");
+    let lastCheckedState = null;
     const checkedState = await waitFor(async () => {
       const state = await readUpdateCenterState(page);
+      lastCheckedState = state;
       const canInstall = state.buttons.some((button) =>
         includesText(button.text, "下载并安装") && !button.disabled);
       const checkInvocation = state.invocations.some((item) =>
         item.command === "check_tauri_update" &&
         includesText(item.result?.downloadUrl, updateSource.packagePath));
       return state.statusDetails["最新版本"] === `v${updateSource.version}` &&
-        state.statusDetails["检查结果"] === "发现新版本" &&
+        state.statusDetails["检查结果"] === "发现可安装的新版本" &&
         includesText(state.releaseNotes, updateSource.marker) &&
         checkInvocation &&
         canInstall
         ? state
         : null;
-    }, timeoutMs, `Timed out waiting for Tauri updater source to become available: ${updateSource.version}`);
+    }, timeoutMs, () => `Timed out waiting for Tauri updater source to become available: ${updateSource.version}.\nLast state: ${JSON.stringify(lastCheckedState)}`);
 
     const installAction = options.mockTauriRuntimeContext
       ? await runUpdateCenterUiAction(page, "下载并安装")

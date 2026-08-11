@@ -51,6 +51,7 @@ function buildMockTauriBootstrap(options) {
         if (command === "check_tauri_update") {
           const result = window.__exportDocManagerSmokeTauriUpdateResult || {
             supported: true,
+            installSupported: true,
             configured: true,
             updateAvailable: false,
             currentVersion: "0.1.0",

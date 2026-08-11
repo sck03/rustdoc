@@ -44,7 +44,6 @@ export function PaymentReportPreviewPanel({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const desktopAvailable = isDesktopBridgeAvailable();
-  const paymentDraftPreviewKey = paymentDraft ? JSON.stringify(paymentDraft) : "";
   const hasSavedPayment = paymentId > 0;
   const canUseSavedPaymentOutput = hasSavedPayment && !hasUnsavedDraftChanges;
   const hasPreviewSource = hasSavedPayment || Boolean(paymentDraft);
@@ -91,7 +90,7 @@ export function PaymentReportPreviewPanel({
     setStatusMessage(null);
     setLastCreatedJobId(null);
     setErrorMessage(null);
-  }, [paymentDraftPreviewKey]);
+  }, [paymentDraft]);
 
   const previewMutation = useMutation({
     mutationFn: () => runAbortableOperation((signal) => {

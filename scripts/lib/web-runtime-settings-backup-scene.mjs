@@ -831,7 +831,7 @@ export function createSettingsBackupSmokeScene(runtime) {
       });
       restoreSubmitted = true;
 
-      const restoreSuccessMessage = await waitForBackupRestoreSuccessMessage(page, timeoutMs);
+      const restoreConfirmationMessage = await waitForBackupRestoreConfirmationMessage(page, timeoutMs);
       return {
         url: redactDesktopAccessToken(checkUrl),
         initialCount: initialState.rows.length,
@@ -848,8 +848,8 @@ export function createSettingsBackupSmokeScene(runtime) {
         },
         createdUserBeforeRestore,
         restoreAction,
-        restoreSuccessMessage,
-        restoreRequiresRestart: includesText(restoreSuccessMessage, "重启"),
+        restoreConfirmationMessage,
+        restoreRequiresRestart: includesText(restoreConfirmationMessage, "重启"),
         backupFileExistsAfterRestore: existsSync(createdRow.fullPath),
       };
     } finally {
@@ -863,7 +863,7 @@ export function createSettingsBackupSmokeScene(runtime) {
     }
   }
 
-  async function waitForBackupRestoreSuccessMessage(page, timeoutMs) {
+  async function waitForBackupRestoreConfirmationMessage(page, timeoutMs) {
     return waitFor(async () => {
       const result = await evaluate(
         page,
@@ -872,16 +872,19 @@ export function createSettingsBackupSmokeScene(runtime) {
           const messages = Array.from(section?.querySelectorAll('.inline-notice, .success-alert') || [])
             .map((item) => item.innerText || item.textContent || '')
             .filter(Boolean);
-          return messages.find((message) =>
-            message.includes('数据库已从备份还原') ||
-            (message.includes('数据库已还原') && message.includes('重启'))) || '';
+          return messages.find((message) => {
+            const restartRequired = message.includes('重启');
+            const restoreScheduled = message.includes('数据库还原任务') && message.includes('排队');
+            const restoreCompleted = message.includes('数据库') && message.includes('已还原');
+            return restartRequired && (restoreScheduled || restoreCompleted);
+          }) || '';
         })()`,
         true,
       );
 
       const message = String(result.value ?? "");
       return message ? message : null;
-    }, timeoutMs, "Timed out waiting for backup restore success message.");
+    }, timeoutMs, "Timed out waiting for backup restore scheduling confirmation.");
   }
 
   async function createBackupRestoreTransientUser(options, accessToken, tokenType, user) {

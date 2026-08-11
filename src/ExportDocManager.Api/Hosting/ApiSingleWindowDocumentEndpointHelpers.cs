@@ -45,10 +45,6 @@ namespace ExportDocManager.Api.Hosting
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
             }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
-            }
         }
 
         private static async Task<IResult> SaveCustomsCooDocumentAsync(
@@ -90,10 +86,6 @@ namespace ExportDocManager.Api.Hosting
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
             }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
-            }
         }
 
         private static async Task<IResult> GetAgentConsignmentDocumentAsync(
@@ -120,10 +112,6 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Json(
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
-            }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
             }
         }
 
@@ -152,10 +140,6 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Json(
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
-            }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
             }
         }
 
@@ -214,10 +198,6 @@ namespace ExportDocManager.Api.Hosting
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
             }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
-            }
         }
 
         private static async Task<IResult> SaveAgentConsignmentDocumentAsync(
@@ -259,10 +239,6 @@ namespace ExportDocManager.Api.Hosting
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
             }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
-            }
         }
 
         private static async Task<IResult> GetAgentConsignmentLockedFieldsAsync(
@@ -290,10 +266,6 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Json(
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
-            }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
             }
         }
 
@@ -351,10 +323,6 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Json(
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
-            }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
             }
         }
 

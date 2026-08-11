@@ -177,7 +177,7 @@ namespace ExportDocManager.Services.Infrastructure
             return query with
             {
                 StartDate = NormalizeDateFilter(query.StartDate),
-                EndDate = NormalizeDateFilter(query.EndDate),
+                EndDateExclusive = NormalizeDateFilter(query.EndDateExclusive),
                 Keyword = TextSearchHelper.NormalizeFilter(query.Keyword),
                 ContractNo = TextSearchHelper.NormalizeFilter(query.ContractNo),
                 InvoiceType = TextSearchHelper.NormalizeFilter(query.InvoiceType),
@@ -253,9 +253,9 @@ namespace ExportDocManager.Services.Infrastructure
                 invoiceQuery = invoiceQuery.Where(invoice => invoice.ShipmentDate >= query.StartDate.Value);
             }
 
-            if (query.EndDate.HasValue)
+            if (query.EndDateExclusive.HasValue)
             {
-                invoiceQuery = invoiceQuery.Where(invoice => invoice.ShipmentDate <= query.EndDate.Value);
+                invoiceQuery = invoiceQuery.Where(invoice => invoice.ShipmentDate < query.EndDateExclusive.Value);
             }
 
             if (query.CustomerId.HasValue && query.CustomerId.Value > 0)

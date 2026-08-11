@@ -506,7 +506,7 @@ namespace ExportDocManager.Api.Hosting
                             parameters = new object[]
                             {
                                 QueryParameter("startDate", "string", "date-time", "Inclusive shipment start date."),
-                                QueryParameter("endDate", "string", "date-time", "Inclusive shipment end date."),
+                                QueryParameter("endDateExclusive", "string", "date-time", "Exclusive shipment end boundary, normally the next day at midnight."),
                                 QueryParameter("customerId", "integer", "int32", "Customer id filter."),
                                 QueryParameter("exporterId", "integer", "int32", "Exporter id filter."),
                                 QueryParameter("keyword", "string", null, "Keyword for invoice number, contract number, customer, exporter, destination, transport, style name, style number, or HS code."),

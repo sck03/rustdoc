@@ -9,6 +9,7 @@ namespace ExportDocManager.Services.Infrastructure;
 internal static class ServerMigrationStorageBudget
 {
     internal const long SafetyMarginBytes = 64L * 1024L * 1024L;
+    internal const long StreamingCheckWindowBytes = 8L * 1024L * 1024L;
 
     internal static void EnsureAvailable(
         string path,
@@ -77,6 +78,46 @@ internal static class ServerMigrationStorageBudget
                 long.MaxValue,
                 0,
                 ex);
+        }
+    }
+
+    internal static IncrementalWriteGuard CreateIncrementalWriteGuard(
+        string path,
+        string operation) => new(path, operation);
+
+    internal sealed class IncrementalWriteGuard
+    {
+        private readonly Action<long> _ensureAvailable;
+        private long _nextCheckAtBytes;
+
+        internal IncrementalWriteGuard(
+            string path,
+            string operation,
+            Action<long> ensureAvailable = null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(path);
+            ArgumentException.ThrowIfNullOrWhiteSpace(operation);
+            _ensureAvailable = ensureAvailable
+                ?? (requiredBytes => EnsureAvailable(path, requiredBytes, operation));
+        }
+
+        internal void EnsureCanWrite(long bytesWritten, int nextWriteBytes)
+        {
+            if (bytesWritten < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(bytesWritten));
+            }
+            if (nextWriteBytes < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(nextWriteBytes));
+            }
+            if (bytesWritten < _nextCheckAtBytes)
+            {
+                return;
+            }
+
+            _ensureAvailable(WithSafetyMargin(StreamingCheckWindowBytes, nextWriteBytes));
+            _nextCheckAtBytes = checked(bytesWritten + StreamingCheckWindowBytes);
         }
     }
 

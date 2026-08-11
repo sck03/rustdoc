@@ -50,6 +50,13 @@
       "maximumLines": 320
     },
     {
+      "name": "backup management components",
+      "directory": "apps/export-doc-web/src/features/settings",
+      "filePattern": "^(?:BackupManagementPanel|DatabaseBackupPanel|DataRootMigrationPanel|DisasterRecoveryPanel|DatabaseBackupTable|useBackupManagement|backupManagementModel)\\.(?:tsx|ts)$",
+      "maximumLines": 360,
+      "maximumAggregateLines": 1000
+    },
+    {
       "name": "job center components",
       "directory": "apps/export-doc-web/src/features/jobs",
       "filePattern": "^(?:JobCenterPage|JobCreationPanels|JobTable|jobPresentation|useJobCenterOperations)\\.(?:tsx|ts)$",
@@ -76,6 +83,20 @@
       "filePattern": "^runtime_(?:paths|paths_config|paths_tests|portable|sidecar_path)\\.rs$",
       "maximumLines": 850,
       "maximumAggregateLines": 1600
+    },
+    {
+      "name": "Tauri data-root migration components",
+      "directory": "apps/export-doc-tauri/src-tauri/src",
+      "filePattern": "^runtime_data_root_(?:migration|storage)\\.rs$",
+      "maximumLines": 420,
+      "maximumAggregateLines": 750
+    },
+    {
+      "name": "Tauri sidecar components",
+      "directory": "apps/export-doc-tauri/src-tauri/src",
+      "filePattern": "^sidecar(?:_endpoint|_process|_shutdown)?\\.rs$",
+      "maximumLines": 360,
+      "maximumAggregateLines": 900
     },
     {
       "name": "Excel analyzer Rust modules",

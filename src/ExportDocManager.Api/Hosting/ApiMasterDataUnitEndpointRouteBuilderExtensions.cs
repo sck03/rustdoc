@@ -85,7 +85,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IAuxiliaryService auxiliaryService,
-                ApiUnitDto request) =>
+                ApiUnitDto request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -114,17 +115,10 @@ namespace ExportDocManager.Api.Hosting
                 unit.Id = 0;
                 unit.RowVersion = null;
 
-                try
-                {
-                    await auxiliaryService.SaveUnitAsync(unit);
-                    return Results.Created(
-                        $"/api/master-data/units/{unit.Id}",
-                        ApiMasterDataDtoFactory.FromUnit(unit));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await auxiliaryService.SaveUnitAsync(unit, cancellationToken);
+                return Results.Created(
+                    $"/api/master-data/units/{unit.Id}",
+                    ApiMasterDataDtoFactory.FromUnit(unit));
             })
             .WithName("CreateUnit");
 
@@ -173,16 +167,9 @@ namespace ExportDocManager.Api.Hosting
                 }
                 unit.Id = id;
 
-                try
-                {
-                    await auxiliaryService.SaveUnitAsync(unit);
-                    var saved = await FindUnitByIdAsync(repository, id, cancellationToken) ?? unit;
-                    return Results.Ok(ApiMasterDataDtoFactory.FromUnit(saved));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await auxiliaryService.SaveUnitAsync(unit, cancellationToken);
+                var saved = await FindUnitByIdAsync(repository, id, cancellationToken) ?? unit;
+                return Results.Ok(ApiMasterDataDtoFactory.FromUnit(saved));
             })
             .WithName("UpdateUnit");
 
@@ -209,15 +196,8 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                try
-                {
-                    await auxiliaryService.DeleteUnitAsync(id);
-                    return Results.Ok(new ApiCommandResponse(true, "单位已删除。"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await auxiliaryService.DeleteUnitAsync(id, cancellationToken);
+                return Results.Ok(new ApiCommandResponse(true, "单位已删除。"));
             })
             .WithName("DeleteUnit");
         }

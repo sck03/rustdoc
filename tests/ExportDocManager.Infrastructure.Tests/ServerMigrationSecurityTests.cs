@@ -77,6 +77,32 @@ public sealed class ServerMigrationSecurityTests
         }
     }
 
+    [Fact]
+    public void StreamingStorageGuard_ShouldRecheckAtEachWriteWindow()
+    {
+        var requiredBudgets = new List<long>();
+        var guard = new ServerMigrationStorageBudget.IncrementalWriteGuard(
+            "test-root",
+            "测试流式写入",
+            requiredBudgets.Add);
+
+        guard.EnsureCanWrite(0, 81_920);
+        guard.EnsureCanWrite(ServerMigrationStorageBudget.StreamingCheckWindowBytes - 1, 81_920);
+        guard.EnsureCanWrite(ServerMigrationStorageBudget.StreamingCheckWindowBytes, 40_960);
+
+        Assert.Equal(2, requiredBudgets.Count);
+        Assert.Equal(
+            ServerMigrationStorageBudget.WithSafetyMargin(
+                ServerMigrationStorageBudget.StreamingCheckWindowBytes,
+                81_920),
+            requiredBudgets[0]);
+        Assert.Equal(
+            ServerMigrationStorageBudget.WithSafetyMargin(
+                ServerMigrationStorageBudget.StreamingCheckWindowBytes,
+                40_960),
+            requiredBudgets[1]);
+    }
+
     [Theory]
     [InlineData("../outside.txt")]
     [InlineData("Data/Files/../Config/appsettings.json")]

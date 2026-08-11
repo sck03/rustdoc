@@ -3,6 +3,7 @@ using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Suppliers
@@ -38,9 +39,13 @@ namespace ExportDocManager.Services.Suppliers
             status = Clean(status);
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var query = _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking());
-            if (keyword.Length > 0)
-                query = query.Where(item => item.Name.Contains(keyword) || item.CountryRegion.Contains(keyword) ||
-                    item.Category.Contains(keyword) || item.MainProducts.Contains(keyword) || item.Notes.Contains(keyword));
+            query = query.ApplyKeywordSearch(
+                keyword,
+                item => item.Name,
+                item => item.CountryRegion,
+                item => item.Category,
+                item => item.MainProducts,
+                item => item.Notes);
             if (status.Length > 0) query = query.Where(item => item.Status == status);
             int total = await query.CountAsync(cancellationToken);
             var items = await query.OrderBy(item => item.Name).Skip(PagingHelper.CalculateOffset(pageNumber, pageSize)).Take(pageSize)

@@ -220,10 +220,6 @@ namespace ExportDocManager.Api.Hosting
                         pathProvider,
                         ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
                 }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
             })
             .WithName("CleanupSystemLogs");
         }

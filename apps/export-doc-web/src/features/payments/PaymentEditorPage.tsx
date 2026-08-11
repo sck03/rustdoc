@@ -163,9 +163,13 @@ export function PaymentEditorPage({
       ? readApiError(customOptionsQuery.error)
       : null;
   const isReferenceDataBusy = selectedPayeeQuery.isFetching || customOptionsQuery.isFetching;
-  const currentPaymentSnapshot = useMemo(
-    () => (payment ? buildPaymentSnapshot(payment, isNew || !isPaymentIdValid ? 0 : parsedPaymentId) : null),
+  const currentPaymentDraft = useMemo(
+    () => (payment ? normalizePaymentForSave(payment, isNew || !isPaymentIdValid ? 0 : parsedPaymentId) : undefined),
     [isNew, isPaymentIdValid, parsedPaymentId, payment],
+  );
+  const currentPaymentSnapshot = useMemo(
+    () => (currentPaymentDraft ? JSON.stringify(currentPaymentDraft) : null),
+    [currentPaymentDraft],
   );
   const hasUnsavedPaymentChanges = Boolean(
     payment &&
@@ -376,7 +380,7 @@ export function PaymentEditorPage({
           <PaymentReportPreviewPanel
             client={client}
             paymentId={isNew || !isPaymentIdValid ? 0 : parsedPaymentId}
-            paymentDraft={normalizePaymentForSave(payment, isNew || !isPaymentIdValid ? 0 : parsedPaymentId)}
+            paymentDraft={currentPaymentDraft}
             hasUnsavedDraftChanges={hasUnsavedPaymentChanges}
           />
         </form>

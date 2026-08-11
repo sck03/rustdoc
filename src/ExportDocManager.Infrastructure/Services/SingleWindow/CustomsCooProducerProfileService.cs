@@ -15,19 +15,6 @@ namespace ExportDocManager.Services.SingleWindow
             _contextFactory = contextFactory;
         }
 
-        public async Task<List<CustomsCooProducerProfile>> GetAllAsync(CancellationToken cancellationToken = default)
-        {
-            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-            return await context.CustomsCooProducerProfiles
-                .AsNoTracking()
-                .OrderByDescending(item => item.LastUsedAt)
-                .ThenByDescending(item => item.UpdatedAt)
-                .ThenBy(item => item.CiqRegNo)
-                .ThenBy(item => item.PrdcEtpsName)
-                .ToListAsync(cancellationToken)
-                .ConfigureAwait(false);
-        }
-
         public async Task<IReadOnlyList<CustomsCooProducerProfile>> SearchAsync(string keyword, CancellationToken cancellationToken = default)
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
@@ -163,14 +150,89 @@ namespace ExportDocManager.Services.SingleWindow
                 return 0;
             }
 
-            int affected = 0;
-            foreach (var input in normalizedInputs)
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+            List<CustomsCooProducerProfile> existingProfiles = await LoadExistingProfilesAsync(
+                context,
+                normalizedInputs,
+                cancellationToken).ConfigureAwait(false);
+            var byCode = new Dictionary<string, CustomsCooProducerProfile>(StringComparer.OrdinalIgnoreCase);
+            var byName = new Dictionary<string, CustomsCooProducerProfile>(StringComparer.OrdinalIgnoreCase);
+            foreach (CustomsCooProducerProfile profile in existingProfiles)
             {
-                await SaveOrUpdateAsync(input, cancellationToken).ConfigureAwait(false);
-                affected++;
+                if (!string.IsNullOrWhiteSpace(profile.CiqRegNo))
+                {
+                    byCode.TryAdd(NormalizeUpperValue(profile.CiqRegNo), profile);
+                }
+                if (!string.IsNullOrWhiteSpace(profile.PrdcEtpsName))
+                {
+                    byName.TryAdd(NormalizeText(profile.PrdcEtpsName), profile);
+                }
             }
 
-            return affected;
+            DateTime now = DateTime.Now;
+            foreach (CustomsCooProducerProfileInput input in normalizedInputs)
+            {
+                CustomsCooProducerProfile entity = ResolveExisting(input, byCode, byName);
+                if (entity == null)
+                {
+                    entity = new CustomsCooProducerProfile { CreatedAt = now };
+                    await context.CustomsCooProducerProfiles.AddAsync(entity, cancellationToken).ConfigureAwait(false);
+                }
+
+                ApplyValues(entity, input, now);
+                if (!string.IsNullOrWhiteSpace(entity.CiqRegNo))
+                {
+                    byCode[NormalizeUpperValue(entity.CiqRegNo)] = entity;
+                }
+                if (!string.IsNullOrWhiteSpace(entity.PrdcEtpsName))
+                {
+                    byName[NormalizeText(entity.PrdcEtpsName)] = entity;
+                }
+            }
+
+            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return normalizedInputs.Count;
+        }
+
+        private static async Task<List<CustomsCooProducerProfile>> LoadExistingProfilesAsync(
+            AppDbContext context,
+            IReadOnlyCollection<CustomsCooProducerProfileInput> inputs,
+            CancellationToken cancellationToken)
+        {
+            string[] codes = inputs
+                .Select(item => NormalizeUpperValue(item.CiqRegNo))
+                .Where(item => item.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            string[] names = inputs
+                .Select(item => NormalizeText(item.PrdcEtpsName).ToUpperInvariant())
+                .Where(item => item.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            return await context.CustomsCooProducerProfiles
+                .Where(item =>
+                    (item.CiqRegNo != null && codes.Contains(item.CiqRegNo.ToUpper())) ||
+                    (item.PrdcEtpsName != null && names.Contains(item.PrdcEtpsName.ToUpper())))
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        private static CustomsCooProducerProfile ResolveExisting(
+            CustomsCooProducerProfileInput input,
+            IReadOnlyDictionary<string, CustomsCooProducerProfile> byCode,
+            IReadOnlyDictionary<string, CustomsCooProducerProfile> byName)
+        {
+            string code = NormalizeUpperValue(input.CiqRegNo);
+            if (code.Length > 0 && byCode.TryGetValue(code, out CustomsCooProducerProfile codeMatch))
+            {
+                return codeMatch;
+            }
+
+            string name = NormalizeText(input.PrdcEtpsName);
+            return name.Length > 0 && byName.TryGetValue(name, out CustomsCooProducerProfile nameMatch)
+                ? nameMatch
+                : null;
         }
 
         private static async Task<CustomsCooProducerProfile> FindExistingAsync(

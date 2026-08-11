@@ -68,7 +68,7 @@ export function createReportTemplateSmokeScene(runtime) {
         `Timed out waiting for report template debug readouts to be absent: ${check.reportType}/${check.templateFileName}`,
       );
       const previewWorkspaceCheck = await waitForReportTemplatePreviewWorkspaceCheck(page, timeoutMs);
-      const sourceFormatCheck = await waitForReportTemplateSourceFormatCheck(page, timeoutMs);
+      const advancedHtmlFormatCheck = await waitForReportTemplateAdvancedHtmlFormatCheck(page, timeoutMs);
 
       results.push({
         reportType: check.reportType,
@@ -79,7 +79,7 @@ export function createReportTemplateSmokeScene(runtime) {
         loadedDesignerCheck,
         debugReadoutRemovedCheck,
         previewWorkspaceCheck,
-        sourceFormatCheck,
+        advancedHtmlFormatCheck,
       });
     }
 
@@ -141,19 +141,19 @@ export function createReportTemplateSmokeScene(runtime) {
     );
   }
 
-  async function waitForReportTemplateSourceFormatCheck(page, timeoutMs) {
+  async function waitForReportTemplateAdvancedHtmlFormatCheck(page, timeoutMs) {
     await evaluate(
       page,
       `(() => {
         const buttons = Array.from(document.querySelectorAll('button'));
-        const sourceTab = buttons.find((button) => (button.innerText || '').includes('源码'));
-        if (!sourceTab) {
-          throw new Error('Report template source tab was not found.');
+        const advancedHtmlTab = buttons.find((button) => (button.innerText || '').includes('高级 HTML'));
+        if (!advancedHtmlTab) {
+          throw new Error('Report template advanced HTML tab was not found.');
         }
 
-        sourceTab.click();
-        window.__reportTemplateSourceFormatClicked = false;
-        delete window.__reportTemplateSourceFormatOriginal;
+        advancedHtmlTab.click();
+        window.__reportTemplateAdvancedHtmlFormatClicked = false;
+        delete window.__reportTemplateAdvancedHtmlFormatOriginal;
         return true;
       })()`,
       true,
@@ -163,7 +163,7 @@ export function createReportTemplateSmokeScene(runtime) {
       const state = await evaluate(
         page,
         `(() => {
-          const textarea = document.querySelector('textarea[aria-label="模板源码"]');
+          const textarea = document.querySelector('textarea[aria-label="模板高级 HTML"]');
           if (!textarea) {
             return null;
           }
@@ -189,11 +189,11 @@ export function createReportTemplateSmokeScene(runtime) {
             notifyReactChange(control);
           };
 
-          if (typeof window.__reportTemplateSourceFormatOriginal !== 'string') {
-            window.__reportTemplateSourceFormatOriginal = textarea.value || '';
+          if (typeof window.__reportTemplateAdvancedHtmlFormatOriginal !== 'string') {
+            window.__reportTemplateAdvancedHtmlFormatOriginal = textarea.value || '';
           }
 
-          if (!window.__reportTemplateSourceFormatClicked) {
+          if (!window.__reportTemplateAdvancedHtmlFormatClicked) {
             setNativeValue(textarea, '<div><span>{{\\n Invoice.InvoiceNo \\n}}</span></div>');
             const buttons = Array.from(document.querySelectorAll('button'));
             const formatButton = buttons.find((button) => (button.innerText || '').includes('格式化'));
@@ -202,7 +202,7 @@ export function createReportTemplateSmokeScene(runtime) {
             }
 
             formatButton.click();
-            window.__reportTemplateSourceFormatClicked = true;
+            window.__reportTemplateAdvancedHtmlFormatClicked = true;
             return null;
           }
 
@@ -212,9 +212,9 @@ export function createReportTemplateSmokeScene(runtime) {
             return null;
           }
 
-          setNativeValue(textarea, window.__reportTemplateSourceFormatOriginal || '');
+          setNativeValue(textarea, window.__reportTemplateAdvancedHtmlFormatOriginal || '');
           return {
-            sourceTabVisible: true,
+            advancedHtmlTabVisible: true,
             formatButtonFound: true,
             formattedIncludesExpected: true,
             expected,
@@ -226,7 +226,7 @@ export function createReportTemplateSmokeScene(runtime) {
       ).catch(() => ({ value: null }));
 
       return state.value ?? null;
-    }, timeoutMs, () => "Timed out waiting for report template source formatter check.");
+    }, timeoutMs, () => "Timed out waiting for report template advanced HTML formatter check.");
   }
 
   function buildReportTemplateCheckUrl(webUrl, check) {

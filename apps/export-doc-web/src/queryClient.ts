@@ -1,6 +1,9 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { notifyAuthenticationFailure } from "./api/authenticationFailureEvents.ts";
 import { queryRetryDelay, shouldRetryQueryFailure } from "./api/queryRetryPolicy.ts";
+import { isDesktopBridgeAvailable } from "./desktop/desktopBridge.ts";
+
+const mutationNetworkMode = isDesktopBridgeAvailable() ? "always" : "online";
 
 export const queryClient = new QueryClient({
   queryCache: new QueryCache({
@@ -20,7 +23,7 @@ export const queryClient = new QueryClient({
       staleTime: 30 * 1000,
     },
     mutations: {
-      networkMode: "always",
+      networkMode: mutationNetworkMode,
       retry: false,
     },
   },

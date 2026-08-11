@@ -4,6 +4,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Data;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Suppliers
@@ -106,7 +107,11 @@ namespace ExportDocManager.Services.Suppliers
             keyword = Clean(keyword); status = Clean(status);
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var query = _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking());
-            if (keyword.Length > 0) query = query.Where(item => item.Name.Contains(keyword) || item.Category.Contains(keyword) || item.MainProducts.Contains(keyword));
+            query = query.ApplyKeywordSearch(
+                keyword,
+                item => item.Name,
+                item => item.Category,
+                item => item.MainProducts);
             if (status.Length > 0) query = query.Where(item => item.Status == status);
             var rows = await query.OrderBy(item => item.Name).Take(MaximumExportRows + 1).Select(item => new
             {

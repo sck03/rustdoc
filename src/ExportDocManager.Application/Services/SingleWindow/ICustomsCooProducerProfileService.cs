@@ -5,8 +5,6 @@ namespace ExportDocManager.Services.SingleWindow
 {
     public interface ICustomsCooProducerProfileService
     {
-        Task<List<CustomsCooProducerProfile>> GetAllAsync(CancellationToken cancellationToken = default);
-
         Task<IReadOnlyList<CustomsCooProducerProfile>> SearchAsync(string keyword, CancellationToken cancellationToken = default);
 
         Task<CustomsCooProducerProfile> GetByIdAsync(int id, CancellationToken cancellationToken = default);

@@ -29,9 +29,13 @@ namespace ExportDocManager.Services.SingleWindow
             }
 
             EnsureBatchBelongsToCurrentStation(batch, profile, stationKey, businessType);
-            if (batch.Status == SingleWindowBatchStatusCatalog.SubmitPackageImported)
+            if (batch.Status is SingleWindowBatchStatusCatalog.Preparing or
+                SingleWindowBatchStatusCatalog.SubmitPackageExported or
+                SingleWindowBatchStatusCatalog.SubmitPackageImported or
+                SingleWindowBatchStatusCatalog.ClientDispatching or
+                SingleWindowBatchStatusCatalog.ClientDispatchFailed)
             {
-                throw new ResourceConflictException("请先把该批次发送到官方客户端，再收集回执。");
+                throw new ResourceConflictException("请先成功把该批次发送到官方客户端，再收集回执。");
             }
 
             string receiptRootPath = ResolveConfiguredRoot(profile, businessType);

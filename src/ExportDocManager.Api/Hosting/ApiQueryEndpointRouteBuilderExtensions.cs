@@ -15,7 +15,7 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 IQueryReadRepository queryReadRepository,
                 DateTime? startDate,
-                DateTime? endDate,
+                DateTime? endDateExclusive,
                 int? customerId,
                 int? exporterId,
                 string keyword,
@@ -37,7 +37,7 @@ namespace ExportDocManager.Api.Hosting
                     new QueryPageQuery
                     {
                         StartDate = startDate,
-                        EndDate = endDate,
+                        EndDateExclusive = endDateExclusive,
                         CustomerId = customerId,
                         ExporterId = exporterId,
                         Keyword = keyword ?? string.Empty,
@@ -132,7 +132,7 @@ namespace ExportDocManager.Api.Hosting
             var retryRequest = new ApiQueryInvoiceExportRequest
             {
                 StartDate = request?.StartDate,
-                EndDate = request?.EndDate,
+                EndDateExclusive = request?.EndDateExclusive,
                 CustomerId = request?.CustomerId,
                 ExporterId = request?.ExporterId,
                 Keyword = request?.Keyword ?? string.Empty,
@@ -186,7 +186,7 @@ namespace ExportDocManager.Api.Hosting
             return new QueryPageQuery
             {
                 StartDate = request?.StartDate,
-                EndDate = request?.EndDate,
+                EndDateExclusive = request?.EndDateExclusive,
                 CustomerId = request?.CustomerId,
                 ExporterId = request?.ExporterId,
                 Keyword = request?.Keyword ?? string.Empty,

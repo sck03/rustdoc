@@ -131,7 +131,7 @@ namespace ExportDocManager.Api.Hosting
             return new Dictionary<string, object>
             {
                 ["startDate"] = new { type = "string", format = "date-time", nullable = true },
-                ["endDate"] = new { type = "string", format = "date-time", nullable = true },
+                ["endDateExclusive"] = new { type = "string", format = "date-time", nullable = true },
                 ["customerId"] = new { type = "integer", format = "int32", nullable = true },
                 ["exporterId"] = new { type = "integer", format = "int32", nullable = true },
                 ["keyword"] = StringProperty("Keyword for invoice number, contract number, customer, or exporter."),

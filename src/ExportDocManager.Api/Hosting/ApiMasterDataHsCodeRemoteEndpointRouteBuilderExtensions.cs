@@ -65,10 +65,6 @@ namespace ExportDocManager.Api.Hosting
                 {
                     throw;
                 }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
             })
             .WithName("SearchRemoteHsCodes");
 
@@ -117,10 +113,6 @@ namespace ExportDocManager.Api.Hosting
                 {
                     throw;
                 }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
             })
             .WithName("CaptureRemoteHsCodes");
 
@@ -165,10 +157,6 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return WriteServiceException(ex);
                 }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
             })
             .WithName("FetchRemoteHsCodeDetail");
 
@@ -209,10 +197,6 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
                 catch (InvalidOperationException ex)
-                {
-                    return WriteServiceException(ex);
-                }
-                catch (Exception ex)
                 {
                     return WriteServiceException(ex);
                 }

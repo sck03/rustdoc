@@ -25,23 +25,25 @@ namespace ExportDocManager.Services.MasterData
             _payeeReadRepository = payeeReadRepository ?? throw new ArgumentNullException(nameof(payeeReadRepository));
         }
 
-        public async Task<int> SavePayeeAsync(Payee payee)
+        public async Task<int> SavePayeeAsync(
+            Payee payee,
+            CancellationToken cancellationToken = default)
         {
             try
             {
                 ArgumentNullException.ThrowIfNull(payee);
                 NormalizePayee(payee);
 
-                using var context = await _contextFactory.CreateDbContextAsync();
+                using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 if (payee.Id == 0)
                 {
-                    await context.Payees.AddAsync(payee);
+                    await context.Payees.AddAsync(payee, cancellationToken);
                 }
                 else
                 {
                     context.Payees.Update(payee);
                 }
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken);
                 return payee.Id;
             }
             catch (DbUpdateConcurrencyException ex)
@@ -52,80 +54,46 @@ namespace ExportDocManager.Services.MasterData
             {
                 throw new ServiceValidationException(ex.Message, ex);
             }
-            catch (ServiceException)
-            {
-                throw;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                throw new InfrastructureServiceException("收款对象保存服务暂时不可用，请稍后重试。", ex);
-            }
         }
 
-        public async Task<List<Payee>> GetAllPayeesAsync()
+        public async Task<List<Payee>> GetAllPayeesAsync(CancellationToken cancellationToken = default)
+        {
+            var rows = await _payeeReadRepository.QueryAsync(new PayeeReadQuery(), cancellationToken);
+            return rows.ToList();
+        }
+
+        public async Task<bool> DeletePayeeAsync(int id, CancellationToken cancellationToken = default)
         {
             try
             {
-                var rows = await _payeeReadRepository.QueryAsync(new PayeeReadQuery());
-                return rows.ToList();
-            }
-            catch (ServiceException)
-            {
-                throw;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                throw new InfrastructureServiceException("收款对象列表服务暂时不可用，请稍后重试。", ex);
-            }
-        }
-
-        public async Task<bool> DeletePayeeAsync(int id)
-        {
-            try
-            {
-                using var context = await _contextFactory.CreateDbContextAsync();
-                var entity = await context.Payees.FirstOrDefaultAsync(x => x.Id == id);
+                using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+                var entity = await context.Payees.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
                 if (entity == null)
                 {
                     return false;
                 }
 
                 context.Payees.Remove(entity);
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken);
                 return true;
             }
             catch (DbUpdateConcurrencyException ex)
             {
                 throw new ServiceConcurrencyException("该收款对象已被其他用户修改，请刷新后再试。", ex);
             }
-            catch (ServiceException)
-            {
-                throw;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                throw new InfrastructureServiceException("收款对象删除服务暂时不可用，请稍后重试。", ex);
-            }
         }
 
-        public async Task<List<Payee>> SearchPayeesAsync(string keyword)
+        public async Task<List<Payee>> SearchPayeesAsync(
+            string keyword,
+            CancellationToken cancellationToken = default)
         {
-            try
-            {
-                var rows = await _payeeReadRepository.QueryAsync(new PayeeReadQuery
+            var rows = await _payeeReadRepository.QueryAsync(
+                new PayeeReadQuery
                 {
                     Keyword = keyword ?? string.Empty
-                });
-                return rows.ToList();
-            }
-            catch (ServiceException)
-            {
-                throw;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                throw new InfrastructureServiceException("收款对象搜索服务暂时不可用，请稍后重试。", ex);
-            }
+                },
+                cancellationToken);
+            return rows.ToList();
         }
 
         private static void NormalizePayee(Payee payee)

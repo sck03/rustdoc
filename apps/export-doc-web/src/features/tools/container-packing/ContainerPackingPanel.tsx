@@ -115,6 +115,7 @@ export function ContainerPackingPanel({
   const [autoRefreshText, setAutoRefreshText] = useState("自动分析已关闭，修改后请点击“立即刷新”。");
   const autoRefreshTimerRef = useRef<number | null>(null);
   const latestAnalyzeSequenceRef = useRef(0);
+  const activeAnalyzeControllerRef = useRef<AbortController | null>(null);
 
   const projectsQuery = useQuery({
     queryKey: queryKeys.containerPackingProjects(),
@@ -136,12 +137,8 @@ export function ContainerPackingPanel({
     () => buildContainerPackingAnalyzeRequest(container, cargoRows, rules),
     [container, cargoRows, rules],
   );
-  const analysisSignature = useMemo(
-    () => JSON.stringify(analysisRequest),
-    [analysisRequest],
-  );
-  const latestAnalysisSignatureRef = useRef(analysisSignature);
-  latestAnalysisSignatureRef.current = analysisSignature;
+  const latestAnalysisRequestRef = useRef(analysisRequest);
+  latestAnalysisRequestRef.current = analysisRequest;
   const analysis = response?.analysis ?? null;
   const visualizationDimensions = analysis ? analysisDimensions : null;
   const canAnalyze =
@@ -170,14 +167,14 @@ export function ContainerPackingPanel({
   );
 
   const analyzeMutation = useMutation({
-    mutationFn: ({ request }: ContainerPackingAnalyzeVariables) =>
+    mutationFn: ({ request, signal }: ContainerPackingAnalyzeVariables) =>
       client.analyzeContainerPacking({
         body: request,
-      }),
+      }, { signal }),
     onSuccess: (nextResponse, variables) => {
       if (
         variables.sequence !== latestAnalyzeSequenceRef.current ||
-        variables.signature !== latestAnalysisSignatureRef.current
+        variables.request !== latestAnalysisRequestRef.current
       ) {
         return;
       }
@@ -199,7 +196,7 @@ export function ContainerPackingPanel({
     onError: (error, variables) => {
       if (
         variables.sequence !== latestAnalyzeSequenceRef.current ||
-        variables.signature !== latestAnalysisSignatureRef.current
+        variables.request !== latestAnalysisRequestRef.current
       ) {
         return;
       }
@@ -208,7 +205,22 @@ export function ContainerPackingPanel({
       setAutoRefreshText("分析失败。");
       setMessage(readApiError(error));
     },
+    onSettled: (_data, _error, variables) => {
+      if (activeAnalyzeControllerRef.current?.signal === variables.signal) {
+        activeAnalyzeControllerRef.current = null;
+      }
+    },
   });
+
+  useEffect(() => {
+    latestAnalyzeSequenceRef.current += 1;
+    activeAnalyzeControllerRef.current?.abort();
+    activeAnalyzeControllerRef.current = null;
+  }, [analysisRequest]);
+
+  useEffect(() => () => {
+    activeAnalyzeControllerRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     if (autoRefreshTimerRef.current) {
@@ -233,13 +245,11 @@ export function ContainerPackingPanel({
     setAutoRefreshState("queued");
     setAutoRefreshText("内容已修改，将在停止输入后自动刷新。");
     const scheduledRequest = analysisRequest;
-    const scheduledSignature = analysisSignature;
     autoRefreshTimerRef.current = window.setTimeout(() => {
       autoRefreshTimerRef.current = null;
       startContainerPackingAnalysis(
         "auto",
         scheduledRequest,
-        scheduledSignature,
       );
     }, containerPackingAutoRefreshDebounceMs);
 
@@ -251,7 +261,6 @@ export function ContainerPackingPanel({
     };
   }, [
     analysisRequest,
-    analysisSignature,
     autoRefreshEnabled,
     canAnalyze,
     validCargoRows.length,
@@ -446,15 +455,14 @@ export function ContainerPackingPanel({
       return;
     }
 
-    startContainerPackingAnalysis("manual", analysisRequest, analysisSignature);
+    startContainerPackingAnalysis("manual", analysisRequest);
   }
 
   function startContainerPackingAnalysis(
     mode: ContainerPackingAnalyzeMode,
     request: ApiContainerPackingAnalyzeRequest,
-    signature: string,
   ) {
-    if (!canAnalyze || signature !== latestAnalysisSignatureRef.current) {
+    if (!canAnalyze || request !== latestAnalysisRequestRef.current) {
       return;
     }
 
@@ -465,6 +473,9 @@ export function ContainerPackingPanel({
 
     const sequence = latestAnalyzeSequenceRef.current + 1;
     latestAnalyzeSequenceRef.current = sequence;
+    activeAnalyzeControllerRef.current?.abort();
+    const controller = new AbortController();
+    activeAnalyzeControllerRef.current = controller;
     setAutoRefreshState("running");
     setAutoRefreshText(
       mode === "auto"
@@ -479,7 +490,7 @@ export function ContainerPackingPanel({
       mode,
       request,
       sequence,
-      signature,
+      signal: controller.signal,
     });
   }
 

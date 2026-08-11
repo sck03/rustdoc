@@ -1,2 +1,2 @@
 /* Layer 1: tokens, reset and shared primitives. Keep this file free of page overrides. */
-@import "../styles.css";
+@import "../styles.css" layer(foundation);

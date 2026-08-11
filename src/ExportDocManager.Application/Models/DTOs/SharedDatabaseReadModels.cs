@@ -25,7 +25,7 @@ namespace ExportDocManager.Models.DTOs
     {
         public DateTime? StartDate { get; init; }
 
-        public DateTime? EndDate { get; init; }
+        public DateTime? EndDateExclusive { get; init; }
 
         public int? CustomerId { get; init; }
 

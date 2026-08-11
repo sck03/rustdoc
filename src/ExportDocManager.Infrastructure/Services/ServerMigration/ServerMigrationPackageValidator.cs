@@ -23,11 +23,12 @@ internal static class ServerMigrationPackageValidator
         MaximumCompressionRatio: 2_000,
         MaximumPathDepth: 12);
 
-    public static async Task CopyBoundedAsync(
+    public static async Task<long> CopyBoundedAsync(
         Stream source,
         string destination,
         long maximumBytes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<long, int> beforeWrite = null)
     {
         await using var target = new FileStream(
             destination,
@@ -41,14 +42,17 @@ internal static class ServerMigrationPackageValidator
         int read;
         while ((read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
         {
-            total = checked(total + read);
-            if (total > maximumBytes)
+            long nextTotal = checked(total + read);
+            if (nextTotal > maximumBytes)
             {
                 throw new PayloadLimitExceededException(maximumBytes);
             }
+            beforeWrite?.Invoke(total, read);
             await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            total = nextTotal;
         }
         await target.FlushAsync(cancellationToken).ConfigureAwait(false);
+        return total;
     }
 
     public static async Task<ServerMigrationManifest> ReadAndValidateManifestAsync(

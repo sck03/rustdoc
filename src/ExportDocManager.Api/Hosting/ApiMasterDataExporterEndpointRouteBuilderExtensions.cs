@@ -148,10 +148,6 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
             })
             .WithName("UploadExporterSeal");
 
@@ -159,7 +155,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterService exporterService,
-                ApiExporterDto request) =>
+                ApiExporterDto request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -189,18 +186,11 @@ namespace ExportDocManager.Api.Hosting
                 exporter.Id = 0;
                 exporter.RowVersion = null;
 
-                try
-                {
-                    int savedId = await exporterService.SaveExporterAsync(exporter);
-                    var saved = await exporterService.GetExporterByIdAsync(savedId) ?? exporter;
-                    return Results.Created(
-                        $"/api/master-data/exporters/{savedId}",
-                        ApiMasterDataDtoFactory.FromExporter(saved));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                int savedId = await exporterService.SaveExporterAsync(exporter, cancellationToken);
+                var saved = await exporterService.GetExporterByIdAsync(savedId, cancellationToken) ?? exporter;
+                return Results.Created(
+                    $"/api/master-data/exporters/{savedId}",
+                    ApiMasterDataDtoFactory.FromExporter(saved));
             })
             .WithName("CreateExporter");
 
@@ -209,7 +199,8 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 IExporterService exporterService,
                 int id,
-                ApiExporterDto request) =>
+                ApiExporterDto request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -231,7 +222,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("请求体出口商ID与路径ID不一致。"));
                 }
 
-                if (await exporterService.GetExporterByIdAsync(id) == null)
+                if (await exporterService.GetExporterByIdAsync(id, cancellationToken) == null)
                 {
                     return Results.NotFound();
                 }
@@ -248,16 +239,9 @@ namespace ExportDocManager.Api.Hosting
 
                 exporter.Id = id;
 
-                try
-                {
-                    int savedId = await exporterService.SaveExporterAsync(exporter);
-                    var saved = await exporterService.GetExporterByIdAsync(savedId) ?? exporter;
-                    return Results.Ok(ApiMasterDataDtoFactory.FromExporter(saved));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                int savedId = await exporterService.SaveExporterAsync(exporter, cancellationToken);
+                var saved = await exporterService.GetExporterByIdAsync(savedId, cancellationToken) ?? exporter;
+                return Results.Ok(ApiMasterDataDtoFactory.FromExporter(saved));
             })
             .WithName("UpdateExporter");
 
@@ -265,7 +249,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterService exporterService,
-                int id) =>
+                int id,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -277,20 +262,13 @@ namespace ExportDocManager.Api.Hosting
                     return BadMasterDataId("出口商");
                 }
 
-                if (await exporterService.GetExporterByIdAsync(id) == null)
+                if (await exporterService.GetExporterByIdAsync(id, cancellationToken) == null)
                 {
                     return Results.NotFound();
                 }
 
-                try
-                {
-                    await exporterService.DeleteExporterAsync(id);
-                    return Results.Ok(new ApiCommandResponse(true, "出口商已删除。"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await exporterService.DeleteExporterAsync(id, cancellationToken);
+                return Results.Ok(new ApiCommandResponse(true, "出口商已删除。"));
             })
             .WithName("DeleteExporter");
         }

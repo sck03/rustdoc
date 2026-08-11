@@ -21,7 +21,6 @@ const modelPath = path.join(
 const stylesRoot = path.join(repoRoot, "apps", "export-doc-web", "src");
 const reportWorkspaceCss = readCssGraph(path.join(stylesRoot, "reportWorkspace.css"));
 const responsiveOverridesCss = readCssGraph(path.join(stylesRoot, "responsiveOverrides.css"));
-const themeCss = readCssGraph(path.join(stylesRoot, "theme.css"));
 const workspaceStateSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "reportTemplateWorkspaceState.ts"), "utf8");
 const modelImportSpecifier = `./${path.relative(workspaceRoot, modelPath).replaceAll("\\", "/")}`;
 
@@ -94,7 +93,7 @@ assertMatch(workspaceStateSource, /canSave\s*=\s*[\s\S]*?hasUnsavedChanges/, "�
 
 assertMatch(
   reportWorkspaceCss,
-  /\.report-template-sidebar\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1\.8fr\)\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/,
+  /\.report-template-sidebar\s*\{[\s\S]*?grid-template-columns:\s*minmax\(420px,\s*1\.6fr\)\s*minmax\(220px,\s*1fr\)\s*minmax\(220px,\s*1fr\)\s*minmax\(120px,\s*0\.55fr\)/,
   "宽屏模板选择、我的模板、模板操作和模板包应保持四栏",
 );
 assertMatch(reportWorkspaceCss, /\.template-selection-panel\s*\{\s*grid-column:\s*1;\s*grid-row:\s*1;/, "选择区应固定在宽屏第一列");
@@ -105,14 +104,19 @@ assertMatch(
   "中等宽度应让选择区独占首行，其余三个模板面板同排",
 );
 assertMatch(
-  themeCss,
+  responsiveOverridesCss,
   /@container\s+report-workspace\s*\(max-width:\s*1160px\)[\s\S]*?\.template-selection-panel\s*\{[\s\S]*?grid-column:\s*1\s*\/\s*-1;[\s\S]*?grid-row:\s*auto;/,
   "工作区实际变窄时选择区必须独占首行并清除宽屏行定位",
 );
 assertMatch(
-  themeCss,
-  /@container\s+report-workspace\s*\(max-width:\s*1160px\)[\s\S]*?\.template-user-panel,\s*\.template-admin-panel,\s*\.template-package-panel\s*\{[\s\S]*?grid-column:\s*auto;[\s\S]*?grid-row:\s*auto;/,
-  "工作区实际变窄时三个管理面板必须清除宽屏固定列，避免覆盖默认模板",
+  responsiveOverridesCss,
+  /@container\s+report-workspace\s*\(max-width:\s*1160px\)[\s\S]*?\.template-user-panel,\s*\.template-admin-panel\s*\{[\s\S]*?grid-column:\s*auto;[\s\S]*?grid-row:\s*auto;/,
+  "工作区实际变窄时用户与管理面板必须清除宽屏固定列",
+);
+assertMatch(
+  responsiveOverridesCss,
+  /@container\s+report-workspace\s*\(max-width:\s*1160px\)[\s\S]*?\.template-package-panel\s*\{[\s\S]*?grid-column:\s*1\s*\/\s*-1;[\s\S]*?grid-row:\s*auto;/,
+  "工作区实际变窄时模板包应独占整行，避免操作区拥挤",
 );
 
 console.log("report-template-workspace-model tests passed");

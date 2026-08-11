@@ -307,6 +307,41 @@ namespace ExportDocManager.Services.Infrastructure
                             upper("CustomsCode") gin_trgm_ops,
                             upper("Phone") gin_trgm_ops,
                             upper("BankName") gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_Payees_TextSearch_Upper_Trgm"
+                        ON "Payees" USING gin (
+                            upper("Category") gin_trgm_ops,
+                            upper("Name") gin_trgm_ops,
+                            upper("BankName") gin_trgm_ops,
+                            upper("RMBAccount") gin_trgm_ops,
+                            upper("USDAccount") gin_trgm_ops,
+                            upper("ContactPerson") gin_trgm_ops,
+                            upper("Phone") gin_trgm_ops,
+                            upper("Notes") gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_CrmCustomers_TextSearch_Upper_Trgm"
+                        ON "CrmCustomers" USING gin (
+                            upper("Name") gin_trgm_ops,
+                            upper("CountryRegion") gin_trgm_ops,
+                            upper("Website") gin_trgm_ops,
+                            upper("Source") gin_trgm_ops,
+                            upper("Notes") gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_SupplierCompanies_TextSearch_Upper_Trgm"
+                        ON "SupplierCompanies" USING gin (
+                            upper("Name") gin_trgm_ops,
+                            upper("CountryRegion") gin_trgm_ops,
+                            upper("Category") gin_trgm_ops,
+                            upper("MainProducts") gin_trgm_ops,
+                            upper("Notes") gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_CustomsCooProducerProfiles_TextSearch_Upper_Trgm"
+                        ON "CustomsCooProducerProfiles" USING gin (
+                            upper("CiqRegNo") gin_trgm_ops,
+                            upper("PrdcEtpsName") gin_trgm_ops,
+                            upper("PrdcEtpsConcEr") gin_trgm_ops,
+                            upper("PrdcEtpsTel") gin_trgm_ops,
+                            upper("Producer") gin_trgm_ops,
+                            upper("ProducerTel") gin_trgm_ops,
+                            upper("ProducerEmail") gin_trgm_ops,
+                            upper("LastInvoiceNo") gin_trgm_ops,
+                            upper("LastSourceStyleNo") gin_trgm_ops);
                     """).ConfigureAwait(false);
             }
             catch (PostgresException ex) when (ex.SqlState is "42501" or "0A000" or "58P01")

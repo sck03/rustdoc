@@ -82,6 +82,10 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
         acdClientRoot,
         timestamp,
       );
+      const stationAssignmentCode = stationProfile.stationAssignmentCode;
+      if (typeof stationAssignmentCode !== "string" || !stationAssignmentCode.startsWith("SWAC1.")) {
+        throw new Error("Single Window invoice-list station profile did not return a valid assignment code.");
+      }
       browserSessionOverrideId = await installBrowserSessionOverride(page, {
         accessToken: operatorLogin.accessToken,
         expiresAt: operatorLogin.expiresAt,
@@ -125,6 +129,7 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
         operatorLogin.accessToken,
         operatorLogin.tokenType,
         invoice,
+        stationAssignmentCode,
         {
           cooSubmitPackagePath,
           acdSubmitPackagePath,
@@ -446,7 +451,16 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
     };
   }
   
-  async function runInvoiceListSingleWindowCheck(page, options, accessToken, tokenType, invoice, paths, timeoutMs) {
+  async function runInvoiceListSingleWindowCheck(
+    page,
+    options,
+    accessToken,
+    tokenType,
+    invoice,
+    stationAssignmentCode,
+    paths,
+    timeoutMs,
+  ) {
     await navigateToInvoiceListSmokeRow(page, options, invoice, timeoutMs);
     await evaluate(
       page,
@@ -477,6 +491,8 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
       timeoutMs,
       "Timed out waiting for invoice list Single Window action panel.",
     );
+
+    await setInvoiceListStationAssignmentCode(page, stationAssignmentCode, timeoutMs);
   
     const coo = await runInvoiceListSingleWindowSubmitPackageCheck(
       page,
@@ -789,6 +805,32 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
     }
     return activeProfile;
   }
+
+  async function setInvoiceListStationAssignmentCode(page, stationAssignmentCode, timeoutMs) {
+    await evaluate(
+      page,
+      `(() => {
+        const panel = document.querySelector('[aria-label="单一窗口办理"]');
+        const textarea = panel?.querySelector('.single-window-assignment-code-field textarea');
+        const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+        if (!textarea || !valueSetter || textarea.disabled) {
+          throw new Error('Single Window station assignment code field is not available.');
+        }
+
+        valueSetter.call(textarea, ${JSON.stringify(stationAssignmentCode)});
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        return textarea.value;
+      })()`,
+      true,
+    );
+
+    await waitForPageExpression(
+      page,
+      `document.querySelector('[aria-label="单一窗口办理"] .single-window-assignment-code-field textarea')?.value === ${JSON.stringify(stationAssignmentCode)}`,
+      timeoutMs,
+      "Timed out waiting for the invoice-list station assignment code to update.",
+    );
+  }
   
   async function runInvoiceListSingleWindowSubmitPackageCheck(
     page,
@@ -801,6 +843,18 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
     packagePath,
     timeoutMs,
   ) {
+    await waitForPageExpression(
+      page,
+      `(() => {
+        const panel = document.querySelector('[aria-label="单一窗口办理"]');
+        const button = panel ? Array.from(panel.querySelectorAll('button'))
+          .find((element) => (element.innerText || '').includes(${JSON.stringify(buttonText)})) : null;
+        return Boolean(button && !button.disabled);
+      })()`,
+      timeoutMs,
+      `Timed out waiting for invoice list Single Window submit action to become available: ${businessType}.`,
+    );
+
     await evaluate(
       page,
       `(() => {
@@ -819,6 +873,7 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
       true,
     );
   
+    let lastUiState = null;
     await waitFor(async () => {
       if (existsSync(packagePath)) {
         return true;
@@ -829,14 +884,23 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
         `(() => {
           const panel = document.querySelector('[aria-label="单一窗口办理"]');
           const text = panel ? panel.innerText || '' : '';
+          const textarea = panel?.querySelector('.single-window-assignment-code-field textarea');
+          const button = panel ? Array.from(panel.querySelectorAll('button'))
+            .find((element) => (element.innerText || '').includes(${JSON.stringify(buttonText)})) : null;
           return {
             needsSecondClick: text.includes('导出前预检完成') || text.includes('确认后可再次点击导出继续'),
             readyWithoutIssues: text.includes('导出前预检未发现问题'),
             textExcerpt: text.slice(0, 1200),
+            assignmentCodeValue: textarea?.value || '',
+            buttonDisabled: button?.disabled ?? null,
+            tauriInvocations: Array.isArray(window.__exportDocManagerSmokeTauriInvocations)
+              ? window.__exportDocManagerSmokeTauriInvocations.slice(-10)
+              : [],
           };
         })()`,
         true,
       ).catch(() => ({ value: null }));
+      lastUiState = state.value;
   
       if (state.value?.needsSecondClick) {
         await evaluate(
@@ -864,7 +928,7 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
       }
   
       return existsSync(packagePath) ? true : null;
-    }, timeoutMs, `Timed out waiting for invoice list Single Window package export: ${businessType}.`);
+    }, timeoutMs, () => `Timed out waiting for invoice list Single Window package export: ${businessType}.\nLast UI state: ${JSON.stringify(lastUiState)}`);
   
     const invocation = await waitForTauriCommandInvocation(
       page,

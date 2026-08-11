@@ -200,7 +200,14 @@ public sealed class ServerMigrationService : IServerMigrationService
                 workingRoot,
                 ServerMigrationStorageBudget.WithSafetyMargin(incomingBytes ?? 0),
                 "接收服务器迁移包");
-            await ServerMigrationPackageValidator.CopyBoundedAsync(package, encryptedPath, ServerMigrationPackageValidator.MaximumPackageBytes, cancellationToken).ConfigureAwait(false);
+            ServerMigrationStorageBudget.IncrementalWriteGuard packageWriteGuard =
+                ServerMigrationStorageBudget.CreateIncrementalWriteGuard(workingRoot, "接收服务器迁移包");
+            await ServerMigrationPackageValidator.CopyBoundedAsync(
+                package,
+                encryptedPath,
+                ServerMigrationPackageValidator.MaximumPackageBytes,
+                cancellationToken,
+                packageWriteGuard.EnsureCanWrite).ConfigureAwait(false);
             long declaredPlaintextBytes = await DisasterRecoveryPackageCrypto
                 .ReadDeclaredPlaintextLengthAsync(encryptedPath, cancellationToken)
                 .ConfigureAwait(false);
@@ -303,8 +310,15 @@ public sealed class ServerMigrationService : IServerMigrationService
                 workingRoot,
                 ServerMigrationStorageBudget.WithSafetyMargin(incomingBytes ?? 0),
                 "接收 PostgreSQL 数据库备份");
-            await ServerMigrationPackageValidator.CopyBoundedAsync(databaseBackup, dumpPath, DisasterRecoveryPackageCrypto.MaximumPlaintextBytes, cancellationToken).ConfigureAwait(false);
-            if (new FileInfo(dumpPath).Length == 0) throw new InvalidDataException("PostgreSQL 备份文件不能为空。");
+            ServerMigrationStorageBudget.IncrementalWriteGuard backupWriteGuard =
+                ServerMigrationStorageBudget.CreateIncrementalWriteGuard(workingRoot, "接收 PostgreSQL 数据库备份");
+            long receivedBackupBytes = await ServerMigrationPackageValidator.CopyBoundedAsync(
+                databaseBackup,
+                dumpPath,
+                DisasterRecoveryPackageCrypto.MaximumPlaintextBytes,
+                cancellationToken,
+                backupWriteGuard.EnsureCanWrite).ConfigureAwait(false);
+            if (receivedBackupBytes == 0) throw new InvalidDataException("PostgreSQL 备份文件不能为空。");
             await ServerMigrationDatabaseRestorer.ValidateDumpContainerAsync(PostgreSqlToolLocator.Resolve(_pathProvider), dumpPath, cancellationToken).ConfigureAwait(false);
             stagingDirectoryName = $"pending-{packageId}";
             string stagingRoot = Path.Combine(ServerMigrationManager.GetControlRoot(_pathProvider), stagingDirectoryName);
@@ -410,8 +424,16 @@ public sealed class ServerMigrationService : IServerMigrationService
     internal static Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken) =>
         ServerMigrationPackageValidator.ComputeSha256Async(path, cancellationToken);
 
-    internal static Task CopyBoundedAsync(Stream source, string destination, long maximumBytes, CancellationToken cancellationToken) =>
-        ServerMigrationPackageValidator.CopyBoundedAsync(source, destination, maximumBytes, cancellationToken);
+    internal static async Task CopyBoundedAsync(
+        Stream source,
+        string destination,
+        long maximumBytes,
+        CancellationToken cancellationToken) =>
+        await ServerMigrationPackageValidator.CopyBoundedAsync(
+            source,
+            destination,
+            maximumBytes,
+            cancellationToken).ConfigureAwait(false);
 
     private static void TryWriteSecurityAudit(
         IAppPathProvider pathProvider,

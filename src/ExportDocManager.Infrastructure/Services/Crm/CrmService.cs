@@ -3,6 +3,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Crm
@@ -39,8 +40,13 @@ namespace ExportDocManager.Services.Crm
             var query = _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking());
             if (keyword.Length > 0)
             {
-                query = query.Where(item => item.Name.Contains(keyword) || item.CountryRegion.Contains(keyword) ||
-                    item.Website.Contains(keyword) || item.Source.Contains(keyword) || item.Notes.Contains(keyword));
+                query = query.ApplyKeywordSearch(
+                    keyword,
+                    item => item.Name,
+                    item => item.CountryRegion,
+                    item => item.Website,
+                    item => item.Source,
+                    item => item.Notes);
             }
             if (status.Length > 0)
             {

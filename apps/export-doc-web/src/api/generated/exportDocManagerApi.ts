@@ -2140,7 +2140,7 @@ export interface ApiQueryInvoiceExportRequest {
   contractNo?: string;
   customerId?: number;
   destinationPath: string;
-  endDate?: string;
+  endDateExclusive?: string;
   exporterId?: number;
   invoiceType?: string;
   keyword?: string;
@@ -2153,7 +2153,7 @@ export interface ApiQueryInvoiceExportRequest {
 export interface ApiQueryInvoiceFilterRequest {
   contractNo?: string;
   customerId?: number;
-  endDate?: string;
+  endDateExclusive?: string;
   exporterId?: number;
   invoiceType?: string;
   keyword?: string;
@@ -4112,7 +4112,7 @@ export interface ListProductsRequest {
 
 export interface ListQueriedInvoicesRequest {
   startDate?: string;
-  endDate?: string;
+  endDateExclusive?: string;
   customerId?: number;
   exporterId?: number;
   keyword?: string;
@@ -6100,7 +6100,7 @@ export class ExportDocManagerApiClient {
     return this.request<ApiPagedResponseOfApiQueryInvoiceRowDto>("GET", path, {
       query: {
         "startDate": request.startDate,
-        "endDate": request.endDate,
+        "endDateExclusive": request.endDateExclusive,
         "customerId": request.customerId,
         "exporterId": request.exporterId,
         "keyword": request.keyword,

@@ -26,7 +26,10 @@ const productLibraryPath = path
 const formUtilsPath = path
   .join(repoRoot, "apps", "export-doc-web", "src", "ui", "formUtils.ts")
   .replaceAll("\\", "/");
-fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as hsModel from ${JSON.stringify(hsModelPath)}; import * as itemModel from ${JSON.stringify(itemModelPath)}; import * as productLibrary from ${JSON.stringify(productLibraryPath)}; import * as formUtils from ${JSON.stringify(formUtilsPath)}; globalThis.__model = model; globalThis.__hsModel = hsModel; globalThis.__itemModel = itemModel; globalThis.__productLibrary = productLibrary; globalThis.__formUtils = formUtils;`, "utf8");
+const draftEqualityPath = path
+  .join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "invoiceDraftEquality.ts")
+  .replaceAll("\\", "/");
+fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as hsModel from ${JSON.stringify(hsModelPath)}; import * as itemModel from ${JSON.stringify(itemModelPath)}; import * as productLibrary from ${JSON.stringify(productLibraryPath)}; import * as formUtils from ${JSON.stringify(formUtilsPath)}; import * as draftEquality from ${JSON.stringify(draftEqualityPath)}; globalThis.__model = model; globalThis.__hsModel = hsModel; globalThis.__itemModel = itemModel; globalThis.__productLibrary = productLibrary; globalThis.__formUtils = formUtils; globalThis.__draftEquality = draftEquality;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -36,6 +39,7 @@ const hsModel = globalThis.__hsModel;
 const itemModel = globalThis.__itemModel;
 const productLibrary = globalThis.__productLibrary;
 const formUtils = globalThis.__formUtils;
+const draftEquality = globalThis.__draftEquality;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const draft = model.uppercaseInvoiceEnglishText({
   ...model.createEmptyInvoice(),
@@ -67,6 +71,12 @@ assert(draft.exporterNameCN === "宁波布利杰进出口有限公司", "Chinese
 assert(draft.items[0].styleName === "MEN'S COTTON T-SHIRT", "item description uppercased");
 assert(draft.items[0].fabricComposition === "100% COTTON", "item composition uppercased");
 assert(draft.items[0].styleNameCN === "棉制男式T恤衫" && draft.items[0].unitCN === "件", "Chinese item fields preserved");
+const persistedDraft = model.normalizeInvoiceForSave(draft, 7);
+const changedDraft = { ...persistedDraft, customerNameEN: "TEMPORARY CUSTOMER" };
+assert(!draftEquality.areInvoiceDraftsEqual(changedDraft, persistedDraft), "invoice dirty comparison detects a changed field");
+const restoredDraft = { ...changedDraft, customerNameEN: persistedDraft.customerNameEN };
+assert(draftEquality.areInvoiceDraftsEqual(restoredDraft, persistedDraft), "invoice dirty comparison clears after restoring the saved value");
+assert(!draftEquality.areInvoiceDraftsEqual({ ...persistedDraft, items: [{ ...persistedDraft.items[0], quantity: 11 }] }, persistedDraft), "invoice dirty comparison detects nested item changes");
 assert(formUtils.toDateInputValue("2026-07-29T00:00:00") === "2026-07-29", "business date keeps its calendar day in positive time zones");
 assert(formUtils.currentLocalDateInputValue(new Date(2026, 6, 29, 0, 30, 0)) === "2026-07-29", "local date input uses the operator calendar day instead of UTC");
 

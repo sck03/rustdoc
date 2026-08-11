@@ -34,10 +34,6 @@ namespace ExportDocManager.Api.Hosting
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
             }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
-            }
         }
     }
 }

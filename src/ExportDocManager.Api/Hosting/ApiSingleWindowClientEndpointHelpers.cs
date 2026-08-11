@@ -17,30 +17,23 @@ namespace ExportDocManager.Api.Hosting
                 return Results.BadRequest(new ApiErrorResponse("持卡机操作档案请求体不能为空。"));
             }
 
-            try
-            {
-                await profileService.SaveAsync(
-                    new SingleWindowClientProfileUpdate
-                    {
-                        ProfileKey = request.ProfileKey ?? string.Empty,
-                        ProfileName = request.ProfileName ?? string.Empty,
-                        CompanyScope = request.CompanyScope ?? string.Empty,
-                        CardIdentifier = request.CardIdentifier ?? string.Empty,
-                        CustomsCooClientRootPath = request.CustomsCooClientRootPath ?? string.Empty,
-                        AgentConsignmentClientRootPath = request.AgentConsignmentClientRootPath ?? string.Empty,
-                        CanSubmitCustomsCoo = request.CanSubmitCustomsCoo,
-                        CanSubmitAgentConsignment = request.CanSubmitAgentConsignment
-                    },
-                    cancellationToken);
-                var profiles = await profileService.ListAsync(cancellationToken);
-                return Results.Ok(ApiSingleWindowDtoFactory.FromClientProfiles(
-                    profiles,
-                    "操作档案已保存并设为当前档案。"));
-            }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
-            }
+            await profileService.SaveAsync(
+                new SingleWindowClientProfileUpdate
+                {
+                    ProfileKey = request.ProfileKey ?? string.Empty,
+                    ProfileName = request.ProfileName ?? string.Empty,
+                    CompanyScope = request.CompanyScope ?? string.Empty,
+                    CardIdentifier = request.CardIdentifier ?? string.Empty,
+                    CustomsCooClientRootPath = request.CustomsCooClientRootPath ?? string.Empty,
+                    AgentConsignmentClientRootPath = request.AgentConsignmentClientRootPath ?? string.Empty,
+                    CanSubmitCustomsCoo = request.CanSubmitCustomsCoo,
+                    CanSubmitAgentConsignment = request.CanSubmitAgentConsignment
+                },
+                cancellationToken);
+            var profiles = await profileService.ListAsync(cancellationToken);
+            return Results.Ok(ApiSingleWindowDtoFactory.FromClientProfiles(
+                profiles,
+                "操作档案已保存并设为当前档案。"));
         }
 
         private static async Task<IResult> ActivateSingleWindowClientProfileAsync(
@@ -48,18 +41,11 @@ namespace ExportDocManager.Api.Hosting
             string profileKey,
             CancellationToken cancellationToken)
         {
-            try
-            {
-                await profileService.ActivateAsync(profileKey, cancellationToken);
-                var profiles = await profileService.ListAsync(cancellationToken);
-                return Results.Ok(ApiSingleWindowDtoFactory.FromClientProfiles(
-                    profiles,
-                    "已切换当前公司抬头与操作卡。"));
-            }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
-            }
+            await profileService.ActivateAsync(profileKey, cancellationToken);
+            var profiles = await profileService.ListAsync(cancellationToken);
+            return Results.Ok(ApiSingleWindowDtoFactory.FromClientProfiles(
+                profiles,
+                "已切换当前公司抬头与操作卡。"));
         }
 
         private static async Task<IResult> DispatchSingleWindowBatchToClientAsync(
@@ -94,10 +80,6 @@ namespace ExportDocManager.Api.Hosting
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
             }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
-            }
         }
 
         private static async Task<IResult> CollectSingleWindowReceiptFilesAsync(
@@ -131,10 +113,6 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Json(
                     new ApiErrorResponse(ex.Message),
                     statusCode: StatusCodes.Status403Forbidden);
-            }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
             }
         }
     }

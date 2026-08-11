@@ -78,7 +78,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IAuxiliaryService auxiliaryService,
-                ApiPortDto request) =>
+                ApiPortDto request,
+                CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
@@ -107,17 +108,10 @@ namespace ExportDocManager.Api.Hosting
                 port.Id = 0;
                 port.RowVersion = null;
 
-                try
-                {
-                    await auxiliaryService.SavePortAsync(port);
-                    return Results.Created(
-                        $"/api/master-data/ports/{port.Id}",
-                        ApiMasterDataDtoFactory.FromPort(port));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await auxiliaryService.SavePortAsync(port, cancellationToken);
+                return Results.Created(
+                    $"/api/master-data/ports/{port.Id}",
+                    ApiMasterDataDtoFactory.FromPort(port));
             })
             .WithName("CreatePort");
 
@@ -166,16 +160,9 @@ namespace ExportDocManager.Api.Hosting
                 }
                 port.Id = id;
 
-                try
-                {
-                    await auxiliaryService.SavePortAsync(port);
-                    var saved = await FindPortByIdAsync(repository, id, cancellationToken) ?? port;
-                    return Results.Ok(ApiMasterDataDtoFactory.FromPort(saved));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await auxiliaryService.SavePortAsync(port, cancellationToken);
+                var saved = await FindPortByIdAsync(repository, id, cancellationToken) ?? port;
+                return Results.Ok(ApiMasterDataDtoFactory.FromPort(saved));
             })
             .WithName("UpdatePort");
 
@@ -202,15 +189,8 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                try
-                {
-                    await auxiliaryService.DeletePortAsync(id);
-                    return Results.Ok(new ApiCommandResponse(true, "港口已删除。"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await auxiliaryService.DeletePortAsync(id, cancellationToken);
+                return Results.Ok(new ApiCommandResponse(true, "港口已删除。"));
             })
             .WithName("DeletePort");
         }

@@ -163,6 +163,10 @@
   scrollbar-width: thin;
 }
 
+.work-surface > [role="tabpanel"] {
+  min-width: 0;
+}
+
 .task-view-tab {
   min-height: 36px;
   padding: 0 14px;

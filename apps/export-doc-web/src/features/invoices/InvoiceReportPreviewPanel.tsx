@@ -58,7 +58,6 @@ export function InvoiceReportPreviewPanel({
     && !hasUnsavedDraftChanges
     && workspaceDeviceCapabilities.canImportExport;
   const hasPreviewSource = hasSavedInvoice || Boolean(invoiceDraft);
-  const invoiceDraftPreviewKey = invoiceDraft ? JSON.stringify(invoiceDraft) : "";
 
   const templatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates("ExportDocument"),
@@ -135,7 +134,7 @@ export function InvoiceReportPreviewPanel({
     setPreview(null);
     documentPackage.clearPreview();
     clearFeedback();
-  }, [invoiceDraftPreviewKey]);
+  }, [invoiceDraft]);
 
   const previewMutation = useMutation({
     mutationFn: () => {

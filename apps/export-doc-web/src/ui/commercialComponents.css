@@ -8,9 +8,12 @@
 .list-page-layout,
 .editor-page-layout {
   container-type: inline-size;
+  container-name: page-workspace;
 }
 
 .responsive-table-frame {
+  container-type: inline-size;
+  container-name: responsive-table;
   min-width: 0;
   overflow: auto;
   overscroll-behavior: contain;
@@ -20,7 +23,7 @@
   width: 100%;
 }
 
-@media (max-width: 760px) {
+@container responsive-table (max-width: 760px) {
   .responsive-table-frame [data-table-priority="secondary"] {
     display: none;
   }
@@ -85,6 +88,33 @@
 
   .responsive-table-frame[data-mobile-layout="cards"] tbody td:last-child {
     border-bottom: 0;
+  }
+}
+
+@container page-workspace (max-width: 960px) {
+  .field-grid,
+  .detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container page-workspace (max-width: 680px) {
+  .field-grid,
+  .detail-grid,
+  .form-grid,
+  .two-column-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .field-grid-span-2 {
+    grid-column: 1;
+  }
+
+  .inline-filter,
+  .inline-filter input,
+  .inline-filter select {
+    width: 100%;
+    min-width: 0;
   }
 }
 .concurrency-conflict-notice {

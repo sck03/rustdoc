@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { applyInterfaceDensity } from "./app/interfaceDensity.ts";
+import "./styles/cascade.css";
 import "./styles/foundation.css";
 import "./styles/workspaces.css";
 import "./styles/responsive.css";

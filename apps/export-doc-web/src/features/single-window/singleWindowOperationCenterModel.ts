@@ -201,12 +201,11 @@ export function buildReceiptPackageFileName(detail: Pick<SingleWindowOperationCe
 
 export async function invalidateSingleWindowBatchQueries(
   queryClient: QueryClient,
-  batchId: number,
 ) {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() }),
-    queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterDetail(batchId) }),
-  ]);
+  const queryKey = queryKeys.singleWindowOperationCenterRoot();
+  await queryClient.cancelQueries({ queryKey });
+  await queryClient.invalidateQueries({ queryKey, refetchType: "none" });
+  await queryClient.refetchQueries({ queryKey, type: "active" });
 }
 
 export function toSafeFileName(value: string) {

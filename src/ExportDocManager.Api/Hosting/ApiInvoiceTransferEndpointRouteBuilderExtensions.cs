@@ -64,10 +64,6 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
             })
             .WithName("SaveInvoiceTransferPackageToPath");
 
@@ -114,10 +110,6 @@ namespace ExportDocManager.Api.Hosting
                 catch (ArgumentException ex)
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
                 }
                 finally
                 {
@@ -173,10 +165,6 @@ namespace ExportDocManager.Api.Hosting
                 catch (InvoiceValidationException ex)
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
                 }
             })
             .WithName("PreviewInvoiceTransferPackage");
@@ -270,10 +258,6 @@ namespace ExportDocManager.Api.Hosting
                 catch (InvalidDataException ex)
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
                 }
             })
             .WithName("ImportInvoiceTransferPackage");
@@ -377,10 +361,6 @@ namespace ExportDocManager.Api.Hosting
             catch (InvoiceValidationException ex)
             {
                 return Results.BadRequest(new ApiErrorResponse(ex.Message));
-            }
-            catch (Exception ex)
-            {
-                return WriteServiceException(ex);
             }
             finally
             {

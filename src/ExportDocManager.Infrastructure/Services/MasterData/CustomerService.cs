@@ -29,31 +29,33 @@ namespace ExportDocManager.Services.MasterData
             _accessScope = accessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
         }
 
-        public async Task<int> SaveCustomerAsync(Customer customer)
+        public async Task<int> SaveCustomerAsync(
+            Customer customer,
+            CancellationToken cancellationToken = default)
         {
             try
             {
                 ArgumentNullException.ThrowIfNull(customer);
                 MasterDataNormalization.NormalizeCustomer(customer);
 
-                using var context = await _contextFactory.CreateDbContextAsync();
+                using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 if (customer.Id == 0)
                 {
                     _accessScope.ApplyOwner(customer);
-                    await context.Customers.AddAsync(customer);
+                    await context.Customers.AddAsync(customer, cancellationToken);
                 }
                 else
                 {
                     var existing = await _accessScope.ApplyCustomerScope(context.Customers)
                         .AsNoTracking()
-                        .SingleOrDefaultAsync(item => item.Id == customer.Id);
+                        .SingleOrDefaultAsync(item => item.Id == customer.Id, cancellationToken);
                     if (existing == null) throw new ResourceNotFoundException("客户不存在或不属于当前账号。");
                     customer.OwnerUserId = existing.OwnerUserId;
                     customer.DepartmentId = existing.DepartmentId;
                     customer.CompanyScope = existing.CompanyScope;
                     context.Customers.Update(customer);
                 }
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken);
                 return customer.Id;
             }
             catch (DbUpdateConcurrencyException ex)
@@ -64,124 +66,66 @@ namespace ExportDocManager.Services.MasterData
             {
                 throw new ServiceValidationException(ex.Message, ex);
             }
-            catch (ServiceException)
-            {
-                throw;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                throw new InfrastructureServiceException("客户数据保存服务暂时不可用，请稍后重试。", ex);
-            }
         }
 
-        public async Task<List<Customer>> GetAllCustomersAsync()
+        public async Task<List<Customer>> GetAllCustomersAsync(CancellationToken cancellationToken = default)
         {
-            try
-            {
-                var rows = await _customerReadRepository.QueryAsync(new CustomerReadQuery());
-                return rows.ToList();
-            }
-            catch (ServiceException)
-            {
-                throw;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                throw new InfrastructureServiceException("客户列表服务暂时不可用，请稍后重试。", ex);
-            }
+            var rows = await _customerReadRepository.QueryAsync(new CustomerReadQuery(), cancellationToken);
+            return rows.ToList();
         }
 
         public async Task<Customer> GetCustomerByIdAsync(
             int id,
             CancellationToken cancellationToken = default)
         {
-            try
-            {
-                using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-                return await _accessScope.ApplyCustomerScope(context.Customers)
-                    .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-            }
-            catch (ServiceException)
-            {
-                throw;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                throw new InfrastructureServiceException("客户查询服务暂时不可用，请稍后重试。", ex);
-            }
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await _accessScope.ApplyCustomerScope(context.Customers)
+                .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         }
 
-        public async Task<bool> DeleteCustomerAsync(int id)
+        public async Task<bool> DeleteCustomerAsync(int id, CancellationToken cancellationToken = default)
         {
             try
             {
-                using var context = await _contextFactory.CreateDbContextAsync();
+                using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 var entity = await _accessScope.ApplyCustomerScope(context.Customers)
-                    .FirstOrDefaultAsync(x => x.Id == id);
+                    .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
                 if (entity == null)
                 {
                     return false;
                 }
 
                 context.Customers.Remove(entity);
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken);
                 return true;
             }
             catch (DbUpdateConcurrencyException ex)
             {
                 throw new ServiceConcurrencyException("该客户数据已被其他用户修改，请刷新后重试。", ex);
             }
-            catch (ServiceException)
-            {
-                throw;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                throw new InfrastructureServiceException("客户删除服务暂时不可用，请稍后重试。", ex);
-            }
         }
 
-        public async Task<Customer> GetCustomerByNameAsync(string name)
+        public async Task<Customer> GetCustomerByNameAsync(
+            string name,
+            CancellationToken cancellationToken = default)
         {
-            try
-            {
-                name = TextSearchHelper.NormalizeValue(name);
-                using var context = await _contextFactory.CreateDbContextAsync();
-                return await _accessScope.ApplyCustomerScope(context.Customers)
-                    .FirstOrDefaultAsync(x => x.CustomerNameEN == name);
-            }
-            catch (ServiceException)
-            {
-                throw;
-            }
-            catch (ArgumentException ex)
-            {
-                throw new ServiceValidationException(ex.Message, ex);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                throw new InfrastructureServiceException("客户名称查询服务暂时不可用，请稍后重试。", ex);
-            }
+            name = TextSearchHelper.NormalizeValue(name);
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await _accessScope.ApplyCustomerScope(context.Customers)
+                .FirstOrDefaultAsync(x => x.CustomerNameEN == name, cancellationToken);
         }
 
-        public async Task<List<Customer>> SearchCustomersAsync(string keyword)
+        public async Task<List<Customer>> SearchCustomersAsync(
+            string keyword,
+            CancellationToken cancellationToken = default)
         {
-            try
-            {
-                var rows = await _customerReadRepository.QueryAsync(new CustomerReadQuery
+            var rows = await _customerReadRepository.QueryAsync(
+                new CustomerReadQuery
                 {
                     Keyword = keyword ?? string.Empty
-                });
-                return rows.ToList();
-            }
-            catch (ServiceException)
-            {
-                throw;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                throw new InfrastructureServiceException("客户搜索服务暂时不可用，请稍后重试。", ex);
-            }
+                },
+                cancellationToken);
+            return rows.ToList();
         }
 
     }

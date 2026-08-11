@@ -1,6 +1,2 @@
 /* Report designer CSS is loaded with the lazy report route. */
-@import "../../reportWorkspace.css";
-/* Theme container queries intentionally follow the report workspace rules. */
-@import "../../theme.css";
-/* Re-apply responsive rules after the lazy stylesheet is inserted. */
-@import "../../responsiveOverrides.css";
+@import "../../reportWorkspace.css" layer(route);

@@ -185,7 +185,7 @@ namespace ExportDocManager.Api.Tests
                 var queryPage = await queryRepository.QueryPageAsync(new QueryPageQuery
                 {
                     StartDate = DateTime.SpecifyKind(startOfMonth.AddDays(1), DateTimeKind.Unspecified),
-                    EndDate = DateTime.SpecifyKind(startOfMonth.AddDays(3), DateTimeKind.Unspecified),
+                    EndDateExclusive = DateTime.SpecifyKind(startOfMonth.AddDays(4), DateTimeKind.Unspecified),
                     PageNumber = 1,
                     PageSize = 10
                 });

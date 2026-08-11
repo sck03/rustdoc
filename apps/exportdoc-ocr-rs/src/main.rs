@@ -73,9 +73,10 @@ fn main() -> Result<()> {
     let model_root = argument(&args, "--model-root")
         .map(PathBuf::from)
         .context("--model-root is required")?;
-    let allowed_root = argument(&args, "--allowed-root")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| env::current_dir().unwrap());
+    let allowed_root = match argument(&args, "--allowed-root") {
+        Some(value) => PathBuf::from(value),
+        None => env::current_dir().context("failed to resolve the OCR working directory")?,
+    };
     let mut engine = Engine::load(&model_root)?;
     if args.iter().any(|v| v == "--health") {
         println!(

@@ -2,6 +2,7 @@ using ClosedXML.Excel;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Crm
@@ -24,9 +25,13 @@ namespace ExportDocManager.Services.Crm
             status = Clean(status);
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var customers = _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking());
-            if (keyword.Length > 0)
-                customers = customers.Where(item => item.Name.Contains(keyword) || item.CountryRegion.Contains(keyword) ||
-                    item.Website.Contains(keyword) || item.Source.Contains(keyword) || item.Notes.Contains(keyword));
+            customers = customers.ApplyKeywordSearch(
+                keyword,
+                item => item.Name,
+                item => item.CountryRegion,
+                item => item.Website,
+                item => item.Source,
+                item => item.Notes);
             if (status.Length > 0) customers = customers.Where(item => item.Status == status);
             var rows = await customers.OrderBy(item => item.Name).Take(MaximumRows + 1)
                 .Select(item => new

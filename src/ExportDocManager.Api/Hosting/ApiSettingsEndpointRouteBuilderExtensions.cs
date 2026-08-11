@@ -87,53 +87,46 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("设置请求体不能为空。"));
                 }
 
-                try
+                await settingsService.LoadAsync();
+                var validation = ApiSettingsDtoFactory.ValidateDraft(
+                    request.Settings,
+                    settingsService.Settings,
+                    request.UpdateSecrets,
+                    ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions));
+                if (!validation.IsValid)
                 {
-                    await settingsService.LoadAsync();
-                    var validation = ApiSettingsDtoFactory.ValidateDraft(
-                        request.Settings,
-                        settingsService.Settings,
-                        request.UpdateSecrets,
-                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions));
-                    if (!validation.IsValid)
-                    {
-                        string errors = string.Join(
-                            "；",
-                            validation.Messages
-                                .Where(message => string.Equals(message.Level, "error", StringComparison.OrdinalIgnoreCase))
-                                .Select(message => message.Message));
-                        return Results.BadRequest(new ApiErrorResponse(
-                            string.IsNullOrWhiteSpace(errors)
-                                ? "设置包含无效内容，请先运行设置校验。"
-                                : errors));
-                    }
-
-                    var prepared = ApiSettingsDtoFactory.PrepareForSave(
-                        request.Settings,
-                        settingsService.Settings,
-                        request.UpdateSecrets);
-                    bool requiresRestart = ApiSettingsDtoFactory.RequiresRestartForSystemSettingsChange(
-                        settingsService.Settings.System,
-                        prepared.System);
-
-                    await settingsService.UpdateAsync(current =>
-                    {
-                        ApiSettingsDtoFactory.CopyInto(current, prepared);
-                        return true;
-                    });
-
-                    return Results.Ok(ApiSettingsDtoFactory.FromSavedSettings(
-                        settingsService.Settings,
-                        requiresRestart,
-                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions),
-                        requiresRestart
-                            ? "设置已保存，数据库连接变更需要重启 sidecar 后生效。"
-                            : "设置已保存。"));
+                    string errors = string.Join(
+                        "；",
+                        validation.Messages
+                            .Where(message => string.Equals(message.Level, "error", StringComparison.OrdinalIgnoreCase))
+                            .Select(message => message.Message));
+                    return Results.BadRequest(new ApiErrorResponse(
+                        string.IsNullOrWhiteSpace(errors)
+                            ? "设置包含无效内容，请先运行设置校验。"
+                            : errors));
                 }
-                catch (Exception ex)
+
+                var prepared = ApiSettingsDtoFactory.PrepareForSave(
+                    request.Settings,
+                    settingsService.Settings,
+                    request.UpdateSecrets);
+                bool requiresRestart = ApiSettingsDtoFactory.RequiresRestartForSystemSettingsChange(
+                    settingsService.Settings.System,
+                    prepared.System);
+
+                await settingsService.UpdateAsync(current =>
                 {
-                    return WriteServiceException(ex);
-                }
+                    ApiSettingsDtoFactory.CopyInto(current, prepared);
+                    return true;
+                });
+
+                return Results.Ok(ApiSettingsDtoFactory.FromSavedSettings(
+                    settingsService.Settings,
+                    requiresRestart,
+                    ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions),
+                    requiresRestart
+                        ? "设置已保存，数据库连接变更需要重启 sidecar 后生效。"
+                        : "设置已保存。"));
             })
             .WithName("UpdateSettings");
         }

@@ -79,6 +79,10 @@ public sealed class InfrastructureSqlSafetyPolicyTests
             "IX_Payments_TextSearch_Upper_Trgm",
             "IX_Customers_TextSearch_Upper_Trgm",
             "IX_Exporters_TextSearch_Upper_Trgm",
+            "IX_Payees_TextSearch_Upper_Trgm",
+            "IX_CrmCustomers_TextSearch_Upper_Trgm",
+            "IX_SupplierCompanies_TextSearch_Upper_Trgm",
+            "IX_CustomsCooProducerProfiles_TextSearch_Upper_Trgm",
             "upper(\"Name\") gin_trgm_ops",
             "PostgreSQL pg_trgm indexes were not installed"
         })

@@ -14,6 +14,8 @@ mod desktop_file_dialog_commands;
 mod desktop_open_commands;
 mod desktop_pdf_commands;
 mod log_rotation;
+mod runtime_data_root_migration;
+mod runtime_data_root_storage;
 mod runtime_layout;
 mod runtime_paths;
 mod runtime_paths_config;
@@ -21,6 +23,9 @@ mod runtime_portable;
 mod runtime_sidecar_path;
 mod runtime_tree_manifest;
 mod sidecar;
+mod sidecar_endpoint;
+mod sidecar_process;
+mod sidecar_shutdown;
 mod tauri_updater_commands;
 mod window;
 

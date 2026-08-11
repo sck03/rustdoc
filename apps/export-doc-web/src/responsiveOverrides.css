@@ -1,4 +1,5 @@
 @import "./styles/responsive/workspaces-primary.css";
 @import "./styles/responsive/workspaces-secondary.css";
 @import "./styles/responsive/compact-tablet.css";
+@import "./styles/responsive/report-workspace.css";
 @import "./styles/responsive/login.css";

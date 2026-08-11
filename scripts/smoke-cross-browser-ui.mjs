@@ -147,18 +147,20 @@ async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, v
     await page.getByRole("button", { name: "登录" }).click();
     await page.locator(".app-shell").waitFor({ state: "visible", timeout: operationTimeout });
 
-    const metrics = await page.evaluate(() => {
-      const shell = document.querySelector(".app-shell");
-      const mobileToggle = document.querySelector(".mobile-nav-toggle");
-      return {
-        title: document.querySelector(".workspace-header h1")?.textContent?.trim() || "",
-        device: shell?.getAttribute("data-workspace-device") || "",
-        horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        mobileToggleVisible: mobileToggle instanceof HTMLElement &&
-          getComputedStyle(mobileToggle).display !== "none" &&
-          mobileToggle.getBoundingClientRect().width > 0,
-      };
-    });
+    const metrics = {
+      ...await page.evaluate(() => {
+        const shell = document.querySelector(".app-shell");
+        const mobileToggle = document.querySelector(".mobile-nav-toggle");
+        return {
+          title: document.querySelector(".workspace-header h1")?.textContent?.trim() || "",
+          device: shell?.getAttribute("data-workspace-device") || "",
+          mobileToggleVisible: mobileToggle instanceof HTMLElement &&
+            getComputedStyle(mobileToggle).display !== "none" &&
+            mobileToggle.getBoundingClientRect().width > 0,
+        };
+      }),
+      ...await readHorizontalOverflowDiagnostics(page),
+    };
     const accessibility = await page.evaluate(async () => {
       const axe = globalThis.axe;
       if (!axe) throw new Error("axe-core was not injected");
@@ -261,15 +263,17 @@ async function validateLazyRouteStyles(page, browserName, viewportName, baseUrl,
       },
       { timeout: operationTimeout },
     );
-    const metrics = await page.evaluate(({ selector, expectedProperty }) => {
-      const element = document.querySelector(selector);
-      if (!(element instanceof HTMLElement)) return null;
-      const style = getComputedStyle(element);
-      return {
-        horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        computedValue: style[expectedProperty],
-      };
-    }, { selector: route.selector, expectedProperty: route.expectedProperty });
+    const metrics = {
+      ...await page.evaluate(({ selector, expectedProperty }) => {
+        const element = document.querySelector(selector);
+        if (!(element instanceof HTMLElement)) return null;
+        const style = getComputedStyle(element);
+        return {
+          computedValue: style[expectedProperty],
+        };
+      }, { selector: route.selector, expectedProperty: route.expectedProperty }),
+      ...await readHorizontalOverflowDiagnostics(page),
+    };
     if (!metrics || metrics.computedValue !== route.expectedValue || metrics.horizontalOverflow > 1) {
       throw new Error(
         `${browserName}/${viewportName}/${route.name}: lazy route CSS contract failed: ` +
@@ -279,6 +283,69 @@ async function validateLazyRouteStyles(page, browserName, viewportName, baseUrl,
     results.push({ name: route.name, ...metrics });
   }
   return results;
+}
+
+async function readHorizontalOverflowDiagnostics(page) {
+  return page.evaluate(() => {
+    const horizontalOverflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
+    if (horizontalOverflow <= 1) {
+      return { horizontalOverflow, overflowingElements: [], overflowAncestors: [] };
+    }
+
+    const viewportWidth = document.documentElement.clientWidth;
+    const candidates = [...document.querySelectorAll("body *")]
+      .filter((candidate) => candidate instanceof HTMLElement)
+      .map((candidate) => {
+        const rect = candidate.getBoundingClientRect();
+        const style = getComputedStyle(candidate);
+        return {
+          element: candidate,
+          selector: describeElement(candidate),
+          left: Math.round(rect.left),
+          right: Math.round(rect.right),
+          width: Math.round(rect.width),
+          clientWidth: candidate.clientWidth,
+          scrollWidth: candidate.scrollWidth,
+          display: style.display,
+          gridTemplateColumns: style.gridTemplateColumns,
+        };
+      })
+      .filter(({ left, right, width }) => width > 0 && (left < -1 || right > viewportWidth + 1))
+      .sort((left, right) => right.right - left.right)
+      .slice(0, 10);
+
+    return {
+      horizontalOverflow,
+      overflowingElements: candidates.map(({ element: _element, ...details }) => details),
+      overflowAncestors: describeAncestors(candidates[0]?.element),
+    };
+
+    function describeAncestors(candidate) {
+      const ancestors = [];
+      for (let current = candidate; current instanceof HTMLElement && ancestors.length < 8; current = current.parentElement) {
+        const rect = current.getBoundingClientRect();
+        const style = getComputedStyle(current);
+        ancestors.push({
+          selector: describeElement(current),
+          left: Math.round(rect.left),
+          right: Math.round(rect.right),
+          width: Math.round(rect.width),
+          clientWidth: current.clientWidth,
+          scrollWidth: current.scrollWidth,
+          display: style.display,
+          gridTemplateColumns: style.gridTemplateColumns,
+          containerType: style.containerType,
+        });
+      }
+      return ancestors;
+    }
+
+    function describeElement(element) {
+      const id = element.id ? `#${element.id}` : "";
+      const classes = [...element.classList].slice(0, 4).map((name) => `.${name}`).join("");
+      return `${element.tagName.toLowerCase()}${id}${classes}`;
+    }
+  });
 }
 
 function readBrowserArgument() {

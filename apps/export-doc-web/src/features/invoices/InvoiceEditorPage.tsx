@@ -39,6 +39,7 @@ import {
 } from "./invoiceModel.ts";
 import { InvoiceEditorFormShell } from "./InvoiceEditorFormShell.tsx";
 import { InvoiceEditorDocumentSections } from "./InvoiceEditorDocumentSections.tsx";
+import { areInvoiceDraftsEqual } from "./invoiceDraftEquality.ts";
 import {
   buildInvoiceSnapshot,
   mergeRouteInvoiceImportDraft,
@@ -88,7 +89,7 @@ export function InvoiceEditorPage({
   const [persistedInvoiceStatus, setPersistedInvoiceStatus] = useState<string>(() =>
     mode === "new" ? normalizeInvoiceStatus(routeInvoiceDraft?.status) : "",
   );
-  const [persistedInvoiceSnapshot, setPersistedInvoiceSnapshot] = useState<string | null>(null);
+  const [persistedInvoiceDraft, setPersistedInvoiceDraft] = useState<ApiInvoiceDetailDto | null>(null);
   const [pendingHsFeedback, setPendingHsFeedback] = useState<HsCodeKnowledgeFeedbackInput[]>([]);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelReasonDialogOpen, setIsCancelReasonDialogOpen] = useState(false);
@@ -159,7 +160,7 @@ export function InvoiceEditorPage({
     setInvoice,
     setMessage,
     setPendingHsFeedback,
-    setPersistedInvoiceSnapshot,
+    setPersistedInvoiceDraft,
     setPersistedInvoiceStatus,
     setSuccessMessage,
   });
@@ -168,7 +169,7 @@ export function InvoiceEditorPage({
     if (isNew) {
       const nextInvoice = routeInvoiceDraft ?? createEmptyInvoice();
       setInvoice(nextInvoice);
-      setPersistedInvoiceSnapshot(buildInvoiceSnapshot(nextInvoice, 0));
+      setPersistedInvoiceDraft(normalizeInvoiceForSave(nextInvoice, 0));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(nextInvoice.status));
       setPendingHsFeedback([]);
       itemsWorkspace.reset();
@@ -180,7 +181,7 @@ export function InvoiceEditorPage({
 
     if (!isInvoiceIdValid) {
       setInvoice(null);
-      setPersistedInvoiceSnapshot(null);
+      setPersistedInvoiceDraft(null);
       setPersistedInvoiceStatus("");
       setPendingHsFeedback([]);
       itemsWorkspace.reset();
@@ -231,16 +232,12 @@ export function InvoiceEditorPage({
     () => (invoice ? normalizeInvoiceForSave(invoice, isNew || !isInvoiceIdValid ? 0 : parsedInvoiceId, pendingHsFeedback) : undefined),
     [invoice, isInvoiceIdValid, isNew, parsedInvoiceId, pendingHsFeedback],
   );
-  const currentInvoiceSnapshot = useMemo(
-    () => (currentInvoiceDraft ? JSON.stringify(currentInvoiceDraft) : null),
-    [currentInvoiceDraft],
-  );
   const hasUnsavedInvoiceChanges = Boolean(
     invoicePermission.canOperate &&
     invoice &&
-      persistedInvoiceSnapshot &&
-      currentInvoiceSnapshot &&
-      currentInvoiceSnapshot !== persistedInvoiceSnapshot,
+    currentInvoiceDraft &&
+    persistedInvoiceDraft &&
+    !areInvoiceDraftsEqual(currentInvoiceDraft, persistedInvoiceDraft),
   );
   const serverDraftSync = useServerDraftSync({
     resourceKey: isNew ? "new" : parsedInvoiceId,
@@ -262,7 +259,7 @@ export function InvoiceEditorPage({
       }
 
       setInvoice(nextInvoice);
-      setPersistedInvoiceSnapshot(buildInvoiceSnapshot(serverInvoice, parsedInvoiceId));
+      setPersistedInvoiceDraft(normalizeInvoiceForSave(serverInvoice, parsedInvoiceId));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(serverInvoice.status));
       setPendingHsFeedback([]);
       itemsWorkspace.reset();

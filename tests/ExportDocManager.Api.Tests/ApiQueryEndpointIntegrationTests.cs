@@ -50,7 +50,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.Created, paymentResponse.StatusCode);
 
             var listResponse = await adminClient.GetAsync(
-                "/api/query/invoices?startDate=2026-06-01T00:00:00&endDate=2026-06-30T23:59:59&keyword=Q-STYLE-001&pageNumber=1&pageSize=10");
+                "/api/query/invoices?startDate=2026-06-01T00:00:00&endDateExclusive=2026-07-01T00:00:00&keyword=Q-STYLE-001&pageNumber=1&pageSize=10");
             Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
             var page = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPagedResponse<ApiQueryInvoiceRowDto>>(listResponse);
             Assert.Equal(1, page.TotalCount);
@@ -87,7 +87,7 @@ namespace ExportDocManager.Api.Tests
             var exportResponse = await adminClient.PostAsJsonAsync("/api/query/invoices/download", new
             {
                 startDate = new DateTime(2026, 6, 1),
-                endDate = new DateTime(2026, 6, 30, 23, 59, 59),
+                endDateExclusive = new DateTime(2026, 7, 1),
                 keyword = "Q-STYLE-001"
             });
             Assert.Equal(HttpStatusCode.Accepted, exportResponse.StatusCode);
@@ -125,6 +125,44 @@ namespace ExportDocManager.Api.Tests
             var emptyWorksheet = emptyWorkbook.Worksheet("查询结果");
             Assert.Equal("发票号", emptyWorksheet.Cell(1, 1).GetString());
             Assert.True(emptyWorksheet.Cell(2, 1).IsEmpty());
+        }
+
+        [Fact]
+        public async Task QueryEndpoint_ShouldTreatEndDateExclusiveAsAPreciseExclusiveBoundary()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-query-exclusive-end",
+                "api-query-exclusive-end.db");
+            using var anonymousClient = harness.CreateClient();
+
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+
+            DateTime boundary = new(2026, 7, 1, 0, 0, 0, 500);
+            var includedResponse = await adminClient.PostAsJsonAsync(
+                "/api/invoices",
+                CreateInvoiceRequest(
+                    "QUERY-BOUNDARY-INCLUDED",
+                    "实际数据",
+                    shipmentDate: boundary.AddMilliseconds(-1)));
+            Assert.Equal(HttpStatusCode.Created, includedResponse.StatusCode);
+
+            var excludedResponse = await adminClient.PostAsJsonAsync(
+                "/api/invoices",
+                CreateInvoiceRequest(
+                    "QUERY-BOUNDARY-EXCLUDED",
+                    "实际数据",
+                    shipmentDate: boundary));
+            Assert.Equal(HttpStatusCode.Created, excludedResponse.StatusCode);
+
+            string encodedBoundary = Uri.EscapeDataString(boundary.ToString("O"));
+            var queryResponse = await adminClient.GetAsync(
+                $"/api/query/invoices?startDate=2026-07-01T00:00:00&endDateExclusive={encodedBoundary}&keyword=QUERY-BOUNDARY&pageNumber=1&pageSize=10");
+            Assert.Equal(HttpStatusCode.OK, queryResponse.StatusCode);
+
+            var page = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPagedResponse<ApiQueryInvoiceRowDto>>(queryResponse);
+            var row = Assert.Single(page.Items);
+            Assert.Equal("QUERY-BOUNDARY-INCLUDED", row.InvoiceNo);
         }
 
         private static async Task<BackgroundJobSnapshot> WaitForTerminalJobAsync(HttpClient client, string jobId)
@@ -250,7 +288,9 @@ namespace ExportDocManager.Api.Tests
             string contractNo = "",
             string styleNo = "Q-STYLE-001",
             string styleName = "Query Jacket",
-            decimal totalAmount = 120m)
+            decimal totalAmount = 120m,
+            DateTime? invoiceDate = null,
+            DateTime? shipmentDate = null)
         {
             contractNo = string.IsNullOrWhiteSpace(contractNo)
                 ? $"{invoiceNo}-CON"
@@ -261,8 +301,8 @@ namespace ExportDocManager.Api.Tests
                 Id = id,
                 InvoiceNo = invoiceNo,
                 ContractNo = contractNo,
-                InvoiceDate = new DateTime(2026, 6, 1),
-                ShipmentDate = new DateTime(2026, 6, 20),
+                InvoiceDate = invoiceDate ?? new DateTime(2026, 6, 1),
+                ShipmentDate = shipmentDate ?? new DateTime(2026, 6, 20),
                 CustomerNameEN = "Query Buyer",
                 CustomerAddressEN = "1 Query Road",
                 ExporterNameEN = "Query Exporter",

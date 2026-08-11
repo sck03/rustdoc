@@ -109,18 +109,11 @@ namespace ExportDocManager.Api.Hosting
                 payee.Id = 0;
                 payee.RowVersion = null;
 
-                try
-                {
-                    int savedId = await payeeService.SavePayeeAsync(payee);
-                    var saved = await FindPayeeByIdAsync(repository, savedId, cancellationToken) ?? payee;
-                    return Results.Created(
-                        $"/api/master-data/payees/{savedId}",
-                        ApiMasterDataDtoFactory.FromPayee(saved));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                int savedId = await payeeService.SavePayeeAsync(payee, cancellationToken);
+                var saved = await FindPayeeByIdAsync(repository, savedId, cancellationToken) ?? payee;
+                return Results.Created(
+                    $"/api/master-data/payees/{savedId}",
+                    ApiMasterDataDtoFactory.FromPayee(saved));
             })
             .WithName("CreatePayee");
 
@@ -169,16 +162,9 @@ namespace ExportDocManager.Api.Hosting
                 }
                 payee.Id = id;
 
-                try
-                {
-                    int savedId = await payeeService.SavePayeeAsync(payee);
-                    var saved = await FindPayeeByIdAsync(repository, savedId, cancellationToken) ?? payee;
-                    return Results.Ok(ApiMasterDataDtoFactory.FromPayee(saved));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                int savedId = await payeeService.SavePayeeAsync(payee, cancellationToken);
+                var saved = await FindPayeeByIdAsync(repository, savedId, cancellationToken) ?? payee;
+                return Results.Ok(ApiMasterDataDtoFactory.FromPayee(saved));
             })
             .WithName("UpdatePayee");
 
@@ -205,15 +191,8 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                try
-                {
-                    await payeeService.DeletePayeeAsync(id);
-                    return Results.Ok(new ApiCommandResponse(true, "收款对象已删除。"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await payeeService.DeletePayeeAsync(id, cancellationToken);
+                return Results.Ok(new ApiCommandResponse(true, "收款对象已删除。"));
             })
             .WithName("DeletePayee");
         }

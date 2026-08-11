@@ -20,9 +20,9 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 string keyword = context.Request.Query["keyword"].ToString();
-                var profiles = string.IsNullOrWhiteSpace(keyword)
-                    ? await producerProfileService.GetAllAsync(cancellationToken).ConfigureAwait(false)
-                    : await producerProfileService.SearchAsync(keyword, cancellationToken).ConfigureAwait(false);
+                var profiles = await producerProfileService
+                    .SearchAsync(keyword, cancellationToken)
+                    .ConfigureAwait(false);
 
                 return Results.Ok(ApiSingleWindowDtoFactory.FromCustomsCooProducerProfileList(profiles));
             })
@@ -70,20 +70,13 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("生产企业资料校验失败：" + string.Join("；", validationErrors)));
                 }
 
-                try
-                {
-                    var saved = await producerProfileService.SaveOrUpdateAsync(
-                        ApiSingleWindowDtoFactory.ToCustomsCooProducerProfileInput(request.Profile),
-                        cancellationToken).ConfigureAwait(false);
+                var saved = await producerProfileService.SaveOrUpdateAsync(
+                    ApiSingleWindowDtoFactory.ToCustomsCooProducerProfileInput(request.Profile),
+                    cancellationToken).ConfigureAwait(false);
 
-                    return Results.Ok(ApiSingleWindowDtoFactory.FromSavedCustomsCooProducerProfile(
-                        saved,
-                        "生产企业资料已保存，后续可直接回填到 COO 商品行。"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                return Results.Ok(ApiSingleWindowDtoFactory.FromSavedCustomsCooProducerProfile(
+                    saved,
+                    "生产企业资料已保存，后续可直接回填到 COO 商品行。"));
             })
             .WithName("CreateCustomsCooProducerProfile");
 
@@ -117,22 +110,15 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound(new ApiErrorResponse("生产企业资料不存在。"));
                 }
 
-                try
-                {
-                    int savedId = await producerProfileService.SaveAsync(
-                        ApiSingleWindowDtoFactory.ToCustomsCooProducerProfileInput(request.Profile),
-                        id,
-                        cancellationToken).ConfigureAwait(false);
-                    var saved = await producerProfileService.GetByIdAsync(savedId, cancellationToken).ConfigureAwait(false);
+                int savedId = await producerProfileService.SaveAsync(
+                    ApiSingleWindowDtoFactory.ToCustomsCooProducerProfileInput(request.Profile),
+                    id,
+                    cancellationToken).ConfigureAwait(false);
+                var updated = await producerProfileService.GetByIdAsync(savedId, cancellationToken).ConfigureAwait(false);
 
-                    return Results.Ok(ApiSingleWindowDtoFactory.FromSavedCustomsCooProducerProfile(
-                        saved,
-                        "生产企业资料已更新。"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                return Results.Ok(ApiSingleWindowDtoFactory.FromSavedCustomsCooProducerProfile(
+                    updated,
+                    "生产企业资料已更新。"));
             })
             .WithName("UpdateCustomsCooProducerProfile");
 
@@ -153,17 +139,10 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("生产企业资料 ID 必须大于 0。"));
                 }
 
-                try
-                {
-                    bool deleted = await producerProfileService.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
-                    return deleted
-                        ? Results.Ok(new ApiCommandResponse(true, "生产企业资料已删除。"))
-                        : Results.NotFound(new ApiErrorResponse("生产企业资料不存在。"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                bool deleted = await producerProfileService.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
+                return deleted
+                    ? Results.Ok(new ApiCommandResponse(true, "生产企业资料已删除。"))
+                    : Results.NotFound(new ApiErrorResponse("生产企业资料不存在。"));
             })
             .WithName("DeleteCustomsCooProducerProfile");
         }

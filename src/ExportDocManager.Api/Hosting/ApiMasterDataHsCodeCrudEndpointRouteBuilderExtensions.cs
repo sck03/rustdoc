@@ -78,18 +78,11 @@ namespace ExportDocManager.Api.Hosting
                 hsCode.Id = 0;
                 hsCode.RowVersion = null;
 
-                try
-                {
-                    await hsCodeService.SaveAsync(hsCode);
-                    var saved = await repository.GetByCodeAsync(hsCode.Code, cancellationToken) ?? hsCode;
-                    return Results.Created(
-                        $"/api/master-data/hs-codes/{saved.Code}",
-                        ApiMasterDataDtoFactory.FromHsCode(saved));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await hsCodeService.SaveAsync(hsCode);
+                var saved = await repository.GetByCodeAsync(hsCode.Code, cancellationToken) ?? hsCode;
+                return Results.Created(
+                    $"/api/master-data/hs-codes/{saved.Code}",
+                    ApiMasterDataDtoFactory.FromHsCode(saved));
             })
             .WithName("CreateHsCode");
 
@@ -181,16 +174,9 @@ namespace ExportDocManager.Api.Hosting
                 hsCode.Id = existing.Id;
                 hsCode.Code = normalizedPathCode;
 
-                try
-                {
-                    await hsCodeService.SaveAsync(hsCode);
-                    var saved = await repository.GetByCodeAsync(hsCode.Code, cancellationToken) ?? hsCode;
-                    return Results.Ok(ApiMasterDataDtoFactory.FromHsCode(saved));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await hsCodeService.SaveAsync(hsCode);
+                var saved = await repository.GetByCodeAsync(hsCode.Code, cancellationToken) ?? hsCode;
+                return Results.Ok(ApiMasterDataDtoFactory.FromHsCode(saved));
             })
             .WithName("UpdateHsCode");
 
@@ -217,15 +203,8 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                try
-                {
-                    await hsCodeService.DeleteAsync(id);
-                    return Results.Ok(new ApiCommandResponse(true, "HS编码已删除。"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await hsCodeService.DeleteAsync(id);
+                return Results.Ok(new ApiCommandResponse(true, "HS编码已删除。"));
             })
             .WithName("DeleteHsCode");
 
@@ -273,17 +252,10 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                try
-                {
-                    await hsCodeService.DeleteAsync(existingIds);
-                    return Results.Ok(new ApiCommandResponse(
-                        true,
-                        $"已删除 {existingIds.Count} 条HS编码。"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await hsCodeService.DeleteAsync(existingIds);
+                return Results.Ok(new ApiCommandResponse(
+                    true,
+                    $"已删除 {existingIds.Count} 条HS编码。"));
             })
             .WithName("DeleteHsCodesBatch");
 
@@ -320,19 +292,12 @@ namespace ExportDocManager.Api.Hosting
                     },
                     cancellationToken);
 
-                try
-                {
-                    await hsCodeService.ClearAllLocalAsync();
-                    return Results.Ok(new ApiCommandResponse(
-                        true,
-                        before.TotalCount > 0
-                            ? $"本地HS编码库已清空，共删除 {before.TotalCount} 条记录。"
-                            : "本地HS编码库已为空。"));
-                }
-                catch (Exception ex)
-                {
-                    return WriteServiceException(ex);
-                }
+                await hsCodeService.ClearAllLocalAsync();
+                return Results.Ok(new ApiCommandResponse(
+                    true,
+                    before.TotalCount > 0
+                        ? $"本地HS编码库已清空，共删除 {before.TotalCount} 条记录。"
+                        : "本地HS编码库已为空。"));
             })
             .WithName("ClearAllHsCodes");
         }
