@@ -200,18 +200,38 @@ jobs:
       - name: Restore report test project
         run: dotnet restore tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj --configfile NuGet.Config
 
-      - name: Render long multilingual built-in reports to PDF
-        timeout-minutes: 10
-        env:
-          EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX: ${{ runner.os == 'Linux' && '1' || '0' }}
+      - name: Build report test project
         run: >-
-          dotnet test tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj
+          dotnet build tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj
           -c Release
           -m:1
           -p:BuildInParallel=false
           --no-restore
-          --logger "console;verbosity=normal"
-          --filter "FullyQualifiedName~RenderBuiltInProgramTemplatesToPdf|FullyQualifiedName~RenderBuiltInProgramTemplatesWithMultiItemBusinessDataToPdf"
+
+      - name: Render long multilingual built-in reports to PDF
+        timeout-minutes: 10
+        shell: pwsh
+        env:
+          EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX: ${{ runner.os == 'Linux' && '1' || '0' }}
+          EXPORTDOCMANAGER_BROWSER_AUTOMATION_RECYCLE_USES: ${{ runner.os == 'macOS' && '4' || '100' }}
+        run: |
+          $tests = @(
+            "ExportDocManager.Infrastructure.Tests.ReportHtmlServiceInfrastructureTests.RenderBuiltInProgramTemplatesToPdf_ShouldUseProgramRootBrowserAndRuntimeDataRoot",
+            "ExportDocManager.Infrastructure.Tests.ReportHtmlServiceInfrastructureTests.RenderBuiltInProgramTemplatesWithMultiItemBusinessDataToPdf_ShouldPreservePaginationAndDomainIsolation"
+          )
+          foreach ($test in $tests) {
+            dotnet test tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj `
+              -c Release `
+              -m:1 `
+              -p:BuildInParallel=false `
+              --no-build `
+              --blame-hang `
+              --blame-hang-timeout 4m `
+              --blame-hang-dump-type none `
+              --logger "console;verbosity=normal" `
+              --filter "FullyQualifiedName=$test"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Verify PDF wrapping and reject overlapping text
         run: python scripts/extract-report-pdf-layout.py .codex-runtime/ExportDocManager.Infrastructure.Tests

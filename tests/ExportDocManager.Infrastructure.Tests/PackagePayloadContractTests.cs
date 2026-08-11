@@ -194,6 +194,13 @@ public sealed class PackagePayloadContractTests
             StringComparison.Ordinal);
         Assert.Contains("extract-report-pdf-layout.py", workflow, StringComparison.Ordinal);
         Assert.Contains("*.layout.json", workflow, StringComparison.Ordinal);
+        Assert.Contains("EXPORTDOCMANAGER_BROWSER_AUTOMATION_RECYCLE_USES", workflow, StringComparison.Ordinal);
+        Assert.Contains("--blame-hang-timeout 4m", workflow, StringComparison.Ordinal);
+        Assert.Contains("--filter \"FullyQualifiedName=$test\"", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "FullyQualifiedName~RenderBuiltInProgramTemplatesToPdf|FullyQualifiedName~RenderBuiltInProgramTemplatesWithMultiItemBusinessDataToPdf",
+            workflow,
+            StringComparison.Ordinal);
         Assert.Contains("find_text_overlaps", extractor, StringComparison.Ordinal);
         Assert.Contains("lineHashes", extractor, StringComparison.Ordinal);
         Assert.Contains("wrappingConsistent", comparer, StringComparison.Ordinal);

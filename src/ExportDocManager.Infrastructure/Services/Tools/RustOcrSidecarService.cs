@@ -12,6 +12,8 @@ namespace ExportDocManager.Services.Tools
     {
         public const string ExecutableEnvironmentVariable = "EXPORTDOCMANAGER_RUST_OCR_EXECUTABLE";
         internal const int MaximumResponseCharacters = 4 * 1024 * 1024;
+        internal static readonly TimeSpan DefaultRecognitionTimeout = TimeSpan.FromSeconds(90);
+        internal static readonly TimeSpan MaximumRecognitionTimeout = TimeSpan.FromMinutes(5);
         private static readonly JsonSerializerOptions JsonOptions = JsonSerializerOptions.Web;
         private readonly IAppPathProvider _paths;
         private readonly SemaphoreSlim _gate = new(1, 1);
@@ -39,8 +41,22 @@ namespace ExportDocManager.Services.Tools
             return !string.IsNullOrWhiteSpace(executablePath) && File.Exists(executablePath);
         }
 
-        public async Task<OcrResult> RecognizeAsync(string imagePath, CancellationToken cancellationToken = default)
+        public Task<OcrResult> RecognizeAsync(string imagePath, CancellationToken cancellationToken = default) =>
+            RecognizeAsync(imagePath, DefaultRecognitionTimeout, cancellationToken);
+
+        internal async Task<OcrResult> RecognizeAsync(
+            string imagePath,
+            TimeSpan recognitionTimeout,
+            CancellationToken cancellationToken = default)
         {
+            if (recognitionTimeout <= TimeSpan.Zero || recognitionTimeout > MaximumRecognitionTimeout)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(recognitionTimeout),
+                    recognitionTimeout,
+                    $"OCR recognition timeout must be greater than zero and no longer than {MaximumRecognitionTimeout.TotalSeconds:0} seconds.");
+            }
+
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
             using var queueTimeout = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
@@ -69,7 +85,7 @@ namespace ExportDocManager.Services.Tools
                     using var operationTimeout = CancellationTokenSource.CreateLinkedTokenSource(
                         cancellationToken,
                         _shutdownSource.Token);
-                    operationTimeout.CancelAfter(TimeSpan.FromSeconds(90));
+                    operationTimeout.CancelAfter(recognitionTimeout);
                     try
                     {
                         return await RecognizeCoreAsync(imagePath, operationTimeout.Token);
@@ -88,7 +104,8 @@ namespace ExportDocManager.Services.Tools
                         operationTimeout.IsCancellationRequested)
                     {
                         await StopAsync();
-                        throw new ServiceTimeoutException("OCR 识别超过 90 秒，任务已终止，请缩小图片后重试。");
+                        throw new ServiceTimeoutException(
+                            $"OCR 识别超过 {Math.Ceiling(recognitionTimeout.TotalSeconds):0} 秒，任务已终止，请缩小图片后重试。");
                     }
                     catch (Exception ex) when (attempt == 0 && IsRecoverableTransportFailure(ex, cancellationToken))
                     {
