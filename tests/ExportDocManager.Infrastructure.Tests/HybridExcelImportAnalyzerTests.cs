@@ -13,6 +13,9 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.False(ExcelImportPartyTextClassifier.LooksLikePostalAddress("Reason Brand Inc"));
             Assert.True(ExcelImportPartyTextClassifier.IsPlausiblePartyName("New York City Trading Co., Ltd."));
             Assert.True(ExcelImportPartyTextClassifier.LooksLikeCompanyName("New York City Trading Co., Ltd."));
+            Assert.True(ExcelImportPartyTextClassifier.LooksLikeCompanyName("FAME FASHION HOUSE LLC"));
+            Assert.False(ExcelImportPartyTextClassifier.LooksLikeCompanyName(
+                string.Join(' ', Enumerable.Repeat("ADDRESS", 10_000))));
             Assert.True(ExcelImportPartyTextClassifier.LooksLikePostalAddress(
                 "3 WEST 35TH STREET 10th FL., New York, NY 10001"));
         }

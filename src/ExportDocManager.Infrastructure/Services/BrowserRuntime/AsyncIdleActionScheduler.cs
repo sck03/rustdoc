@@ -21,10 +21,11 @@ internal sealed class AsyncIdleActionScheduler : IAsyncDisposable
             throw new ArgumentOutOfRangeException(nameof(delay));
         }
 
+        CancellationTokenSource? previousSource;
         lock (_sync)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            CancelPendingCore();
+            previousSource = DetachPendingCore();
             var source = CancellationTokenSource.CreateLinkedTokenSource(_shutdownSource.Token);
             _pendingSource = source;
             Task task = RunAsync(source, delay);
@@ -41,14 +42,19 @@ internal sealed class AsyncIdleActionScheduler : IAsyncDisposable
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
         }
+
+        TryCancel(previousSource);
     }
 
     public void Cancel()
     {
+        CancellationTokenSource? source;
         lock (_sync)
         {
-            CancelPendingCore();
+            source = DetachPendingCore();
         }
+
+        TryCancel(source);
     }
 
     private async Task RunAsync(CancellationTokenSource source, TimeSpan delay)
@@ -77,15 +83,16 @@ internal sealed class AsyncIdleActionScheduler : IAsyncDisposable
         }
     }
 
-    private void CancelPendingCore()
+    private CancellationTokenSource? DetachPendingCore()
     {
         CancellationTokenSource? source = _pendingSource;
         _pendingSource = null;
-        source?.Cancel();
+        return source;
     }
 
     public async ValueTask DisposeAsync()
     {
+        CancellationTokenSource? pendingSource;
         Task[] tasks;
         lock (_sync)
         {
@@ -95,12 +102,26 @@ internal sealed class AsyncIdleActionScheduler : IAsyncDisposable
             }
 
             _disposed = true;
-            _shutdownSource.Cancel();
-            CancelPendingCore();
+            pendingSource = DetachPendingCore();
             tasks = [.. _tasks];
         }
 
+        _shutdownSource.Cancel();
+        TryCancel(pendingSource);
         await Task.WhenAll(tasks).ConfigureAwait(false);
         _shutdownSource.Dispose();
+    }
+
+    private static void TryCancel(CancellationTokenSource? source)
+    {
+        try
+        {
+            source?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The delayed task can complete and dispose its source immediately
+            // after it is detached from the scheduler.
+        }
     }
 }

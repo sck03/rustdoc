@@ -687,7 +687,6 @@ namespace ExportDocManager.Services.BrowserRuntime
             }
 
             _shutdownSource.Cancel();
-            _idleRecycleScheduler.Cancel();
             Task operationsDrained;
             await _lifecycleGate.WaitAsync().ConfigureAwait(false);
             try
@@ -708,6 +707,11 @@ namespace ExportDocManager.Services.BrowserRuntime
             {
                 _lifecycleGate.Release();
             }
+
+            // Stop the idle worker after marking the host as stopping and
+            // before competing with it for browser shutdown. This prevents a
+            // delayed recycle from racing explicit host disposal on macOS.
+            await _idleRecycleScheduler.DisposeAsync().ConfigureAwait(false);
 
             try
             {
@@ -741,7 +745,6 @@ namespace ExportDocManager.Services.BrowserRuntime
                 _lifecycleGate.Release();
             }
 
-            await _idleRecycleScheduler.DisposeAsync().ConfigureAwait(false);
             _shutdownSource.Dispose();
             _lifecycleGate.Dispose();
         }

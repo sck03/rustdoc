@@ -1,14 +1,13 @@
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace ExportDocManager.Services.Data
 {
     internal static class ExcelImportPartyTextClassifier
     {
-        private static readonly Regex CompanyNamePattern = new(
-            @"\b(CO\.?\s*,?\s*LTD\.?|LTD\.?|LIMITED|LLC\.?|INC\.?|CORP\.?|CORPORATION|COMPANY|GROUP)\b",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking,
-            TimeSpan.FromMilliseconds(100));
+        private static readonly HashSet<string> CompanyNameMarkers = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "ltd", "limited", "llc", "inc", "corp", "corporation", "company", "group"
+        };
 
         private static readonly HashSet<string> FullAddressMarkers = new(StringComparer.Ordinal)
         {
@@ -29,7 +28,8 @@ namespace ExportDocManager.Services.Data
 
         internal static bool LooksLikeCompanyName(string value)
         {
-            return !string.IsNullOrWhiteSpace(value) && CompanyNamePattern.IsMatch(value.Trim());
+            return !string.IsNullOrWhiteSpace(value)
+                && Tokenize(value.Trim()).Any(CompanyNameMarkers.Contains);
         }
 
         internal static bool LooksLikePostalAddress(string value)

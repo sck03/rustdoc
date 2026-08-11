@@ -323,7 +323,7 @@ jobs:
             --volume "${{ github.workspace }}/artifacts/container-runtime/acme-config-test/webroot:/var/www/certbot:ro" \
             nginx:1.30.4-alpine3.24 nginx -t
 
-      - name: Build HTTP images
+      - name: Build HTTP images and validate API OCR runtime
         working-directory: deploy/container
         shell: bash
         timeout-minutes: 15
@@ -333,7 +333,7 @@ jobs:
           mkdir -p "$(dirname "$build_log")"
 
           if docker compose build --progress=plain 2>&1 | tee "$build_log"; then
-            exit 0
+            exec bash ./verify-api-ocr-runtime.sh
           fi
 
           echo "::group::Container build failure tail"

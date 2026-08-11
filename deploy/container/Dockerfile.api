@@ -16,7 +16,7 @@ ARG TARGETARCH
 
 # The OCR sidecar loads the ONNX native library from the managed publish
 # output. Restore and publish for the target Linux RID explicitly; a portable
-# publish would omit libonnxruntime.so and make the build-time OCR probe fail.
+# publish would omit libonnxruntime.so and make the runtime OCR probe fail.
 RUN case "$TARGETARCH" in \
         amd64) echo linux-x64 > /tmp/exportdoc-runtime-id ;; \
         arm64) echo linux-arm64 > /tmp/exportdoc-runtime-id ;; \
@@ -135,13 +135,15 @@ RUN set -- /app/.playwright/node/linux-*/node \
     && test "$#" -eq 1 \
     && playwright_node="$1" \
     && test -f "$playwright_node" \
+    && test -s /app/libonnxruntime.so \
+    && test -s /app/OcrModels/PaddleOCR/V6/det/inference.onnx \
+    && test -s /app/OcrModels/PaddleOCR/V6/rec/inference.onnx \
+    && test -s /app/OcrModels/PaddleOCR/V6/rec/inference.yml \
     && chmod 0755 \
         "$playwright_node" \
         /app/sidecar/ocr/exportdoc-ocr \
         /app/Tools/exportdoc-excel-analyzer \
     && "$playwright_node" --version
-RUN dotnet ExportDocManager.Api.dll --app-root /app --data-root /tmp/exportdoc-ocr-check --verify-ocr-runtime \
-    && rm -rf /tmp/exportdoc-ocr-check
 USER 10001:10001
 EXPOSE 5188
 ENTRYPOINT ["/usr/bin/tini", "--", "dotnet", "ExportDocManager.Api.dll"]

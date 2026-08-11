@@ -3,7 +3,7 @@ namespace ExportDocManager.Infrastructure.Tests
     public sealed class OcrLinuxPackagingContractTests
     {
         [Fact]
-        public void LinuxX64AndDockerPackages_ShouldCarryAndVerifyPpOcrV6Runtime()
+        public void LinuxX64AndDockerPackages_ShouldCarryAndIndependentlyVerifyPpOcrV6Runtime()
         {
             string root = FindWorkspaceRoot();
             string project = File.ReadAllText(Path.Combine(
@@ -18,16 +18,34 @@ namespace ExportDocManager.Infrastructure.Tests
                 ".github",
                 "workflows",
                 "browser-server-package-reusable.yml"));
+            string containerWorkflow = File.ReadAllText(Path.Combine(
+                root,
+                ".github",
+                "workflows",
+                "container-runtime-validation.yml"));
+            string containerOcrVerifier = File.ReadAllText(Path.Combine(
+                root,
+                "deploy",
+                "container",
+                "verify-api-ocr-runtime.sh"));
             string startScript = File.ReadAllText(Path.Combine(root, "deploy", "browser-server", "start-linux.sh"));
             string notices = Path.Combine(root, "OcrModels", "PaddleOCR", "V6", "THIRD_PARTY_NOTICES.md");
 
             Assert.DoesNotContain("OpenCvSharp", project, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("EXPORTDOCMANAGER_OCR_RUNTIME=enabled", dockerfile, StringComparison.Ordinal);
-            Assert.Contains("--verify-ocr-runtime", dockerfile, StringComparison.Ordinal);
+            Assert.DoesNotContain("--verify-ocr-runtime", dockerfile, StringComparison.Ordinal);
+            Assert.Contains("test -s /app/libonnxruntime.so", dockerfile, StringComparison.Ordinal);
+            Assert.Contains("OcrModels/PaddleOCR/V6/det/inference.onnx", dockerfile, StringComparison.Ordinal);
+            Assert.Contains("OcrModels/PaddleOCR/V6/rec/inference.onnx", dockerfile, StringComparison.Ordinal);
             Assert.Contains("apps/exportdoc-ocr-rs/Cargo.toml", workflow, StringComparison.Ordinal);
             Assert.Contains("sidecar/ocr", workflow, StringComparison.Ordinal);
             Assert.Contains("libonnxruntime.so", workflow, StringComparison.Ordinal);
             Assert.Contains("--verify-ocr-runtime", workflow, StringComparison.Ordinal);
+            Assert.Contains("exec bash ./verify-api-ocr-runtime.sh", containerWorkflow, StringComparison.Ordinal);
+            Assert.Contains("--network none", containerOcrVerifier, StringComparison.Ordinal);
+            Assert.Contains("--read-only", containerOcrVerifier, StringComparison.Ordinal);
+            Assert.Contains("docker rm --force", containerOcrVerifier, StringComparison.Ordinal);
+            Assert.Contains("--verify-ocr-runtime", containerOcrVerifier, StringComparison.Ordinal);
             Assert.Contains("--verify-ocr-runtime", startScript, StringComparison.Ordinal);
             Assert.True(File.Exists(notices));
             Assert.Contains("Apache License 2.0", File.ReadAllText(notices), StringComparison.Ordinal);
