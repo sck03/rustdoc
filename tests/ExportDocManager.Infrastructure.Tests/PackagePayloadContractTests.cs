@@ -196,6 +196,7 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("*.layout.json", workflow, StringComparison.Ordinal);
         Assert.Contains("EXPORTDOCMANAGER_BROWSER_AUTOMATION_RECYCLE_USES", workflow, StringComparison.Ordinal);
         Assert.Contains("--blame-hang-timeout 4m", workflow, StringComparison.Ordinal);
+        Assert.Contains("src/ExportDocManager.Infrastructure/Services/BrowserRuntime/**", workflow, StringComparison.Ordinal);
         Assert.Contains("--filter \"FullyQualifiedName=$test\"", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain(
             "FullyQualifiedName~RenderBuiltInProgramTemplatesToPdf|FullyQualifiedName~RenderBuiltInProgramTemplatesWithMultiItemBusinessDataToPdf",
