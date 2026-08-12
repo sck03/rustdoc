@@ -28,7 +28,8 @@ namespace ExportDocManager.Api.Hosting
                 await ApiReadinessApplicationBuilderExtensions.WriteLivenessAsync(context).ConfigureAwait(false);
                 return Results.Empty;
             })
-                .WithName("Liveness");
+                .WithName("getLiveness")
+            .Produces(StatusCodes.Status200OK);
 
             endpoints.MapMethods("/readyz", [HttpMethods.Get, HttpMethods.Head], async (
                 HttpContext context,
@@ -39,7 +40,9 @@ namespace ExportDocManager.Api.Hosting
                     .ConfigureAwait(false);
                 return Results.Empty;
             })
-                .WithName("Readiness");
+                .WithName("getReadiness")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapGet("/healthz", async (
                 HttpContext context,
@@ -59,7 +62,7 @@ namespace ExportDocManager.Api.Hosting
                 if (!canViewDetails && !string.IsNullOrWhiteSpace(bearerToken))
                 {
                     var user = await currentUserResolver.ResolveAsync(context, context.RequestAborted);
-                    canViewDetails = authorizationService.CanManageSettings(user);
+                    canViewDetails = user != null && authorizationService.CanManageSettings(user);
                 }
 
                 if (!canViewDetails)
@@ -79,7 +82,8 @@ namespace ExportDocManager.Api.Hosting
                     hasDesktopAccess);
                 return Results.Ok(response);
             })
-            .WithName("Healthz");
+            .WithName("getHealth")
+            .Produces<ApiHealthResponse>(StatusCodes.Status200OK);
 
             var officialOpenApi = endpoints.MapGroup(string.Empty);
             officialOpenApi.AddEndpointFilter(async (invocationContext, next) =>
@@ -100,27 +104,7 @@ namespace ExportDocManager.Api.Hosting
             });
             officialOpenApi.MapOpenApi("/openapi/{documentName}.json");
 
-            endpoints.MapGet("/swagger/v1/swagger.json", async (
-                HttpContext context,
-                ApiCurrentUserResolver currentUserResolver,
-                ApiAuthorizationService authorizationService,
-                ApiDesktopAccessOptions desktopAccessOptions) =>
-            {
-                var accessError = await GetApiDocumentationAccessErrorAsync(
-                    context,
-                    runtimeOptions,
-                    currentUserResolver,
-                    authorizationService,
-                    desktopAccessOptions);
-                if (accessError != null)
-                {
-                    return accessError;
-                }
-
-                return Results.Json(OpenApiDocumentFactory.Create(runtimeOptions));
-            })
-                .WithName("SwaggerJson")
-                .ExcludeFromDescription();
+            officialOpenApi.MapOpenApi("/swagger/v1/swagger.json");
 
             endpoints.MapGet("/swagger", async (
                 HttpContext context,
@@ -140,7 +124,7 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 return Results.Content(
-                    OpenApiDocumentFactory.CreateSwaggerLandingPage(),
+                    ApiOpenApiLandingPage.Html,
                     "text/html; charset=utf-8");
             })
                 .WithName("Swagger")
@@ -198,7 +182,9 @@ namespace ExportDocManager.Api.Hosting
                         pathProvider));
                 }
             })
-            .WithName("RunShutdownMaintenance");
+            .WithName("RunShutdownMaintenance")
+            .Produces<ApiShutdownMaintenanceResponse>(StatusCodes.Status200OK)
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/system/logs/cleanup", async (
                 HttpContext context,
@@ -240,10 +226,14 @@ namespace ExportDocManager.Api.Hosting
                         ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
                 }
             })
-            .WithName("CleanupSystemLogs");
+            .WithName("CleanupSystemLogs")
+            .Produces<ApiSystemLogCleanupResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden)
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
         }
 
-        private static async Task<IResult> GetApiDocumentationAccessErrorAsync(
+        private static async Task<IResult?> GetApiDocumentationAccessErrorAsync(
             HttpContext context,
             ApiRuntimeOptions runtimeOptions,
             ApiCurrentUserResolver currentUserResolver,

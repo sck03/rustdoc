@@ -2,8 +2,8 @@ namespace ExportDocManager.Models.DTOs
 {
     public class InvoiceTransferPreview
     {
-        public string InvoiceNo { get; set; }
-        public string Type { get; set; }
+        public string InvoiceNo { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
         public int ItemCount { get; set; }
         public bool CustomerExists { get; set; }
         public bool ExporterExists { get; set; }
@@ -23,9 +23,9 @@ namespace ExportDocManager.Models.DTOs
     public class InvoiceImportResult
     {
         public bool Success { get; set; }
-        public string Message { get; set; }
+        public string Message { get; set; } = string.Empty;
         public int? InvoiceId { get; set; }
-        public string FinalInvoiceNo { get; set; }
+        public string FinalInvoiceNo { get; set; } = string.Empty;
         public InvoiceImportConflictAction ActionTaken { get; set; }
     }
 }

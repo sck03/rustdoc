@@ -59,12 +59,16 @@ namespace ExportDocManager.Api.Hosting
                     subject,
                     body));
             })
-            .WithName("StartInvoiceDocumentEmailJob");
+            .WithName("StartInvoiceDocumentEmailJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
         }
 
-        internal static IResult ValidateInvoiceDocumentEmailRequest(
+        internal static IResult? ValidateInvoiceDocumentEmailRequest(
             int invoiceId,
-            ApiInvoiceDocumentEmailRequest request,
+            ApiInvoiceDocumentEmailRequest? request,
             out IReadOnlyList<ApiInvoiceDocumentPackageItemRequest> normalizedItems,
             out bool includeMergedPdf,
             out string toAddress,
@@ -270,7 +274,7 @@ namespace ExportDocManager.Api.Hosting
         }
 
         private static string ApplyInvoiceDocumentEmailTemplate(
-            string configuredTemplate,
+            string? configuredTemplate,
             string fallbackTemplate,
             ApiInvoiceGeneratedDocumentSet documentSet)
         {

@@ -7,9 +7,9 @@ namespace ExportDocManager.Api.Hosting
         int VersionNumber);
 
     public sealed record ApiSalesOpportunitySaveRequest(
-        int Id, int CrmCustomerId, int? ProductId, string Title, string Stage, string QuotationNo,
-        decimal EstimatedAmount, string Currency, int ProbabilityPercent,
-        DateOnly? ExpectedCloseDate, string NextAction, string Notes, string ChangeNote,
+        int Id, int CrmCustomerId, int? ProductId = null, string Title = "", string Stage = "", string QuotationNo = "",
+        decimal EstimatedAmount = 0, string Currency = "USD", int ProbabilityPercent = 0,
+        DateOnly? ExpectedCloseDate = null, string NextAction = "", string Notes = "", string ChangeNote = "",
         int ExpectedVersion = 0);
 
     public sealed record ApiSalesOpportunityHistoryDto(

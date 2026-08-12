@@ -35,7 +35,7 @@ namespace ExportDocManager.Services.Infrastructure
         public LocalSharedReadRepository(
             IDbContextFactory<AppDbContext> contextFactory,
             DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope businessDataAccessScope)
+            BusinessDataAccessScope? businessDataAccessScope)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
@@ -78,7 +78,7 @@ namespace ExportDocManager.Services.Infrastructure
             return new PagedResult<Payment>(items, totalCount, normalizedQuery.PageNumber, normalizedQuery.PageSize);
         }
 
-        public async Task<Payment> GetByIdAsync(
+        public async Task<Payment?> GetByIdAsync(
             int id,
             CancellationToken cancellationToken = default)
         {

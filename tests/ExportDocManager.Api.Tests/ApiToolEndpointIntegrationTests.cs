@@ -442,7 +442,7 @@ namespace ExportDocManager.Api.Tests
                 Assert.Equal("browser-invoice.xlsx", result.SourcePath);
                 Assert.NotNull(result.Invoice);
                 Assert.Equal("INV-WEB-001", result.Invoice.InvoiceNo);
-                Assert.Equal("Browser Buyer Ltd", result.Customer.CustomerNameEN);
+                Assert.Equal("Browser Buyer Ltd", Assert.IsType<ApiImportedCustomerDto>(result.Customer).CustomerNameEN);
                 Assert.Contains("Cache/BrowserUploads/ExcelImport", result.StoragePolicy, StringComparison.Ordinal);
                 Assert.Contains("立即删除", result.StoragePolicy, StringComparison.Ordinal);
                 Assert.DoesNotContain(harness.DataRoot, result.SourcePath, StringComparison.OrdinalIgnoreCase);
@@ -649,7 +649,7 @@ namespace ExportDocManager.Api.Tests
         private sealed class FakeOpenAiServer : IAsyncDisposable
         {
             private readonly string _reportText;
-            private WebApplication _app;
+            private WebApplication? _app;
 
             private FakeOpenAiServer(string endpoint, string reportText)
             {

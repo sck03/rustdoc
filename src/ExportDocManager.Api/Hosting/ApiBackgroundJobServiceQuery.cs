@@ -57,20 +57,20 @@ namespace ExportDocManager.Api.Hosting
                 pageSize));
         }
 
-        public Task<BackgroundJobSnapshot> GetAsync(
+        public Task<BackgroundJobSnapshot?> GetAsync(
             string jobId,
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(jobId))
             {
-                return Task.FromResult<BackgroundJobSnapshot>(null);
+                return Task.FromResult<BackgroundJobSnapshot?>(null);
             }
 
             _jobs.TryGetValue(jobId.Trim(), out var job);
             return Task.FromResult(job);
         }
 
-        private static bool Contains(string value, string keyword)
+        private static bool Contains(string? value, string keyword)
         {
             return !string.IsNullOrWhiteSpace(value)
                 && value.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0;

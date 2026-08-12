@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, FileDown, LayoutTemplate, Printer, RefreshCw, Save, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { ApiPaymentDto, ApiPaymentReportHtmlPreviewResponse, ApiReportTemplateDto, ExportDocManagerApiClient } from "../../api/index.ts";
+import { ApiPaymentDto, ApiPaymentReportHtmlPreviewResponse, ApiReportTemplateDto, AppSettings, ExportDocManagerApiClient } from "../../api/index.ts";
+
+type SettingsLike = AppSettings | Record<string, unknown>;
 import { useModulePermission, usePermissionCapabilities } from "../../app/PermissionAccessContext.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { isDesktopBridgeAvailable, selectSavePdfPath } from "../../desktop/desktopBridge.ts";
@@ -400,7 +402,7 @@ type PaymentTemplateView = {
 
 function buildPaymentTemplateViews(
   templates: ApiReportTemplateDto[],
-  settings: Record<string, unknown> | undefined,
+  settings: SettingsLike | undefined,
 ): PaymentTemplateView[] {
   const configuredItems = readPaymentTemplateItems(settings).filter((item) => item.templatePath.length > 0);
   const usedTemplatePaths = new Set<string>();
@@ -443,7 +445,7 @@ function buildPaymentTemplateViews(
   return views;
 }
 
-function readPaymentTemplateItems(settings?: Record<string, unknown>): PaymentTemplateSetting[] {
+function readPaymentTemplateItems(settings?: SettingsLike): PaymentTemplateSetting[] {
   const rawItems = settings ? readRecordValue(settings, "paymentTemplates", "PaymentTemplates") : undefined;
   if (!Array.isArray(rawItems)) {
     return [];
@@ -523,10 +525,11 @@ function normalizePathForMatch(path: string) {
     .toLowerCase();
 }
 
-function readRecordValue(record: Record<string, unknown>, ...names: string[]) {
+function readRecordValue(record: SettingsLike, ...names: string[]) {
+  const source = record as unknown as Record<string, unknown>;
   for (const name of names) {
-    if (Object.prototype.hasOwnProperty.call(record, name)) {
-      return record[name];
+    if (Object.prototype.hasOwnProperty.call(source, name)) {
+      return source[name];
     }
   }
 

@@ -32,7 +32,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
         }
 
-        public SettingsService(IAppPathProvider pathProvider, string filePath)
+        public SettingsService(IAppPathProvider pathProvider, string? filePath)
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
             _filePath = ResolveSettingsPath(pathProvider, filePath);
@@ -130,10 +130,10 @@ namespace ExportDocManager.Services.Infrastructure
 
         private async Task SaveUnsafeAsync()
         {
-            var originalEmailPwd = Settings.Email?.Password;
-            var originalWebDavPwd = Settings.WebDav?.Password;
-            var originalPostgreSqlPwd = Settings.System?.PostgreSqlPassword;
-            var originalAiApiKey = Settings.AI?.ApiKey;
+            string originalEmailPwd = Settings.Email?.Password ?? string.Empty;
+            string originalWebDavPwd = Settings.WebDav?.Password ?? string.Empty;
+            string originalPostgreSqlPwd = Settings.System?.PostgreSqlPassword ?? string.Empty;
+            string originalAiApiKey = Settings.AI?.ApiKey ?? string.Empty;
 
             try
             {
@@ -246,7 +246,7 @@ namespace ExportDocManager.Services.Infrastructure
             Settings.System.UpdaterEndpoint = UpdaterEndpointPolicy.Normalize(Settings.System.UpdaterEndpoint);
         }
 
-        private static string ResolveSettingsPath(IAppPathProvider pathProvider, string filePath)
+        private static string ResolveSettingsPath(IAppPathProvider pathProvider, string? filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {

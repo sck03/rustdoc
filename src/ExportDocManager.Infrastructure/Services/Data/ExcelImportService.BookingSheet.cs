@@ -53,7 +53,7 @@ namespace ExportDocManager.Services.Data
             return added;
         }
 
-        private BookingSheetGoodsTable FindBookingSheetGoodsTable(IExcelImportWorksheet worksheet)
+        private BookingSheetGoodsTable? FindBookingSheetGoodsTable(IExcelImportWorksheet worksheet)
         {
             for (int row = 1; row <= 80; row++)
             {
@@ -242,16 +242,16 @@ namespace ExportDocManager.Services.Data
             return lines;
         }
 
-        private Item BuildBookingSheetItem(
+        private Item? BuildBookingSheetItem(
             IExcelImportWorksheet worksheet,
             BookingSheetGoodsTable table,
             int row,
             IReadOnlyList<string> descriptionLines)
         {
-            string styleName = descriptionLines.FirstOrDefault(line =>
+            string? styleName = descriptionLines.FirstOrDefault(line =>
                 !LooksLikeHsCodeLine(line) && line.Any(char.IsLetter) && !line.Any(IsCjk));
-            string styleNameCn = descriptionLines.FirstOrDefault(line => line.Any(IsCjk));
-            string hsCode = descriptionLines
+            string? styleNameCn = descriptionLines.FirstOrDefault(line => line.Any(IsCjk));
+            string? hsCode = descriptionLines
                 .Select(ExtractHsCode)
                 .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 

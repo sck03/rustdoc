@@ -13,9 +13,9 @@ namespace ExportDocManager.Services.Data
 {
     public partial class ExcelImportService
     {
-        private DetectedItemTableLayout DetectItemTableLayout(IExcelImportWorksheet worksheet)
+        private DetectedItemTableLayout? DetectItemTableLayout(IExcelImportWorksheet worksheet)
         {
-            DetectedItemTableLayout bestLayout = null;
+            DetectedItemTableLayout? bestLayout = null;
             int bestScore = 0;
 
             for (int row = 1; row <= 80; row++)
@@ -253,9 +253,9 @@ namespace ExportDocManager.Services.Data
 
         private bool IsItemDataRow(IExcelImportWorksheet worksheet, int row, DetectedItemColumns columns)
         {
-            string quantity = GetItemCellValue(worksheet, row, null, columns.QuantityCol);
-            string styleNo = GetItemCellValue(worksheet, row, null, columns.StyleNoCol);
-            string styleName = GetItemCellValue(worksheet, row, null, columns.StyleNameCol);
+            string quantity = GetItemCellValue(worksheet, row, columns.QuantityCol);
+            string styleNo = GetItemCellValue(worksheet, row, columns.StyleNoCol);
+            string styleName = GetItemCellValue(worksheet, row, columns.StyleNameCol);
 
             if (string.IsNullOrWhiteSpace(quantity) || (!ContainsDigit(quantity) && ParseExcelDecimal(quantity) == 0))
             {
@@ -273,7 +273,6 @@ namespace ExportDocManager.Services.Data
         private string GetItemCellValue(
             IExcelImportWorksheet worksheet,
             int row,
-            DetectedItemTableLayout detectedLayout,
             int column,
             string defaultValue = "")
         {
@@ -384,4 +383,3 @@ namespace ExportDocManager.Services.Data
         }
     }
 }
-

@@ -127,7 +127,7 @@ namespace ExportDocManager.Services.Data
             return fields;
         }
 
-        private static ExcelImportFieldAnalysis FindFieldByConfiguredCell(
+        private static ExcelImportFieldAnalysis? FindFieldByConfiguredCell(
             SheetGrid sheet,
             FieldDefinition definition,
             ExcelImportSettings settings)
@@ -155,9 +155,9 @@ namespace ExportDocManager.Services.Data
             }
         }
 
-        private static ExcelImportFieldAnalysis FindFieldByLabels(SheetGrid sheet, FieldDefinition definition)
+        private static ExcelImportFieldAnalysis? FindFieldByLabels(SheetGrid sheet, FieldDefinition definition)
         {
-            ExcelImportFieldAnalysis best = null;
+            ExcelImportFieldAnalysis? best = null;
 
             for (int row = 1; row <= Math.Min(sheet.UsedRowCount, 100); row++)
             {
@@ -227,11 +227,11 @@ namespace ExportDocManager.Services.Data
             return best;
         }
 
-        private static ExcelImportItemTableAnalysis DetectItemTable(
+        private static ExcelImportItemTableAnalysis? DetectItemTable(
             SheetGrid sheet,
             CancellationToken cancellationToken)
         {
-            ExcelImportItemTableAnalysis best = null;
+            ExcelImportItemTableAnalysis? best = null;
             int bestScore = 0;
 
             for (int row = 1; row <= Math.Min(sheet.UsedRowCount, 100); row++)

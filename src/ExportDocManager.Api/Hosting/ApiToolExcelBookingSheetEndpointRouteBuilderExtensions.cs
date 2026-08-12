@@ -41,7 +41,11 @@ namespace ExportDocManager.Api.Hosting
 
                 return AcceptedBackgroundJob(EnqueueBlankBookingSheetExportJob(jobRunner, user.Username, destinationPath));
             })
-            .WithName("StartBlankBookingSheetSaveToPathJob");
+            .WithName("StartBlankBookingSheetSaveToPathJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/tools/excel/booking-sheet/blank/download", (
                 HttpContext context,
@@ -64,7 +68,9 @@ namespace ExportDocManager.Api.Hosting
                     user.Username,
                     destinationPath));
             })
-            .WithName("StartBlankBookingSheetDownloadJob");
+            .WithName("StartBlankBookingSheetDownloadJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapPost("/api/tools/excel/booking-sheet/convert/save-to-path", (
                 HttpContext context,
@@ -113,7 +119,11 @@ namespace ExportDocManager.Api.Hosting
                     sourcePath,
                     destinationPath));
             })
-            .WithName("StartBookingSheetConvertSaveToPathJob");
+            .WithName("StartBookingSheetConvertSaveToPathJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/tools/excel/booking-sheet/convert/upload", async (
                 HttpContext context,
@@ -178,7 +188,11 @@ namespace ExportDocManager.Api.Hosting
                     throw;
                 }
             })
-            .WithName("UploadAndStartBookingSheetConvertDownloadJob");
+            .Accepts<IFormFile>("application/octet-stream")
+            .WithName("UploadAndStartBookingSheetConvertDownloadJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapPost("/api/tools/excel/booking-sheet/from-invoice/save-to-path", async (
                 HttpContext context,
@@ -234,7 +248,12 @@ namespace ExportDocManager.Api.Hosting
                     request.InvoiceId,
                     destinationPath));
             })
-            .WithName("StartInvoiceBookingSheetSaveToPathJob");
+            .WithName("StartInvoiceBookingSheetSaveToPathJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapPost("/api/tools/excel/booking-sheet/from-invoice/{invoiceId:int}/download", async (
                 HttpContext context,
@@ -276,7 +295,11 @@ namespace ExportDocManager.Api.Hosting
                     invoiceId,
                     destinationPath));
             })
-            .WithName("StartInvoiceBookingSheetDownloadJob");
+            .WithName("StartInvoiceBookingSheetDownloadJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound);
         }
 
         internal static BackgroundJobSnapshot EnqueueBlankBookingSheetExportJob(

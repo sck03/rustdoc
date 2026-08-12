@@ -82,7 +82,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.True(secondStatus.IsRegistered);
                 Assert.False(secondStatus.IsTrialExpired);
                 Assert.Equal(firstStatus.MachineId, secondStatus.MachineId);
-                Assert.Equal(LicenseValueNormalizer.NormalizeLicenseKey(key), anchor.LicenseKey);
+                Assert.Equal(LicenseValueNormalizer.NormalizeLicenseKey(key), Assert.IsType<RuntimeLicenseAnchorData>(anchor).LicenseKey);
                 Assert.True(File.Exists(Path.Combine(secondProvider.SecurityRoot, "license.dat")));
             }
             finally
@@ -250,7 +250,7 @@ namespace ExportDocManager.Infrastructure.Tests
                     anchorStore);
                 var firstStatus = await firstService.GetStatusAsync();
 
-                var anchor = await anchorStore.LoadAsync();
+                var anchor = Assert.IsType<RuntimeLicenseAnchorData>(await anchorStore.LoadAsync());
                 anchor.InstallDate = DateTime.Now.AddDays(-8);
                 anchor.LastRunDate = DateTime.Now;
                 await anchorStore.SaveAsync(anchor);
@@ -354,7 +354,7 @@ namespace ExportDocManager.Infrastructure.Tests
         private static RuntimeLicenseService CreateService(
             IAppPathProvider pathProvider,
             Func<string> deviceFingerprintProvider,
-            Func<string> localBindingSecretProvider,
+            Func<string>? localBindingSecretProvider,
             IRuntimeLicenseAnchorStore anchorStore)
         {
             return new RuntimeLicenseService(
@@ -416,7 +416,7 @@ namespace ExportDocManager.Infrastructure.Tests
             public int LoadCount => Volatile.Read(ref _loadCount);
             public int SaveCount => Volatile.Read(ref _saveCount);
 
-            public async Task<RuntimeLicenseAnchorData> LoadAsync(CancellationToken cancellationToken = default)
+            public async Task<RuntimeLicenseAnchorData?> LoadAsync(CancellationToken cancellationToken = default)
             {
                 Interlocked.Increment(ref _loadCount);
                 return await inner.LoadAsync(cancellationToken);

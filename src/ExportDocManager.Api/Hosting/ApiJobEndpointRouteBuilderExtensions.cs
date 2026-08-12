@@ -47,7 +47,9 @@ namespace ExportDocManager.Api.Hosting
                     result.PageNumber,
                     result.PageSize));
             })
-            .WithName("ListJobs");
+            .WithName("ListJobs")
+            .Produces<ApiPagedResponse<BackgroundJobSnapshot>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapGet("/api/jobs/{jobId}", async (
                 HttpContext context,
@@ -81,7 +83,11 @@ namespace ExportDocManager.Api.Hosting
                         result,
                         ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions)));
             })
-            .WithName("GetJob");
+            .WithName("GetJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapGet("/api/jobs/{jobId}/download", async (
                 HttpContext context,
@@ -104,7 +110,8 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 var job = await jobService.GetAsync(jobId, cancellationToken);
-                if (!CanAccessJob(job, user, authorizationService) ||
+                if (job == null ||
+                    !CanAccessJob(job, user, authorizationService) ||
                     !string.Equals(job.Status, BackgroundJobStatusCatalog.Succeeded, StringComparison.OrdinalIgnoreCase) ||
                     !IsControlledBrowserDownloadPath(pathProvider, job.OutputPath) ||
                     !File.Exists(job.OutputPath))
@@ -112,7 +119,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                IResult transportError = RequireSecureJobResultTransport(context, job);
+                IResult? transportError = RequireSecureJobResultTransport(context, job);
                 if (transportError != null) return transportError;
 
                 string contentType = GetDownloadContentType(job.OutputPath);
@@ -122,7 +129,12 @@ namespace ExportDocManager.Api.Hosting
                     Path.GetFileName(job.OutputPath),
                     enableRangeProcessing: true);
             })
-            .WithName("DownloadJobResult");
+            .WithName("DownloadJobResult")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status426UpgradeRequired);
 
             endpoints.MapPost("/api/jobs/{jobId}/download-ticket", async (
                 HttpContext context,
@@ -142,7 +154,8 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 var job = await jobService.GetAsync(jobId, cancellationToken);
-                if (!CanAccessJob(job, user, authorizationService) ||
+                if (job == null ||
+                    !CanAccessJob(job, user, authorizationService) ||
                     !string.Equals(job.Status, BackgroundJobStatusCatalog.Succeeded, StringComparison.OrdinalIgnoreCase) ||
                     !IsControlledBrowserDownloadPath(pathProvider, job.OutputPath) ||
                     !File.Exists(job.OutputPath))
@@ -150,7 +163,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                IResult transportError = RequireSecureJobResultTransport(context, job);
+                IResult? transportError = RequireSecureJobResultTransport(context, job);
                 if (transportError != null) return transportError;
 
                 return Results.Ok(ticketService.Issue(
@@ -161,7 +174,11 @@ namespace ExportDocManager.Api.Hosting
                     "/downloads/jobs",
                     requireSessionBinding: !ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions)));
             })
-            .WithName("CreateJobDownloadTicket");
+            .WithName("CreateJobDownloadTicket")
+            .Produces<ApiDownloadTicket>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status426UpgradeRequired);
 
             endpoints.MapGet("/downloads/jobs/{token}", async (
                 HttpContext context,
@@ -189,7 +206,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                IResult transportError = RequireSecureJobResultTransport(context, job);
+                IResult? transportError = RequireSecureJobResultTransport(context, job);
                 if (transportError != null) return transportError;
 
                 return Results.File(
@@ -198,7 +215,10 @@ namespace ExportDocManager.Api.Hosting
                     Path.GetFileName(job.OutputPath),
                     enableRangeProcessing: true);
             })
-            .WithName("DownloadJobResultWithTicket");
+            .WithName("DownloadJobResultWithTicket")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status426UpgradeRequired);
 
             endpoints.MapPost("/api/jobs/{jobId}/cancel", async (
                 HttpContext context,
@@ -234,7 +254,11 @@ namespace ExportDocManager.Api.Hosting
                         new ApiErrorResponse("任务不存在、已结束或不支持取消。"),
                         statusCode: StatusCodes.Status409Conflict);
             })
-            .WithName("CancelJob");
+            .WithName("CancelJob")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapDelete("/api/jobs/{jobId}", async (
                 HttpContext context,
@@ -270,7 +294,11 @@ namespace ExportDocManager.Api.Hosting
                         new ApiErrorResponse("任务不存在，或仍在排队/运行中，不能删除。"),
                         statusCode: StatusCodes.Status409Conflict);
             })
-            .WithName("DeleteJob");
+            .WithName("DeleteJob")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapDelete("/api/jobs/finished", async (
                 HttpContext context,
@@ -289,7 +317,9 @@ namespace ExportDocManager.Api.Hosting
                 int deletedCount = await jobService.ClearTerminalAsync(requestedBy, cancellationToken);
                 return Results.Ok(new ApiCommandResponse(true, $"已清理 {deletedCount} 条已结束任务记录。"));
             })
-            .WithName("ClearFinishedJobs");
+            .WithName("ClearFinishedJobs")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapPost("/api/jobs/{jobId}/retry", async (
                 HttpContext context,
@@ -313,7 +343,7 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 var sourceJob = await jobService.GetAsync(jobId, cancellationToken);
-                if (!CanAccessJob(sourceJob, user, authorizationService))
+                if (sourceJob == null || !CanAccessJob(sourceJob, user, authorizationService))
                 {
                     return Results.NotFound();
                 }
@@ -324,10 +354,15 @@ namespace ExportDocManager.Api.Hosting
                     invoiceService,
                     cancellationToken);
             })
-            .WithName("RetryJob");
+            .WithName("RetryJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
         }
 
-        private static IResult RequireSecureJobResultTransport(
+        private static IResult? RequireSecureJobResultTransport(
             HttpContext context,
             BackgroundJobSnapshot job)
         {
@@ -342,7 +377,7 @@ namespace ExportDocManager.Api.Hosting
         }
 
         private static bool CanAccessJob(
-            BackgroundJobSnapshot job,
+            BackgroundJobSnapshot? job,
             User user,
             ApiAuthorizationService authorizationService)
         {
@@ -371,7 +406,9 @@ namespace ExportDocManager.Api.Hosting
 
         private static BackgroundJobSnapshot ForJobClient(BackgroundJobSnapshot job, bool revealPaths)
         {
-            if (job == null || revealPaths || string.IsNullOrWhiteSpace(job.OutputPath))
+            ArgumentNullException.ThrowIfNull(job);
+
+            if (revealPaths || string.IsNullOrWhiteSpace(job.OutputPath))
             {
                 return job;
             }

@@ -12,10 +12,23 @@ export function createEmptyPayment(): ApiPaymentDto {
 
   return {
     id: 0,
+    ownerUserId: null,
+    departmentId: "",
+    companyScope: "",
     invoiceNo: "",
     shipmentDate: today,
+    payeeId: 0,
+    department: "",
+    project: "",
     payeeName: "",
     payerName: "",
+    bankName: "",
+    accountNo: "",
+    paymentMethod: "",
+    notes: "",
+    goodsName: "",
+    quantity: "",
+    shipmentCountry: "",
     paymentDate: today,
     receiptDate: today,
     usdAmount: 0,
@@ -66,9 +79,9 @@ export function normalizePaymentForSave(payment: ApiPaymentDto, id: number): Api
   };
 }
 
-function normalizeOptionalDate(value?: string) {
+function normalizeOptionalDate(value?: string | null) {
   const inputValue = toDateInputValue(value);
-  return inputValue ? dateInputToApiDate(inputValue) : undefined;
+  return inputValue ? dateInputToApiDate(inputValue) : null;
 }
 
 export function validatePaymentDraft(payment: ApiPaymentDto) {

@@ -100,7 +100,7 @@ namespace ExportDocManager.Services.Reporting
             string resolved = Path.IsPathRooted(packagePath)
                 ? Path.GetFullPath(packagePath)
                 : Path.GetFullPath(Path.Combine(_pathProvider.DataRoot, "TemplatePackages", packagePath));
-            string directory = Path.GetDirectoryName(resolved);
+            string? directory = Path.GetDirectoryName(resolved);
             if (!string.IsNullOrWhiteSpace(directory))
             {
                 Directory.CreateDirectory(directory);

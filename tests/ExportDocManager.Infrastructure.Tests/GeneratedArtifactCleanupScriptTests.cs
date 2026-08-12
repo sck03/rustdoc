@@ -307,7 +307,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
         private static string ResolveWorkspacePath(params string[] segments)
         {
-            string directory = AppContext.BaseDirectory;
+            string? directory = AppContext.BaseDirectory;
             while (!string.IsNullOrWhiteSpace(directory))
             {
                 string candidate = Path.Combine(new[] { directory }.Concat(segments).ToArray());

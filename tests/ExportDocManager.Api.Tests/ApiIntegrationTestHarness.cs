@@ -46,10 +46,10 @@ namespace ExportDocManager.Api.Tests
         public static async Task<ApiIntegrationTestHarness> StartAsync(
             string prefix,
             string databaseFileName,
-            string desktopAccessToken = null,
-            string productEdition = null,
-            ILicenseSignatureVerifier licenseSignatureVerifier = null,
-            Action<IServiceCollection> configureServices = null)
+            string? desktopAccessToken = null,
+            string? productEdition = null,
+            ILicenseSignatureVerifier? licenseSignatureVerifier = null,
+            Action<IServiceCollection>? configureServices = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
             ArgumentException.ThrowIfNullOrWhiteSpace(databaseFileName);
@@ -71,10 +71,10 @@ namespace ExportDocManager.Api.Tests
             string appRoot,
             string dataRoot,
             string databaseFileName,
-            string desktopAccessToken = null,
-            string productEdition = null,
-            ILicenseSignatureVerifier licenseSignatureVerifier = null,
-            Action<IServiceCollection> configureServices = null)
+            string? desktopAccessToken = null,
+            string? productEdition = null,
+            ILicenseSignatureVerifier? licenseSignatureVerifier = null,
+            Action<IServiceCollection>? configureServices = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(appRoot);
             ArgumentException.ThrowIfNullOrWhiteSpace(dataRoot);
@@ -95,15 +95,15 @@ namespace ExportDocManager.Api.Tests
             string appRoot,
             string dataRoot,
             string databaseFileName,
-            string desktopAccessToken,
-            string productEdition,
-            ILicenseSignatureVerifier licenseSignatureVerifier,
-            Action<IServiceCollection> configureServices,
+            string? desktopAccessToken,
+            string? productEdition,
+            ILicenseSignatureVerifier? licenseSignatureVerifier,
+            Action<IServiceCollection>? configureServices,
             bool cleanupOnFailure)
         {
             string databasePath = Path.Combine(dataRoot, "Database", databaseFileName);
             string baseUrl = $"http://127.0.0.1:{GetAvailablePort()}";
-            WebApplication app = null;
+            WebApplication? app = null;
 
             try
             {
@@ -119,7 +119,7 @@ namespace ExportDocManager.Api.Tests
                     DataRoot = dataRoot,
                     ListenUrls = baseUrl,
                     DesktopAccessToken = desktopAccessToken ?? string.Empty,
-                    ProductEdition = ProductEditionCatalog.Normalize(productEdition)
+                    ProductEdition = ProductEditionCatalog.Normalize(productEdition ?? string.Empty)
                 };
 
                 ApiStartupValidator.Validate(pathProvider, databaseSettings, runtimeOptions);
@@ -190,7 +190,7 @@ namespace ExportDocManager.Api.Tests
             }
         }
 
-        public HttpClient CreateClient(string accessToken = null, string desktopAccessToken = null)
+        public HttpClient CreateClient(string? accessToken = null, string? desktopAccessToken = null)
         {
             var client = new HttpClient
             {

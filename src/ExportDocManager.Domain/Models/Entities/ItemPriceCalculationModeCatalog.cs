@@ -9,11 +9,11 @@ namespace ExportDocManager.Models.Entities
         public const string UnitPriceDriven = "UnitPriceDriven";
         public const string LineAmountDriven = "LineAmountDriven";
 
-        public static bool IsKnown(string value) =>
+        public static bool IsKnown(string? value) =>
             string.Equals(value, UnitPriceDriven, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(value, LineAmountDriven, StringComparison.OrdinalIgnoreCase);
 
-        public static string Normalize(string value)
+        public static string Normalize(string? value)
         {
             string normalized = value?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(normalized) ||

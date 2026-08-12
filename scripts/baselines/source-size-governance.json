@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 118934,
-      "maximumAggregateGrowthLines": 250,
-      "maximumAggregateLines": 119500,
+      "baselineAggregateLines": 108139,
+      "maximumAggregateGrowthLines": 200,
+      "maximumAggregateLines": 108250,
       "reportFiles": false
     },
     {
@@ -22,7 +22,7 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 77685,
+      "baselineAggregateLines": 77823,
       "maximumAggregateGrowthLines": 200,
       "maximumAggregateLines": 78500,
       "reportFiles": false
@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 37572,
-      "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 38500,
+      "baselineAggregateLines": 37288,
+      "maximumAggregateGrowthLines": 120,
+      "maximumAggregateLines": 37300,
       "reportFiles": false
     },
     {
@@ -56,7 +56,7 @@
       "directories": ["scripts", "deploy", ".github/workflows"],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 38681,
+      "baselineAggregateLines": 38701,
       "maximumAggregateGrowthLines": 150,
       "maximumAggregateLines": 39000,
       "reportFiles": false
@@ -66,7 +66,7 @@
       "directory": ".github/workflows",
       "filePattern": "^.+\\.(?:yml|yaml)$",
       "maximumLines": 800,
-      "baselineAggregateLines": 2737,
+      "baselineAggregateLines": 2747,
       "maximumAggregateGrowthLines": 20,
       "maximumAggregateLines": 2800,
       "reportFiles": false
@@ -175,23 +175,11 @@
       "maximumAggregateLines": 3100
     },
     {
-      "name": "OpenAPI document modules",
+      "name": "official OpenAPI infrastructure",
       "directory": "src/ExportDocManager.Api/Hosting",
-      "filePattern": "^OpenApiDocument(?:Paths|Schemas)\\..+\\.cs$",
-      "maximumLines": 1200
-    },
-    {
-      "name": "OpenAPI factory components",
-      "directory": "src/ExportDocManager.Api/Hosting",
-      "filePattern": "^OpenApiDocumentFactory(?:\\..+)?\\.cs$",
-      "maximumLines": 600,
-      "maximumAggregateLines": 1250
-    },
-    {
-      "name": "OpenAPI document and system components",
-      "directory": "src/ExportDocManager.Api/Hosting",
-      "filePattern": "^OpenApiDocument(?:Paths|Schemas)\\.(?:Documents|System)(?:\\..+)?\\.cs$",
-      "maximumLines": 800
+      "filePattern": "^(?:ApiOpenApiDocumentTransformer|ApiOpenApiLandingPage|NullableOpenApiSchemaTransformer)\\.cs$",
+      "maximumLines": 100,
+      "maximumAggregateLines": 220
     },
     {
       "name": "application shell orchestration",

@@ -467,6 +467,54 @@
 
 .query-export-panel {
   min-width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.query-export-summary {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 44px;
+  padding: 12px 16px;
+  color: var(--edm-ink-800);
+  font-weight: 750;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.query-export-summary::-webkit-details-marker {
+  display: none;
+}
+
+.query-export-summary::before {
+  content: "›";
+  flex: 0 0 auto;
+  color: var(--edm-ink-500);
+  font-size: 20px;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform 140ms ease;
+}
+
+.query-export-summary span {
+  min-width: 0;
+}
+
+.query-export-summary small {
+  margin-left: auto;
+  color: var(--edm-ink-500);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.query-export-panel[open] > .query-export-summary {
+  border-bottom: 1px solid var(--edm-border);
+}
+
+.query-export-panel[open] > .query-export-summary::before {
+  transform: rotate(90deg);
 }
 
 .query-export-grid {
@@ -475,6 +523,7 @@
   gap: 12px;
   align-items: end;
   min-width: 0;
+  padding: 14px 16px 16px;
 }
 
 .query-export-path-filter input {

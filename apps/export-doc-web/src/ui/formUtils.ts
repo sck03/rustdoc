@@ -26,7 +26,7 @@ export function readRouteSuccessMessage(state: unknown) {
   return null;
 }
 
-export function toDateInputValue(value?: string) {
+export function toDateInputValue(value?: string | null) {
   if (!value) {
     return "";
   }
@@ -69,7 +69,7 @@ export function numberInputValue(value?: number) {
   return Number.isFinite(value) ? String(value) : "0";
 }
 
-export function formatDate(value?: string) {
+export function formatDate(value?: string | null) {
   if (!value) {
     return "-";
   }
@@ -99,10 +99,10 @@ export function formatPlainNumber(value?: number) {
   });
 }
 
-export function normalizeText(value?: string) {
+export function normalizeText(value?: string | null) {
   return value?.trim() ?? "";
 }
 
-export function numberValue(value?: number) {
+export function numberValue(value?: number | null) {
   return Number.isFinite(value) ? Number(value) : 0;
 }

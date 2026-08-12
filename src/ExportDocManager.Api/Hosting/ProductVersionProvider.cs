@@ -11,7 +11,7 @@ namespace ExportDocManager.Api.Hosting
             get
             {
                 var assembly = typeof(ProductVersionProvider).Assembly;
-                string informationalVersion = assembly
+                string? informationalVersion = assembly
                     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
                     ?.InformationalVersion;
 

@@ -28,11 +28,11 @@ namespace ExportDocManager.Api.Tests
             var settings = new DatabaseConnectionSettings
             {
                 Provider = DatabaseConnectionSettings.PostgreSqlProvider,
-                PostgreSqlHost = builder.Host,
+                PostgreSqlHost = builder.Host ?? string.Empty,
                 PostgreSqlPort = builder.Port,
-                PostgreSqlDatabase = builder.Database,
-                PostgreSqlUsername = builder.Username,
-                PostgreSqlPassword = builder.Password
+                PostgreSqlDatabase = builder.Database ?? string.Empty,
+                PostgreSqlUsername = builder.Username ?? string.Empty,
+                PostgreSqlPassword = builder.Password ?? string.Empty
             };
             var options = new DbContextOptionsBuilder<AppDbContext>()
                 .UseNpgsql(DbHelper.BuildPostgreSqlConnectionString(settings))
@@ -215,11 +215,11 @@ namespace ExportDocManager.Api.Tests
             var settings = new DatabaseConnectionSettings
             {
                 Provider = DatabaseConnectionSettings.PostgreSqlProvider,
-                PostgreSqlHost = builder.Host,
+                PostgreSqlHost = builder.Host ?? string.Empty,
                 PostgreSqlPort = builder.Port,
-                PostgreSqlDatabase = builder.Database,
-                PostgreSqlUsername = builder.Username,
-                PostgreSqlPassword = builder.Password
+                PostgreSqlDatabase = builder.Database ?? string.Empty,
+                PostgreSqlUsername = builder.Username ?? string.Empty,
+                PostgreSqlPassword = builder.Password ?? string.Empty
             };
             var options = new DbContextOptionsBuilder<AppDbContext>()
                 .UseNpgsql(DbHelper.BuildPostgreSqlConnectionString(settings))

@@ -11,7 +11,7 @@ namespace ExportDocManager.Services.Infrastructure
         Task<QueryResultExportResult> ExportToExcelAsync(
             QueryPageQuery query,
             string filePath,
-            IProgress<OperationProgressUpdate> progress = null,
+            IProgress<OperationProgressUpdate>? progress = null,
             CancellationToken cancellationToken = default);
 
     }

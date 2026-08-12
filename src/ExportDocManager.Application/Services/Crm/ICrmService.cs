@@ -68,7 +68,7 @@ namespace ExportDocManager.Services.Crm
 
     public interface ICrmService
     {
-        Task<PagedResult<CrmCustomerRecord>> QueryCustomersAsync(string keyword, string status, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
+        Task<PagedResult<CrmCustomerRecord>> QueryCustomersAsync(string? keyword, string? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
         Task<CrmCustomerRecord> SaveCustomerAsync(CrmCustomerSaveRequest request, CancellationToken cancellationToken = default);
         Task<bool> DeleteCustomerAsync(int id, CancellationToken cancellationToken = default);
         Task<int> UpdateCustomerStatusAsync(IReadOnlyList<int> ids, string status, CancellationToken cancellationToken = default);
@@ -91,6 +91,6 @@ namespace ExportDocManager.Services.Crm
 
     public interface ICrmCustomerExportService
     {
-        Task<byte[]> ExportAsync(string keyword, string status, CancellationToken cancellationToken = default);
+        Task<byte[]> ExportAsync(string? keyword, string? status, CancellationToken cancellationToken = default);
     }
 }

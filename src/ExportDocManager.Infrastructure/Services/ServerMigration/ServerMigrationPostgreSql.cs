@@ -204,7 +204,7 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 version.CommandText =
                     "SELECT \"Version\" FROM \"__ExportDocManagerSchema\" WHERE \"Id\" = 1;";
-                object value;
+                object? value;
                 try
                 {
                     value = await version.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);

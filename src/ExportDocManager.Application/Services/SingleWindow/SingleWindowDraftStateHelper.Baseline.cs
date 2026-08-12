@@ -126,7 +126,7 @@ namespace ExportDocManager.Services.SingleWindow
                 JsonOptions);
         }
 
-        private static Dictionary<string, string> DeserializeBaselineMap(string baselineJson)
+        private static Dictionary<string, string> DeserializeBaselineMap(string? baselineJson)
         {
             if (string.IsNullOrWhiteSpace(baselineJson))
             {

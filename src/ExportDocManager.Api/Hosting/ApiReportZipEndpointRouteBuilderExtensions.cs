@@ -49,7 +49,11 @@ namespace ExportDocManager.Api.Hosting
                     withSeal,
                     destinationPath));
             })
-            .WithName("StartInvoiceReportPdfZipSaveToPathJob");
+            .WithName("StartInvoiceReportPdfZipSaveToPathJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/reports/invoices/pdf-zip/download", (
                 HttpContext context,
@@ -88,11 +92,14 @@ namespace ExportDocManager.Api.Hosting
                     request.WithSeal,
                     destinationPath));
             })
-            .WithName("StartInvoiceReportPdfZipDownloadJob");
+            .WithName("StartInvoiceReportPdfZipDownloadJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
         }
 
-        internal static IResult ValidateInvoiceReportZipRequest(
-            ApiInvoiceReportZipRequest request,
+        internal static IResult? ValidateInvoiceReportZipRequest(
+            ApiInvoiceReportZipRequest? request,
             out IReadOnlyList<int> invoiceIds,
             out ReportDocumentType reportType,
             out string destinationPath)

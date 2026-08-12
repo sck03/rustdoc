@@ -10,7 +10,7 @@ namespace ExportDocManager.Api.Hosting
             string kind,
             string title,
             string requestedBy,
-            User currentUser,
+            User? currentUser,
             DateTimeOffset now,
             string rejectionMessage,
             string retryOperation,

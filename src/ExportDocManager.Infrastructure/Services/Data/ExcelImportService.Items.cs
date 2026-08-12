@@ -57,8 +57,8 @@ namespace ExportDocManager.Services.Data
 
                     try
                     {
-                        string quantity = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.QuantityCol ?? settings.QuantityCol);
-                        string styleNo = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.StyleNoCol ?? settings.StyleNoCol);
+                        string quantity = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.QuantityCol ?? settings.QuantityCol);
+                        string styleNo = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.StyleNoCol ?? settings.StyleNoCol);
 
                         if (detectedLayout != null && !IsItemDataRow(worksheet, currentRow, detectedLayout.Columns))
                         {
@@ -76,39 +76,39 @@ namespace ExportDocManager.Services.Data
                         if (detectedLayout == null && string.IsNullOrEmpty(quantity) && string.IsNullOrEmpty(styleNo))
                             break;
 
-                        string unitPriceText = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.UnitPriceCol ?? settings.UnitPriceCol);
-                        string totalPriceText = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.TotalPriceCol ?? settings.TotalPriceCol);
+                        string unitPriceText = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.UnitPriceCol ?? settings.UnitPriceCol);
+                        string totalPriceText = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.TotalPriceCol ?? settings.TotalPriceCol);
                         var item = new Item
                         {
                             InvoiceId = invoice.Id,
-                            PoNumber = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.PoNumberCol ?? settings.PoNumberCol),
+                            PoNumber = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.PoNumberCol ?? settings.PoNumberCol),
                             StyleNo = styleNo,
-                            StyleName = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.StyleNameCol ?? settings.StyleNameCol),
-                            FabricComposition = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.FabricCompositionCol ?? settings.FabricCompositionCol),
-                            StyleNameCN = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.StyleNameCNCol ?? settings.StyleNameCNCol),
-                            Brand = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.BrandCol ?? settings.BrandCol),
-                            HSCode = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.HSCodeCol ?? settings.HSCodeCol),
-                            Origin = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.OriginCol ?? settings.OriginCol, "宁波其他"),
+                            StyleName = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.StyleNameCol ?? settings.StyleNameCol),
+                            FabricComposition = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.FabricCompositionCol ?? settings.FabricCompositionCol),
+                            StyleNameCN = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.StyleNameCNCol ?? settings.StyleNameCNCol),
+                            Brand = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.BrandCol ?? settings.BrandCol),
+                            HSCode = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.HSCodeCol ?? settings.HSCodeCol),
+                            Origin = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.OriginCol ?? settings.OriginCol, "宁波其他"),
                             Quantity = ParseExcelDecimal(quantity),
-                            UnitEN = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.UnitENCol ?? settings.UnitENCol, "PCS"),
-                            UnitCN = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.UnitCNCol ?? settings.UnitCNCol, "件"),
-                            Cartons = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.CartonsCol ?? settings.CartonsCol)),
-                            CtnUnitEN = GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.CtnUnitENCol ?? settings.CtnUnitENCol, "CTNS"),
-                            Length = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.LengthCol ?? settings.LengthCol)),
-                            Width = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.WidthCol ?? settings.WidthCol)),
-                            Height = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.HeightCol ?? settings.HeightCol)),
-                            Volume = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.VolumeCol ?? settings.VolumeCol)),
-                            GWPerCtn = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.GWPerCtnCol ?? settings.GWPerCtnCol)),
-                            GWTotal = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.GWTotalCol ?? settings.GWTotalCol)),
-                            NWPerCtn = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.NWPerCtnCol ?? settings.NWPerCtnCol)),
-                            NWTotal = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.NWTotalCol ?? settings.NWTotalCol)),
+                            UnitEN = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.UnitENCol ?? settings.UnitENCol, "PCS"),
+                            UnitCN = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.UnitCNCol ?? settings.UnitCNCol, "件"),
+                            Cartons = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.CartonsCol ?? settings.CartonsCol)),
+                            CtnUnitEN = GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.CtnUnitENCol ?? settings.CtnUnitENCol, "CTNS"),
+                            Length = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.LengthCol ?? settings.LengthCol)),
+                            Width = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.WidthCol ?? settings.WidthCol)),
+                            Height = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.HeightCol ?? settings.HeightCol)),
+                            Volume = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.VolumeCol ?? settings.VolumeCol)),
+                            GWPerCtn = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.GWPerCtnCol ?? settings.GWPerCtnCol)),
+                            GWTotal = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.GWTotalCol ?? settings.GWTotalCol)),
+                            NWPerCtn = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.NWPerCtnCol ?? settings.NWPerCtnCol)),
+                            NWTotal = ParseExcelDecimal(GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.NWTotalCol ?? settings.NWTotalCol)),
                             UnitPrice = ParseExcelDecimal(unitPriceText),
                             TotalPrice = ParseExcelDecimal(totalPriceText)
                         };
 
                         NormalizeItemDescriptionLanguages(item);
                         NormalizeItemDescriptionAndBrand(item);
-                        ApplyDimensionsFromSingleCell(item, GetItemCellValue(worksheet, currentRow, detectedLayout, detectedLayout?.Columns.DimensionCol ?? 0));
+                        ApplyDimensionsFromSingleCell(item, GetItemCellValue(worksheet, currentRow, detectedLayout?.Columns.DimensionCol ?? 0));
                         NormalizeImportedItemMeasurements(item);
                         NormalizeImportedItemPrice(
                             item,
@@ -194,7 +194,7 @@ namespace ExportDocManager.Services.Data
                 return;
             }
 
-            string descriptionSource = !string.IsNullOrWhiteSpace(item.StyleNameCN)
+            string? descriptionSource = !string.IsNullOrWhiteSpace(item.StyleNameCN)
                 ? item.StyleNameCN
                 : item.Brand;
             if (string.IsNullOrWhiteSpace(descriptionSource))
@@ -242,10 +242,10 @@ namespace ExportDocManager.Services.Data
             (item.StyleName, item.StyleNameCN) = (item.StyleNameCN, item.StyleName);
         }
 
-        private static bool ContainsCjkText(string value) =>
+        private static bool ContainsCjkText(string? value) =>
             (value ?? string.Empty).Any(character => character is >= '\u3400' and <= '\u9fff');
 
-        private static bool ContainsLatinText(string value) =>
+        private static bool ContainsLatinText(string? value) =>
             (value ?? string.Empty).Any(character => character is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z'));
     }
 }

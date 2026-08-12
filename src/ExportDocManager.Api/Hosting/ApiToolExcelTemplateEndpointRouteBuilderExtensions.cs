@@ -38,7 +38,11 @@ namespace ExportDocManager.Api.Hosting
 
                 return AcceptedBackgroundJob(EnqueueExcelTemplateExportJob(jobRunner, user.Username, destinationPath));
             })
-            .WithName("StartExcelTemplateSaveToPathJob");
+            .WithName("StartExcelTemplateSaveToPathJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/tools/excel/template/download", (
                 HttpContext context,
@@ -61,7 +65,9 @@ namespace ExportDocManager.Api.Hosting
                     user.Username,
                     destinationPath));
             })
-            .WithName("StartExcelTemplateDownloadJob");
+            .WithName("StartExcelTemplateDownloadJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status401Unauthorized);
         }
 
         internal static BackgroundJobSnapshot EnqueueExcelTemplateExportJob(

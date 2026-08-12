@@ -132,7 +132,7 @@ namespace ExportDocManager.Services.MasterData
             }
         }
 
-        public async Task<PagedResult<HsCode>> GetPagedLocalAsync(int pageNumber, int pageSize, string keyword = null)
+        public async Task<PagedResult<HsCode>> GetPagedLocalAsync(int pageNumber, int pageSize, string? keyword = null)
         {
             return await GetReadRepository().QueryPageAsync(new HsCodeReadQuery
             {

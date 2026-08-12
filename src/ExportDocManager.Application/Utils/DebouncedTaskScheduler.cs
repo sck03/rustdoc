@@ -6,7 +6,7 @@ namespace ExportDocManager.Utils
     {
         private readonly TimeSpan _delay;
         private readonly Lock _syncRoot = new();
-        private CancellationTokenSource _pendingSource = new();
+        private CancellationTokenSource? _pendingSource = new();
         private bool _disposed;
 
         public DebouncedTaskScheduler(TimeSpan delay)
@@ -18,7 +18,7 @@ namespace ExportDocManager.Utils
         {
             ArgumentNullException.ThrowIfNull(action);
 
-            CancellationTokenSource previousSource;
+            CancellationTokenSource? previousSource;
             Task scheduledTask;
 
             lock (_syncRoot)
@@ -39,7 +39,7 @@ namespace ExportDocManager.Utils
 
         public void CancelPending()
         {
-            CancellationTokenSource pendingSource;
+            CancellationTokenSource? pendingSource;
 
             lock (_syncRoot)
             {
@@ -57,7 +57,7 @@ namespace ExportDocManager.Utils
 
         public void Dispose()
         {
-            CancellationTokenSource pendingSource;
+            CancellationTokenSource? pendingSource;
 
             lock (_syncRoot)
             {
@@ -86,7 +86,7 @@ namespace ExportDocManager.Utils
             }
         }
 
-        private static void CancelAndDispose(CancellationTokenSource source)
+        private static void CancelAndDispose(CancellationTokenSource? source)
         {
             if (source == null)
             {

@@ -7,7 +7,7 @@ namespace ExportDocManager.Services.Infrastructure
         Task<DatabaseInitializationResult> InitializeAsync(
             string username,
             string password,
-            string bootstrapToken = null);
+            string? bootstrapToken = null);
     }
 
     public sealed class DatabaseInitializationResult

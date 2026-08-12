@@ -1,5 +1,6 @@
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Errors;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -7,7 +8,10 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapPermissionTemplateEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/permission-templates", async (
+            endpoints.MapGet("/api/permission-templates", async Task<Results<
+                Ok<ApiPermissionTemplateCatalogResponse>,
+                UnauthorizedHttpResult,
+                JsonHttpResult<ApiErrorResponse>>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -15,23 +19,81 @@ namespace ExportDocManager.Api.Hosting
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null) return Results.Unauthorized();
+                if (user is null)
+                {
+                    return TypedResults.Unauthorized();
+                }
+
                 if (!authorizationService.CanManageUsers(user))
-                    return WriteForbidden("只有全功能版管理员可以管理权限模板。");
+                {
+                    return TypedForbidden("只有全功能版管理员可以管理权限模板。");
+                }
 
                 var templates = await service.ListAsync(cancellationToken);
-                return Results.Ok(new ApiPermissionTemplateCatalogResponse(
+                return TypedResults.Ok(new ApiPermissionTemplateCatalogResponse(
                     PermissionModuleCatalog.Modules.Select(ToApiDto).ToArray(),
                     templates.Select(ToApiDto).ToArray(),
                     PermissionAccessLevel.Levels,
                     "模板修改后，已登录账号需要重新登录；服务端按产品版本、模板和数据归属计算最终权限。"));
-            }).WithName("ListPermissionTemplates");
+            })
+            .WithName("ListPermissionTemplates")
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
-            endpoints.MapPost("/api/permission-templates", SaveTemplateAsync)
-                .WithName("CreatePermissionTemplate");
-            endpoints.MapPut("/api/permission-templates/{id:int}", SaveTemplateAsync)
-                .WithName("UpdatePermissionTemplate");
-            endpoints.MapDelete("/api/permission-templates/{id:int}", async (
+            endpoints.MapPost("/api/permission-templates", async Task<Results<
+                Ok<ApiPermissionTemplateDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                JsonHttpResult<ApiErrorResponse>,
+                NotFound<ApiErrorResponse>,
+                Conflict<ApiErrorResponse>>>(
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                ApiAuthorizationService authorizationService,
+                IPermissionTemplateService service,
+                ApiPermissionTemplateSaveRequest request,
+                CancellationToken cancellationToken) =>
+                await SavePermissionTemplateAsync(
+                    context,
+                    tokenService,
+                    authorizationService,
+                    service,
+                    request,
+                    null,
+                    cancellationToken))
+            .WithName("CreatePermissionTemplate")
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
+
+            endpoints.MapPut("/api/permission-templates/{id:int}", async Task<Results<
+                Ok<ApiPermissionTemplateDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                JsonHttpResult<ApiErrorResponse>,
+                NotFound<ApiErrorResponse>,
+                Conflict<ApiErrorResponse>>>(
+                HttpContext context,
+                IApiSessionTokenService tokenService,
+                ApiAuthorizationService authorizationService,
+                IPermissionTemplateService service,
+                int id,
+                ApiPermissionTemplateSaveRequest request,
+                CancellationToken cancellationToken) =>
+                await SavePermissionTemplateAsync(
+                    context,
+                    tokenService,
+                    authorizationService,
+                    service,
+                    request,
+                    id,
+                    cancellationToken))
+            .WithName("UpdatePermissionTemplate")
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
+
+            endpoints.MapDelete("/api/permission-templates/{id:int}", async Task<Results<
+                Ok<ApiCommandResponse>,
+                UnauthorizedHttpResult,
+                JsonHttpResult<ApiErrorResponse>,
+                NotFound<ApiErrorResponse>,
+                Conflict<ApiErrorResponse>>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -40,36 +102,63 @@ namespace ExportDocManager.Api.Hosting
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null) return Results.Unauthorized();
+                if (user is null)
+                {
+                    return TypedResults.Unauthorized();
+                }
+
                 if (!authorizationService.CanManageUsers(user))
-                    return WriteForbidden("只有全功能版管理员可以管理权限模板。");
+                {
+                    return TypedForbidden("只有全功能版管理员可以管理权限模板。");
+                }
+
                 try
                 {
-                    return await service.DeleteAsync(id, cancellationToken)
-                        ? Results.Ok(new ApiCommandResponse(true, "权限模板已删除。"))
-                        : Results.NotFound(new ApiErrorResponse("未找到权限模板。"));
+                    bool deleted = await service.DeleteAsync(id, cancellationToken);
+                    return deleted
+                        ? TypedResults.Ok(new ApiCommandResponse(true, "权限模板已删除。"))
+                        : TypedResults.NotFound(new ApiErrorResponse("未找到权限模板。"));
                 }
-                catch (ServiceException ex)
+                catch (ResourceConflictException ex)
                 {
-                    return WriteServiceException(ex);
+                    return TypedResults.Conflict(new ApiErrorResponse(ex.Message));
                 }
-            }).WithName("DeletePermissionTemplate");
+            })
+            .WithName("DeletePermissionTemplate")
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
         }
 
-        private static async Task<IResult> SaveTemplateAsync(
+        private static async Task<Results<
+            Ok<ApiPermissionTemplateDto>,
+            BadRequest<ApiErrorResponse>,
+            UnauthorizedHttpResult,
+            JsonHttpResult<ApiErrorResponse>,
+            NotFound<ApiErrorResponse>,
+            Conflict<ApiErrorResponse>>> SavePermissionTemplateAsync(
             HttpContext context,
             IApiSessionTokenService tokenService,
             ApiAuthorizationService authorizationService,
             IPermissionTemplateService service,
             ApiPermissionTemplateSaveRequest request,
-            CancellationToken cancellationToken,
-            int? id = null)
+            int? id,
+            CancellationToken cancellationToken)
         {
             var user = ApiEndpointAuth.RequireUser(context, tokenService);
-            if (user == null) return Results.Unauthorized();
+            if (user is null)
+            {
+                return TypedResults.Unauthorized();
+            }
+
             if (!authorizationService.CanManageUsers(user))
-                return WriteForbidden("只有全功能版管理员可以管理权限模板。");
-            if (request == null) return Results.BadRequest(new ApiErrorResponse("权限模板请求不能为空。"));
+            {
+                return TypedForbidden("只有全功能版管理员可以管理权限模板。");
+            }
+
+            if (request is null)
+            {
+                return TypedResults.BadRequest(new ApiErrorResponse("权限模板请求不能为空。"));
+            }
+
             try
             {
                 var saved = await service.SaveAsync(
@@ -82,11 +171,23 @@ namespace ExportDocManager.Api.Hosting
                         (request.Modules ?? []).Select(module =>
                             new PermissionTemplateModuleRecord(module.ModuleKey, module.AccessLevel)).ToArray()),
                     cancellationToken);
-                return Results.Ok(ToApiDto(saved));
+                return TypedResults.Ok(ToApiDto(saved));
             }
-            catch (ServiceException ex)
+            catch (ServiceValidationException ex)
             {
-                return WriteServiceException(ex);
+                return TypedResults.BadRequest(new ApiErrorResponse(ex.Message));
+            }
+            catch (PermissionDeniedException ex)
+            {
+                return TypedForbidden(ex.Message);
+            }
+            catch (ResourceNotFoundException ex)
+            {
+                return TypedResults.NotFound(new ApiErrorResponse(ex.Message));
+            }
+            catch (ResourceConflictException ex)
+            {
+                return TypedResults.Conflict(new ApiErrorResponse(ex.Message));
             }
         }
 

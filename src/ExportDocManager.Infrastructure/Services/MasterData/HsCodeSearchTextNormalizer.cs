@@ -19,7 +19,7 @@ internal static class HsCodeSearchTextNormalizer
         ("钩编", "针织")
     ];
 
-    public static string Normalize(string value)
+    public static string Normalize(string? value)
     {
         string normalized = (value ?? string.Empty).Normalize(NormalizationForm.FormKC).Trim().ToUpperInvariant();
         if (normalized.Length == 0) return string.Empty;

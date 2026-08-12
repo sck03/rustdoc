@@ -608,7 +608,7 @@ namespace ExportDocManager.Infrastructure.Tests
             string appRoot = CreateTempDirectory("report-pdf-app");
             string dataRoot = CreateTempDirectory("report-pdf-data");
             string destinationPath = Path.Combine(dataRoot, "Exports", "invoice.pdf");
-            string originalRendererPath = Environment.GetEnvironmentVariable(ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable);
+            string? originalRendererPath = Environment.GetEnvironmentVariable(ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable);
 
             try
             {
@@ -836,7 +836,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             string appRoot = CreateTempDirectory("report-pdf-app");
             string dataRoot = CreateTempDirectory("report-pdf-data");
-            string originalRendererPath = Environment.GetEnvironmentVariable(ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable);
+            string? originalRendererPath = Environment.GetEnvironmentVariable(ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable);
 
             try
             {
@@ -897,7 +897,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             string appRoot = CreateTempDirectory("browser-manifest-app");
             string dataRoot = CreateTempDirectory("browser-manifest-data");
-            string originalRendererPath = Environment.GetEnvironmentVariable(
+            string? originalRendererPath = Environment.GetEnvironmentVariable(
                 ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable);
 
             try
@@ -1413,7 +1413,7 @@ namespace ExportDocManager.Infrastructure.Tests
             var mediaBoxMatch = Regex.Match(content, @"/MediaBox\s*\[\s*([^\]]+?)\s*\]");
             Assert.True(mediaBoxMatch.Success, $"{pdfPath}: missing MediaBox.");
             double[] mediaBox = mediaBoxMatch.Groups[1].Value
-                .Split((char[])null, StringSplitOptions.RemoveEmptyEntries)
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
                 .Select(part => double.Parse(part, System.Globalization.CultureInfo.InvariantCulture))
                 .ToArray();
             Assert.True(mediaBox.Length >= 4, $"{pdfPath}: invalid MediaBox.");
@@ -1444,7 +1444,7 @@ namespace ExportDocManager.Infrastructure.Tests
             int ExpectedPages,
             string ExpectedOrientation,
             int MinBytes,
-            string ExpectedTemplatePageOrientation = null);
+            string? ExpectedTemplatePageOrientation = null);
 
         private sealed record SameInvoiceNumberSeed(
             int ActualInvoiceId,

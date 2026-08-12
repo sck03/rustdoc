@@ -1,6 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -26,7 +28,10 @@ namespace ExportDocManager.Api.Hosting
 
         private static void MapCustomOptionEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/custom-options/{optionType}", async (
+            endpoints.MapGet("/api/custom-options/{optionType}", async Task<Results<
+                Ok<ApiCustomOptionListResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 string optionType,
                 IApiSessionTokenService tokenService,
@@ -35,22 +40,25 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (!TryGetCustomOptionDefinition(optionType, out var definition, out var error))
                 {
-                    return Results.BadRequest(new ApiErrorResponse(error));
+                    return TypedResults.BadRequest(new ApiErrorResponse(error));
                 }
 
-                return Results.Ok(await BuildCustomOptionResponseAsync(
+                return TypedResults.Ok(await BuildCustomOptionResponseAsync(
                     definition,
                     customOptionService,
                     cancellationToken));
             })
             .WithName("ListCustomOptions");
 
-            endpoints.MapPost("/api/custom-options/{optionType}", async (
+            endpoints.MapPost("/api/custom-options/{optionType}", async Task<Results<
+                Ok<ApiCustomOptionListResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 string optionType,
                 ApiCustomOptionSaveRequest request,
@@ -60,27 +68,27 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (!TryGetCustomOptionDefinition(optionType, out var definition, out var error))
                 {
-                    return Results.BadRequest(new ApiErrorResponse(error));
+                    return TypedResults.BadRequest(new ApiErrorResponse(error));
                 }
 
                 if (!definition.AllowCustomValues)
                 {
-                    return Results.BadRequest(new ApiErrorResponse($"{definition.OptionType} 使用固定内置候选值，不允许保存自定义选项。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse($"{definition.OptionType} 使用固定内置候选值，不允许保存自定义选项。"));
                 }
 
                 string value = TextSearchHelper.NormalizeValue(request?.Value);
                 if (string.IsNullOrWhiteSpace(value))
                 {
-                    return Results.BadRequest(new ApiErrorResponse("自定义选项不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("自定义选项不能为空。"));
                 }
 
                 await customOptionService.SaveOptionAsync(definition.OptionType, value, cancellationToken);
-                return Results.Ok(await BuildCustomOptionResponseAsync(
+                return TypedResults.Ok(await BuildCustomOptionResponseAsync(
                     definition,
                     customOptionService,
                     cancellationToken));
@@ -90,7 +98,7 @@ namespace ExportDocManager.Api.Hosting
 
         private static bool TryGetCustomOptionDefinition(
             string optionType,
-            out CustomOptionDefinition definition,
+            [NotNullWhen(true)] out CustomOptionDefinition? definition,
             out string error)
         {
             string normalizedType = TextSearchHelper.NormalizeValue(optionType);

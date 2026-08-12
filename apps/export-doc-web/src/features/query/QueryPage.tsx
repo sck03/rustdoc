@@ -337,13 +337,11 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
         </div>
       </form>
 
-      {queryPermission.canOperate ? <section className="form-section query-export-panel" aria-label="查询结果导出">
-        <div className="section-header">
-          <div>
-            <h2>导出</h2>
-            <span>{page ? `${page.totalCount} 条当前结果` : "等待查询"}</span>
-          </div>
-        </div>
+      {queryPermission.canOperate ? <details className="form-section query-export-panel" aria-label="查询结果导出">
+        <summary className="query-export-summary">
+          <span>导出查询结果</span>
+          <small>{page ? `${page.totalCount} 条当前结果` : "等待查询"}</small>
+        </summary>
         <div className="query-export-grid">
           {isDesktop ? <label className="inline-filter query-export-path-filter">
             <span>输出路径</span>
@@ -366,7 +364,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
             </button>
           </div>
         </div>
-      </section> : null}
+      </details> : null}
 
       {message ? <InlineNotice tone="error" title="查询未完成">{message}</InlineNotice> : null}
       {selectedCustomerQuery.isError ? <InlineNotice tone="warning" title="当前客户资料未加载">{readApiError(selectedCustomerQuery.error)}</InlineNotice> : null}

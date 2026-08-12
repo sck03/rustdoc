@@ -83,7 +83,7 @@ namespace ExportDocManager.Services.Infrastructure
             string sql = usesPostgreSql
                 ? "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'"
                 : "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'";
-            object value = await ExecuteScalarAsync(context, sql).ConfigureAwait(false);
+            object? value = await ExecuteScalarAsync(context, sql).ConfigureAwait(false);
             return Convert.ToInt32(value ?? 0);
         }
 
@@ -99,7 +99,7 @@ namespace ExportDocManager.Services.Infrastructure
                 return null;
             }
 
-            object version = await ExecuteScalarAsync(
+            object? version = await ExecuteScalarAsync(
                 context,
                 $"SELECT \"Version\" FROM \"{MetadataTableName}\" WHERE \"Id\" = 1").ConfigureAwait(false);
             return version == null || version == DBNull.Value ? null : Convert.ToInt32(version);
@@ -129,7 +129,7 @@ namespace ExportDocManager.Services.Infrastructure
             await context.Database.ExecuteSqlRawAsync(sql).ConfigureAwait(false);
         }
 
-        private static async Task<object> ExecuteScalarAsync(AppDbContext context, string commandText)
+        private static async Task<object?> ExecuteScalarAsync(AppDbContext context, string commandText)
         {
             DbConnection connection = context.Database.GetDbConnection();
             bool shouldClose = connection.State != ConnectionState.Open;

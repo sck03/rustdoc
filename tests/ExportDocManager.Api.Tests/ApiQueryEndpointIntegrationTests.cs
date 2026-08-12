@@ -167,7 +167,7 @@ namespace ExportDocManager.Api.Tests
 
         private static async Task<BackgroundJobSnapshot> WaitForTerminalJobAsync(HttpClient client, string jobId)
         {
-            BackgroundJobSnapshot lastJob = null;
+            BackgroundJobSnapshot? lastJob = null;
             for (int attempt = 0; attempt < 100; attempt++)
             {
                 var response = await client.GetAsync($"/api/jobs/{jobId}");

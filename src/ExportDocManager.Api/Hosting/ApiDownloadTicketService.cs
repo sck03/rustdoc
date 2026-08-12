@@ -98,7 +98,7 @@ namespace ExportDocManager.Api.Hosting
             }
 
             string normalizedToken = token.Trim();
-            if (!_tickets.TryGetValue(normalizedToken, out TicketState ticket))
+            if (!_tickets.TryGetValue(normalizedToken, out TicketState? ticket))
             {
                 return false;
             }
@@ -117,7 +117,7 @@ namespace ExportDocManager.Api.Hosting
                 return true;
             }
 
-            if (!context.Request.Cookies.TryGetValue(DownloadSessionCookieName, out string sessionBinding) ||
+            if (!context.Request.Cookies.TryGetValue(DownloadSessionCookieName, out string? sessionBinding) ||
                 !IsValidSessionBinding(sessionBinding))
             {
                 return false;
@@ -138,7 +138,7 @@ namespace ExportDocManager.Api.Hosting
             ArgumentNullException.ThrowIfNull(context);
             string sessionBinding = context.Request.Cookies.TryGetValue(
                 DownloadSessionCookieName,
-                out string existing)
+                out string? existing)
                 ? existing
                 : string.Empty;
             byte[] sessionHash = IsValidSessionBinding(sessionBinding)
@@ -186,7 +186,7 @@ namespace ExportDocManager.Api.Hosting
 
         private string GetOrCreateDownloadSession(HttpContext context)
         {
-            if (context.Request.Cookies.TryGetValue(DownloadSessionCookieName, out string existing) &&
+            if (context.Request.Cookies.TryGetValue(DownloadSessionCookieName, out string? existing) &&
                 IsValidSessionBinding(existing))
             {
                 return existing;
@@ -211,7 +211,7 @@ namespace ExportDocManager.Api.Hosting
             return binding;
         }
 
-        private static bool IsValidSessionBinding(string value) =>
+        private static bool IsValidSessionBinding(string? value) =>
             !string.IsNullOrWhiteSpace(value) &&
             value.Length == 43 &&
             value.All(character =>

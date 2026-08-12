@@ -56,7 +56,7 @@ export function TextField({
   onChange,
 }: {
   label: string;
-  value?: string;
+  value?: string | null;
   required?: boolean;
   disabled?: boolean;
   className?: string;
@@ -202,7 +202,7 @@ export function DateField({
   onChange,
 }: {
   label: string;
-  value?: string;
+  value?: string | null;
   required?: boolean;
   disabled?: boolean;
   className?: string;

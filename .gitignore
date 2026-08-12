@@ -11,6 +11,8 @@ __cuscustoms_*
 **/bin/
 **/obj/
 **/node_modules/
+/.pnpm-store/
+/apps/export-doc-web/pnpm-workspace.yaml
 **/.vite/
 **/dist/
 **/target/

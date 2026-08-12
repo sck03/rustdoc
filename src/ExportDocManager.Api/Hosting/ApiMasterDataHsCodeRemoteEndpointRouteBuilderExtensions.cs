@@ -21,7 +21,9 @@ namespace ExportDocManager.Api.Hosting
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
                 var health = await hsCodeService.GetRemoteSourceHealthAsync(cancellationToken);
                 return Results.Ok(new ApiHsCodeRemoteHealthResponse(health.Source, health.Available, health.CheckedAt, health.Message));
-            }).WithName("GetHsCodeRemoteHealth");
+            }).WithName("GetHsCodeRemoteHealth")
+            .Produces<ApiHsCodeRemoteHealthResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapGet("/api/master-data/hs-codes/search-remote", async (
                 HttpContext context,
@@ -66,7 +68,11 @@ namespace ExportDocManager.Api.Hosting
                     throw;
                 }
             })
-            .WithName("SearchRemoteHsCodes");
+            .WithName("SearchRemoteHsCodes")
+            .Produces<ApiHsCodeSearchResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/master-data/hs-codes/search-remote/capture", async (
                 HttpContext context,
@@ -114,7 +120,11 @@ namespace ExportDocManager.Api.Hosting
                     throw;
                 }
             })
-            .WithName("CaptureRemoteHsCodes");
+            .WithName("CaptureRemoteHsCodes")
+            .Produces<ApiHsCodeSearchResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/master-data/hs-codes/fetch-remote-detail", async (
                 HttpContext context,
@@ -158,7 +168,11 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("FetchRemoteHsCodeDetail");
+            .WithName("FetchRemoteHsCodeDetail")
+            .Produces<ApiHsCodeDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/master-data/hs-codes/resolve-remote-detail", async (
                 HttpContext context,
@@ -201,7 +215,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("ResolveRemoteHsCodeDetail");
+            .WithName("ResolveRemoteHsCodeDetail")
+            .Produces<ApiHsCodeRemoteDetailResolutionResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
         }
     }
 }

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Diagnostics.CodeAnalysis;
 using ExportDocManager.Services.Infrastructure;
 
 namespace ExportDocManager.Services.Security
@@ -71,7 +72,7 @@ namespace ExportDocManager.Services.Security
             }
         }
 
-        public string Unprotect(string protectedText)
+        public string? Unprotect(string protectedText)
         {
             if (string.IsNullOrEmpty(protectedText))
             {
@@ -123,9 +124,11 @@ namespace ExportDocManager.Services.Security
             !string.IsNullOrEmpty(value) && value.StartsWith(PayloadPrefix, StringComparison.Ordinal);
 
         internal string UnprotectSettingsValue(string value) =>
-            IsProtectedPayload(value) ? Unprotect(value) : value;
+            IsProtectedPayload(value)
+                ? Unprotect(value) ?? throw new InvalidDataException("本地主密钥载荷内容无效。")
+                : value;
 
-        public bool TryUnprotect(string value, out string plainText)
+        public bool TryUnprotect(string value, [NotNullWhen(true)] out string? plainText)
         {
             if (!IsProtectedPayload(value))
             {
@@ -136,7 +139,7 @@ namespace ExportDocManager.Services.Security
             try
             {
                 plainText = Unprotect(value);
-                return true;
+                return plainText != null;
             }
             catch (InvalidDataException)
             {

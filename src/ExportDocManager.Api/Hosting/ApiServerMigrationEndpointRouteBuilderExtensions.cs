@@ -7,6 +7,7 @@ using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -31,11 +32,11 @@ namespace ExportDocManager.Api.Hosting
                 IServerMigrationService migrationService,
                 ApiDesktopAccessOptions desktopAccessOptions) =>
             {
-                User user = ApiEndpointAuth.RequireUser(context, tokenService);
+                User? user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null) return Results.Unauthorized();
                 if (!authorizationService.CanManageDisasterRecovery(user))
                     return WriteForbidden("当前账号没有灾难恢复管理权限。");
-                IResult transportError = RequireSecureDisasterRecoveryTransport(context);
+                IResult? transportError = RequireSecureDisasterRecoveryTransport(context);
                 if (transportError != null) return transportError;
                 ServerMigrationStatus status = migrationService.GetStatus();
                 return Results.Ok(new ApiServerMigrationStatusResponse(
@@ -52,7 +53,10 @@ namespace ExportDocManager.Api.Hosting
                     status.RestoreDetail,
                     status.RestoreUpdatedAtUtc));
             })
-            .WithName("GetServerMigrationStatus");
+            .WithName("GetServerMigrationStatus")
+            .Produces<ApiServerMigrationStatusResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/server-migration/authorization", async (
                 HttpContext context,
@@ -64,16 +68,16 @@ namespace ExportDocManager.Api.Hosting
                 IAppPathProvider pathProvider,
                 ApiSensitiveOperationAuthorizationRequest request) =>
             {
-                User user = ApiEndpointAuth.RequireUser(context, tokenService);
+                User? user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null) return Results.Unauthorized();
                 if (!authorizationService.CanManageDisasterRecovery(user))
                     return WriteForbidden("当前账号没有灾难恢复管理权限。");
-                IResult transportError = RequireSecureDisasterRecoveryTransport(context);
+                IResult? transportError = RequireSecureDisasterRecoveryTransport(context);
                 if (transportError != null) return transportError;
                 string action = request?.Action?.Trim() ?? string.Empty;
                 if (!ApiSensitiveOperationAction.IsKnown(action))
                     return Results.BadRequest(new ApiErrorResponse("敏感操作类型无效。"));
-                IResult reauthenticationError = await ReauthenticateAsync(
+                IResult? reauthenticationError = await ReauthenticateAsync(
                     context,
                     user,
                     request?.AdminPassword,
@@ -104,7 +108,12 @@ namespace ExportDocManager.Api.Hosting
                     ticket.Token,
                     ticket.ExpiresAtUtc));
             })
-            .WithName("AuthorizeServerMigrationOperation");
+            .WithName("AuthorizeServerMigrationOperation")
+            .Produces<ApiSensitiveOperationAuthorizationResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status429TooManyRequests);
 
             endpoints.MapPost("/api/postgresql-maintenance/backups/download-ticket", (
                 HttpContext context,
@@ -113,16 +122,16 @@ namespace ExportDocManager.Api.Hosting
                 ISharedDatabaseMaintenanceService maintenanceService,
                 IAppPathProvider pathProvider,
                 ApiDownloadTicketService ticketService,
-                ApiDesktopAccessOptions desktopAccessOptions) =>
+                ApiDesktopAccessOptions desktopAccessOptions,
+                string? fileName) =>
             {
-                User user = ApiEndpointAuth.RequireUser(context, tokenService);
+                User? user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null) return Results.Unauthorized();
                 if (!authorizationService.CanManageDisasterRecovery(user))
                     return WriteForbidden("当前账号没有灾难恢复管理权限。");
-                IResult transportError = RequireSecureDisasterRecoveryTransport(context);
+                IResult? transportError = RequireSecureDisasterRecoveryTransport(context);
                 if (transportError != null) return transportError;
-                string fileName = context.Request.Query["fileName"].ToString();
-                SharedDatabaseBackupItem backup = maintenanceService.ListPostgreSqlPhysicalBackups()
+                SharedDatabaseBackupItem? backup = maintenanceService.ListPostgreSqlPhysicalBackups()
                     .FirstOrDefault(item => string.Equals(
                         item.FileName,
                         fileName,
@@ -139,7 +148,12 @@ namespace ExportDocManager.Api.Hosting
                         "/downloads/postgresql-backups",
                         requireSessionBinding: !ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions)));
             })
-            .WithName("CreatePostgreSqlPhysicalBackupDownloadTicket");
+            .WithName("CreatePostgreSqlPhysicalBackupDownloadTicket")
+            .Produces<ApiDownloadTicket>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status426UpgradeRequired);
 
             endpoints.MapGet("/downloads/postgresql-backups/{token}", (
                 HttpContext context,
@@ -148,7 +162,7 @@ namespace ExportDocManager.Api.Hosting
                 IAppPathProvider pathProvider,
                 string token) =>
             {
-                IResult transportError = RequireSecureDisasterRecoveryTransport(context);
+                IResult? transportError = RequireSecureDisasterRecoveryTransport(context);
                 if (transportError != null) return transportError;
                 if (!ticketService.TryResolve(
                     context,
@@ -159,7 +173,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                SharedDatabaseBackupItem backup = maintenanceService.ListPostgreSqlPhysicalBackups()
+                SharedDatabaseBackupItem? backup = maintenanceService.ListPostgreSqlPhysicalBackups()
                     .FirstOrDefault(item => string.Equals(
                         item.FileName,
                         fileName,
@@ -174,7 +188,10 @@ namespace ExportDocManager.Api.Hosting
                         backup.FileName,
                         enableRangeProcessing: true);
             })
-            .WithName("DownloadPostgreSqlPhysicalBackupWithTicket");
+            .WithName("DownloadPostgreSqlPhysicalBackupWithTicket")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status426UpgradeRequired);
 
             endpoints.MapPost("/api/postgresql-maintenance/backups/restore", async (
                 HttpContext context,
@@ -189,11 +206,11 @@ namespace ExportDocManager.Api.Hosting
                 ApiPostgreSqlDatabaseRestoreRequest request,
                 CancellationToken cancellationToken) =>
             {
-                User user = ApiEndpointAuth.RequireUser(context, tokenService);
+                User? user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null) return Results.Unauthorized();
                 if (!authorizationService.CanManageDisasterRecovery(user))
                     return WriteForbidden("当前账号没有灾难恢复管理权限。");
-                IResult transportError = RequireSecureDisasterRecoveryTransport(context);
+                IResult? transportError = RequireSecureDisasterRecoveryTransport(context);
                 if (transportError != null) return transportError;
                 if (request == null || !string.Equals(
                     request.ConfirmationText?.Trim(),
@@ -203,14 +220,14 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse(
                         "恢复数据库前需要输入确认文本 RESTORE DATABASE。"));
                 }
-                IResult reauthenticationError = await ReauthenticateAsync(
+                IResult? reauthenticationError = await ReauthenticateAsync(
                     context,
                     user,
                     request.AdminPassword,
                     userService,
                     loginAttempts).ConfigureAwait(false);
                 if (reauthenticationError != null) return reauthenticationError;
-                SharedDatabaseBackupItem backup = maintenanceService.ListPostgreSqlPhysicalBackups()
+                SharedDatabaseBackupItem? backup = maintenanceService.ListPostgreSqlPhysicalBackups()
                     .FirstOrDefault(item => string.Equals(
                         item.FileName,
                         request.BackupFileName,
@@ -243,7 +260,14 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("RestorePostgreSqlPhysicalBackup");
+            .WithName("RestorePostgreSqlPhysicalBackup")
+            .Produces<ApiServerMigrationRestoreResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/postgresql-maintenance/backups/upload-restore", async (
                 HttpContext context,
@@ -253,16 +277,19 @@ namespace ExportDocManager.Api.Hosting
                 IServerMigrationService migrationService,
                 IHostApplicationLifetime applicationLifetime,
                 ApiDesktopAccessOptions desktopAccessOptions,
+                [FromHeader(Name = RestoreConfirmationHeader)] string restoreConfirmation,
+                [FromHeader(Name = SensitiveOperationTicketHeader)] string sensitiveOperationTicket,
+                [FromHeader(Name = PostgreSqlBackupFileNameHeader)] string postgreSqlBackupFileName,
                 CancellationToken cancellationToken) =>
             {
-                User user = ApiEndpointAuth.RequireUser(context, tokenService);
+                User? user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null) return Results.Unauthorized();
                 if (!authorizationService.CanManageDisasterRecovery(user))
                     return WriteForbidden("当前账号没有灾难恢复管理权限。");
-                IResult transportError = RequireSecureDisasterRecoveryTransport(context);
+                IResult? transportError = RequireSecureDisasterRecoveryTransport(context);
                 if (transportError != null) return transportError;
                 if (!string.Equals(
-                    context.Request.Headers[RestoreConfirmationHeader].ToString().Trim(),
+                    restoreConfirmation?.Trim(),
                     "RESTORE DATABASE",
                     StringComparison.Ordinal))
                 {
@@ -270,14 +297,14 @@ namespace ExportDocManager.Api.Hosting
                         "恢复数据库前需要输入确认文本 RESTORE DATABASE。"));
                 }
                 if (!ticketService.Consume(
-                    context.Request.Headers[SensitiveOperationTicketHeader].ToString(),
+                    sensitiveOperationTicket,
                     user.Id,
                     ApiSensitiveOperationAction.RestoreDatabase))
                 {
                     return Results.Unauthorized();
                 }
                 ConfigureLargeUpload(context);
-                string fileName = context.Request.Headers[PostgreSqlBackupFileNameHeader].ToString();
+                string fileName = postgreSqlBackupFileName ?? string.Empty;
                 try
                 {
                     ServerMigrationRestoreResult result = await migrationService
@@ -303,7 +330,15 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("UploadAndRestorePostgreSqlPhysicalBackup");
+            .Accepts<IFormFile>("application/octet-stream")
+            .WithName("UploadAndRestorePostgreSqlPhysicalBackup")
+            .Produces<ApiServerMigrationRestoreResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable)
+            .Produces(StatusCodes.Status413PayloadTooLarge);
 
             endpoints.MapPost("/api/server-migration/packages", async (
                 HttpContext context,
@@ -315,11 +350,11 @@ namespace ExportDocManager.Api.Hosting
                 IAppPathProvider pathProvider,
                 ApiServerMigrationCreateRequest request) =>
             {
-                User user = ApiEndpointAuth.RequireUser(context, tokenService);
+                User? user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null) return Results.Unauthorized();
                 if (!authorizationService.CanManageDisasterRecovery(user))
                     return WriteForbidden("当前账号没有灾难恢复管理权限。");
-                IResult transportError = RequireSecureDisasterRecoveryTransport(context);
+                IResult? transportError = RequireSecureDisasterRecoveryTransport(context);
                 if (transportError != null) return transportError;
                 if (request == null || !string.Equals(
                     request.ConfirmationText?.Trim(),
@@ -329,7 +364,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse(
                         "创建完整迁移包前需要输入确认文本 MIGRATE。"));
                 }
-                IResult reauthenticationError = await ReauthenticateAsync(
+                IResult? reauthenticationError = await ReauthenticateAsync(
                     context,
                     user,
                     request.AdminPassword,
@@ -348,7 +383,7 @@ namespace ExportDocManager.Api.Hosting
                         IServerMigrationService migrationService =
                             services.GetRequiredService<IServerMigrationService>();
                         jobContext.Report(5, "准备迁移数据", "正在创建 PostgreSQL 物理备份。");
-                        ServerMigrationPackageResult result = null;
+                        ServerMigrationPackageResult? result = null;
                         string outputPath = string.Empty;
                         try
                         {
@@ -376,7 +411,12 @@ namespace ExportDocManager.Api.Hosting
                     });
                 return AcceptedBackgroundJob(job);
             })
-            .WithName("CreateServerMigrationPackage");
+            .WithName("CreateServerMigrationPackage")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status429TooManyRequests);
 
             endpoints.MapPost("/api/server-migration/restore", async (
                 HttpContext context,
@@ -386,16 +426,20 @@ namespace ExportDocManager.Api.Hosting
                 IServerMigrationService migrationService,
                 IHostApplicationLifetime applicationLifetime,
                 ApiDesktopAccessOptions desktopAccessOptions,
+                [FromHeader(Name = RestoreConfirmationHeader)] string restoreConfirmation,
+                [FromHeader(Name = SensitiveOperationTicketHeader)] string sensitiveOperationTicket,
+                [FromHeader(Name = ServerMigrationPasswordHeader)] string migrationPassword,
+                [FromHeader(Name = ServerMigrationFileNameHeader)] string migrationFileName,
                 CancellationToken cancellationToken) =>
             {
-                User user = ApiEndpointAuth.RequireUser(context, tokenService);
+                User? user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null) return Results.Unauthorized();
                 if (!authorizationService.CanManageDisasterRecovery(user))
                     return WriteForbidden("当前账号没有灾难恢复管理权限。");
-                IResult transportError = RequireSecureDisasterRecoveryTransport(context);
+                IResult? transportError = RequireSecureDisasterRecoveryTransport(context);
                 if (transportError != null) return transportError;
                 if (!string.Equals(
-                    context.Request.Headers[RestoreConfirmationHeader].ToString().Trim(),
+                    restoreConfirmation?.Trim(),
                     "MIGRATE",
                     StringComparison.Ordinal))
                 {
@@ -403,14 +447,14 @@ namespace ExportDocManager.Api.Hosting
                         "恢复完整迁移包前需要输入确认文本 MIGRATE。"));
                 }
                 if (!ticketService.Consume(
-                    context.Request.Headers[SensitiveOperationTicketHeader].ToString(),
+                    sensitiveOperationTicket,
                     user.Id,
                     ApiSensitiveOperationAction.RestoreServer))
                 {
                     return Results.Unauthorized();
                 }
-                string password = context.Request.Headers[ServerMigrationPasswordHeader].ToString();
-                string fileName = context.Request.Headers[ServerMigrationFileNameHeader].ToString();
+                string password = migrationPassword ?? string.Empty;
+                string fileName = migrationFileName ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(fileName))
                     return Results.BadRequest(new ApiErrorResponse("迁移包文件名不能为空。"));
                 ConfigureLargeUpload(context);
@@ -446,13 +490,21 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("StageServerMigrationRestore");
+            .Accepts<IFormFile>("application/octet-stream")
+            .WithName("StageServerMigrationRestore")
+            .Produces<ApiServerMigrationRestoreResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable)
+            .Produces(StatusCodes.Status413PayloadTooLarge);
         }
 
-        private static async Task<IResult> ReauthenticateAsync(
+        private static async Task<IResult?> ReauthenticateAsync(
             HttpContext context,
             User currentUser,
-            string adminPassword,
+            string? adminPassword,
             IUserService userService,
             ApiLoginAttemptService loginAttempts)
         {
@@ -472,7 +524,7 @@ namespace ExportDocManager.Api.Hosting
                     new ApiErrorResponse("重新认证失败次数过多，请稍后再试。"),
                     statusCode: StatusCodes.Status429TooManyRequests);
             }
-            User authenticated = await userService.AuthenticateAsync(
+            User? authenticated = await userService.AuthenticateAsync(
                 currentUser.Username,
                 adminPassword ?? string.Empty).ConfigureAwait(false);
             if (authenticated == null || authenticated.Id != currentUser.Id || !authenticated.IsActive)
@@ -542,9 +594,9 @@ namespace ExportDocManager.Api.Hosting
         private static string GetRemoteAddress(HttpContext context) =>
             context.Connection.RemoteIpAddress?.ToString() ?? "loopback";
 
-        private static IResult RequireSecureDisasterRecoveryTransport(HttpContext context)
+        private static IResult? RequireSecureDisasterRecoveryTransport(HttpContext context)
         {
-            IPAddress remoteAddress = context.Connection.RemoteIpAddress;
+            IPAddress? remoteAddress = context.Connection.RemoteIpAddress;
             if (context.Request.IsHttps ||
                 remoteAddress == null ||
                 IPAddress.IsLoopback(remoteAddress) ||
@@ -579,7 +631,7 @@ namespace ExportDocManager.Api.Hosting
 
         private static void ConfigureLargeUpload(HttpContext context)
         {
-            IHttpMaxRequestBodySizeFeature feature =
+            IHttpMaxRequestBodySizeFeature? feature =
                 context.Features.Get<IHttpMaxRequestBodySizeFeature>();
             if (feature is { IsReadOnly: false })
             {

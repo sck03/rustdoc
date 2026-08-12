@@ -177,7 +177,7 @@ namespace ExportDocManager.Services.Data
         private sealed record SheetProfile(
             SheetGrid Sheet,
             Dictionary<string, ExcelImportFieldAnalysis> Fields,
-            ExcelImportItemTableAnalysis ItemTable,
+            ExcelImportItemTableAnalysis? ItemTable,
             double Score,
             double Confidence)
         {

@@ -58,7 +58,9 @@ namespace ExportDocManager.Api.Hosting
 
                 return Results.Ok(ApiAuditLogDtoFactory.FromPagedAuditLogs(result));
             })
-            .WithName("ListAuditLogs");
+            .WithName("ListAuditLogs")
+            .Produces<ApiPagedResponse<ApiAuditLogDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapPost("/api/audit-logs/save-to-path", async (
                 HttpContext context,
@@ -109,7 +111,11 @@ namespace ExportDocManager.Api.Hosting
                     destinationPath,
                     AuditLogStoragePolicy));
             })
-            .WithName("SaveAuditLogsToPath");
+            .WithName("SaveAuditLogsToPath")
+            .Produces<ApiAuditLogCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/audit-logs/download", async (
                 HttpContext context,
@@ -169,7 +175,11 @@ namespace ExportDocManager.Api.Hosting
                     throw;
                 }
             })
-            .WithName("DownloadAuditLogs");
+            .WithName("DownloadAuditLogs")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/audit-logs/delete", async (
                 HttpContext context,
@@ -208,7 +218,11 @@ namespace ExportDocManager.Api.Hosting
                     string.Empty,
                     AuditLogStoragePolicy));
             })
-            .WithName("DeleteAuditLogsByCriteria");
+            .WithName("DeleteAuditLogsByCriteria")
+            .Produces<ApiAuditLogCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/audit-logs/cleanup", async (
                 HttpContext context,
@@ -257,7 +271,11 @@ namespace ExportDocManager.Api.Hosting
                     string.Empty,
                     AuditLogStoragePolicy));
             })
-            .WithName("CleanupAuditLogs");
+            .WithName("CleanupAuditLogs")
+            .Produces<ApiAuditLogCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
         }
 
         private static AuditLogQueryCriteria ToAuditLogCriteria(ApiAuditLogFilterRequest request)
@@ -274,7 +292,7 @@ namespace ExportDocManager.Api.Hosting
             };
         }
 
-        private static IResult ValidateAuditLogDeleteRequest(ApiAuditLogDeleteRequest request)
+        private static IResult? ValidateAuditLogDeleteRequest(ApiAuditLogDeleteRequest? request)
         {
             if (request == null)
             {

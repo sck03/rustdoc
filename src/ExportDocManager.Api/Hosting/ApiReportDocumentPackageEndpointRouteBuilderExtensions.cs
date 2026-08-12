@@ -53,7 +53,11 @@ namespace ExportDocManager.Api.Hosting
                     createZip,
                     destinationPath));
             })
-            .WithName("StartInvoiceDocumentPackageSaveToPathJob");
+            .WithName("StartInvoiceDocumentPackageSaveToPathJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/reports/invoices/{invoiceId:int}/document-package/download", (
                 HttpContext context,
@@ -96,12 +100,15 @@ namespace ExportDocManager.Api.Hosting
                     createZip,
                     destinationPath));
             })
-            .WithName("StartInvoiceDocumentPackageDownloadJob");
+            .WithName("StartInvoiceDocumentPackageDownloadJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
         }
 
-        internal static IResult ValidateInvoiceDocumentPackageRequest(
+        internal static IResult? ValidateInvoiceDocumentPackageRequest(
             int invoiceId,
-            ApiInvoiceDocumentPackageRequest request,
+            ApiInvoiceDocumentPackageRequest? request,
             out IReadOnlyList<ApiInvoiceDocumentPackageItemRequest> normalizedItems,
             out bool includeMergedPdf,
             out bool createZip,
@@ -158,7 +165,7 @@ namespace ExportDocManager.Api.Hosting
             }
         }
 
-        internal static IResult ValidateInvoiceDocumentItemRequests(
+        internal static IResult? ValidateInvoiceDocumentItemRequests(
             IReadOnlyCollection<ApiInvoiceDocumentPackageItemRequest> requestItems,
             out IReadOnlyList<ApiInvoiceDocumentPackageItemRequest> normalizedItems)
         {

@@ -38,7 +38,7 @@ namespace ExportDocManager.Services.Reporting
 
         public async Task<ReportTemplatePackageExportResult> ExportAsync(
             string packagePath,
-            IProgress<OperationProgressUpdate> progress = null,
+            IProgress<OperationProgressUpdate>? progress = null,
             CancellationToken cancellationToken = default)
         {
             string targetPath = NormalizeExportPackagePath(packagePath);
@@ -125,7 +125,7 @@ namespace ExportDocManager.Services.Reporting
         public async Task<ReportTemplatePackageImportResult> ImportAsync(
             string packagePath,
             ReportTemplateImportStrategy strategy = ReportTemplateImportStrategy.Overwrite,
-            IProgress<OperationProgressUpdate> progress = null,
+            IProgress<OperationProgressUpdate>? progress = null,
             CancellationToken cancellationToken = default)
         {
             string sourcePackagePath = NormalizeImportPackagePath(packagePath);
@@ -255,7 +255,7 @@ namespace ExportDocManager.Services.Reporting
         }
 
         private static void ReportProgress(
-            IProgress<OperationProgressUpdate> progress,
+            IProgress<OperationProgressUpdate>? progress,
             string statusText,
             string detailText,
             int? percent = null)

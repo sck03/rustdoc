@@ -13,7 +13,7 @@ public sealed class PackagePayloadContractTests
         string packagePropsPath = Path.Combine(root, "Directory.Packages.props");
         var packageProps = XDocument.Load(packagePropsPath);
         string packageVersion = packageProps.Descendants("PackageVersion")
-            .Single(element => string.Equals((string)element.Attribute("Include"), "Microsoft.Playwright", StringComparison.Ordinal))
+            .Single(element => string.Equals((string?)element.Attribute("Include"), "Microsoft.Playwright", StringComparison.Ordinal))
             .Attribute("Version")?.Value ?? string.Empty;
         string expectedBrowserVersion = packageProps.Descendants("PlaywrightChromiumVersion").Single().Value;
         string expectedRevision = packageProps.Descendants("PlaywrightChromiumRevision").Single().Value;

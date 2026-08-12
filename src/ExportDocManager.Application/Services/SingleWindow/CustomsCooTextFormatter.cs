@@ -4,14 +4,14 @@ namespace ExportDocManager.Services.SingleWindow
 {
     public static class CustomsCooTextFormatter
     {
-        public static string ResolveExporterCreditCode(Invoice invoice, Exporter exporter)
+        public static string ResolveExporterCreditCode(Invoice? invoice, Exporter? exporter)
         {
             return FirstNonEmpty(
                 NormalizeText(invoice?.ExporterCreditCode),
                 NormalizeText(exporter?.CreditCode));
         }
 
-        public static string BuildPartyBlock(string name, string address)
+        public static string BuildPartyBlock(string? name, string? address)
         {
             string normalizedName = NormalizeText(name);
             var lines = new List<string>();
@@ -26,7 +26,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : string.Join(Environment.NewLine, lines);
         }
 
-        public static string DecodeXmlMultiline(string value)
+        public static string DecodeXmlMultiline(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -49,7 +49,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : string.Join(Environment.NewLine, lines);
         }
 
-        public static string EncodeXmlMultiline(string value)
+        public static string EncodeXmlMultiline(string? value)
         {
             string normalized = DecodeXmlMultiline(value);
             if (string.IsNullOrWhiteSpace(normalized))
@@ -65,7 +65,7 @@ namespace ExportDocManager.Services.SingleWindow
                     .Where(line => !string.IsNullOrWhiteSpace(line)));
         }
 
-        private static string FirstNonEmpty(params string[] values)
+        private static string FirstNonEmpty(params string?[] values)
         {
             foreach (var value in values ?? [])
             {
@@ -78,12 +78,12 @@ namespace ExportDocManager.Services.SingleWindow
             return string.Empty;
         }
 
-        private static string NormalizeText(string value)
+        private static string NormalizeText(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
         }
 
-        private static IReadOnlyList<string> SplitAddressLines(string address)
+        private static IReadOnlyList<string> SplitAddressLines(string? address)
         {
             string normalizedAddress = DecodeXmlMultiline(address);
             if (string.IsNullOrWhiteSpace(normalizedAddress))

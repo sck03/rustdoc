@@ -65,6 +65,39 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task ImportFromExcelAsync_ShouldIgnoreFormattedEmptyLegacyCellsInResourceBudget()
+        {
+            string directory = Path.Combine(
+                AppContext.BaseDirectory,
+                "ExcelImportXlsTests",
+                Guid.NewGuid().ToString("N"));
+            string filePath = Path.Combine(directory, "formatted-empty-cells.xls");
+
+            Directory.CreateDirectory(directory);
+            try
+            {
+                await WriteFormattedEmptyLegacyWorkbookAsync(filePath);
+
+                var settings = new StubSettingsService();
+                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波测试出口有限公司";
+                var service = new ExcelImportService(settings);
+                var result = await service.ImportFromExcelAsync(filePath);
+
+                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+                Assert.NotNull(result.Invoice);
+                Assert.Equal("INV-FORMAT-001", result.Invoice.InvoiceNo);
+                Assert.Equal("FORMATTED EMPTY CELLS BUYER", result.Invoice.CustomerNameEN);
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                {
+                    Directory.Delete(directory, recursive: true);
+                }
+            }
+        }
+
+        [Fact]
         public async Task ImportFromExcelAsync_ShouldRejectAmountAsDestinationCountryAndRepairSwappedItemNames()
         {
             string directory = Path.Combine(
@@ -577,6 +610,8 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.NotNull(result.Invoice);
                 Assert.Equal("26GFR-038", result.Invoice.InvoiceNo);
                 Assert.Equal("GLOBAL FASHION RESOURCE INC", result.Invoice.CustomerNameEN);
+                Assert.Equal("SAME AS CONSIGNEE", result.Invoice.NotifyPartyName);
+                Assert.Equal(result.Invoice.CustomerAddressEN, result.Invoice.NotifyPartyAddress);
                 Assert.Equal("NINGBO BRIDGE IMP. & EXP. CO. LTD.", result.Invoice.ExporterNameEN);
                 Assert.Equal("宁波布利杰进出口有限公司", result.Invoice.ExporterNameCN);
                 Assert.NotEqual(result.Invoice.ExporterNameEN, result.Invoice.ExporterNameCN);
@@ -815,6 +850,39 @@ namespace ExportDocManager.Infrastructure.Tests
             WriteCell(sheet, 20, 14, "CTNS");
             WriteCell(sheet, 20, 23, 2.5d);
             WriteCell(sheet, 20, 24, 300d);
+
+            await using var output = File.Create(filePath);
+            workbook.Write(output);
+        }
+
+        private static async Task WriteFormattedEmptyLegacyWorkbookAsync(string filePath)
+        {
+            var workbook = new HSSFWorkbook();
+            ISheet sheet = workbook.CreateSheet("报关和清关");
+            ICellStyle emptyStyle = workbook.CreateCellStyle();
+            emptyStyle.WrapText = true;
+
+            WriteCell(sheet, "A1", "出口商");
+            WriteCell(sheet, "B1", "NINGBO FORMAT TEST EXPORT CO., LTD.");
+            WriteCell(sheet, "A2", "收货人");
+            WriteCell(sheet, "B2", "FORMATTED EMPTY CELLS BUYER");
+            WriteCell(sheet, "A3", "发票号");
+            WriteCell(sheet, "B3", "INV-FORMAT-001");
+            WriteCell(sheet, "A4", "款号");
+            WriteCell(sheet, "B4", "英文品名");
+            WriteCell(sheet, "C4", "数量");
+            WriteCell(sheet, 5, 1, "STYLE-001");
+            WriteCell(sheet, 5, 2, "TEST GOODS");
+            WriteCell(sheet, 5, 3, 1d);
+
+            for (int rowIndex = 5; rowIndex < 4_500; rowIndex++)
+            {
+                IRow row = sheet.CreateRow(rowIndex);
+                for (int columnIndex = 0; columnIndex < 256; columnIndex++)
+                {
+                    row.CreateCell(columnIndex).CellStyle = emptyStyle;
+                }
+            }
 
             await using var output = File.Create(filePath);
             workbook.Write(output);
@@ -1383,6 +1451,8 @@ namespace ExportDocManager.Infrastructure.Tests
             WriteCell(sheet, "S2", "26GFR-038");
             WriteCell(sheet, "A3", "收货人");
             WriteCell(sheet, "B3", "GLOBAL FASHION RESOURCE INC                                                                                                                                                                                                                       3315 S.BROADWAY                                                                                                                                                                                                                       LOS ANGELES CA 90007, USA                                                                                                                                                                                                                       TEL:(213)973-5941");
+            WriteCell(sheet, "A5", "通知人");
+            WriteCell(sheet, "B5", "Same as Consignee");
             WriteCell(sheet, "R3", "监管方式");
             WriteCell(sheet, "S3", "一般贸易");
             WriteCell(sheet, "R4", "付款方式");

@@ -108,7 +108,7 @@ namespace ExportDocManager.Services.MasterData
             {
                 var entry = GetRequiredKnowledgeEntry(archive, name);
                 string actualChecksum = await ComputeEntrySha256Async(entry, cancellationToken);
-                if (!manifest.Checksums.TryGetValue(name, out string expected) ||
+                if (!manifest.Checksums.TryGetValue(name, out string? expected) ||
                     !string.Equals(expected, actualChecksum, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException($"HS知识库文件校验失败：{name}。");
 

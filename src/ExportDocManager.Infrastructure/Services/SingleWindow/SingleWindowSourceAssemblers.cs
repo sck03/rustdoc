@@ -15,7 +15,7 @@ namespace ExportDocManager.Services.SingleWindow
         public CustomsCooSourceAssembler(
             IDbContextFactory<AppDbContext> contextFactory,
             DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope businessDataAccessScope = null)
+            BusinessDataAccessScope? businessDataAccessScope = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
@@ -35,7 +35,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .Where(item => item.InvoiceId == invoiceId)
                 .ToListAsync(cancellationToken);
 
-            Customer customer = null;
+            Customer? customer = null;
             if (invoice.CustomerId > 0)
             {
                 customer = await context.Customers
@@ -43,7 +43,7 @@ namespace ExportDocManager.Services.SingleWindow
                     .FirstOrDefaultAsync(item => item.Id == invoice.CustomerId, cancellationToken);
             }
 
-            Exporter exporter = null;
+            Exporter? exporter = null;
             if (invoice.ExporterId > 0)
             {
                 exporter = await context.Exporters
@@ -78,7 +78,7 @@ namespace ExportDocManager.Services.SingleWindow
         public AgentConsignmentSourceAssembler(
             IDbContextFactory<AppDbContext> contextFactory,
             DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope businessDataAccessScope = null)
+            BusinessDataAccessScope? businessDataAccessScope = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
@@ -98,7 +98,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .Where(item => item.InvoiceId == invoiceId)
                 .ToListAsync(cancellationToken);
 
-            Customer customer = null;
+            Customer? customer = null;
             if (invoice.CustomerId > 0)
             {
                 customer = await context.Customers
@@ -106,7 +106,7 @@ namespace ExportDocManager.Services.SingleWindow
                     .FirstOrDefaultAsync(item => item.Id == invoice.CustomerId, cancellationToken);
             }
 
-            Exporter exporter = null;
+            Exporter? exporter = null;
             if (invoice.ExporterId > 0)
             {
                 exporter = await context.Exporters

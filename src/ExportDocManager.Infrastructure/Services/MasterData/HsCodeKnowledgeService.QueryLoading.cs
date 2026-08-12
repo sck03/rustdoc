@@ -9,7 +9,7 @@ namespace ExportDocManager.Services.MasterData
 {
     public sealed partial class HsCodeKnowledgeService
     {
-        private static IQueryable<HsCodeDeclarationExample> BuildExampleQuery(AppDbContext context, string keyword)
+        private static IQueryable<HsCodeDeclarationExample> BuildExampleQuery(AppDbContext context, string? keyword)
         {
             var query = context.HsCodeDeclarationExamples.AsNoTracking();
             string value = (keyword ?? string.Empty).Trim();
@@ -186,7 +186,7 @@ namespace ExportDocManager.Services.MasterData
 
         private static CurrentCodeResolution ResolveRecommendedCurrentCode(
             string rawCode,
-            IReadOnlyList<HsCodeRemoteReplacementEvidence> evidence,
+            IReadOnlyList<HsCodeRemoteReplacementEvidence>? evidence,
             IReadOnlyDictionary<string, HsCode> codes)
         {
             var matching = (evidence ?? [])

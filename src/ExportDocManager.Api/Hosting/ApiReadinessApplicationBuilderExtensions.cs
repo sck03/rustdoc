@@ -22,8 +22,8 @@ namespace ExportDocManager.Api.Hosting
 
         public static IApplicationBuilder UseExportDocManagerReadiness(
             this IApplicationBuilder app,
-            DatabaseConnectionSettings databaseSettings = null,
-            ApiRuntimeOptions runtimeOptions = null)
+            DatabaseConnectionSettings? databaseSettings = null,
+            ApiRuntimeOptions? runtimeOptions = null)
         {
             ArgumentNullException.ThrowIfNull(app);
             var desktopAccessOptions = runtimeOptions == null
@@ -62,7 +62,7 @@ namespace ExportDocManager.Api.Hosting
 
         internal static bool ShouldHandlePublicHealthProbe(
             HttpContext context,
-            ApiDesktopAccessOptions desktopAccessOptions)
+            ApiDesktopAccessOptions? desktopAccessOptions)
         {
             ArgumentNullException.ThrowIfNull(context);
 

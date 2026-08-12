@@ -22,10 +22,10 @@ namespace ExportDocManager.Infrastructure.Tests
                 OperatingSystem.IsWindows() ? "chrome-headless-shell.exe" : "chrome-headless-shell");
             string modelRoot = Path.Combine(appRoot, "OcrModels", "PaddleOCR", "V6");
             string postgreSqlBin = Path.Combine(appRoot, "Tools", "PostgreSQL", "bin");
-            string previousBrowser = Environment.GetEnvironmentVariable(ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable);
-            string previousCdpEndpoint = Environment.GetEnvironmentVariable(BrowserCdpEndpointPolicy.EndpointEnvironmentVariable);
-            string previousOcr = Environment.GetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME");
-            string previousPostgreSql = Environment.GetEnvironmentVariable(PostgreSqlToolLocator.BinRootEnvironmentVariable);
+            string? previousBrowser = Environment.GetEnvironmentVariable(ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable);
+            string? previousCdpEndpoint = Environment.GetEnvironmentVariable(BrowserCdpEndpointPolicy.EndpointEnvironmentVariable);
+            string? previousOcr = Environment.GetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME");
+            string? previousPostgreSql = Environment.GetEnvironmentVariable(PostgreSqlToolLocator.BinRootEnvironmentVariable);
 
             try
             {
@@ -110,7 +110,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public void Inspect_ShouldTreatConfiguredIsolatedBrowserAsReadyWithoutLocalExecutable()
         {
             string root = Path.Combine(AppContext.BaseDirectory, "runtime-dependency-cdp-tests", Guid.NewGuid().ToString("N"));
-            string previousEndpoint = Environment.GetEnvironmentVariable(BrowserCdpEndpointPolicy.EndpointEnvironmentVariable);
+            string? previousEndpoint = Environment.GetEnvironmentVariable(BrowserCdpEndpointPolicy.EndpointEnvironmentVariable);
             try
             {
                 Environment.SetEnvironmentVariable(
@@ -150,13 +150,14 @@ namespace ExportDocManager.Infrastructure.Tests
             string configured,
             bool expectedValid)
         {
-            string previousEndpoint = Environment.GetEnvironmentVariable(BrowserCdpEndpointPolicy.EndpointEnvironmentVariable);
+            string? previousEndpoint = Environment.GetEnvironmentVariable(BrowserCdpEndpointPolicy.EndpointEnvironmentVariable);
             try
             {
                 Environment.SetEnvironmentVariable(BrowserCdpEndpointPolicy.EndpointEnvironmentVariable, configured);
                 if (expectedValid)
                 {
-                    Assert.True(BrowserCdpEndpointPolicy.TryResolve(out Uri endpoint));
+                    Assert.True(BrowserCdpEndpointPolicy.TryResolve(out Uri? endpoint));
+                    Assert.NotNull(endpoint);
                     Assert.Equal(configured.TrimEnd('/'), endpoint.ToString().TrimEnd('/'));
                 }
                 else

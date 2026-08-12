@@ -68,7 +68,10 @@ namespace ExportDocManager.Api.Hosting
                     AtomicFileHelper.TryDeleteDirectory(exportDirectory);
                     return WriteServiceException(ex);
                 }
-            }).WithName("ExportHsCodeKnowledge");
+            }).WithName("ExportHsCodeKnowledge")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/vnd.exportdocmanager.hs-knowledge+zip")
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/master-data/hs-knowledge/import", async (
                 HttpContext context,
@@ -100,16 +103,14 @@ namespace ExportDocManager.Api.Hosting
 
                     var preview = await service.PreviewPackageAsync(path, cancellationToken);
                     var result = await service.ImportPackageAsync(preview, cancellationToken);
-                    return Results.Ok(new
-                    {
+                    return Results.Ok(new ApiHsCodeKnowledgeImportResponse(
                         preview.FileName,
                         preview.HsCodeCount,
                         preview.ExampleCount,
                         preview.ReplacementCount,
                         preview.FeedbackCount,
                         preview.Warnings,
-                        result
-                    });
+                        result));
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -123,7 +124,10 @@ namespace ExportDocManager.Api.Hosting
                 {
                     AtomicFileHelper.TryDeleteDirectory(tempRoot);
                 }
-            }).WithName("ImportHsCodeKnowledge");
+            }).Accepts<IFormFile>("application/octet-stream").WithName("ImportHsCodeKnowledge")
+            .Produces<ApiHsCodeKnowledgeImportResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
         }
     }
 }

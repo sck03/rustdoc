@@ -8,13 +8,13 @@ namespace ExportDocManager.Services.Infrastructure
 {
     public class AuditLogQueryCriteria
     {
-        public string InvoiceKeyword { get; set; }
-        public string EntityName { get; set; }
-        public string Action { get; set; }
-        public string UserId { get; set; }
+        public string? InvoiceKeyword { get; set; }
+        public string? EntityName { get; set; }
+        public string? Action { get; set; }
+        public string? UserId { get; set; }
         public DateTime? StartTime { get; set; }
         public DateTime? EndTime { get; set; }
-        public string Keyword { get; set; }
+        public string? Keyword { get; set; }
     }
 
     public interface IAuditLogService

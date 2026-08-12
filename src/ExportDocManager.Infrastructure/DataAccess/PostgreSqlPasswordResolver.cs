@@ -15,7 +15,7 @@ namespace ExportDocManager.DataAccess
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
 
-            string environmentSecret = ResolveEnvironmentSecret(
+            string? environmentSecret = ResolveEnvironmentSecret(
                 PasswordEnvironmentVariable,
                 PasswordFileEnvironmentVariable,
                 pathProvider);
@@ -29,7 +29,7 @@ namespace ExportDocManager.DataAccess
                 return string.Empty;
             }
 
-            string decrypted = SecurityHelper.Decrypt(configuredValue);
+            string? decrypted = SecurityHelper.Decrypt(configuredValue);
             if (decrypted == null)
             {
                 throw new ServiceValidationException(
@@ -40,7 +40,7 @@ namespace ExportDocManager.DataAccess
             return decrypted;
         }
 
-        internal static string ResolveEnvironmentSecret(
+        internal static string? ResolveEnvironmentSecret(
             string passwordEnvironmentVariable,
             string passwordFileEnvironmentVariable,
             IAppPathProvider pathProvider)
@@ -49,7 +49,7 @@ namespace ExportDocManager.DataAccess
             ArgumentException.ThrowIfNullOrWhiteSpace(passwordFileEnvironmentVariable);
             ArgumentNullException.ThrowIfNull(pathProvider);
 
-            string passwordFile = Environment.GetEnvironmentVariable(passwordFileEnvironmentVariable);
+            string? passwordFile = Environment.GetEnvironmentVariable(passwordFileEnvironmentVariable);
             if (!string.IsNullOrWhiteSpace(passwordFile))
             {
                 return ReadPasswordFile(

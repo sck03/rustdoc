@@ -74,7 +74,7 @@ namespace ExportDocManager.Utils
                 throw new FileNotFoundException("待复制文件不存在。", fullSourcePath);
             }
 
-            string targetDirectory = Path.GetDirectoryName(fullTargetPath);
+            string? targetDirectory = Path.GetDirectoryName(fullTargetPath);
             if (!string.IsNullOrWhiteSpace(targetDirectory))
             {
                 Directory.CreateDirectory(targetDirectory);

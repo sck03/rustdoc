@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
+using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
 
@@ -35,7 +36,11 @@ namespace ExportDocManager.Api.Hosting
                 var profiles = await profileService.ListAsync(cancellationToken);
                 return Results.Ok(ApiSingleWindowDtoFactory.FromClientProfiles(profiles));
             })
-            .WithName("GetSingleWindowClientProfiles");
+            .WithName("GetSingleWindowClientProfiles")
+            .Produces<ApiSingleWindowClientProfilesResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPut("/api/single-window/client-profiles", async (
                 HttpContext context,
@@ -66,7 +71,12 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("SaveSingleWindowClientProfile");
+            .WithName("SaveSingleWindowClientProfile")
+            .Produces<ApiSingleWindowClientProfilesResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/client-profiles/{profileKey}/activate", async (
                 HttpContext context,
@@ -97,7 +107,12 @@ namespace ExportDocManager.Api.Hosting
                     profileKey,
                     cancellationToken);
             })
-            .WithName("ActivateSingleWindowClientProfile");
+            .WithName("ActivateSingleWindowClientProfile")
+            .Produces<ApiSingleWindowClientProfilesResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/client/dispatch", async (
                 HttpContext context,
@@ -128,7 +143,13 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("DispatchSingleWindowBatchToClient");
+            .WithName("DispatchSingleWindowBatchToClient")
+            .Produces<SingleWindowClientDispatchResult>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/client/collect-receipts", async (
                 HttpContext context,
@@ -159,7 +180,13 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("CollectSingleWindowClientReceipts");
+            .WithName("CollectSingleWindowClientReceipts")
+            .Produces<SingleWindowReceiptCollectionResult>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
         }
     }
 }

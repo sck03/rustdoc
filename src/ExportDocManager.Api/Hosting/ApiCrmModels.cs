@@ -16,16 +16,16 @@ namespace ExportDocManager.Api.Hosting
 
     public sealed record ApiCrmCustomerSaveRequest(
         int Id, string Name, string CountryRegion, string Website, string Status,
-        string Source, string Notes, int? LinkedDocumentCustomerId, int ExpectedVersion = 0);
+        string Source, string Notes, int? LinkedDocumentCustomerId = null, int ExpectedVersion = 0);
 
     public sealed record ApiCrmContactSaveRequest(
         int Id, int CrmCustomerId, string Name, string Title, string Email,
         string Phone, string InstantMessaging, bool IsPrimary, int ExpectedVersion = 0);
 
     public sealed record ApiCrmFollowUpSaveRequest(
-        int Id, int CrmCustomerId, int? CrmContactId, string Type, string Summary,
-        string NextAction, DateTimeOffset? FollowedUpAt, DateTimeOffset? NextFollowUpAt,
-        bool IsCompleted, int ExpectedVersion = 0);
+        int Id, int CrmCustomerId, int? CrmContactId = null, string Type = "", string Summary = "",
+        string NextAction = "", DateTimeOffset? FollowedUpAt = null, DateTimeOffset? NextFollowUpAt = null,
+        bool IsCompleted = false, int ExpectedVersion = 0);
 
     public sealed record ApiCrmDashboardDto(
         int CustomerCount,

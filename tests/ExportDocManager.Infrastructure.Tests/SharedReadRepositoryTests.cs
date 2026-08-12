@@ -52,7 +52,7 @@ namespace ExportDocManager.Infrastructure.Tests
             var payment = Assert.Single(payments.Items);
             Assert.Equal("OWN-INV", invoice.InvoiceNo);
             Assert.Equal("OWN-PAY", payment.InvoiceNo);
-            Assert.Equal("OWN-PAY", ownPaymentDetail.InvoiceNo);
+            Assert.Equal("OWN-PAY", Assert.IsType<Payment>(ownPaymentDetail).InvoiceNo);
             Assert.Null(foreignPaymentDetail);
         }
 

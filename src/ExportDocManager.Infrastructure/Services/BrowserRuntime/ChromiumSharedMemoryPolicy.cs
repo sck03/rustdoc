@@ -7,7 +7,7 @@ namespace ExportDocManager.Services.BrowserRuntime
 
         public static bool ResolveDisableDevShmUsageSetting()
         {
-            string configured = Environment.GetEnvironmentVariable(DisableDevShmUsageEnvironmentVariable);
+            string? configured = Environment.GetEnvironmentVariable(DisableDevShmUsageEnvironmentVariable);
             if (string.IsNullOrWhiteSpace(configured))
             {
                 return true;

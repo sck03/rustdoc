@@ -18,7 +18,7 @@ namespace ExportDocManager.Services.MasterData
         public ExporterSealService(
             IDbContextFactory<AppDbContext> contextFactory,
             IAppPathProvider pathProvider,
-            BusinessDataAccessScope accessScope = null)
+            BusinessDataAccessScope? accessScope = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
@@ -61,7 +61,7 @@ namespace ExportDocManager.Services.MasterData
                 managedPath,
                 Path.Combine(_pathProvider.FileRoot, "Seals"),
                 "Files");
-            string previousPath = sealKind == ExporterSealKind.Document
+            string? previousPath = sealKind == ExporterSealKind.Document
                 ? exporter.DocSealPath
                 : exporter.CustomsSealPath;
 
@@ -101,8 +101,8 @@ namespace ExportDocManager.Services.MasterData
 
         public void DeleteReplacedManagedSeal(
             int exporterId,
-            string previousPath,
-            string currentPath)
+            string? previousPath,
+            string? currentPath)
         {
             if (exporterId <= 0 || string.IsNullOrWhiteSpace(previousPath))
             {

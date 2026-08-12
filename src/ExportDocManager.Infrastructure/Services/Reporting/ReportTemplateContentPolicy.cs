@@ -92,6 +92,10 @@ internal static class ReportTemplateContentPolicy
         }
 
         var visitor = new GlobalVariableVisitor();
+        if (template.Page == null)
+        {
+            throw new ArgumentException("报表模板没有可执行的 Scriban 页面。", nameof(content));
+        }
         template.Page.Accept(visitor);
         if (visitor.UsesThis)
         {
@@ -368,7 +372,7 @@ internal static class ReportTemplateContentPolicy
             base.Visit(node);
         }
 
-        private static bool IsDynamicEvaluationMember(string memberName) =>
+        private static bool IsDynamicEvaluationMember(string? memberName) =>
             string.Equals(memberName, "eval", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(memberName, "eval_template", StringComparison.OrdinalIgnoreCase);
     }

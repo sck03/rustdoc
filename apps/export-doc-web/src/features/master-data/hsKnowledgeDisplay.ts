@@ -13,7 +13,7 @@ export function formatHsKnowledgeStatus(status?: string) {
   return statusLabels[status ?? ""] ?? status ?? "待处理";
 }
 
-export function formatHsKnowledgeVerifiedAt(value?: string) {
+export function formatHsKnowledgeVerifiedAt(value?: string | null) {
   if (!value) return "未标明验证时间";
   const date = new Date(value);
   return Number.isNaN(date.getTime())

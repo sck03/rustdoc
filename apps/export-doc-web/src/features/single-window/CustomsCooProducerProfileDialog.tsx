@@ -15,7 +15,7 @@ import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { useModalDialog } from "../../ui/useModalDialog.ts";
 
-type ProducerProfileDraft = ApiCustomsCooProducerProfileInputDto & {
+type ProducerProfileDraft = Required<ApiCustomsCooProducerProfileInputDto> & {
   id: number;
 };
 

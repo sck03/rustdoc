@@ -178,7 +178,7 @@ namespace ExportDocManager.Services.Data
 
         private string ResolveRustAnalyzerPath()
         {
-            string configuredPath = Environment.GetEnvironmentVariable(AnalyzerPathEnvironmentVariable);
+            string? configuredPath = Environment.GetEnvironmentVariable(AnalyzerPathEnvironmentVariable);
             if (!string.IsNullOrWhiteSpace(configuredPath) && File.Exists(configuredPath))
             {
                 return Path.GetFullPath(configuredPath);
@@ -199,7 +199,7 @@ namespace ExportDocManager.Services.Data
 
         private static ExcelAnalyzerMode ResolveAnalyzerMode()
         {
-            string configuredMode = Environment.GetEnvironmentVariable(AnalyzerModeEnvironmentVariable);
+            string? configuredMode = Environment.GetEnvironmentVariable(AnalyzerModeEnvironmentVariable);
             if (string.IsNullOrWhiteSpace(configuredMode))
             {
                 return ExcelAnalyzerMode.ExternalFirst;
@@ -491,8 +491,8 @@ namespace ExportDocManager.Services.Data
         }
 
         private static bool ShouldPreferFallbackTable(
-            ExcelImportItemTableAnalysis current,
-            ExcelImportItemTableAnalysis fallback)
+            ExcelImportItemTableAnalysis? current,
+            ExcelImportItemTableAnalysis? fallback)
         {
             if (fallback == null)
             {
@@ -594,43 +594,43 @@ namespace ExportDocManager.Services.Data
         private sealed class RustAnalysisReport
         {
             [JsonPropertyName("schema_version")]
-            public string SchemaVersion { get; set; }
+            public string SchemaVersion { get; set; } = string.Empty;
 
             [JsonPropertyName("analyzer_id")]
-            public string AnalyzerId { get; set; }
+            public string AnalyzerId { get; set; } = string.Empty;
 
             [JsonPropertyName("selected_worksheet_name")]
-            public string SelectedWorksheetName { get; set; }
+            public string SelectedWorksheetName { get; set; } = string.Empty;
 
             [JsonPropertyName("confidence")]
             public double Confidence { get; set; }
 
             [JsonPropertyName("fields")]
-            public List<RustFieldCandidate> Fields { get; set; }
+            public List<RustFieldCandidate> Fields { get; set; } = [];
 
             [JsonPropertyName("issues")]
-            public List<RustIssue> Issues { get; set; }
+            public List<RustIssue> Issues { get; set; } = [];
 
             [JsonPropertyName("sheets")]
-            public List<RustSheetAnalysis> Sheets { get; set; }
+            public List<RustSheetAnalysis> Sheets { get; set; } = [];
         }
 
         private sealed class RustSheetAnalysis
         {
             [JsonPropertyName("name")]
-            public string Name { get; set; }
+            public string Name { get; set; } = string.Empty;
 
             [JsonPropertyName("used_range")]
-            public RustUsedRange UsedRange { get; set; }
+            public RustUsedRange UsedRange { get; set; } = new();
 
             [JsonPropertyName("confidence")]
             public double Confidence { get; set; }
 
             [JsonPropertyName("field_candidates")]
-            public List<RustFieldCandidate> FieldCandidates { get; set; }
+            public List<RustFieldCandidate> FieldCandidates { get; set; } = [];
 
             [JsonPropertyName("table")]
-            public RustTableAnalysis Table { get; set; }
+            public RustTableAnalysis Table { get; set; } = new();
         }
 
         private sealed class RustUsedRange
@@ -657,13 +657,13 @@ namespace ExportDocManager.Services.Data
             public double Confidence { get; set; }
 
             [JsonPropertyName("fields")]
-            public List<RustTableField> Fields { get; set; }
+            public List<RustTableField> Fields { get; set; } = [];
         }
 
         private sealed class RustTableField
         {
             [JsonPropertyName("canonical_field")]
-            public string CanonicalField { get; set; }
+            public string CanonicalField { get; set; } = string.Empty;
 
             [JsonPropertyName("column")]
             public int Column { get; set; }
@@ -672,16 +672,16 @@ namespace ExportDocManager.Services.Data
         private sealed class RustFieldCandidate
         {
             [JsonPropertyName("field_key")]
-            public string FieldKey { get; set; }
+            public string FieldKey { get; set; } = string.Empty;
 
             [JsonPropertyName("display_name")]
-            public string DisplayName { get; set; }
+            public string DisplayName { get; set; } = string.Empty;
 
             [JsonPropertyName("value")]
-            public string Value { get; set; }
+            public string Value { get; set; } = string.Empty;
 
             [JsonPropertyName("worksheet_name")]
-            public string WorksheetName { get; set; }
+            public string WorksheetName { get; set; } = string.Empty;
 
             [JsonPropertyName("row")]
             public int Row { get; set; }
@@ -693,22 +693,22 @@ namespace ExportDocManager.Services.Data
             public double Confidence { get; set; }
 
             [JsonPropertyName("source")]
-            public string Source { get; set; }
+            public string Source { get; set; } = string.Empty;
         }
 
         private sealed class RustIssue
         {
             [JsonPropertyName("severity")]
-            public string Severity { get; set; }
+            public string Severity { get; set; } = string.Empty;
 
             [JsonPropertyName("code")]
-            public string Code { get; set; }
+            public string Code { get; set; } = string.Empty;
 
             [JsonPropertyName("message")]
-            public string Message { get; set; }
+            public string Message { get; set; } = string.Empty;
 
             [JsonPropertyName("field_key")]
-            public string FieldKey { get; set; }
+            public string FieldKey { get; set; } = string.Empty;
         }
     }
 }

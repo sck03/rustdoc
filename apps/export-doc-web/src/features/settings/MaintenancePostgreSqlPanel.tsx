@@ -106,7 +106,13 @@ export function PostgreSqlMaintenancePanel({
   const restoreMigrationMutation = useMutation({
     mutationFn: () => runAbortableOperation(async (signal) => {
       const authorization = await client.authorizeServerMigrationOperation({ body: { action: "restore-server", adminPassword: migrationAdminPassword } }, { signal });
-      return client.stageServerMigrationRestore({ body: migrationRestoreFile as File }, { signal, headers: { "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket, "X-ExportDocManager-Migration-Password": migrationRestorePassword, "X-ExportDocManager-Migration-File-Name": migrationRestoreFile?.name ?? "migration.edmmigration", "X-ExportDocManager-Restore-Confirmation": migrationRestoreConfirmation.trim() } });
+      return client.stageServerMigrationRestore({
+        body: migrationRestoreFile as File,
+        "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket,
+        "X-ExportDocManager-Migration-Password": migrationRestorePassword,
+        "X-ExportDocManager-Migration-File-Name": migrationRestoreFile?.name ?? "migration.edmmigration",
+        "X-ExportDocManager-Restore-Confirmation": migrationRestoreConfirmation.trim(),
+      }, { signal });
     }),
     onSuccess: async (response) => { setMigrationAdminPassword(""); setMigrationRestorePassword(""); setMigrationRestoreConfirmation(""); setMigrationRestoreFile(null); setMessage(null); setSuccessMessage(response.message || "服务器迁移已排队，请重启服务完成恢复。"); await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() }); },
     onError: (error) => { setMigrationAdminPassword(""); setMigrationRestorePassword(""); setMigrationRestoreConfirmation(""); fail(error); },
@@ -127,7 +133,12 @@ export function PostgreSqlMaintenancePanel({
   const uploadDatabaseRestoreMutation = useMutation({
     mutationFn: () => runAbortableOperation(async (signal) => {
       const authorization = await client.authorizeServerMigrationOperation({ body: { action: "restore-database", adminPassword: databaseAdminPassword } }, { signal });
-      return client.uploadAndRestorePostgreSqlPhysicalBackup({ body: databaseUploadFile as File }, { signal, headers: { "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket, "X-ExportDocManager-PostgreSql-Backup-File-Name": databaseUploadFile?.name ?? "database.dump", "X-ExportDocManager-Restore-Confirmation": databaseRestoreConfirmation.trim() } });
+      return client.uploadAndRestorePostgreSqlPhysicalBackup({
+        body: databaseUploadFile as File,
+        "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket,
+        "X-ExportDocManager-PostgreSql-Backup-File-Name": databaseUploadFile?.name ?? "database.dump",
+        "X-ExportDocManager-Restore-Confirmation": databaseRestoreConfirmation.trim(),
+      }, { signal });
     }),
     onSuccess: async (response) => { setDatabaseAdminPassword(""); setDatabaseUploadFile(null); setDatabaseRestoreConfirmation(""); setMessage(null); setSuccessMessage(response.message || "上传的 PostgreSQL 数据库恢复已排队，请重启服务完成恢复。"); await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() }); },
     onError: (error) => { setDatabaseAdminPassword(""); setDatabaseRestoreConfirmation(""); fail(error); },

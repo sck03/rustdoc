@@ -7,9 +7,9 @@ import {
   toPascalCase,
 } from "./settingsValueUtils.ts";
 
-export type SettingsRecord = Record<string, unknown>;
+type ExcelImportSettingsRecord = Record<string, unknown>;
 
-export const defaultExcelImportSettings: SettingsRecord = {
+export const defaultExcelImportSettings: ExcelImportSettingsRecord = {
   schemeName: "Default",
   exporterNameCNCell: "A1",
   exporterNameCell: "B3",
@@ -63,15 +63,15 @@ export const defaultExcelImportSettings: SettingsRecord = {
   totalPriceCol: 24,
 };
 
-export function readExcelImportSettingsForSettings(settings: SettingsRecord) {
+export function readExcelImportSettingsForSettings(settings: Record<string, unknown>) {
   return normalizeExcelImportSettings(readNestedValue(settings, ["excelImport"]));
 }
 
-export function readExcelImportSchemesForSettings(settings: SettingsRecord) {
+export function readExcelImportSchemesForSettings(settings: Record<string, unknown>) {
   const value = readNestedValue(settings, ["excelImportSchemes"]);
   if (!Array.isArray(value)) return [];
 
-  const schemes: SettingsRecord[] = [];
+  const schemes: ExcelImportSettingsRecord[] = [];
   const seen = new Set<string>();
   for (const rawScheme of value) {
     const scheme = normalizeExcelImportSettings(rawScheme);
@@ -85,7 +85,7 @@ export function readExcelImportSchemesForSettings(settings: SettingsRecord) {
 
 export function normalizeExcelImportSettings(value: unknown) {
   const source = isRecord(value) ? value : {};
-  const result: SettingsRecord = {};
+  const result: ExcelImportSettingsRecord = {};
   for (const [key, defaultValue] of Object.entries(defaultExcelImportSettings)) {
     const sourceValue = readRecordValue(source, key, toPascalCase(key));
     result[key] = typeof defaultValue === "number"
@@ -99,14 +99,14 @@ export function createDefaultExcelImportSettings(schemeName: string) {
   return { ...defaultExcelImportSettings, schemeName: schemeName.trim() || "Default" };
 }
 
-export function buildExcelSchemeOptions(schemes: SettingsRecord[]) {
+export function buildExcelSchemeOptions(schemes: ExcelImportSettingsRecord[]) {
   return schemes.map((scheme) => {
     const schemeName = readRecordString(scheme, "schemeName");
     return { value: schemeName, label: schemeName };
   });
 }
 
-export function readExcelImportRecordNumber(record: SettingsRecord, key: string) {
+export function readExcelImportRecordNumber(record: ExcelImportSettingsRecord, key: string) {
   const defaultValue = defaultExcelImportSettings[key];
   return readFiniteNumber(
     readRecordValue(record, key, toPascalCase(key)),

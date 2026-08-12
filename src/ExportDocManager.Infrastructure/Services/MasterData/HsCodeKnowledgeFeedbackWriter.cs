@@ -15,7 +15,7 @@ namespace ExportDocManager.Services.MasterData
         public static async Task RecordInvoiceFeedbackAsync(
             AppDbContext context,
             IReadOnlyList<Item> invoiceItems,
-            IReadOnlyList<HsCodeKnowledgeFeedbackInput> inputs,
+            IReadOnlyList<HsCodeKnowledgeFeedbackInput>? inputs,
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(context);
@@ -33,7 +33,7 @@ namespace ExportDocManager.Services.MasterData
             foreach (var input in feedback)
             {
                 string code = HsCodeTextHelper.NormalizeCode(input.CandidateCode);
-                Item matchedItem = items.FirstOrDefault(item =>
+                Item? matchedItem = items.FirstOrDefault(item =>
                     string.Equals(HsCodeTextHelper.NormalizeCode(item.HSCode), code, StringComparison.OrdinalIgnoreCase));
                 if (input.Accepted && matchedItem == null)
                 {
@@ -164,14 +164,14 @@ namespace ExportDocManager.Services.MasterData
             return normalized;
         }
 
-        private static string FirstNonEmpty(params string[] values) =>
+        private static string FirstNonEmpty(params string?[] values) =>
             values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
 
-        private static string BuildSpecification(Item item, string productName, string fallback)
+        private static string BuildSpecification(Item item, string productName, string? fallback)
         {
             var values = new[] { item.StyleName, item.FabricComposition, item.Brand }
                 .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Select(value => value.Trim())
+                .Select(value => value?.Trim() ?? string.Empty)
                 .Where(value => !string.Equals(value, productName, StringComparison.OrdinalIgnoreCase))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();

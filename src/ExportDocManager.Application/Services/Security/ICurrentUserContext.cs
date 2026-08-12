@@ -4,6 +4,6 @@ namespace ExportDocManager.Services.Security
 {
     public interface ICurrentUserContext
     {
-        User CurrentUser { get; }
+        User? CurrentUser { get; }
     }
 }

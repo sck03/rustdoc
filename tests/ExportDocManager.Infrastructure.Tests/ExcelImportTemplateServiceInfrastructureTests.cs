@@ -199,7 +199,7 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 LastDistinctNameLimit = maxCount;
                 IReadOnlyList<string> result = _exporters
-                    .Select(exporter => exporter?.ExporterNameCN?.Trim())
+                    .Select(exporter => exporter?.ExporterNameCN?.Trim() ?? string.Empty)
                     .Where(name => !string.IsNullOrWhiteSpace(name))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .Take(Math.Clamp(maxCount, 1, 10))

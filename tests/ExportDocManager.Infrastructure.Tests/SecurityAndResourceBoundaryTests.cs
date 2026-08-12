@@ -48,7 +48,7 @@ public sealed class SecurityAndResourceBoundaryTests
             Assert.Equal("数据库密码", second.Unprotect(encryptedOne));
             string tampered = encryptedOne[..^1] + (encryptedOne[^1] == 'A' ? 'B' : 'A');
             Assert.Throws<InvalidDataException>(() => second.Unprotect(tampered));
-            Assert.False(second.TryUnprotect(tampered, out string plainText));
+            Assert.False(second.TryUnprotect(tampered, out string? plainText));
             Assert.Null(plainText);
             Assert.Throws<InvalidOperationException>(() => second.Protect(encryptedOne));
             Assert.Null(second.Unprotect("plain-text-secret"));

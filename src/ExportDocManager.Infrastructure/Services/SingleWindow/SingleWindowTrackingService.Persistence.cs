@@ -155,7 +155,7 @@ namespace ExportDocManager.Services.SingleWindow
                     continue;
                 }
 
-                string rawContent = entry.RawContent ?? string.Empty;
+                string rawContent = entry?.RawContent ?? string.Empty;
                 entries.Add(new ReceiptImportEntry(
                     receipt,
                     SingleWindowPackageIntegrity.ComputeTextSha256(rawContent),
@@ -198,14 +198,14 @@ namespace ExportDocManager.Services.SingleWindow
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
 
-        private static string NormalizeReceiptKeyPart(string value)
+        private static string NormalizeReceiptKeyPart(string? value)
         {
             return value?.Trim() ?? string.Empty;
         }
 
         private static SwHandoffPackageRecord BuildPackageRecord(
             int batchId,
-            string packagePath,
+            string? packagePath,
             SingleWindowPackageManifest manifest,
             string direction)
         {
@@ -240,7 +240,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : batchReference.Trim();
         }
 
-        internal static SingleWindowReceiptParseResult SelectPrimaryReceipt(IReadOnlyList<SingleWindowReceiptParseResult> parsedReceipts)
+        internal static SingleWindowReceiptParseResult? SelectPrimaryReceipt(IReadOnlyList<SingleWindowReceiptParseResult>? parsedReceipts)
         {
             var terminalStatuses = (parsedReceipts ?? [])
                 .Where(item => item != null && IsTerminalStatus(item.BusinessStatus))
@@ -252,7 +252,7 @@ namespace ExportDocManager.Services.SingleWindow
                 throw new InvalidDataException("同一回执包同时包含放行和退单终态，已拒绝写入。" );
             }
 
-            return parsedReceipts
+            return (parsedReceipts ?? [])
                 .Where(item => item != null)
                 .OrderByDescending(item => GetStatusRank(item.BusinessStatus))
                 .ThenByDescending(item => item.OccurredAt ?? DateTime.MinValue)
@@ -261,7 +261,7 @@ namespace ExportDocManager.Services.SingleWindow
 
         internal static bool ShouldUpdateReceiptSummary(
             SwSubmissionBatch batch,
-            SingleWindowReceiptParseResult candidate)
+            SingleWindowReceiptParseResult? candidate)
         {
             if (candidate == null)
             {
@@ -299,9 +299,9 @@ namespace ExportDocManager.Services.SingleWindow
 
         private static string ResolveMonotonicBatchStatus(
             SwSubmissionBatch batch,
-            SingleWindowReceiptParseResult candidate)
+            SingleWindowReceiptParseResult? candidate)
         {
-            if (!ShouldUpdateReceiptSummary(batch, candidate))
+            if (candidate is null || !ShouldUpdateReceiptSummary(batch, candidate))
             {
                 return batch.Status;
             }
@@ -386,7 +386,7 @@ namespace ExportDocManager.Services.SingleWindow
         private static async Task ApplyReceiptWriteBackAsync(
             AppDbContext context,
             SwSubmissionBatch batch,
-            SingleWindowReceiptParseResult primaryReceipt,
+            SingleWindowReceiptParseResult? primaryReceipt,
             string batchStatus,
             CancellationToken cancellationToken)
         {

@@ -20,7 +20,7 @@ namespace ExportDocManager.Application.Tests
             {
                 ApplyType = " ",
                 CertStatus = "",
-                CertType = null,
+                CertType = string.Empty,
                 AplPromiseCode = "",
                 EtpsName = "  EXPORTER LTD.  "
             };

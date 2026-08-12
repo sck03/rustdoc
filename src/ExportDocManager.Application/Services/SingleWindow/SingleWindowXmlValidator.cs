@@ -5,12 +5,12 @@ namespace ExportDocManager.Services.SingleWindow
 {
     public interface ISingleWindowXmlValidator
     {
-        IReadOnlyList<string> ValidateForBuild(SingleWindowBusinessType businessType, object mappedDocument);
+        IReadOnlyList<string> ValidateForBuild(SingleWindowBusinessType businessType, object? mappedDocument);
     }
 
     public sealed class SingleWindowXmlValidator : ISingleWindowXmlValidator
     {
-        public IReadOnlyList<string> ValidateForBuild(SingleWindowBusinessType businessType, object mappedDocument)
+        public IReadOnlyList<string> ValidateForBuild(SingleWindowBusinessType businessType, object? mappedDocument)
         {
             var errors = new List<string>();
             switch (businessType)
@@ -29,7 +29,7 @@ namespace ExportDocManager.Services.SingleWindow
             return errors;
         }
 
-        private static void ValidateCustomsCoo(CooMappedDocument document, ICollection<string> errors)
+        private static void ValidateCustomsCoo(CooMappedDocument? document, ICollection<string> errors)
         {
             if (document == null)
             {
@@ -324,7 +324,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        private static void ValidateAgentConsignment(AcdMappedDocument document, ICollection<string> errors)
+        private static void ValidateAgentConsignment(AcdMappedDocument? document, ICollection<string> errors)
         {
             if (document == null)
             {
@@ -360,7 +360,7 @@ namespace ExportDocManager.Services.SingleWindow
             return CustomsCooRuleCatalog.UsesModificationFields(certStatus);
         }
 
-        private static bool UsesRcepImportComponentRatio(string certType, string originCriteria)
+        private static bool UsesRcepImportComponentRatio(string? certType, string? originCriteria)
         {
             return string.Equals(certType?.Trim(), "RC", StringComparison.OrdinalIgnoreCase) &&
                    string.Equals(originCriteria?.Trim(), "RVC", StringComparison.OrdinalIgnoreCase);

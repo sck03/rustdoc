@@ -744,12 +744,12 @@ namespace ExportDocManager.Api.Tests
 
             public bool IsActive { get; set; } = true;
 
-            public Task<User> AuthenticateAsync(string username, string password) =>
+            public Task<User?> AuthenticateAsync(string username, string password) =>
                 Task.FromResult(GetActive(username));
 
-            public Task<User> GetUserByUsernameAsync(string username) => Task.FromResult(GetActive(username));
+            public Task<User?> GetUserByUsernameAsync(string username) => Task.FromResult(GetActive(username));
 
-            public Task<User> GetActiveUserByIdAsync(int userId, CancellationToken cancellationToken = default) =>
+            public Task<User?> GetActiveUserByIdAsync(int userId, CancellationToken cancellationToken = default) =>
                 Task.FromResult(userId == _user.Id && IsActive ? _user : null);
 
             public Task<IReadOnlyList<User>> GetUsersAsync(CancellationToken cancellationToken = default) =>
@@ -761,7 +761,7 @@ namespace ExportDocManager.Api.Tests
             public Task<bool> DeleteUserAsync(int userId, CancellationToken cancellationToken = default) =>
                 throw new NotSupportedException();
 
-            private User GetActive(string username) =>
+            private User? GetActive(string username) =>
                 IsActive && string.Equals(username, _user.Username, StringComparison.OrdinalIgnoreCase) ? _user : null;
         }
     }

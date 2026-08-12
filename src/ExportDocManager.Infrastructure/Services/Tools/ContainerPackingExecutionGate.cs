@@ -46,7 +46,7 @@ internal static class ContainerPackingExecutionGate
         int minimum,
         int maximum)
     {
-        string configured = Environment.GetEnvironmentVariable(environmentVariable);
+        string? configured = Environment.GetEnvironmentVariable(environmentVariable);
         return int.TryParse(configured, out int parsed)
             ? Math.Clamp(parsed, minimum, maximum)
             : defaultValue;

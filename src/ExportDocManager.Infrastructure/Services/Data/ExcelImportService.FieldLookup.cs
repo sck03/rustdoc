@@ -39,7 +39,7 @@ namespace ExportDocManager.Services.Data
             }
         }
 
-        private static string GetAnalyzedValue(ExcelImportAnalysisReport analysisReport, string fieldKey)
+        private static string? GetAnalyzedValue(ExcelImportAnalysisReport analysisReport, string fieldKey)
         {
             var field = analysisReport?.Fields?
                 .Where(item => string.Equals(item.FieldKey, fieldKey, StringComparison.Ordinal))
@@ -51,16 +51,16 @@ namespace ExportDocManager.Services.Data
                 : null;
         }
 
-        private static string GetAnalyzedValue(
+        private static string? GetAnalyzedValue(
             ExcelImportAnalysisReport analysisReport,
             string fieldKey,
             Func<string, bool> valueValidator)
         {
-            string value = GetAnalyzedValue(analysisReport, fieldKey);
-            return valueValidator == null || valueValidator(value) ? value : null;
+            string? value = GetAnalyzedValue(analysisReport, fieldKey);
+            return value != null && valueValidator(value) ? value : null;
         }
 
-        private static string PickMoreCompleteMultilineValue(string analyzedValue, string fallbackValue)
+        private static string PickMoreCompleteMultilineValue(string? analyzedValue, string? fallbackValue)
         {
             analyzedValue = NormalizeExcelTextBlock(analyzedValue);
             fallbackValue = NormalizeExcelTextBlock(fallbackValue);
@@ -94,7 +94,7 @@ namespace ExportDocManager.Services.Data
                 .Count(line => !string.IsNullOrWhiteSpace(line));
         }
 
-        private static string NormalizeExcelTextBlock(string value)
+        private static string NormalizeExcelTextBlock(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -152,7 +152,7 @@ namespace ExportDocManager.Services.Data
             string cellReference,
             IReadOnlyList<string> labels,
             string defaultValue = "",
-            Func<string, bool> configuredValueValidator = null)
+            Func<string, bool>? configuredValueValidator = null)
         {
             string labelValue = FindValueBesideLabel(worksheet, labels);
             if (!string.IsNullOrWhiteSpace(labelValue))
@@ -450,4 +450,3 @@ namespace ExportDocManager.Services.Data
         }
     }
 }
-

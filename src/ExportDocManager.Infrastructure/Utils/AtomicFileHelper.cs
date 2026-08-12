@@ -72,7 +72,7 @@ namespace ExportDocManager.Utils
         {
             ArgumentNullException.ThrowIfNull(writeTempFile);
 
-            WriteFileAtomic<object>(targetPath, tempPath =>
+            WriteFileAtomic<object?>(targetPath, tempPath =>
             {
                 writeTempFile(tempPath);
                 return null;
@@ -86,7 +86,7 @@ namespace ExportDocManager.Utils
         {
             ArgumentNullException.ThrowIfNull(writeTempFile);
 
-            WriteFileAtomic<object>(
+            WriteFileAtomic<object?>(
                 targetPath,
                 (tempPath, ct) =>
                 {
@@ -144,7 +144,7 @@ namespace ExportDocManager.Utils
         {
             ArgumentNullException.ThrowIfNull(writeTempFileAsync);
 
-            return WriteFileAtomicAsync<object>(
+            return WriteFileAtomicAsync<object?>(
                 targetPath,
                 async (tempPath, ct) =>
                 {
@@ -177,7 +177,7 @@ namespace ExportDocManager.Utils
             }
         }
 
-        public static void WriteAllTextAtomic(string targetPath, string content, Encoding encoding = null)
+        public static void WriteAllTextAtomic(string targetPath, string content, Encoding? encoding = null)
         {
             WriteFileAtomic(
                 targetPath,
@@ -187,7 +187,7 @@ namespace ExportDocManager.Utils
         public static async Task WriteAllTextAtomicAsync(
             string targetPath,
             string content,
-            Encoding encoding = null,
+            Encoding? encoding = null,
             CancellationToken cancellationToken = default)
         {
             await WriteFileAtomicAsync(

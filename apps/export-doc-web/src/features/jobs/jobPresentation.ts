@@ -26,7 +26,7 @@ export function isTerminalJob(value?: string) {
   return normalized === "succeeded" || normalized === "failed" || normalized === "canceled";
 }
 
-export function formatProgress(value?: number) {
+export function formatProgress(value?: number | null) {
   return typeof value === "number" ? `${formatPlainNumber(value)}%` : "-";
 }
 
@@ -34,7 +34,7 @@ export function readJobMessage(job: BackgroundJobSnapshot) {
   return job.errorMessage || job.detailText || job.statusText || "-";
 }
 
-export function formatDateTime(value?: string) {
+export function formatDateTime(value?: string | null) {
   if (!value) return "-";
   const date = new Date(value);
   return Number.isNaN(date.getTime())

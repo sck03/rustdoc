@@ -192,7 +192,7 @@ namespace ExportDocManager.Services.Reporting
             return Path.GetFullPath(_pathResolver.ToAbsolutePath(templatePath.Trim()));
         }
 
-        public static ReportDocumentType ResolveCatalogReportType(string rawType, string templatePath)
+        public static ReportDocumentType ResolveCatalogReportType(string? rawType, string? templatePath)
         {
             if (Enum.TryParse(rawType, true, out ReportDocumentType reportType))
             {
@@ -204,7 +204,7 @@ namespace ExportDocManager.Services.Reporting
                 : ReportDocumentType.ExportDocument;
         }
 
-        public static string NormalizeTemplateCatalogType(string rawType, string templatePath)
+        public static string NormalizeTemplateCatalogType(string? rawType, string? templatePath)
         {
             if (Enum.TryParse(rawType, true, out ReportDocumentType reportType))
             {
@@ -226,7 +226,7 @@ namespace ExportDocManager.Services.Reporting
             return DetermineTemplateCatalogType(templatePath);
         }
 
-        public static string NormalizeTemplateDisplayName(string name, string templatePath)
+        public static string NormalizeTemplateDisplayName(string? name, string? templatePath)
         {
             if (!string.IsNullOrWhiteSpace(name))
             {
@@ -291,7 +291,7 @@ namespace ExportDocManager.Services.Reporting
             };
         }
 
-        private static string DetermineTemplateCatalogType(string templatePath)
+        private static string DetermineTemplateCatalogType(string? templatePath)
         {
             if (string.IsNullOrWhiteSpace(templatePath))
             {
@@ -383,16 +383,16 @@ namespace ExportDocManager.Services.Reporting
 
     internal sealed class ReportTemplateConfigRoot
     {
-        public List<ReportTemplateConfig> Reports { get; set; }
+        public List<ReportTemplateConfig> Reports { get; set; } = [];
     }
 
     internal sealed class ReportTemplateConfig
     {
-        public string Type { get; set; }
+        public string Type { get; set; } = string.Empty;
 
-        public string FileName { get; set; }
+        public string FileName { get; set; } = string.Empty;
 
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         public bool? WithSeal { get; set; }
     }

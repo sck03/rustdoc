@@ -133,14 +133,18 @@ namespace ExportDocManager.Services.SingleWindow
                 throw new InvalidDataException("提交包不能携带官方回执业务编号。");
             }
 
-            EnsureExpectedPathPrefix(manifest.PayloadFiles, expectedPackageType == SingleWindowPackageType.SubmitPackage
+            IReadOnlyList<SingleWindowPackageFile> payloadFiles = manifest.PayloadFiles
+                ?? throw new InvalidDataException("单一窗口交接包缺少业务载荷清单。");
+            IReadOnlyList<SingleWindowPackageFile> attachmentFiles = manifest.AttachmentFiles
+                ?? throw new InvalidDataException("单一窗口交接包缺少附件清单。");
+            EnsureExpectedPathPrefix(payloadFiles, expectedPackageType == SingleWindowPackageType.SubmitPackage
                 ? "payloads/"
                 : "receipts/");
-            EnsureExpectedPathPrefix(manifest.AttachmentFiles, "attachments/");
-            EnsureNoDuplicatePaths(manifest.PayloadFiles, manifest.AttachmentFiles);
+            EnsureExpectedPathPrefix(attachmentFiles, "attachments/");
+            EnsureNoDuplicatePaths(payloadFiles, attachmentFiles);
 
-            await ValidateFilesAsync(workingDirectory, manifest.PayloadFiles, cancellationToken).ConfigureAwait(false);
-            await ValidateFilesAsync(workingDirectory, manifest.AttachmentFiles, cancellationToken).ConfigureAwait(false);
+            await ValidateFilesAsync(workingDirectory, payloadFiles, cancellationToken).ConfigureAwait(false);
+            await ValidateFilesAsync(workingDirectory, attachmentFiles, cancellationToken).ConfigureAwait(false);
 
             if (expectedPackageType == SingleWindowPackageType.SubmitPackage)
             {

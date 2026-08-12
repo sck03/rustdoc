@@ -42,7 +42,13 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("ImportSingleWindowSubmitPackage");
+            .WithName("ImportSingleWindowSubmitPackage")
+            .Produces<ApiSingleWindowImportedPackageResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/receipts/import", async (
                 HttpContext context,
@@ -70,7 +76,13 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("ImportSingleWindowReceiptPackage");
+            .WithName("ImportSingleWindowReceiptPackage")
+            .Produces<ApiSingleWindowImportedPackageResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/packages/upload", async (
                 HttpContext context,
@@ -109,7 +121,13 @@ namespace ExportDocManager.Api.Hosting
                     keepWorkingDirectory ?? false,
                     cancellationToken);
             })
-            .WithName("UploadSingleWindowSubmitPackage");
+            .Accepts<IFormFile>("application/octet-stream")
+            .WithName("UploadSingleWindowSubmitPackage")
+            .Produces<ApiSingleWindowImportedPackageResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/receipts/upload", async (
                 HttpContext context,
@@ -137,7 +155,13 @@ namespace ExportDocManager.Api.Hosting
                     keepWorkingDirectory ?? false,
                     cancellationToken);
             })
-            .WithName("UploadSingleWindowReceiptPackage");
+            .Accepts<IFormFile>("application/octet-stream")
+            .WithName("UploadSingleWindowReceiptPackage")
+            .Produces<ApiSingleWindowImportedPackageResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/receipts/save-package-to-path", async (
                 HttpContext context,
@@ -164,7 +188,12 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("SaveSingleWindowReceiptPackageToPath");
+            .WithName("SaveSingleWindowReceiptPackageToPath")
+            .Produces<ApiSingleWindowHandoffPackageResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/receipts/download-package", async (
                 HttpContext context,
@@ -192,7 +221,12 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("DownloadSingleWindowReceiptPackage");
+            .WithName("DownloadSingleWindowReceiptPackage")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict);
         }
     }
 }

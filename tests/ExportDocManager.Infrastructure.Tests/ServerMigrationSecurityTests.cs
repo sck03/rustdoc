@@ -597,8 +597,7 @@ public sealed class ServerMigrationSecurityTests
             Assert.False(Directory.Exists(oldSwapRoot));
             Assert.False(Directory.Exists(snapshotRoot));
             Assert.False(File.Exists(markerPath));
-            ServerMigrationRestoreStatusSnapshot status = ServerMigrationManager.ReadStatus(paths);
-            Assert.NotNull(status);
+            ServerMigrationRestoreStatusSnapshot status = Assert.IsType<ServerMigrationRestoreStatusSnapshot>(ServerMigrationManager.ReadStatus(paths));
             Assert.Equal(ServerMigrationRestorePhase.Failed, status.Phase);
             Assert.Contains("已清理未应用的迁移准备数据", status.Message, StringComparison.Ordinal);
         }
@@ -720,8 +719,7 @@ public sealed class ServerMigrationSecurityTests
             await ServerMigrationManager.ApplyPendingRestoreAsync(paths);
 
             Assert.False(File.Exists(markerPath));
-            ServerMigrationRestoreStatusSnapshot status = ServerMigrationManager.ReadStatus(paths);
-            Assert.NotNull(status);
+            ServerMigrationRestoreStatusSnapshot status = Assert.IsType<ServerMigrationRestoreStatusSnapshot>(ServerMigrationManager.ReadStatus(paths));
             Assert.Equal(ServerMigrationRestorePhase.Failed, status.Phase);
             Assert.Contains("恢复标记无效", status.Message, StringComparison.Ordinal);
         }
@@ -814,7 +812,7 @@ public sealed class ServerMigrationSecurityTests
 
     private static string FindRepositoryRoot()
     {
-        string directory = AppContext.BaseDirectory;
+        string? directory = AppContext.BaseDirectory;
         while (!string.IsNullOrWhiteSpace(directory))
         {
             if (File.Exists(Path.Combine(directory, "ExportDocManager.sln")))

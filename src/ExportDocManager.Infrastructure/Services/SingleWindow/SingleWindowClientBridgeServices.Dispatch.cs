@@ -458,7 +458,7 @@ namespace ExportDocManager.Services.SingleWindow
             string outBoxDirectory,
             string batchReference,
             CancellationToken cancellationToken,
-            Action<int, string> beforeCommit = null)
+            Action<int, string>? beforeCommit = null)
         {
             Directory.CreateDirectory(outBoxDirectory);
             var publishedFiles = new List<string>(stagedFiles?.Count ?? 0);
@@ -514,7 +514,7 @@ namespace ExportDocManager.Services.SingleWindow
             string outBoxDirectory,
             string originalFileName,
             string batchReference,
-            ISet<string> reservedPaths = null)
+            ISet<string>? reservedPaths = null)
         {
             string candidate = Path.Combine(outBoxDirectory, originalFileName);
             if (!File.Exists(candidate) &&

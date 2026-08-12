@@ -25,7 +25,7 @@ namespace ExportDocManager.Services.Core
             IItemService itemService,
             IInvoicePartyResolver invoicePartyResolver,
             DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope businessDataAccessScope = null)
+            BusinessDataAccessScope? businessDataAccessScope = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _itemService = itemService ?? throw new ArgumentNullException(nameof(itemService));

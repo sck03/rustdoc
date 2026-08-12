@@ -133,7 +133,7 @@ namespace ExportDocManager.Api.Hosting
                 return true;
             }
 
-            string oldestUnlockedKey = _states
+            string? oldestUnlockedKey = _states
                 .Where(pair => pair.Value.LockedUntil <= now)
                 .OrderBy(pair => pair.Value.LastSeen)
                 .Select(pair => pair.Key)

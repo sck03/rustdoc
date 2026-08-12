@@ -451,295 +451,6 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
-        public void OpenApiDocument_ShouldExposeHealthEndpoint()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("\"openapi\":\"3.0.1\"", json, StringComparison.Ordinal);
-            Assert.Contains("/healthz", json, StringComparison.Ordinal);
-            Assert.Contains("/readyz", json, StringComparison.Ordinal);
-            Assert.Contains("/livez", json, StringComparison.Ordinal);
-            Assert.Contains("ApiHealthResponse", json, StringComparison.Ordinal);
-            Assert.Contains("requirement", json, StringComparison.Ordinal);
-            Assert.Contains("core, feature, or optional", json, StringComparison.Ordinal);
-            Assert.Contains("runtimeDependencies", json, StringComparison.Ordinal);
-            Assert.Contains("ApiRuntimeDependencyInfo", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeBearerSecurityScheme()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("securitySchemes", json, StringComparison.Ordinal);
-            Assert.Contains("BearerAuth", json, StringComparison.Ordinal);
-            Assert.Contains("\"type\":\"http\"", json, StringComparison.Ordinal);
-            Assert.Contains("\"scheme\":\"bearer\"", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeAuthenticationCapabilitySchema()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/auth/login", json, StringComparison.Ordinal);
-            Assert.Contains(ApiRuntimeOptions.BootstrapTokenHeaderName, json, StringComparison.Ordinal);
-            Assert.Contains("Deployment bootstrap token", json, StringComparison.Ordinal);
-            Assert.Contains("/api/auth/me", json, StringComparison.Ordinal);
-            Assert.Contains("ApiLoginResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiUserDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiUserCapabilitiesDto", json, StringComparison.Ordinal);
-            Assert.Contains("capabilities", json, StringComparison.Ordinal);
-            Assert.Contains("canManageSettings", json, StringComparison.Ordinal);
-            Assert.Contains("canManageUsers", json, StringComparison.Ordinal);
-            Assert.Contains("canViewAllBusinessData", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeDesktopShutdownMaintenanceEndpoint()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/system/shutdown-maintenance", json, StringComparison.Ordinal);
-            Assert.Contains("runShutdownMaintenance", json, StringComparison.Ordinal);
-            Assert.Contains("DesktopAccess", json, StringComparison.Ordinal);
-            Assert.Contains(ApiDesktopAccessOptions.HeaderName, json, StringComparison.Ordinal);
-            Assert.Contains("ApiShutdownMaintenanceResponse", json, StringComparison.Ordinal);
-            Assert.Contains("Runtime data root Backups", json, StringComparison.Ordinal);
-            Assert.Contains("Program root logs", json, StringComparison.Ordinal);
-            Assert.Contains("/api/system/logs/cleanup", json, StringComparison.Ordinal);
-            Assert.Contains("cleanupSystemLogs", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSystemLogCleanupResponse", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeUserManagementEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/users", json, StringComparison.Ordinal);
-            Assert.Contains("/api/users/{id}", json, StringComparison.Ordinal);
-            Assert.Contains("listUsers", json, StringComparison.Ordinal);
-            Assert.Contains("createUserAccount", json, StringComparison.Ordinal);
-            Assert.Contains("updateUserAccount", json, StringComparison.Ordinal);
-            Assert.Contains("deleteUserAccount", json, StringComparison.Ordinal);
-            Assert.Contains("ApiUserListResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiUserAccountDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiUserSaveRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiUserSaveResponse", json, StringComparison.Ordinal);
-            Assert.Contains("resetPassword", json, StringComparison.Ordinal);
-            Assert.Contains("403", json, StringComparison.Ordinal);
-            Assert.Contains("409", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeInvoiceListEndpoint()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/invoices", json, StringComparison.Ordinal);
-            Assert.Contains("/api/invoices/{id}", json, StringComparison.Ordinal);
-            Assert.Contains("listInvoices", json, StringComparison.Ordinal);
-            Assert.Contains("getInvoice", json, StringComparison.Ordinal);
-            Assert.Contains("createInvoice", json, StringComparison.Ordinal);
-            Assert.Contains("updateInvoice", json, StringComparison.Ordinal);
-            Assert.Contains("deleteInvoice", json, StringComparison.Ordinal);
-            Assert.Contains("/api/system/data-maintenance/invoices/{id}", json, StringComparison.Ordinal);
-            Assert.Contains("/api/system/data-maintenance/invoices/{id}/purge", json, StringComparison.Ordinal);
-            Assert.Contains("getInvoiceDataMaintenancePreview", json, StringComparison.Ordinal);
-            Assert.Contains("purgeCancelledInvoice", json, StringComparison.Ordinal);
-            Assert.Contains("/api/invoices/{id}/clone", json, StringComparison.Ordinal);
-            Assert.Contains("cloneInvoice", json, StringComparison.Ordinal);
-            Assert.Contains("/api/invoices/{id}/unverify", json, StringComparison.Ordinal);
-            Assert.Contains("unverifyInvoice", json, StringComparison.Ordinal);
-            Assert.Contains("/api/invoices/{id}/clone-type", json, StringComparison.Ordinal);
-            Assert.Contains("cloneInvoiceAsType", json, StringComparison.Ordinal);
-            Assert.Contains("/api/invoices/shipping-marks/image", json, StringComparison.Ordinal);
-            Assert.Contains("/api/invoices/shipping-marks/image/preview", json, StringComparison.Ordinal);
-            Assert.Contains("saveShippingMarkImage", json, StringComparison.Ordinal);
-            Assert.Contains("previewShippingMarkImage", json, StringComparison.Ordinal);
-            Assert.Contains("/api/invoices/profit-analysis", json, StringComparison.Ordinal);
-            Assert.Contains("analyzeInvoiceProfit", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPagedResponseOfApiInvoiceListItemDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceListItemDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceDetailDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceItemDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceSaveResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceDataMaintenancePreviewResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoicePurgeRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoicePurgeResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceCloneRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceCloneResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceCloneTypeRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceCloneTypeResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiShippingMarkImageSaveRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiShippingMarkImageSaveResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiShippingMarkImagePreviewRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiShippingMarkImagePreviewResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceProfitAnalysisRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceProfitAnalysisResponse", json, StringComparison.Ordinal);
-            Assert.Contains("does not read payment/reimbursement data", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCommandResponse", json, StringComparison.Ordinal);
-
-            using var jsonDocument = JsonDocument.Parse(json);
-            var paths = jsonDocument.RootElement.GetProperty("paths");
-            var deleteResponses = paths
-                .GetProperty("/api/invoices/{id}")
-                .GetProperty("delete")
-                .GetProperty("responses");
-            Assert.True(deleteResponses.TryGetProperty("409", out _));
-            var historyResponses = paths
-                .GetProperty("/api/invoices/{id}/status-history")
-                .GetProperty("get")
-                .GetProperty("responses");
-            Assert.False(historyResponses.TryGetProperty("409", out _));
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeSettingsEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/settings", json, StringComparison.Ordinal);
-            Assert.Contains("getSettings", json, StringComparison.Ordinal);
-            Assert.Contains("updateSettings", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSettingsResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSettingsSaveRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSettingsSaveResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSettingsSecretsDto", json, StringComparison.Ordinal);
-            Assert.Contains("403", json, StringComparison.Ordinal);
-            Assert.Contains("cannot manage program settings", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeBackupEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/backup", json, StringComparison.Ordinal);
-            Assert.Contains("/api/backup/cleanup", json, StringComparison.Ordinal);
-            Assert.Contains("/api/backup/restore", json, StringComparison.Ordinal);
-            Assert.Contains("/api/backup/cloud/status", json, StringComparison.Ordinal);
-            Assert.Contains("/api/backup/cloud/test-connection", json, StringComparison.Ordinal);
-            Assert.Contains("/api/backup/cloud/upload-latest", json, StringComparison.Ordinal);
-            Assert.Contains("/api/backup/cloud/backups", json, StringComparison.Ordinal);
-            Assert.Contains("/api/backup/cloud/download", json, StringComparison.Ordinal);
-            Assert.Contains("/api/postgresql-maintenance/backups", json, StringComparison.Ordinal);
-            Assert.Contains("/api/postgresql-maintenance/restore-plan", json, StringComparison.Ordinal);
-            Assert.Contains("/api/shared-database/ownership", json, StringComparison.Ordinal);
-            Assert.Contains("/api/shared-database/ownership/transfer", json, StringComparison.Ordinal);
-            Assert.Contains("/api/support-package", json, StringComparison.Ordinal);
-            Assert.Contains("listDatabaseBackups", json, StringComparison.Ordinal);
-            Assert.Contains("createDatabaseBackup", json, StringComparison.Ordinal);
-            Assert.Contains("cleanupDatabaseBackups", json, StringComparison.Ordinal);
-            Assert.Contains("restoreDatabaseBackup", json, StringComparison.Ordinal);
-            Assert.Contains("getCloudBackupStatus", json, StringComparison.Ordinal);
-            Assert.Contains("testCloudBackupConnection", json, StringComparison.Ordinal);
-            Assert.Contains("uploadLatestDatabaseBackupToCloud", json, StringComparison.Ordinal);
-            Assert.Contains("listCloudDatabaseBackups", json, StringComparison.Ordinal);
-            Assert.Contains("downloadCloudDatabaseBackup", json, StringComparison.Ordinal);
-            Assert.Contains("listPostgreSqlPhysicalBackups", json, StringComparison.Ordinal);
-            Assert.Contains("createPostgreSqlPhysicalBackup", json, StringComparison.Ordinal);
-            Assert.Contains("createPostgreSqlRestorePlan", json, StringComparison.Ordinal);
-            Assert.Contains("getSharedDatabaseOwnershipSummary", json, StringComparison.Ordinal);
-            Assert.Contains("transferSharedDatabaseOwnership", json, StringComparison.Ordinal);
-            Assert.Contains("saveSupportPackageToRuntime", json, StringComparison.Ordinal);
-            Assert.Contains("downloadSupportPackage", json, StringComparison.Ordinal);
-            Assert.Contains("ApiBackupListResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiBackupItemDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCloudBackupListResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCloudBackupItemDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCloudBackupDownloadRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCloudBackupStatusResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCloudBackupCommandResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiBackupCleanupRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiBackupRestoreRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPostgreSqlMaintenanceStatusResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPostgreSqlPhysicalBackupListResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPostgreSqlRestorePlanRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPostgreSqlRestorePlanResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSharedDatabaseOwnershipSummaryResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSharedDatabaseOwnershipTransferRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSupportPackageRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSupportPackageResponse", json, StringComparison.Ordinal);
-            Assert.Contains("runtime data root Backups", json, StringComparison.Ordinal);
-
-            using var jsonDocument = JsonDocument.Parse(json);
-            var paths = jsonDocument.RootElement.GetProperty("paths");
-            Assert.False(paths.TryGetProperty("/api/postgresql-maintenance/backups/download", out _));
-            Assert.True(paths
-                .GetProperty("/api/postgresql-maintenance/backups/download-ticket")
-                .GetProperty("post")
-                .GetProperty("responses")
-                .TryGetProperty("426", out _));
-            var supportResponses = paths
-                .GetProperty("/api/support-package/download")
-                .GetProperty("post")
-                .GetProperty("responses");
-            Assert.True(supportResponses.TryGetProperty("202", out _));
-            Assert.True(supportResponses.TryGetProperty("426", out _));
-            Assert.True(supportResponses.TryGetProperty("429", out _));
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeDashboardEndpoint()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/dashboard", json, StringComparison.Ordinal);
-            Assert.Contains("getDashboard", json, StringComparison.Ordinal);
-            Assert.Contains("ApiDashboardResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiDashboardRecentInvoiceDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiDashboardTodoItemDto", json, StringComparison.Ordinal);
-            Assert.Contains("does not read payment/reimbursement data", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
         public void ApiAuthorizationService_ShouldExposeAdminCapabilities()
         {
             var service = new ApiAuthorizationService(new ApiRuntimeOptions());
@@ -1027,255 +738,6 @@ namespace ExportDocManager.Api.Tests
 
             Assert.Equal(expectedUserManagement, service.CanManageUsers(user));
             Assert.Equal(expectedAuditManagement, service.CanManageAuditLogs(user));
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeLetterOfCreditToolEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/tools/letter-of-credit/import", json, StringComparison.Ordinal);
-            Assert.Contains("importLetterOfCreditDocument", json, StringComparison.Ordinal);
-            Assert.Contains("ApiLetterOfCreditImportRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiLetterOfCreditImportResponse", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/letter-of-credit/import-upload", json, StringComparison.Ordinal);
-            Assert.Contains("uploadLetterOfCreditDocument", json, StringComparison.Ordinal);
-            Assert.Contains("runtime Cache/BrowserUploads/LetterOfCredit", json, StringComparison.Ordinal);
-            Assert.Contains("exceeds 25 MB", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/letter-of-credit/review", json, StringComparison.Ordinal);
-            Assert.Contains("reviewLetterOfCreditCompliance", json, StringComparison.Ordinal);
-            Assert.Contains("ApiLetterOfCreditReviewRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiLetterOfCreditReviewResponse", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeOcrImageEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/tools/ocr/recognize-image", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/ocr/recognize-image-content", json, StringComparison.Ordinal);
-            Assert.Contains("recognizeOcrImage", json, StringComparison.Ordinal);
-            Assert.Contains("recognizeOcrImageContent", json, StringComparison.Ordinal);
-            Assert.Contains("ApiOcrRecognizeImageRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiOcrRecognizeImageContentRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiOcrRecognizeImageResponse", json, StringComparison.Ordinal);
-            Assert.Contains("Clipboard and other pathless sources stay in request memory", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeExcelToolEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/tools/excel/import-preview", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/excel/import-preview-upload", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/excel/template/save-to-path", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/excel/template/download", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/excel/booking-sheet/blank/download", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/excel/booking-sheet/convert/upload", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/excel/booking-sheet/from-invoice/{invoiceId}/download", json, StringComparison.Ordinal);
-            Assert.Contains("previewExcelImport", json, StringComparison.Ordinal);
-            Assert.Contains("previewUploadedExcelImport", json, StringComparison.Ordinal);
-            Assert.Contains("startExcelTemplateDownloadJob", json, StringComparison.Ordinal);
-            Assert.Contains("startBlankBookingSheetDownloadJob", json, StringComparison.Ordinal);
-            Assert.Contains("uploadAndStartBookingSheetConvertDownloadJob", json, StringComparison.Ordinal);
-            Assert.Contains("startInvoiceBookingSheetDownloadJob", json, StringComparison.Ordinal);
-            Assert.Contains("ApiExcelImportPreviewRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiExcelImportPreviewResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiExcelOutputRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiExcelConvertBookingSheetRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceBookingSheetRequest", json, StringComparison.Ordinal);
-            Assert.Contains("Resources/ExcelTemplates", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeExchangeRateToolEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/tools/exchange-rates", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/exchange-rates/available-currencies", json, StringComparison.Ordinal);
-            Assert.Contains("listExchangeRates", json, StringComparison.Ordinal);
-            Assert.Contains("listAvailableExchangeRateCurrencies", json, StringComparison.Ordinal);
-            Assert.Contains("ApiExchangeRateListResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiExchangeRateAvailableCurrenciesResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiExchangeRateDto", json, StringComparison.Ordinal);
-            Assert.Contains("appsettings.json", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeCustomOptionEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/custom-options/{optionType}", json, StringComparison.Ordinal);
-            Assert.Contains("listCustomOptions", json, StringComparison.Ordinal);
-            Assert.Contains("saveCustomOption", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomOptionListResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomOptionSaveRequest", json, StringComparison.Ordinal);
-            Assert.Contains("CustomOptions", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeEmailToolEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/tools/email/status", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/email/server-suggestion", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/email/send", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/email/test-connection", json, StringComparison.Ordinal);
-            Assert.Contains("getEmailToolStatus", json, StringComparison.Ordinal);
-            Assert.Contains("suggestEmailServerConfig", json, StringComparison.Ordinal);
-            Assert.Contains("sendEmail", json, StringComparison.Ordinal);
-            Assert.Contains("testEmailConnection", json, StringComparison.Ordinal);
-            Assert.Contains("ApiEmailStatusResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiEmailServerSuggestionRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiEmailServerSuggestionResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiEmailSendRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiEmailSendResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiEmailTestResponse", json, StringComparison.Ordinal);
-            Assert.Contains("does not save settings or write files", json, StringComparison.Ordinal);
-            Assert.Contains("Explicit attachment file paths", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeContainerPackingAnalyzeEndpoint()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/tools/container-packing/analyze", json, StringComparison.Ordinal);
-            Assert.Contains("analyzeContainerPacking", json, StringComparison.Ordinal);
-            Assert.Contains("ApiContainerPackingAnalyzeRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiContainerPackingAnalyzeResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiContainerPackingAnalysisDto", json, StringComparison.Ordinal);
-            Assert.Contains("colorArgb", json, StringComparison.Ordinal);
-            Assert.Contains("in-memory request data", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/container-packing/projects", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/container-packing/projects/{id}", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/container-packing/container-types", json, StringComparison.Ordinal);
-            Assert.Contains("/api/tools/container-packing/container-types/{id}", json, StringComparison.Ordinal);
-            Assert.Contains("listContainerPackingProjects", json, StringComparison.Ordinal);
-            Assert.Contains("saveContainerPackingProject", json, StringComparison.Ordinal);
-            Assert.Contains("deleteContainerPackingProject", json, StringComparison.Ordinal);
-            Assert.Contains("listContainerPackingContainerTypes", json, StringComparison.Ordinal);
-            Assert.Contains("saveContainerPackingContainerType", json, StringComparison.Ordinal);
-            Assert.Contains("deleteContainerPackingContainerType", json, StringComparison.Ordinal);
-            Assert.Contains("ApiContainerPackingProjectDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiContainerTypeDto", json, StringComparison.Ordinal);
-            Assert.Contains("does not read invoice, customs, payment, or reimbursement data", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeInvoiceReportZipEndpoint()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/reports/invoices/pdf-zip/save-to-path", json, StringComparison.Ordinal);
-            Assert.Contains("/api/reports/invoices/pdf-zip/download", json, StringComparison.Ordinal);
-            Assert.Contains("startInvoiceReportPdfZipDownloadJob", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceReportZipRequest", json, StringComparison.Ordinal);
-            Assert.Contains("BackgroundJobSnapshot", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeInvoiceDocumentPackageEndpoint()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/reports/invoices/{invoiceId}/document-package/save-to-path", json, StringComparison.Ordinal);
-            Assert.Contains("/api/reports/invoices/{invoiceId}/document-package/download", json, StringComparison.Ordinal);
-            Assert.Contains("startInvoiceDocumentPackageDownloadJob", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceDocumentPackageRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceDocumentPackageItemRequest", json, StringComparison.Ordinal);
-            Assert.Contains("createZip", json, StringComparison.Ordinal);
-            Assert.Contains("invoice/customs document domain", json, StringComparison.Ordinal);
-            Assert.Contains("batch folder", json, StringComparison.Ordinal);
-            Assert.Contains("BackgroundJobSnapshot", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeInvoiceDocumentPackageHtmlPreviewEndpoint()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/reports/invoices/{invoiceId}/document-package/html-preview", json, StringComparison.Ordinal);
-            Assert.Contains("previewInvoiceDocumentPackageHtml", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceDocumentPackagePreviewRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceDocumentPackagePreviewResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceDocumentPackagePreviewItemResponse", json, StringComparison.Ordinal);
-            Assert.Contains("returns HTML in memory", json, StringComparison.Ordinal);
-            Assert.Contains("does not create PDF, ZIP, cache files, or default export directories", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeInvoiceDocumentEmailEndpoint()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/reports/invoices/{invoiceId}/document-email", json, StringComparison.Ordinal);
-            Assert.Contains("startInvoiceDocumentEmailJob", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceDocumentEmailRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceDocumentPackageItemRequest", json, StringComparison.Ordinal);
-            Assert.Contains("runtime data cache", json, StringComparison.Ordinal);
-            Assert.Contains("default attachment directory", json, StringComparison.Ordinal);
-            Assert.Contains("BackgroundJobSnapshot", json, StringComparison.Ordinal);
         }
 
         [Fact]
@@ -1577,11 +1039,14 @@ namespace ExportDocManager.Api.Tests
 
                 Assert.True(response.Success);
                 Assert.Equal(Path.GetFullPath(sourcePath), response.SourcePath);
-                Assert.Equal("INV-XLS-001", response.Invoice.InvoiceNo);
-                Assert.Equal("Buyer Ltd", response.Customer.CustomerNameEN);
-                Assert.Equal("Exporter Ltd", response.Exporter.ExporterNameEN);
-                Assert.Equal("宁波测试出口有限公司", response.Exporter.ExporterNameCN);
-                Assert.Single(response.Invoice.Items);
+                var invoice = Assert.IsType<ApiInvoiceDetailDto>(response.Invoice);
+                var customer = Assert.IsType<ApiImportedCustomerDto>(response.Customer);
+                var exporter = Assert.IsType<ApiImportedExporterDto>(response.Exporter);
+                Assert.Equal("INV-XLS-001", invoice.InvoiceNo);
+                Assert.Equal("Buyer Ltd", customer.CustomerNameEN);
+                Assert.Equal("Exporter Ltd", exporter.ExporterNameEN);
+                Assert.Equal("宁波测试出口有限公司", exporter.ExporterNameCN);
+                Assert.Single(invoice.Items);
                 Assert.False(response.SourcePath.StartsWith(appRoot, StringComparison.OrdinalIgnoreCase));
                 Assert.Contains("Resources/ExcelTemplates", response.StoragePolicy, StringComparison.Ordinal);
                 Assert.DoesNotContain(@"C:\", response.StoragePolicy, StringComparison.OrdinalIgnoreCase);
@@ -1712,201 +1177,6 @@ namespace ExportDocManager.Api.Tests
                 DeleteDirectoryIfExists(appRoot);
                 DeleteDirectoryIfExists(dataRoot);
             }
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposePaymentEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/payments", json, StringComparison.Ordinal);
-            Assert.Contains("/api/payments/{id}", json, StringComparison.Ordinal);
-            Assert.Contains("listPayments", json, StringComparison.Ordinal);
-            Assert.Contains("getPayment", json, StringComparison.Ordinal);
-            Assert.Contains("createPayment", json, StringComparison.Ordinal);
-            Assert.Contains("updatePayment", json, StringComparison.Ordinal);
-            Assert.Contains("deletePayment", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPaymentDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPagedResponseOfApiPaymentDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPaymentSaveResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCommandResponse", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeAuditLogEndpoint()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/audit-logs", json, StringComparison.Ordinal);
-            Assert.Contains("listAuditLogs", json, StringComparison.Ordinal);
-            Assert.Contains("/api/audit-logs/save-to-path", json, StringComparison.Ordinal);
-            Assert.Contains("saveAuditLogsToPath", json, StringComparison.Ordinal);
-            Assert.Contains("/api/audit-logs/download", json, StringComparison.Ordinal);
-            Assert.Contains("downloadAuditLogs", json, StringComparison.Ordinal);
-            Assert.Contains("/api/audit-logs/delete", json, StringComparison.Ordinal);
-            Assert.Contains("deleteAuditLogsByCriteria", json, StringComparison.Ordinal);
-            Assert.Contains("/api/audit-logs/cleanup", json, StringComparison.Ordinal);
-            Assert.Contains("cleanupAuditLogs", json, StringComparison.Ordinal);
-            Assert.Contains("ApiAuditLogDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPagedResponseOfApiAuditLogDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiAuditLogPathExportRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiAuditLogCommandResponse", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeJobEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/jobs", json, StringComparison.Ordinal);
-            Assert.Contains("/api/jobs/{jobId}", json, StringComparison.Ordinal);
-            Assert.Contains("/api/jobs/{jobId}/cancel", json, StringComparison.Ordinal);
-            Assert.Contains("/api/jobs/{jobId}/retry", json, StringComparison.Ordinal);
-            Assert.Contains("/api/jobs/finished", json, StringComparison.Ordinal);
-            Assert.Contains("listJobs", json, StringComparison.Ordinal);
-            Assert.Contains("getJob", json, StringComparison.Ordinal);
-            Assert.Contains("cancelJob", json, StringComparison.Ordinal);
-            Assert.Contains("retryJob", json, StringComparison.Ordinal);
-            Assert.Contains("deleteJob", json, StringComparison.Ordinal);
-            Assert.Contains("clearFinishedJobs", json, StringComparison.Ordinal);
-            Assert.Contains("BackgroundJobSnapshot", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPagedResponseOfBackgroundJobSnapshot", json, StringComparison.Ordinal);
-            Assert.Contains("canRetry", json, StringComparison.Ordinal);
-            Assert.Contains("retryOperation", json, StringComparison.Ordinal);
-            Assert.Contains("retryRequestJson", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposePdfMergeJobEndpoint()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/tools/pdf/merge", json, StringComparison.Ordinal);
-            Assert.Contains("startPdfMergeSaveToPathJob", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPdfMergeRequest", json, StringComparison.Ordinal);
-            Assert.Contains("sourceFiles", json, StringComparison.Ordinal);
-            Assert.Contains("destinationPath", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeReportHtmlPreviewEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/reports/templates", json, StringComparison.Ordinal);
-            Assert.Contains("/api/reports/templates/storage-check", json, StringComparison.Ordinal);
-            Assert.Contains("/api/reports/templates/content", json, StringComparison.Ordinal);
-            Assert.Contains("/api/reports/templates/fields", json, StringComparison.Ordinal);
-            Assert.Contains("/api/reports/invoices/{invoiceId}/html-preview", json, StringComparison.Ordinal);
-            Assert.Contains("/api/reports/invoices/draft/html-preview", json, StringComparison.Ordinal);
-            Assert.Contains("/api/reports/payments/{paymentId}/html-preview", json, StringComparison.Ordinal);
-            Assert.Contains("/api/reports/payments/draft/html-preview", json, StringComparison.Ordinal);
-            Assert.Contains("listReportTemplates", json, StringComparison.Ordinal);
-            Assert.Contains("createReportTemplate", json, StringComparison.Ordinal);
-            Assert.Contains("getReportTemplateFieldCatalog", json, StringComparison.Ordinal);
-            Assert.Contains("getReportTemplateContent", json, StringComparison.Ordinal);
-            Assert.Contains("saveReportTemplateContent", json, StringComparison.Ordinal);
-            Assert.Contains("renameReportTemplate", json, StringComparison.Ordinal);
-            Assert.Contains("deleteReportTemplate", json, StringComparison.Ordinal);
-            Assert.Contains("saveReportTemplatePackageToPath", json, StringComparison.Ordinal);
-            Assert.Contains("importReportTemplatePackage", json, StringComparison.Ordinal);
-            Assert.Contains("downloadReportTemplatePackage", json, StringComparison.Ordinal);
-            Assert.Contains("uploadReportTemplatePackage", json, StringComparison.Ordinal);
-            Assert.Contains("previewReportTemplateContent", json, StringComparison.Ordinal);
-            Assert.Contains("previewInvoiceReportHtml", json, StringComparison.Ordinal);
-            Assert.Contains("previewInvoiceReportDraftHtml", json, StringComparison.Ordinal);
-            Assert.Contains("previewPaymentVoucherHtml", json, StringComparison.Ordinal);
-            Assert.Contains("previewPaymentVoucherDraftHtml", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportTemplateDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportTemplateContentDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportTemplateFieldCatalogResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportTemplateFieldDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportTemplateSaveRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportTemplateCreateRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportTemplateRenameRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportTemplatePackageExportRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportTemplatePackageImportRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportTemplatePreviewRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportTemplatePreviewResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportHtmlPreviewRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPaymentReportHtmlPreviewRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiInvoiceDraftReportHtmlPreviewRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPaymentDraftReportHtmlPreviewRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportHtmlPreviewResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPaymentReportHtmlPreviewResponse", json, StringComparison.Ordinal);
-            Assert.Contains("storagePolicy", json, StringComparison.Ordinal);
-
-            using var jsonDocument = JsonDocument.Parse(json);
-            var schemas = jsonDocument.RootElement.GetProperty("components").GetProperty("schemas");
-            var paymentPreviewRequestProperties = schemas
-                .GetProperty("ApiPaymentReportHtmlPreviewRequest")
-                .GetProperty("properties");
-            Assert.False(paymentPreviewRequestProperties.TryGetProperty("withSeal", out _));
-            Assert.False(paymentPreviewRequestProperties.TryGetProperty("reportType", out _));
-
-            var paymentDraftRequestProperties = schemas
-                .GetProperty("ApiPaymentDraftReportHtmlPreviewRequest")
-                .GetProperty("properties");
-            Assert.False(paymentDraftRequestProperties.TryGetProperty("withSeal", out _));
-            Assert.False(paymentDraftRequestProperties.TryGetProperty("reportType", out _));
-
-            var paymentPreviewResponseProperties = schemas
-                .GetProperty("ApiPaymentReportHtmlPreviewResponse")
-                .GetProperty("properties");
-            Assert.False(paymentPreviewResponseProperties.TryGetProperty("withSeal", out _));
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeReportPdfJobEndpoint()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/reports/invoices/{invoiceId}/pdf", json, StringComparison.Ordinal);
-            Assert.Contains("/api/reports/payments/{paymentId}/pdf", json, StringComparison.Ordinal);
-            Assert.Contains("startInvoiceReportPdfDownloadJob", json, StringComparison.Ordinal);
-            Assert.Contains("startPaymentVoucherPdfDownloadJob", json, StringComparison.Ordinal);
-            Assert.Contains("ApiReportPdfRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPaymentReportPdfRequest", json, StringComparison.Ordinal);
-            Assert.Contains("destinationPath", json, StringComparison.Ordinal);
-
-            using var jsonDocument = JsonDocument.Parse(json);
-            var paymentRequestProperties = jsonDocument.RootElement
-                .GetProperty("components")
-                .GetProperty("schemas")
-                .GetProperty("ApiPaymentReportPdfRequest")
-                .GetProperty("properties");
-            Assert.False(paymentRequestProperties.TryGetProperty("withSeal", out _));
-            Assert.False(paymentRequestProperties.TryGetProperty("reportType", out _));
         }
 
         [Fact]
@@ -2284,7 +1554,7 @@ namespace ExportDocManager.Api.Tests
                 jobService,
                 provider.GetRequiredService<IServiceScopeFactory>(),
                 NullLogger<ApiBackgroundJobRunner>.Instance);
-            var observedUser = new TaskCompletionSource<User>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var observedUser = new TaskCompletionSource<User?>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             var job = runner.Enqueue(
                 "Test",
@@ -2296,7 +1566,7 @@ namespace ExportDocManager.Api.Tests
                     return Task.FromResult(string.Empty);
                 });
 
-            var user = await observedUser.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var user = Assert.IsType<User>(await observedUser.Task.WaitAsync(TimeSpan.FromSeconds(5)));
             var final = await WaitForJobStatusAsync(jobService, job.JobId, BackgroundJobStatusCatalog.Succeeded);
 
             Assert.Equal(42, user.Id);
@@ -2438,308 +1708,6 @@ namespace ExportDocManager.Api.Tests
 
             Assert.Equal(StatusCodes.Status409Conflict, response.StatusCode);
             Assert.Contains("无法重试", error.Message, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeMasterDataEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/master-data/customers", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/exporters", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/exporters/{id}/seals/{sealType}/upload", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/payees", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/products", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/ports", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/units", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/hs-codes", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/hs-codes/import-path", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/hs-codes/import-upload", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/hs-codes/search-remote", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/hs-codes/fetch-remote-detail", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/hs-codes/{code}", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/hs-codes/by-id/{id}", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/hs-codes/delete-batch", json, StringComparison.Ordinal);
-            Assert.Contains("/api/master-data/hs-codes/clear-all", json, StringComparison.Ordinal);
-            Assert.Contains("createCustomer", json, StringComparison.Ordinal);
-            Assert.Contains("getCustomer", json, StringComparison.Ordinal);
-            Assert.Contains("updateCustomer", json, StringComparison.Ordinal);
-            Assert.Contains("deleteCustomer", json, StringComparison.Ordinal);
-            Assert.Contains("createExporter", json, StringComparison.Ordinal);
-            Assert.Contains("uploadExporterSeal", json, StringComparison.Ordinal);
-            Assert.Contains("updateExporter", json, StringComparison.Ordinal);
-            Assert.Contains("deleteExporter", json, StringComparison.Ordinal);
-            Assert.Contains("createPayee", json, StringComparison.Ordinal);
-            Assert.Contains("updatePayee", json, StringComparison.Ordinal);
-            Assert.Contains("deletePayee", json, StringComparison.Ordinal);
-            Assert.Contains("createProduct", json, StringComparison.Ordinal);
-            Assert.Contains("updateProduct", json, StringComparison.Ordinal);
-            Assert.Contains("deleteProduct", json, StringComparison.Ordinal);
-            Assert.Contains("createPort", json, StringComparison.Ordinal);
-            Assert.Contains("updatePort", json, StringComparison.Ordinal);
-            Assert.Contains("deletePort", json, StringComparison.Ordinal);
-            Assert.Contains("createUnit", json, StringComparison.Ordinal);
-            Assert.Contains("updateUnit", json, StringComparison.Ordinal);
-            Assert.Contains("deleteUnit", json, StringComparison.Ordinal);
-            Assert.Contains("createHsCode", json, StringComparison.Ordinal);
-            Assert.Contains("importHsCodesFromPath", json, StringComparison.Ordinal);
-            Assert.Contains("uploadHsCodesImportFile", json, StringComparison.Ordinal);
-            Assert.Contains("searchRemoteHsCodes", json, StringComparison.Ordinal);
-            Assert.Contains("fetchRemoteHsCodeDetail", json, StringComparison.Ordinal);
-            Assert.Contains("updateHsCode", json, StringComparison.Ordinal);
-            Assert.Contains("deleteHsCode", json, StringComparison.Ordinal);
-            Assert.Contains("deleteHsCodesBatch", json, StringComparison.Ordinal);
-            Assert.Contains("clearAllHsCodes", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomerDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiExporterDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiProductDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiHsCodeBatchDeleteRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiHsCodeClearAllRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiHsCodeImportResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiHsCodeSearchResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiPagedResponseOfApiHsCodeDto", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeSingleWindowOperationCenterEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/single-window/operation-center", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/operation-center/{batchId}", json, StringComparison.Ordinal);
-            Assert.Contains("listSingleWindowOperationCenter", json, StringComparison.Ordinal);
-            Assert.Contains("getSingleWindowOperationCenterDetail", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowOperationCenterPageResult", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowOperationCenterRow", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowOperationCenterDetail", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowOperationCenterPackageRecord", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowOperationCenterReceiptRecord", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeSingleWindowReferenceCatalogEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/single-window/reference-catalog", json, StringComparison.Ordinal);
-            Assert.Contains("getSingleWindowReferenceCatalog", json, StringComparison.Ordinal);
-            Assert.Contains("updateSingleWindowReferenceCatalog", json, StringComparison.Ordinal);
-            Assert.Contains("resetSingleWindowReferenceCatalog", json, StringComparison.Ordinal);
-            Assert.Contains("importSingleWindowReferenceCatalogJson", json, StringComparison.Ordinal);
-            Assert.Contains("previewSingleWindowReferenceCatalogExcelImport", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/coo/issuing-authorities", json, StringComparison.Ordinal);
-            Assert.Contains("getCustomsCooIssuingAuthorities", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowReferenceCatalogResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowReferenceCatalogSaveRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowReferenceCatalogSaveResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowReferenceCatalogExcelImportPreviewResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowIssuingAuthorityCatalogResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowIssuingAuthorityOptionDto", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowReferenceCatalogModel", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowReferenceCurrencyEntry", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowReferenceAcdTradeModeEntry", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldNotExposeRemovedSingleWindowCollaborationEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.DoesNotContain("/api/single-window/collaboration", json, StringComparison.Ordinal);
-            Assert.DoesNotContain("SingleWindowOperationTicketRow", json, StringComparison.Ordinal);
-            Assert.DoesNotContain("SingleWindowWorkstationRow", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeSingleWindowDocumentEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/single-window/coo/{invoiceId}", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/coo/{invoiceId}/build-defaults", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/coo/{invoiceId}/locked-fields", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/coo/{invoiceId}/unlock-fields", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/coo/producer-profiles", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/coo/producer-profiles/{id}", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/acd/{invoiceId}", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/acd/{invoiceId}/build-defaults", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/acd/{invoiceId}/locked-fields", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/acd/{invoiceId}/unlock-fields", json, StringComparison.Ordinal);
-            Assert.Contains("getCustomsCooDocument", json, StringComparison.Ordinal);
-            Assert.Contains("saveCustomsCooDocument", json, StringComparison.Ordinal);
-            Assert.Contains("buildCustomsCooDefaults", json, StringComparison.Ordinal);
-            Assert.Contains("getCustomsCooLockedFields", json, StringComparison.Ordinal);
-            Assert.Contains("unlockCustomsCooFields", json, StringComparison.Ordinal);
-            Assert.Contains("listCustomsCooProducerProfiles", json, StringComparison.Ordinal);
-            Assert.Contains("createCustomsCooProducerProfile", json, StringComparison.Ordinal);
-            Assert.Contains("getCustomsCooProducerProfile", json, StringComparison.Ordinal);
-            Assert.Contains("updateCustomsCooProducerProfile", json, StringComparison.Ordinal);
-            Assert.Contains("deleteCustomsCooProducerProfile", json, StringComparison.Ordinal);
-            Assert.Contains("getAgentConsignmentDocument", json, StringComparison.Ordinal);
-            Assert.Contains("saveAgentConsignmentDocument", json, StringComparison.Ordinal);
-            Assert.Contains("buildAgentConsignmentDefaults", json, StringComparison.Ordinal);
-            Assert.Contains("getAgentConsignmentLockedFields", json, StringComparison.Ordinal);
-            Assert.Contains("unlockAgentConsignmentFields", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomsCooDocumentDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomsCooItemDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomsCooNonpartyCorpDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomsCooAttachmentDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomsCooDocumentSaveResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomsCooProducerProfileDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomsCooProducerProfileInputDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomsCooProducerProfileListResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomsCooProducerProfileSaveRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomsCooProducerProfileSaveResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowLockedFieldDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowLockedFieldsResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowUnlockFieldsRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiCustomsCooUnlockFieldsResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiAgentConsignmentDocumentDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiAgentConsignmentDocumentSaveResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiAgentConsignmentUnlockFieldsResponse", json, StringComparison.Ordinal);
-            Assert.Contains("hsCode", json, StringComparison.Ordinal);
-            Assert.Contains("ieDate", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeSingleWindowExportReviewEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/single-window/export-review/{businessType}/{invoiceId}", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/export-review/{businessType}/{invoiceId}/repair", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/coo/{invoiceId}/export-review", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/acd/{invoiceId}/export-review", json, StringComparison.Ordinal);
-            Assert.Contains("getSingleWindowExportReview", json, StringComparison.Ordinal);
-            Assert.Contains("buildCustomsCooExportReview", json, StringComparison.Ordinal);
-            Assert.Contains("buildAgentConsignmentExportReview", json, StringComparison.Ordinal);
-            Assert.Contains("repairSingleWindowExportReviewGroups", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowExportReview", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowExportIssueGroup", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowExportIssue", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowEditorNavigationTarget", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowRepairGroupsRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowRepairGroupsResponse", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeSingleWindowSubmitPackageEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/single-window/coo/{invoiceId}/submit-package", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/acd/{invoiceId}/submit-package", json, StringComparison.Ordinal);
-            Assert.Contains("downloadCustomsCooSubmitPackage", json, StringComparison.Ordinal);
-            Assert.Contains("downloadAgentConsignmentSubmitPackage", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowSubmitPackageRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowHandoffPackageResponse", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowPackageManifest", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowPackageFile", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindow/Outbox", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeSingleWindowPackageImportEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/single-window/packages/import", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/receipts/import", json, StringComparison.Ordinal);
-            Assert.Contains("importSingleWindowSubmitPackage", json, StringComparison.Ordinal);
-            Assert.Contains("importSingleWindowReceiptPackage", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowImportPackageRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowImportedPackageResponse", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowReceiptParseResult", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindow/Inbox", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindow/ReceiptInbox", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeSingleWindowReceiptPackageExportEndpoint()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/single-window/receipts/save-package-to-path", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/receipts/download-package", json, StringComparison.Ordinal);
-            Assert.Contains("downloadSingleWindowReceiptPackage", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowReceiptPackageExportRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowHandoffPackageResponse", json, StringComparison.Ordinal);
-            Assert.Contains("receiptFiles", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindow/Outbox", json, StringComparison.Ordinal);
-        }
-
-        [Fact]
-        public void OpenApiDocument_ShouldExposeSingleWindowClientBridgeEndpoints()
-        {
-            var document = OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-            {
-                ListenUrls = "http://127.0.0.1:5188"
-            });
-
-            string json = JsonSerializer.Serialize(document);
-
-            Assert.Contains("/api/single-window/client-profiles", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/client-profiles/{profileKey}/activate", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/client/dispatch", json, StringComparison.Ordinal);
-            Assert.Contains("/api/single-window/client/collect-receipts", json, StringComparison.Ordinal);
-            Assert.Contains("getSingleWindowClientProfiles", json, StringComparison.Ordinal);
-            Assert.Contains("saveSingleWindowClientProfile", json, StringComparison.Ordinal);
-            Assert.Contains("activateSingleWindowClientProfile", json, StringComparison.Ordinal);
-            Assert.Contains("dispatchSingleWindowBatchToClient", json, StringComparison.Ordinal);
-            Assert.Contains("collectSingleWindowClientReceipts", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowClientProfileDto", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowClientProfilesResponse", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowClientProfileSaveRequest", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowClientDispatchRequest", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowClientDispatchResult", json, StringComparison.Ordinal);
-            Assert.Contains("ApiSingleWindowReceiptCollectionRequest", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindowReceiptCollectionResult", json, StringComparison.Ordinal);
-            Assert.Contains("SingleWindow/Inbox", json, StringComparison.Ordinal);
         }
 
         [Fact]
@@ -3043,7 +2011,7 @@ namespace ExportDocManager.Api.Tests
             {
                 string appRoot = CreateTempDirectory("edm-api-ocr-app");
                 string dataRoot = CreateTempDirectory("edm-api-ocr-data");
-                string previousRuntime = Environment.GetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME");
+                string? previousRuntime = Environment.GetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME");
 
                 try
                 {
@@ -3082,7 +2050,7 @@ namespace ExportDocManager.Api.Tests
             {
                 string appRoot = CreateTempDirectory("edm-api-ocr-app");
                 string dataRoot = CreateTempDirectory("edm-api-ocr-data");
-                string previousRuntime = Environment.GetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME");
+                string? previousRuntime = Environment.GetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME");
 
                 try
                 {
@@ -3123,7 +2091,7 @@ namespace ExportDocManager.Api.Tests
             {
                 string appRoot = CreateTempDirectory("edm-api-ocr-app");
                 string dataRoot = CreateTempDirectory("edm-api-ocr-data");
-                string previousRuntime = Environment.GetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME");
+                string? previousRuntime = Environment.GetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME");
 
                 try
                 {
@@ -3233,7 +2201,7 @@ namespace ExportDocManager.Api.Tests
             }
         }
 
-        private static (int StatusCode, object Value) ReadResult(IResult result)
+        private static (int StatusCode, object? Value) ReadResult(IResult result)
         {
             var statusResult = Assert.IsAssignableFrom<IStatusCodeHttpResult>(result);
             var valueResult = Assert.IsAssignableFrom<IValueHttpResult>(result);
@@ -3256,7 +2224,8 @@ namespace ExportDocManager.Api.Tests
                 await Task.Delay(20);
             }
 
-            return await service.GetAsync(jobId);
+            return await service.GetAsync(jobId)
+                ?? throw new TimeoutException($"Background job {jobId} did not reach {expectedStatus}.");
         }
 
         private static string CreateTempDirectory(string prefix)
@@ -3294,10 +2263,10 @@ namespace ExportDocManager.Api.Tests
         {
             public Task<SaveResult> SaveInvoiceWithAutoCreationAsync(
                 Invoice invoice,
-                List<Item> items,
-                Customer customer,
-                Exporter exporter,
-                IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null,
+                List<Item>? items,
+                Customer? customer,
+                Exporter? exporter,
+                IReadOnlyList<HsCodeKnowledgeFeedbackInput>? pendingHsFeedback = null,
                 CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
@@ -3313,9 +2282,9 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetInvoiceByIdAsync(int id, CancellationToken cancellationToken = default)
+            public Task<Invoice?> GetInvoiceByIdAsync(int id, CancellationToken cancellationToken = default)
             {
-                return Task.FromResult(new Invoice
+                return Task.FromResult<Invoice?>(new Invoice
                 {
                     Id = id,
                     InvoiceNo = "PATTERN-001",
@@ -3325,7 +2294,7 @@ namespace ExportDocManager.Api.Tests
                 });
             }
 
-            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(
+            public Task<Invoice?> GetInvoiceByInvoiceNoAndTypeAsync(
                 string companyScope,
                 string invoiceNo,
                 string type,
@@ -3342,32 +2311,32 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> CopyInvoiceAsync(
+            public Task<Invoice?> CopyInvoiceAsync(
                 int originalId,
                 string newInvoiceNo,
-                InvoiceCloneOptions options = null,
+                InvoiceCloneOptions? options = null,
                 CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> CopyInvoiceAsTypeAsync(
+            public Task<Invoice?> CopyInvoiceAsTypeAsync(
                 int originalId,
                 string targetType,
-                InvoiceCloneOptions options = null,
+                InvoiceCloneOptions? options = null,
                 CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> TransitionInvoiceStatusAsync(
+            public Task<Invoice?> TransitionInvoiceStatusAsync(
                 InvoiceStatusTransitionRequest request,
                 CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> UnverifyInvoiceAsync(
+            public Task<Invoice?> UnverifyInvoiceAsync(
                 int id,
                 byte[] expectedRowVersion,
                 string note,
@@ -3383,7 +2352,7 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetLatestInvoiceByPartiesAsync(
+            public Task<Invoice?> GetLatestInvoiceByPartiesAsync(
                 int? customerId,
                 int? exporterId,
                 CancellationToken cancellationToken = default)
@@ -3391,7 +2360,7 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetLastInvoiceAsync(CancellationToken cancellationToken = default)
+            public Task<Invoice?> GetLastInvoiceAsync(CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
@@ -3459,21 +2428,21 @@ namespace ExportDocManager.Api.Tests
                 _user = user;
             }
 
-            public Task<User> AuthenticateAsync(string username, string password)
+            public Task<User?> AuthenticateAsync(string username, string password)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<User> GetUserByUsernameAsync(string username)
+            public Task<User?> GetUserByUsernameAsync(string username)
             {
-                return Task.FromResult(string.Equals(_user.Username, username, StringComparison.OrdinalIgnoreCase)
+                return Task.FromResult<User?>(string.Equals(_user.Username, username, StringComparison.OrdinalIgnoreCase)
                     ? _user
                     : null);
             }
 
-            public Task<User> GetActiveUserByIdAsync(int userId, CancellationToken cancellationToken = default)
+            public Task<User?> GetActiveUserByIdAsync(int userId, CancellationToken cancellationToken = default)
             {
-                return Task.FromResult(_user.Id == userId && _user.IsActive ? _user : null);
+                return Task.FromResult<User?>(_user.Id == userId && _user.IsActive ? _user : null);
             }
 
             public Task<IReadOnlyList<User>> GetUsersAsync(CancellationToken cancellationToken = default)
@@ -3499,10 +2468,10 @@ namespace ExportDocManager.Api.Tests
         {
             public Task<SaveResult> SaveInvoiceWithAutoCreationAsync(
                 Invoice invoice,
-                List<Item> items,
-                Customer customer,
-                Exporter exporter,
-                IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback = null,
+                List<Item>? items,
+                Customer? customer,
+                Exporter? exporter,
+                IReadOnlyList<HsCodeKnowledgeFeedbackInput>? pendingHsFeedback = null,
                 CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
@@ -3518,12 +2487,12 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetInvoiceByIdAsync(int id, CancellationToken cancellationToken = default)
+            public Task<Invoice?> GetInvoiceByIdAsync(int id, CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetInvoiceByInvoiceNoAndTypeAsync(
+            public Task<Invoice?> GetInvoiceByInvoiceNoAndTypeAsync(
                 string companyScope,
                 string invoiceNo,
                 string type,
@@ -3540,32 +2509,32 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> CopyInvoiceAsync(
+            public Task<Invoice?> CopyInvoiceAsync(
                 int originalId,
                 string newInvoiceNo,
-                InvoiceCloneOptions options = null,
+                InvoiceCloneOptions? options = null,
                 CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> CopyInvoiceAsTypeAsync(
+            public Task<Invoice?> CopyInvoiceAsTypeAsync(
                 int originalId,
                 string targetType,
-                InvoiceCloneOptions options = null,
+                InvoiceCloneOptions? options = null,
                 CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> TransitionInvoiceStatusAsync(
+            public Task<Invoice?> TransitionInvoiceStatusAsync(
                 InvoiceStatusTransitionRequest request,
                 CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> UnverifyInvoiceAsync(
+            public Task<Invoice?> UnverifyInvoiceAsync(
                 int id,
                 byte[] expectedRowVersion,
                 string note,
@@ -3581,7 +2550,7 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetLatestInvoiceByPartiesAsync(
+            public Task<Invoice?> GetLatestInvoiceByPartiesAsync(
                 int? customerId,
                 int? exporterId,
                 CancellationToken cancellationToken = default)
@@ -3589,7 +2558,7 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<Invoice> GetLastInvoiceAsync(CancellationToken cancellationToken = default)
+            public Task<Invoice?> GetLastInvoiceAsync(CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }

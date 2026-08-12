@@ -82,7 +82,7 @@ namespace ExportDocManager.Services.Infrastructure
             BackgroundJobQuery query,
             CancellationToken cancellationToken = default);
 
-        Task<BackgroundJobSnapshot> GetAsync(
+        Task<BackgroundJobSnapshot?> GetAsync(
             string jobId,
             CancellationToken cancellationToken = default);
 

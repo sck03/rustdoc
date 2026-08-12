@@ -38,7 +38,11 @@ namespace ExportDocManager.Api.Hosting
                 var rows = await service.ListAsync(parsedReportType, includeInactive ?? false, cancellationToken);
                 return Results.Ok(rows.Select(ToApiDto));
             })
-            .WithName("ListUserReportTemplates");
+            .WithName("ListUserReportTemplates")
+            .Produces<IReadOnlyList<ApiUserReportTemplateDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/reports/user-templates", async (
                 HttpContext context,
@@ -98,7 +102,12 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("CreateUserReportTemplate");
+            .WithName("CreateUserReportTemplate")
+            .Produces<ApiUserReportTemplateDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapPut("/api/reports/user-templates/{id:int}", async (
                 HttpContext context,
@@ -146,7 +155,12 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Conflict(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("UpdateUserReportTemplate");
+            .WithName("UpdateUserReportTemplate")
+            .Produces<ApiUserReportTemplateDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapDelete("/api/reports/user-templates/{id:int}", async (
                 HttpContext context,
@@ -181,7 +195,11 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Conflict(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("DeleteUserReportTemplate");
+            .WithName("DeleteUserReportTemplate")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapGet("/api/reports/user-templates/{id:int}/versions", async (
                 HttpContext context,
@@ -198,7 +216,11 @@ namespace ExportDocManager.Api.Hosting
                 if (id <= 0) return Results.BadRequest(new ApiErrorResponse("报表模板 ID 无效。"));
                 var rows = await service.ListVersionsAsync(id, cancellationToken);
                 return rows.Count == 0 ? Results.NotFound() : Results.Ok(rows.Select(ToApiVersionDto));
-            }).WithName("ListUserReportTemplateVersions");
+            }).WithName("ListUserReportTemplateVersions")
+            .Produces<IReadOnlyList<ApiUserReportTemplateVersionDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapPost("/api/reports/user-templates/{id:int}/versions/{versionNumber:int}/restore", async (
                 HttpContext context,
@@ -221,7 +243,12 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
-            }).WithName("RestoreUserReportTemplateVersion");
+            }).WithName("RestoreUserReportTemplateVersion")
+            .Produces<ApiUserReportTemplateDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
         }
 
         private static ApiUserReportTemplateDto ToApiDto(UserReportTemplateRecord item) =>

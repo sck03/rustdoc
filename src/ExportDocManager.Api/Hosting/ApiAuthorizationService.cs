@@ -148,7 +148,7 @@ namespace ExportDocManager.Api.Hosting
                 return [];
             }
 
-            return BuiltInPermissionTemplateCatalog.FindForRole(user?.Role).GetModuleAccess();
+            return BuiltInPermissionTemplateCatalog.FindForRole(user?.Role ?? string.Empty).GetModuleAccess();
         }
 
         private static int AccessRank(string accessLevel) =>

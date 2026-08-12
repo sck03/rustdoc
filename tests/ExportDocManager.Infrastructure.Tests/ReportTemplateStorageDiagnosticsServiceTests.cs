@@ -73,7 +73,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
         private static string FindRepositoryRoot()
         {
-            string directory = AppContext.BaseDirectory;
+            string? directory = AppContext.BaseDirectory;
             while (!string.IsNullOrWhiteSpace(directory))
             {
                 if (File.Exists(Path.Combine(directory, "ExportDocManager.sln")))

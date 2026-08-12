@@ -6,7 +6,7 @@ namespace ExportDocManager.Api.Hosting
 {
     public sealed class ApiCurrentUserContext : ICurrentUserContext
     {
-        private static readonly AsyncLocal<User> BackgroundCurrentUser = new();
+        private static readonly AsyncLocal<User?> BackgroundCurrentUser = new();
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         public ApiCurrentUserContext(IHttpContextAccessor httpContextAccessor)
@@ -14,7 +14,7 @@ namespace ExportDocManager.Api.Hosting
             _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
         }
 
-        public User CurrentUser
+        public User? CurrentUser
         {
             get
             {
@@ -34,7 +34,7 @@ namespace ExportDocManager.Api.Hosting
             }
         }
 
-        public static IDisposable UseBackgroundUser(User user)
+        public static IDisposable UseBackgroundUser(User? user)
         {
             var previous = BackgroundCurrentUser.Value;
             BackgroundCurrentUser.Value = user;
@@ -48,10 +48,10 @@ namespace ExportDocManager.Api.Hosting
 
         private sealed class BackgroundUserScope : IDisposable
         {
-            private readonly User _previous;
+            private readonly User? _previous;
             private bool _disposed;
 
-            public BackgroundUserScope(User previous)
+            public BackgroundUserScope(User? previous)
             {
                 _previous = previous;
             }

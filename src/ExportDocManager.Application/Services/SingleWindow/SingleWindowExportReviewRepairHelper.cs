@@ -132,7 +132,7 @@ namespace ExportDocManager.Services.SingleWindow
             object defaults,
             IReadOnlyDictionary<string, PropertyInfo> defaultPropertyMap,
             IEnumerable<string> fieldKeys,
-            Func<string, string, string> normalize)
+            Func<string, string?, string> normalize)
         {
             int changeCount = 0;
             foreach (string fieldKey in (fieldKeys ?? Array.Empty<string>()).Distinct(StringComparer.Ordinal))
@@ -153,16 +153,16 @@ namespace ExportDocManager.Services.SingleWindow
             return changeCount;
         }
 
-        private static string NormalizeCustomsCooHeaderValue(string fieldKey, string value)
+        private static string NormalizeCustomsCooHeaderValue(string fieldKey, string? value)
         {
             string normalized = value?.Trim() ?? string.Empty;
             return string.IsNullOrWhiteSpace(normalized) &&
-                   SingleWindowExportReviewRepairCatalog.CustomsCooHeaderDefaultFallbacks.TryGetValue(fieldKey, out string fallback)
+                   SingleWindowExportReviewRepairCatalog.CustomsCooHeaderDefaultFallbacks.TryGetValue(fieldKey, out var fallback)
                 ? fallback
                 : normalized;
         }
 
-        private static string NormalizeAgentConsignmentValue(string fieldKey, string value)
+        private static string NormalizeAgentConsignmentValue(string fieldKey, string? value)
         {
             string normalized = value?.Trim() ?? string.Empty;
             return string.Equals(fieldKey, nameof(AgentConsignmentDocument.OperType), StringComparison.Ordinal) &&

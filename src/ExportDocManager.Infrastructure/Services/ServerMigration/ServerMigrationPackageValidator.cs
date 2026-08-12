@@ -28,7 +28,7 @@ internal static class ServerMigrationPackageValidator
         string destination,
         long maximumBytes,
         CancellationToken cancellationToken,
-        Action<long, int> beforeWrite = null)
+        Action<long, int>? beforeWrite = null)
     {
         await using var target = new FileStream(
             destination,

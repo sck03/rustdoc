@@ -17,7 +17,7 @@ namespace ExportDocManager.Services.Infrastructure
             string to,
             string subject,
             string body,
-            List<string> attachments = null,
+            List<string>? attachments = null,
             CancellationToken cancellationToken = default);
 
         /// <summary>

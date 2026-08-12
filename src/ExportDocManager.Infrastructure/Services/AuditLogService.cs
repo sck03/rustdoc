@@ -57,7 +57,7 @@ namespace ExportDocManager.Services.Infrastructure
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
             string destinationPath = Path.GetFullPath(filePath);
-            string destinationDirectory = Path.GetDirectoryName(destinationPath);
+            string? destinationDirectory = Path.GetDirectoryName(destinationPath);
             if (!string.IsNullOrWhiteSpace(destinationDirectory))
             {
                 Directory.CreateDirectory(destinationDirectory);

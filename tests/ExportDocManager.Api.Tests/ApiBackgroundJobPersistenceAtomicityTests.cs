@@ -21,8 +21,7 @@ public sealed class ApiBackgroundJobPersistenceAtomicityTests
 
             await Assert.ThrowsAnyAsync<Exception>(() => service.RequestCancelAsync("cancel-job"));
 
-            BackgroundJobSnapshot snapshot = await service.GetAsync("cancel-job");
-            Assert.NotNull(snapshot);
+            BackgroundJobSnapshot snapshot = Assert.IsType<BackgroundJobSnapshot>(await service.GetAsync("cancel-job"));
             Assert.Equal(BackgroundJobStatusCatalog.Running, snapshot.Status);
             Assert.True(snapshot.CanCancel);
             Assert.False(cancellation.IsCancellationRequested);
@@ -48,8 +47,7 @@ public sealed class ApiBackgroundJobPersistenceAtomicityTests
                 "update-job",
                 current => CopyWithStatus(current, BackgroundJobStatusCatalog.Failed)));
 
-            BackgroundJobSnapshot snapshot = await service.GetAsync("update-job");
-            Assert.NotNull(snapshot);
+            BackgroundJobSnapshot snapshot = Assert.IsType<BackgroundJobSnapshot>(await service.GetAsync("update-job"));
             Assert.Equal(BackgroundJobStatusCatalog.Running, snapshot.Status);
             Assert.True(snapshot.CanCancel);
         }

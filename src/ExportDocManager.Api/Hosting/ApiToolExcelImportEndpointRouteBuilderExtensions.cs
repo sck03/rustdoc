@@ -55,7 +55,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("PreviewExcelImport");
+            .WithName("PreviewExcelImport")
+            .Produces<ApiExcelImportPreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/tools/excel/import-preview-upload", async (
                 HttpContext context,
@@ -137,7 +142,13 @@ namespace ExportDocManager.Api.Hosting
                     AtomicFileHelper.TryDeleteDirectory(uploadRoot);
                 }
             })
-            .WithName("PreviewUploadedExcelImport");
+            .Accepts<IFormFile>("application/octet-stream")
+            .WithName("PreviewUploadedExcelImport")
+            .Produces<ApiExcelImportPreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status413PayloadTooLarge);
         }
     }
 }

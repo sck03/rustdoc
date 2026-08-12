@@ -24,7 +24,7 @@ namespace ExportDocManager.Services.Core
         public PaymentService(
             IDbContextFactory<AppDbContext> contextFactory,
             DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope businessDataAccessScope)
+            BusinessDataAccessScope? businessDataAccessScope)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
@@ -171,7 +171,7 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        private static void EnsureTextLength(string value, int maximumLength, string label)
+        private static void EnsureTextLength(string? value, int maximumLength, string label)
         {
             if ((value?.Length ?? 0) > maximumLength)
             {

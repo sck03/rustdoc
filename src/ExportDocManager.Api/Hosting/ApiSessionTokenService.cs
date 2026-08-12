@@ -12,7 +12,7 @@ namespace ExportDocManager.Api.Hosting
     {
         Task<ApiSessionToken> IssueAsync(User user, TimeSpan? lifetime = null, CancellationToken cancellationToken = default);
 
-        Task<User> ValidateAsync(string token, CancellationToken cancellationToken = default);
+        Task<User?> ValidateAsync(string token, CancellationToken cancellationToken = default);
 
         Task<bool> RevokeAsync(string token, CancellationToken cancellationToken = default);
 
@@ -35,7 +35,7 @@ namespace ExportDocManager.Api.Hosting
         public InMemoryApiSessionTokenService()
         {
             _cleanupTimer = new Timer(
-                static state => ((InMemoryApiSessionTokenService)state).CleanupExpiredTokens(),
+                static state => ((InMemoryApiSessionTokenService?)state)?.CleanupExpiredTokens(),
                 this,
                 CleanupInterval,
                 CleanupInterval);
@@ -62,7 +62,7 @@ namespace ExportDocManager.Api.Hosting
             CancellationToken cancellationToken = default) =>
             Task.FromResult(Issue(user, lifetime));
 
-        public User Validate(string token)
+        public User? Validate(string token)
         {
             if (string.IsNullOrWhiteSpace(token))
             {
@@ -83,7 +83,7 @@ namespace ExportDocManager.Api.Hosting
             return ApiUserDtoFactory.ToUserSnapshot(issued.User);
         }
 
-        public Task<User> ValidateAsync(string token, CancellationToken cancellationToken = default) =>
+        public Task<User?> ValidateAsync(string token, CancellationToken cancellationToken = default) =>
             Task.FromResult(Validate(token));
 
         public bool Revoke(string token)
@@ -205,7 +205,7 @@ namespace ExportDocManager.Api.Hosting
             return new ApiSessionToken(token, expiresAt, ApiUserDtoFactory.ToUserSnapshot(user));
         }
 
-        public async Task<User> ValidateAsync(
+        public async Task<User?> ValidateAsync(
             string token,
             CancellationToken cancellationToken = default)
         {
@@ -216,7 +216,7 @@ namespace ExportDocManager.Api.Hosting
 
             string tokenHash = HashToken(token.Trim());
             var now = DateTimeOffset.UtcNow;
-            if (TryGetCachedValidation(tokenHash, now, out User cachedUser))
+            if (TryGetCachedValidation(tokenHash, now, out User? cachedUser))
             {
                 return cachedUser;
             }
@@ -233,7 +233,7 @@ namespace ExportDocManager.Api.Hosting
 
             var user = await context.Users
                 .Include(item => item.PermissionTemplate)
-                .ThenInclude(template => template.Modules)
+                .ThenInclude(template => template!.Modules)
                 .AsNoTracking()
                 .SingleOrDefaultAsync(item => item.Id == session.UserId && item.IsActive, cancellationToken);
             if (user == null)
@@ -343,7 +343,7 @@ namespace ExportDocManager.Api.Hosting
         private bool TryGetCachedValidation(
             string tokenHash,
             DateTimeOffset now,
-            out User user)
+            out User? user)
         {
             user = null;
             if (!_validationCache.TryGetValue(tokenHash, out var cached))

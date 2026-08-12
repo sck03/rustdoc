@@ -194,7 +194,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
         title: "基础信息",
         fields: [
           { name: "name", label: "名称", required: true, className: "field-grid-span-2" },
-          { name: "category", label: "分类", required: true, customOptionType: "PayeeCategory" },
+          { name: "category", label: "分类", customOptionType: "PayeeCategory" },
           { name: "contactPerson", label: "联系人" },
           { name: "phone", label: "电话" },
         ],

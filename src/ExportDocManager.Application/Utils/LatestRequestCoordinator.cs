@@ -4,7 +4,7 @@ namespace ExportDocManager.Utils
 {
     public sealed class LatestRequestCoordinator : IDisposable
     {
-        private CancellationTokenSource _currentRequestSource = new();
+        private CancellationTokenSource? _currentRequestSource = new();
         private int _currentVersion;
 
         public RequestHandle Begin()
@@ -37,7 +37,7 @@ namespace ExportDocManager.Utils
 
         public readonly record struct RequestHandle(int Version, CancellationToken CancellationToken);
 
-        private static void CancelAndDispose(CancellationTokenSource source)
+        private static void CancelAndDispose(CancellationTokenSource? source)
         {
             if (source == null)
             {
@@ -60,7 +60,7 @@ namespace ExportDocManager.Utils
             }
         }
 
-        private static void TryCancel(CancellationTokenSource source)
+        private static void TryCancel(CancellationTokenSource? source)
         {
             if (source == null)
             {

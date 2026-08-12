@@ -102,7 +102,7 @@ public sealed class InfrastructureSqlSafetyPolicyTests
 
     private static string ResolveSourceRoot(params string[] segments)
     {
-        string directory = AppContext.BaseDirectory;
+        string? directory = AppContext.BaseDirectory;
         while (!string.IsNullOrWhiteSpace(directory))
         {
             string candidate = Path.Combine(new[] { directory }.Concat(segments).ToArray());

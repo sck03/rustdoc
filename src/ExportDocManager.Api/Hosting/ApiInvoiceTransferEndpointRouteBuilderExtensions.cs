@@ -65,7 +65,13 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("SaveInvoiceTransferPackageToPath");
+            .WithName("SaveInvoiceTransferPackageToPath")
+            .Produces<ApiInvoiceTransferExportResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/invoices/{id:int}/transfer-package/download", async (
                 HttpContext context,
@@ -119,7 +125,12 @@ namespace ExportDocManager.Api.Hosting
                     }
                 }
             })
-            .WithName("DownloadInvoiceTransferPackage");
+            .WithName("DownloadInvoiceTransferPackage")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/invoices/transfer-package/preview", async (
                 HttpContext context,
@@ -167,7 +178,12 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("PreviewInvoiceTransferPackage");
+            .WithName("PreviewInvoiceTransferPackage")
+            .Produces<ApiInvoiceTransferPreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/invoices/transfer-package/upload/preview", async (
                 HttpContext context,
@@ -198,7 +214,12 @@ namespace ExportDocManager.Api.Hosting
                     },
                     cancellationToken);
             })
-            .WithName("PreviewUploadedInvoiceTransferPackage");
+            .Accepts<IFormFile>("application/octet-stream")
+            .WithName("PreviewUploadedInvoiceTransferPackage")
+            .Produces<ApiInvoiceTransferPreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/invoices/transfer-package/import", async (
                 HttpContext context,
@@ -260,7 +281,12 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("ImportInvoiceTransferPackage");
+            .WithName("ImportInvoiceTransferPackage")
+            .Produces<ApiInvoiceTransferImportResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/invoices/transfer-package/upload/import", async (
                 HttpContext context,
@@ -309,13 +335,18 @@ namespace ExportDocManager.Api.Hosting
                     },
                     cancellationToken);
             })
-            .WithName("ImportUploadedInvoiceTransferPackage");
+            .Accepts<IFormFile>("application/octet-stream")
+            .WithName("ImportUploadedInvoiceTransferPackage")
+            .Produces<ApiInvoiceTransferImportResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
         }
 
         private static async Task<IResult> ProcessUploadedInvoiceTransferPackageAsync(
             HttpContext context,
             IAppPathProvider pathProvider,
-            string fileName,
+            string? fileName,
             Func<string, Task<IResult>> processAsync,
             CancellationToken cancellationToken)
         {
@@ -394,7 +425,7 @@ namespace ExportDocManager.Api.Hosting
         }
 
         private static bool TryParseInvoiceTransferConflictAction(
-            string action,
+            string? action,
             out InvoiceImportConflictAction conflictAction)
         {
             if (Enum.TryParse(action?.Trim(), ignoreCase: true, out conflictAction) &&

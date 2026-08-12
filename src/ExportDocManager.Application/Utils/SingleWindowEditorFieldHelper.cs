@@ -34,27 +34,27 @@ namespace ExportDocManager.Utils
                     StringComparer.Ordinal);
         }
 
-        public static string NormalizeGroupKey(string groupKey, string fallback)
+        public static string NormalizeGroupKey(string? groupKey, string fallback)
         {
             return string.IsNullOrWhiteSpace(groupKey) ? fallback : groupKey.Trim();
         }
 
-        public static bool ScopeMatches(string scopeKey, string expectedKey)
+        public static bool ScopeMatches(string? scopeKey, string expectedKey)
         {
             return string.IsNullOrWhiteSpace(scopeKey) ||
                    string.Equals(scopeKey, expectedKey, StringComparison.Ordinal);
         }
 
-        public static string NormalizeStringValue(string value)
+        public static string NormalizeStringValue(string? value)
         {
             return value?.Trim() ?? string.Empty;
         }
 
         public static string GetStringPropertyValue(
-            object target,
+            object? target,
             IReadOnlyDictionary<string, PropertyInfo> propertyMap,
             string propertyName,
-            Func<string, string> normalize = null)
+            Func<string, string>? normalize = null)
         {
             ArgumentNullException.ThrowIfNull(propertyMap);
 
@@ -63,16 +63,16 @@ namespace ExportDocManager.Utils
                 return string.Empty;
             }
 
-            string value = property.GetValue(target) as string;
-            return normalize == null ? value ?? string.Empty : normalize(value);
+            string? value = property.GetValue(target) as string;
+            return normalize == null ? value ?? string.Empty : normalize(value ?? string.Empty);
         }
 
         public static bool SetStringPropertyValue(
-            object target,
+            object? target,
             IReadOnlyDictionary<string, PropertyInfo> propertyMap,
             string propertyName,
-            string value,
-            Func<string, string> normalize = null)
+            string? value,
+            Func<string, string>? normalize = null)
         {
             ArgumentNullException.ThrowIfNull(propertyMap);
 
@@ -81,16 +81,16 @@ namespace ExportDocManager.Utils
                 return false;
             }
 
-            property.SetValue(target, normalize == null ? value ?? string.Empty : normalize(value));
+            property.SetValue(target, normalize == null ? value ?? string.Empty : normalize(value ?? string.Empty));
             return true;
         }
 
         public static void AssignStringPropertyValues(
-            object target,
+            object? target,
             IReadOnlyDictionary<string, PropertyInfo> propertyMap,
-            IEnumerable<string> propertyNames,
-            Func<string, string> valueFactory,
-            Func<string, string, string> normalize = null)
+            IEnumerable<string>? propertyNames,
+            Func<string, string?> valueFactory,
+            Func<string, string?, string>? normalize = null)
         {
             ArgumentNullException.ThrowIfNull(propertyMap);
             ArgumentNullException.ThrowIfNull(valueFactory);
@@ -104,7 +104,7 @@ namespace ExportDocManager.Utils
                     continue;
                 }
 
-                string value = valueFactory(propertyName);
+                string? value = valueFactory(propertyName);
                 property.SetValue(
                     target,
                     normalize == null
@@ -114,12 +114,12 @@ namespace ExportDocManager.Utils
         }
 
         public static void CopyStringPropertyValues(
-            object source,
+            object? source,
             IReadOnlyDictionary<string, PropertyInfo> sourcePropertyMap,
-            object target,
+            object? target,
             IReadOnlyDictionary<string, PropertyInfo> targetPropertyMap,
-            IEnumerable<string> propertyNames,
-            Func<string, string, string> normalize = null)
+            IEnumerable<string>? propertyNames,
+            Func<string, string?, string>? normalize = null)
         {
             ArgumentNullException.ThrowIfNull(sourcePropertyMap);
 
@@ -132,10 +132,10 @@ namespace ExportDocManager.Utils
         }
 
         public static IReadOnlyDictionary<string, string> SnapshotStringPropertyValues(
-            object target,
+            object? target,
             IReadOnlyDictionary<string, PropertyInfo> propertyMap,
-            IEnumerable<string> propertyNames,
-            Func<string, string> normalize = null)
+            IEnumerable<string>? propertyNames,
+            Func<string, string>? normalize = null)
         {
             ArgumentNullException.ThrowIfNull(propertyMap);
 
@@ -148,16 +148,16 @@ namespace ExportDocManager.Utils
         }
 
         public static int ApplyNormalizedStringChange(
-            string currentValue,
-            string nextValue,
+            string? currentValue,
+            string? nextValue,
             Action<string> assign,
-            Func<string, string> normalize = null)
+            Func<string, string>? normalize = null)
         {
             ArgumentNullException.ThrowIfNull(assign);
 
             var normalizer = normalize ?? NormalizeStringValue;
-            string normalizedCurrent = normalizer(currentValue);
-            string normalizedNext = normalizer(nextValue);
+            string normalizedCurrent = normalizer(currentValue ?? string.Empty);
+            string normalizedNext = normalizer(nextValue ?? string.Empty);
             if (string.Equals(normalizedCurrent, normalizedNext, StringComparison.Ordinal))
             {
                 return 0;
@@ -168,11 +168,11 @@ namespace ExportDocManager.Utils
         }
 
         public static int ApplyStringPropertyChange(
-            object target,
+            object? target,
             IReadOnlyDictionary<string, PropertyInfo> propertyMap,
             string propertyName,
-            string nextValue,
-            Func<string, string> normalize = null)
+            string? nextValue,
+            Func<string, string>? normalize = null)
         {
             ArgumentNullException.ThrowIfNull(propertyMap);
 
@@ -189,10 +189,10 @@ namespace ExportDocManager.Utils
         }
 
         public static int ClearStringPropertyValues(
-            object target,
+            object? target,
             IReadOnlyDictionary<string, PropertyInfo> propertyMap,
-            IEnumerable<string> propertyNames,
-            Func<string, string> normalize = null)
+            IEnumerable<string>? propertyNames,
+            Func<string, string>? normalize = null)
         {
             ArgumentNullException.ThrowIfNull(propertyMap);
 
@@ -213,11 +213,11 @@ namespace ExportDocManager.Utils
         }
 
         public static bool SetPrivateStringBackingField(
-            object target,
+            object? target,
             IReadOnlyDictionary<string, FieldInfo> fieldMap,
             string propertyName,
-            string value,
-            Action<string> raisePropertyChanged = null)
+            string? value,
+            Action<string>? raisePropertyChanged = null)
         {
             ArgumentNullException.ThrowIfNull(fieldMap);
 

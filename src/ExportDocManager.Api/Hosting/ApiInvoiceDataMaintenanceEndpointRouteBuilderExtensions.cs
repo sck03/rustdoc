@@ -1,5 +1,6 @@
 using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Security;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -7,7 +8,12 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapInvoiceDataMaintenanceEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/system/data-maintenance/invoices/{id:int}", async (
+            endpoints.MapGet("/api/system/data-maintenance/invoices/{id:int}", async Task<Results<
+                Ok<ApiInvoiceDataMaintenancePreviewResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                JsonHttpResult<ApiErrorResponse>,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -16,27 +22,27 @@ namespace ExportDocManager.Api.Hosting
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
+                if (user is null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (!authorizationService.CanManageSettings(user))
                 {
-                    return WriteForbidden("只有管理员可以使用发票数据维护功能。");
+                    return TypedForbidden("只有管理员可以使用发票数据维护功能。");
                 }
 
                 if (id <= 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("发票 ID 必须大于 0。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("发票 ID 必须大于 0。"));
                 }
 
                 var preview = await maintenanceService
                     .GetPurgePreviewAsync(id, cancellationToken)
                     .ConfigureAwait(false);
                 return preview == null
-                    ? Results.NotFound()
-                    : Results.Ok(new ApiInvoiceDataMaintenancePreviewResponse(
+                    ? TypedResults.NotFound()
+                    : TypedResults.Ok(new ApiInvoiceDataMaintenancePreviewResponse(
                         preview.Id,
                         preview.InvoiceNo,
                         preview.Type,
@@ -48,9 +54,16 @@ namespace ExportDocManager.Api.Hosting
                         preview.Guidance,
                         preview.StoragePolicy));
             })
-            .WithName("GetInvoiceDataMaintenancePreview");
+            .WithName("GetInvoiceDataMaintenancePreview")
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
-            endpoints.MapPost("/api/system/data-maintenance/invoices/{id:int}/purge", async (
+            endpoints.MapPost("/api/system/data-maintenance/invoices/{id:int}/purge", async Task<Results<
+                Ok<ApiInvoicePurgeResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                JsonHttpResult<ApiErrorResponse>,
+                NotFound,
+                Conflict<ApiErrorResponse>>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -60,19 +73,19 @@ namespace ExportDocManager.Api.Hosting
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
+                if (user is null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (!authorizationService.CanManageSettings(user))
                 {
-                    return WriteForbidden("只有管理员可以使用发票数据维护功能。");
+                    return TypedForbidden("只有管理员可以使用发票数据维护功能。");
                 }
 
-                if (id <= 0 || request == null)
+                if (id <= 0 || request is null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("发票 ID 和数据清理请求不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("发票 ID 和数据清理请求不能为空。"));
                 }
 
                 try
@@ -86,8 +99,8 @@ namespace ExportDocManager.Api.Hosting
                             cancellationToken)
                         .ConfigureAwait(false);
                     return result == null
-                        ? Results.NotFound()
-                        : Results.Ok(new ApiInvoicePurgeResponse(
+                        ? TypedResults.NotFound()
+                        : TypedResults.Ok(new ApiInvoicePurgeResponse(
                             result.Success,
                             result.InvoiceId,
                             result.InvoiceNo,
@@ -97,18 +110,19 @@ namespace ExportDocManager.Api.Hosting
                 }
                 catch (InvoiceValidationException ex)
                 {
-                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                    return TypedResults.BadRequest(new ApiErrorResponse(ex.Message));
                 }
                 catch (InvoiceConflictException ex)
                 {
-                    return Results.Conflict(new ApiErrorResponse(ex.Message));
+                    return TypedResults.Conflict(new ApiErrorResponse(ex.Message));
                 }
                 catch (UnauthorizedAccessException ex)
                 {
-                    return WriteForbidden(ex.Message);
+                    return TypedForbidden(ex.Message);
                 }
             })
-            .WithName("PurgeCancelledInvoice");
+            .WithName("PurgeCancelledInvoice")
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
         }
     }
 }

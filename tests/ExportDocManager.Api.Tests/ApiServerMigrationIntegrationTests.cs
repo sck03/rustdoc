@@ -277,7 +277,7 @@ namespace ExportDocManager.Api.Tests
             var boundContext = CreateDownloadContext(issueContext);
             time.Advance(TimeSpan.FromMilliseconds(1));
 
-            ApiDownloadTicket latest = null;
+            ApiDownloadTicket? latest = null;
             for (int index = 0; index < 4096; index++)
             {
                 latest = service.Issue(
@@ -387,7 +387,7 @@ namespace ExportDocManager.Api.Tests
             public string LastPackagePassword { get; private set; } = string.Empty;
             public string LastDatabaseFileName { get; private set; } = string.Empty;
             public byte[] LastDatabaseBytes { get; private set; } = [];
-            public ServerMigrationRequestContext LastRequestContext { get; private set; }
+            public ServerMigrationRequestContext? LastRequestContext { get; private set; }
 
             public ServerMigrationStatus GetStatus() => new(
                 true,

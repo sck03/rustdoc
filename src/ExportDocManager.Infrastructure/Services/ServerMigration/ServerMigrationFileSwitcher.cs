@@ -27,6 +27,6 @@ internal static class ServerMigrationFileSwitcher
     public static void CleanupSnapshots(ServerMigrationFileTransactionState state) =>
         ServerMigrationFileTransaction.CleanupSnapshots(state);
 
-    public static ServerMigrationFileTransactionState ReadState(string safetyRoot) =>
+    public static ServerMigrationFileTransactionState? ReadState(string safetyRoot) =>
         ServerMigrationFileTransaction.ReadState(safetyRoot);
 }

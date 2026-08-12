@@ -6,7 +6,7 @@ namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiEndpointRouteBuilderExtensions
     {
-        private static async Task<Payee> FindPayeeByIdAsync(
+        private static async Task<Payee?> FindPayeeByIdAsync(
             IPayeeReadRepository repository,
             int id,
             CancellationToken cancellationToken)
@@ -14,7 +14,7 @@ namespace ExportDocManager.Api.Hosting
             return await repository.GetByIdAsync(id, cancellationToken);
         }
 
-        private static async Task<Port> FindPortByIdAsync(
+        private static async Task<Port?> FindPortByIdAsync(
             IPortReadRepository repository,
             int id,
             CancellationToken cancellationToken)
@@ -22,7 +22,7 @@ namespace ExportDocManager.Api.Hosting
             return await repository.GetByIdAsync(id, cancellationToken);
         }
 
-        private static async Task<Unit> FindUnitByIdAsync(
+        private static async Task<Unit?> FindUnitByIdAsync(
             IUnitReadRepository repository,
             int id,
             CancellationToken cancellationToken)
@@ -30,7 +30,7 @@ namespace ExportDocManager.Api.Hosting
             return await repository.GetByIdAsync(id, cancellationToken);
         }
 
-        private static async Task<HsCode> FindHsCodeByIdAsync(
+        private static async Task<HsCode?> FindHsCodeByIdAsync(
             IHsCodeReadRepository repository,
             int id,
             CancellationToken cancellationToken)

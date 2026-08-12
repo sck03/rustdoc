@@ -61,7 +61,7 @@ namespace ExportDocManager.Api.Hosting
                 return false;
             }
             CleanupExpired();
-            if (!_tickets.TryRemove(token.Trim(), out TicketState ticket))
+            if (!_tickets.TryRemove(token.Trim(), out TicketState? ticket))
             {
                 return false;
             }

@@ -20,7 +20,7 @@ namespace ExportDocManager.Services.Infrastructure
 
     public interface IPaymentDetailReadRepository
     {
-        Task<Payment> GetByIdAsync(
+        Task<Payment?> GetByIdAsync(
             int id,
             CancellationToken cancellationToken = default);
     }

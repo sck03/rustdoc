@@ -89,8 +89,8 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             var appRoot = CreateTempDirectory();
             var previousProvider = new RuntimeAppPathProvider();
-            string previousPassword = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable);
-            string previousFile = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable);
+            string? previousPassword = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable);
+            string? previousFile = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable);
             try
             {
                 var provider = new RuntimeAppPathProvider(appRoot);
@@ -127,8 +127,8 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             var appRoot = CreateTempDirectory();
             var previousProvider = new RuntimeAppPathProvider();
-            string previousPassword = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable);
-            string previousFile = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable);
+            string? previousPassword = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable);
+            string? previousFile = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable);
             try
             {
                 var provider = new RuntimeAppPathProvider(appRoot);
@@ -158,8 +158,8 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             var appRoot = CreateTempDirectory();
             var previousProvider = new RuntimeAppPathProvider();
-            string previousPassword = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable);
-            string previousFile = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable);
+            string? previousPassword = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable);
+            string? previousFile = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable);
             try
             {
                 var provider = new RuntimeAppPathProvider(appRoot);

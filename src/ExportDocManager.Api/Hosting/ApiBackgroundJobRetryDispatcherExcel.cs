@@ -157,7 +157,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiEndpointRouteBuilderExtensions.EnqueueQueryInvoiceExportJob(
                     jobRunner,
                     requestedBy,
-                    request,
+                    request!,
                     destinationPath));
         }
     }

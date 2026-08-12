@@ -82,15 +82,17 @@ public static class ServerMigrationManager
             throw new ResourceConflictException("已有服务器迁移任务等待重启执行。");
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(markerPath)!);
-        RuntimeFilePermissionHelper.RestrictDirectory(Path.GetDirectoryName(markerPath)!);
+        string controlRoot = Path.GetDirectoryName(markerPath)
+            ?? throw new InfrastructureServiceException("服务器迁移控制文件缺少父目录。");
+        Directory.CreateDirectory(controlRoot);
+        RuntimeFilePermissionHelper.RestrictDirectory(controlRoot);
         marker.StatusMessage = "服务器迁移恢复已排队，等待服务重启。";
         marker.SafetyBackupRoot = GetSafetyBackupRoot(pathProvider, marker.PackageId);
         WriteMarker(markerPath, marker);
         TryWriteStatusFile(pathProvider, BuildStatus(marker, marker.StatusMessage, marker.SafetyBackupRoot));
     }
 
-    internal static ServerMigrationRestoreStatusSnapshot ReadStatus(IAppPathProvider pathProvider)
+    internal static ServerMigrationRestoreStatusSnapshot? ReadStatus(IAppPathProvider pathProvider)
     {
         ArgumentNullException.ThrowIfNull(pathProvider);
         string path = GetStatusPath(pathProvider);
@@ -99,7 +101,7 @@ public static class ServerMigrationManager
         {
             try
             {
-                PendingServerMigrationRestore marker = JsonSerializer.Deserialize<PendingServerMigrationRestore>(
+                PendingServerMigrationRestore? marker = JsonSerializer.Deserialize<PendingServerMigrationRestore>(
                     File.ReadAllText(markerPath),
                     ServerMigrationService.JsonOptions);
                 if (marker != null)

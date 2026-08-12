@@ -33,7 +33,7 @@ namespace ExportDocManager.Services.Core
             IInvoicePartyResolver invoicePartyResolver,
             DatabaseConnectionSettings databaseSettings,
             IAppPathProvider pathProvider,
-            BusinessDataAccessScope businessDataAccessScope = null)
+            BusinessDataAccessScope? businessDataAccessScope = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _invoicePartyResolver = invoicePartyResolver ?? throw new ArgumentNullException(nameof(invoicePartyResolver));
@@ -155,7 +155,7 @@ namespace ExportDocManager.Services.Core
             return await BuildPreviewAsync(context, pkg, cancellationToken);
         }
 
-        public async Task<InvoiceImportResult> ImportAsync(InvoiceTransferPackage pkg, InvoiceImportConflictAction action, string newInvoiceNo = null, CancellationToken cancellationToken = default)
+        public async Task<InvoiceImportResult> ImportAsync(InvoiceTransferPackage pkg, InvoiceImportConflictAction action, string? newInvoiceNo = null, CancellationToken cancellationToken = default)
         {
             EnsurePackageValid(pkg);
 
@@ -192,7 +192,9 @@ namespace ExportDocManager.Services.Core
                         pkg.Invoice?.ExporterNameCN,
                         token);
                     var importItems = CloneItems(pkg.Items);
-                    var importInvoice = CloneInvoice(pkg.Invoice);
+                    var packageInvoice = pkg.Invoice
+                        ?? throw new InvalidDataException("迁移包缺少发票主体。");
+                    var importInvoice = CloneInvoice(packageInvoice);
 
                     importInvoice.Id = 0;
                     importInvoice.RowVersion = null;
@@ -236,7 +238,7 @@ namespace ExportDocManager.Services.Core
                         throw new PermissionDeniedException("目标公司范围已有相同发票号和类型，但当前账号无权覆盖；请改用新发票号导入。");
                     }
 
-                    Invoice existingInvoiceForMutation = null;
+                    Invoice? existingInvoiceForMutation = null;
                     if (preview.InvoiceExists && preview.ExistingInvoiceId > 0 &&
                         action is InvoiceImportConflictAction.Overwrite or InvoiceImportConflictAction.AppendItems)
                     {
@@ -277,16 +279,18 @@ namespace ExportDocManager.Services.Core
                         existingStatus: existingInvoiceForMutation?.Status ?? InvoiceStatusCatalog.Draft,
                         token).ConfigureAwait(false);
                     importItems = importInvoice.Items?.ToList() ?? [];
-                    importInvoice.Items = null;
+                    importInvoice.Items = [];
 
                     int finalInvoiceId;
                     if (preview.InvoiceExists && action == InvoiceImportConflictAction.Overwrite)
                     {
-                        importInvoice.Id = existingInvoiceForMutation.Id;
-                        importInvoice.OwnerUserId = existingInvoiceForMutation.OwnerUserId;
-                        importInvoice.DepartmentId = existingInvoiceForMutation.DepartmentId;
-                        importInvoice.CompanyScope = existingInvoiceForMutation.CompanyScope;
-                        importInvoice.RowVersion = existingInvoiceForMutation.RowVersion?.ToArray();
+                        var existingInvoice = existingInvoiceForMutation
+                            ?? throw new ResourceNotFoundException("目标发票已不存在或当前账号无权修改，请刷新后重试。");
+                        importInvoice.Id = existingInvoice.Id;
+                        importInvoice.OwnerUserId = existingInvoice.OwnerUserId;
+                        importInvoice.DepartmentId = existingInvoice.DepartmentId;
+                        importInvoice.CompanyScope = existingInvoice.CompanyScope;
+                        importInvoice.RowVersion = existingInvoice.RowVersion?.ToArray();
                         context.Invoices.Update(importInvoice);
                         await context.SaveChangesAsync(token);
                         await ReplaceItemsAsync(context, importInvoice.Id, importItems, token);
@@ -329,8 +333,8 @@ namespace ExportDocManager.Services.Core
 
             var items = await context.Items.AsNoTracking().Where(x => x.InvoiceId == invoiceId).ToListAsync(cancellationToken);
 
-            Customer customer = null;
-            Exporter exporter = null;
+            Customer? customer = null;
+            Exporter? exporter = null;
             if (invoice.CustomerId > 0)
             {
                 customer = await context.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == invoice.CustomerId, cancellationToken);
@@ -360,7 +364,7 @@ namespace ExportDocManager.Services.Core
             var preview = new InvoiceTransferPreview
             {
                 InvoiceNo = pkg.Invoice.InvoiceNo,
-                Type = pkg.Invoice.Type,
+                Type = pkg.Invoice.Type ?? string.Empty,
                 ItemCount = pkg.Items?.Count ?? 0
             };
 
@@ -420,7 +424,7 @@ namespace ExportDocManager.Services.Core
             return preview;
         }
 
-        private string ResolveImportCompanyScope(string packageCompanyScope)
+        private string ResolveImportCompanyScope(string? packageCompanyScope)
         {
             var currentUser = _businessDataAccessScope.CurrentUser;
             return currentUser != null && currentUser.Id > 0
@@ -430,10 +434,10 @@ namespace ExportDocManager.Services.Core
 
         private async Task<string> ResolveInvoiceNoAsync(
             AppDbContext context,
-            string companyScope,
-            string baseInvoiceNo,
-            string invoiceType,
-            string requestedInvoiceNo,
+            string? companyScope,
+            string? baseInvoiceNo,
+            string? invoiceType,
+            string? requestedInvoiceNo,
             CancellationToken cancellationToken)
         {
             var seed = string.IsNullOrWhiteSpace(requestedInvoiceNo)
@@ -486,7 +490,8 @@ namespace ExportDocManager.Services.Core
 
         private static Invoice CloneInvoice(Invoice invoice)
         {
-            return invoice?.CloneHeader();
+            ArgumentNullException.ThrowIfNull(invoice);
+            return invoice.CloneHeader();
         }
 
         private static List<Item> CloneItems(IEnumerable<Item> items)
@@ -498,7 +503,7 @@ namespace ExportDocManager.Services.Core
                 ?? new List<Item>();
         }
 
-        private static Customer CloneCustomer(Customer customer)
+        private static Customer? CloneCustomer(Customer? customer)
         {
             if (customer == null)
             {
@@ -521,7 +526,7 @@ namespace ExportDocManager.Services.Core
             };
         }
 
-        private static Exporter CloneExporter(Exporter exporter)
+        private static Exporter? CloneExporter(Exporter? exporter)
         {
             if (exporter == null)
             {
@@ -563,7 +568,7 @@ namespace ExportDocManager.Services.Core
                    a.Currency == b.Currency;
         }
 
-        private async Task<bool> CompareItemsAsync(AppDbContext context, int invoiceId, List<Item> items, CancellationToken cancellationToken)
+        private async Task<bool> CompareItemsAsync(AppDbContext context, int invoiceId, List<Item>? items, CancellationToken cancellationToken)
         {
             var existing = await context.Items.AsNoTracking().Where(x => x.InvoiceId == invoiceId).ToListAsync(cancellationToken);
             var incoming = items ?? new List<Item>();
@@ -637,7 +642,7 @@ namespace ExportDocManager.Services.Core
             await UpdateInvoiceTotalsAsync(context, invoiceId, cancellationToken: cancellationToken);
         }
 
-        private async Task UpdateInvoiceTotalsAsync(AppDbContext context, int invoiceId, List<Item> items = null, CancellationToken cancellationToken = default)
+        private async Task UpdateInvoiceTotalsAsync(AppDbContext context, int invoiceId, List<Item>? items = null, CancellationToken cancellationToken = default)
         {
             var invoice = await _businessDataAccessScope
                 .ApplyInvoiceScope(context.Invoices)

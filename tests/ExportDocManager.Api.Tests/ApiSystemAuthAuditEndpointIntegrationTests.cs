@@ -263,7 +263,7 @@ namespace ExportDocManager.Api.Tests
             public Task<DatabaseInitializationResult> InitializeAsync(
                 string username,
                 string password,
-                string bootstrapToken = null)
+                string? bootstrapToken = null)
             {
                 return Task.FromResult(DatabaseInitializationResult.Fail(
                     "首次管理员初始化令牌无效。",

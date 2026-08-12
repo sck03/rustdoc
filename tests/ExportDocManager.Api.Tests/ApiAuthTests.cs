@@ -77,7 +77,7 @@ namespace ExportDocManager.Api.Tests
             await resolver.ResolveAsync(httpContext);
             var context = new ApiCurrentUserContext(accessor);
 
-            Assert.Equal("admin", context.CurrentUser.Username);
+            Assert.Equal("admin", Assert.IsType<User>(context.CurrentUser).Username);
             Assert.Equal(issued.AccessToken, ApiCurrentUserContext.GetBearerToken(httpContext));
         }
 
@@ -96,8 +96,8 @@ namespace ExportDocManager.Api.Tests
             var admin = await resolver.ResolveAsync(adminContext);
             var operatorUser = await resolver.ResolveAsync(operatorContext);
 
-            Assert.Equal("admin", admin.Username);
-            Assert.Equal("operator", operatorUser.Username);
+            Assert.Equal("admin", Assert.IsType<User>(admin).Username);
+            Assert.Equal("operator", Assert.IsType<User>(operatorUser).Username);
             Assert.Equal("admin", Assert.IsType<User>(adminContext.Items[ApiEndpointAuth.AuthenticatedUserItemKey]).Username);
             Assert.Equal("operator", Assert.IsType<User>(operatorContext.Items[ApiEndpointAuth.AuthenticatedUserItemKey]).Username);
         }
@@ -119,13 +119,13 @@ namespace ExportDocManager.Api.Tests
             var currentUserContext = new ApiCurrentUserContext(accessor);
 
             accessor.HttpContext = adminContext;
-            Assert.Equal("admin", currentUserContext.CurrentUser.Username);
+            Assert.Equal("admin", Assert.IsType<User>(currentUserContext.CurrentUser).Username);
 
             accessor.HttpContext = operatorContext;
-            Assert.Equal("operator", currentUserContext.CurrentUser.Username);
+            Assert.Equal("operator", Assert.IsType<User>(currentUserContext.CurrentUser).Username);
 
             accessor.HttpContext = adminContext;
-            Assert.Equal("admin", currentUserContext.CurrentUser.Username);
+            Assert.Equal("admin", Assert.IsType<User>(currentUserContext.CurrentUser).Username);
         }
 
         [Fact]

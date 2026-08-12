@@ -5,7 +5,7 @@ namespace ExportDocManager.Services.SingleWindow
 {
     public static partial class SingleWindowFieldMapperHelpers
     {
-        private static Func<SingleWindowReferenceCatalogModel> _referenceCatalogSnapshotLoader;
+        private static Func<SingleWindowReferenceCatalogModel>? _referenceCatalogSnapshotLoader;
         private static ReferenceCatalogState _referenceCatalogState = ReferenceCatalogState.Empty;
 
         public static void ConfigureReferenceCatalogSnapshotLoader(Func<SingleWindowReferenceCatalogModel> loader)
@@ -205,7 +205,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        private static CountryCatalogEntry MapCountryEntry(SingleWindowReferenceCountryEntry entry)
+        private static CountryCatalogEntry? MapCountryEntry(SingleWindowReferenceCountryEntry? entry)
         {
             if (entry == null)
             {
@@ -233,7 +233,7 @@ namespace ExportDocManager.Services.SingleWindow
                     .ToArray() ?? Array.Empty<string>());
         }
 
-        private static CurrencyCatalogEntry MapCurrencyEntry(SingleWindowReferenceCurrencyEntry entry)
+        private static CurrencyCatalogEntry? MapCurrencyEntry(SingleWindowReferenceCurrencyEntry? entry)
         {
             if (entry == null)
             {
@@ -259,7 +259,7 @@ namespace ExportDocManager.Services.SingleWindow
                     .ToArray() ?? Array.Empty<string>());
         }
 
-        private static AcdCountryCatalogEntry MapAcdCountryEntry(SingleWindowReferenceAcdCountryEntry entry)
+        private static AcdCountryCatalogEntry? MapAcdCountryEntry(SingleWindowReferenceAcdCountryEntry? entry)
         {
             if (entry == null)
             {
@@ -287,7 +287,7 @@ namespace ExportDocManager.Services.SingleWindow
                     .ToArray() ?? Array.Empty<string>());
         }
 
-        private static AcdTradeModeCatalogEntry MapAcdTradeModeEntry(SingleWindowReferenceAcdTradeModeEntry entry)
+        private static AcdTradeModeCatalogEntry? MapAcdTradeModeEntry(SingleWindowReferenceAcdTradeModeEntry? entry)
         {
             if (entry == null)
             {
@@ -313,7 +313,7 @@ namespace ExportDocManager.Services.SingleWindow
                     .ToArray() ?? Array.Empty<string>());
         }
 
-        private static TransportModeCatalogEntry MapTransportModeEntry(SingleWindowReferenceTransportModeEntry entry)
+        private static TransportModeCatalogEntry? MapTransportModeEntry(SingleWindowReferenceTransportModeEntry? entry)
         {
             if (entry == null)
             {
@@ -335,7 +335,7 @@ namespace ExportDocManager.Services.SingleWindow
                     .ToArray() ?? Array.Empty<string>());
         }
 
-        private static PortCatalogEntry MapPortEntry(SingleWindowReferencePortEntry entry)
+        private static PortCatalogEntry? MapPortEntry(SingleWindowReferencePortEntry? entry)
         {
             if (entry == null)
             {
@@ -368,7 +368,7 @@ namespace ExportDocManager.Services.SingleWindow
                 FallbackPortCatalog.ToList());
         }
 
-        private static void AddLookup<TValue>(IDictionary<string, TValue> lookup, string key, TValue value)
+        private static void AddLookup<TValue>(IDictionary<string, TValue> lookup, string? key, TValue value)
         {
             string normalized = NormalizeLookupKey(key);
             if (!string.IsNullOrWhiteSpace(normalized))

@@ -110,7 +110,12 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("RecognizeOcrImage");
+            .WithName("RecognizeOcrImage")
+            .Produces<ApiOcrRecognizeImageResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/tools/ocr/recognize-image-content", async (
                 HttpContext context,
@@ -201,7 +206,11 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("RecognizeOcrImageContent");
+            .WithName("RecognizeOcrImageContent")
+            .Produces<ApiOcrRecognizeImageResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
         }
     }
 }

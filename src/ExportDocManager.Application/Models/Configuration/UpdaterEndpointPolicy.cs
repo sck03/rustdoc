@@ -4,12 +4,12 @@ namespace ExportDocManager.Models
     {
         public const int MaxLength = 2048;
 
-        public static string Normalize(string value)
+        public static string Normalize(string? value)
         {
             return value?.Trim() ?? string.Empty;
         }
 
-        public static bool TryValidate(string value, out Uri endpoint, out string errorMessage)
+        public static bool TryValidate(string? value, out Uri? endpoint, out string errorMessage)
         {
             endpoint = null;
             errorMessage = string.Empty;
@@ -56,7 +56,7 @@ namespace ExportDocManager.Models
             return true;
         }
 
-        public static bool UsesInsecureHttp(string value)
+        public static bool UsesInsecureHttp(string? value)
         {
             return TryValidate(value, out var endpoint, out _) &&
                    endpoint != null &&

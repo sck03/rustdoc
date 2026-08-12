@@ -12,7 +12,7 @@ namespace ExportDocManager.Services.SingleWindow
             NonGoodsCode
         ];
 
-        public static string NormalizeOrDefault(string value)
+        public static string NormalizeOrDefault(string? value)
         {
             string normalized = value?.Trim().ToUpperInvariant() ?? string.Empty;
             return string.Equals(normalized, GoodsCode, StringComparison.Ordinal) ||
@@ -21,7 +21,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : DefaultCode;
         }
 
-        public static bool IsNonGoods(string value)
+        public static bool IsNonGoods(string? value)
         {
             return string.Equals(NormalizeOrDefault(value), NonGoodsCode, StringComparison.Ordinal);
         }

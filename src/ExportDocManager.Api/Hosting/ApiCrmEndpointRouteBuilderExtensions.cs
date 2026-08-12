@@ -14,7 +14,10 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService auth, ICrmService service, ISalesOpportunityService opportunities, CancellationToken ct) =>
                 HasSalesAccess(context, tokens, auth, out var denied)
                     ? Results.Ok(ToApiDto(await service.GetDashboardAsync(ct), await opportunities.GetDashboardAsync(ct)))
-                    : denied).WithName("GetCrmDashboard");
+                    : denied).WithName("GetCrmDashboard")
+            .Produces<ApiCrmDashboardDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapGet("/api/crm/customers/page", async (HttpContext context, IApiSessionTokenService tokens,
                 ApiAuthorizationService auth, ICrmService service, string? keyword, string? status,
@@ -25,7 +28,10 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Ok(new ApiPagedResponse<ApiCrmCustomerDto>(
                     page.Items.Select(ToApiDto).ToArray(), page.TotalCount, page.PageNumber, page.PageSize,
                     page.TotalPages, page.HasPreviousPage, page.HasNextPage));
-            }).WithName("QueryCrmCustomers");
+            }).WithName("QueryCrmCustomers")
+            .Produces<ApiPagedResponse<ApiCrmCustomerDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/crm/customers/batch-status", async (HttpContext context, IApiSessionTokenService tokens,
                 ApiAuthorizationService auth, ICrmService service, ApiCrmCustomerBatchStatusRequest request, CancellationToken ct) =>
@@ -34,18 +40,26 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     int affected = await service.UpdateCustomerStatusAsync(request?.Ids ?? [], request?.Status ?? string.Empty, ct);
-                    return Results.Ok(new ApiCrmCustomerBatchStatusResult(affected, request.Status));
+                    return Results.Ok(new ApiCrmCustomerBatchStatusResult(affected, request?.Status ?? string.Empty));
                 }
                 catch (ServiceException ex) { return WriteServiceException(ex); }
-            }).WithName("UpdateCrmCustomerBatchStatus");
+            }).WithName("UpdateCrmCustomerBatchStatus")
+            .Produces<ApiCrmCustomerBatchStatusResult>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapGet("/api/crm/customers/export", async (HttpContext context, IApiSessionTokenService tokens,
-                ApiAuthorizationService auth, ICrmCustomerExportService exportService, CancellationToken ct) =>
+                ApiAuthorizationService auth, ICrmCustomerExportService exportService, string? keyword, string? status,
+                CancellationToken ct) =>
             {
                 if (!HasSalesAccess(context, tokens, auth, out var denied)) return denied;
-                byte[] content = await exportService.ExportAsync(context.Request.Query["keyword"], context.Request.Query["status"], ct);
+                byte[] content = await exportService.ExportAsync(keyword, status, ct);
                 return Results.File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"crm-customers-{DateTime.UtcNow:yyyyMMdd-HHmmss}.xlsx");
-            }).WithName("ExportCrmCustomers");
+            }).WithName("ExportCrmCustomers")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/crm/customers", async (HttpContext context, IApiSessionTokenService tokens,
                 ApiAuthorizationService auth, ICrmService service, ApiCrmCustomerSaveRequest request, CancellationToken ct) =>
@@ -58,7 +72,11 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Created($"/api/crm/customers/{saved.Id}", ToApiDto(saved));
                 }
                 catch (ServiceException ex) { return WriteServiceException(ex); }
-            }).WithName("CreateCrmCustomer");
+            }).WithName("CreateCrmCustomer")
+            .Produces<ApiCrmCustomerDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPut("/api/crm/customers/{id:int}", async (HttpContext context, IApiSessionTokenService tokens,
                 ApiAuthorizationService auth, ICrmService service, int id, ApiCrmCustomerSaveRequest request, CancellationToken ct) =>
@@ -68,7 +86,12 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("CRM 客户ID无效。"));
                 try { return Results.Ok(ToApiDto(await service.SaveCustomerAsync(ToSaveRequest(request, id), ct))); }
                 catch (ServiceException ex) { return WriteServiceException(ex); }
-            }).WithName("UpdateCrmCustomer");
+            }).WithName("UpdateCrmCustomer")
+            .Produces<ApiCrmCustomerDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapDelete("/api/crm/customers/{id:int}", async (HttpContext context, IApiSessionTokenService tokens,
                 ApiAuthorizationService auth, ICrmService service, int id, CancellationToken ct) =>
@@ -81,13 +104,17 @@ namespace ExportDocManager.Api.Hosting
                         : Results.NotFound();
                 }
                 catch (ServiceException ex) { return WriteServiceException(ex); }
-            }).WithName("DeleteCrmCustomer");
+            }).WithName("DeleteCrmCustomer")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/crm/import/preview", async (HttpContext context, IApiSessionTokenService tokens,
-                ApiAuthorizationService auth, ICrmCustomerImportService importService, CancellationToken ct) =>
+                ApiAuthorizationService auth, ICrmCustomerImportService importService, string? fileName, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(context, tokens, auth, out var denied)) return denied;
-                string fileName = context.Request.Query["fileName"].ToString();
                 try
                 {
                     using var input = new MemoryStream();
@@ -99,11 +126,15 @@ namespace ExportDocManager.Api.Hosting
                     if (input.Length == 0)
                         return Results.BadRequest(new ApiErrorResponse("CRM 导入文件为空。"));
                     input.Position = 0;
-                    return Results.Ok(ToApiDto(await importService.PreviewAsync(input, fileName, ct)));
+                    return Results.Ok(ToApiDto(await importService.PreviewAsync(input, fileName ?? string.Empty, ct)));
                 }
                 catch (PayloadLimitExceededException ex) { return WritePayloadTooLarge(ex); }
                 catch (InvalidDataException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
-            }).WithName("PreviewCrmCustomerImport");
+            }).Accepts<IFormFile>("application/octet-stream").WithName("PreviewCrmCustomerImport")
+            .Produces<ApiCrmCustomerImportPreviewDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/crm/import", async (HttpContext context, IApiSessionTokenService tokens,
                 ApiAuthorizationService auth, ICrmCustomerImportService importService,
@@ -115,7 +146,11 @@ namespace ExportDocManager.Api.Hosting
                 var result = await importService.ImportAsync(request.Rows.Select(ToImportRow).ToArray(), ct);
                 return Results.Ok(new ApiCrmCustomerImportResultDto(
                     result.CreatedCustomers, result.CreatedContacts, result.SkippedDuplicates));
-            }).WithName("ImportCrmCustomers");
+            }).WithName("ImportCrmCustomers")
+            .Produces<ApiCrmCustomerImportResultDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapGet("/api/crm/customers/{customerId:int}/email-variable-draft", async (HttpContext context,
                 IApiSessionTokenService tokens, ApiAuthorizationService auth, ICrmService service, int customerId, CancellationToken ct) =>
@@ -123,13 +158,20 @@ namespace ExportDocManager.Api.Hosting
                 if (!HasSalesAccess(context, tokens, auth, out var denied)) return denied;
                 try { return Results.Ok(ToApiDto(await service.GetEmailVariableDraftAsync(customerId, ct))); }
                 catch (ServiceException ex) { return WriteServiceException(ex); }
-            }).WithName("GetCrmEmailVariableDraft");
+            }).WithName("GetCrmEmailVariableDraft")
+            .Produces<ApiCrmEmailVariableDraftDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapGet("/api/crm/customers/{customerId:int}/contacts", async (HttpContext context,
                 IApiSessionTokenService tokens, ApiAuthorizationService auth, ICrmService service, int customerId, CancellationToken ct) =>
                 HasSalesAccess(context, tokens, auth, out var denied)
                     ? Results.Ok((await service.ListContactsAsync(customerId, ct)).Select(ToApiDto))
-                    : denied).WithName("ListCrmContacts");
+                    : denied).WithName("ListCrmContacts")
+            .Produces<IReadOnlyList<ApiCrmContactDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/crm/customers/{customerId:int}/contacts", async (HttpContext context,
                 IApiSessionTokenService tokens, ApiAuthorizationService auth, ICrmService service, int customerId,
@@ -143,7 +185,11 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Created($"/api/crm/customers/{customerId}/contacts/{saved.Id}", ToApiDto(saved));
                 }
                 catch (ServiceException ex) { return WriteServiceException(ex); }
-            }).WithName("CreateCrmContact");
+            }).WithName("CreateCrmContact")
+            .Produces<ApiCrmContactDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPut("/api/crm/customers/{customerId:int}/contacts/{id:int}", async (HttpContext context,
                 IApiSessionTokenService tokens, ApiAuthorizationService auth, ICrmService service, int customerId, int id,
@@ -154,7 +200,12 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("联系人ID无效。"));
                 try { return Results.Ok(ToApiDto(await service.SaveContactAsync(ToSaveRequest(request, customerId, id), ct))); }
                 catch (ServiceException ex) { return WriteServiceException(ex); }
-            }).WithName("UpdateCrmContact");
+            }).WithName("UpdateCrmContact")
+            .Produces<ApiCrmContactDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapDelete("/api/crm/customers/{customerId:int}/contacts/{id:int}", async (HttpContext context,
                 IApiSessionTokenService tokens, ApiAuthorizationService auth, ICrmService service, int customerId, int id,
@@ -168,14 +219,21 @@ namespace ExportDocManager.Api.Hosting
                         : Results.NotFound();
                 }
                 catch (ServiceException ex) { return WriteServiceException(ex); }
-            }).WithName("DeleteCrmContact");
+            }).WithName("DeleteCrmContact")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapGet("/api/crm/follow-ups", async (HttpContext context, IApiSessionTokenService tokens,
                 ApiAuthorizationService auth, ICrmService service, int? crmCustomerId, bool? includeCompleted,
                 int? limit, CancellationToken ct) =>
                 HasSalesAccess(context, tokens, auth, out var denied)
                     ? Results.Ok((await service.ListFollowUpsAsync(crmCustomerId, includeCompleted ?? false, limit ?? 100, ct)).Select(ToApiDto))
-                    : denied).WithName("ListCrmFollowUps");
+                    : denied).WithName("ListCrmFollowUps")
+            .Produces<IReadOnlyList<ApiCrmFollowUpDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapGet("/api/crm/follow-ups/page", async (HttpContext context, IApiSessionTokenService tokens,
                 ApiAuthorizationService auth, ICrmService service, int? crmCustomerId, bool? includeCompleted,
@@ -186,7 +244,10 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Ok(new ApiPagedResponse<ApiCrmFollowUpDto>(
                     page.Items.Select(ToApiDto).ToArray(), page.TotalCount, page.PageNumber, page.PageSize,
                     page.TotalPages, page.HasPreviousPage, page.HasNextPage));
-            }).WithName("QueryCrmFollowUps");
+            }).WithName("QueryCrmFollowUps")
+            .Produces<ApiPagedResponse<ApiCrmFollowUpDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/crm/follow-ups", async (HttpContext context, IApiSessionTokenService tokens,
                 ApiAuthorizationService auth, ICrmService service, ApiCrmFollowUpSaveRequest request, CancellationToken ct) =>
@@ -195,7 +256,11 @@ namespace ExportDocManager.Api.Hosting
                 if (request == null || request.Id > 0) return Results.BadRequest(new ApiErrorResponse("新增跟进不能包含已有ID。"));
                 try { return Results.Ok(ToApiDto(await service.SaveFollowUpAsync(ToSaveRequest(request, 0), ct))); }
                 catch (ServiceException ex) { return WriteServiceException(ex); }
-            }).WithName("CreateCrmFollowUp");
+            }).WithName("CreateCrmFollowUp")
+            .Produces<ApiCrmFollowUpDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPut("/api/crm/follow-ups/{id:int}", async (HttpContext context, IApiSessionTokenService tokens,
                 ApiAuthorizationService auth, ICrmService service, int id, ApiCrmFollowUpSaveRequest request, CancellationToken ct) =>
@@ -204,7 +269,12 @@ namespace ExportDocManager.Api.Hosting
                 if (request == null || id <= 0) return Results.BadRequest(new ApiErrorResponse("跟进记录ID无效。"));
                 try { return Results.Ok(ToApiDto(await service.SaveFollowUpAsync(ToSaveRequest(request, id), ct))); }
                 catch (ServiceException ex) { return WriteServiceException(ex); }
-            }).WithName("UpdateCrmFollowUp");
+            }).WithName("UpdateCrmFollowUp")
+            .Produces<ApiCrmFollowUpDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapDelete("/api/crm/follow-ups/{id:int}", async (HttpContext context, IApiSessionTokenService tokens,
                 ApiAuthorizationService auth, ICrmService service, int id, CancellationToken ct) =>
@@ -217,7 +287,11 @@ namespace ExportDocManager.Api.Hosting
                         : Results.NotFound();
                 }
                 catch (ServiceException ex) { return WriteServiceException(ex); }
-            }).WithName("DeleteCrmFollowUp");
+            }).WithName("DeleteCrmFollowUp")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
         }
 
         private static bool HasSalesAccess(HttpContext context, IApiSessionTokenService tokens,

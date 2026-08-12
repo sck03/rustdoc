@@ -25,7 +25,7 @@ namespace ExportDocManager.Services.Security
             return Volatile.Read(ref _protector).Protect(plainText);
         }
 
-        public static string Decrypt(string cipherText)
+        public static string? Decrypt(string cipherText)
         {
             if (string.IsNullOrEmpty(cipherText)) return cipherText;
 

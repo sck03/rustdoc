@@ -2,7 +2,7 @@ namespace ExportDocManager.Utils
 {
     public static class ListSelectionHelper
     {
-        public static T GetFallbackItemAfterRemoval<T>(IReadOnlyList<T> items, Func<T, bool> removedPredicate)
+        public static T? GetFallbackItemAfterRemoval<T>(IReadOnlyList<T>? items, Func<T, bool> removedPredicate)
         {
             ArgumentNullException.ThrowIfNull(removedPredicate);
 

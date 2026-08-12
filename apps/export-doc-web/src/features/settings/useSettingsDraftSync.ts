@@ -41,7 +41,7 @@ export function useSettingsDraftSync({
       return;
     }
 
-    setSettings(response.settings);
+    setSettings(response.settings as unknown as SettingsRecord);
     setMessage(null);
     setUpdateSecrets(false);
     setHasUnsavedChanges(false);

@@ -117,10 +117,10 @@ namespace ExportDocManager.Api.Hosting
         string SummaryUrl = "",
         string EvidenceUrl = "",
         DateTime? ObservedAt = null,
-        IReadOnlyList<string> RecommendedKeywords = null,
+        IReadOnlyList<string>? RecommendedKeywords = null,
         string PersonalPostalTaxCode = "",
-        IReadOnlyList<ApiHsCodeRemoteReferenceEntry> CiqEntries = null,
-        IReadOnlyList<ApiHsCodeRemoteReferenceEntry> ClassificationEntries = null,
+        IReadOnlyList<ApiHsCodeRemoteReferenceEntry>? CiqEntries = null,
+        IReadOnlyList<ApiHsCodeRemoteReferenceEntry>? ClassificationEntries = null,
         int DeclarationExampleCount = 0,
         string RowVersion = "");
 
@@ -133,7 +133,7 @@ namespace ExportDocManager.Api.Hosting
         string FilePath,
         string Mode,
         string SourceName,
-        int? EffectiveYear);
+        int? EffectiveYear = null);
 
     public sealed record ApiHsCodeImportCommitRequest(string Token);
 

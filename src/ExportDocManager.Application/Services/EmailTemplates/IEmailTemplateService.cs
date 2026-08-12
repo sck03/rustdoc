@@ -22,7 +22,7 @@ namespace ExportDocManager.Services.EmailTemplates
 
     public interface IEmailTemplateService
     {
-        Task<IReadOnlyList<EmailTemplateRecord>> ListAsync(string keyword, string category, bool includeInactive, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<EmailTemplateRecord>> ListAsync(string? keyword, string? category, bool includeInactive, CancellationToken cancellationToken = default);
         Task<EmailTemplateRecord> SaveAsync(EmailTemplateSaveRequest request, CancellationToken cancellationToken = default);
         Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<EmailTemplateVersionRecord>> ListVersionsAsync(int id, CancellationToken cancellationToken = default);

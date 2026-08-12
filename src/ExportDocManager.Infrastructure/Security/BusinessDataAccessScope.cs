@@ -7,7 +7,7 @@ namespace ExportDocManager.Services.Security
     public sealed class BusinessDataAccessScope
     {
         private readonly DatabaseConnectionSettings _settings;
-        private readonly ICurrentUserContext _currentUserContext;
+        private readonly ICurrentUserContext? _currentUserContext;
 
         public BusinessDataAccessScope(DatabaseConnectionSettings settings)
             : this(settings, null)
@@ -16,27 +16,27 @@ namespace ExportDocManager.Services.Security
 
         public BusinessDataAccessScope(
             DatabaseConnectionSettings settings,
-            ICurrentUserContext currentUserContext)
+            ICurrentUserContext? currentUserContext)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _currentUserContext = currentUserContext;
         }
 
-        public User CurrentUser => _currentUserContext?.CurrentUser;
+        public User? CurrentUser => _currentUserContext?.CurrentUser;
 
-        public bool ShouldFilterBusinessData(User user = null)
+        public bool ShouldFilterBusinessData(User? user = null)
         {
             user ??= _currentUserContext?.CurrentUser;
             return DatabaseModeHelper.UsesPostgreSql(_settings) &&
                    !CanViewAllBusinessData(user);
         }
 
-        public static bool CanViewAllBusinessData(User user)
+        public static bool CanViewAllBusinessData(User? user)
         {
             return string.Equals(user?.Role?.Trim(), "Admin", StringComparison.OrdinalIgnoreCase);
         }
 
-        public IQueryable<Invoice> ApplyInvoiceScope(IQueryable<Invoice> query, User user = null)
+        public IQueryable<Invoice> ApplyInvoiceScope(IQueryable<Invoice> query, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
@@ -64,7 +64,7 @@ namespace ExportDocManager.Services.Security
                 : query.Where(_ => false);
         }
 
-        public IQueryable<Payment> ApplyPaymentScope(IQueryable<Payment> query, User user = null)
+        public IQueryable<Payment> ApplyPaymentScope(IQueryable<Payment> query, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
@@ -82,7 +82,7 @@ namespace ExportDocManager.Services.Security
 
         public IQueryable<CrmCustomer> ApplyCrmCustomerScope(
             IQueryable<CrmCustomer> query,
-            User user = null)
+            User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
@@ -98,7 +98,7 @@ namespace ExportDocManager.Services.Security
                 : query.Where(_ => false);
         }
 
-        public IQueryable<Customer> ApplyCustomerScope(IQueryable<Customer> query, User user = null)
+        public IQueryable<Customer> ApplyCustomerScope(IQueryable<Customer> query, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
@@ -109,7 +109,7 @@ namespace ExportDocManager.Services.Security
                 : query.Where(_ => false);
         }
 
-        public IQueryable<Exporter> ApplyExporterScope(IQueryable<Exporter> query, User user = null)
+        public IQueryable<Exporter> ApplyExporterScope(IQueryable<Exporter> query, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
@@ -120,7 +120,7 @@ namespace ExportDocManager.Services.Security
                 : query.Where(_ => false);
         }
 
-        public IQueryable<CrmFollowUp> ApplyCrmFollowUpScope(IQueryable<CrmFollowUp> query, User user = null)
+        public IQueryable<CrmFollowUp> ApplyCrmFollowUpScope(IQueryable<CrmFollowUp> query, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
@@ -129,7 +129,7 @@ namespace ExportDocManager.Services.Security
             return userId > 0 ? query.Where(item => item.OwnerUserId == userId) : query.Where(_ => false);
         }
 
-        public IQueryable<SupplierCompany> ApplySupplierScope(IQueryable<SupplierCompany> query, User user = null)
+        public IQueryable<SupplierCompany> ApplySupplierScope(IQueryable<SupplierCompany> query, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
@@ -138,7 +138,7 @@ namespace ExportDocManager.Services.Security
             return userId > 0 ? query.Where(item => item.OwnerUserId == userId) : query.Where(_ => false);
         }
 
-        public IQueryable<EmailTemplate> ApplyEmailTemplateScope(IQueryable<EmailTemplate> query, User user = null)
+        public IQueryable<EmailTemplate> ApplyEmailTemplateScope(IQueryable<EmailTemplate> query, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
@@ -147,7 +147,7 @@ namespace ExportDocManager.Services.Security
             return userId > 0 ? query.Where(item => item.OwnerUserId == userId || item.IsShared) : query.Where(_ => false);
         }
 
-        public IQueryable<EmailTemplate> ApplyOwnedEmailTemplateScope(IQueryable<EmailTemplate> query, User user = null)
+        public IQueryable<EmailTemplate> ApplyOwnedEmailTemplateScope(IQueryable<EmailTemplate> query, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
@@ -158,7 +158,7 @@ namespace ExportDocManager.Services.Security
 
         public IQueryable<UserReportTemplate> ApplyUserReportTemplateScope(
             IQueryable<UserReportTemplate> query,
-            User user = null)
+            User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
@@ -182,7 +182,7 @@ namespace ExportDocManager.Services.Security
 
         public IQueryable<UserReportTemplate> ApplyOwnedUserReportTemplateScope(
             IQueryable<UserReportTemplate> query,
-            User user = null)
+            User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
@@ -197,7 +197,7 @@ namespace ExportDocManager.Services.Security
                 : query.Where(_ => false);
         }
 
-        public IQueryable<SalesOpportunity> ApplySalesOpportunityScope(IQueryable<SalesOpportunity> query, User user = null)
+        public IQueryable<SalesOpportunity> ApplySalesOpportunityScope(IQueryable<SalesOpportunity> query, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
@@ -208,7 +208,7 @@ namespace ExportDocManager.Services.Security
 
         public IQueryable<ContainerProject> ApplyContainerProjectScope(
             IQueryable<ContainerProject> query,
-            User user = null)
+            User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
@@ -220,7 +220,7 @@ namespace ExportDocManager.Services.Security
         public IQueryable<SwSubmissionBatch> ApplySubmissionBatchScope(
             IQueryable<SwSubmissionBatch> query,
             AppDbContext context,
-            User user = null)
+            User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             ArgumentNullException.ThrowIfNull(context);
@@ -240,7 +240,7 @@ namespace ExportDocManager.Services.Security
             AppDbContext context,
             int paymentId,
             CancellationToken cancellationToken = default,
-            User user = null)
+            User? user = null)
         {
             ArgumentNullException.ThrowIfNull(context);
             if (paymentId <= 0)
@@ -257,7 +257,7 @@ namespace ExportDocManager.Services.Security
             AppDbContext context,
             int invoiceId,
             CancellationToken cancellationToken = default,
-            User user = null)
+            User? user = null)
         {
             ArgumentNullException.ThrowIfNull(context);
             if (invoiceId <= 0)
@@ -270,7 +270,7 @@ namespace ExportDocManager.Services.Security
                 .ConfigureAwait(false);
         }
 
-        public void ApplyOwner(Invoice invoice, User user = null)
+        public void ApplyOwner(Invoice invoice, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(invoice);
             user ??= _currentUserContext?.CurrentUser;
@@ -284,7 +284,7 @@ namespace ExportDocManager.Services.Security
             invoice.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
-        public void ApplyOwner(Payment payment, User user = null)
+        public void ApplyOwner(Payment payment, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(payment);
             user ??= _currentUserContext?.CurrentUser;
@@ -298,7 +298,7 @@ namespace ExportDocManager.Services.Security
             payment.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
-        public void ApplyOwner(CrmCustomer customer, User user = null)
+        public void ApplyOwner(CrmCustomer customer, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(customer);
             user ??= _currentUserContext?.CurrentUser;
@@ -308,7 +308,7 @@ namespace ExportDocManager.Services.Security
             customer.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
-        public void ApplyOwner(Customer customer, User user = null)
+        public void ApplyOwner(Customer customer, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(customer);
             user ??= _currentUserContext?.CurrentUser;
@@ -318,7 +318,7 @@ namespace ExportDocManager.Services.Security
             customer.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
-        public void ApplyOwner(Exporter exporter, User user = null)
+        public void ApplyOwner(Exporter exporter, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(exporter);
             user ??= _currentUserContext?.CurrentUser;
@@ -328,7 +328,7 @@ namespace ExportDocManager.Services.Security
             exporter.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
-        public void ApplyOwner(CrmFollowUp followUp, User user = null)
+        public void ApplyOwner(CrmFollowUp followUp, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(followUp);
             user ??= _currentUserContext?.CurrentUser;
@@ -338,7 +338,7 @@ namespace ExportDocManager.Services.Security
             followUp.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
-        public void ApplyOwner(SupplierCompany supplier, User user = null)
+        public void ApplyOwner(SupplierCompany supplier, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(supplier);
             user ??= _currentUserContext?.CurrentUser;
@@ -348,7 +348,7 @@ namespace ExportDocManager.Services.Security
             supplier.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
-        public void ApplyOwner(EmailTemplate template, User user = null)
+        public void ApplyOwner(EmailTemplate template, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(template);
             user ??= _currentUserContext?.CurrentUser;
@@ -358,7 +358,7 @@ namespace ExportDocManager.Services.Security
             template.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
-        public void ApplyOwner(UserReportTemplate template, User user = null)
+        public void ApplyOwner(UserReportTemplate template, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(template);
             user ??= _currentUserContext?.CurrentUser;
@@ -372,7 +372,7 @@ namespace ExportDocManager.Services.Security
             template.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
-        public void ApplyOwner(SalesOpportunity opportunity, User user = null)
+        public void ApplyOwner(SalesOpportunity opportunity, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(opportunity);
             user ??= _currentUserContext?.CurrentUser;
@@ -382,7 +382,7 @@ namespace ExportDocManager.Services.Security
             opportunity.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
-        public void ApplyOwner(ContainerProject project, User user = null)
+        public void ApplyOwner(ContainerProject project, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(project);
             user ??= _currentUserContext?.CurrentUser;
@@ -392,15 +392,15 @@ namespace ExportDocManager.Services.Security
             project.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
-        private static string NormalizeScope(string value)
+        private static string NormalizeScope(string? value)
         {
             return (value ?? string.Empty).Trim();
         }
 
-        private static bool CanManageModule(User user, string moduleKey)
+        private static bool CanManageModule(User? user, string moduleKey)
         {
             return user?.EffectiveModuleAccess != null &&
-                user.EffectiveModuleAccess.TryGetValue(moduleKey, out string accessLevel) &&
+                user.EffectiveModuleAccess.TryGetValue(moduleKey, out string? accessLevel) &&
                 PermissionAccessLevel.Rank(accessLevel) >= PermissionAccessLevel.Rank(PermissionAccessLevel.Manage);
         }
     }

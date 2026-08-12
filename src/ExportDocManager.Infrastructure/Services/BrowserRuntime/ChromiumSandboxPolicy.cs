@@ -7,7 +7,7 @@ namespace ExportDocManager.Services.BrowserRuntime
 
         public static bool ResolveNoSandboxSetting()
         {
-            string configured = Environment.GetEnvironmentVariable(NoSandboxEnvironmentVariable);
+            string? configured = Environment.GetEnvironmentVariable(NoSandboxEnvironmentVariable);
             if (string.IsNullOrWhiteSpace(configured))
             {
                 return RequiresLegacyWindowsCompatibilityMode(

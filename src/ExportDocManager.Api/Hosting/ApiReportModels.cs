@@ -22,7 +22,7 @@ namespace ExportDocManager.Api.Hosting
     {
         public string TemplatePath { get; set; } = string.Empty;
 
-        public ApiPaymentDto Payment { get; set; }
+        public ApiPaymentDto? Payment { get; set; }
     }
 
     public sealed class ApiInvoiceDraftReportHtmlPreviewRequest
@@ -33,7 +33,7 @@ namespace ExportDocManager.Api.Hosting
 
         public bool WithSeal { get; set; } = true;
 
-        public ApiInvoiceDetailDto Invoice { get; set; }
+        public ApiInvoiceDetailDto? Invoice { get; set; }
     }
 
     public sealed class ApiReportPdfRequest

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Diagnostics.CodeAnalysis;
 using ExportDocManager.Services.Errors;
 
 namespace ExportDocManager.Services.BrowserRuntime;
@@ -9,7 +10,7 @@ public static class BrowserCdpEndpointPolicy
     public const string EndpointEnvironmentVariable =
         "EXPORTDOCMANAGER_BROWSER_CDP_ENDPOINT";
 
-    public static bool TryResolve(out Uri endpoint)
+    public static bool TryResolve([NotNullWhen(true)] out Uri? endpoint)
     {
         string configured = Environment.GetEnvironmentVariable(EndpointEnvironmentVariable)?.Trim()
             ?? string.Empty;
@@ -19,7 +20,7 @@ public static class BrowserCdpEndpointPolicy
             return false;
         }
 
-        if (!Uri.TryCreate(configured, UriKind.Absolute, out Uri parsed) ||
+        if (!Uri.TryCreate(configured, UriKind.Absolute, out Uri? parsed) ||
             parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps ||
             string.IsNullOrWhiteSpace(parsed.Host) ||
             !string.IsNullOrEmpty(parsed.UserInfo) ||
@@ -56,7 +57,7 @@ public static class BrowserCdpEndpointPolicy
             return true;
         }
 
-        return IPAddress.TryParse(host, out IPAddress address) && IsTrustedHttpAddress(address);
+        return IPAddress.TryParse(host, out IPAddress? address) && IsTrustedHttpAddress(address);
     }
 
     internal static bool IsTrustedHttpAddress(IPAddress address)

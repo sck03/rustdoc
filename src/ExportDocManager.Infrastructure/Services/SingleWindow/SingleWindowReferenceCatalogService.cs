@@ -26,7 +26,7 @@ namespace ExportDocManager.Services.SingleWindow
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
         }
 
-        public static event Action ReferenceCatalogChanged;
+        public static event Action? ReferenceCatalogChanged;
 
         public async Task<SingleWindowReferenceCatalogModel> LoadEffectiveCatalogAsync(CancellationToken cancellationToken = default)
         {
@@ -40,7 +40,11 @@ namespace ExportDocManager.Services.SingleWindow
         {
             ArgumentNullException.ThrowIfNull(catalog);
             string overridePath = GetOverrideCatalogPath();
-            Directory.CreateDirectory(Path.GetDirectoryName(overridePath)!);
+            string? overrideDirectory = Path.GetDirectoryName(overridePath);
+            if (!string.IsNullOrWhiteSpace(overrideDirectory))
+            {
+                Directory.CreateDirectory(overrideDirectory);
+            }
             string json = JsonSerializer.Serialize(NormalizeCatalog(catalog), JsonOptions);
             await AtomicFileHelper.WriteAllTextAtomicAsync(overridePath, json, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
             OnReferenceCatalogChanged();
@@ -67,7 +71,11 @@ namespace ExportDocManager.Services.SingleWindow
                 throw new ArgumentException("导出文件路径不能为空。", nameof(filePath));
             }
 
-            Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+            string? exportDirectory = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrWhiteSpace(exportDirectory))
+            {
+                Directory.CreateDirectory(exportDirectory);
+            }
             string json = JsonSerializer.Serialize(NormalizeCatalog(catalog), JsonOptions);
             await AtomicFileHelper.WriteAllTextAtomicAsync(filePath, json, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
         }
@@ -97,7 +105,7 @@ namespace ExportDocManager.Services.SingleWindow
             return LoadEffectiveCatalogCore(GetOverrideCatalogPath(pathProvider), GetBundledCatalogPath(pathProvider));
         }
 
-        private static async Task<SingleWindowReferenceCatalogModel> LoadCatalogFromFileAsync(string filePath, CancellationToken cancellationToken)
+        private static async Task<SingleWindowReferenceCatalogModel?> LoadCatalogFromFileAsync(string filePath, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             {
@@ -115,7 +123,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        private static SingleWindowReferenceCatalogModel LoadCatalogFromFileSnapshot(string filePath)
+        private static SingleWindowReferenceCatalogModel? LoadCatalogFromFileSnapshot(string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             {
@@ -165,7 +173,7 @@ namespace ExportDocManager.Services.SingleWindow
             return bundledCatalog;
         }
 
-        private static SingleWindowReferenceCatalogModel NormalizeCatalog(SingleWindowReferenceCatalogModel catalog)
+        private static SingleWindowReferenceCatalogModel NormalizeCatalog(SingleWindowReferenceCatalogModel? catalog)
         {
             catalog ??= new SingleWindowReferenceCatalogModel();
             return new SingleWindowReferenceCatalogModel

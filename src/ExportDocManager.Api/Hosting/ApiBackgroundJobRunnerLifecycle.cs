@@ -24,7 +24,7 @@ namespace ExportDocManager.Api.Hosting
                     initiateShutdown = true;
                 }
 
-                shutdownTask = _shutdownTask;
+                shutdownTask = _shutdownTask ?? Task.CompletedTask;
             }
 
             if (initiateShutdown)

@@ -29,10 +29,10 @@ namespace ExportDocManager.Api.Hosting
         public ApiExcelImportPreviewResponse(
             string sourcePath,
             bool success,
-            ApiInvoiceDetailDto invoice,
-            ApiImportedCustomerDto customer,
-            ApiImportedExporterDto exporter,
-            ApiExcelImportAnalysisReportDto analysisReport,
+            ApiInvoiceDetailDto? invoice,
+            ApiImportedCustomerDto? customer,
+            ApiImportedExporterDto? exporter,
+            ApiExcelImportAnalysisReportDto? analysisReport,
             IReadOnlyList<string> errors,
             string storagePolicy)
         {
@@ -50,13 +50,13 @@ namespace ExportDocManager.Api.Hosting
 
         public bool Success { get; }
 
-        public ApiInvoiceDetailDto Invoice { get; }
+        public ApiInvoiceDetailDto? Invoice { get; }
 
-        public ApiImportedCustomerDto Customer { get; }
+        public ApiImportedCustomerDto? Customer { get; }
 
-        public ApiImportedExporterDto Exporter { get; }
+        public ApiImportedExporterDto? Exporter { get; }
 
-        public ApiExcelImportAnalysisReportDto AnalysisReport { get; }
+        public ApiExcelImportAnalysisReportDto? AnalysisReport { get; }
 
         public IReadOnlyList<string> Errors { get; }
 
@@ -70,7 +70,7 @@ namespace ExportDocManager.Api.Hosting
         decimal Confidence,
         IReadOnlyList<ApiExcelImportSheetAnalysisDto> Sheets,
         IReadOnlyList<ApiExcelImportFieldAnalysisDto> Fields,
-        ApiExcelImportItemTableAnalysisDto ItemTable,
+        ApiExcelImportItemTableAnalysisDto? ItemTable,
         IReadOnlyList<ApiExcelImportAnalysisIssueDto> Issues);
 
     public sealed record ApiExcelImportSheetAnalysisDto(

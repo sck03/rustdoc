@@ -31,12 +31,12 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly string _databaseFileName;
         private readonly bool _usesSqlite;
         private readonly IAppPathProvider _pathProvider;
-        private readonly Regex _managedBackupNamePattern;
+        private readonly Regex? _managedBackupNamePattern;
 
         public BackupService(
             DatabaseConnectionSettings databaseSettings,
-            string backupDirectory = null,
-            string databasePath = null)
+            string? backupDirectory = null,
+            string? databasePath = null)
             : this(databaseSettings, new RuntimeAppPathProvider(), backupDirectory, databasePath)
         {
         }
@@ -44,8 +44,8 @@ namespace ExportDocManager.Services.Infrastructure
         public BackupService(
             DatabaseConnectionSettings databaseSettings,
             IAppPathProvider pathProvider,
-            string backupDirectory = null,
-            string databasePath = null)
+            string? backupDirectory = null,
+            string? databasePath = null)
         {
             ArgumentNullException.ThrowIfNull(databaseSettings);
             ArgumentNullException.ThrowIfNull(pathProvider);
@@ -130,7 +130,7 @@ namespace ExportDocManager.Services.Infrastructure
 
         public async Task<DatabaseBackupImportResult> ImportBackupAsync(
             string sourceFilePath,
-            string preferredFileName = null,
+            string? preferredFileName = null,
             CancellationToken cancellationToken = default)
         {
             if (!_usesSqlite)
@@ -526,7 +526,7 @@ namespace ExportDocManager.Services.Infrastructure
                 $"^\\d{{8}}_\\d{{6}}_\\d{{3}}_(?:(?:pre-restore|imported)_)?{Regex.Escape(BuildBackupNameToken(databaseFileName))}_[0-9a-f]{{32}}\\.zip$",
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
 
-        private string BuildImportedBackupFileName(string preferredFileName)
+        private string BuildImportedBackupFileName(string? preferredFileName)
         {
             string preferred = (preferredFileName ?? string.Empty).Trim();
             if (_managedBackupNamePattern?.IsMatch(preferred) == true)

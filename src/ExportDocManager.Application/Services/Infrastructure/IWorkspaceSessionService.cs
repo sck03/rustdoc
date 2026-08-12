@@ -4,7 +4,7 @@ namespace ExportDocManager.Services.Infrastructure
 {
     public interface IWorkspaceSessionService
     {
-        Invoice CurrentInvoice { get; }
+        Invoice? CurrentInvoice { get; }
 
         int ActiveInvoiceId { get; }
 
@@ -12,7 +12,7 @@ namespace ExportDocManager.Services.Infrastructure
 
         void RegisterSaveHandler(Func<Task<bool>> saveHandler);
 
-        void ClearSaveHandler(Func<Task<bool>> saveHandler = null);
+        void ClearSaveHandler(Func<Task<bool>>? saveHandler = null);
 
         Task<bool> RequestSaveAsync();
     }

@@ -9,7 +9,7 @@ namespace ExportDocManager.Services.Reporting
         public const string InternalPaymentVoucherStarterPreset = "internal-payment-voucher";
         public const string InternalExpenseReimbursementStarterPreset = "internal-expense-reimbursement";
 
-        public static string Create(ReportDocumentType reportType, string title, string templateIdentifier = null)
+        public static string Create(ReportDocumentType reportType, string title, string? templateIdentifier = null)
         {
             string starterPreset = DetermineStarterPreset(reportType, templateIdentifier, title);
             string resolvedTitle = ResolveHeading(title, starterPreset, templateIdentifier);
@@ -18,8 +18,8 @@ namespace ExportDocManager.Services.Reporting
 
         public static string DetermineStarterPreset(
             ReportDocumentType reportType,
-            string templateIdentifier,
-            string title = null)
+            string? templateIdentifier,
+            string? title = null)
         {
             string identity = $"{templateIdentifier} {title}".ToLowerInvariant();
             if (reportType == ReportDocumentType.PaymentVoucher)
@@ -39,7 +39,7 @@ namespace ExportDocManager.Services.Reporting
                 : ExportInvoiceStarterPreset;
         }
 
-        private static string ResolveHeading(string title, string starterPreset, string templateIdentifier)
+        private static string ResolveHeading(string title, string starterPreset, string? templateIdentifier)
         {
             if (!string.IsNullOrWhiteSpace(title) && !LooksLikeTechnicalTemplateName(title.ToLowerInvariant()))
             {

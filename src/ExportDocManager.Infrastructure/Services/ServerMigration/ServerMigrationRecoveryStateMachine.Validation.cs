@@ -69,7 +69,7 @@ public static partial class ServerMigrationRecoveryStateMachine
             !file.RelativePath.Equals(
                 ServerMigrationLayout.DatabaseEntry,
                 StringComparison.OrdinalIgnoreCase));
-        ServerMigrationFileManifest masterKey = manifest.Files.FirstOrDefault(file =>
+        ServerMigrationFileManifest? masterKey = manifest.Files.FirstOrDefault(file =>
             file.RelativePath.Equals(masterKeyEntry, StringComparison.OrdinalIgnoreCase));
         if (!fullMigration)
         {

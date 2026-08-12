@@ -418,9 +418,9 @@ namespace ExportDocManager.Infrastructure.Tests
 
             public bool BackupDatabaseCalled { get; private set; }
 
-            public DatabaseBackupResult BackupResult { get; init; }
+            public DatabaseBackupResult? BackupResult { get; init; }
 
-            public Exception CleanOldBackupsException { get; init; }
+            public Exception? CleanOldBackupsException { get; init; }
 
             public Task<DatabaseBackupResult> BackupDatabaseAsync(CancellationToken cancellationToken = default)
             {
@@ -434,7 +434,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
             public Task<DatabaseBackupImportResult> ImportBackupAsync(
                 string sourceFilePath,
-                string preferredFileName = null,
+                string? preferredFileName = null,
                 CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
@@ -464,7 +464,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
         private sealed class TestCloudSyncService : ICloudSyncService
         {
-            public Exception UploadException { get; init; }
+            public Exception? UploadException { get; init; }
 
             public string UploadedLocalPath { get; private set; } = string.Empty;
 

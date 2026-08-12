@@ -5,10 +5,10 @@ namespace ExportDocManager.Services.Infrastructure
     public sealed class WorkspaceSessionService : IWorkspaceSessionService
     {
         private readonly Lock _syncRoot = new();
-        private Func<Task<bool>> _saveHandler;
-        private Task<bool> _pendingSaveTask;
+        private Func<Task<bool>>? _saveHandler;
+        private Task<bool>? _pendingSaveTask;
 
-        public Invoice CurrentInvoice { get; private set; }
+        public Invoice? CurrentInvoice { get; private set; }
 
         public int ActiveInvoiceId => CurrentInvoice?.Id ?? 0;
 
@@ -28,7 +28,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
         }
 
-        public void ClearSaveHandler(Func<Task<bool>> saveHandler = null)
+        public void ClearSaveHandler(Func<Task<bool>>? saveHandler = null)
         {
             lock (_syncRoot)
             {
@@ -41,7 +41,7 @@ namespace ExportDocManager.Services.Infrastructure
 
         public Task<bool> RequestSaveAsync()
         {
-            Func<Task<bool>> saveHandler;
+            Func<Task<bool>>? saveHandler;
             lock (_syncRoot)
             {
                 if (_pendingSaveTask != null)
@@ -66,7 +66,7 @@ namespace ExportDocManager.Services.Infrastructure
         private async Task ExecuteSaveAsync(Func<Task<bool>> saveHandler, TaskCompletionSource<bool> pendingSaveSource)
         {
             bool saveSucceeded = false;
-            Exception saveException = null;
+            Exception? saveException = null;
 
             try
             {

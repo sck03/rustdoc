@@ -37,7 +37,11 @@ namespace ExportDocManager.Api.Hosting
 
                 return AcceptedBackgroundJob(EnqueuePdfMergeJob(jobRunner, user.Username, sourceFiles, destinationPath));
             })
-            .WithName("StartPdfMergeSaveToPathJob");
+            .WithName("StartPdfMergeSaveToPathJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/tools/pdf/merge/upload", async (
                 HttpContext context,
@@ -127,11 +131,15 @@ namespace ExportDocManager.Api.Hosting
                     throw;
                 }
             })
-            .WithName("UploadAndStartPdfMergeDownloadJob");
+            .Accepts<IFormFileCollection>("multipart/form-data")
+            .WithName("UploadAndStartPdfMergeDownloadJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
         }
 
-        internal static IResult ValidatePdfMergeRequest(
-            ApiPdfMergeRequest request,
+        internal static IResult? ValidatePdfMergeRequest(
+            ApiPdfMergeRequest? request,
             out IReadOnlyCollection<string> sourceFiles,
             out string destinationPath)
         {
@@ -155,14 +163,14 @@ namespace ExportDocManager.Api.Hosting
                     $"请选择 2 至 {ApiUploadLimits.PdfMergeMaximumFileCount} 个 PDF 源文件。"));
             }
 
-            string invalidSourceExtension = files.FirstOrDefault(file =>
+            string? invalidSourceExtension = files.FirstOrDefault(file =>
                 !string.Equals(Path.GetExtension(file), ".pdf", StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrWhiteSpace(invalidSourceExtension))
             {
                 return Results.BadRequest(new ApiErrorResponse($"源文件必须是 PDF：{invalidSourceExtension}"));
             }
 
-            string missingFile = files.FirstOrDefault(file => !File.Exists(file));
+            string? missingFile = files.FirstOrDefault(file => !File.Exists(file));
             if (!string.IsNullOrWhiteSpace(missingFile))
             {
                 return Results.BadRequest(new ApiErrorResponse($"PDF 源文件不存在：{missingFile}"));

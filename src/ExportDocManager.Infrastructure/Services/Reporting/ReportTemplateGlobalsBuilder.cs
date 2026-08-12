@@ -10,10 +10,10 @@ namespace ExportDocManager.Services.Reporting
     {
         public static ScriptObject BuildInvoiceGlobals(
             Invoice invoice,
-            Customer customer,
-            Exporter exporter,
+            Customer? customer,
+            Exporter? exporter,
             bool withSeal,
-            IAppPathProvider pathProvider = null)
+            IAppPathProvider? pathProvider = null)
         {
             invoice.Items ??= new List<Item>();
 
@@ -25,8 +25,12 @@ namespace ExportDocManager.Services.Reporting
             scriptObject.Import(new
             {
                 total_amount_words = ConvertNumberToWords(invoice.TotalAmount),
-                total_by_ctn_unit = invoice.Items.GroupBy(i => i.CtnUnitEN).ToDictionary(g => g.Key, g => g.Sum(i => i.Cartons)),
-                total_by_qty_unit = invoice.Items.GroupBy(i => i.UnitEN).ToDictionary(g => g.Key, g => g.Sum(i => i.Quantity)),
+                total_by_ctn_unit = invoice.Items
+                    .GroupBy(i => i.CtnUnitEN ?? string.Empty)
+                    .ToDictionary(g => g.Key, g => g.Sum(i => i.Cartons)),
+                total_by_qty_unit = invoice.Items
+                    .GroupBy(i => i.UnitEN ?? string.Empty)
+                    .ToDictionary(g => g.Key, g => g.Sum(i => i.Quantity)),
             });
 
             scriptObject.Add("items", invoice.Items);
@@ -50,7 +54,7 @@ namespace ExportDocManager.Services.Reporting
 
         public static ScriptObject BuildPaymentVoucherGlobals(
             Payment payment,
-            Payee payee)
+            Payee? payee)
         {
             payment ??= new Payment();
             var scriptObject = new ScriptObject();
@@ -86,9 +90,9 @@ namespace ExportDocManager.Services.Reporting
     {
         private const long MaximumImageBytes = 5L * 1024L * 1024L;
 
-        public static string GetShippingMarkDataUri(string path, IAppPathProvider pathProvider)
+        public static string GetShippingMarkDataUri(string? path, IAppPathProvider? pathProvider)
         {
-            if (pathProvider == null)
+            if (pathProvider == null || string.IsNullOrWhiteSpace(path))
             {
                 return string.Empty;
             }
@@ -109,9 +113,9 @@ namespace ExportDocManager.Services.Reporting
             }
         }
 
-        public static string GetSealDataUri(string path, IAppPathProvider pathProvider)
+        public static string GetSealDataUri(string? path, IAppPathProvider? pathProvider)
         {
-            if (pathProvider == null)
+            if (pathProvider == null || string.IsNullOrWhiteSpace(path))
             {
                 return string.Empty;
             }
@@ -145,7 +149,7 @@ namespace ExportDocManager.Services.Reporting
             try
             {
                 string fullPath = Path.GetFullPath(path);
-                string allowedRoot = allowedRoots?.FirstOrDefault(root =>
+                string? allowedRoot = allowedRoots?.FirstOrDefault(root =>
                     PathBoundaryHelper.IsWithinRoot(fullPath, root));
                 if (string.IsNullOrWhiteSpace(allowedRoot) ||
                     !File.Exists(fullPath) ||
@@ -178,9 +182,13 @@ namespace ExportDocManager.Services.Reporting
         {
             string fullRoot = Path.GetFullPath(root)
                 .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            string current = Path.GetFullPath(path);
+            string? current = Path.GetFullPath(path);
             while (!string.Equals(current, fullRoot, PathBoundaryHelper.PathComparison))
             {
+                if (string.IsNullOrWhiteSpace(current))
+                {
+                    return true;
+                }
                 if (!PathBoundaryHelper.IsWithinRoot(current, fullRoot))
                 {
                     return true;
@@ -190,10 +198,6 @@ namespace ExportDocManager.Services.Reporting
                     return true;
                 }
                 current = Path.GetDirectoryName(current);
-                if (string.IsNullOrWhiteSpace(current))
-                {
-                    return true;
-                }
             }
             return false;
         }

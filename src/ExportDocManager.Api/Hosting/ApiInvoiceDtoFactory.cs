@@ -4,7 +4,7 @@ namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiInvoiceDtoFactory
     {
-        private static byte[] DecodeRowVersion(string rowVersion)
+        private static byte[]? DecodeRowVersion(string? rowVersion)
         {
             return string.IsNullOrWhiteSpace(rowVersion)
                 ? null

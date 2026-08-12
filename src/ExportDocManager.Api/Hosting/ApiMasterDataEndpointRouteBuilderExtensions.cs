@@ -1,4 +1,5 @@
 using ExportDocManager.Models.DTOs;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -15,14 +16,14 @@ namespace ExportDocManager.Api.Hosting
             MapHsCodeMasterDataEndpoints(endpoints);
         }
 
-        private static IResult BadMasterDataId(string name)
+        private static BadRequest<ApiErrorResponse> BadMasterDataId(string name)
         {
-            return Results.BadRequest(new ApiErrorResponse($"{name}ID必须大于0。"));
+            return TypedResults.BadRequest(new ApiErrorResponse($"{name}ID必须大于0。"));
         }
 
-        private static IResult BadRowVersion(string name)
+        private static BadRequest<ApiErrorResponse> BadRowVersion(string name)
         {
-            return Results.BadRequest(new ApiErrorResponse($"{name} rowVersion 必须是有效的 Base64 字符串。"));
+            return TypedResults.BadRequest(new ApiErrorResponse($"{name} rowVersion 必须是有效的 Base64 字符串。"));
         }
     }
 }

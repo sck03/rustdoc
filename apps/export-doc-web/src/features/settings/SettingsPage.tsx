@@ -12,6 +12,7 @@ import { useLocation } from "react-router-dom";
 import {
   ApiSettingsResponse,
   ApiSettingsValidationResponse,
+  AppSettings,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -170,12 +171,12 @@ export function SettingsPage({
     mutationFn: (body: SettingsRecord) =>
       client.updateSettings({
         body: {
-          settings: body,
+          settings: body as unknown as AppSettings,
           updateSecrets,
         },
       }),
     onSuccess: async (response) => {
-      setSettings(response.settings);
+      setSettings(response.settings as unknown as SettingsRecord);
       setMessage(null);
       setSuccessMessage(response.requiresRestart ? `${response.message} 需要重启后生效。` : response.message || "设置已保存。");
       setUpdateSecrets(false);
@@ -198,7 +199,7 @@ export function SettingsPage({
     mutationFn: (body: SettingsRecord) =>
       client.validateSettings({
         body: {
-          settings: body,
+          settings: body as unknown as AppSettings,
           updateSecrets,
         },
       }),
@@ -504,7 +505,7 @@ export function SettingsPage({
       return;
     }
 
-    setSettings(validationResult.normalizedSettings as SettingsRecord);
+    setSettings(validationResult.normalizedSettings as unknown as SettingsRecord);
     setHasUnsavedChanges(true);
     setMessage(null);
     setSuccessMessage("已把自动修复结果应用到当前草稿，请检查后保存。");

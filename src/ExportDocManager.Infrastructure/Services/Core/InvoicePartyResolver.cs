@@ -12,15 +12,15 @@ namespace ExportDocManager.Services.Core
     {
         Task<int> ResolveCustomerIdAsync(
             AppDbContext context,
-            Customer customer,
-            string fallbackCustomerName = null,
+            Customer? customer,
+            string? fallbackCustomerName = null,
             CancellationToken cancellationToken = default);
 
         Task<int> ResolveExporterIdAsync(
             AppDbContext context,
-            Exporter exporter,
-            string fallbackExporterNameEn = null,
-            string fallbackExporterNameCn = null,
+            Exporter? exporter,
+            string? fallbackExporterNameEn = null,
+            string? fallbackExporterNameCn = null,
             CancellationToken cancellationToken = default);
     }
 
@@ -28,15 +28,15 @@ namespace ExportDocManager.Services.Core
     {
         private readonly BusinessDataAccessScope _accessScope;
 
-        public InvoicePartyResolver(BusinessDataAccessScope accessScope = null)
+        public InvoicePartyResolver(BusinessDataAccessScope? accessScope = null)
         {
             _accessScope = accessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
         }
 
         public async Task<int> ResolveCustomerIdAsync(
             AppDbContext context,
-            Customer customer,
-            string fallbackCustomerName = null,
+            Customer? customer,
+            string? fallbackCustomerName = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(context);
@@ -86,9 +86,9 @@ namespace ExportDocManager.Services.Core
 
         public async Task<int> ResolveExporterIdAsync(
             AppDbContext context,
-            Exporter exporter,
-            string fallbackExporterNameEn = null,
-            string fallbackExporterNameCn = null,
+            Exporter? exporter,
+            string? fallbackExporterNameEn = null,
+            string? fallbackExporterNameCn = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(context);
@@ -139,9 +139,9 @@ namespace ExportDocManager.Services.Core
             return exporter.Id;
         }
 
-        private static string Coalesce(string preferredValue, string fallbackValue)
+        private static string Coalesce(string? preferredValue, string? fallbackValue)
         {
-            return string.IsNullOrWhiteSpace(preferredValue) ? fallbackValue : preferredValue;
+            return string.IsNullOrWhiteSpace(preferredValue) ? fallbackValue ?? string.Empty : preferredValue;
         }
     }
 }

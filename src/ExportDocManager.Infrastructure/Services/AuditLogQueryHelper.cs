@@ -108,7 +108,7 @@ namespace ExportDocManager.Services.Infrastructure
             return query;
         }
 
-        public static string NormalizeOption(string value)
+        public static string NormalizeOption(string? value)
         {
             var normalized = TextSearchHelper.NormalizeFilter(value);
             return string.Equals(normalized, "全部", StringComparison.OrdinalIgnoreCase)
@@ -116,7 +116,7 @@ namespace ExportDocManager.Services.Infrastructure
                 : normalized;
         }
 
-        private static string EmptyToNull(string value)
+        private static string? EmptyToNull(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? null : value;
         }

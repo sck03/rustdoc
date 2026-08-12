@@ -294,11 +294,11 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public IReadOnlyList<Item> Items { get; init; } = [];
 
-        public Customer Customer { get; init; }
+        public Customer? Customer { get; init; }
 
-        public Exporter Exporter { get; init; }
+        public Exporter? Exporter { get; init; }
 
-        public CustomsCooDocument ExistingDocument { get; init; }
+        public CustomsCooDocument? ExistingDocument { get; init; }
 
         public IReadOnlyList<SingleWindowAttachmentSource> Attachments { get; init; } = [];
     }
@@ -309,11 +309,11 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public IReadOnlyList<Item> Items { get; init; } = [];
 
-        public Customer Customer { get; init; }
+        public Customer? Customer { get; init; }
 
-        public Exporter Exporter { get; init; }
+        public Exporter? Exporter { get; init; }
 
-        public AgentConsignmentDocument ExistingDocument { get; init; }
+        public AgentConsignmentDocument? ExistingDocument { get; init; }
 
         public IReadOnlyList<SingleWindowAttachmentSource> Attachments { get; init; } = [];
     }

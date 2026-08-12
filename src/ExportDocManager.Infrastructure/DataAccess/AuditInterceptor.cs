@@ -148,8 +148,8 @@ namespace ExportDocManager.DataAccess
                     ? PendingEntityId
                     : FormatEntityId(primaryKeys);
 
-                var oldValues = new Dictionary<string, object>();
-                var newValues = new Dictionary<string, object>();
+                var oldValues = new Dictionary<string, object?>();
+                var newValues = new Dictionary<string, object?>();
 
                 foreach (var property in entry.Properties)
                 {
@@ -212,8 +212,13 @@ namespace ExportDocManager.DataAccess
             return auditEntries;
         }
 
-        private void FinalizePendingEntityIds(DbContext context)
+        private void FinalizePendingEntityIds(DbContext? context)
         {
+            if (context is null)
+            {
+                return;
+            }
+
             var state = TakePendingAuditState(context);
             if (state == null || state.Entries.Count == 0)
             {
@@ -236,9 +241,14 @@ namespace ExportDocManager.DataAccess
         }
 
         private async Task FinalizePendingEntityIdsAsync(
-            DbContext context,
+            DbContext? context,
             CancellationToken cancellationToken)
         {
+            if (context is null)
+            {
+                return;
+            }
+
             var state = TakePendingAuditState(context);
             if (state == null || state.Entries.Count == 0)
             {
@@ -281,7 +291,7 @@ namespace ExportDocManager.DataAccess
             }
         }
 
-        private PendingAuditState TakePendingAuditState(DbContext context)
+        private PendingAuditState? TakePendingAuditState(DbContext? context)
         {
             if (context == null || !_pendingAudits.TryGetValue(context, out var state))
             {
@@ -292,7 +302,7 @@ namespace ExportDocManager.DataAccess
             return state;
         }
 
-        private void RemovePendingAuditState(DbContext context)
+        private void RemovePendingAuditState(DbContext? context)
         {
             if (context != null)
             {
@@ -312,10 +322,10 @@ namespace ExportDocManager.DataAccess
                 return "Unknown";
             }
 
-            return string.Join(",", primaryKeys.Select(property => property.CurrentValue.ToString()));
+            return string.Join(",", primaryKeys.Select(property => property.CurrentValue?.ToString() ?? "Unknown"));
         }
 
-        private static object SanitizeAuditValue(string propertyName, object value)
+        private static object? SanitizeAuditValue(string propertyName, object? value)
         {
             if (value == null)
             {

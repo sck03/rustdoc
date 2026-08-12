@@ -43,7 +43,7 @@ export function useCustomsCooProducerProfiles({ client, queryClient, document, s
   function save(index: number) {
     if (!document?.items[index]) return;
     const profile = buildProducerProfileInputFromCooItem(document.items[index], document);
-    if (!profile.ciqRegNo.trim() && !profile.prdcEtpsName.trim()) { setMessage("请先填写当前货项的生产企业代码或生产企业名称。"); setSuccessMessage(null); return; }
+    if (!profile.ciqRegNo?.trim() && !profile.prdcEtpsName?.trim()) { setMessage("请先填写当前货项的生产企业代码或生产企业名称。"); setSuccessMessage(null); return; }
     setMessage(null); setSuccessMessage(null); saveMutation.mutate({ rowIndex: index, profile });
   }
   const currentProfile = rowIndex !== null && document?.items[rowIndex] ? buildProducerProfileInputFromCooItem(document.items[rowIndex], document) : null;

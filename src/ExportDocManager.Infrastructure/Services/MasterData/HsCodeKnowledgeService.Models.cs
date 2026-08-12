@@ -33,7 +33,7 @@ namespace ExportDocManager.Services.MasterData
             if (source.IsManuallyVerified) target.ResolutionStatus = source.ResolutionStatus;
         }
 
-        private static HsCode CloneHsCode(HsCode source) => new()
+        private static HsCode CloneHsCode(HsCode? source) => new()
         {
             Id = source?.Id ?? 0,
             Code = source?.Code ?? string.Empty,
@@ -45,7 +45,7 @@ namespace ExportDocManager.Services.MasterData
             InspectionCategory = source?.InspectionCategory,
             RebateRate = source?.RebateRate,
             UpdateTime = source?.UpdateTime,
-            Status = source?.Status,
+            Status = source?.Status ?? "ReferenceOnly",
             SourceName = source?.SourceName,
             EffectiveYear = source?.EffectiveYear,
             LastVerifiedAt = source?.LastVerifiedAt,
@@ -60,7 +60,7 @@ namespace ExportDocManager.Services.MasterData
             DetailUrl = source?.DetailUrl
         };
 
-        private static HsCodeDeclarationExample CloneHsCodeDeclarationExample(HsCodeDeclarationExample source) => new()
+        private static HsCodeDeclarationExample CloneHsCodeDeclarationExample(HsCodeDeclarationExample? source) => new()
         {
             Id = source?.Id ?? 0,
             Fingerprint = source?.Fingerprint ?? string.Empty,
@@ -80,7 +80,7 @@ namespace ExportDocManager.Services.MasterData
             UpdatedAt = source?.UpdatedAt ?? DateTime.UtcNow
         };
 
-        private static HsCodeReplacementRelation CloneHsCodeReplacementRelation(HsCodeReplacementRelation source) => new()
+        private static HsCodeReplacementRelation CloneHsCodeReplacementRelation(HsCodeReplacementRelation? source) => new()
         {
             Id = source?.Id ?? 0,
             OldCode = source?.OldCode ?? string.Empty,
@@ -93,7 +93,7 @@ namespace ExportDocManager.Services.MasterData
             UpdatedAt = source?.UpdatedAt ?? DateTime.UtcNow
         };
 
-        private static HsCodeSearchFeedback CloneHsCodeSearchFeedback(HsCodeSearchFeedback source) => new()
+        private static HsCodeSearchFeedback CloneHsCodeSearchFeedback(HsCodeSearchFeedback? source) => new()
         {
             Id = source?.Id ?? 0,
             Fingerprint = source?.Fingerprint ?? string.Empty,
@@ -107,9 +107,10 @@ namespace ExportDocManager.Services.MasterData
             UpdatedAt = source?.UpdatedAt ?? DateTime.UtcNow
         };
 
-        private static string Prefer(string primary, string fallback) => string.IsNullOrWhiteSpace(primary) ? fallback : primary.Trim();
+        private static string Prefer(string? primary, string? fallback) =>
+            string.IsNullOrWhiteSpace(primary) ? fallback?.Trim() ?? string.Empty : primary.Trim();
 
-        private static string ValidateTextLength(string value, int maximumLength, string fieldName)
+        private static string ValidateTextLength(string? value, int maximumLength, string fieldName)
         {
             string normalized = (value ?? string.Empty).Trim();
             if (normalized.Length > maximumLength)
@@ -117,7 +118,7 @@ namespace ExportDocManager.Services.MasterData
             return normalized;
         }
 
-        private static string NormalizeHistoryProductName(string value)
+        private static string NormalizeHistoryProductName(string? value)
         {
             string name = (value ?? string.Empty).Normalize(NormalizationForm.FormKC).Trim();
             int separator = name.LastIndexOf('-');
@@ -126,8 +127,8 @@ namespace ExportDocManager.Services.MasterData
             return name;
         }
 
-        private static string JoinHistorySpecification(params string[] values) => string.Join(" · ",
-            values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()));
+        private static string JoinHistorySpecification(params string?[] values) => string.Join(" · ",
+            values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!.Trim()));
 
         private static int? Max(int? left, int? right) => !left.HasValue ? right : !right.HasValue ? left : Math.Max(left.Value, right.Value);
         private static DateTime? Max(DateTime? left, DateTime? right) => !left.HasValue ? right : !right.HasValue ? left : left > right ? left : right;
@@ -355,7 +356,7 @@ namespace ExportDocManager.Services.MasterData
 
         private sealed record KnowledgeManifest(string SchemaVersion, DateTimeOffset ExportedAt, DateTimeOffset? Since, Dictionary<string, string> Checksums);
         private readonly record struct ReplacementRelationKey(string OldCode, string NewCode, int? EffectiveYear);
-        private sealed record CurrentCodeResolution(string CurrentCode, string Status, IReadOnlyList<string> Replacements, bool CanUse);
+        private sealed record CurrentCodeResolution(string? CurrentCode, string Status, IReadOnlyList<string> Replacements, bool CanUse);
         private sealed record KnowledgeCandidate(
             HsCodeDeclarationExample Example,
             CurrentCodeResolution Resolution,
@@ -365,15 +366,15 @@ namespace ExportDocManager.Services.MasterData
         private sealed record AttributeAssessment(int Penalty, IReadOnlyList<string> MatchReasons, IReadOnlyList<string> ConflictWarnings);
         private sealed record HistorySourceRow(string Code, string Name, string Specification, string Source, string Variant);
         private sealed record HistorySourceProjection(
-            string Code,
-            string NamePrimary,
-            string NameFallback,
-            string SpecificationOne,
-            string SpecificationTwo,
-            string SpecificationThree,
-            string SpecificationFour,
+            string? Code,
+            string? NamePrimary,
+            string? NameFallback,
+            string? SpecificationOne,
+            string? SpecificationTwo,
+            string? SpecificationThree,
+            string? SpecificationFour,
             string Source,
-            string Variant);
+            string? Variant);
         private sealed record HistorySourceReadResult(IReadOnlyList<HistorySourceProjection> Rows, bool HasMore);
         private sealed record HistoryCandidateGroup(
             string Fingerprint,

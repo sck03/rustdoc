@@ -17,14 +17,14 @@ namespace ExportDocManager.Services.MasterData
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly IExporterReadRepository _exporterReadRepository;
-        private readonly IExporterSealService _exporterSealService;
+        private readonly IExporterSealService? _exporterSealService;
         private readonly BusinessDataAccessScope _accessScope;
 
         public ExporterService(
             IDbContextFactory<AppDbContext> contextFactory,
             IExporterReadRepository exporterReadRepository,
-            IExporterSealService exporterSealService = null,
-            BusinessDataAccessScope accessScope = null)
+            IExporterSealService? exporterSealService = null,
+            BusinessDataAccessScope? accessScope = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _exporterReadRepository = exporterReadRepository ?? throw new ArgumentNullException(nameof(exporterReadRepository));
@@ -42,8 +42,8 @@ namespace ExportDocManager.Services.MasterData
                 MasterDataNormalization.NormalizeExporter(exporter);
 
                 using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-                string previousDocSealPath = null;
-                string previousCustomsSealPath = null;
+                string? previousDocSealPath = null;
+                string? previousCustomsSealPath = null;
                 if (exporter.Id == 0)
                 {
                     if (!string.IsNullOrWhiteSpace(exporter.DocSealPath) ||
@@ -157,7 +157,7 @@ namespace ExportDocManager.Services.MasterData
             return rows.ToList();
         }
 
-        private static bool IsUnchangedOrCleared(string requestedPath, string existingPath) =>
+        private static bool IsUnchangedOrCleared(string? requestedPath, string? existingPath) =>
             string.IsNullOrWhiteSpace(requestedPath) ||
             string.Equals(requestedPath, existingPath, StringComparison.Ordinal);
 

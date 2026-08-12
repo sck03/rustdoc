@@ -156,7 +156,7 @@ namespace ExportDocManager.Services.Reporting
             };
         }
 
-        private List<BatchExportItemManifest> BuildExportManifestItems(IEnumerable<BatchExportItem> items)
+        private List<BatchExportItemManifest> BuildExportManifestItems(IEnumerable<BatchExportItem>? items)
         {
             return (items ?? Enumerable.Empty<BatchExportItem>())
                 .Select(item => TryNormalizeTemplateReference(
@@ -176,7 +176,7 @@ namespace ExportDocManager.Services.Reporting
                 .ToList();
         }
 
-        private List<PaymentTemplateItemManifest> BuildPaymentManifestItems(IEnumerable<PaymentTemplateItem> items)
+        private List<PaymentTemplateItemManifest> BuildPaymentManifestItems(IEnumerable<PaymentTemplateItem>? items)
         {
             return (items ?? Enumerable.Empty<PaymentTemplateItem>())
                 .Select(item => TryNormalizeTemplateReference(
@@ -235,7 +235,7 @@ namespace ExportDocManager.Services.Reporting
         }
 
         private bool TryNormalizeTemplateReference(
-            string templatePath,
+            string? templatePath,
             ReportDocumentType reportType,
             out string normalizedPath)
         {

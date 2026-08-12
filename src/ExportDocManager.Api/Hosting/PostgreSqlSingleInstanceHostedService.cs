@@ -20,8 +20,8 @@ public sealed class PostgreSqlSingleInstanceHostedService : IHostedService, IAsy
     private readonly IHostApplicationLifetime _applicationLifetime;
     private readonly ILogger<PostgreSqlSingleInstanceHostedService> _logger;
     private readonly Lock _gate = new();
-    private NpgsqlConnection _connection;
-    private CancellationTokenSource _monitorCancellation;
+    private NpgsqlConnection? _connection;
+    private CancellationTokenSource? _monitorCancellation;
     private Task _monitorTask = Task.CompletedTask;
     private long _lockId;
 
@@ -77,9 +77,9 @@ public sealed class PostgreSqlSingleInstanceHostedService : IHostedService, IAsy
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        CancellationTokenSource monitorCancellation;
+        CancellationTokenSource? monitorCancellation;
         Task monitorTask;
-        NpgsqlConnection connection;
+        NpgsqlConnection? connection;
         lock (_gate)
         {
             monitorCancellation = _monitorCancellation;

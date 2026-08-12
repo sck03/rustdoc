@@ -6,7 +6,7 @@ namespace ExportDocManager.Services.SingleWindow
 {
     public static class SingleWindowReferenceCatalogs
     {
-        private static Func<SingleWindowReferenceCatalogModel> _referenceCatalogSnapshotLoader;
+        private static Func<SingleWindowReferenceCatalogModel>? _referenceCatalogSnapshotLoader;
         private static Lazy<IReadOnlyList<SelectionOption<string>>> _acdTradeModeOptionsHolder = new(BuildAcdTradeModeOptions);
         private static Lazy<IReadOnlyList<SelectionOption<string>>> _acdCountryOptionsHolder = new(BuildAcdCountryOptions);
 

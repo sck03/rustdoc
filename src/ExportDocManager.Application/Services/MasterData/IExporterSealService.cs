@@ -24,8 +24,8 @@ namespace ExportDocManager.Services.MasterData
 
         void DeleteReplacedManagedSeal(
             int exporterId,
-            string previousPath,
-            string currentPath);
+            string? previousPath,
+            string? currentPath);
 
         void DeleteAllManagedSeals(int exporterId);
     }

@@ -19,7 +19,7 @@ namespace ExportDocManager.Utils
             string sourceDirectory,
             string zipPath,
             CancellationToken cancellationToken = default,
-            IProgress<OperationProgressUpdate> progress = null,
+            IProgress<OperationProgressUpdate>? progress = null,
             string statusText = "正在生成压缩包",
             int startPercent = 0,
             int endPercent = 100)
@@ -54,7 +54,7 @@ namespace ExportDocManager.Utils
             IEnumerable<(string SourcePath, string EntryName)> entries,
             string zipPath,
             CancellationToken cancellationToken = default,
-            IProgress<OperationProgressUpdate> progress = null,
+            IProgress<OperationProgressUpdate>? progress = null,
             string statusText = "正在生成压缩包",
             int startPercent = 0,
             int endPercent = 100,
@@ -107,11 +107,11 @@ namespace ExportDocManager.Utils
             string packagePath,
             string targetDirectory,
             CancellationToken cancellationToken = default,
-            IProgress<OperationProgressUpdate> progress = null,
+            IProgress<OperationProgressUpdate>? progress = null,
             string statusText = "正在解压压缩包",
             int startPercent = 0,
             int endPercent = 100,
-            ZipExtractionLimits limits = null)
+            ZipExtractionLimits? limits = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(packagePath);
             ArgumentException.ThrowIfNullOrWhiteSpace(targetDirectory);
@@ -276,7 +276,7 @@ namespace ExportDocManager.Utils
             IReadOnlyList<(string SourcePath, string EntryName)> entries,
             string zipPath,
             CancellationToken cancellationToken,
-            IProgress<OperationProgressUpdate> progress,
+            IProgress<OperationProgressUpdate>? progress,
             string statusText,
             int startPercent,
             int endPercent,
@@ -396,7 +396,7 @@ namespace ExportDocManager.Utils
         }
 
         private static void ReportProgress(
-            IProgress<OperationProgressUpdate> progress,
+            IProgress<OperationProgressUpdate>? progress,
             string statusText,
             string detailText,
             int? percent = null)

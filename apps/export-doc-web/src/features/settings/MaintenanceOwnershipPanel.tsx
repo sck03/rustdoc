@@ -52,7 +52,7 @@ export function SharedDatabaseOwnershipPanel({
     mutationFn: () =>
       client.transferSharedDatabaseOwnership({
         body: {
-          fromUserId: onlyUnassigned || !fromUserId ? undefined : Number(fromUserId),
+          fromUserId: onlyUnassigned || !fromUserId ? null : Number(fromUserId),
           toUserId: Number(toUserId),
           includeInvoices,
           includePayments,

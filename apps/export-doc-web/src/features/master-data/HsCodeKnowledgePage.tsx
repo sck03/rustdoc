@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { BookOpen, CloudDownload, Database, Download, GraduationCap, RefreshCw, Search, ShieldCheck, Sparkles, Upload } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import type { ExportDocManagerApiClient, HsCodeKnowledgeExampleInput } from "../../api/index.ts";
+import type { ExportDocManagerApiClient, HsCodeExampleInput } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
@@ -106,13 +106,13 @@ function ExampleLibrary({ client, canOperate, canManage, canBatchManage }: { cli
   const queryClient = useQueryClient();
   const requestConfirmation = useConfirmation();
   const [keyword, setKeyword] = useState(""); const debouncedKeyword = useDebouncedValue(keyword); const [pageNumber, setPageNumber] = useState(1); const [pageSize, setPageSize] = useState(30);
-  const [editing, setEditing] = useState<HsCodeKnowledgeExampleInput | null>(null); const [selected, setSelected] = useState<Set<number>>(new Set()); const [feedback, setFeedback] = useState<KnowledgeFeedback | null>(null);
+  const [editing, setEditing] = useState<HsCodeExampleInput | null>(null); const [selected, setSelected] = useState<Set<number>>(new Set()); const [feedback, setFeedback] = useState<KnowledgeFeedback | null>(null);
   const data = useQuery({ queryKey: ["hs-knowledge", "examples", debouncedKeyword, pageNumber, pageSize], queryFn: ({ signal }) => client.listHsCodeKnowledgeExamples({ keyword: debouncedKeyword, pageNumber, pageSize }, { signal }), placeholderData: keepPreviousData });
   const invalidate = async () => { setSelected(new Set()); await queryClient.invalidateQueries({ queryKey: ["hs-knowledge", "examples"] }); };
-  const save = useMutation({ mutationFn: (value: HsCodeKnowledgeExampleInput) => client.saveHsCodeKnowledgeExample({ body: value }), onSuccess: async () => { setEditing(null); setFeedback({tone:"success",message:"申报实例已保存。"}); await invalidate(); }, onError: error => setFeedback({tone:"error",message:readApiError(error)}) });
+  const save = useMutation({ mutationFn: (value: HsCodeExampleInput) => client.saveHsCodeKnowledgeExample({ body: value }), onSuccess: async () => { setEditing(null); setFeedback({tone:"success",message:"申报实例已保存。"}); await invalidate(); }, onError: error => setFeedback({tone:"error",message:readApiError(error)}) });
   const remove = useMutation({ mutationFn: (id: number) => client.deleteHsCodeKnowledgeExample({ id }), onSuccess: async () => { setFeedback({tone:"success",message:"申报实例已删除。"}); await invalidate(); }, onError: error => setFeedback({tone:"error",message:readApiError(error)}) });
   const batchRemove = useMutation({ mutationFn: (ids: number[]) => client.deleteHsCodeKnowledgeExamplesBatch({ body: { ids } }), onSuccess: async response => { setFeedback({tone:"success",message:response.message}); await invalidate(); }, onError: error => setFeedback({tone:"error",message:readApiError(error)}) });
-  const blank: HsCodeKnowledgeExampleInput = { id: 0, rawReportedHsCode: "", resolvedCurrentHsCode: "", productName: "", specification: "", source: "Manual", sourceYear: new Date().getFullYear(), resolutionStatus: "Unresolved", isManuallyVerified: true };
+  const blank: HsCodeExampleInput = { id: 0, rawReportedHsCode: "", resolvedCurrentHsCode: "", productName: "", specification: "", source: "Manual", sourceYear: new Date().getFullYear(), resolutionStatus: "Unresolved", isManuallyVerified: true };
   const totalPages = Math.max(1, Math.ceil((data.data?.totalCount ?? 0) / pageSize));
   useEffect(() => { setPageNumber(1); setSelected(new Set()); }, [debouncedKeyword, pageSize]);
   function toggle(id: number) { setSelected(current => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; }); }

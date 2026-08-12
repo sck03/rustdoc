@@ -6,6 +6,7 @@ using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -64,6 +65,11 @@ namespace ExportDocManager.Api.Hosting
                 statusCode: StatusCodes.Status403Forbidden);
         }
 
+        private static JsonHttpResult<ApiErrorResponse> TypedForbidden(string message) =>
+            TypedResults.Json(
+                new ApiErrorResponse(string.IsNullOrWhiteSpace(message) ? "没有权限执行该操作。" : message),
+                statusCode: StatusCodes.Status403Forbidden);
+
         private static async Task<User> FindUserByIdAsync(
             IUserService userService,
             int userId,
@@ -81,8 +87,9 @@ namespace ExportDocManager.Api.Hosting
 
         internal static IResult AcceptedBackgroundJob(BackgroundJobSnapshot job)
         {
-            if (job != null &&
-                string.Equals(job.StatusText, ApiBackgroundJobQueueStatusCatalog.Rejected, StringComparison.Ordinal))
+            ArgumentNullException.ThrowIfNull(job);
+
+            if (string.Equals(job.StatusText, ApiBackgroundJobQueueStatusCatalog.Rejected, StringComparison.Ordinal))
             {
                 return Results.Json(
                     new ApiErrorResponse(job.ErrorMessage),

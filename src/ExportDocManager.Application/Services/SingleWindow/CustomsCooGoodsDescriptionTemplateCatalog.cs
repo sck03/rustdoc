@@ -23,10 +23,10 @@ namespace ExportDocManager.Services.SingleWindow
         }
 
         public static string BuildTemplate(
-            string packQty,
-            string packUnit,
-            string goodsNameEnglish,
-            string goodsNameChinese = "")
+            string? packQty,
+            string? packUnit,
+            string? goodsNameEnglish,
+            string? goodsNameChinese = "")
         {
             string normalizedGoodsName = FirstNonEmpty(
                 NormalizeUpperText(goodsNameEnglish),
@@ -45,7 +45,7 @@ namespace ExportDocManager.Services.SingleWindow
             return $"{packSummary} OF {normalizedGoodsName}".Trim();
         }
 
-        public static string BuildPackingSummary(string packQty, string packUnit)
+        public static string BuildPackingSummary(string? packQty, string? packUnit)
         {
             string normalizedPackQty = NormalizeText(packQty);
             string unitText = ResolveGoodsDescriptionPackUnit(packUnit, normalizedPackQty);
@@ -73,9 +73,9 @@ namespace ExportDocManager.Services.SingleWindow
             return "请先确认当前货项已经填了包装件数、包装单位(英)和英文品名，再点“生成货物描述”。";
         }
 
-        private static string BuildGoodsDescriptionQuantityText(string packQty)
+        private static string BuildGoodsDescriptionQuantityText(string? packQty)
         {
-            decimal quantity = NumberHelper.ParseDecimal(packQty);
+            decimal quantity = NumberHelper.ParseDecimal(packQty ?? string.Empty);
             if (quantity <= 0)
             {
                 return string.Empty;
@@ -90,10 +90,10 @@ namespace ExportDocManager.Services.SingleWindow
             return NormalizeText(packQty);
         }
 
-        private static string ResolveGoodsDescriptionPackUnit(string packUnit, string packQty)
+        private static string ResolveGoodsDescriptionPackUnit(string? packUnit, string? packQty)
         {
             string normalizedUnit = SingleWindowUnitNormalizer.NormalizeEnglish(packUnit);
-            decimal quantity = NumberHelper.ParseDecimal(packQty);
+            decimal quantity = NumberHelper.ParseDecimal(packQty ?? string.Empty);
             bool singular = quantity == 1m;
 
             return normalizedUnit switch
@@ -107,7 +107,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        private static string FirstNonEmpty(params string[] values)
+        private static string FirstNonEmpty(params string?[] values)
         {
             foreach (var value in values ?? [])
             {
@@ -120,9 +120,9 @@ namespace ExportDocManager.Services.SingleWindow
             return string.Empty;
         }
 
-        private static string NormalizeUpperText(string value) => NormalizeText(value).ToUpperInvariant();
+        private static string NormalizeUpperText(string? value) => NormalizeText(value).ToUpperInvariant();
 
-        private static string NormalizeText(string value)
+        private static string NormalizeText(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
         }

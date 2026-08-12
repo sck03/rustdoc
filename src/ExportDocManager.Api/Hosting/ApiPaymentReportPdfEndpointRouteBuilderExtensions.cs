@@ -45,7 +45,11 @@ namespace ExportDocManager.Api.Hosting
                     templatePath,
                     destinationPath));
             })
-            .WithName("StartPaymentVoucherPdfSaveToPathJob");
+            .WithName("StartPaymentVoucherPdfSaveToPathJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/reports/payments/{paymentId:int}/pdf/download", (
                 HttpContext context,
@@ -82,12 +86,15 @@ namespace ExportDocManager.Api.Hosting
                     request.TemplatePath?.Trim() ?? string.Empty,
                     destinationPath));
             })
-            .WithName("StartPaymentVoucherPdfDownloadJob");
+            .WithName("StartPaymentVoucherPdfDownloadJob")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
         }
 
-        internal static IResult ValidatePaymentReportPdfRequest(
+        internal static IResult? ValidatePaymentReportPdfRequest(
             int paymentId,
-            ApiPaymentReportPdfRequest request,
+            ApiPaymentReportPdfRequest? request,
             out string destinationPath)
         {
             destinationPath = string.Empty;

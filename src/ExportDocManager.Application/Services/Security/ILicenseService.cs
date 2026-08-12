@@ -26,6 +26,6 @@ namespace ExportDocManager.Services.Security
     {
         public bool Success { get; init; }
         public string Message { get; init; } = string.Empty;
-        public LicenseStatus Status { get; init; }
+        public LicenseStatus Status { get; init; } = new();
     }
 }

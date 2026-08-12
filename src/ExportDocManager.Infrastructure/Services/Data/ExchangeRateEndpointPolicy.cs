@@ -14,11 +14,11 @@ public static class ExchangeRateEndpointPolicy
     public const string DefaultUrl = "https://www.boc.cn/sourcedb/whpj/";
     public const int MaximumRedirects = 5;
 
-    public static Uri Normalize(string value)
+    public static Uri Normalize(string? value)
     {
         string configured = string.IsNullOrWhiteSpace(value) ? DefaultUrl : value.Trim();
         if (configured.Length > 2048 ||
-            !Uri.TryCreate(configured, UriKind.Absolute, out Uri uri) ||
+            !Uri.TryCreate(configured, UriKind.Absolute, out Uri? uri) ||
             !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
             string.IsNullOrWhiteSpace(uri.Host) ||
             !string.IsNullOrEmpty(uri.UserInfo) ||
@@ -93,7 +93,7 @@ public static class ExchangeRateEndpointPolicy
             throw new HttpRequestException(ex.Message, ex);
         }
 
-        Exception lastError = null;
+        Exception? lastError = null;
         foreach (IPAddress address in addresses)
         {
             try
@@ -190,7 +190,7 @@ public static class ExchangeRateEndpointPolicy
         Func<string, CancellationToken, Task<IPAddress[]>> resolveHostAsync,
         CancellationToken cancellationToken)
     {
-        IPAddress[] addresses = IPAddress.TryParse(host, out IPAddress literal)
+        IPAddress[]? addresses = IPAddress.TryParse(host, out IPAddress? literal)
             ? [literal]
             : await resolveHostAsync(host, cancellationToken).ConfigureAwait(false);
         if (addresses == null || addresses.Length == 0 || addresses.Any(IsDisallowedAddress))
@@ -205,7 +205,7 @@ public static class ExchangeRateEndpointPolicy
     }
 
     private static bool IsDisallowedHostLiteral(string host) =>
-        IPAddress.TryParse(host, out IPAddress address) && IsDisallowedAddress(address);
+        IPAddress.TryParse(host, out IPAddress? address) && IsDisallowedAddress(address);
 
     private static ServiceValidationException CreateBlockedHostException(string host) =>
         new($"已拒绝汇率源主机“{host}”：解析结果属于回环、私有、链路本地或其它不可访问网络。");

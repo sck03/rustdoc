@@ -309,19 +309,44 @@ export function readInvoiceItemNumberInput(value: string) {
 }
 
 export function createEmptyInvoiceItem(invoiceId = 0): ApiInvoiceItemDto {
-  const item: Partial<ApiInvoiceItemDto> = {
+  return {
     id: 0,
     invoiceId,
-    ctnUnitCN: "",
-    ctnUnitEN: "",
+    poNumber: "",
     styleNo: "",
     styleName: "",
+    fabricComposition: "",
+    styleNameCN: "",
+    brand: "",
+    hsCode: "",
+    origin: "",
+    quantity: 0,
     unitEN: "",
     unitCN: "",
+    pcsPerCtn: 0,
+    cartons: 0,
+    ctnUnitCN: "",
+    ctnUnitEN: "",
+    length: 0,
+    width: 0,
+    height: 0,
+    volume: 0,
+    gwPerCtn: 0,
+    nwPerCtn: 0,
+    gwTotal: 0,
+    nwTotal: 0,
     priceCalculationMode: invoiceItemPriceCalculationModes.unitPriceDriven,
+    unitPrice: 0,
+    totalPrice: 0,
+    purchasePrice: 0,
+    purchaseTotal: 0,
+    taxRebateRate: 0,
+    taxRefundAmount: 0,
+    spare1: "",
+    spare2: "",
+    spare3: "",
+    customFieldsJson: "",
   };
-
-  return item as ApiInvoiceItemDto;
 }
 
 export function recalculateInvoiceItem(item: ApiInvoiceItemDto, changedFields: string[]): ApiInvoiceItemDto {
@@ -414,7 +439,7 @@ export function recalculateInvoiceItem(item: ApiInvoiceItemDto, changedFields: s
 
 export function calculateInvoiceTotals(
   items: ApiInvoiceItemDto[],
-  exchangeRate?: number,
+  exchangeRate?: number | null,
   currency?: string,
 ): Partial<ApiInvoiceDetailDto> {
   const totals = items.reduce(
@@ -469,25 +494,25 @@ export function normalizeInvoiceItemForSave(item: ApiInvoiceItemDto): ApiInvoice
     ...createEmptyInvoiceItem(numberValue(item.invoiceId)),
     ...item,
     brand: normalizeText(item.brand),
-    cartons: normalizeOptionalInvoiceItemNumber(item.cartons),
+    cartons: numberValue(item.cartons),
     ctnUnitCN: normalizeText(item.ctnUnitCN),
     ctnUnitEN: normalizeText(item.ctnUnitEN),
     customFieldsJson: normalizeText(item.customFieldsJson),
     fabricComposition: normalizeText(item.fabricComposition),
-    gwPerCtn: roundOptionalWeight(item.gwPerCtn),
-    gwTotal: roundOptionalWeight(item.gwTotal),
-    height: normalizeOptionalInvoiceItemNumber(item.height),
+    gwPerCtn: roundWeight(numberValue(item.gwPerCtn)),
+    gwTotal: roundWeight(numberValue(item.gwTotal)),
+    height: numberValue(item.height),
     hsCode: normalizeText(item.hsCode),
     id: numberValue(item.id),
     invoiceId: numberValue(item.invoiceId),
-    length: normalizeOptionalInvoiceItemNumber(item.length),
-    nwPerCtn: roundOptionalWeight(item.nwPerCtn),
-    nwTotal: roundOptionalWeight(item.nwTotal),
+    length: numberValue(item.length),
+    nwPerCtn: roundWeight(numberValue(item.nwPerCtn)),
+    nwTotal: roundWeight(numberValue(item.nwTotal)),
     origin: normalizeText(item.origin),
-    pcsPerCtn: normalizeOptionalInvoiceItemNumber(item.pcsPerCtn),
+    pcsPerCtn: numberValue(item.pcsPerCtn),
     poNumber: normalizeText(item.poNumber),
-    purchasePrice: normalizeOptionalInvoiceItemNumber(item.purchasePrice),
-    purchaseTotal: normalizeOptionalInvoiceItemNumber(item.purchaseTotal),
+    purchasePrice: numberValue(item.purchasePrice),
+    purchaseTotal: numberValue(item.purchaseTotal),
     quantity: numberValue(item.quantity),
     spare1: normalizeText(item.spare1),
     spare2: normalizeText(item.spare2),
@@ -495,14 +520,14 @@ export function normalizeInvoiceItemForSave(item: ApiInvoiceItemDto): ApiInvoice
     styleName: normalizeText(item.styleName),
     styleNameCN: normalizeText(item.styleNameCN),
     styleNo: normalizeText(item.styleNo),
-    taxRebateRate: normalizeOptionalInvoiceItemNumber(item.taxRebateRate),
+    taxRebateRate: numberValue(item.taxRebateRate),
     totalPrice: numberValue(item.totalPrice),
     unitCN: normalizeText(item.unitCN),
     unitEN: normalizeText(item.unitEN),
     unitPrice: numberValue(item.unitPrice),
     priceCalculationMode: normalizePriceCalculationMode(item.priceCalculationMode),
-    volume: roundOptionalVolume(item.volume),
-    width: normalizeOptionalInvoiceItemNumber(item.width),
+    volume: roundVolume(numberValue(item.volume)),
+    width: numberValue(item.width),
   };
 
   return recalculateInvoiceItem(normalized, ["quantity"]);

@@ -93,7 +93,11 @@ namespace ExportDocManager.Services.Security
             try
             {
                 string encrypted = await File.ReadAllTextAsync(_path, cancellationToken).ConfigureAwait(false);
-                string payload = _secretProtector.Unprotect(encrypted);
+                string? payload = _secretProtector.Unprotect(encrypted);
+                if (string.IsNullOrWhiteSpace(payload))
+                {
+                    return null;
+                }
                 return RuntimeLicenseAnchorCodec.Decode(payload);
             }
             catch

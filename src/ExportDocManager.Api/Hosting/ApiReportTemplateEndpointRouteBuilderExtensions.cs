@@ -33,7 +33,10 @@ namespace ExportDocManager.Api.Hosting
                     ToApiReportTemplatePath(context, template.TemplatePath),
                     template.WithSealDefault)));
             })
-            .WithName("ListReportTemplates");
+            .WithName("ListReportTemplates")
+            .Produces<IReadOnlyList<ApiReportTemplateDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapPost("/api/reports/templates", async (
                 HttpContext context,
@@ -90,7 +93,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("CreateReportTemplate");
+            .WithName("CreateReportTemplate")
+            .Produces<ApiReportTemplateContentDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/reports/templates/storage-check", async (
                 HttpContext context,
@@ -121,7 +129,10 @@ namespace ExportDocManager.Api.Hosting
                     result.Message,
                     result.StoragePolicy));
             })
-            .WithName("CheckReportTemplateStorage");
+            .WithName("CheckReportTemplateStorage")
+            .Produces<ApiReportTemplateStorageStatusResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapGet("/api/reports/templates/fields", (
                 HttpContext context,
@@ -142,7 +153,10 @@ namespace ExportDocManager.Api.Hosting
                 var catalog = fieldCatalogService.GetFieldCatalog(parsedReportType);
                 return Results.Ok(ToApiReportTemplateFieldCatalogDto(catalog));
             })
-            .WithName("GetReportTemplateFieldCatalog");
+            .WithName("GetReportTemplateFieldCatalog")
+            .Produces<ApiReportTemplateFieldCatalogResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapGet("/api/reports/templates/content", async (
                 HttpContext context,
@@ -166,7 +180,7 @@ namespace ExportDocManager.Api.Hosting
                 {
                     var result = await reportTemplateService.GetTemplateContentAsync(
                         parsedReportType,
-                        templatePath,
+                        templatePath ?? string.Empty,
                         cancellationToken);
                     return Results.Ok(ToApiReportTemplateContentDto(context, result));
                 }
@@ -187,7 +201,13 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("GetReportTemplateContent");
+            .WithName("GetReportTemplateContent")
+            .Produces<ApiReportTemplateContentDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPut("/api/reports/templates/content", async (
                 HttpContext context,
@@ -248,7 +268,13 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("SaveReportTemplateContent");
+            .WithName("SaveReportTemplateContent")
+            .Produces<ApiReportTemplateContentDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/reports/templates/rename", async (
                 HttpContext context,
@@ -309,7 +335,13 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("RenameReportTemplate");
+            .WithName("RenameReportTemplate")
+            .Produces<ApiReportTemplateContentDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapDelete("/api/reports/templates/content", async (
                 HttpContext context,
@@ -340,7 +372,7 @@ namespace ExportDocManager.Api.Hosting
                 {
                     var result = await reportTemplateService.DeleteTemplateAsync(
                         parsedReportType,
-                        templatePath,
+                        templatePath ?? string.Empty,
                         cancellationToken);
                     return Results.Ok(new ApiCommandResponse(true, result.Message));
                 }
@@ -365,7 +397,13 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("DeleteReportTemplate");
+            .WithName("DeleteReportTemplate")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/reports/templates/package/save-to-path", async (
                 HttpContext context,
@@ -418,7 +456,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("SaveReportTemplatePackageToPath");
+            .WithName("SaveReportTemplatePackageToPath")
+            .Produces<ApiReportTemplatePackageExportResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/reports/templates/package/download", async (
                 HttpContext context,
@@ -478,7 +521,12 @@ namespace ExportDocManager.Api.Hosting
                     }
                 }
             })
-            .WithName("DownloadReportTemplatePackage");
+            .WithName("DownloadReportTemplatePackage")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/reports/templates/package/import", async (
                 HttpContext context,
@@ -551,7 +599,13 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("ImportReportTemplatePackage");
+            .WithName("ImportReportTemplatePackage")
+            .Produces<ApiReportTemplatePackageImportResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/reports/templates/package/upload", async (
                 HttpContext context,
@@ -559,6 +613,8 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 IReportTemplatePackageService packageService,
                 IAppPathProvider pathProvider,
+                string? strategy,
+                string? fileName,
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
@@ -572,10 +628,10 @@ namespace ExportDocManager.Api.Hosting
                     return WriteForbidden("当前权限模板不允许上传模板包。");
                 }
 
-                string rawStrategy = context.Request.Query["strategy"].ToString();
+                string rawStrategy = strategy ?? string.Empty;
                 if (!TryParseReportTemplateImportStrategy(
                     string.IsNullOrWhiteSpace(rawStrategy) ? "Merge" : rawStrategy,
-                    out var strategy))
+                    out var importStrategy))
                 {
                     return Results.BadRequest(new ApiErrorResponse("模板包导入策略无效。"));
                 }
@@ -587,9 +643,8 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    string fileName = NormalizeUploadedReportTemplatePackageFileName(
-                        context.Request.Query["fileName"].ToString());
-                    string packagePath = Path.Combine(tempRoot, fileName);
+                    string safeFileName = NormalizeUploadedReportTemplatePackageFileName(fileName ?? string.Empty);
+                    string packagePath = Path.Combine(tempRoot, safeFileName);
                     await using (var output = File.Create(packagePath))
                     {
                         await ApiUploadLimits.CopyRequestBodyAsync(
@@ -606,7 +661,7 @@ namespace ExportDocManager.Api.Hosting
 
                     var result = await packageService.ImportAsync(
                         packagePath,
-                        strategy,
+                        importStrategy,
                         cancellationToken: cancellationToken);
                     return Results.Ok(new ApiReportTemplatePackageImportResponse(
                         result.TemplateCount,
@@ -638,7 +693,13 @@ namespace ExportDocManager.Api.Hosting
                     AtomicFileHelper.TryDeleteDirectory(tempRoot);
                 }
             })
-            .WithName("UploadReportTemplatePackage");
+            .Accepts<IFormFile>("application/octet-stream")
+            .WithName("UploadReportTemplatePackage")
+            .Produces<ApiReportTemplatePackageImportResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/reports/templates/preview", async (
                 HttpContext context,
@@ -690,7 +751,11 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("PreviewReportTemplateContent");
+            .WithName("PreviewReportTemplateContent")
+            .Produces<ApiReportTemplatePreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status409Conflict);
         }
 
         private static ApiReportTemplateContentDto ToApiReportTemplateContentDto(

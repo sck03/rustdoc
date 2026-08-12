@@ -93,7 +93,7 @@ internal static class ServerMigrationStorageBudget
         internal IncrementalWriteGuard(
             string path,
             string operation,
-            Action<long> ensureAvailable = null)
+            Action<long>? ensureAvailable = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(path);
             ArgumentException.ThrowIfNullOrWhiteSpace(operation);

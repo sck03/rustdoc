@@ -43,7 +43,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 SourceName = "i5a6（第三方参考）"
             });
 
-            var saved = await service.GetByCodeAsync("6109100000");
+            var saved = Assert.IsType<HsCode>(await service.GetByCodeAsync("6109100000"));
             Assert.Equal("Active", saved.Status);
             Assert.Equal("年度税则名称", saved.Name);
             Assert.Equal("年度申报要素", saved.Elements);
@@ -68,7 +68,7 @@ namespace ExportDocManager.Infrastructure.Tests
             }));
 
             await service.SaveAsync(new HsCode { Code = "6109100000", Name = "参考编码" });
-            var saved = await service.GetByCodeAsync("6109100000");
+            var saved = Assert.IsType<HsCode>(await service.GetByCodeAsync("6109100000"));
             Assert.Equal("ReferenceOnly", saved.Status);
 
             await Assert.ThrowsAsync<ServiceValidationException>(() => service.SaveAsync(new HsCode
@@ -132,7 +132,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.Equal(1, preview.UpdateCount);
 
                 await service.CommitImportAsync(preview);
-                var saved = await service.GetByCodeAsync("6205200090");
+                var saved = Assert.IsType<HsCode>(await service.GetByCodeAsync("6205200090"));
                 Assert.Equal("棉制男衬衫", saved.Name);
                 Assert.Equal("保留的申报要素", saved.Elements);
                 Assert.Equal("件", saved.Unit);
@@ -402,8 +402,8 @@ namespace ExportDocManager.Infrastructure.Tests
             var hsCodeService = new HsCodeService(factory, repository);
 
             int productId = await productService.AddProductAsync(new Product { ProductCode = "P-1", NameEN = "Product" });
-            var productFirst = await productService.GetByIdAsync(productId);
-            var productStale = await productService.GetByIdAsync(productId);
+            var productFirst = Assert.IsType<Product>(await productService.GetByIdAsync(productId));
+            var productStale = Assert.IsType<Product>(await productService.GetByIdAsync(productId));
             productFirst.NameEN = "Product First";
             Assert.True(await productService.UpdateProductAsync(productFirst));
             productStale.NameEN = "Product Stale";
@@ -440,8 +440,8 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("其他用户", unitConflict.Message);
 
             await hsCodeService.SaveAsync(new HsCode { Code = "6109100000", Name = "T-Shirts" });
-            var hsFirst = await hsCodeService.GetByCodeAsync("6109100000");
-            var hsStale = await hsCodeService.GetByCodeAsync("6109100000");
+            var hsFirst = Assert.IsType<HsCode>(await hsCodeService.GetByCodeAsync("6109100000"));
+            var hsStale = Assert.IsType<HsCode>(await hsCodeService.GetByCodeAsync("6109100000"));
             hsFirst.Name = "T-Shirts First";
             await hsCodeService.SaveAsync(hsFirst);
             hsStale.Name = "T-Shirts Stale";

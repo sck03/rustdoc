@@ -41,7 +41,9 @@ namespace ExportDocManager.Api.Hosting
 
                 return Results.Ok(ApiInvoiceDtoFactory.FromPagedInvoices(result));
             })
-            .WithName("ListInvoices");
+            .WithName("ListInvoices")
+            .Produces<ApiPagedResponse<ApiInvoiceListItemDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapGet("/api/invoices/{id:int}", async (
                 HttpContext context,
@@ -65,7 +67,11 @@ namespace ExportDocManager.Api.Hosting
                     ? Results.NotFound()
                     : Results.Ok(ApiInvoiceDtoFactory.FromInvoiceDetail(invoice));
             })
-            .WithName("GetInvoice");
+            .WithName("GetInvoice")
+            .Produces<ApiInvoiceDetailDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapPost("/api/invoices/profit-analysis", (
                 HttpContext context,
@@ -94,7 +100,10 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("发票 rowVersion 必须是有效的 Base64 字符串。"));
                 }
             })
-            .WithName("AnalyzeInvoiceProfit");
+            .WithName("AnalyzeInvoiceProfit")
+            .Produces<ApiInvoiceProfitAnalysisResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapPost("/api/invoices", async (
                 HttpContext context,
@@ -158,7 +167,11 @@ namespace ExportDocManager.Api.Hosting
                     ApiInvoiceDtoFactory.FromInvoiceDetail(result.SavedInvoice));
                 return Results.Created($"/api/invoices/{result.SavedInvoice.Id}", response);
             })
-            .WithName("CreateInvoice");
+            .WithName("CreateInvoice")
+            .Produces<ApiInvoiceSaveResponse>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPut("/api/invoices/{id:int}", async (
                 HttpContext context,
@@ -236,7 +249,12 @@ namespace ExportDocManager.Api.Hosting
                     result.IsUpdate,
                     ApiInvoiceDtoFactory.FromInvoiceDetail(result.SavedInvoice)));
             })
-            .WithName("UpdateInvoice");
+            .WithName("UpdateInvoice")
+            .Produces<ApiInvoiceSaveResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapDelete("/api/invoices/{id:int}", async (
                 HttpContext context,
@@ -261,7 +279,12 @@ namespace ExportDocManager.Api.Hosting
                     ? Results.Ok(new ApiCommandResponse(true, "发票已删除。"))
                     : Results.NotFound();
             })
-            .WithName("DeleteInvoice");
+            .WithName("DeleteInvoice")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/invoices/{id:int}/status", async (
                 HttpContext context,
@@ -328,7 +351,13 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Conflict(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("TransitionInvoiceStatus");
+            .WithName("TransitionInvoiceStatus")
+            .Produces<ApiInvoiceSaveResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/invoices/{id:int}/unverify", async (
                 HttpContext context,
@@ -389,7 +418,12 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Conflict(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("UnverifyInvoice");
+            .WithName("UnverifyInvoice")
+            .Produces<ApiInvoiceSaveResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapGet("/api/invoices/{id:int}/status-history", async (
                 HttpContext context,
@@ -419,7 +453,11 @@ namespace ExportDocManager.Api.Hosting
                     item.ChangedByUsername,
                     item.ChangedAt)).ToList());
             })
-            .WithName("ListInvoiceStatusHistory");
+            .WithName("ListInvoiceStatusHistory")
+            .Produces<IReadOnlyList<ApiInvoiceStatusHistoryDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapPost("/api/invoices/{id:int}/clone", async (
                 HttpContext context,
@@ -444,7 +482,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("新发票号不能为空。"));
                 }
 
-                Invoice copiedInvoice = await invoiceService.CopyInvoiceAsync(
+                Invoice? copiedInvoice = await invoiceService.CopyInvoiceAsync(
                     id,
                     request.NewInvoiceNo.Trim(),
                     request.Options ?? new InvoiceCloneOptions(),
@@ -458,7 +496,11 @@ namespace ExportDocManager.Api.Hosting
                         ApiInvoiceDtoFactory.FromInvoiceDetail(copiedInvoice),
                         "发票已复制。"));
             })
-            .WithName("CloneInvoice");
+            .WithName("CloneInvoice")
+            .Produces<ApiInvoiceCloneResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapPost("/api/invoices/{id:int}/clone-type", async (
                 HttpContext context,
@@ -518,7 +560,7 @@ namespace ExportDocManager.Api.Hosting
                     ClearAmounts = false
                 };
 
-                Invoice clonedInvoice;
+                Invoice? clonedInvoice;
                 try
                 {
                     clonedInvoice = await invoiceService.CopyInvoiceAsTypeAsync(
@@ -540,7 +582,12 @@ namespace ExportDocManager.Api.Hosting
                         ApiInvoiceDtoFactory.FromInvoiceDetail(clonedInvoice),
                         $"已生成同一发票号的{targetType}。"));
             })
-            .WithName("CloneInvoiceAsType");
+            .WithName("CloneInvoiceAsType")
+            .Produces<ApiInvoiceCloneTypeResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
         }
 
         private static ApiInvoiceProfitAnalysisResponse ToProfitAnalysisResponse(

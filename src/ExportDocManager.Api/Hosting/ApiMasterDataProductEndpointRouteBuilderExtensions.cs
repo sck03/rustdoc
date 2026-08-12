@@ -3,6 +3,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Security;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -10,7 +11,9 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapProductMasterDataEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/master-data/products", async (
+            endpoints.MapGet("/api/master-data/products", async Task<Results<
+                Ok<ApiPagedResponse<ApiProductDto>>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductReadRepository repository,
@@ -21,7 +24,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 var result = await repository.QueryPageAsync(
@@ -33,15 +36,22 @@ namespace ExportDocManager.Api.Hosting
                     },
                     cancellationToken);
 
-                return Results.Ok(new ExportDocManager.Models.PagedResult<ApiProductDto>(
-                    result.Items.Select(ApiMasterDataDtoFactory.FromProduct).ToList(),
+                return TypedResults.Ok(new ApiPagedResponse<ApiProductDto>(
+                    result.Items.Select(ApiMasterDataDtoFactory.FromProduct).ToArray(),
                     result.TotalCount,
                     result.PageNumber,
-                    result.PageSize));
+                    result.PageSize,
+                    result.TotalPages,
+                    result.HasPreviousPage,
+                    result.HasNextPage));
             })
             .WithName("ListProducts");
 
-            endpoints.MapGet("/api/master-data/products/{id:int}", async (
+            endpoints.MapGet("/api/master-data/products/{id:int}", async Task<Results<
+                Ok<ApiProductDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductService productService,
@@ -50,7 +60,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -60,12 +70,15 @@ namespace ExportDocManager.Api.Hosting
 
                 var product = await productService.GetByIdAsync(id, cancellationToken);
                 return product == null
-                    ? Results.NotFound()
-                    : Results.Ok(ApiMasterDataDtoFactory.FromProduct(product));
+                    ? TypedResults.NotFound()
+                    : TypedResults.Ok(ApiMasterDataDtoFactory.FromProduct(product));
             })
             .WithName("GetProduct");
 
-            endpoints.MapPost("/api/master-data/products", async (
+            endpoints.MapPost("/api/master-data/products", async Task<Results<
+                Created<ApiProductDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductService productService,
@@ -74,17 +87,17 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (request == null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("商品请求体不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("商品请求体不能为空。"));
                 }
 
                 if (request.Id > 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("新增商品不能包含已有ID。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("新增商品不能包含已有ID。"));
                 }
 
                 Product product;
@@ -101,13 +114,18 @@ namespace ExportDocManager.Api.Hosting
 
                 int savedId = await productService.AddProductAsync(product, cancellationToken);
                 var saved = await productService.GetByIdAsync(savedId, cancellationToken) ?? product;
-                return Results.Created(
+                return TypedResults.Created(
                     $"/api/master-data/products/{savedId}",
                     ApiMasterDataDtoFactory.FromProduct(saved));
             })
-            .WithName("CreateProduct");
+            .WithName("CreateProduct")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
-            endpoints.MapPut("/api/master-data/products/{id:int}", async (
+            endpoints.MapPut("/api/master-data/products/{id:int}", async Task<Results<
+                Ok<ApiProductDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductService productService,
@@ -117,7 +135,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -127,18 +145,18 @@ namespace ExportDocManager.Api.Hosting
 
                 if (request == null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("商品请求体不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("商品请求体不能为空。"));
                 }
 
                 if (request.Id > 0 && request.Id != id)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("请求体商品ID与路径ID不一致。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("请求体商品ID与路径ID不一致。"));
                 }
 
                 var existing = await productService.GetByIdAsync(id, cancellationToken);
                 if (existing == null)
                 {
-                    return Results.NotFound();
+                    return TypedResults.NotFound();
                 }
 
                 Product product;
@@ -155,15 +173,20 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!await productService.UpdateProductAsync(product, cancellationToken))
                 {
-                    return Results.NotFound();
+                    return TypedResults.NotFound();
                 }
 
                 var updated = await productService.GetByIdAsync(id, cancellationToken) ?? product;
-                return Results.Ok(ApiMasterDataDtoFactory.FromProduct(updated));
+                return TypedResults.Ok(ApiMasterDataDtoFactory.FromProduct(updated));
             })
-            .WithName("UpdateProduct");
+            .WithName("UpdateProduct")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
-            endpoints.MapDelete("/api/master-data/products/{id:int}", async (
+            endpoints.MapDelete("/api/master-data/products/{id:int}", async Task<Results<
+                Ok<ApiCommandResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductService productService,
@@ -172,7 +195,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -181,10 +204,11 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 return await productService.DeleteAsync(id, cancellationToken)
-                    ? Results.Ok(new ApiCommandResponse(true, "商品已删除。"))
-                    : Results.NotFound();
+                    ? TypedResults.Ok(new ApiCommandResponse(true, "商品已删除。"))
+                    : TypedResults.NotFound();
             })
-            .WithName("DeleteProduct");
+            .WithName("DeleteProduct")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
         }
     }
 }

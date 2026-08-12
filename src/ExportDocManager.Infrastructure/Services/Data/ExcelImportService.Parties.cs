@@ -142,7 +142,7 @@ namespace ExportDocManager.Services.Data
 
                     int exporterAddressLines = Math.Max(1, settings.ExporterAddressLineCount);
                     bool exporterAddressFromPartyBlock = !string.IsNullOrWhiteSpace(exporterPartyBlock?.Address);
-                    string exporterAddress = exporterPartyBlock?.Address;
+                    string? exporterAddress = exporterPartyBlock?.Address;
                     if (string.IsNullOrWhiteSpace(exporterAddress))
                     {
                         exporterAddress = GetAnalyzedValue(analysisReport, "ExporterAddressEN", IsUsablePartyAddressValue)
@@ -373,7 +373,7 @@ namespace ExportDocManager.Services.Data
         }
 
 
-        private static string NormalizeExporterNameCn(string value)
+        private static string NormalizeExporterNameCn(string? value)
         {
             if (ExcelImportTemplateText.IsExporterPlaceholder(value))
             {

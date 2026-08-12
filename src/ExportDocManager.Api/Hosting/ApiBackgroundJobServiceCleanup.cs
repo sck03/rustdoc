@@ -141,6 +141,11 @@ namespace ExportDocManager.Api.Hosting
 
         private bool IsReparsePointFreeBrowserPath(string path, string browserRoot)
         {
+            if (_pathProvider is null)
+            {
+                return false;
+            }
+
             try
             {
                 string fullPath = Path.GetFullPath(path);

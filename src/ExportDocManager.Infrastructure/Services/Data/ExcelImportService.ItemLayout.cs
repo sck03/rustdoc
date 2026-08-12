@@ -13,7 +13,7 @@ namespace ExportDocManager.Services.Data
 {
     public partial class ExcelImportService
     {
-        private static DetectedItemTableLayout GetDetectedLayoutFromAnalysis(ExcelImportAnalysisReport analysisReport)
+        private static DetectedItemTableLayout? GetDetectedLayoutFromAnalysis(ExcelImportAnalysisReport analysisReport)
         {
             var table = analysisReport?.ItemTable;
             if (table == null || table.DataStartRow <= 0 || table.Columns == null)
@@ -254,7 +254,7 @@ namespace ExportDocManager.Services.Data
 
             public int DataStartRow { get; set; }
 
-            public DetectedItemColumns Columns { get; set; }
+            public DetectedItemColumns Columns { get; set; } = new();
         }
 
         private sealed class BookingSheetGoodsTable
@@ -325,4 +325,3 @@ namespace ExportDocManager.Services.Data
             public int TotalPriceCol { get; set; }
         }    }
 }
-

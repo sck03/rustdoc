@@ -4,7 +4,7 @@ namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiEndpointRouteBuilderExtensions
     {
-        private static bool TryParseReportDocumentType(string reportType, out ReportDocumentType parsedReportType)
+        private static bool TryParseReportDocumentType(string? reportType, out ReportDocumentType parsedReportType)
         {
             if (string.IsNullOrWhiteSpace(reportType))
             {

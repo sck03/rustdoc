@@ -76,7 +76,7 @@ export function HsCodeToolsPanel({
         body: {
           filePath,
           mode: importMode,
-          sourceName: importSourceName.trim() || undefined,
+          sourceName: importSourceName.trim(),
           effectiveYear: parseImportYear(importEffectiveYear),
         },
       }),
@@ -585,7 +585,7 @@ function remoteEvidenceCount(item: ApiHsCodeDto) {
   return "尚未提取实例";
 }
 
-function formatObservedAt(value?: string) {
+function formatObservedAt(value?: string | null) {
   if (!value) return "-";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });

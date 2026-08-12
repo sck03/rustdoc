@@ -2,8 +2,8 @@ namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiEndpointRouteBuilderExtensions
     {
-        internal static IResult ValidateExcelSourcePath(
-            string inputPath,
+        internal static IResult? ValidateExcelSourcePath(
+            string? inputPath,
             string fieldName,
             out string sourcePath)
         {
@@ -33,8 +33,8 @@ namespace ExportDocManager.Api.Hosting
                 : Results.BadRequest(new ApiErrorResponse($"{fieldName}不存在：{sourcePath}"));
         }
 
-        internal static IResult ValidateExcelDestinationPath(
-            string inputPath,
+        internal static IResult? ValidateExcelDestinationPath(
+            string? inputPath,
             string fieldName,
             out string destinationPath)
         {

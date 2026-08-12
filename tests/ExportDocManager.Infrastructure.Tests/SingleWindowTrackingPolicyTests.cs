@@ -26,7 +26,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 CreateReceipt(SingleWindowReceiptBusinessStatus.Approved, now.AddMinutes(-10))
             ]);
 
-            Assert.Equal(SingleWindowReceiptBusinessStatus.Approved, primary.BusinessStatus);
+            Assert.Equal(SingleWindowReceiptBusinessStatus.Approved, Assert.IsType<SingleWindowReceiptParseResult>(primary).BusinessStatus);
         }
 
         [Fact]

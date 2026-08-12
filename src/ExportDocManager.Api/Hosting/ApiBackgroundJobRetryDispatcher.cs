@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics.CodeAnalysis;
 using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Infrastructure;
 
@@ -89,8 +90,8 @@ namespace ExportDocManager.Api.Hosting
 
         private static bool TryDeserializeRetryRequest<TRequest>(
             BackgroundJobSnapshot job,
-            out TRequest request,
-            out IResult error)
+            [NotNullWhen(true)] out TRequest? request,
+            [NotNullWhen(false)] out IResult? error)
             where TRequest : class
         {
             request = null;

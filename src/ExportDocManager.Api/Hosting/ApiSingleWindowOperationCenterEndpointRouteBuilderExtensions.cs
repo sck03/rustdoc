@@ -3,6 +3,7 @@ using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -10,7 +11,9 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapSingleWindowOperationCenterEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/single-window/operation-center", async (
+            endpoints.MapGet("/api/single-window/operation-center", async Task<Results<
+                Ok<SingleWindowOperationCenterPageResult>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ISingleWindowOperationCenterService operationCenterService,
@@ -23,7 +26,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 var result = await operationCenterService.QueryPageAsync(
@@ -37,11 +40,15 @@ namespace ExportDocManager.Api.Hosting
                     },
                     cancellationToken);
 
-                return Results.Ok(result);
+                return TypedResults.Ok(result);
             })
             .WithName("ListSingleWindowOperationCenter");
 
-            endpoints.MapGet("/api/single-window/operation-center/{batchId:int}", async (
+            endpoints.MapGet("/api/single-window/operation-center/{batchId:int}", async Task<Results<
+                Ok<SingleWindowOperationCenterDetail>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ISingleWindowOperationCenterService operationCenterService,
@@ -50,22 +57,22 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (batchId <= 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("单一窗口批次ID必须大于0。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("单一窗口批次ID必须大于0。"));
                 }
 
                 try
                 {
                     var result = await operationCenterService.GetDetailAsync(batchId, cancellationToken);
-                    return Results.Ok(result);
+                    return TypedResults.Ok(result);
                 }
                 catch (ResourceNotFoundException)
                 {
-                    return Results.NotFound();
+                    return TypedResults.NotFound();
                 }
             })
             .WithName("GetSingleWindowOperationCenterDetail");

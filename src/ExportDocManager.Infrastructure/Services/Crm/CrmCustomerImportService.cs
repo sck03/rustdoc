@@ -140,7 +140,7 @@ namespace ExportDocManager.Services.Crm
             for (int index = 0; index < headers.Count; index++)
             {
                 string normalized = NormalizeHeader(headers[index]);
-                if (aliases.TryGetValue(normalized, out string key) && !result.ContainsKey(key)) result[key] = index;
+                if (aliases.TryGetValue(normalized, out string? key) && !result.ContainsKey(key)) result[key] = index;
             }
             return result;
         }

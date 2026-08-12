@@ -12,7 +12,7 @@ namespace ExportDocManager.Services.Security
             "ExportDocManager-Dummy-Password-Verification-Only");
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly DatabaseConnectionSettings _databaseSettings;
-        private readonly ICurrentUserContext _currentUserContext;
+        private readonly ICurrentUserContext? _currentUserContext;
 
         public UserService(IDbContextFactory<AppDbContext> contextFactory)
             : this(contextFactory, new DatabaseConnectionSettings())
@@ -29,14 +29,14 @@ namespace ExportDocManager.Services.Security
         public UserService(
             IDbContextFactory<AppDbContext> contextFactory,
             DatabaseConnectionSettings databaseSettings,
-            ICurrentUserContext currentUserContext)
+            ICurrentUserContext? currentUserContext)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _databaseSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
             _currentUserContext = currentUserContext;
         }
 
-        public async Task<User> AuthenticateAsync(string username, string password)
+        public async Task<User?> AuthenticateAsync(string username, string password)
         {
             if (DatabaseModeHelper.UsesPostgreSql(_databaseSettings) &&
                 string.IsNullOrEmpty(password))
@@ -47,8 +47,7 @@ namespace ExportDocManager.Services.Security
             using var context = await _contextFactory.CreateDbContextAsync();
             var normalizedUsername = (username ?? string.Empty).Trim().ToUpperInvariant();
             var user = await context.Users
-                    .Include(item => item.PermissionTemplate)
-                    .ThenInclude(template => template.Modules)
+                    .Include(item => item.PermissionTemplate!.Modules)
                     .AsNoTracking()
                     .FirstOrDefaultAsync(u =>
                         u.IsActive && u.Username.ToUpper() == normalizedUsername);
@@ -68,13 +67,12 @@ namespace ExportDocManager.Services.Security
             return null;
         }
 
-        public async Task<User> GetUserByUsernameAsync(string username)
+        public async Task<User?> GetUserByUsernameAsync(string username)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
             var normalizedUsername = (username ?? string.Empty).Trim().ToUpperInvariant();
             var user = await context.Users
-                    .Include(item => item.PermissionTemplate)
-                    .ThenInclude(template => template.Modules)
+                    .Include(item => item.PermissionTemplate!.Modules)
                     .AsNoTracking()
                     .FirstOrDefaultAsync(item =>
                         item.IsActive && item.Username.ToUpper() == normalizedUsername);
@@ -86,7 +84,7 @@ namespace ExportDocManager.Services.Security
             return user;
         }
 
-        public async Task<User> GetActiveUserByIdAsync(
+        public async Task<User?> GetActiveUserByIdAsync(
             int userId,
             CancellationToken cancellationToken = default)
         {
@@ -97,8 +95,7 @@ namespace ExportDocManager.Services.Security
 
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var user = await context.Users
-                .Include(item => item.PermissionTemplate)
-                .ThenInclude(template => template.Modules)
+                .Include(item => item.PermissionTemplate!.Modules)
                 .AsNoTracking()
                 .SingleOrDefaultAsync(item => item.Id == userId && item.IsActive, cancellationToken);
             if (user != null)
@@ -343,7 +340,7 @@ namespace ExportDocManager.Services.Security
             }
         }
 
-        private static bool CanManageUsers(User user)
+        private static bool CanManageUsers(User? user)
         {
             return BusinessDataAccessScope.CanViewAllBusinessData(user);
         }
@@ -354,7 +351,7 @@ namespace ExportDocManager.Services.Security
             int? requestedTemplateId,
             CancellationToken cancellationToken)
         {
-            string requiredCode = string.Equals(role, UserRoleCatalog.Admin, StringComparison.OrdinalIgnoreCase)
+            string? requiredCode = string.Equals(role, UserRoleCatalog.Admin, StringComparison.OrdinalIgnoreCase)
                 ? BuiltInPermissionTemplateCatalog.Admin
                 : null;
             if (requiredCode != null)

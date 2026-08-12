@@ -213,7 +213,7 @@ export function UserManagementPanel({
       username: draft.username.trim(),
       fullName: draft.fullName.trim(),
       role: draft.role,
-      permissionTemplateId: draft.permissionTemplateId ?? undefined,
+      permissionTemplateId: draft.permissionTemplateId,
       departmentId: draft.departmentId.trim(),
       companyScope: draft.companyScope.trim(),
       isActive: draft.isActive,

@@ -32,7 +32,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
         }
 
-        public LocalPreferenceService(IAppPathProvider pathProvider, string filePath)
+        public LocalPreferenceService(IAppPathProvider pathProvider, string? filePath)
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
             _filePath = ResolvePreferencePath(pathProvider, filePath);
@@ -46,7 +46,7 @@ namespace ExportDocManager.Services.Infrastructure
                 return new T();
             }
 
-            string preferenceJson;
+            string? preferenceJson;
             lock (_stateLock)
             {
                 _preferenceStates.TryGetValue(key.Trim(), out preferenceJson);
@@ -139,7 +139,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
         }
 
-        private static Dictionary<string, string> NormalizePreferenceStates(Dictionary<string, string> states)
+        private static Dictionary<string, string> NormalizePreferenceStates(Dictionary<string, string>? states)
         {
             var normalizedStates = CreateEmptyState();
             if (states == null)
@@ -160,7 +160,7 @@ namespace ExportDocManager.Services.Infrastructure
             return normalizedStates;
         }
 
-        private static string ResolvePreferencePath(IAppPathProvider pathProvider, string filePath)
+        private static string ResolvePreferencePath(IAppPathProvider pathProvider, string? filePath)
         {
             var preferencePath = string.IsNullOrWhiteSpace(filePath)
                 ? Path.Combine(pathProvider.ConfigRoot, PreferencesFileName)

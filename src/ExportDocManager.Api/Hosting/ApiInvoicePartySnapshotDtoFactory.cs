@@ -4,7 +4,7 @@ namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiInvoiceDtoFactory
     {
-        public static Customer CreateCustomerForAutoCreation(Invoice invoice)
+        public static Customer? CreateCustomerForAutoCreation(Invoice invoice)
         {
             ArgumentNullException.ThrowIfNull(invoice);
             if (invoice.CustomerId > 0 || !HasCustomerSnapshot(invoice))
@@ -21,7 +21,7 @@ namespace ExportDocManager.Api.Hosting
             };
         }
 
-        public static Exporter CreateExporterForAutoCreation(Invoice invoice)
+        public static Exporter? CreateExporterForAutoCreation(Invoice invoice)
         {
             ArgumentNullException.ThrowIfNull(invoice);
             if (invoice.ExporterId > 0 || !HasExporterSnapshot(invoice))

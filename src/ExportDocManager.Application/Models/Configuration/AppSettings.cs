@@ -104,14 +104,14 @@ namespace ExportDocManager.Models
             set => SetProperty(ref _reportType, value);
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        protected void SetProperty<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        protected void SetProperty<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
         {
             if (EqualityComparer<T>.Default.Equals(field, value))
             {
@@ -119,7 +119,7 @@ namespace ExportDocManager.Models
             }
 
             field = value;
-            OnPropertyChanged(propertyName);
+            OnPropertyChanged(propertyName ?? string.Empty);
         }
     }
 
@@ -585,18 +585,18 @@ namespace ExportDocManager.Models
         [Category("WebDAV 设置")]
         [DisplayName("服务器地址")]
         [Description("WebDAV 服务器地址，例如 https://dav.jianguoyun.com/dav/")]
-        public string Url { get; set; }
+        public string Url { get; set; } = string.Empty;
 
         [Category("WebDAV 设置")]
         [DisplayName("用户名")]
         [Description("WebDAV 用户名")]
-        public string UserName { get; set; }
+        public string UserName { get; set; } = string.Empty;
 
         [Category("WebDAV 设置")]
         [DisplayName("密码/应用密码")]
         [Description("WebDAV 密码或应用专用密码")]
         [PasswordPropertyText(true)]
-        public string Password { get; set; }
+        public string Password { get; set; } = string.Empty;
 
         [Category("WebDAV 设置")]
         [DisplayName("启用自动备份")]

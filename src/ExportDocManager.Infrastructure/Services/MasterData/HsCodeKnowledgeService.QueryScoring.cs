@@ -111,7 +111,7 @@ namespace ExportDocManager.Services.MasterData
                 (value ?? string.Empty).Replace("人棉", "粘胶", StringComparison.OrdinalIgnoreCase);
         }
 
-        internal static string NormalizeSearchText(string value)
+        internal static string NormalizeSearchText(string? value)
             => HsCodeSearchTextNormalizer.Normalize(value);
 
         private static int CountIntersection(HashSet<string> left, HashSet<string> right)
@@ -129,7 +129,7 @@ namespace ExportDocManager.Services.MasterData
             return count;
         }
 
-        internal static string BuildFingerprint(params string[] values) =>
+        internal static string BuildFingerprint(params string?[] values) =>
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("|", values.Select(value => (value ?? string.Empty).Trim().ToUpperInvariant())))));
 
     }

@@ -3,6 +3,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Security;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -10,7 +11,9 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapPayeeMasterDataEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/master-data/payees", async (
+            endpoints.MapGet("/api/master-data/payees", async Task<Results<
+                Ok<IReadOnlyList<ApiPayeeDto>>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPayeeReadRepository repository,
@@ -19,18 +22,20 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 var rows = await repository.QueryAsync(
                     new PayeeReadQuery { Keyword = keyword ?? string.Empty },
                     cancellationToken);
 
-                return Results.Ok(ApiMasterDataDtoFactory.FromPayees(rows));
+                return TypedResults.Ok(ApiMasterDataDtoFactory.FromPayees(rows));
             })
             .WithName("ListPayees");
 
-            endpoints.MapGet("/api/master-data/payees/page", async (
+            endpoints.MapGet("/api/master-data/payees/page", async Task<Results<
+                Ok<ApiPagedResponse<ApiPayeeDto>>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPayeeReadRepository repository,
@@ -39,18 +44,22 @@ namespace ExportDocManager.Api.Hosting
                 string? keyword,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return TypedResults.Unauthorized();
                 var page = await repository.QueryPageAsync(new PayeeReadQuery
                 {
                     PageNumber = pageNumber,
                     PageSize = pageSize,
                     Keyword = keyword ?? string.Empty
                 }, cancellationToken);
-                return Results.Ok(ApiMasterDataDtoFactory.FromPage(page, ApiMasterDataDtoFactory.FromPayees));
+                return TypedResults.Ok(ApiMasterDataDtoFactory.FromPage(page, ApiMasterDataDtoFactory.FromPayees));
             })
             .WithName("ListPayeesPage");
 
-            endpoints.MapGet("/api/master-data/payees/{id:int}", async (
+            endpoints.MapGet("/api/master-data/payees/{id:int}", async Task<Results<
+                Ok<ApiPayeeDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPayeeReadRepository repository,
@@ -59,7 +68,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -69,12 +78,15 @@ namespace ExportDocManager.Api.Hosting
 
                 var payee = await FindPayeeByIdAsync(repository, id, cancellationToken);
                 return payee == null
-                    ? Results.NotFound()
-                    : Results.Ok(ApiMasterDataDtoFactory.FromPayee(payee));
+                    ? TypedResults.NotFound()
+                    : TypedResults.Ok(ApiMasterDataDtoFactory.FromPayee(payee));
             })
             .WithName("GetPayee");
 
-            endpoints.MapPost("/api/master-data/payees", async (
+            endpoints.MapPost("/api/master-data/payees", async Task<Results<
+                Created<ApiPayeeDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPayeeService payeeService,
@@ -84,17 +96,17 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (request == null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("收款对象请求体不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("收款对象请求体不能为空。"));
                 }
 
                 if (request.Id > 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("新增收款对象不能包含已有ID。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("新增收款对象不能包含已有ID。"));
                 }
 
                 Payee payee;
@@ -111,13 +123,18 @@ namespace ExportDocManager.Api.Hosting
 
                 int savedId = await payeeService.SavePayeeAsync(payee, cancellationToken);
                 var saved = await FindPayeeByIdAsync(repository, savedId, cancellationToken) ?? payee;
-                return Results.Created(
+                return TypedResults.Created(
                     $"/api/master-data/payees/{savedId}",
                     ApiMasterDataDtoFactory.FromPayee(saved));
             })
-            .WithName("CreatePayee");
+            .WithName("CreatePayee")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
-            endpoints.MapPut("/api/master-data/payees/{id:int}", async (
+            endpoints.MapPut("/api/master-data/payees/{id:int}", async Task<Results<
+                Ok<ApiPayeeDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPayeeService payeeService,
@@ -128,7 +145,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -138,17 +155,17 @@ namespace ExportDocManager.Api.Hosting
 
                 if (request == null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("收款对象请求体不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("收款对象请求体不能为空。"));
                 }
 
                 if (request.Id > 0 && request.Id != id)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("请求体收款对象ID与路径ID不一致。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("请求体收款对象ID与路径ID不一致。"));
                 }
 
                 if (await FindPayeeByIdAsync(repository, id, cancellationToken) == null)
                 {
-                    return Results.NotFound();
+                    return TypedResults.NotFound();
                 }
 
                 Payee payee;
@@ -164,11 +181,16 @@ namespace ExportDocManager.Api.Hosting
 
                 int savedId = await payeeService.SavePayeeAsync(payee, cancellationToken);
                 var saved = await FindPayeeByIdAsync(repository, savedId, cancellationToken) ?? payee;
-                return Results.Ok(ApiMasterDataDtoFactory.FromPayee(saved));
+                return TypedResults.Ok(ApiMasterDataDtoFactory.FromPayee(saved));
             })
-            .WithName("UpdatePayee");
+            .WithName("UpdatePayee")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
-            endpoints.MapDelete("/api/master-data/payees/{id:int}", async (
+            endpoints.MapDelete("/api/master-data/payees/{id:int}", async Task<Results<
+                Ok<ApiCommandResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPayeeService payeeService,
@@ -178,7 +200,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -188,13 +210,14 @@ namespace ExportDocManager.Api.Hosting
 
                 if (await FindPayeeByIdAsync(repository, id, cancellationToken) == null)
                 {
-                    return Results.NotFound();
+                    return TypedResults.NotFound();
                 }
 
                 await payeeService.DeletePayeeAsync(id, cancellationToken);
-                return Results.Ok(new ApiCommandResponse(true, "收款对象已删除。"));
+                return TypedResults.Ok(new ApiCommandResponse(true, "收款对象已删除。"));
             })
-            .WithName("DeletePayee");
+            .WithName("DeletePayee")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
         }
     }
 }

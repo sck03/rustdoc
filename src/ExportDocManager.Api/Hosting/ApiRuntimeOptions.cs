@@ -84,7 +84,7 @@ namespace ExportDocManager.Api.Hosting
             };
         }
 
-        private static string ReadOption(IReadOnlyList<string> args, string optionName)
+        private static string? ReadOption(IReadOnlyList<string> args, string optionName)
         {
             for (int index = 0; index < args.Count; index++)
             {

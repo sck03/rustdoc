@@ -41,7 +41,9 @@ namespace ExportDocManager.Api.Hosting
                     StoragePolicy = EmailToolStoragePolicy
                 });
             })
-            .WithName("GetEmailToolStatus");
+            .WithName("GetEmailToolStatus")
+            .Produces<ApiEmailStatusResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapPost("/api/tools/email/server-suggestion", (
                 HttpContext context,
@@ -81,7 +83,10 @@ namespace ExportDocManager.Api.Hosting
                     StoragePolicy = EmailServerSuggestionStoragePolicy
                 });
             })
-            .WithName("SuggestEmailServerConfig");
+            .WithName("SuggestEmailServerConfig")
+            .Produces<ApiEmailServerSuggestionResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapPost("/api/tools/email/send", async (
                 HttpContext context,
@@ -102,6 +107,11 @@ namespace ExportDocManager.Api.Hosting
                 if (validation != null)
                 {
                     return validation;
+                }
+
+                if (normalizedRequest is null)
+                {
+                    return Results.BadRequest(new ApiErrorResponse("邮件发送请求体无效。"));
                 }
 
                 await settingsService.LoadAsync();
@@ -144,7 +154,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteInfrastructureFailure("邮件发送服务暂时不可用，请稍后重试。", ex);
                 }
             })
-            .WithName("SendEmail");
+            .WithName("SendEmail")
+            .Produces<ApiEmailSendResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/tools/email/test-connection", async (
                 HttpContext context,
@@ -200,13 +215,17 @@ namespace ExportDocManager.Api.Hosting
                     return WriteInfrastructureFailure("邮件连接服务暂时不可用，请稍后重试。", ex);
                 }
             })
-            .WithName("TestEmailConnection");
+            .WithName("TestEmailConnection")
+            .Produces<ApiEmailTestResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
         }
 
-        private static IResult ValidateEmailSendRequest(
-            ApiEmailSendRequest request,
+        private static IResult? ValidateEmailSendRequest(
+            ApiEmailSendRequest? request,
             bool allowAttachmentPaths,
-            out ApiEmailSendRequest normalizedRequest)
+            out ApiEmailSendRequest? normalizedRequest)
         {
             normalizedRequest = null;
 

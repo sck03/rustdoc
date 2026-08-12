@@ -36,7 +36,7 @@ namespace ExportDocManager.Services.MasterData
         public string Name => "i5a6";
         public int Priority => 100;
 
-        public bool CanHandleDetailUrl(string detailUrl) => IsTrustedUri(detailUrl);
+        public bool CanHandleDetailUrl(string? detailUrl) => IsTrustedUri(detailUrl);
 
         public async Task<IReadOnlyList<HsCode>> SearchAsync(string keyword, CancellationToken cancellationToken = default)
         {
@@ -91,14 +91,16 @@ namespace ExportDocManager.Services.MasterData
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(record);
-            if (!CanHandleDetailUrl(record.Item?.DetailUrl))
+            var item = record.Item ?? throw new ServiceValidationException("i5a6 详情记录缺少 HS 编码对象。");
+            string? detailUrl = item.DetailUrl;
+            if (string.IsNullOrWhiteSpace(detailUrl) || !CanHandleDetailUrl(detailUrl))
                 throw new ArgumentException("i5a6 Provider 只能处理受信任的 HTTPS 详情地址。", nameof(record));
             try
             {
-                string html = await GetHtmlWithRetryAsync(record.Item.DetailUrl, cancellationToken).ConfigureAwait(false);
+                string html = await GetHtmlWithRetryAsync(detailUrl, cancellationToken).ConfigureAwait(false);
                 return I5a6PageParser.ParseDetailPage(
                     html,
-                    record.Item,
+                    item,
                     record.InstanceCount,
                     record.EvidenceUrl,
                     DateTimeOffset.UtcNow);
@@ -197,7 +199,10 @@ namespace ExportDocManager.Services.MasterData
             HsCodeRemoteSearchRecord record,
             CancellationToken cancellationToken)
         {
-            await page.GotoAsync(record.Item.DetailUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded })
+            var item = record.Item ?? throw new ServiceValidationException("i5a6 详情记录缺少 HS 编码对象。");
+            string detailUrl = item.DetailUrl
+                ?? throw new ServiceValidationException("i5a6 详情记录缺少受信任的详情地址。");
+            await page.GotoAsync(detailUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded })
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
             EnsureTrustedPageUrl(page.Url);
@@ -205,7 +210,7 @@ namespace ExportDocManager.Services.MasterData
             string html = await page.ContentAsync()
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
-            return I5a6PageParser.ParseDetailPage(html, record.Item, record.InstanceCount, record.EvidenceUrl, DateTimeOffset.UtcNow);
+            return I5a6PageParser.ParseDetailPage(html, item, record.InstanceCount, record.EvidenceUrl, DateTimeOffset.UtcNow);
         }
 
         private async Task<string> GetHtmlWithRetryAsync(string url, CancellationToken cancellationToken)
@@ -215,7 +220,7 @@ namespace ExportDocManager.Services.MasterData
                 throw new ServiceValidationException("i5a6 请求地址必须使用受信任的 HTTPS 主机和默认端口。");
             }
 
-            Exception lastError = null;
+            Exception? lastError = null;
             for (int attempt = 1; attempt <= 2; attempt++)
             {
                 try
@@ -276,9 +281,9 @@ namespace ExportDocManager.Services.MasterData
             }
         }
 
-        internal static bool IsTrustedUri(string value)
+        internal static bool IsTrustedUri(string? value)
         {
-            return Uri.TryCreate(value, UriKind.Absolute, out Uri uri) &&
+            return Uri.TryCreate(value, UriKind.Absolute, out Uri? uri) &&
                    uri.Scheme == Uri.UriSchemeHttps &&
                    string.Equals(uri.Host, "www.i5a6.com", StringComparison.OrdinalIgnoreCase) &&
                    (uri.IsDefaultPort || uri.Port == 443) &&

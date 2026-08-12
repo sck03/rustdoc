@@ -13,7 +13,7 @@ namespace ExportDocManager.Services.Data
 {
     public partial class ExcelImportService
     {
-        private static (string Name, string Address)? GetUsablePartyBlock(string value)
+        private static (string Name, string Address)? GetUsablePartyBlock(string? value)
         {
             var block = SplitPartyNameAndAddress(value);
             string name = NormalizeExcelTextBlock(block.Name);
@@ -309,7 +309,7 @@ namespace ExportDocManager.Services.Data
         }
 
 
-        private static (string Name, string Address) SplitPartyNameAndAddress(string value)
+        private static (string Name, string Address) SplitPartyNameAndAddress(string? value)
         {
             string normalized = NormalizeExcelTextBlock(value);
             if (string.IsNullOrWhiteSpace(normalized))

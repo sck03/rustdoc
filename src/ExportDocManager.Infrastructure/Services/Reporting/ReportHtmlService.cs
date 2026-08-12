@@ -19,8 +19,8 @@ namespace ExportDocManager.Services.Reporting
 
         private readonly SemaphoreSlim _templateConfigSemaphore = new(1, 1);
         private readonly Lock _configLock = new();
-        private Dictionary<ReportDocumentType, string> _templatePathCache;
-        private List<ReportTemplateConfig> _templateConfigs;
+        private Dictionary<ReportDocumentType, string> _templatePathCache = [];
+        private List<ReportTemplateConfig> _templateConfigs = [];
         private bool _templateConfigLoaded;
 
         public ReportHtmlService(
@@ -119,7 +119,7 @@ namespace ExportDocManager.Services.Reporting
         public async Task<ReportHtmlRenderResult> RenderInvoiceReportAsync(
             int invoiceId,
             ReportDocumentType reportType,
-            string templatePath = null,
+            string? templatePath = null,
             bool withSeal = true,
             CancellationToken cancellationToken = default)
         {
@@ -155,7 +155,7 @@ namespace ExportDocManager.Services.Reporting
         public async Task<ReportHtmlRenderResult> RenderInvoiceReportDraftAsync(
             Invoice invoice,
             ReportDocumentType reportType,
-            string templatePath = null,
+            string? templatePath = null,
             bool withSeal = true,
             CancellationToken cancellationToken = default)
         {
@@ -181,7 +181,7 @@ namespace ExportDocManager.Services.Reporting
 
         public async Task<ReportHtmlRenderResult> RenderPaymentVoucherAsync(
             int paymentId,
-            string templatePath = null,
+            string? templatePath = null,
             CancellationToken cancellationToken = default)
         {
             if (paymentId <= 0)
@@ -214,7 +214,7 @@ namespace ExportDocManager.Services.Reporting
 
         public async Task<ReportHtmlRenderResult> RenderPaymentVoucherDraftAsync(
             Payment payment,
-            string templatePath = null,
+            string? templatePath = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(payment);
@@ -348,7 +348,7 @@ namespace ExportDocManager.Services.Reporting
 
         private async Task<string> ResolveTemplatePathAsync(
             ReportDocumentType reportType,
-            string templatePath,
+            string? templatePath,
             CancellationToken cancellationToken)
         {
             var resolvedTemplatePath = string.IsNullOrWhiteSpace(templatePath)
@@ -385,7 +385,7 @@ namespace ExportDocManager.Services.Reporting
 
         private async Task<(string Path, string Content)> LoadTemplateAsync(
             ReportDocumentType reportType,
-            string templatePath,
+            string? templatePath,
             CancellationToken cancellationToken)
         {
             if (TryParseUserTemplateId(templatePath, out int userTemplateId))
@@ -401,7 +401,7 @@ namespace ExportDocManager.Services.Reporting
                     throw new ResourceNotFoundException("用户报表模板不存在、已停用或无权访问。");
                 }
 
-                return (templatePath, template.ContentHtml ?? string.Empty);
+                return ($"user-template:{userTemplateId}", template.ContentHtml ?? string.Empty);
             }
 
             string resolvedPath = await ResolveTemplatePathAsync(reportType, templatePath, cancellationToken).ConfigureAwait(false);
@@ -409,7 +409,7 @@ namespace ExportDocManager.Services.Reporting
             return (resolvedPath, content);
         }
 
-        private static bool TryParseUserTemplateId(string templatePath, out int id)
+        private static bool TryParseUserTemplateId(string? templatePath, out int id)
         {
             const string prefix = "user-template:";
             id = 0;
@@ -473,7 +473,7 @@ namespace ExportDocManager.Services.Reporting
         {
             await EnsureTemplateConfigLoadedAsync(cancellationToken).ConfigureAwait(false);
 
-            string configuredPath = null;
+            string? configuredPath = null;
             lock (_configLock)
             {
                 if (_templatePathCache != null && _templatePathCache.TryGetValue(reportType, out var path))

@@ -1,6 +1,7 @@
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -8,27 +9,33 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapSingleWindowProducerProfileEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/single-window/coo/producer-profiles", async (
+            endpoints.MapGet("/api/single-window/coo/producer-profiles", async Task<Results<
+                Ok<ApiCustomsCooProducerProfileListResponse>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomsCooProducerProfileService producerProfileService,
+                string? keyword,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
-                string keyword = context.Request.Query["keyword"].ToString();
                 var profiles = await producerProfileService
-                    .SearchAsync(keyword, cancellationToken)
+                    .SearchAsync(keyword ?? string.Empty, cancellationToken)
                     .ConfigureAwait(false);
 
-                return Results.Ok(ApiSingleWindowDtoFactory.FromCustomsCooProducerProfileList(profiles));
+                return TypedResults.Ok(ApiSingleWindowDtoFactory.FromCustomsCooProducerProfileList(profiles));
             })
             .WithName("ListCustomsCooProducerProfiles");
 
-            endpoints.MapGet("/api/single-window/coo/producer-profiles/{id:int}", async (
+            endpoints.MapGet("/api/single-window/coo/producer-profiles/{id:int}", async Task<Results<
+                Ok<ApiCustomsCooProducerProfileResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound<ApiErrorResponse>>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomsCooProducerProfileService producerProfileService,
@@ -37,22 +44,25 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("生产企业资料 ID 必须大于 0。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("生产企业资料 ID 必须大于 0。"));
                 }
 
                 var profile = await producerProfileService.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
                 return profile == null
-                    ? Results.NotFound(new ApiErrorResponse("生产企业资料不存在。"))
-                    : Results.Ok(ApiSingleWindowDtoFactory.FromCustomsCooProducerProfileResponse(profile));
+                    ? TypedResults.NotFound(new ApiErrorResponse("生产企业资料不存在。"))
+                    : TypedResults.Ok(ApiSingleWindowDtoFactory.FromCustomsCooProducerProfileResponse(profile));
             })
             .WithName("GetCustomsCooProducerProfile");
 
-            endpoints.MapPost("/api/single-window/coo/producer-profiles", async (
+            endpoints.MapPost("/api/single-window/coo/producer-profiles", async Task<Results<
+                Ok<ApiCustomsCooProducerProfileSaveResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomsCooProducerProfileService producerProfileService,
@@ -61,26 +71,37 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
-                var validationErrors = ValidateCustomsCooProducerProfile(request?.Profile);
+                ApiCustomsCooProducerProfileInputDto? profile = request?.Profile;
+                var validationErrors = ValidateCustomsCooProducerProfile(profile);
                 if (validationErrors.Count > 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("生产企业资料校验失败：" + string.Join("；", validationErrors)));
+                    return TypedResults.BadRequest(new ApiErrorResponse("生产企业资料校验失败：" + string.Join("；", validationErrors)));
+                }
+
+                if (profile is null)
+                {
+                    return TypedResults.BadRequest(new ApiErrorResponse("生产企业资料请求体不能为空。"));
                 }
 
                 var saved = await producerProfileService.SaveOrUpdateAsync(
-                    ApiSingleWindowDtoFactory.ToCustomsCooProducerProfileInput(request.Profile),
+                    ApiSingleWindowDtoFactory.ToCustomsCooProducerProfileInput(profile),
                     cancellationToken).ConfigureAwait(false);
 
-                return Results.Ok(ApiSingleWindowDtoFactory.FromSavedCustomsCooProducerProfile(
+                return TypedResults.Ok(ApiSingleWindowDtoFactory.FromSavedCustomsCooProducerProfile(
                     saved,
                     "生产企业资料已保存，后续可直接回填到 COO 商品行。"));
             })
-            .WithName("CreateCustomsCooProducerProfile");
+            .WithName("CreateCustomsCooProducerProfile")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
-            endpoints.MapPut("/api/single-window/coo/producer-profiles/{id:int}", async (
+            endpoints.MapPut("/api/single-window/coo/producer-profiles/{id:int}", async Task<Results<
+                Ok<ApiCustomsCooProducerProfileSaveResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound<ApiErrorResponse>>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomsCooProducerProfileService producerProfileService,
@@ -90,39 +111,55 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("生产企业资料 ID 必须大于 0。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("生产企业资料 ID 必须大于 0。"));
                 }
 
-                var validationErrors = ValidateCustomsCooProducerProfile(request?.Profile);
+                ApiCustomsCooProducerProfileInputDto? profile = request?.Profile;
+                var validationErrors = ValidateCustomsCooProducerProfile(profile);
                 if (validationErrors.Count > 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("生产企业资料校验失败：" + string.Join("；", validationErrors)));
+                    return TypedResults.BadRequest(new ApiErrorResponse("生产企业资料校验失败：" + string.Join("；", validationErrors)));
+                }
+
+                if (profile is null)
+                {
+                    return TypedResults.BadRequest(new ApiErrorResponse("生产企业资料请求体不能为空。"));
                 }
 
                 var existing = await producerProfileService.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
                 if (existing == null)
                 {
-                    return Results.NotFound(new ApiErrorResponse("生产企业资料不存在。"));
+                    return TypedResults.NotFound(new ApiErrorResponse("生产企业资料不存在。"));
                 }
 
                 int savedId = await producerProfileService.SaveAsync(
-                    ApiSingleWindowDtoFactory.ToCustomsCooProducerProfileInput(request.Profile),
+                    ApiSingleWindowDtoFactory.ToCustomsCooProducerProfileInput(profile),
                     id,
                     cancellationToken).ConfigureAwait(false);
                 var updated = await producerProfileService.GetByIdAsync(savedId, cancellationToken).ConfigureAwait(false);
 
-                return Results.Ok(ApiSingleWindowDtoFactory.FromSavedCustomsCooProducerProfile(
+                if (updated is null)
+                {
+                    return TypedResults.NotFound(new ApiErrorResponse("已保存的生产企业资料不存在。"));
+                }
+
+                return TypedResults.Ok(ApiSingleWindowDtoFactory.FromSavedCustomsCooProducerProfile(
                     updated,
                     "生产企业资料已更新。"));
             })
-            .WithName("UpdateCustomsCooProducerProfile");
+            .WithName("UpdateCustomsCooProducerProfile")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
-            endpoints.MapDelete("/api/single-window/coo/producer-profiles/{id:int}", async (
+            endpoints.MapDelete("/api/single-window/coo/producer-profiles/{id:int}", async Task<Results<
+                Ok<ApiCommandResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound<ApiErrorResponse>>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomsCooProducerProfileService producerProfileService,
@@ -131,24 +168,25 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("生产企业资料 ID 必须大于 0。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("生产企业资料 ID 必须大于 0。"));
                 }
 
                 bool deleted = await producerProfileService.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
                 return deleted
-                    ? Results.Ok(new ApiCommandResponse(true, "生产企业资料已删除。"))
-                    : Results.NotFound(new ApiErrorResponse("生产企业资料不存在。"));
+                    ? TypedResults.Ok(new ApiCommandResponse(true, "生产企业资料已删除。"))
+                    : TypedResults.NotFound(new ApiErrorResponse("生产企业资料不存在。"));
             })
-            .WithName("DeleteCustomsCooProducerProfile");
+            .WithName("DeleteCustomsCooProducerProfile")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
         }
 
         private static IReadOnlyList<string> ValidateCustomsCooProducerProfile(
-            ApiCustomsCooProducerProfileInputDto profile)
+            ApiCustomsCooProducerProfileInputDto? profile)
         {
             var errors = new List<string>();
             if (profile == null)
@@ -196,7 +234,7 @@ namespace ExportDocManager.Api.Hosting
 
         private static void AddMaxLengthError(
             ICollection<string> errors,
-            string value,
+            string? value,
             int maxLength,
             string displayName)
         {

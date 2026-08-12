@@ -16,7 +16,7 @@ namespace ExportDocManager.Models.DTOs
 
         public List<ExcelImportFieldAnalysis> Fields { get; set; } = new();
 
-        public ExcelImportItemTableAnalysis ItemTable { get; set; }
+        public ExcelImportItemTableAnalysis? ItemTable { get; set; }
 
         public List<ExcelImportAnalysisIssue> Issues { get; set; } = new();
     }

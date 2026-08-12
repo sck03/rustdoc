@@ -4,7 +4,7 @@ namespace ExportDocManager.Utils
 {
     public static class HsCodeTextHelper
     {
-        public static string NormalizeCode(string code)
+        public static string NormalizeCode(string? code)
         {
             if (string.IsNullOrWhiteSpace(code))
             {
@@ -23,7 +23,7 @@ namespace ExportDocManager.Utils
             return builder.ToString();
         }
 
-        public static string NormalizeCodeSearchKeyword(string keyword)
+        public static string NormalizeCodeSearchKeyword(string? keyword)
         {
             if (string.IsNullOrWhiteSpace(keyword))
             {
@@ -60,7 +60,7 @@ namespace ExportDocManager.Utils
                 : string.Empty;
         }
 
-        public static bool HasSameCode(string left, string right)
+        public static bool HasSameCode(string? left, string? right)
         {
             var normalizedLeft = NormalizeCode(left);
             var normalizedRight = NormalizeCode(right);
@@ -69,13 +69,13 @@ namespace ExportDocManager.Utils
                    string.Equals(normalizedLeft, normalizedRight, StringComparison.OrdinalIgnoreCase);
         }
 
-        public static bool IsExpired(HsCode hsCode)
+        public static bool IsExpired(HsCode? hsCode)
         {
             return hsCode != null &&
                    (IsExpiredText(hsCode.Name) || IsExpiredText(hsCode.Code));
         }
 
-        public static bool IsExpiredText(string value)
+        public static bool IsExpiredText(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
             {

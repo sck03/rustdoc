@@ -38,7 +38,7 @@ namespace ExportDocManager.Api.Hosting
             };
         }
 
-        private static string Shrink(string value)
+        private static string Shrink(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
             {

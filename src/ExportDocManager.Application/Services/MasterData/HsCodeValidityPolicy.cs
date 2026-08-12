@@ -8,7 +8,7 @@ namespace ExportDocManager.Services.MasterData
         public const string ActiveStatus = "Active";
         public const string ReferenceOnlyStatus = "ReferenceOnly";
 
-        public static bool IsTrustedActive(HsCode item)
+        public static bool IsTrustedActive(HsCode? item)
         {
             return item != null &&
                 string.Equals(item.Status, ActiveStatus, StringComparison.OrdinalIgnoreCase) &&

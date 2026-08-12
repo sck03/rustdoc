@@ -126,7 +126,7 @@ namespace ExportDocManager.Api.Tests
             ApiIntegrationTestHarness harness = await ApiIntegrationTestHarness.StartAsync(
                 "edm-api-backup-restore",
                 "api-backup-restore.db");
-            ApiIntegrationTestHarness restartedHarness = null;
+            ApiIntegrationTestHarness? restartedHarness = null;
 
             try
             {

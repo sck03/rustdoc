@@ -1,4 +1,5 @@
 using ExportDocManager.Services.SingleWindow;
+using ExportDocManager.ViewModels;
 
 namespace ExportDocManager.Application.Tests
 {
@@ -34,7 +35,7 @@ namespace ExportDocManager.Application.Tests
             Assert.Equal(CustomsCooEditorFieldKind.EditableComboBox, issuingAuthority.FieldKind);
             Assert.Equal(CustomsCooEditorFieldKind.ComboBox, tradeMode.FieldKind);
             Assert.NotNull(issuingAuthority.Options);
-            Assert.NotEmpty(tradeMode.Options);
+            Assert.NotEmpty(Assert.IsAssignableFrom<IReadOnlyList<SelectionOption<string>>>(tradeMode.Options));
         }
 
         [Fact]

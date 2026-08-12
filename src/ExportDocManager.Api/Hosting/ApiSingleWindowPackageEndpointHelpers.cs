@@ -334,8 +334,8 @@ namespace ExportDocManager.Api.Hosting
             ISingleWindowHandoffPackageService handoffPackageService,
             IAppPathProvider pathProvider,
             SingleWindowPackageType packageType,
-            string fileName,
-            string workingDirectory,
+            string? fileName,
+            string? workingDirectory,
             bool keepWorkingDirectory,
             CancellationToken cancellationToken)
         {

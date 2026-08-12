@@ -40,7 +40,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             try
             {
-                if (BrowserCdpEndpointPolicy.TryResolve(out Uri endpoint))
+                if (BrowserCdpEndpointPolicy.TryResolve(out Uri? endpoint))
                 {
                     return new RuntimeDependencyDiagnostic(
                         "browser-automation",
@@ -79,7 +79,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             try
             {
-                if (BrowserCdpEndpointPolicy.TryResolve(out Uri endpoint))
+                if (BrowserCdpEndpointPolicy.TryResolve(out Uri? endpoint))
                 {
                     return new RuntimeDependencyDiagnostic(
                         "report-renderer",

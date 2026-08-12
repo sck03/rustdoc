@@ -10,7 +10,7 @@ namespace ExportDocManager.Models
 
         [DisplayName("SMTP 服务器")]
         [Description("邮件服务器地址，例如 smtp.qq.com")]
-        public string SmtpHost { get; set; }
+        public string SmtpHost { get; set; } = string.Empty;
 
         [DisplayName("SMTP 端口")]
         [Description("邮件服务器端口，通常为 587 (TLS) 或 465 (SSL)")]
@@ -18,12 +18,12 @@ namespace ExportDocManager.Models
 
         [DisplayName("用户名/邮箱")]
         [Description("登录邮箱的用户名或完整邮箱地址")]
-        public string UserName { get; set; }
+        public string UserName { get; set; } = string.Empty;
 
         [DisplayName("密码/授权码")]
         [Description("邮箱密码或应用授权码 (推荐使用授权码)")]
         [PasswordPropertyText(true)]
-        public string Password { get; set; }
+        public string Password { get; set; } = string.Empty;
 
         [DisplayName("启用 SSL")]
         [Description("是否启用安全连接 (SSL/TLS)")]
@@ -31,11 +31,11 @@ namespace ExportDocManager.Models
 
         [DisplayName("发件人地址")]
         [Description("邮件显示的发送方地址")]
-        public string FromAddress { get; set; }
+        public string FromAddress { get; set; } = string.Empty;
 
         [DisplayName("发件人名称")]
         [Description("邮件显示的发送方名称，例如 '单证部'")]
-        public string FromDisplayName { get; set; }
+        public string FromDisplayName { get; set; } = string.Empty;
 
         [DisplayName("单据邮件默认主题")]
         [Description("从发票页发送单据附件时的默认主题，支持占位符：{InvoiceNo} {Customer} {Date}")]

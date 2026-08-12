@@ -102,7 +102,7 @@ namespace ExportDocManager.Services.Suppliers
             }, cancellationToken);
         }
 
-        public async Task<byte[]> ExportAsync(string keyword, string status, CancellationToken cancellationToken = default)
+        public async Task<byte[]> ExportAsync(string? keyword, string? status, CancellationToken cancellationToken = default)
         {
             keyword = Clean(keyword); status = Clean(status);
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
@@ -156,12 +156,12 @@ namespace ExportDocManager.Services.Suppliers
             for (int index = 0; index < headers.Count; index++)
             {
                 string header = new string((headers[index] ?? string.Empty).Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
-                if (aliases.TryGetValue(header, out string key) && !result.ContainsKey(key)) result[key] = index;
+                if (aliases.TryGetValue(header, out string? key) && !result.ContainsKey(key)) result[key] = index;
             }
             return result;
         }
         private static string Read(IReadOnlyList<string> row, IReadOnlyDictionary<string, int> columns, string key) => columns.TryGetValue(key, out int index) && index < row.Count ? Clean(row[index]) : string.Empty;
         private static string Default(string value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value;
-        private static string Clean(string value) => (value ?? string.Empty).Trim();
+        private static string Clean(string? value) => (value ?? string.Empty).Trim();
     }
 }

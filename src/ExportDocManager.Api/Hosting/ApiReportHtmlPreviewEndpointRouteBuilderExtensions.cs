@@ -73,7 +73,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("PreviewInvoiceReportHtml");
+            .WithName("PreviewInvoiceReportHtml")
+            .Produces<ApiReportHtmlPreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/reports/invoices/draft/html-preview", async (
                 HttpContext context,
@@ -137,7 +142,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("PreviewInvoiceReportDraftHtml");
+            .WithName("PreviewInvoiceReportDraftHtml")
+            .Produces<ApiReportHtmlPreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
         }
 
         private static void MapInvoiceDocumentPackageHtmlPreviewEndpoints(this IEndpointRouteBuilder endpoints)
@@ -210,7 +220,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("PreviewInvoiceDocumentPackageHtml");
+            .WithName("PreviewInvoiceDocumentPackageHtml")
+            .Produces<ApiInvoiceDocumentPackagePreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
         }
 
         private static void MapPaymentDraftReportHtmlPreviewEndpoints(this IEndpointRouteBuilder endpoints)
@@ -265,7 +280,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("PreviewPaymentVoucherDraftHtml");
+            .WithName("PreviewPaymentVoucherDraftHtml")
+            .Produces<ApiPaymentReportHtmlPreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
         }
 
         private static void MapPaymentReportHtmlPreviewEndpoints(this IEndpointRouteBuilder endpoints)
@@ -320,7 +340,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("PreviewPaymentVoucherHtml");
+            .WithName("PreviewPaymentVoucherHtml")
+            .Produces<ApiPaymentReportHtmlPreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
         }
     }
 }

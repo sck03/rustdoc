@@ -4,7 +4,7 @@ namespace ExportDocManager.Services.Infrastructure
 {
     internal static class ManagedDataPathResolver
     {
-        public static string NormalizeStoredPath(string storedPath, string requiredTopLevelDirectory)
+        public static string NormalizeStoredPath(string? storedPath, string requiredTopLevelDirectory)
         {
             if (string.IsNullOrWhiteSpace(storedPath))
             {
@@ -42,7 +42,7 @@ namespace ExportDocManager.Services.Infrastructure
 
         public static string ResolveStoredPath(
             IAppPathProvider pathProvider,
-            string storedPath,
+             string? storedPath,
             string allowedRoot,
             string requiredTopLevelDirectory)
         {

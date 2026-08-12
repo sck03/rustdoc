@@ -9,7 +9,7 @@ namespace ExportDocManager.Services.MasterData
     public sealed partial class HsCodeKnowledgeService
     {
         public async Task<IReadOnlyList<HsCodeDeclarationExample>> ListExamplesAsync(
-            string keyword, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+            string? keyword, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
         {
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             var query = BuildExampleQuery(context, keyword);
@@ -20,7 +20,7 @@ namespace ExportDocManager.Services.MasterData
                 .Take(normalizedPageSize).ToListAsync(cancellationToken);
         }
 
-        public async Task<int> CountExamplesAsync(string keyword, CancellationToken cancellationToken = default)
+        public async Task<int> CountExamplesAsync(string? keyword, CancellationToken cancellationToken = default)
         {
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             return await BuildExampleQuery(context, keyword).CountAsync(cancellationToken);

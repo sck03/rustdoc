@@ -10,12 +10,17 @@ namespace ExportDocManager.Api.Hosting
         {
             if (!TryDeserializeRetryRequest<ApiReportPdfJobRetryRequest>(sourceJob, out var reportRequest, out var reportError))
             {
-                return reportError;
+                return reportError ?? Results.BadRequest(new ApiErrorResponse("任务重试描述无效。"));
+            }
+
+            if (reportRequest is null)
+            {
+                return Results.BadRequest(new ApiErrorResponse("任务重试描述无效。"));
             }
 
             var reportValidation = ApiEndpointRouteBuilderExtensions.ValidateReportPdfRequest(
-                reportRequest?.InvoiceId ?? 0,
-                reportRequest?.Body,
+                reportRequest.InvoiceId,
+                reportRequest.Body,
                 out var reportType,
                 out string reportDestinationPath);
             if (reportValidation != null)
@@ -42,7 +47,7 @@ namespace ExportDocManager.Api.Hosting
         {
             if (!TryDeserializeRetryRequest<ApiInvoiceReportZipRequest>(sourceJob, out var zipRequest, out var zipError))
             {
-                return zipError;
+                return zipError ?? Results.BadRequest(new ApiErrorResponse("任务重试描述无效。"));
             }
 
             var zipValidation = ApiEndpointRouteBuilderExtensions.ValidateInvoiceReportZipRequest(
@@ -77,7 +82,7 @@ namespace ExportDocManager.Api.Hosting
                     out var packageRequest,
                     out var packageError))
             {
-                return packageError;
+                return packageError ?? Results.BadRequest(new ApiErrorResponse("任务重试描述无效。"));
             }
 
             var packageValidation = ApiEndpointRouteBuilderExtensions.ValidateInvoiceDocumentPackageRequest(
@@ -96,7 +101,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiEndpointRouteBuilderExtensions.EnqueueInvoiceDocumentPackageJob(
                     jobRunner,
                     requestedBy,
-                    packageRequest.InvoiceId,
+                    packageRequest!.InvoiceId,
                     packageItems,
                     includeMergedPdf,
                     createZip,
@@ -112,7 +117,7 @@ namespace ExportDocManager.Api.Hosting
                     out var emailRequest,
                     out var emailError))
             {
-                return emailError;
+                return emailError ?? Results.BadRequest(new ApiErrorResponse("任务重试描述无效。"));
             }
 
             var emailValidation = ApiEndpointRouteBuilderExtensions.ValidateInvoiceDocumentEmailRequest(
@@ -132,7 +137,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiEndpointRouteBuilderExtensions.EnqueueInvoiceDocumentEmailJob(
                     jobRunner,
                     requestedBy,
-                    emailRequest.InvoiceId,
+                    emailRequest!.InvoiceId,
                     emailItems,
                     includeMergedPdf,
                     toAddress,
@@ -149,7 +154,7 @@ namespace ExportDocManager.Api.Hosting
                     out var paymentRequest,
                     out var paymentError))
             {
-                return paymentError;
+                return paymentError ?? Results.BadRequest(new ApiErrorResponse("任务重试描述无效。"));
             }
 
             var paymentValidation = ApiEndpointRouteBuilderExtensions.ValidatePaymentReportPdfRequest(
@@ -161,7 +166,7 @@ namespace ExportDocManager.Api.Hosting
                 return paymentValidation;
             }
 
-            string paymentTemplatePath = paymentRequest.Body.TemplatePath?.Trim() ?? string.Empty;
+            string paymentTemplatePath = paymentRequest!.Body.TemplatePath?.Trim() ?? string.Empty;
             return ApiEndpointRouteBuilderExtensions.AcceptedBackgroundJob(
                 ApiEndpointRouteBuilderExtensions.EnqueuePaymentReportPdfJob(
                     jobRunner,

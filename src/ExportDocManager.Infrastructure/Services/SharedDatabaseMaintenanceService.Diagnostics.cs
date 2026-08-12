@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Utils;
 
@@ -32,7 +33,7 @@ namespace ExportDocManager.Services.Infrastructure
 
         private async Task WriteRecentLogsAsync(ZipArchive archive, CancellationToken cancellationToken)
         {
-            if (!TryGetManagedDirectory(_pathProvider.LogRoot, out DirectoryInfo logDirectory))
+            if (!TryGetManagedDirectory(_pathProvider.LogRoot, out DirectoryInfo? logDirectory))
             {
                 await WriteJsonEntryAsync(archive, "logs/log-index.json", Array.Empty<object>(), cancellationToken).ConfigureAwait(false);
                 return;
@@ -275,10 +276,10 @@ namespace ExportDocManager.Services.Infrastructure
             await WriteJsonEntryAsync(archive, "optional/index.json", optionalIndex, cancellationToken).ConfigureAwait(false);
         }
 
-        private FileInfo GetLatestAnyDatabaseBackup()
+        private FileInfo? GetLatestAnyDatabaseBackup()
         {
             var candidates = new List<FileInfo>();
-            if (TryGetManagedDirectory(_pathProvider.BackupRoot, out DirectoryInfo backupDirectory))
+            if (TryGetManagedDirectory(_pathProvider.BackupRoot, out DirectoryInfo? backupDirectory))
             {
                 try
                 {
@@ -291,7 +292,7 @@ namespace ExportDocManager.Services.Infrastructure
 
             try
             {
-                if (TryGetManagedDirectory(PostgreSqlBackupRoot, out DirectoryInfo postgreSqlDirectory))
+                if (TryGetManagedDirectory(PostgreSqlBackupRoot, out DirectoryInfo? postgreSqlDirectory))
                 {
                     try
                     {
@@ -312,7 +313,7 @@ namespace ExportDocManager.Services.Infrastructure
                 .FirstOrDefault();
         }
 
-        private bool TryGetManagedDirectory(string path, out DirectoryInfo directory)
+        private bool TryGetManagedDirectory(string path, [NotNullWhen(true)] out DirectoryInfo? directory)
         {
             directory = null;
             try

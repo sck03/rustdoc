@@ -1,9 +1,9 @@
-export function readUpdaterEndpoint(settings?: Record<string, unknown> | null) {
+export function readUpdaterEndpoint(settings?: object | null) {
   if (!settings || typeof settings !== "object") {
     return "";
   }
 
-  const system = settings.system;
+  const system = (settings as { system?: unknown }).system;
   if (!system || typeof system !== "object") {
     return "";
   }

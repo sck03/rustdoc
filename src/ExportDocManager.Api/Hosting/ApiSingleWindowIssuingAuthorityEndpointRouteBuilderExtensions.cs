@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Security;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -6,29 +7,33 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapSingleWindowIssuingAuthorityEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/single-window/coo/issuing-authorities", (
+            endpoints.MapGet("/api/single-window/coo/issuing-authorities", Results<
+                Ok<ApiSingleWindowIssuingAuthorityCatalogResponse>,
+                UnauthorizedHttpResult> (
                 HttpContext context,
                 IApiSessionTokenService tokenService) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
-                return Results.Ok(ApiSingleWindowDtoFactory.FromIssuingAuthorityCatalog());
+                return TypedResults.Ok(ApiSingleWindowDtoFactory.FromIssuingAuthorityCatalog());
             })
             .WithName("GetCustomsCooIssuingAuthorities");
 
-            endpoints.MapGet("/api/single-window/coo/editor-options", (
+            endpoints.MapGet("/api/single-window/coo/editor-options", Results<
+                Ok<ApiCustomsCooEditorOptionsResponse>,
+                UnauthorizedHttpResult> (
                 HttpContext context,
                 IApiSessionTokenService tokenService) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
-                return Results.Ok(ApiSingleWindowDtoFactory.FromCustomsCooEditorOptions());
+                return TypedResults.Ok(ApiSingleWindowDtoFactory.FromCustomsCooEditorOptions());
             })
             .WithName("GetCustomsCooEditorOptions");
         }

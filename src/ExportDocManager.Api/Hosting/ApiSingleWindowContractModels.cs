@@ -81,13 +81,13 @@ namespace ExportDocManager.Api.Hosting
         string Message);
 
     public sealed record ApiSingleWindowSubmitPackageRequest(
-        string PackagePath,
-        string StationAssignmentCode);
+        string PackagePath = "",
+        string StationAssignmentCode = "");
 
     public sealed record ApiSingleWindowImportPackageRequest(
         string PackagePath,
-        string WorkingDirectory,
-        bool KeepWorkingDirectory);
+        string WorkingDirectory = "",
+        bool KeepWorkingDirectory = false);
 
     public sealed record ApiSingleWindowReceiptPackageExportRequest(
         string BusinessType,

@@ -3,6 +3,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Security;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -10,7 +11,9 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapUnitMasterDataEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/master-data/units", async (
+            endpoints.MapGet("/api/master-data/units", async Task<Results<
+                Ok<IReadOnlyList<ApiUnitDto>>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IUnitReadRepository repository,
@@ -19,7 +22,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 var rows = await repository.QueryAsync(
@@ -33,11 +36,13 @@ namespace ExportDocManager.Api.Hosting
                     },
                     cancellationToken);
 
-                return Results.Ok(ApiMasterDataDtoFactory.FromUnits(rows));
+                return TypedResults.Ok(ApiMasterDataDtoFactory.FromUnits(rows));
             })
             .WithName("ListUnits");
 
-            endpoints.MapGet("/api/master-data/units/page", async (
+            endpoints.MapGet("/api/master-data/units/page", async Task<Results<
+                Ok<ApiPagedResponse<ApiUnitDto>>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IUnitReadRepository repository,
@@ -46,18 +51,22 @@ namespace ExportDocManager.Api.Hosting
                 string? keyword,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return TypedResults.Unauthorized();
                 var page = await repository.QueryPageAsync(new UnitReadQuery
                 {
                     PageNumber = pageNumber,
                     PageSize = pageSize,
                     Keyword = keyword ?? string.Empty
                 }, cancellationToken);
-                return Results.Ok(ApiMasterDataDtoFactory.FromPage(page, ApiMasterDataDtoFactory.FromUnits));
+                return TypedResults.Ok(ApiMasterDataDtoFactory.FromPage(page, ApiMasterDataDtoFactory.FromUnits));
             })
             .WithName("ListUnitsPage");
 
-            endpoints.MapGet("/api/master-data/units/{id:int}", async (
+            endpoints.MapGet("/api/master-data/units/{id:int}", async Task<Results<
+                Ok<ApiUnitDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IUnitReadRepository repository,
@@ -66,7 +75,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -76,12 +85,15 @@ namespace ExportDocManager.Api.Hosting
 
                 var unit = await FindUnitByIdAsync(repository, id, cancellationToken);
                 return unit == null
-                    ? Results.NotFound()
-                    : Results.Ok(ApiMasterDataDtoFactory.FromUnit(unit));
+                    ? TypedResults.NotFound()
+                    : TypedResults.Ok(ApiMasterDataDtoFactory.FromUnit(unit));
             })
             .WithName("GetUnit");
 
-            endpoints.MapPost("/api/master-data/units", async (
+            endpoints.MapPost("/api/master-data/units", async Task<Results<
+                Created<ApiUnitDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IAuxiliaryService auxiliaryService,
@@ -90,17 +102,17 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (request == null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("单位请求体不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("单位请求体不能为空。"));
                 }
 
                 if (request.Id > 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("新增单位不能包含已有ID。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("新增单位不能包含已有ID。"));
                 }
 
                 Unit unit;
@@ -116,13 +128,18 @@ namespace ExportDocManager.Api.Hosting
                 unit.RowVersion = null;
 
                 await auxiliaryService.SaveUnitAsync(unit, cancellationToken);
-                return Results.Created(
+                return TypedResults.Created(
                     $"/api/master-data/units/{unit.Id}",
                     ApiMasterDataDtoFactory.FromUnit(unit));
             })
-            .WithName("CreateUnit");
+            .WithName("CreateUnit")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
-            endpoints.MapPut("/api/master-data/units/{id:int}", async (
+            endpoints.MapPut("/api/master-data/units/{id:int}", async Task<Results<
+                Ok<ApiUnitDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IAuxiliaryService auxiliaryService,
@@ -133,7 +150,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -143,17 +160,17 @@ namespace ExportDocManager.Api.Hosting
 
                 if (request == null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("单位请求体不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("单位请求体不能为空。"));
                 }
 
                 if (request.Id > 0 && request.Id != id)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("请求体单位ID与路径ID不一致。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("请求体单位ID与路径ID不一致。"));
                 }
 
                 if (await FindUnitByIdAsync(repository, id, cancellationToken) == null)
                 {
-                    return Results.NotFound();
+                    return TypedResults.NotFound();
                 }
 
                 Unit unit;
@@ -169,11 +186,16 @@ namespace ExportDocManager.Api.Hosting
 
                 await auxiliaryService.SaveUnitAsync(unit, cancellationToken);
                 var saved = await FindUnitByIdAsync(repository, id, cancellationToken) ?? unit;
-                return Results.Ok(ApiMasterDataDtoFactory.FromUnit(saved));
+                return TypedResults.Ok(ApiMasterDataDtoFactory.FromUnit(saved));
             })
-            .WithName("UpdateUnit");
+            .WithName("UpdateUnit")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
-            endpoints.MapDelete("/api/master-data/units/{id:int}", async (
+            endpoints.MapDelete("/api/master-data/units/{id:int}", async Task<Results<
+                Ok<ApiCommandResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IAuxiliaryService auxiliaryService,
@@ -183,7 +205,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -193,13 +215,14 @@ namespace ExportDocManager.Api.Hosting
 
                 if (await FindUnitByIdAsync(repository, id, cancellationToken) == null)
                 {
-                    return Results.NotFound();
+                    return TypedResults.NotFound();
                 }
 
                 await auxiliaryService.DeleteUnitAsync(id, cancellationToken);
-                return Results.Ok(new ApiCommandResponse(true, "单位已删除。"));
+                return TypedResults.Ok(new ApiCommandResponse(true, "单位已删除。"));
             })
-            .WithName("DeleteUnit");
+            .WithName("DeleteUnit")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
         }
     }
 }

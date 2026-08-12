@@ -21,9 +21,9 @@ namespace ExportDocManager.Services.SingleWindow
         };
         private const int SourceDiffSummaryLineLimit = 20;
 
-        public static int CountLockedFields(string lockedFieldsJson) => ParseLockedFields(lockedFieldsJson).Count;
+        public static int CountLockedFields(string? lockedFieldsJson) => ParseLockedFields(lockedFieldsJson).Count;
 
-        public static HashSet<string> ParseLockedFields(string lockedFieldsJson)
+        public static HashSet<string> ParseLockedFields(string? lockedFieldsJson)
         {
             if (string.IsNullOrWhiteSpace(lockedFieldsJson))
             {
@@ -44,7 +44,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        public static string SerializeLockedFields(IEnumerable<string> keys)
+        public static string SerializeLockedFields(IEnumerable<string>? keys)
         {
             var normalized = (keys ?? [])
                 .Where(item => !string.IsNullOrWhiteSpace(item))
@@ -58,7 +58,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : JsonSerializer.Serialize(normalized, JsonOptions);
         }
 
-        public static string ComputeBaselineHash(string baselineJson)
+        public static string ComputeBaselineHash(string? baselineJson)
         {
             if (string.IsNullOrWhiteSpace(baselineJson))
             {
@@ -69,9 +69,9 @@ namespace ExportDocManager.Services.SingleWindow
             return Convert.ToHexString(bytes);
         }
 
-        public static CustomsCooDocument BuildCustomsCooLockedOverlay(
-            CustomsCooDocument stored,
-            IReadOnlyList<Item> sourceItems)
+        public static CustomsCooDocument? BuildCustomsCooLockedOverlay(
+            CustomsCooDocument? stored,
+            IReadOnlyList<Item>? sourceItems)
         {
             if (stored == null)
             {
@@ -102,7 +102,7 @@ namespace ExportDocManager.Services.SingleWindow
             return overlay;
         }
 
-        public static AgentConsignmentDocument BuildAgentConsignmentLockedOverlay(AgentConsignmentDocument stored)
+        public static AgentConsignmentDocument? BuildAgentConsignmentLockedOverlay(AgentConsignmentDocument? stored)
         {
             if (stored == null)
             {
@@ -118,7 +118,7 @@ namespace ExportDocManager.Services.SingleWindow
             return overlay;
         }
 
-        public static HashSet<string> BuildCustomsCooLockedFields(CustomsCooDocument current, CustomsCooDocument defaults)
+        public static HashSet<string> BuildCustomsCooLockedFields(CustomsCooDocument? current, CustomsCooDocument? defaults)
         {
             var lockedKeys = new HashSet<string>(StringComparer.Ordinal);
             if (current == null)
@@ -148,7 +148,7 @@ namespace ExportDocManager.Services.SingleWindow
             return lockedKeys;
         }
 
-        public static HashSet<string> BuildAgentConsignmentLockedFields(AgentConsignmentDocument current, AgentConsignmentDocument defaults)
+        public static HashSet<string> BuildAgentConsignmentLockedFields(AgentConsignmentDocument? current, AgentConsignmentDocument? defaults)
         {
             var lockedKeys = new HashSet<string>(StringComparer.Ordinal);
             if (current == null)
@@ -171,10 +171,10 @@ namespace ExportDocManager.Services.SingleWindow
         public static string BuildAgentConsignmentSourceBaselineJson(AgentConsignmentDocument defaults) =>
             SerializeBaselineMap(BuildAgentConsignmentBaselineMap(defaults));
 
-        public static (int Count, string Summary) BuildCustomsCooSourceDiff(string baselineJson, CustomsCooDocument currentDefaults) =>
+        public static (int Count, string Summary) BuildCustomsCooSourceDiff(string? baselineJson, CustomsCooDocument currentDefaults) =>
             BuildSourceDiffSummary(DeserializeBaselineMap(baselineJson), BuildCustomsCooSourceDiffBaselineMap(currentDefaults));
 
-        public static (int Count, string Summary) BuildAgentConsignmentSourceDiff(string baselineJson, AgentConsignmentDocument currentDefaults) =>
+        public static (int Count, string Summary) BuildAgentConsignmentSourceDiff(string? baselineJson, AgentConsignmentDocument currentDefaults) =>
             BuildSourceDiffSummary(DeserializeBaselineMap(baselineJson), BuildAgentConsignmentBaselineMap(currentDefaults));
 
         public static IReadOnlyList<SingleWindowLockedFieldDetail> DescribeCustomsCooLockedFields(
@@ -201,7 +201,7 @@ namespace ExportDocManager.Services.SingleWindow
 
         public static string DescribeFieldKey(string key) => FormatFieldKey(key);
 
-        public static string GetGoodsIdentity(int sourceItemId, string sourceStyleNo, int lineNo) =>
+        public static string GetGoodsIdentity(int sourceItemId, string? sourceStyleNo, int lineNo) =>
             BuildGoodsIdentity(sourceItemId, sourceStyleNo, lineNo);
 
         public static bool TryParseGoodsFieldKey(string key, out string identity, out string propertyName)
@@ -276,7 +276,7 @@ namespace ExportDocManager.Services.SingleWindow
 
         private static void AddChangedGoodsRowKeys(
             CustomsCooItem current,
-            CustomsCooItem defaults,
+            CustomsCooItem? defaults,
             ISet<string> lockedKeys)
         {
             string identity = BuildGoodsIdentity(current.SourceItemId, current.SourceStyleNo, current.GNo);
@@ -326,7 +326,7 @@ namespace ExportDocManager.Services.SingleWindow
                     !exclusions.Contains(property.Name));
         }
 
-        private static HashSet<string> BuildSourceItemIdentitySet(IReadOnlyList<Item> sourceItems)
+        private static HashSet<string> BuildSourceItemIdentitySet(IReadOnlyList<Item>? sourceItems)
         {
             return (sourceItems ?? [])
                 .Where(item => item != null)
@@ -334,7 +334,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .ToHashSet(StringComparer.Ordinal);
         }
 
-        private static string BuildGoodsIdentity(int sourceItemId, string sourceStyleNo, int lineNo)
+        private static string BuildGoodsIdentity(int sourceItemId, string? sourceStyleNo, int lineNo)
         {
             if (sourceItemId > 0)
             {
@@ -382,7 +382,7 @@ namespace ExportDocManager.Services.SingleWindow
             return $"{rowLabel}{label}";
         }
 
-        private static string NormalizeText(string value) =>
+        private static string NormalizeText(string? value) =>
             string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
     }
 }

@@ -67,7 +67,7 @@ namespace ExportDocManager.Application.Tests
         public void GetFallbackItemAfterRemoval_ShouldRequirePredicate()
         {
             Assert.Throws<ArgumentNullException>(() =>
-                ListSelectionHelper.GetFallbackItemAfterRemoval<TestEntity>([], null));
+                ListSelectionHelper.GetFallbackItemAfterRemoval<TestEntity>([], null!));
         }
 
         private sealed class TestEntity

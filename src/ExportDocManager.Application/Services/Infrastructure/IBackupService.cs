@@ -17,7 +17,7 @@ namespace ExportDocManager.Services.Infrastructure
         /// </summary>
         Task<DatabaseBackupImportResult> ImportBackupAsync(
             string sourceFilePath,
-            string preferredFileName = null,
+            string? preferredFileName = null,
             CancellationToken cancellationToken = default);
 
         /// <summary>

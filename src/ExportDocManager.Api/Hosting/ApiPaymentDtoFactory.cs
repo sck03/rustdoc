@@ -108,7 +108,7 @@ namespace ExportDocManager.Api.Hosting
             target.CompanyScope = existing.CompanyScope ?? string.Empty;
         }
 
-        private static byte[] DecodeRowVersion(string rowVersion)
+        private static byte[]? DecodeRowVersion(string? rowVersion)
         {
             if (string.IsNullOrWhiteSpace(rowVersion)) return null;
             try

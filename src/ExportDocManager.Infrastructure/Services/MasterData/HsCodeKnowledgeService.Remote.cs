@@ -149,8 +149,8 @@ namespace ExportDocManager.Services.MasterData
         }
 
         public async Task<HsCodeRemoteCandidatePage> ListRemoteCandidatesAsync(
-            string reviewStatus,
-            string keyword,
+            string? reviewStatus,
+            string? keyword,
             int pageNumber,
             int pageSize,
             CancellationToken cancellationToken = default)
@@ -288,7 +288,7 @@ namespace ExportDocManager.Services.MasterData
                     candidate.RawReportedHsCode,
                     currentCode,
                     candidate.ProductName,
-                    candidate.Specification,
+                    candidate.Specification ?? string.Empty,
                     BuildRemoteConfirmationSource(candidate),
                     null,
                     "ManuallyVerified",

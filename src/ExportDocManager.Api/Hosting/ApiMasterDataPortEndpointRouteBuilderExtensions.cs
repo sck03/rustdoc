@@ -3,6 +3,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Security;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -10,7 +11,9 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapPortMasterDataEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/master-data/ports", async (
+            endpoints.MapGet("/api/master-data/ports", async Task<Results<
+                Ok<IReadOnlyList<ApiPortDto>>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPortReadRepository repository,
@@ -19,18 +22,20 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 var rows = await repository.QueryAsync(
                     new PortReadQuery { Keyword = keyword ?? string.Empty },
                     cancellationToken);
 
-                return Results.Ok(ApiMasterDataDtoFactory.FromPorts(rows));
+                return TypedResults.Ok(ApiMasterDataDtoFactory.FromPorts(rows));
             })
             .WithName("ListPorts");
 
-            endpoints.MapGet("/api/master-data/ports/page", async (
+            endpoints.MapGet("/api/master-data/ports/page", async Task<Results<
+                Ok<ApiPagedResponse<ApiPortDto>>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPortReadRepository repository,
@@ -39,18 +44,22 @@ namespace ExportDocManager.Api.Hosting
                 string? keyword,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return TypedResults.Unauthorized();
                 var page = await repository.QueryPageAsync(new PortReadQuery
                 {
                     PageNumber = pageNumber,
                     PageSize = pageSize,
                     Keyword = keyword ?? string.Empty
                 }, cancellationToken);
-                return Results.Ok(ApiMasterDataDtoFactory.FromPage(page, ApiMasterDataDtoFactory.FromPorts));
+                return TypedResults.Ok(ApiMasterDataDtoFactory.FromPage(page, ApiMasterDataDtoFactory.FromPorts));
             })
             .WithName("ListPortsPage");
 
-            endpoints.MapGet("/api/master-data/ports/{id:int}", async (
+            endpoints.MapGet("/api/master-data/ports/{id:int}", async Task<Results<
+                Ok<ApiPortDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPortReadRepository repository,
@@ -59,7 +68,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -69,12 +78,15 @@ namespace ExportDocManager.Api.Hosting
 
                 var port = await FindPortByIdAsync(repository, id, cancellationToken);
                 return port == null
-                    ? Results.NotFound()
-                    : Results.Ok(ApiMasterDataDtoFactory.FromPort(port));
+                    ? TypedResults.NotFound()
+                    : TypedResults.Ok(ApiMasterDataDtoFactory.FromPort(port));
             })
             .WithName("GetPort");
 
-            endpoints.MapPost("/api/master-data/ports", async (
+            endpoints.MapPost("/api/master-data/ports", async Task<Results<
+                Created<ApiPortDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IAuxiliaryService auxiliaryService,
@@ -83,17 +95,17 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (request == null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("港口请求体不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("港口请求体不能为空。"));
                 }
 
                 if (request.Id > 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("新增港口不能包含已有ID。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("新增港口不能包含已有ID。"));
                 }
 
                 Port port;
@@ -109,13 +121,18 @@ namespace ExportDocManager.Api.Hosting
                 port.RowVersion = null;
 
                 await auxiliaryService.SavePortAsync(port, cancellationToken);
-                return Results.Created(
+                return TypedResults.Created(
                     $"/api/master-data/ports/{port.Id}",
                     ApiMasterDataDtoFactory.FromPort(port));
             })
-            .WithName("CreatePort");
+            .WithName("CreatePort")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
-            endpoints.MapPut("/api/master-data/ports/{id:int}", async (
+            endpoints.MapPut("/api/master-data/ports/{id:int}", async Task<Results<
+                Ok<ApiPortDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IAuxiliaryService auxiliaryService,
@@ -126,7 +143,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -136,17 +153,17 @@ namespace ExportDocManager.Api.Hosting
 
                 if (request == null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("港口请求体不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("港口请求体不能为空。"));
                 }
 
                 if (request.Id > 0 && request.Id != id)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("请求体港口ID与路径ID不一致。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("请求体港口ID与路径ID不一致。"));
                 }
 
                 if (await FindPortByIdAsync(repository, id, cancellationToken) == null)
                 {
-                    return Results.NotFound();
+                    return TypedResults.NotFound();
                 }
 
                 Port port;
@@ -162,11 +179,16 @@ namespace ExportDocManager.Api.Hosting
 
                 await auxiliaryService.SavePortAsync(port, cancellationToken);
                 var saved = await FindPortByIdAsync(repository, id, cancellationToken) ?? port;
-                return Results.Ok(ApiMasterDataDtoFactory.FromPort(saved));
+                return TypedResults.Ok(ApiMasterDataDtoFactory.FromPort(saved));
             })
-            .WithName("UpdatePort");
+            .WithName("UpdatePort")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
-            endpoints.MapDelete("/api/master-data/ports/{id:int}", async (
+            endpoints.MapDelete("/api/master-data/ports/{id:int}", async Task<Results<
+                Ok<ApiCommandResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IAuxiliaryService auxiliaryService,
@@ -176,7 +198,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -186,13 +208,14 @@ namespace ExportDocManager.Api.Hosting
 
                 if (await FindPortByIdAsync(repository, id, cancellationToken) == null)
                 {
-                    return Results.NotFound();
+                    return TypedResults.NotFound();
                 }
 
                 await auxiliaryService.DeletePortAsync(id, cancellationToken);
-                return Results.Ok(new ApiCommandResponse(true, "港口已删除。"));
+                return TypedResults.Ok(new ApiCommandResponse(true, "港口已删除。"));
             })
-            .WithName("DeletePort");
+            .WithName("DeletePort")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
         }
     }
 }

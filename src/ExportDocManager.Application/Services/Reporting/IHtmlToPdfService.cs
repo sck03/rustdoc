@@ -19,7 +19,7 @@ namespace ExportDocManager.Services.Reporting
         Task<HtmlToPdfRenderResult> RenderAsync(
             string html,
             string destinationPath,
-            HtmlToPdfRenderOptions options = null,
+            HtmlToPdfRenderOptions? options = null,
             CancellationToken cancellationToken = default);
     }
 }

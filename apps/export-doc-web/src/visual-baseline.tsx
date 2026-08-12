@@ -106,8 +106,8 @@ function QueryBaseline() {
           <button className="icon-button solid" type="submit" title="查询" aria-label="查询"><Search size={18} aria-hidden="true" /></button>
         </div>
       </form>
-      <section className="form-section query-export-panel" aria-label="查询结果导出">
-        <div className="section-header"><div><h2>导出</h2><span>0 条当前结果</span></div></div>
+      <details className="form-section query-export-panel" aria-label="查询结果导出">
+        <summary className="query-export-summary"><span>导出查询结果</span><small>0 条当前结果</small></summary>
         <div className="query-export-grid">
           <label className="inline-filter query-export-path-filter"><span>输出路径</span><input defaultValue="QueryResults.xlsx" /></label>
           <div className="query-inline-actions">
@@ -115,7 +115,7 @@ function QueryBaseline() {
             <button className="icon-button solid" type="button" title="导出 Excel" aria-label="导出 Excel"><Download size={18} aria-hidden="true" /></button>
           </div>
         </div>
-      </section>
+      </details>
       <div className="table-frame query-table-frame" tabIndex={0} aria-label="查询结果表格">
         <table className="query-table"><thead><tr>{["发票号","日期","合同号","客户","出口商","目的国","贸易条款","船期/航期","运输方式","箱数","数量","金额","类型"].map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody><tr><td colSpan={13}><PageState tone="empty" title="暂无查询结果" description="调整筛选条件后执行查询。" /></td></tr></tbody></table>
       </div>

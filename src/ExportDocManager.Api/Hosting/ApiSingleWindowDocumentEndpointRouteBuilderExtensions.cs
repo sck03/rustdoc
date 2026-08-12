@@ -35,7 +35,13 @@ namespace ExportDocManager.Api.Hosting
                     buildDefaults: false,
                     cancellationToken);
             })
-            .WithName("GetCustomsCooDocument");
+            .WithName("GetCustomsCooDocument")
+            .Produces<ApiCustomsCooDocumentDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPut("/api/single-window/coo/{invoiceId:int}", async (
                 HttpContext context,
@@ -63,7 +69,13 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("SaveCustomsCooDocument");
+            .WithName("SaveCustomsCooDocument")
+            .Produces<ApiCustomsCooDocumentSaveResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/coo/{invoiceId:int}/build-defaults", async (
                 HttpContext context,
@@ -90,7 +102,13 @@ namespace ExportDocManager.Api.Hosting
                     buildDefaults: true,
                     cancellationToken);
             })
-            .WithName("BuildCustomsCooDefaults");
+            .WithName("BuildCustomsCooDefaults")
+            .Produces<ApiCustomsCooDocumentDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapGet("/api/single-window/coo/{invoiceId:int}/locked-fields", async (
                 HttpContext context,
@@ -116,7 +134,13 @@ namespace ExportDocManager.Api.Hosting
                     invoiceId,
                     cancellationToken);
             })
-            .WithName("GetCustomsCooLockedFields");
+            .WithName("GetCustomsCooLockedFields")
+            .Produces<ApiSingleWindowLockedFieldsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/coo/{invoiceId:int}/unlock-fields", async (
                 HttpContext context,
@@ -144,7 +168,13 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("UnlockCustomsCooFields");
+            .WithName("UnlockCustomsCooFields")
+            .Produces<ApiCustomsCooUnlockFieldsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/coo/{invoiceId:int}/submit-package/save-to-path", async (
                 HttpContext context,
@@ -190,7 +220,14 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("SaveCustomsCooSubmitPackageToPath");
+            .Accepts<ApiSingleWindowSubmitPackageRequest>("application/json")
+            .WithName("SaveCustomsCooSubmitPackageToPath")
+            .Produces<ApiSingleWindowHandoffPackageResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/coo/{invoiceId:int}/submit-package/download", async (
                 HttpContext context,
@@ -226,7 +263,14 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("DownloadCustomsCooSubmitPackage");
+            .Accepts<ApiSingleWindowSubmitPackageRequest>("application/json")
+            .WithName("DownloadCustomsCooSubmitPackage")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapGet("/api/single-window/acd/{invoiceId:int}", async (
                 HttpContext context,
@@ -253,7 +297,13 @@ namespace ExportDocManager.Api.Hosting
                     buildDefaults: false,
                     cancellationToken);
             })
-            .WithName("GetAgentConsignmentDocument");
+            .WithName("GetAgentConsignmentDocument")
+            .Produces<ApiAgentConsignmentDocumentDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPut("/api/single-window/acd/{invoiceId:int}", async (
                 HttpContext context,
@@ -281,7 +331,13 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("SaveAgentConsignmentDocument");
+            .WithName("SaveAgentConsignmentDocument")
+            .Produces<ApiAgentConsignmentDocumentSaveResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/acd/{invoiceId:int}/build-defaults", async (
                 HttpContext context,
@@ -308,7 +364,13 @@ namespace ExportDocManager.Api.Hosting
                     buildDefaults: true,
                     cancellationToken);
             })
-            .WithName("BuildAgentConsignmentDefaults");
+            .WithName("BuildAgentConsignmentDefaults")
+            .Produces<ApiAgentConsignmentDocumentDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapGet("/api/single-window/acd/{invoiceId:int}/locked-fields", async (
                 HttpContext context,
@@ -334,7 +396,13 @@ namespace ExportDocManager.Api.Hosting
                     invoiceId,
                     cancellationToken);
             })
-            .WithName("GetAgentConsignmentLockedFields");
+            .WithName("GetAgentConsignmentLockedFields")
+            .Produces<ApiSingleWindowLockedFieldsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/acd/{invoiceId:int}/unlock-fields", async (
                 HttpContext context,
@@ -362,7 +430,13 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("UnlockAgentConsignmentFields");
+            .WithName("UnlockAgentConsignmentFields")
+            .Produces<ApiAgentConsignmentUnlockFieldsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/acd/{invoiceId:int}/submit-package/save-to-path", async (
                 HttpContext context,
@@ -408,7 +482,14 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("SaveAgentConsignmentSubmitPackageToPath");
+            .Accepts<ApiSingleWindowSubmitPackageRequest>("application/json")
+            .WithName("SaveAgentConsignmentSubmitPackageToPath")
+            .Produces<ApiSingleWindowHandoffPackageResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/acd/{invoiceId:int}/submit-package/download", async (
                 HttpContext context,
@@ -444,7 +525,14 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     cancellationToken);
             })
-            .WithName("DownloadAgentConsignmentSubmitPackage");
+            .Accepts<ApiSingleWindowSubmitPackageRequest>("application/json")
+            .WithName("DownloadAgentConsignmentSubmitPackage")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
         }
     }
 }

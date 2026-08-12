@@ -36,7 +36,9 @@ namespace ExportDocManager.Api.Hosting
 
                 return Results.Ok(ApiMasterDataDtoFactory.FromPagedHsCodes(result));
             })
-            .WithName("ListHsCodes");
+            .WithName("ListHsCodes")
+            .Produces<ApiPagedResponse<ApiHsCodeDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapPost("/api/master-data/hs-codes", async (
                 HttpContext context,
@@ -84,7 +86,12 @@ namespace ExportDocManager.Api.Hosting
                     $"/api/master-data/hs-codes/{saved.Code}",
                     ApiMasterDataDtoFactory.FromHsCode(saved));
             })
-            .WithName("CreateHsCode");
+            .WithName("CreateHsCode")
+            .Produces<ApiHsCodeDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapGet("/api/master-data/hs-codes/{code}", async (
                 HttpContext context,
@@ -108,7 +115,11 @@ namespace ExportDocManager.Api.Hosting
                     ? Results.NotFound()
                     : Results.Ok(ApiMasterDataDtoFactory.FromHsCode(row));
             })
-            .WithName("GetHsCode");
+            .WithName("GetHsCode")
+            .Produces<ApiHsCodeDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapGet("/api/invoices/hs-codes/{code}", async (
                 HttpContext context,
@@ -122,7 +133,11 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("HS编码不能为空。"));
                 var row = await repository.GetByCodeAsync(code, cancellationToken);
                 return row == null ? Results.NotFound() : Results.Ok(ApiMasterDataDtoFactory.FromHsCode(row));
-            }).WithName("GetInvoiceHsCode");
+            }).WithName("GetInvoiceHsCode")
+            .Produces<ApiHsCodeDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapPut("/api/master-data/hs-codes/{code}", async (
                 HttpContext context,
@@ -178,7 +193,13 @@ namespace ExportDocManager.Api.Hosting
                 var saved = await repository.GetByCodeAsync(hsCode.Code, cancellationToken) ?? hsCode;
                 return Results.Ok(ApiMasterDataDtoFactory.FromHsCode(saved));
             })
-            .WithName("UpdateHsCode");
+            .WithName("UpdateHsCode")
+            .Produces<ApiHsCodeDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapDelete("/api/master-data/hs-codes/by-id/{id:int}", async (
                 HttpContext context,
@@ -206,7 +227,13 @@ namespace ExportDocManager.Api.Hosting
                 await hsCodeService.DeleteAsync(id);
                 return Results.Ok(new ApiCommandResponse(true, "HS编码已删除。"));
             })
-            .WithName("DeleteHsCode");
+            .WithName("DeleteHsCode")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/master-data/hs-codes/delete-batch", async (
                 HttpContext context,
@@ -257,7 +284,13 @@ namespace ExportDocManager.Api.Hosting
                     true,
                     $"已删除 {existingIds.Count} 条HS编码。"));
             })
-            .WithName("DeleteHsCodesBatch");
+            .WithName("DeleteHsCodesBatch")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/master-data/hs-codes/clear-all", async (
                 HttpContext context,
@@ -299,7 +332,13 @@ namespace ExportDocManager.Api.Hosting
                         ? $"本地HS编码库已清空，共删除 {before.TotalCount} 条记录。"
                         : "本地HS编码库已为空。"));
             })
-            .WithName("ClearAllHsCodes");
+            .WithName("ClearAllHsCodes")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
         }
     }
 }

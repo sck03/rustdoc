@@ -24,7 +24,7 @@ namespace ExportDocManager.Api.Hosting
             this IServiceCollection services,
             IAppPathProvider pathProvider,
             DatabaseConnectionSettings databaseSettings,
-            ApiRuntimeOptions runtimeOptions = null)
+            ApiRuntimeOptions? runtimeOptions = null)
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
             ArgumentNullException.ThrowIfNull(databaseSettings);
@@ -37,7 +37,15 @@ namespace ExportDocManager.Api.Hosting
             services.AddSingleton(pathProvider);
             services.AddSingleton(databaseSettings);
             services.AddSingleton(runtimeOptions);
-            services.AddOpenApi("v1");
+            services.ConfigureHttpJsonOptions(options =>
+            {
+                options.SerializerOptions.RespectNullableAnnotations = true;
+            });
+            services.AddOpenApi("v1", options =>
+            {
+                options.AddSchemaTransformer<NullableOpenApiSchemaTransformer>();
+                options.AddDocumentTransformer<ApiOpenApiDocumentTransformer>();
+            });
             services.AddSingleton(ApiDesktopAccessOptions.FromRuntimeOptions(runtimeOptions));
             services.AddLogging();
             services.AddHttpContextAccessor();

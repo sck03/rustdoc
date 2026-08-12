@@ -4,7 +4,7 @@ import type {
   ApiInvoiceItemDto,
   ExportDocManagerApiClient,
   HsCodeKnowledgeFeedbackInput,
-  HsCodeKnowledgeSearchItem,
+  HsCodeKnowledgeSearchResult,
 } from "../../api/index.ts";
 import { normalizeText, readApiError } from "../../ui/formUtils.ts";
 import { useModalDialog } from "../../ui/useModalDialog.ts";
@@ -20,12 +20,12 @@ export function InvoiceHsKnowledgePanel({
   client: ExportDocManagerApiClient;
   item: ApiInvoiceItemDto | null;
   open: boolean;
-  onApply: (patch: Partial<ApiInvoiceItemDto>, result: HsCodeKnowledgeSearchItem, pendingFeedback: HsCodeKnowledgeFeedbackInput) => void;
+  onApply: (patch: Partial<ApiInvoiceItemDto>, result: HsCodeKnowledgeSearchResult, pendingFeedback: HsCodeKnowledgeFeedbackInput) => void;
   onClose: () => void;
 }) {
   const suggestedQuery = useMemo(() => buildInvoiceHsQuery(item), [item]);
   const [draft, setDraft] = useState("");
-  const [results, setResults] = useState<HsCodeKnowledgeSearchItem[]>([]);
+  const [results, setResults] = useState<HsCodeKnowledgeSearchResult[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const queryRef = useRef<HTMLTextAreaElement | null>(null);
@@ -65,7 +65,7 @@ export function InvoiceHsKnowledgePanel({
     void search();
   }
 
-  async function apply(result: HsCodeKnowledgeSearchItem) {
+  async function apply(result: HsCodeKnowledgeSearchResult) {
     if (!result.canUse || !result.currentCode || busy) return;
     setBusy(true);
     setMessage("");
@@ -151,12 +151,12 @@ function parsePercent(value?: string) {
   return Number.isFinite(number) ? number : null;
 }
 
-function isTrustedActiveHsCode(value: { status?: string; sourceName?: string; effectiveYear?: number; lastVerifiedAt?: string }) {
+function isTrustedActiveHsCode(value: { status?: string; sourceName?: string; effectiveYear?: number | null; lastVerifiedAt?: string | null }) {
   return value.status === "Active" && !!value.sourceName?.trim() && !!value.lastVerifiedAt &&
     (value.effectiveYear ?? 0) >= 2000 && (value.effectiveYear ?? 0) <= 2100;
 }
 
-function formatDate(value?: string) {
+function formatDate(value?: string | null) {
   if (!value) return "未标明验证时间";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : `验证于 ${date.toLocaleDateString("zh-CN")}`;

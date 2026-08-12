@@ -188,7 +188,7 @@ namespace ExportDocManager.Services.SingleWindow
             int invoiceId,
             Invoice invoice,
             IReadOnlyList<Item> invoiceItems,
-            CustomsCooDocument baseDocument,
+            CustomsCooDocument? baseDocument,
             IReadOnlyList<SingleWindowAttachmentSource> attachmentSources,
             CooMappedDocument mapped)
         {
@@ -300,7 +300,7 @@ namespace ExportDocManager.Services.SingleWindow
             return document;
         }
 
-        private static string NormalizePersistedValue(string value)
+        private static string NormalizePersistedValue(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
         }

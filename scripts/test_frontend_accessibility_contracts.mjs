@@ -43,6 +43,17 @@ for (const file of walk(root)) {
     failures.push(`${sourceRelativePath}: 高级导出工作区缺少稳定的布局容器`);
   }
 
+  if (sourceRelativePath === "features/query/QueryPage.tsx"
+    && (!sourceText.includes('<details className="form-section query-export-panel"')
+      || sourceText.includes('<details className="form-section query-export-panel" open'))) {
+    failures.push(`${sourceRelativePath}: 低频查询导出区必须使用默认折叠的原生 details，避免长期占用结果页空间`);
+  }
+
+  if (sourceRelativePath === "features/master-data/masterDataConfigs.ts"
+    && /name:\s*["']category["'][^}\n]*required:\s*true[^}\n]*PayeeCategory/.test(sourceText)) {
+    failures.push(`${sourceRelativePath}: 收款对象分类是可选辅助信息，不得作为保存必填项`);
+  }
+
   if (sourceRelativePath === "features/invoices/InvoiceEditorPage.tsx") {
     if (!sourceText.includes("useInvoiceItemsWorkspace")) {
       failures.push(`${sourceRelativePath}: 商品库与明细表操作必须保持独立工作区 Hook`);
@@ -208,7 +219,7 @@ for (const file of walk(root)) {
   }
 
   if (sourceRelativePath === "features/settings/useSettingsDraftSync.ts") {
-    for (const settingsDraftContract of ["hasUnsavedChanges", "if (!response || hasUnsavedChanges)", "setSettings(response.settings)"]) {
+    for (const settingsDraftContract of ["hasUnsavedChanges", "if (!response || hasUnsavedChanges)", "setSettings(response.settings as unknown as SettingsRecord)"]) {
       if (!sourceText.includes(settingsDraftContract)) {
         failures.push(`${sourceRelativePath}: 设置草稿同步缺少未保存保护契约：${settingsDraftContract}`);
       }

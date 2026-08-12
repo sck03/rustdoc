@@ -1,20 +1,23 @@
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
+using System.Diagnostics.CodeAnalysis;
 
 namespace ExportDocManager.Services.SingleWindow
 {
     public static class SingleWindowSourceCloneHelper
     {
-        public static Invoice CloneInvoice(Invoice invoice) => invoice?.CloneHeader();
+        [return: NotNullIfNotNull(nameof(invoice))]
+        public static Invoice? CloneInvoice(Invoice? invoice) => invoice?.CloneHeader();
 
-        public static List<Item> CloneItems(IEnumerable<Item> items) =>
+        public static List<Item> CloneItems(IEnumerable<Item>? items) =>
             items?
                 .Where(item => item != null)
                 .Select(item => item.Clone())
                 .ToList()
             ?? [];
 
-        public static Customer CloneCustomer(Customer customer)
+        [return: NotNullIfNotNull(nameof(customer))]
+        public static Customer? CloneCustomer(Customer? customer)
         {
             if (customer == null)
             {
@@ -37,7 +40,8 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static Exporter CloneExporter(Exporter exporter)
+        [return: NotNullIfNotNull(nameof(exporter))]
+        public static Exporter? CloneExporter(Exporter? exporter)
         {
             if (exporter == null)
             {
@@ -65,7 +69,8 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static CustomsCooDocument CloneCustomsCooDocument(CustomsCooDocument document)
+        [return: NotNullIfNotNull(nameof(document))]
+        public static CustomsCooDocument? CloneCustomsCooDocument(CustomsCooDocument? document)
         {
             if (document == null)
             {
@@ -236,7 +241,8 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static AgentConsignmentDocument CloneAgentConsignmentDocument(AgentConsignmentDocument document)
+        [return: NotNullIfNotNull(nameof(document))]
+        public static AgentConsignmentDocument? CloneAgentConsignmentDocument(AgentConsignmentDocument? document)
         {
             if (document == null)
             {
@@ -282,7 +288,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static List<SingleWindowAttachmentSource> CloneAttachmentSources(IEnumerable<CustomsCooAttachment> attachments) =>
+        public static List<SingleWindowAttachmentSource> CloneAttachmentSources(IEnumerable<CustomsCooAttachment>? attachments) =>
             attachments?
                 .Where(item => item != null)
                 .OrderBy(item => item.SortOrder)

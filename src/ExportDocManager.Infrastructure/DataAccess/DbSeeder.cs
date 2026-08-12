@@ -8,8 +8,8 @@ namespace ExportDocManager.DataAccess
     {
         public static void SeedAuxiliaryData(
             AppDbContext context,
-            DatabaseConnectionSettings databaseSettings = null,
-            string initialAdminPassword = null)
+            DatabaseConnectionSettings? databaseSettings = null,
+            string? initialAdminPassword = null)
         {
             ArgumentNullException.ThrowIfNull(context);
             bool usesPostgreSql = databaseSettings != null &&
@@ -31,13 +31,13 @@ namespace ExportDocManager.DataAccess
 
                 if (usesPostgreSql)
                 {
-                    UserPasswordPolicy.EnsureValid(initialAdminPassword, "admin 初始密码");
+                    UserPasswordPolicy.EnsureValid(initialAdminPassword ?? string.Empty, "admin 初始密码");
                 }
 
                 var admin = new User
                 {
                     Username = "admin",
-                    PasswordHash = PasswordHasher.HashPassword(usesPostgreSql ? initialAdminPassword : string.Empty),
+                    PasswordHash = PasswordHasher.HashPassword(usesPostgreSql ? initialAdminPassword ?? string.Empty : string.Empty),
                     FullName = "System Administrator",
                     Role = UserRoleCatalog.Admin,
                     PermissionTemplateId = adminTemplateId,

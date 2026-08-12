@@ -11,7 +11,7 @@ namespace ExportDocManager.Api.Hosting
         private readonly ConcurrentDictionary<string, BackgroundJobSnapshot> _jobs = new(StringComparer.OrdinalIgnoreCase);
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _cancellationSources = new(StringComparer.OrdinalIgnoreCase);
         private readonly ConcurrentDictionary<string, long> _lastPersistedUtcTicks = new(StringComparer.OrdinalIgnoreCase);
-        private readonly IAppPathProvider _pathProvider;
+        private readonly IAppPathProvider? _pathProvider;
         private readonly ApiBackgroundJobRetentionOptions _retentionOptions;
         private readonly Lock _mutationLock = new();
         private readonly Lock _historyCleanupLock = new();
@@ -21,17 +21,13 @@ namespace ExportDocManager.Api.Hosting
         public ApiBackgroundJobService()
         {
             _retentionOptions = new ApiBackgroundJobRetentionOptions().Normalize();
+            _storePath = string.Empty;
         }
 
         public ApiBackgroundJobService(IAppPathProvider pathProvider)
         {
             _retentionOptions = new ApiBackgroundJobRetentionOptions().Normalize();
-            if (pathProvider == null)
-            {
-                return;
-            }
-
-            _pathProvider = pathProvider;
+            _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _storePath = Path.Combine(pathProvider.CacheRoot, "BackgroundJobs", "jobs.json");
             LoadPersistedJobs();
             PruneOrphanControlledBrowserOutputs();
@@ -150,7 +146,7 @@ namespace ExportDocManager.Api.Hosting
 
             string key = jobId.Trim();
             cancellationToken.ThrowIfCancellationRequested();
-            BackgroundJobSnapshot removedJob;
+            BackgroundJobSnapshot? removedJob;
             lock (_mutationLock)
             {
                 if (!_jobs.TryGetValue(key, out var job) || !BackgroundJobStatusCatalog.IsTerminal(job.Status))
@@ -266,7 +262,7 @@ namespace ExportDocManager.Api.Hosting
             lock (_mutationLock)
             {
                 string key = job.JobId.Trim();
-                bool hadPrevious = _jobs.TryGetValue(key, out var previous);
+                bool hadPrevious = _jobs.TryGetValue(key, out BackgroundJobSnapshot? previous);
                 BackgroundJobSnapshot normalized = _jobs.AddOrUpdate(
                     key,
                     _ => NormalizeNewJob(job, key),
@@ -286,7 +282,7 @@ namespace ExportDocManager.Api.Hosting
                     // Enqueue callers reserve queue capacity before Upsert. Restore the
                     // in-memory snapshot when durable persistence fails so a rejected
                     // write cannot leave a phantom task consuming capacity forever.
-                    if (hadPrevious)
+                    if (hadPrevious && previous is not null)
                     {
                         _jobs[key] = previous;
                     }
@@ -297,7 +293,7 @@ namespace ExportDocManager.Api.Hosting
 
                     try
                     {
-                        if (hadPrevious)
+                        if (hadPrevious && previous is not null)
                         {
                             PersistJob(previous);
                         }
@@ -322,7 +318,7 @@ namespace ExportDocManager.Api.Hosting
             }
         }
 
-        public BackgroundJobSnapshot Update(
+        public BackgroundJobSnapshot? Update(
             string jobId,
             Func<BackgroundJobSnapshot, BackgroundJobSnapshot> update)
         {

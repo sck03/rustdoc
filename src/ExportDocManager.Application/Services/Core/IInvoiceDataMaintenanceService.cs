@@ -29,11 +29,11 @@ namespace ExportDocManager.Services.Core
 
     public interface IInvoiceDataMaintenanceService
     {
-        Task<InvoiceDataMaintenancePreview> GetPurgePreviewAsync(
+        Task<InvoiceDataMaintenancePreview?> GetPurgePreviewAsync(
             int invoiceId,
             CancellationToken cancellationToken = default);
 
-        Task<InvoicePurgeResult> PurgeCancelledInvoiceAsync(
+        Task<InvoicePurgeResult?> PurgeCancelledInvoiceAsync(
             InvoicePurgeCommand command,
             CancellationToken cancellationToken = default);
     }

@@ -53,7 +53,7 @@ namespace ExportDocManager.Services.SingleWindow
         private sealed record EditorFieldRule(
             string PropertyName,
             Func<CustomsCooEditorRuleContext, bool> IsVisible,
-            Func<CustomsCooEditorRuleContext, bool> IsRequired = null);
+            Func<CustomsCooEditorRuleContext, bool>? IsRequired = null);
 
         private static readonly EditorFieldRule[] HeaderFieldRules =
         [

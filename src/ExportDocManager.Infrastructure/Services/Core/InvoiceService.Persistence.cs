@@ -66,7 +66,7 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> TransitionInvoiceStatusAsync(
+        public async Task<Invoice?> TransitionInvoiceStatusAsync(
             InvoiceStatusTransitionRequest request,
             CancellationToken cancellationToken = default)
         {
@@ -137,7 +137,7 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> UnverifyInvoiceAsync(
+        public async Task<Invoice?> UnverifyInvoiceAsync(
             int id,
             byte[] expectedRowVersion,
             string note,
@@ -232,7 +232,7 @@ namespace ExportDocManager.Services.Core
         private async Task SaveInvoiceCoreAsync(
             AppDbContext context,
             Invoice invoice,
-            IReadOnlyList<HsCodeKnowledgeFeedbackInput> pendingHsFeedback,
+            IReadOnlyList<HsCodeKnowledgeFeedbackInput>? pendingHsFeedback,
             bool requireRowVersion = true,
             CancellationToken cancellationToken = default)
         {
@@ -264,7 +264,8 @@ namespace ExportDocManager.Services.Core
                     .ApplyInvoiceScope(context.Invoices.AsNoTracking())
                     .Where(item => item.Id == invoice.Id)
                     .Select(item => item.Status)
-                    .FirstOrDefaultAsync(cancellationToken);
+                    .FirstOrDefaultAsync(cancellationToken)
+                    ?? throw new ResourceNotFoundException("要保存的发票已不存在，请刷新后重试。");
                 if (!InvoiceStatusCatalog.IsEditable(existingStatus))
                 {
                     throw new InvoiceConflictException("当前发票已锁定，请先反审核后再编辑。");
@@ -290,8 +291,8 @@ namespace ExportDocManager.Services.Core
                     $"发票号“{invoice.InvoiceNo}”的{invoice.Type}已经存在，未覆盖原发票。请打开已有记录或使用复制功能创建新单号。");
             }
 
-            items = invoice.Items;
-            invoice.Items = null;
+            items = invoice.Items ?? [];
+            invoice.Items = [];
 
             try
             {
@@ -307,10 +308,7 @@ namespace ExportDocManager.Services.Core
 
                 await context.SaveChangesAsync(cancellationToken);
 
-                if (items != null)
-                {
-                    await _itemService.SaveItemsAsync(context, invoice.Id, items, cancellationToken);
-                }
+                await _itemService.SaveItemsAsync(context, invoice.Id, items, cancellationToken);
 
                 try
                 {
@@ -441,9 +439,9 @@ namespace ExportDocManager.Services.Core
                    string.IsNullOrWhiteSpace(invoice.SwiftCode);
         }
 
-        private static string PreferExistingValue(string currentValue, string fallbackValue)
+        private static string PreferExistingValue(string? currentValue, string? fallbackValue)
         {
-            return string.IsNullOrWhiteSpace(currentValue) ? fallbackValue : currentValue;
+            return string.IsNullOrWhiteSpace(currentValue) ? fallbackValue ?? string.Empty : currentValue;
         }
 
         private static void NormalizeInvoiceDates(Invoice invoice)

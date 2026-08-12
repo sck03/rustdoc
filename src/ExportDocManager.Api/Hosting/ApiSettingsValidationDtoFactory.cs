@@ -177,7 +177,7 @@ namespace ExportDocManager.Api.Hosting
             string databaseValidation = DatabaseModeHelper.Validate(new DatabaseConnectionSettings
             {
                 Provider = normalized.DatabaseProvider,
-                SqliteDatabaseFileName = normalized.SqliteDatabaseFileName,
+                SqliteDatabaseFileName = normalized.SqliteDatabaseFileName ?? string.Empty,
                 PostgreSqlHost = normalized.PostgreSqlHost,
                 PostgreSqlPort = normalized.PostgreSqlPort,
                 PostgreSqlDatabase = normalized.PostgreSqlDatabase,

@@ -31,7 +31,7 @@ namespace ExportDocManager.Services.EmailTemplates
         }
 
         public async Task<IReadOnlyList<EmailTemplateRecord>> ListAsync(
-            string keyword, string category, bool includeInactive, CancellationToken cancellationToken = default)
+            string? keyword, string? category, bool includeInactive, CancellationToken cancellationToken = default)
         {
             keyword = Clean(keyword);
             category = Clean(category);
@@ -192,7 +192,7 @@ namespace ExportDocManager.Services.EmailTemplates
             string body = EmailTemplateHtmlPolicy.Sanitize(request.BodyHtml);
             foreach (var variable in Variables)
             {
-                supplied.TryGetValue(variable.Key, out string value);
+                supplied.TryGetValue(variable.Key, out string? value);
                 value ??= string.Empty;
                 subject = subject.Replace(variable.Token, value, StringComparison.Ordinal);
                 body = body.Replace(variable.Token, WebUtility.HtmlEncode(value), StringComparison.Ordinal);
@@ -226,6 +226,6 @@ namespace ExportDocManager.Services.EmailTemplates
             item.IsActive != isActive || item.IsShared != isShared;
         private static string Required(string value, string field) => string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException($"{field}不能为空。") : value.Trim();
-        private static string Clean(string value) => (value ?? string.Empty).Trim();
+        private static string Clean(string? value) => (value ?? string.Empty).Trim();
     }
 }

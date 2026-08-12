@@ -83,7 +83,7 @@ namespace ExportDocManager.Services.SingleWindow
                 string sourceDocumentType = string.Empty;
                 int draftRevision = 0;
                 string sourceBaselineHash = string.Empty;
-                CooMappedDocument customsCooDocument = null;
+                CooMappedDocument? customsCooDocument = null;
 
                 switch (businessType)
                 {

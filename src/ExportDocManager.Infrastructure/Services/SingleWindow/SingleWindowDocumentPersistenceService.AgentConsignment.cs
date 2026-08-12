@@ -208,9 +208,9 @@ namespace ExportDocManager.Services.SingleWindow
             int invoiceId,
             Invoice invoice,
             IReadOnlyList<Item> invoiceItems,
-            Customer customer,
-            Exporter exporter,
-            AgentConsignmentDocument existingDocument)
+            Customer? customer,
+            Exporter? exporter,
+            AgentConsignmentDocument? existingDocument)
         {
             var rawExistingDocument = SingleWindowSourceCloneHelper.CloneAgentConsignmentDocument(existingDocument);
 
@@ -258,7 +258,7 @@ namespace ExportDocManager.Services.SingleWindow
         private static AgentConsignmentDocument CreateAgentConsignmentDocumentFromMapped(
             int invoiceId,
             Invoice invoice,
-            AgentConsignmentDocument rawExistingDocument,
+            AgentConsignmentDocument? rawExistingDocument,
             AcdMappedDocument mapped)
         {
             var document = rawExistingDocument != null

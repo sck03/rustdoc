@@ -6,7 +6,7 @@ namespace ExportDocManager.Services.Errors;
 /// </summary>
 public abstract class ServiceException : Exception
 {
-    protected ServiceException(string message, Exception innerException = null)
+    protected ServiceException(string message, Exception? innerException = null)
         : base(message, innerException)
     {
     }
@@ -14,7 +14,7 @@ public abstract class ServiceException : Exception
 
 public class ServiceValidationException : ServiceException
 {
-    public ServiceValidationException(string message, Exception innerException = null)
+    public ServiceValidationException(string message, Exception? innerException = null)
         : base(message, innerException)
     {
     }
@@ -22,7 +22,7 @@ public class ServiceValidationException : ServiceException
 
 public class ResourceNotFoundException : ServiceException
 {
-    public ResourceNotFoundException(string message, Exception innerException = null)
+    public ResourceNotFoundException(string message, Exception? innerException = null)
         : base(message, innerException)
     {
     }
@@ -30,7 +30,7 @@ public class ResourceNotFoundException : ServiceException
 
 public class ResourceConflictException : ServiceException
 {
-    public ResourceConflictException(string message, Exception innerException = null)
+    public ResourceConflictException(string message, Exception? innerException = null)
         : base(message, innerException)
     {
     }
@@ -38,7 +38,7 @@ public class ResourceConflictException : ServiceException
 
 public class PermissionDeniedException : ServiceException
 {
-    public PermissionDeniedException(string message, Exception innerException = null)
+    public PermissionDeniedException(string message, Exception? innerException = null)
         : base(message, innerException)
     {
     }
@@ -46,7 +46,7 @@ public class PermissionDeniedException : ServiceException
 
 public class ServiceConcurrencyException : ResourceConflictException
 {
-    public ServiceConcurrencyException(string message, Exception innerException = null)
+    public ServiceConcurrencyException(string message, Exception? innerException = null)
         : base(message, innerException)
     {
     }
@@ -54,7 +54,7 @@ public class ServiceConcurrencyException : ResourceConflictException
 
 public class InfrastructureServiceException : ServiceException
 {
-    public InfrastructureServiceException(string message, Exception innerException = null)
+    public InfrastructureServiceException(string message, Exception? innerException = null)
         : base(message, innerException)
     {
     }
@@ -68,7 +68,7 @@ public class InfrastructureServiceException : ServiceException
 /// </summary>
 public sealed class ManualRecoveryRequiredException : InfrastructureServiceException
 {
-    public ManualRecoveryRequiredException(string message, Exception innerException = null)
+    public ManualRecoveryRequiredException(string message, Exception? innerException = null)
         : base(message, innerException)
     {
     }
@@ -80,7 +80,7 @@ public sealed class InsufficientStorageException : ServiceException
         string message,
         long requiredBytes = 0,
         long availableBytes = 0,
-        Exception innerException = null)
+        Exception? innerException = null)
         : base(message, innerException)
     {
         RequiredBytes = requiredBytes;
@@ -94,7 +94,7 @@ public sealed class InsufficientStorageException : ServiceException
 
 public class ServiceBusyException : ServiceException
 {
-    public ServiceBusyException(string message, Exception innerException = null)
+    public ServiceBusyException(string message, Exception? innerException = null)
         : base(message, innerException)
     {
     }
@@ -102,7 +102,7 @@ public class ServiceBusyException : ServiceException
 
 public class ServiceTimeoutException : ServiceException
 {
-    public ServiceTimeoutException(string message, Exception innerException = null)
+    public ServiceTimeoutException(string message, Exception? innerException = null)
         : base(message, innerException)
     {
     }

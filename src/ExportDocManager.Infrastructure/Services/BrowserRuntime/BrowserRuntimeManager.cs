@@ -32,8 +32,8 @@ namespace ExportDocManager.Services.BrowserRuntime
         private int _activeAutomationTasks;
         private int _activeLeases;
         private int _disposed;
-        private TaskCompletionSource<bool> _leasesDrained;
-        private Task _disposeTask;
+        private TaskCompletionSource<bool>? _leasesDrained;
+        private Task? _disposeTask;
 
         public BrowserRuntimeManager()
         {
@@ -212,7 +212,7 @@ namespace ExportDocManager.Services.BrowserRuntime
 
     public sealed class BrowserWorkloadLease : IAsyncDisposable
     {
-        private BrowserRuntimeManager _owner;
+        private BrowserRuntimeManager? _owner;
         private readonly BrowserWorkloadKind _workload;
         private readonly SemaphoreSlim _workloadGate;
 
@@ -233,7 +233,7 @@ namespace ExportDocManager.Services.BrowserRuntime
 
     public sealed class BrowserProcessRegistration : IDisposable
     {
-        private BrowserRuntimeManager _owner;
+        private BrowserRuntimeManager? _owner;
         private readonly int _processId;
 
         internal BrowserProcessRegistration(BrowserRuntimeManager owner, int processId)

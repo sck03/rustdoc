@@ -88,7 +88,7 @@ public sealed class BrowserCdpConnectionResolverTests
         _ = await reader.ReadLineAsync();
         while (true)
         {
-            string line = await reader.ReadLineAsync();
+            string? line = await reader.ReadLineAsync();
             if (string.IsNullOrEmpty(line))
             {
                 break;

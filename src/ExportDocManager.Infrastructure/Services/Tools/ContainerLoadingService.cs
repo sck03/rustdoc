@@ -345,7 +345,7 @@ namespace ExportDocManager.Services.Tools
             return string.IsNullOrWhiteSpace(projectName) ? "未命名方案" : projectName.Trim();
         }
 
-        private static string NormalizeContainerType(string containerType)
+        private static string NormalizeContainerType(string? containerType)
         {
             return string.IsNullOrWhiteSpace(containerType) ? string.Empty : containerType.Trim();
         }

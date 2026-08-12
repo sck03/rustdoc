@@ -41,8 +41,7 @@ namespace ExportDocManager.Services.SingleWindow
 
                 return payload.Entries
                     .Select(MapEntry)
-                    .Where(entry => entry != null)
-                    .Cast<CustomsCooIssuingAuthorityEntry>()
+                    .OfType<CustomsCooIssuingAuthorityEntry>()
                     .ToList();
             }
             catch
@@ -51,7 +50,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        private static CustomsCooIssuingAuthorityEntry MapEntry(CustomsCooIssuingAuthorityDataEntry entry)
+        private static CustomsCooIssuingAuthorityEntry? MapEntry(CustomsCooIssuingAuthorityDataEntry? entry)
         {
             if (entry == null)
             {

@@ -22,15 +22,22 @@ namespace ExportDocManager.Services.Data
                 && !normalized.EndsWith('%');
         }
 
-        public static bool TryNormalizeDestinationCountry(string value, out string country)
+        public static bool TryNormalizeDestinationCountry(string? value, out string country)
         {
             country = string.Empty;
             string key = NormalizeCountryKey(value);
-            return !string.IsNullOrWhiteSpace(key)
-                && CountryNames.Value.TryGetValue(key, out country);
+            if (!string.IsNullOrWhiteSpace(key) &&
+                CountryNames.Value.TryGetValue(key, out string? resolvedCountry) &&
+                !string.IsNullOrWhiteSpace(resolvedCountry))
+            {
+                country = resolvedCountry;
+                return true;
+            }
+
+            return false;
         }
 
-        public static bool TryInferDestinationCountry(string destination, string address, out string country)
+        public static bool TryInferDestinationCountry(string? destination, string? address, out string country)
         {
             if (TryNormalizeDestinationCountry(destination, out country))
             {
@@ -86,7 +93,7 @@ namespace ExportDocManager.Services.Data
             }
         }
 
-        private static string NormalizeCountryKey(string value)
+        private static string NormalizeCountryKey(string? value)
         {
             return Regex.Replace((value ?? string.Empty).Trim().ToUpperInvariant(), @"[^\p{L}\p{N}]", string.Empty);
         }

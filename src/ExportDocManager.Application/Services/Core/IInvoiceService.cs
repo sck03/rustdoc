@@ -53,20 +53,20 @@ namespace ExportDocManager.Services.Core
             string companyScope,
             string invoiceNo,
             CancellationToken cancellationToken = default);
-        Task<Invoice> CopyInvoiceAsync(
+        Task<Invoice?> CopyInvoiceAsync(
             int originalId,
             string newInvoiceNo,
             InvoiceCloneOptions? options = null,
             CancellationToken cancellationToken = default);
-        Task<Invoice> CopyInvoiceAsTypeAsync(
+        Task<Invoice?> CopyInvoiceAsTypeAsync(
             int originalId,
             string targetType,
             InvoiceCloneOptions? options = null,
             CancellationToken cancellationToken = default);
-        Task<Invoice> TransitionInvoiceStatusAsync(
+        Task<Invoice?> TransitionInvoiceStatusAsync(
             InvoiceStatusTransitionRequest request,
             CancellationToken cancellationToken = default);
-        Task<Invoice> UnverifyInvoiceAsync(
+        Task<Invoice?> UnverifyInvoiceAsync(
             int id,
             byte[] expectedRowVersion,
             string note,

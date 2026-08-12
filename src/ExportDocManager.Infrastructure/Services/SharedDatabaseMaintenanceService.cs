@@ -38,13 +38,13 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly DatabaseConnectionSettings _maintenanceDatabaseSettings;
         private readonly string _postgreSqlOwnerRole;
         private readonly IAppPathProvider _pathProvider;
-        private readonly IBackgroundJobService _backgroundJobs;
+        private readonly IBackgroundJobService? _backgroundJobs;
 
         public SharedDatabaseMaintenanceService(
             IDbContextFactory<AppDbContext> contextFactory,
             DatabaseConnectionSettings databaseSettings,
             IAppPathProvider pathProvider,
-            IBackgroundJobService backgroundJobs = null)
+            IBackgroundJobService? backgroundJobs = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _databaseSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));

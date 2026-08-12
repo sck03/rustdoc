@@ -1,5 +1,6 @@
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Services.Infrastructure;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -10,7 +11,9 @@ namespace ExportDocManager.Api.Hosting
 
         private static void MapQueryEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/query/invoices", async (
+            endpoints.MapGet("/api/query/invoices", async Task<Results<
+                Ok<ApiPagedResponse<ApiQueryInvoiceRowDto>>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IQueryReadRepository queryReadRepository,
@@ -30,7 +33,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 var result = await queryReadRepository.QueryPageAsync(
@@ -51,7 +54,7 @@ namespace ExportDocManager.Api.Hosting
                     },
                     cancellationToken);
 
-                return Results.Ok(ApiQueryDtoFactory.FromPagedInvoices(result));
+                return TypedResults.Ok(ApiQueryDtoFactory.FromPagedInvoices(result));
             })
             .WithName("ListQueriedInvoices");
 
@@ -90,7 +93,11 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     destinationPath));
             })
-            .WithName("SaveQueriedInvoicesToPath");
+            .WithName("SaveQueriedInvoicesToPath")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/query/invoices/download", (
                 HttpContext context,
@@ -120,7 +127,10 @@ namespace ExportDocManager.Api.Hosting
                     request,
                     destinationPath));
             })
-            .WithName("DownloadQueriedInvoices");
+            .WithName("DownloadQueriedInvoices")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
         }
 
         internal static BackgroundJobSnapshot EnqueueQueryInvoiceExportJob(

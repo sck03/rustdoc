@@ -40,7 +40,7 @@ namespace ExportDocManager.Services.MasterData
         public async Task<HsCodeImportPreview> PreviewImportAsync(
             string filePath,
             HsCodeImportMode mode = HsCodeImportMode.Incremental,
-            string sourceName = null,
+            string? sourceName = null,
             int? effectiveYear = null,
             CancellationToken cancellationToken = default)
         {
@@ -61,7 +61,7 @@ namespace ExportDocManager.Services.MasterData
             await using var context = await CreateDbContextAsync(cancellationToken);
             var existingMap = await LoadExistingMapAsync(
                 context,
-                parsedRows.Where(row => row.Item != null).Select(row => row.Item.NormalizedCode),
+                parsedRows.Select(row => row.Item).OfType<HsCode>().Select(item => item.NormalizedCode),
                 mode == HsCodeImportMode.CompleteSnapshot,
                 cancellationToken);
 
@@ -142,8 +142,14 @@ namespace ExportDocManager.Services.MasterData
 
                         foreach (var previewItem in previewBatch)
                         {
+                            if (previewItem.Item is null)
+                            {
+                                skipped++;
+                                continue;
+                            }
+
                             var imported = CloneHsCode(previewItem.Item);
-                            string code = HsCodeTextHelper.NormalizeCode(imported?.Code);
+                            string code = HsCodeTextHelper.NormalizeCode(imported.Code);
                             if (string.IsNullOrWhiteSpace(code) || previewItem.ChangeType is "Invalid" or "Conflict")
                             {
                                 skipped++;
@@ -258,9 +264,9 @@ namespace ExportDocManager.Services.MasterData
             return result;
         }
 
-        private static DetectedImportLayout DetectBestImportLayout(XLWorkbook workbook)
+        private static DetectedImportLayout? DetectBestImportLayout(XLWorkbook workbook)
         {
-            DetectedImportLayout best = null;
+            DetectedImportLayout? best = null;
             foreach (var worksheet in workbook.Worksheets)
             {
                 var used = worksheet.RangeUsed();
@@ -383,7 +389,7 @@ namespace ExportDocManager.Services.MasterData
             int lastRow = Math.Min(worksheet.LastRowUsed()?.RowNumber() ?? headerRow, headerRow + 20);
             for (int row = headerRow + 1; row <= lastRow; row++)
             {
-                string raw = ReadImportCell(worksheet.Cell(row, codeColumn));
+                string? raw = ReadImportCell(worksheet.Cell(row, codeColumn));
                 if (string.IsNullOrWhiteSpace(raw))
                 {
                     continue;
@@ -430,10 +436,10 @@ namespace ExportDocManager.Services.MasterData
             HsCodeImportMode mode)
         {
             var items = new List<HsCodeImportPreviewItem>();
-            var validRows = parsedRows.Where(row => row.Item != null).ToList();
-            var duplicateCodes = validRows
-                .GroupBy(row => row.Item.NormalizedCode, StringComparer.OrdinalIgnoreCase)
-                .Where(group => group.Select(row => BuildComparableValue(row.Item)).Distinct(StringComparer.Ordinal).Count() > 1)
+            var validItems = parsedRows.Select(row => row.Item).OfType<HsCode>().ToList();
+            var duplicateCodes = validItems
+                .GroupBy(item => item.NormalizedCode, StringComparer.OrdinalIgnoreCase)
+                .Where(group => group.Select(BuildComparableValue).Distinct(StringComparer.Ordinal).Count() > 1)
                 .Select(group => group.Key)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var seenCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -442,7 +448,14 @@ namespace ExportDocManager.Services.MasterData
             {
                 if (parsed.Item == null)
                 {
-                    items.Add(CreatePreviewItem("Invalid", parsed.RowNumber, new HsCode(), [], [], parsed.Error, detected));
+                    items.Add(CreatePreviewItem(
+                        "Invalid",
+                        parsed.RowNumber,
+                        new HsCode(),
+                        [],
+                        [],
+                        parsed.Error ?? "无法识别有效 HS 编码。",
+                        detected));
                     continue;
                 }
                 string code = parsed.Item.NormalizedCode;
@@ -474,8 +487,8 @@ namespace ExportDocManager.Services.MasterData
 
             if (mode == HsCodeImportMode.CompleteSnapshot)
             {
-                var importedCodes = validRows.Select(row => row.Item.NormalizedCode).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var importedItems = validRows.Select(row => row.Item).ToList();
+                var importedCodes = validItems.Select(item => item.NormalizedCode).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var importedItems = validItems;
                 foreach (var existing in existingMap.Values.Where(item => !importedCodes.Contains(item.NormalizedCode)))
                 {
                     var replacements = FindReplacementCandidates(existing, importedItems);
@@ -498,7 +511,7 @@ namespace ExportDocManager.Services.MasterData
                 item, fields, replacements, message);
         }
 
-        private static HsCode BuildImportEntity(IXLRow row, ImportLayout layout)
+        private static HsCode? BuildImportEntity(IXLRow row, ImportLayout layout)
         {
             string code = HsCodeTextHelper.NormalizeCode(ReadImportCell(row.Cell(layout.CodeColumn)));
             if (string.IsNullOrWhiteSpace(code) || code.Length < 6 || code.Length > 13 || !code.All(char.IsDigit))
@@ -508,7 +521,7 @@ namespace ExportDocManager.Services.MasterData
             return new HsCode
             {
                 Code = code,
-                Name = ReadOptionalCell(row, layout.NameColumn),
+                Name = ReadOptionalCell(row, layout.NameColumn) ?? string.Empty,
                 Unit = MergeImportUnits(row, layout),
                 RebateRate = ReadImportRateCell(row, layout.RebateColumn),
                 NormalTariffRate = ReadImportRateCell(row, layout.NormalTariffRateColumn),
@@ -526,9 +539,9 @@ namespace ExportDocManager.Services.MasterData
             };
         }
 
-        private static string ReadOptionalCell(IXLRow row, int column) => column > 0 ? ReadImportCell(row.Cell(column)) : null;
+        private static string? ReadOptionalCell(IXLRow row, int column) => column > 0 ? ReadImportCell(row.Cell(column)) : null;
 
-        private static string ReadImportRateCell(IXLRow row, int column)
+        private static string? ReadImportRateCell(IXLRow row, int column)
         {
             if (column <= 0) return null;
             var cell = row.Cell(column);
@@ -541,7 +554,7 @@ namespace ExportDocManager.Services.MasterData
             return ReadImportCell(cell);
         }
 
-        private static string NormalizeImportNotes(string value)
+        private static string? NormalizeImportNotes(string? value)
         {
             if (string.IsNullOrWhiteSpace(value)) return null;
             string normalized = value.Trim();
@@ -556,13 +569,13 @@ namespace ExportDocManager.Services.MasterData
             return normalized;
         }
 
-        private static string ReadImportCell(IXLCell cell)
+        private static string? ReadImportCell(IXLCell? cell)
         {
             if (cell == null || cell.IsEmpty())
             {
                 return null;
             }
-            string formatted = cell.GetFormattedString()?.Trim();
+            string? formatted = cell.GetFormattedString()?.Trim();
             if (!string.IsNullOrWhiteSpace(formatted) && !formatted.Contains('E', StringComparison.OrdinalIgnoreCase))
             {
                 return formatted;
@@ -574,23 +587,23 @@ namespace ExportDocManager.Services.MasterData
             return formatted;
         }
 
-        private static string MergeImportUnits(IXLRow row, ImportLayout layout)
+        private static string? MergeImportUnits(IXLRow row, ImportLayout layout)
         {
-            string unit1 = layout.Unit1Column > 0 ? ConvertImportedUnit(ReadImportCell(row.Cell(layout.Unit1Column))) : null;
-            string unit2 = layout.Unit2Column > 0 ? ConvertImportedUnit(ReadImportCell(row.Cell(layout.Unit2Column))) : null;
+            string? unit1 = layout.Unit1Column > 0 ? ConvertImportedUnit(ReadImportCell(row.Cell(layout.Unit1Column))) : null;
+            string? unit2 = layout.Unit2Column > 0 ? ConvertImportedUnit(ReadImportCell(row.Cell(layout.Unit2Column))) : null;
             if (string.IsNullOrWhiteSpace(unit1)) return unit2;
             if (string.IsNullOrWhiteSpace(unit2) || string.Equals(unit1, unit2, StringComparison.OrdinalIgnoreCase)) return unit1;
             return $"{unit1}/{unit2}";
         }
 
-        private static string ConvertImportedUnit(string raw)
+        private static string? ConvertImportedUnit(string? raw)
         {
             if (string.IsNullOrWhiteSpace(raw)) return null;
             string value = raw.Trim();
             var parts = value.Split([' ', '-', '—'], StringSplitOptions.RemoveEmptyEntries);
-            string nonDigitPart = parts.FirstOrDefault(part => !part.All(char.IsDigit));
+            string? nonDigitPart = parts.FirstOrDefault(part => !part.All(char.IsDigit));
             if (parts.Length > 1 && !string.IsNullOrWhiteSpace(nonDigitPart)) return nonDigitPart;
-            if (CustomsUnitMap.TryGetValue(value, out string mappedValue)) return mappedValue;
+            if (CustomsUnitMap.TryGetValue(value, out string? mappedValue)) return mappedValue;
             if (char.IsDigit(value[0]))
             {
                 string trimmed = new string(value.SkipWhile(char.IsDigit).ToArray()).Trim();
@@ -617,7 +630,7 @@ namespace ExportDocManager.Services.MasterData
             Compare("备注", existing.Notes, imported.Notes);
             return fields;
 
-            void Compare(string name, string oldValue, string newValue)
+            void Compare(string name, string? oldValue, string? newValue)
             {
                 if (!string.IsNullOrWhiteSpace(newValue) && !string.Equals(oldValue?.Trim(), newValue.Trim(), StringComparison.OrdinalIgnoreCase))
                 {
@@ -643,7 +656,8 @@ namespace ExportDocManager.Services.MasterData
             target.Notes = Coalesce(source.Notes, target.Notes);
         }
 
-        private static string Coalesce(params string[] values) => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
+        private static string Coalesce(params string?[] values) =>
+            values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
 
         private static IReadOnlyList<string> FindReplacementCandidates(HsCode obsolete, IReadOnlyList<HsCode> imported)
         {
@@ -676,14 +690,15 @@ namespace ExportDocManager.Services.MasterData
             return Math.Min(score, 100);
         }
 
-        private static int CommonPrefixLength(string left, string right)
+        private static int CommonPrefixLength(string? left, string? right)
         {
             int length = 0;
-            while (length < Math.Min(left?.Length ?? 0, right?.Length ?? 0) && left[length] == right[length]) length++;
+            while (left is not null && right is not null &&
+                   length < Math.Min(left.Length, right.Length) && left[length] == right[length]) length++;
             return length;
         }
 
-        private static HashSet<string> BuildTextTokens(string value)
+        private static HashSet<string> BuildTextTokens(string? value)
         {
             return (value ?? string.Empty)
                 .ToUpperInvariant()
@@ -710,7 +725,7 @@ namespace ExportDocManager.Services.MasterData
             ReplacedByCodes = item.ReplacedByCodes, UpdateTime = item.UpdateTime
         };
 
-        private sealed record ParsedImportRow(int RowNumber, HsCode Item, string Error);
+        private sealed record ParsedImportRow(int RowNumber, HsCode? Item, string? Error);
         private sealed record DetectedImportLayout(IXLWorksheet Worksheet, int HeaderRowNumber, ImportLayout Layout, int Confidence);
         private sealed record ImportLayout(
             int CodeColumn, int NameColumn, int Unit1Column, int Unit2Column, int RebateColumn,

@@ -93,10 +93,10 @@ public static partial class ServerMigrationRecoveryStateMachine
         string databaseDump = ServerMigrationPackageValidator.ResolvePath(
             stagingRoot,
             ServerMigrationLayout.DatabaseEntry);
-        DatabaseConnectionSettings applicationSettings = null;
-        DatabaseConnectionSettings settings = null;
-        PostgreSqlToolPaths tools = null;
-        ServerMigrationFileTransactionState fileState = null;
+        DatabaseConnectionSettings? applicationSettings = null;
+        DatabaseConnectionSettings? settings = null;
+        PostgreSqlToolPaths? tools = null;
+        ServerMigrationFileTransactionState? fileState = null;
         marker.Attempt++;
         marker.ValidationDatabaseName =
             $"edm_migration_verify_{marker.PackageId[..16]}";
@@ -268,8 +268,8 @@ public static partial class ServerMigrationRecoveryStateMachine
         CancellationToken cancellationToken)
     {
         string safetyRoot = ServerMigrationManager.GetSafetyBackupRoot(pathProvider, marker.PackageId);
-        DatabaseConnectionSettings settings = null;
-        PostgreSqlToolPaths tools = null;
+        DatabaseConnectionSettings? settings = null;
+        PostgreSqlToolPaths? tools = null;
         try
         {
             DatabaseConnectionSettings applicationSettings = DbHelper.LoadDatabaseSettings();
@@ -326,8 +326,8 @@ public static partial class ServerMigrationRecoveryStateMachine
         IAppPathProvider pathProvider,
         string markerPath,
         PendingServerMigrationRestore marker,
-        DatabaseConnectionSettings settings,
-        PostgreSqlToolPaths tools,
+        DatabaseConnectionSettings? settings,
+        PostgreSqlToolPaths? tools,
         string safetyRoot,
         Exception originalError,
         CancellationToken cancellationToken)
@@ -356,7 +356,7 @@ public static partial class ServerMigrationRecoveryStateMachine
         {
             if (Directory.Exists(safetyRoot))
             {
-                ServerMigrationFileTransactionState state =
+                ServerMigrationFileTransactionState? state =
                     ServerMigrationFileSwitcher.ReadState(safetyRoot);
                 if (state != null)
                 {

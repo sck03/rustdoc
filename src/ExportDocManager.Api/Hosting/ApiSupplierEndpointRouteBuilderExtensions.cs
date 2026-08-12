@@ -9,7 +9,10 @@ namespace ExportDocManager.Api.Hosting
         private static void MapSupplierEndpoints(this IEndpointRouteBuilder endpoints)
         {
             endpoints.MapGet("/api/suppliers", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a, ISupplierDirectoryService s, CancellationToken ct) =>
-                HasSalesAccess(c, t, a, out var denied) ? Results.Ok((await s.ListAsync(ct)).Select(ToApiDto)) : denied).WithName("ListSuppliers");
+                HasSalesAccess(c, t, a, out var denied) ? Results.Ok((await s.ListAsync(ct)).Select(ToApiDto)) : denied).WithName("ListSuppliers")
+            .Produces<IReadOnlyList<ApiSupplierDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
             endpoints.MapGet("/api/suppliers/page", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a, ISupplierDirectoryService s,
                 string? keyword, string? status, int? pageNumber, int? pageSize, CancellationToken ct) =>
             {
@@ -17,7 +20,10 @@ namespace ExportDocManager.Api.Hosting
                 var page = await s.QueryAsync(keyword, status, pageNumber ?? 1, pageSize ?? 20, ct);
                 return Results.Ok(new ApiPagedResponse<ApiSupplierDto>(page.Items.Select(ToApiDto).ToArray(), page.TotalCount,
                     page.PageNumber, page.PageSize, page.TotalPages, page.HasPreviousPage, page.HasNextPage));
-            }).WithName("QuerySuppliers");
+            }).WithName("QuerySuppliers")
+            .Produces<ApiPagedResponse<ApiSupplierDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
             endpoints.MapPost("/api/suppliers", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a, ISupplierDirectoryService s,
                 ApiSupplierSaveRequest r, CancellationToken ct) =>
             {
@@ -25,7 +31,11 @@ namespace ExportDocManager.Api.Hosting
                 if (r == null || r.Id > 0) return Results.BadRequest(new ApiErrorResponse("新增供应商不能包含已有ID。"));
                 try { var saved = await s.SaveAsync(ToSaveRequest(r, 0), ct); return Results.Created($"/api/suppliers/{saved.Id}", ToApiDto(saved)); }
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
-            }).WithName("CreateSupplier");
+            }).WithName("CreateSupplier")
+            .Produces<ApiSupplierDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
             endpoints.MapPut("/api/suppliers/{id:int}", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a, ISupplierDirectoryService s,
                 int id, ApiSupplierSaveRequest r, CancellationToken ct) =>
             {
@@ -35,7 +45,12 @@ namespace ExportDocManager.Api.Hosting
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
                 catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
-            }).WithName("UpdateSupplier");
+            }).WithName("UpdateSupplier")
+            .Produces<ApiSupplierDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
             endpoints.MapDelete("/api/suppliers/{id:int}", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a, ISupplierDirectoryService s, int id, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(c, t, a, out var denied)) return denied;
@@ -56,17 +71,25 @@ namespace ExportDocManager.Api.Hosting
                         result.AssessmentCount));
                 }
                 catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
-            }).WithName("DeleteSupplier");
+            }).WithName("DeleteSupplier")
+            .Produces<ApiSupplierDeleteResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
             endpoints.MapPost("/api/suppliers/batch-status", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierDirectoryService s, ApiSupplierBatchStatusRequest r, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(c, t, a, out var denied)) return denied;
-                try { int affected = await s.UpdateStatusAsync(r?.Ids ?? [], r?.Status ?? string.Empty, ct); return Results.Ok(new ApiSupplierBatchStatusResult(affected, r.Status)); }
+                try { int affected = await s.UpdateStatusAsync(r?.Ids ?? [], r?.Status ?? string.Empty, ct); return Results.Ok(new ApiSupplierBatchStatusResult(affected, r?.Status ?? string.Empty)); }
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
                 catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
-            }).WithName("UpdateSupplierBatchStatus");
+            }).WithName("UpdateSupplierBatchStatus")
+            .Produces<ApiSupplierBatchStatusResult>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
             endpoints.MapPost("/api/suppliers/import/preview", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
-                ISupplierFileService files, CancellationToken ct) =>
+                ISupplierFileService files, string? fileName, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(c, t, a, out var denied)) return denied;
                 try
@@ -74,11 +97,15 @@ namespace ExportDocManager.Api.Hosting
                     using var input = new MemoryStream();
                     await ApiUploadLimits.CopyRequestBodyAsync(c.Request, input, ApiUploadLimits.SupplierImportBytes, ct);
                     if (input.Length == 0) return Results.BadRequest(new ApiErrorResponse("导入文件为空。"));
-                    input.Position = 0; return Results.Ok(ToApiDto(await files.PreviewAsync(input, c.Request.Query["fileName"].ToString(), ct)));
+                    input.Position = 0; return Results.Ok(ToApiDto(await files.PreviewAsync(input, fileName ?? string.Empty, ct)));
                 }
                 catch (PayloadLimitExceededException ex) { return WritePayloadTooLarge(ex); }
                 catch (InvalidDataException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
-            }).WithName("PreviewSupplierImport");
+            }).Accepts<IFormFile>("application/octet-stream").WithName("PreviewSupplierImport")
+            .Produces<ApiSupplierImportPreviewDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
             endpoints.MapPost("/api/suppliers/import", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierFileService files, ApiSupplierImportRequest r, CancellationToken ct) =>
             {
@@ -86,29 +113,45 @@ namespace ExportDocManager.Api.Hosting
                 if (r?.Rows == null || r.Rows.Count == 0 || r.Rows.Count > 5000) return Results.BadRequest(new ApiErrorResponse("请选择 1 至 5000 行供应商数据。"));
                 var result = await files.ImportAsync(r.Rows.Select(ToImportRow).ToArray(), ct);
                 return Results.Ok(new ApiSupplierImportResultDto(result.CreatedSuppliers, result.CreatedContacts, result.SkippedRows));
-            }).WithName("ImportSuppliers");
+            }).WithName("ImportSuppliers")
+            .Produces<ApiSupplierImportResultDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
             endpoints.MapGet("/api/suppliers/export", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierFileService files, string? keyword, string? status, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(c, t, a, out var denied)) return denied;
                 byte[] content = await files.ExportAsync(keyword, status, ct);
                 return Results.File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"suppliers-{DateTime.UtcNow:yyyyMMdd-HHmmss}.xlsx");
-            }).WithName("ExportSuppliers");
+            }).WithName("ExportSuppliers")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
             endpoints.MapGet("/api/suppliers/product-options", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierDirectoryService s, string? keyword, CancellationToken ct) =>
                 HasSalesAccess(c, t, a, out var denied)
                     ? Results.Ok((await s.SearchProductsAsync(keyword, ct)).Select(ToApiDto))
-                    : denied).WithName("SearchSupplierProductOptions");
+                    : denied).WithName("SearchSupplierProductOptions")
+            .Produces<IReadOnlyList<ApiSupplierProductOptionDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
             endpoints.MapGet("/api/suppliers/assessment-overview", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierAssessmentService s, CancellationToken ct) =>
                 HasSalesAccess(c, t, a, out var denied)
                     ? Results.Ok(ToApiDto(await s.GetOverviewAsync(ct)))
-                    : denied).WithName("GetSupplierAssessmentOverview");
+                    : denied).WithName("GetSupplierAssessmentOverview")
+            .Produces<ApiSupplierAssessmentOverviewDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
             endpoints.MapGet("/api/suppliers/{supplierId:int}/products", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierDirectoryService s, int supplierId, CancellationToken ct) =>
                 HasSalesAccess(c, t, a, out var denied)
                     ? Results.Ok((await s.ListProductLinksAsync(supplierId, ct)).Select(ToApiDto))
-                    : denied).WithName("ListSupplierProductLinks");
+                    : denied).WithName("ListSupplierProductLinks")
+            .Produces<IReadOnlyList<ApiSupplierProductLinkDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
             endpoints.MapPost("/api/suppliers/{supplierId:int}/products", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierDirectoryService s, int supplierId, ApiSupplierProductLinkSaveRequest r, CancellationToken ct) =>
             {
@@ -122,7 +165,12 @@ namespace ExportDocManager.Api.Hosting
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
                 catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
-            }).WithName("CreateSupplierProductLink");
+            }).WithName("CreateSupplierProductLink")
+            .Produces<ApiSupplierProductLinkDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
             endpoints.MapPut("/api/suppliers/{supplierId:int}/products/{id:int}", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierDirectoryService s, int supplierId, int id, ApiSupplierProductLinkSaveRequest r, CancellationToken ct) =>
             {
@@ -132,7 +180,12 @@ namespace ExportDocManager.Api.Hosting
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
                 catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
-            }).WithName("UpdateSupplierProductLink");
+            }).WithName("UpdateSupplierProductLink")
+            .Produces<ApiSupplierProductLinkDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
             endpoints.MapDelete("/api/suppliers/{supplierId:int}/products/{id:int}", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierDirectoryService s, int supplierId, int id, CancellationToken ct) =>
             {
@@ -143,12 +196,19 @@ namespace ExportDocManager.Api.Hosting
                         ? Results.Ok(new ApiCommandResponse(true, "供应商产品关联已删除。")) : Results.NotFound();
                 }
                 catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
-            }).WithName("DeleteSupplierProductLink");
+            }).WithName("DeleteSupplierProductLink")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
             endpoints.MapGet("/api/suppliers/{supplierId:int}/assessments", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierAssessmentService s, int supplierId, CancellationToken ct) =>
                 HasSalesAccess(c, t, a, out var denied)
                     ? Results.Ok((await s.ListAsync(supplierId, ct)).Select(ToApiDto))
-                    : denied).WithName("ListSupplierAssessments");
+                    : denied).WithName("ListSupplierAssessments")
+            .Produces<IReadOnlyList<ApiSupplierAssessmentDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
             endpoints.MapPost("/api/suppliers/{supplierId:int}/assessments", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierAssessmentService s, int supplierId, ApiSupplierAssessmentSaveRequest r, CancellationToken ct) =>
             {
@@ -162,7 +222,12 @@ namespace ExportDocManager.Api.Hosting
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
                 catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
-            }).WithName("CreateSupplierAssessment");
+            }).WithName("CreateSupplierAssessment")
+            .Produces<ApiSupplierAssessmentDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
             endpoints.MapPut("/api/suppliers/{supplierId:int}/assessments/{id:int}", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierAssessmentService s, int supplierId, int id, ApiSupplierAssessmentSaveRequest r, CancellationToken ct) =>
             {
@@ -172,7 +237,12 @@ namespace ExportDocManager.Api.Hosting
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
                 catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
-            }).WithName("UpdateSupplierAssessment");
+            }).WithName("UpdateSupplierAssessment")
+            .Produces<ApiSupplierAssessmentDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
             endpoints.MapDelete("/api/suppliers/{supplierId:int}/assessments/{id:int}", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierAssessmentService s, int supplierId, int id, CancellationToken ct) =>
             {
@@ -184,10 +254,17 @@ namespace ExportDocManager.Api.Hosting
                         : Results.NotFound();
                 }
                 catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
-            }).WithName("DeleteSupplierAssessment");
+            }).WithName("DeleteSupplierAssessment")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
             endpoints.MapGet("/api/suppliers/{supplierId:int}/contacts", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierDirectoryService s, int supplierId, CancellationToken ct) =>
-                HasSalesAccess(c, t, a, out var denied) ? Results.Ok((await s.ListContactsAsync(supplierId, ct)).Select(ToApiDto)) : denied).WithName("ListSupplierContacts");
+                HasSalesAccess(c, t, a, out var denied) ? Results.Ok((await s.ListContactsAsync(supplierId, ct)).Select(ToApiDto)) : denied).WithName("ListSupplierContacts")
+            .Produces<IReadOnlyList<ApiSupplierContactDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
             endpoints.MapPost("/api/suppliers/{supplierId:int}/contacts", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierDirectoryService s, int supplierId, ApiSupplierContactSaveRequest r, CancellationToken ct) =>
             {
@@ -197,7 +274,12 @@ namespace ExportDocManager.Api.Hosting
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
                 catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
-            }).WithName("CreateSupplierContact");
+            }).WithName("CreateSupplierContact")
+            .Produces<ApiSupplierContactDto>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
             endpoints.MapPut("/api/suppliers/{supplierId:int}/contacts/{id:int}", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierDirectoryService s, int supplierId, int id, ApiSupplierContactSaveRequest r, CancellationToken ct) =>
             {
@@ -207,7 +289,12 @@ namespace ExportDocManager.Api.Hosting
                 catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
                 catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
                 catch (KeyNotFoundException) { return Results.NotFound(); }
-            }).WithName("UpdateSupplierContact");
+            }).WithName("UpdateSupplierContact")
+            .Produces<ApiSupplierContactDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
             endpoints.MapDelete("/api/suppliers/{supplierId:int}/contacts/{id:int}", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
                 ISupplierDirectoryService s, int supplierId, int id, CancellationToken ct) =>
             {
@@ -218,7 +305,11 @@ namespace ExportDocManager.Api.Hosting
                         ? Results.Ok(new ApiCommandResponse(true, "联系人已删除。")) : Results.NotFound();
                 }
                 catch (BusinessConcurrencyException ex) { return Results.Conflict(new ApiErrorResponse(ex.Message)); }
-            }).WithName("DeleteSupplierContact");
+            }).WithName("DeleteSupplierContact")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
         }
 
         private static ApiSupplierDto ToApiDto(SupplierRecord x) => new(x.Id, x.Name, x.CountryRegion, x.Category,

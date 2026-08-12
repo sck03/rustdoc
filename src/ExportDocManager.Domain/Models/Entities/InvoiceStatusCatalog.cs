@@ -37,13 +37,13 @@ namespace ExportDocManager.Models.Entities
             Cancelled
         ];
 
-        public static bool IsKnown(string status)
+        public static bool IsKnown(string? status)
         {
             string normalized = Normalize(status);
             return Statuses.Contains(normalized, StringComparer.OrdinalIgnoreCase);
         }
 
-        public static string Normalize(string status)
+        public static string Normalize(string? status)
         {
             string normalized = status?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(normalized))
@@ -56,12 +56,12 @@ namespace ExportDocManager.Models.Entities
                    ?? normalized;
         }
 
-        public static bool IsEditable(string status)
+        public static bool IsEditable(string? status)
         {
             return string.Equals(Normalize(status), Draft, StringComparison.OrdinalIgnoreCase);
         }
 
-        public static bool CanUnverify(string status)
+        public static bool CanUnverify(string? status)
         {
             if (string.IsNullOrWhiteSpace(status))
             {
@@ -71,12 +71,12 @@ namespace ExportDocManager.Models.Entities
             return ReversibleLockedStatuses.Contains(status.Trim());
         }
 
-        public static bool IsCancelled(string status)
+        public static bool IsCancelled(string? status)
         {
             return string.Equals(status?.Trim(), Cancelled, StringComparison.OrdinalIgnoreCase);
         }
 
-        public static bool CanTransition(string currentStatus, string targetStatus)
+        public static bool CanTransition(string? currentStatus, string? targetStatus)
         {
             string current = Normalize(currentStatus);
             string target = Normalize(targetStatus);
@@ -100,7 +100,7 @@ namespace ExportDocManager.Models.Entities
             };
         }
 
-        public static string GetNextOperationalStatus(string status)
+        public static string GetNextOperationalStatus(string? status)
         {
             return Normalize(status) switch
             {
@@ -111,7 +111,7 @@ namespace ExportDocManager.Models.Entities
             };
         }
 
-        public static string GetDisplayName(string status)
+        public static string GetDisplayName(string? status)
         {
             if (string.IsNullOrWhiteSpace(status))
             {

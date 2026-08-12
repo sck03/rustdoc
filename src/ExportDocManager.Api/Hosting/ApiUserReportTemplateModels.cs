@@ -27,13 +27,13 @@ namespace ExportDocManager.Api.Hosting
         bool CanRestore);
 
     public sealed record ApiUserReportTemplateSaveRequest(
-        int Id,
-        string ReportType,
-        string Name,
-        string ContentHtml,
-        bool IsActive,
-        bool IsShared,
-        string ShareScope,
+        int Id = 0,
+        string ReportType = "",
+        string Name = "",
+        string ContentHtml = "",
+        bool IsActive = true,
+        bool IsShared = false,
+        string ShareScope = "Private",
         int ExpectedVersion = 0,
         string SourceTemplatePath = "");
 }

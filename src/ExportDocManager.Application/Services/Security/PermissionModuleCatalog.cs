@@ -44,7 +44,7 @@ namespace ExportDocManager.Services.Security
         string Name,
         string Description,
         IReadOnlyList<string> ModuleKeys,
-        IReadOnlyDictionary<string, string> AccessOverrides = null)
+        IReadOnlyDictionary<string, string>? AccessOverrides = null)
     {
         public string GetAccessLevel(string moduleKey) =>
             AccessOverrides != null && AccessOverrides.TryGetValue(moduleKey, out var accessLevel)

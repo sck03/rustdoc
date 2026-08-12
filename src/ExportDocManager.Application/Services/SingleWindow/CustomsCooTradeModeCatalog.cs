@@ -29,7 +29,7 @@ namespace ExportDocManager.Services.SingleWindow
 
         public static IReadOnlyList<string> CodeValues => SingleWindowFieldValidationHelper.CooTradeModeCodeValues;
 
-        public static string NormalizeCode(string value)
+        public static string NormalizeCode(string? value)
         {
             string normalized = NormalizeText(value);
             if (string.IsNullOrWhiteSpace(normalized))
@@ -42,12 +42,12 @@ namespace ExportDocManager.Services.SingleWindow
                 return normalized;
             }
 
-            return CooTradeModeLookup.TryGetValue(NormalizeLookupKey(value), out string mapped)
+            return CooTradeModeLookup.TryGetValue(NormalizeLookupKey(value), out string? mapped)
                 ? mapped
                 : string.Empty;
         }
 
-        public static string PreferCode(string preferredValue, string fallbackValue)
+        public static string PreferCode(string? preferredValue, string? fallbackValue)
         {
             string normalizedPreferred = NormalizeCode(preferredValue);
             return string.IsNullOrWhiteSpace(normalizedPreferred)
@@ -55,7 +55,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : normalizedPreferred;
         }
 
-        private static string NormalizeLookupKey(string value)
+        private static string NormalizeLookupKey(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -69,7 +69,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .ToArray());
         }
 
-        private static string NormalizeText(string value)
+        private static string NormalizeText(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
         }

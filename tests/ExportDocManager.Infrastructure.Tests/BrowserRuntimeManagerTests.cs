@@ -16,7 +16,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task AutomationLease_ShouldSerializeAndReleaseCapacity()
         {
-            string previous = Environment.GetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable);
+            string? previous = Environment.GetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable);
             Environment.SetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable, "1");
             try
             {
@@ -38,9 +38,9 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task QueuedAutomationLease_ShouldNotBlockAvailablePdfCapacity()
         {
-            string previousGlobal = Environment.GetEnvironmentVariable(BrowserRuntimeManager.GlobalConcurrencyEnvironmentVariable);
-            string previousPdf = Environment.GetEnvironmentVariable(BrowserRuntimeManager.PdfConcurrencyEnvironmentVariable);
-            string previousAutomation = Environment.GetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable);
+            string? previousGlobal = Environment.GetEnvironmentVariable(BrowserRuntimeManager.GlobalConcurrencyEnvironmentVariable);
+            string? previousPdf = Environment.GetEnvironmentVariable(BrowserRuntimeManager.PdfConcurrencyEnvironmentVariable);
+            string? previousAutomation = Environment.GetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable);
             Environment.SetEnvironmentVariable(BrowserRuntimeManager.GlobalConcurrencyEnvironmentVariable, "2");
             Environment.SetEnvironmentVariable(BrowserRuntimeManager.PdfConcurrencyEnvironmentVariable, "2");
             Environment.SetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable, "1");
@@ -71,7 +71,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task DisposeAsync_ShouldCancelQueuedAcquireAndWaitForActiveLease()
         {
-            string previousAutomation = Environment.GetEnvironmentVariable(
+            string? previousAutomation = Environment.GetEnvironmentVariable(
                 BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable);
             Environment.SetEnvironmentVariable(
                 BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable,
@@ -190,8 +190,8 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task ManagedPlaywrightHost_ShouldDeferRecycleUntilParallelPagesFinish()
         {
-            string previousConcurrency = Environment.GetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable);
-            string previousRecycleUses = Environment.GetEnvironmentVariable(ManagedPlaywrightBrowserHost.RecycleUsesEnvironmentVariable);
+            string? previousConcurrency = Environment.GetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable);
+            string? previousRecycleUses = Environment.GetEnvironmentVariable(ManagedPlaywrightBrowserHost.RecycleUsesEnvironmentVariable);
             Environment.SetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable, "2");
             Environment.SetEnvironmentVariable(ManagedPlaywrightBrowserHost.RecycleUsesEnvironmentVariable, "1");
             string root = FindRepositoryRoot();
@@ -236,7 +236,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task ManagedPlaywrightHost_ShouldRecycleLocalBrowserAfterIdleTimeout()
         {
-            string previousIdleTimeout = Environment.GetEnvironmentVariable(
+            string? previousIdleTimeout = Environment.GetEnvironmentVariable(
                 ManagedPlaywrightBrowserHost.IdleTimeoutSecondsEnvironmentVariable);
             Environment.SetEnvironmentVariable(
                 ManagedPlaywrightBrowserHost.IdleTimeoutSecondsEnvironmentVariable,

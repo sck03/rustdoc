@@ -77,13 +77,19 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("ImportLetterOfCreditDocument");
+            .WithName("ImportLetterOfCreditDocument")
+            .Produces<ApiLetterOfCreditImportResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/tools/letter-of-credit/import-upload", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ILetterOfCreditDocumentService documentService,
                 IAppPathProvider pathProvider,
+                string? fileName,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -100,9 +106,8 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    string fileName = NormalizeUploadedLetterOfCreditFileName(
-                        context.Request.Query["fileName"].ToString());
-                    string uploadPath = Path.Combine(uploadRoot, fileName);
+                    string safeFileName = NormalizeUploadedLetterOfCreditFileName(fileName ?? string.Empty);
+                    string uploadPath = Path.Combine(uploadRoot, safeFileName);
                     await using (var output = File.Create(uploadPath))
                     {
                         await ApiUploadLimits.CopyRequestBodyAsync(
@@ -119,7 +124,7 @@ namespace ExportDocManager.Api.Hosting
 
                     var result = await documentService.ImportAsync(uploadPath, cancellationToken);
                     return Results.Ok(new ApiLetterOfCreditImportResponse(
-                        fileName,
+                        safeFileName,
                         result.SourceDescription,
                         result.ExtractedText,
                         "浏览器上传文件仅暂存在运行数据根 Cache/BrowserUploads/LetterOfCredit，请求结束后立即删除；响应和发票草稿只保留安全原文件名，不返回或保存服务器临时绝对路径。"));
@@ -153,7 +158,13 @@ namespace ExportDocManager.Api.Hosting
                     AtomicFileHelper.TryDeleteDirectory(uploadRoot);
                 }
             })
-            .WithName("UploadLetterOfCreditDocument");
+            .Accepts<IFormFile>("application/octet-stream")
+            .WithName("UploadLetterOfCreditDocument")
+            .Produces<ApiLetterOfCreditImportResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable)
+            .Produces(StatusCodes.Status413PayloadTooLarge);
 
             endpoints.MapPost("/api/tools/letter-of-credit/review", async (
                 HttpContext context,
@@ -207,7 +218,11 @@ namespace ExportDocManager.Api.Hosting
                     return WriteInfrastructureFailure("AI 审查服务返回了无效响应，请稍后重试。", ex);
                 }
             })
-            .WithName("ReviewLetterOfCreditCompliance");
+            .WithName("ReviewLetterOfCreditCompliance")
+            .Produces<ApiLetterOfCreditReviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
         }
 
         private static LetterOfCreditComplianceReviewDraft ToLetterOfCreditReviewDraft(ApiInvoiceDetailDto invoice)

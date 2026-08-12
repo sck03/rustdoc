@@ -152,8 +152,7 @@ export function createInvoiceQuerySmokeScene(runtime) {
       const checkUrl = buildQueryKeyboardCheckUrl(options.webUrl);
       await page.send("Page.navigate", { url: checkUrl });
       const expectedText = [
-        "导出",
-        "输出路径",
+        "导出查询结果",
         "发票号",
         "合同号",
         "客户",

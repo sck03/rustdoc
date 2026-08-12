@@ -19,7 +19,7 @@ namespace ExportDocManager.Services.Crm
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
         }
 
-        public async Task<byte[]> ExportAsync(string keyword, string status, CancellationToken cancellationToken = default)
+        public async Task<byte[]> ExportAsync(string? keyword, string? status, CancellationToken cancellationToken = default)
         {
             keyword = Clean(keyword);
             status = Clean(status);
@@ -73,6 +73,6 @@ namespace ExportDocManager.Services.Crm
             return output.ToArray();
         }
 
-        private static string Clean(string value) => (value ?? string.Empty).Trim();
+        private static string Clean(string? value) => (value ?? string.Empty).Trim();
     }
 }

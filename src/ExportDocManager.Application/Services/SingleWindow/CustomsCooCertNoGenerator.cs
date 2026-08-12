@@ -10,11 +10,11 @@ namespace ExportDocManager.Services.SingleWindow
             RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
         public static string NormalizeOrGenerate(
-            string currentValue,
-            string certType,
-            string primaryEnterpriseCode,
-            string secondaryEnterpriseCode,
-            string aplDate,
+            string? currentValue,
+            string? certType,
+            string? primaryEnterpriseCode,
+            string? secondaryEnterpriseCode,
+            string? aplDate,
             bool generateWhenBlank = true)
         {
             string normalizedCurrent = NormalizeText(currentValue);
@@ -43,10 +43,10 @@ namespace ExportDocManager.Services.SingleWindow
         }
 
         public static bool TryBuildPrefix(
-            string certType,
-            string primaryEnterpriseCode,
-            string secondaryEnterpriseCode,
-            string aplDate,
+            string? certType,
+            string? primaryEnterpriseCode,
+            string? secondaryEnterpriseCode,
+            string? aplDate,
             out string prefix)
         {
             prefix = string.Empty;
@@ -62,7 +62,7 @@ namespace ExportDocManager.Services.SingleWindow
             return true;
         }
 
-        public static bool TryGetStructuredSequence(string certNo, out string sequence)
+        public static bool TryGetStructuredSequence(string? certNo, out string sequence)
         {
             sequence = string.Empty;
             string normalized = NormalizeText(certNo);
@@ -81,7 +81,7 @@ namespace ExportDocManager.Services.SingleWindow
             return true;
         }
 
-        private static string ResolveYear(string aplDate)
+        private static string ResolveYear(string? aplDate)
         {
             if (DateTime.TryParseExact(
                     NormalizeText(aplDate),
@@ -101,15 +101,15 @@ namespace ExportDocManager.Services.SingleWindow
             return DateTime.Today.ToString("yy", CultureInfo.InvariantCulture);
         }
 
-        private static string NormalizeCertType(string certType)
+        private static string NormalizeCertType(string? certType)
         {
             string normalized = NormalizeText(certType).ToUpperInvariant();
             return normalized.Length is >= 1 and <= 2 ? normalized : string.Empty;
         }
 
-        private static string ResolveOrganizationCodeSegment(string primaryEnterpriseCode, string secondaryEnterpriseCode)
+        private static string ResolveOrganizationCodeSegment(string? primaryEnterpriseCode, string? secondaryEnterpriseCode)
         {
-            foreach (string candidate in new[] { primaryEnterpriseCode, secondaryEnterpriseCode })
+            foreach (string? candidate in new[] { primaryEnterpriseCode, secondaryEnterpriseCode })
             {
                 string normalized = NormalizeText(candidate).ToUpperInvariant();
                 if (normalized.Length == 18)
@@ -133,6 +133,6 @@ namespace ExportDocManager.Services.SingleWindow
         private static bool IsDigits(string value) => value.All(char.IsDigit);
         private static bool IsAlphaNumeric(string value) => value.All(char.IsLetterOrDigit);
 
-        private static string NormalizeText(string value) => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+        private static string NormalizeText(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
     }
 }

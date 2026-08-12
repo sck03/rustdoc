@@ -20,7 +20,7 @@ namespace ExportDocManager.Api.Hosting
         private readonly Lock _persistenceLock = new();
         private readonly string _storePath;
         private readonly bool _useDatabaseStore;
-        private readonly IDbContextFactory<AppDbContext> _contextFactory;
+        private readonly IDbContextFactory<AppDbContext>? _contextFactory;
 
         private void LoadPersistedJobs()
         {
@@ -158,7 +158,7 @@ namespace ExportDocManager.Api.Hosting
 
         private void LoadDatabaseJobs()
         {
-            using var context = _contextFactory.CreateDbContext();
+            using var context = GetContextFactory().CreateDbContext();
             var restartTime = DateTimeOffset.UtcNow;
             var changedJobs = new List<BackgroundJobSnapshot>();
             foreach (var record in context.ApiBackgroundJobs.AsNoTracking().ToList())
@@ -192,7 +192,7 @@ namespace ExportDocManager.Api.Hosting
 
         private void PersistDatabaseJobLocked(BackgroundJobSnapshot snapshot)
         {
-            using var context = _contextFactory.CreateDbContext();
+            using var context = GetContextFactory().CreateDbContext();
             var record = context.ApiBackgroundJobs.Find(snapshot.JobId);
             if (record != null && record.UpdatedAt >= snapshot.UpdatedAt)
             {
@@ -216,7 +216,7 @@ namespace ExportDocManager.Api.Hosting
         {
             lock (_persistenceLock)
             {
-                using var context = _contextFactory.CreateDbContext();
+                using var context = GetContextFactory().CreateDbContext();
                 var records = context.ApiBackgroundJobs
                     .Where(record => jobIds.Contains(record.JobId))
                     .ToList();
@@ -356,8 +356,7 @@ namespace ExportDocManager.Api.Hosting
 
         private BackgroundJobSnapshot CleanupRestoredFailedOutput(BackgroundJobSnapshot job, ref bool changed)
         {
-            if (job == null ||
-                string.Equals(job.Status, BackgroundJobStatusCatalog.Succeeded, StringComparison.OrdinalIgnoreCase) ||
+            if (string.Equals(job.Status, BackgroundJobStatusCatalog.Succeeded, StringComparison.OrdinalIgnoreCase) ||
                 !BackgroundJobStatusCatalog.IsTerminal(job.Status) ||
                 string.IsNullOrWhiteSpace(job.OutputPath))
             {
@@ -389,5 +388,8 @@ namespace ExportDocManager.Api.Hosting
                 RetryRequestJson = job.RetryRequestJson
             };
         }
+
+        private IDbContextFactory<AppDbContext> GetContextFactory() =>
+            _contextFactory ?? throw new InvalidOperationException("后台任务数据库存储未配置。");
     }
 }

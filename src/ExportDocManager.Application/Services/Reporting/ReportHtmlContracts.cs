@@ -135,25 +135,25 @@ namespace ExportDocManager.Services.Reporting
         Task<ReportHtmlRenderResult> RenderInvoiceReportAsync(
             int invoiceId,
             ReportDocumentType reportType,
-            string templatePath = null,
+            string? templatePath = null,
             bool withSeal = true,
             CancellationToken cancellationToken = default);
 
         Task<ReportHtmlRenderResult> RenderInvoiceReportDraftAsync(
             Invoice invoice,
             ReportDocumentType reportType,
-            string templatePath = null,
+            string? templatePath = null,
             bool withSeal = true,
             CancellationToken cancellationToken = default);
 
         Task<ReportHtmlRenderResult> RenderPaymentVoucherAsync(
             int paymentId,
-            string templatePath = null,
+            string? templatePath = null,
             CancellationToken cancellationToken = default);
 
         Task<ReportHtmlRenderResult> RenderPaymentVoucherDraftAsync(
             Payment payment,
-            string templatePath = null,
+            string? templatePath = null,
             CancellationToken cancellationToken = default);
     }
 
@@ -162,7 +162,7 @@ namespace ExportDocManager.Services.Reporting
         Task<ReportTemplateContentResult> CreateTemplateAsync(
             ReportDocumentType reportType,
             string templatePath,
-            string displayName = null,
+            string? displayName = null,
             CancellationToken cancellationToken = default);
 
         Task<ReportTemplateContentResult> GetTemplateContentAsync(
@@ -203,13 +203,13 @@ namespace ExportDocManager.Services.Reporting
     {
         Task<ReportTemplatePackageExportResult> ExportAsync(
             string packagePath,
-            IProgress<OperationProgressUpdate> progress = null,
+            IProgress<OperationProgressUpdate>? progress = null,
             CancellationToken cancellationToken = default);
 
         Task<ReportTemplatePackageImportResult> ImportAsync(
             string packagePath,
             ReportTemplateImportStrategy strategy = ReportTemplateImportStrategy.Overwrite,
-            IProgress<OperationProgressUpdate> progress = null,
+            IProgress<OperationProgressUpdate>? progress = null,
             CancellationToken cancellationToken = default);
     }
 

@@ -56,7 +56,7 @@ namespace ExportDocManager.Utils
         {
             string fullRoot = Normalize(root);
             string fullPath = EnsureWithinRoot(path, fullRoot, errorMessage);
-            string current = fullPath;
+            string? current = fullPath;
 
             while (true)
             {
@@ -128,7 +128,7 @@ namespace ExportDocManager.Utils
                     throw new UnauthorizedAccessException(errorMessage, ex);
                 }
 
-                string parent = Path.GetDirectoryName(current);
+                string? parent = Path.GetDirectoryName(current);
                 if (string.IsNullOrWhiteSpace(parent) ||
                     string.Equals(parent, current, PathComparison))
                 {

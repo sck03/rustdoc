@@ -16,12 +16,12 @@ namespace ExportDocManager.Services.SingleWindow
             var customer = snapshot.Customer;
             var existing = snapshot.ExistingDocument;
             var warnings = new List<string>();
-            string firstOrigin = snapshot.Items.FirstOrDefault()?.Origin;
+            string? firstOrigin = snapshot.Items.FirstOrDefault()?.Origin;
             string exporterCreditCode = CustomsCooTextFormatter.ResolveExporterCreditCode(invoice, exporter);
-            string exporterNameEnglish = invoice.ExporterNameEN ?? exporter?.ExporterNameEN;
-            string exporterAddressEnglish = invoice.ExporterAddressEN ?? exporter?.AddressEN;
-            string customerNameEnglish = invoice.CustomerNameEN ?? customer?.CustomerNameEN;
-            string customerAddressEnglish = invoice.CustomerAddressEN ?? customer?.AddressEN;
+            string? exporterNameEnglish = invoice.ExporterNameEN ?? exporter?.ExporterNameEN;
+            string? exporterAddressEnglish = invoice.ExporterAddressEN ?? exporter?.AddressEN;
+            string? customerNameEnglish = invoice.CustomerNameEN ?? customer?.CustomerNameEN;
+            string? customerAddressEnglish = invoice.CustomerAddressEN ?? customer?.AddressEN;
             string existingOrgCode = NormalizeText(existing?.OrgCode);
             string existingFetchPlace = NormalizeText(existing?.FetchPlace);
             string derivedApplicationAddress = FirstNonEmpty(
@@ -200,7 +200,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .ToList();
         }
 
-        private static CooMappedGoodsItem MapGoodsItem(Item item, Invoice invoice, Exporter exporter, int lineNo)
+        private static CooMappedGoodsItem MapGoodsItem(Item item, Invoice invoice, Exporter? exporter, int lineNo)
         {
             return new CooMappedGoodsItem
             {
@@ -244,7 +244,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        private static CooMappedGoodsItem MergeGoodsItem(Item item, Invoice invoice, Exporter exporter, CustomsCooItem existing, int lineNo)
+        private static CooMappedGoodsItem MergeGoodsItem(Item item, Invoice invoice, Exporter? exporter, CustomsCooItem existing, int lineNo)
         {
             var fallback = MapGoodsItem(item, invoice, exporter, lineNo);
             fallback.GNo = lineNo;
@@ -379,7 +379,7 @@ namespace ExportDocManager.Services.SingleWindow
                 return new ExistingGoodsItemIndex(bySourceItemId, bySourceStyleNo, byLineNo);
             }
 
-            public CustomsCooItem Find(Item item, int lineNo)
+            public CustomsCooItem? Find(Item? item, int lineNo)
             {
                 if (item != null && item.Id > 0 && _bySourceItemId.TryGetValue(item.Id, out var bySourceItemId))
                 {
@@ -398,7 +398,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        private static CooMappedGoodsItem NormalizeGoodsItem(CooMappedGoodsItem item, string certType)
+        private static CooMappedGoodsItem NormalizeGoodsItem(CooMappedGoodsItem? item, string? certType)
         {
             if (item == null)
             {
@@ -415,20 +415,20 @@ namespace ExportDocManager.Services.SingleWindow
             return item;
         }
 
-        private static string PreferPartyBlock(string existingValue, string fallbackValue)
+        private static string PreferPartyBlock(string? existingValue, string? fallbackValue)
         {
             string normalizedExisting = CustomsCooTextFormatter.DecodeXmlMultiline(existingValue);
             return string.IsNullOrWhiteSpace(normalizedExisting)
-                ? fallbackValue
+                ? fallbackValue ?? string.Empty
                 : normalizedExisting;
         }
 
-        private static string PreferRecognizedCountryNameEnglish(string existingValue, string fallbackValue, string rawOriginValue)
+        private static string PreferRecognizedCountryNameEnglish(string? existingValue, string? fallbackValue, string? rawOriginValue)
         {
             string normalizedExisting = NormalizeText(existingValue);
             if (string.IsNullOrWhiteSpace(normalizedExisting))
             {
-                return fallbackValue;
+                return fallbackValue ?? string.Empty;
             }
 
             if (string.IsNullOrWhiteSpace(fallbackValue) && !TryResolveCountry(rawOriginValue, out _))
@@ -445,14 +445,14 @@ namespace ExportDocManager.Services.SingleWindow
             return normalizedExisting;
         }
 
-        private static string NormalizeRecognizedCountryCode(string value)
+        private static string NormalizeRecognizedCountryCode(string? value)
         {
             return TryResolveCountry(value, out var entry)
                 ? entry.Code
                 : string.Empty;
         }
 
-        private static string NormalizeRecognizedCountryNameEnglish(string value)
+        private static string NormalizeRecognizedCountryNameEnglish(string? value)
         {
             return TryResolveCountry(value, out var entry)
                 ? entry.EnglishName

@@ -40,7 +40,10 @@ namespace ExportDocManager.Api.Hosting
                     pathProvider,
                     ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
             })
-            .WithName("ListDatabaseBackups");
+            .WithName("ListDatabaseBackups")
+            .Produces<ApiBackupListResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/backup", async (
                 HttpContext context,
@@ -78,7 +81,10 @@ namespace ExportDocManager.Api.Hosting
                         "数据库备份服务暂时不可用，请稍后重试。",
                         new InvalidOperationException(backupResult.Message));
             })
-            .WithName("CreateDatabaseBackup");
+            .WithName("CreateDatabaseBackup")
+            .Produces<ApiBackupCreateResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/backup/cleanup", (
                 HttpContext context,
@@ -122,7 +128,11 @@ namespace ExportDocManager.Api.Hosting
                     list.BackupRoot,
                     list.StoragePolicy));
             })
-            .WithName("CleanupDatabaseBackups");
+            .WithName("CleanupDatabaseBackups")
+            .Produces<ApiBackupCreateResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/backup/restore", async (
                 HttpContext context,
@@ -169,7 +179,14 @@ namespace ExportDocManager.Api.Hosting
                     throw;
                 }
             })
-            .WithName("RestoreDatabaseBackup");
+            .WithName("RestoreDatabaseBackup")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapGet("/api/backup/disaster-recovery/status", (
                 HttpContext context,
@@ -200,7 +217,10 @@ namespace ExportDocManager.Api.Hosting
                     status.Message,
                     status.StoragePolicy));
             })
-            .WithName("GetDisasterRecoveryStatus");
+            .WithName("GetDisasterRecoveryStatus")
+            .Produces<ApiDisasterRecoveryStatusResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/backup/disaster-recovery/create", async (
                 HttpContext context,
@@ -254,7 +274,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("CreateDisasterRecoveryPackage");
+            .WithName("CreateDisasterRecoveryPackage")
+            .Produces<ApiDisasterRecoveryPackageResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/backup/disaster-recovery/restore", async (
                 HttpContext context,
@@ -319,7 +344,14 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("RestoreDisasterRecoveryPackage");
+            .WithName("RestoreDisasterRecoveryPackage")
+            .Produces<ApiDisasterRecoveryRestoreResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapGet("/api/backup/cloud/status", async (
                 HttpContext context,
@@ -356,7 +388,10 @@ namespace ExportDocManager.Api.Hosting
                         ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
                     CloudBackupStoragePolicy));
             })
-            .WithName("GetCloudBackupStatus");
+            .WithName("GetCloudBackupStatus")
+            .Produces<ApiCloudBackupStatusResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/backup/cloud/test-connection", async (
                 HttpContext context,
@@ -401,7 +436,12 @@ namespace ExportDocManager.Api.Hosting
                     string.Empty,
                     CloudBackupStoragePolicy));
             })
-            .WithName("TestCloudBackupConnection");
+            .WithName("TestCloudBackupConnection")
+            .Produces<ApiCloudBackupCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/backup/cloud/upload-latest", async (
                 HttpContext context,
@@ -468,7 +508,13 @@ namespace ExportDocManager.Api.Hosting
                     return WriteInfrastructureFailure("WebDAV 云备份上传服务暂时不可用，请稍后重试。", ex);
                 }
             })
-            .WithName("UploadLatestDatabaseBackupToCloud");
+            .WithName("UploadLatestDatabaseBackupToCloud")
+            .Produces<ApiCloudBackupCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapGet("/api/backup/cloud/backups", async (
                 HttpContext context,
@@ -524,7 +570,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteInfrastructureFailure("WebDAV 云备份列表服务暂时不可用，请稍后重试。", ex);
                 }
             })
-            .WithName("ListCloudDatabaseBackups");
+            .WithName("ListCloudDatabaseBackups")
+            .Produces<ApiCloudBackupListResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/backup/cloud/download", async (
                 HttpContext context,
@@ -630,7 +681,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteInfrastructureFailure("WebDAV 云备份下载服务暂时不可用，请稍后重试。", ex);
                 }
             })
-            .WithName("DownloadCloudDatabaseBackup");
+            .WithName("DownloadCloudDatabaseBackup")
+            .Produces<ApiCloudBackupCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
         }
 
         private static ApiBackupListResponse CreateBackupListResponse(
@@ -702,7 +758,7 @@ namespace ExportDocManager.Api.Hosting
             return true;
         }
 
-        private static FileInfo GetLatestBackupFile(IBackupService backupService)
+        private static FileInfo? GetLatestBackupFile(IBackupService backupService)
         {
             return (backupService.GetAvailableBackups() ?? [])
                 .Select(path => new FileInfo(path))

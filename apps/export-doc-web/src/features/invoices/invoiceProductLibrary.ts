@@ -79,8 +79,8 @@ export function createProductDraftFromInvoiceItem(item: ApiInvoiceItemDto, exist
     packageUnitEN: normalizeText(normalized.ctnUnitEN),
     packageUnitCN: normalizeText(normalized.ctnUnitCN),
     defaultPrice: numberValue(normalized.unitPrice),
-    createdAt: existing?.createdAt,
-    updatedAt: existing?.updatedAt,
+    createdAt: existing?.createdAt ?? new Date(0).toISOString(),
+    updatedAt: existing?.updatedAt ?? new Date(0).toISOString(),
     rowVersion: existing?.rowVersion ?? "",
   };
 }

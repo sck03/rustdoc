@@ -53,7 +53,7 @@ export function useReportTemplatePreviewMutations({
         paymentId: previewPaymentId,
         body: { templatePath: selectedTemplatePath },
       }),
-    onSuccess: (response) => onPreviewed({ reportType: response.reportType, html: response.html }),
+    onSuccess: (response) => onPreviewed({ reportType: response.reportType, withSeal: null, html: response.html }),
     onError,
   });
 

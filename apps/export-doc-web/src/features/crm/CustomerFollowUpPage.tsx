@@ -432,14 +432,14 @@ function optionalNumber(value: FormDataEntryValue | null) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-function toDateTimeLocal(value?: string) {
+function toDateTimeLocal(value?: string | null) {
   if (!value) return "";
   const date = new Date(value);
   const offset = date.getTimezoneOffset() * 60_000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
-function formatDateTime(value?: string) {
+function formatDateTime(value?: string | null) {
   if (!value) return "未设置";
   return new Intl.DateTimeFormat("zh-CN", {
     year: "numeric",
@@ -450,6 +450,6 @@ function formatDateTime(value?: string) {
   }).format(new Date(value));
 }
 
-function isOverdue(value?: string) {
+function isOverdue(value?: string | null) {
   return Boolean(value && new Date(value).getTime() < Date.now());
 }

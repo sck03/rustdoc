@@ -5,9 +5,9 @@ namespace ExportDocManager.Services.Data
 {
     public sealed partial class BuiltInExcelImportAnalyzer
     {
-        private static ExcelImportFieldAnalysis PickBetter(
-            ExcelImportFieldAnalysis current,
-            ExcelImportFieldAnalysis candidate)
+        private static ExcelImportFieldAnalysis? PickBetter(
+            ExcelImportFieldAnalysis? current,
+            ExcelImportFieldAnalysis? candidate)
         {
             if (candidate == null || string.IsNullOrWhiteSpace(candidate.Value))
             {
@@ -419,8 +419,27 @@ namespace ExportDocManager.Services.Data
 
         private static bool IsUsableFieldValue(string fieldKey, string value)
         {
-            return !string.Equals(fieldKey, "DestinationCountry", StringComparison.Ordinal)
-                || ExcelImportFieldValueValidator.IsDestinationCountry(value);
+            if (string.Equals(fieldKey, "DestinationCountry", StringComparison.Ordinal))
+            {
+                return ExcelImportFieldValueValidator.IsDestinationCountry(value);
+            }
+
+            if (string.Equals(fieldKey, "NotifyPartyName", StringComparison.Ordinal)
+                || string.Equals(fieldKey, "NotifyPartyAddress", StringComparison.Ordinal))
+            {
+                return IsSameAsConsigneeValue(value)
+                    || (value.Any(char.IsLetter)
+                        && !LooksLikeKnownLabel(value)
+                        && !LooksLikeItemHeader(value));
+            }
+
+            return true;
+        }
+
+        private static bool IsSameAsConsigneeValue(string value)
+        {
+            string normalized = NormalizeText(value);
+            return normalized is "sameasconsignee" or "sameasconsignees" or "sameconsignee";
         }
 
         private static bool LooksLikeKnownLabel(string value)

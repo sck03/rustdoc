@@ -216,9 +216,9 @@ namespace ExportDocManager.Services.SingleWindow
             int invoiceId,
             Invoice invoice,
             IReadOnlyList<Item> invoiceItems,
-            Customer customer,
-            Exporter exporter,
-            CustomsCooDocument existingDocument)
+            Customer? customer,
+            Exporter? exporter,
+            CustomsCooDocument? existingDocument)
         {
             var attachmentSources = SingleWindowSourceCloneHelper.CloneAttachmentSources(existingDocument?.Attachments);
             var rawExistingDocument = SingleWindowSourceCloneHelper.CloneCustomsCooDocument(existingDocument);

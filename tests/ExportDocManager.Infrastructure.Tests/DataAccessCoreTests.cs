@@ -37,7 +37,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public void PostgreSqlConnectionString_ShouldBoundPoolForMultiUserLoad()
         {
-            string previous = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlMaximumPoolSizeEnvironmentVariable);
+            string? previous = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlMaximumPoolSizeEnvironmentVariable);
             Environment.SetEnvironmentVariable(DbHelper.PostgreSqlMaximumPoolSizeEnvironmentVariable, "24");
             try
             {

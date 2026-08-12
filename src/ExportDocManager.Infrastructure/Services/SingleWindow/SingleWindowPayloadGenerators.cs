@@ -213,7 +213,7 @@ namespace ExportDocManager.Services.SingleWindow
                 new XElement(ns + "EntryId", document.EntryId));
         }
 
-        private static XElement CreateOptionalModCertificate(XNamespace ns, CooMappedDocument document)
+        private static XElement? CreateOptionalModCertificate(XNamespace ns, CooMappedDocument document)
         {
             bool shouldEmit = IsModificationStatus(document.CertStatus) ||
                               HasValue(document.OldCertNo) ||
@@ -239,7 +239,7 @@ namespace ExportDocManager.Services.SingleWindow
                 new XElement(ns + "OldIssueDate", document.OldIssueDate));
         }
 
-        private static XElement CreateOptionalOriInvs(XNamespace ns, CooMappedDocument document)
+        private static XElement? CreateOptionalOriInvs(XNamespace ns, CooMappedDocument document)
         {
             if (!CustomsCooRuleCatalog.UsesRcepInvoiceInfo(document.CertType))
             {
@@ -259,7 +259,7 @@ namespace ExportDocManager.Services.SingleWindow
                     new XElement(ns + "InvDate", document.InvDate)));
         }
 
-        private static XElement CreateOptionalNonpartyCorpList(XNamespace ns, CooMappedDocument document)
+        private static XElement? CreateOptionalNonpartyCorpList(XNamespace ns, CooMappedDocument document)
         {
             if (document.NonpartyCorps == null || document.NonpartyCorps.Count == 0)
             {
@@ -321,12 +321,12 @@ namespace ExportDocManager.Services.SingleWindow
                 new XElement(ns + "PackType", item.PackType));
         }
 
-        private static bool HasValue(string value)
+        private static bool HasValue(string? value)
         {
             return !string.IsNullOrWhiteSpace(value);
         }
 
-        private static XElement CreateOptionalElement(XNamespace ns, string name, string value)
+        private static XElement? CreateOptionalElement(XNamespace ns, string name, string? value)
         {
             return string.IsNullOrWhiteSpace(value)
                 ? null

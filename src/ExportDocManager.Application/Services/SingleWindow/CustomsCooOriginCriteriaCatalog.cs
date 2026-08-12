@@ -98,7 +98,7 @@ namespace ExportDocManager.Services.SingleWindow
             "G"
         };
 
-        public static IReadOnlyList<SelectionOption<string>> GetOriginCriteriaOptions(string certType)
+        public static IReadOnlyList<SelectionOption<string>> GetOriginCriteriaOptions(string? certType)
         {
             string normalized = Normalize(certType);
             if (string.Equals(normalized, "C", StringComparison.Ordinal))
@@ -136,7 +136,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static IReadOnlyList<SelectionOption<string>> GetOriginCriteriaSubOptions(string certType, string originCriteria)
+        public static IReadOnlyList<SelectionOption<string>> GetOriginCriteriaSubOptions(string? certType, string? originCriteria)
         {
             string normalizedCertType = Normalize(certType);
             string normalizedOriginCriteria = Normalize(originCriteria);
@@ -148,7 +148,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static string GetOriginCriteriaSubHelpText(string certType, string originCriteria)
+        public static string GetOriginCriteriaSubHelpText(string? certType, string? originCriteria)
         {
             string normalizedCertType = Normalize(certType);
             string normalizedOriginCriteria = Normalize(originCriteria);
@@ -170,7 +170,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static string GetOriginCriteriaSubCueText(string certType, string originCriteria)
+        public static string GetOriginCriteriaSubCueText(string? certType, string? originCriteria)
         {
             string normalizedCertType = Normalize(certType);
             string normalizedOriginCriteria = Normalize(originCriteria);
@@ -190,14 +190,14 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static bool UsesOriginCriteriaRef(string certType)
+        public static bool UsesOriginCriteriaRef(string? certType)
         {
             string normalized = Normalize(certType);
             return string.Equals(normalized, "E", StringComparison.Ordinal) ||
                    GspCertificateTypes.Contains(normalized);
         }
 
-        public static string GetOriginCriteriaRefHelpText(string certType, string originCriteria)
+        public static string GetOriginCriteriaRefHelpText(string? certType, string? originCriteria)
         {
             string normalizedCertType = Normalize(certType);
             string normalizedOriginCriteria = Normalize(originCriteria);
@@ -224,7 +224,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static string GetOriginCriteriaRefCueText(string certType, string originCriteria)
+        public static string GetOriginCriteriaRefCueText(string? certType, string? originCriteria)
         {
             string normalizedCertType = Normalize(certType);
             string normalizedOriginCriteria = Normalize(originCriteria);
@@ -245,7 +245,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static string GetOriginCriteriaHelpText(string certType)
+        public static string GetOriginCriteriaHelpText(string? certType)
         {
             string normalized = Normalize(certType);
             return normalized switch
@@ -265,7 +265,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static string GetOriginCriteriaCueText(string certType)
+        public static string GetOriginCriteriaCueText(string? certType)
         {
             string normalized = Normalize(certType);
             return normalized switch
@@ -283,7 +283,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static bool UsesOriginCriteriaRefPercent(string certType, string originCriteria)
+        public static bool UsesOriginCriteriaRefPercent(string? certType, string? originCriteria)
         {
             string normalizedCertType = Normalize(certType);
             string normalizedOriginCriteria = Normalize(originCriteria);
@@ -296,7 +296,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static int? GetOriginCriteriaRefPercentMax(string certType, string originCriteria)
+        public static int? GetOriginCriteriaRefPercentMax(string? certType, string? originCriteria)
         {
             string normalizedCertType = Normalize(certType);
             string normalizedOriginCriteria = Normalize(originCriteria);
@@ -309,14 +309,14 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        public static bool RequiresOriginCriteria(string certType)
+        public static bool RequiresOriginCriteria(string? certType)
         {
             string normalized = Normalize(certType);
             return CustomsCooRuleCatalog.UsesGoodsOriginCriteria(normalized) &&
                    !string.Equals(normalized, "C", StringComparison.Ordinal);
         }
 
-        public static bool RequiresOriginCriteriaRef(string certType, string originCriteria)
+        public static bool RequiresOriginCriteriaRef(string? certType, string? originCriteria)
         {
             string normalizedCertType = Normalize(certType);
             string normalizedOriginCriteria = Normalize(originCriteria);
@@ -325,7 +325,7 @@ namespace ExportDocManager.Services.SingleWindow
                     string.Equals(normalizedOriginCriteria, "Y", StringComparison.Ordinal));
         }
 
-        public static bool IsValidOriginCriteria(string certType, string originCriteria)
+        public static bool IsValidOriginCriteria(string? certType, string? originCriteria)
         {
             string normalizedOriginCriteria = Normalize(originCriteria);
             if (string.IsNullOrWhiteSpace(normalizedOriginCriteria))
@@ -337,7 +337,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .Any(option => string.Equals(Normalize(option.Value), normalizedOriginCriteria, StringComparison.Ordinal));
         }
 
-        public static bool IsValidOriginCriteriaSub(string certType, string originCriteria, string originCriteriaSub)
+        public static bool IsValidOriginCriteriaSub(string? certType, string? originCriteria, string? originCriteriaSub)
         {
             string normalizedSub = NormalizeOriginCriteriaSubInput(certType, originCriteria, originCriteriaSub);
             if (string.IsNullOrWhiteSpace(normalizedSub))
@@ -349,7 +349,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .Any(option => string.Equals(Normalize(option.Value), normalizedSub, StringComparison.Ordinal));
         }
 
-        public static string NormalizeOriginCriteriaSubInput(string certType, string originCriteria, string value)
+        public static string NormalizeOriginCriteriaSubInput(string? certType, string? originCriteria, string? value)
         {
             string normalizedCertType = Normalize(certType);
             string normalizedOriginCriteria = Normalize(originCriteria);
@@ -374,10 +374,10 @@ namespace ExportDocManager.Services.SingleWindow
             return normalizedValue;
         }
 
-        public static string NormalizeOriginCriteriaRefInput(string certType, string originCriteria, string value)
+        public static string NormalizeOriginCriteriaRefInput(string? certType, string? originCriteria, string? value)
             => NormalizeOriginCriteriaRefInput(certType, originCriteria, string.Empty, value);
 
-        public static string NormalizeOriginCriteriaRefInput(string certType, string originCriteria, string hsCode, string value)
+        public static string NormalizeOriginCriteriaRefInput(string? certType, string? originCriteria, string? hsCode, string? value)
         {
             string normalized = value?.Trim() ?? string.Empty;
             if (UsesOriginCriteriaRefHsHeading(certType, originCriteria))
@@ -403,10 +403,10 @@ namespace ExportDocManager.Services.SingleWindow
             return $"{formatted}%";
         }
 
-        public static bool IsOriginCriteriaRefReadOnly(string certType, string originCriteria) =>
+        public static bool IsOriginCriteriaRefReadOnly(string? certType, string? originCriteria) =>
             UsesOriginCriteriaRefHsHeading(certType, originCriteria);
 
-        public static bool UsesOriginCriteriaRefHsHeading(string certType, string originCriteria)
+        public static bool UsesOriginCriteriaRefHsHeading(string? certType, string? originCriteria)
         {
             string normalizedCertType = Normalize(certType);
             string normalizedOriginCriteria = Normalize(originCriteria);
@@ -414,7 +414,7 @@ namespace ExportDocManager.Services.SingleWindow
                    string.Equals(normalizedOriginCriteria, "W", StringComparison.Ordinal);
         }
 
-        private static string FormatHsHeading(string hsCode)
+        private static string FormatHsHeading(string? hsCode)
         {
             if (string.IsNullOrWhiteSpace(hsCode))
             {
@@ -445,6 +445,6 @@ namespace ExportDocManager.Services.SingleWindow
             return $"{heading[..2]}.{heading[2..4]}";
         }
 
-        private static string Normalize(string value) => value?.Trim().ToUpperInvariant() ?? string.Empty;
+        private static string Normalize(string? value) => value?.Trim().ToUpperInvariant() ?? string.Empty;
     }
 }

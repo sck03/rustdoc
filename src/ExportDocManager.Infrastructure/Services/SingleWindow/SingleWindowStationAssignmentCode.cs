@@ -63,7 +63,8 @@ namespace ExportDocManager.Services.SingleWindow
             {
                 payload = JsonSerializer.Deserialize<AssignmentCodePayload>(
                     Base64UrlDecode(normalized[Prefix.Length..]),
-                    JsonOptions);
+                    JsonOptions)
+                    ?? throw new InvalidDataException("持卡机授权码内容为空，请从目标操作档案重新复制。");
             }
             catch (Exception ex) when (ex is FormatException or JsonException)
             {

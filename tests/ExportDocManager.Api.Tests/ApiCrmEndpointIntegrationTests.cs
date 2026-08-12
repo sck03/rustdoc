@@ -47,9 +47,10 @@ namespace ExportDocManager.Api.Tests
             var secondContact = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCrmContactDto>(secondContactResponse);
 
             var contacts = await client.GetFromJsonAsync<List<ApiCrmContactDto>>($"/api/crm/customers/{customer.Id}/contacts");
-            Assert.Equal(2, contacts?.Count);
-            Assert.Single(contacts!, item => item.IsPrimary);
-            Assert.True(contacts.Single(item => item.Id == secondContact.Id).IsPrimary);
+            var contactItems = Assert.IsType<List<ApiCrmContactDto>>(contacts);
+            Assert.Equal(2, contactItems.Count);
+            Assert.Single(contactItems, item => item.IsPrimary);
+            Assert.True(contactItems.Single(item => item.Id == secondContact.Id).IsPrimary);
             var contactUpdateResponse = await client.PutAsJsonAsync(
                 $"/api/crm/customers/{customer.Id}/contacts/{secondContact.Id}",
                 new ApiCrmContactSaveRequest(secondContact.Id, customer.Id, secondContact.Name, "Director",

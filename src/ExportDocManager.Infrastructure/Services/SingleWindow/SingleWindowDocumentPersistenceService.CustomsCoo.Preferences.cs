@@ -46,8 +46,8 @@ namespace ExportDocManager.Services.SingleWindow
 
         private async Task RememberCustomsCooProducerProfilesAsync(
             CustomsCooDocument document,
-            string sourceInvoiceNo,
-            string sourceContractNo,
+            string? sourceInvoiceNo,
+            string? sourceContractNo,
             CancellationToken cancellationToken)
         {
             if (document == null)
@@ -68,8 +68,12 @@ namespace ExportDocManager.Services.SingleWindow
                     ProducerFax = item.ProducerFax,
                     ProducerEmail = item.ProducerEmail,
                     ProducerSertFlag = item.ProducerSertFlag,
-                    LastInvoiceNo = string.IsNullOrWhiteSpace(document.InvoiceNo) ? sourceInvoiceNo : document.InvoiceNo,
-                    LastContractNo = string.IsNullOrWhiteSpace(document.ContractNo) ? sourceContractNo : document.ContractNo,
+                    LastInvoiceNo = string.IsNullOrWhiteSpace(document.InvoiceNo)
+                        ? sourceInvoiceNo ?? string.Empty
+                        : document.InvoiceNo,
+                    LastContractNo = string.IsNullOrWhiteSpace(document.ContractNo)
+                        ? sourceContractNo ?? string.Empty
+                        : document.ContractNo,
                     LastSourceStyleNo = item.SourceStyleNo
                 })
                 .ToList();

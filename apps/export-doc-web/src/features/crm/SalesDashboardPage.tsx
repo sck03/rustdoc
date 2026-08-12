@@ -123,9 +123,9 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
 }
 
 function formatAmount(value?: number) { return (value ?? 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function formatDate(value?: string) { return value ? new Date(value).toLocaleDateString("zh-CN") : "未设置"; }
+function formatDate(value?: string | null) { return value ? new Date(value).toLocaleDateString("zh-CN") : "未设置"; }
 
-function formatDateTime(value?: string) {
+function formatDateTime(value?: string | null) {
   if (!value) return "未设置";
   return new Date(value).toLocaleString("zh-CN", { hour12: false });
 }

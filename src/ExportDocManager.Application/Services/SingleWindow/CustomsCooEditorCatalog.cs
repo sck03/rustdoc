@@ -15,7 +15,7 @@ namespace ExportDocManager.Services.SingleWindow
         string PropertyName,
         CustomsCooEditorFieldKind FieldKind = CustomsCooEditorFieldKind.TextBox,
         int Height = 32,
-        IReadOnlyList<SelectionOption<string>> Options = null);
+        IReadOnlyList<SelectionOption<string>>? Options = null);
 
     public static partial class CustomsCooEditorCatalog
     {

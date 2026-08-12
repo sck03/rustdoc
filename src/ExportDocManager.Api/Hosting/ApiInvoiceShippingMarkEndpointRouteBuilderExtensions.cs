@@ -43,7 +43,10 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("SaveShippingMarkImage");
+            .WithName("SaveShippingMarkImage")
+            .Produces<ApiShippingMarkImageSaveResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapPost("/api/invoices/shipping-marks/image/preview", async (
                 HttpContext context,
@@ -98,7 +101,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("PreviewShippingMarkImage");
+            .WithName("PreviewShippingMarkImage")
+            .Produces<ApiShippingMarkImagePreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
         }
     }
 }

@@ -8,7 +8,7 @@ namespace ExportDocManager.Services.MasterData
     public sealed partial class HsCodeKnowledgeService
     {
         public async Task<HsCodeKnowledgeSearchResponse> SearchAsync(
-            string query,
+            string? query,
             int maxResults = 20,
             CancellationToken cancellationToken = default)
         {
@@ -98,7 +98,7 @@ namespace ExportDocManager.Services.MasterData
                 .Select(group =>
                 {
                     var best = group.OrderByDescending(item => item.Score).First();
-                    string currentCode = best.Resolution.CurrentCode;
+                    string? currentCode = best.Resolution.CurrentCode;
                     codeMap.TryGetValue(currentCode ?? string.Empty, out var standard);
                     return new HsCodeKnowledgeSearchResult(
                         currentCode ?? string.Empty,
@@ -189,7 +189,7 @@ namespace ExportDocManager.Services.MasterData
                 int score = string.Equals(code.NormalizedCode, codePrefix, StringComparison.OrdinalIgnoreCase)
                     ? 100
                     : Math.Min(96, 72 + codePrefix.Length * 3);
-                string specification = bestExample?.Specification?.Trim();
+                string? specification = bestExample?.Specification?.Trim();
                 if (string.IsNullOrWhiteSpace(specification))
                     specification = !string.IsNullOrWhiteSpace(code.Elements) ? code.Elements.Trim() : code.Description?.Trim() ?? string.Empty;
                 return new HsCodeKnowledgeSearchResult(
@@ -205,7 +205,7 @@ namespace ExportDocManager.Services.MasterData
                     [],
                     [$"HS编码前缀匹配：{codePrefix}"],
                     [],
-                    code.SourceName,
+                    code.SourceName ?? string.Empty,
                     code.EffectiveYear,
                     code.LastVerifiedAt,
                     true);

@@ -1,14 +1,9 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using ExportDocManager.Api.Hosting;
 
 var options = GeneratorOptions.Parse(args);
-var document = JsonSerializer.SerializeToNode(OpenApiDocumentFactory.Create(new ApiRuntimeOptions
-{
-    ListenUrls = options.BaseUrl
-})) as JsonObject ?? throw new InvalidOperationException("OpenAPI document could not be serialized.");
-
+var document = await OfficialOpenApiDocumentLoader.LoadAsync(options.BaseUrl);
 string generated = TypeScriptClientGenerator.Generate(document);
 string? outputDirectory = Path.GetDirectoryName(options.OutputPath);
 if (!string.IsNullOrWhiteSpace(outputDirectory))
@@ -18,41 +13,6 @@ if (!string.IsNullOrWhiteSpace(outputDirectory))
 
 File.WriteAllText(options.OutputPath, generated, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
 Console.WriteLine($"Generated TypeScript API client: {options.OutputPath}");
-
-internal sealed record GeneratorOptions(string OutputPath, string BaseUrl)
-{
-    public static GeneratorOptions Parse(string[] args)
-    {
-        string outputPath = Path.Combine(
-            "apps",
-            "export-doc-web",
-            "src",
-            "api",
-            "generated",
-            "exportDocManagerApi.ts");
-        string baseUrl = "http://127.0.0.1:5188";
-
-        for (int index = 0; index < args.Length; index++)
-        {
-            string arg = args[index];
-            if (string.Equals(arg, "--output", StringComparison.OrdinalIgnoreCase) && index + 1 < args.Length)
-            {
-                outputPath = args[++index];
-                continue;
-            }
-
-            if (string.Equals(arg, "--base-url", StringComparison.OrdinalIgnoreCase) && index + 1 < args.Length)
-            {
-                baseUrl = args[++index];
-                continue;
-            }
-
-            throw new ArgumentException($"Unknown or incomplete argument: {arg}");
-        }
-
-        return new GeneratorOptions(Path.GetFullPath(outputPath), baseUrl);
-    }
-}
 
 internal static class TypeScriptClientGenerator
 {
@@ -153,7 +113,9 @@ internal static class TypeScriptClientGenerator
             }
 
             builder.AppendLine($"export interface {operation.RequestTypeName} {{");
-            foreach (var parameter in operation.PathParameters.Concat(operation.QueryParameters))
+            foreach (var parameter in operation.PathParameters
+                         .Concat(operation.QueryParameters)
+                         .Concat(operation.HeaderParameters))
             {
                 string optional = parameter.Required ? string.Empty : "?";
                 builder.AppendLine($"  {FormatPropertyName(parameter.Name)}{optional}: {parameter.TypeName};");
@@ -322,6 +284,16 @@ internal static class TypeScriptClientGenerator
         builder.AppendLine("function encodePath(value: string | number | boolean): string {");
         builder.AppendLine("  return encodeURIComponent(String(value));");
         builder.AppendLine("}");
+        builder.AppendLine();
+        builder.AppendLine("function mergeHeaders(initHeaders: HeadersInit | undefined, values: Record<string, string | undefined>): Headers {");
+        builder.AppendLine("  const headers = new Headers(initHeaders);");
+        builder.AppendLine("  for (const [name, value] of Object.entries(values)) {");
+        builder.AppendLine("    if (value !== undefined) {");
+        builder.AppendLine("      headers.set(name, value);");
+        builder.AppendLine("    }");
+        builder.AppendLine("  }");
+        builder.AppendLine("  return headers;");
+        builder.AppendLine("}");
     }
 
     private static void EmitClientMethod(StringBuilder builder, ApiOperation operation)
@@ -371,10 +343,40 @@ internal static class TypeScriptClientGenerator
             wroteOption = true;
         }
 
+        if (operation.HeaderParameters.Count > 0)
+        {
+            if (wroteOption)
+            {
+                builder.AppendLine(",");
+            }
+            else
+            {
+                builder.AppendLine();
+            }
+
+            builder.AppendLine("      init: {");
+            builder.AppendLine("        ...init,");
+            builder.AppendLine("        headers: mergeHeaders(init?.headers, {");
+            foreach (var parameter in operation.HeaderParameters)
+            {
+                string value = RequestPropertyAccess(parameter.Name);
+                builder.AppendLine(parameter.Required
+                    ? $"          {JsonSerializer.Serialize(parameter.Name)}: String({value}),"
+                    : $"          {JsonSerializer.Serialize(parameter.Name)}: {value} === undefined ? undefined : String({value}),");
+            }
+
+            builder.AppendLine("        }),");
+            builder.Append("      }");
+            wroteOption = true;
+        }
+
         if (wroteOption)
         {
             builder.AppendLine(",");
-            builder.AppendLine("      init,");
+            if (operation.HeaderParameters.Count == 0)
+            {
+                builder.AppendLine("      init,");
+            }
             builder.AppendLine("    });");
         }
         else
@@ -419,6 +421,7 @@ internal static class TypeScriptClientGenerator
                     operationId,
                     parameters.Where(item => item.Location == "path").ToArray(),
                     parameters.Where(item => item.Location == "query").ToArray(),
+                    parameters.Where(item => item.Location == "header").ToArray(),
                     bodyType,
                     bodyRequired,
                     responseType));
@@ -468,11 +471,15 @@ internal static class TypeScriptClientGenerator
             return "void";
         }
 
-        foreach (string preferred in new[] { "200", "201", "202", "204" })
+        foreach (string preferred in new[] { "200", "201", "202", "203", "206", "204" })
         {
             if (responses[preferred] is JsonObject response)
             {
-                return ContentToType(response["content"]) ?? "void";
+                string? responseType = ContentToType(response["content"]);
+                if (!string.IsNullOrWhiteSpace(responseType))
+                {
+                    return responseType;
+                }
             }
         }
 
@@ -482,7 +489,11 @@ internal static class TypeScriptClientGenerator
                 response.Key[0] == '2' &&
                 response.Value is JsonObject responseObject)
             {
-                return ContentToType(responseObject["content"]) ?? "void";
+                string? responseType = ContentToType(responseObject["content"]);
+                if (!string.IsNullOrWhiteSpace(responseType))
+                {
+                    return responseType;
+                }
             }
         }
 
@@ -505,7 +516,9 @@ internal static class TypeScriptClientGenerator
         {
             if (entry.Value is JsonObject mediaType &&
                 mediaType["schema"] is JsonObject binarySchema &&
-                string.Equals(binarySchema["format"]?.GetValue<string>(), "binary", StringComparison.OrdinalIgnoreCase))
+                GetString(binarySchema, "format") is { } format &&
+                (string.Equals(format, "binary", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(format, "byte", StringComparison.OrdinalIgnoreCase)))
             {
                 return "Blob";
             }
@@ -516,10 +529,16 @@ internal static class TypeScriptClientGenerator
             return "FormData";
         }
 
-        if (contentObject["application/json"] is not JsonObject jsonContent ||
-            jsonContent["schema"] is not JsonObject schema)
+        JsonObject? jsonContent = contentObject["application/json"] as JsonObject
+            ?? contentObject.FirstOrDefault(entry =>
+                    entry.Key.EndsWith("+json", StringComparison.OrdinalIgnoreCase))
+                .Value as JsonObject;
+        if (jsonContent?["schema"] is not JsonObject schema)
         {
-            return null;
+            return contentObject.Any(entry =>
+                entry.Key.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
+                ? "string"
+                : null;
         }
 
         return SchemaToType(schema);
@@ -537,8 +556,26 @@ internal static class TypeScriptClientGenerator
             return ToTypeName(reference[(reference.LastIndexOf('/') + 1)..]);
         }
 
-        string? type = GetString(schema, "type");
-        return type switch
+        if (schema["oneOf"] is JsonArray oneOf)
+        {
+            return UnionSchemaToType(oneOf);
+        }
+
+        if (schema["anyOf"] is JsonArray anyOf)
+        {
+            return UnionSchemaToType(anyOf);
+        }
+
+        if (schema["allOf"] is JsonArray allOf)
+        {
+            return string.Join(" & ", allOf
+                .OfType<JsonObject>()
+                .Select(SchemaToType)
+                .Distinct(StringComparer.Ordinal));
+        }
+
+        string[] types = GetSchemaTypes(schema);
+        string result = types.FirstOrDefault(type => type != "null") switch
         {
             "array" => $"{SchemaToType(schema["items"] as JsonObject)}[]",
             "boolean" => "boolean",
@@ -549,6 +586,36 @@ internal static class TypeScriptClientGenerator
             "object" => "Record<string, unknown>",
             _ when TryGetProperties(schema, out var properties) => InlineObjectType(properties, GetRequiredProperties(schema)),
             _ => "unknown"
+        };
+
+        return types.Contains("null", StringComparer.Ordinal) && result != "unknown"
+            ? $"{result} | null"
+            : result;
+    }
+
+    private static string UnionSchemaToType(JsonArray schemas)
+    {
+        string[] types = schemas
+            .OfType<JsonObject>()
+            .Select(SchemaToType)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        return types.Length == 0 ? "unknown" : string.Join(" | ", types);
+    }
+
+    private static string[] GetSchemaTypes(JsonObject schema)
+    {
+        return schema["type"] switch
+        {
+            JsonValue value when value.TryGetValue<string>(out string? type) && !string.IsNullOrWhiteSpace(type) =>
+                [type],
+            JsonArray array => array
+                .OfType<JsonValue>()
+                .Select(value => value.TryGetValue<string>(out string? type) ? type : null)
+                .Where(type => !string.IsNullOrWhiteSpace(type))
+                .Select(type => type!)
+                .ToArray(),
+            _ => []
         };
     }
 
@@ -604,7 +671,9 @@ internal static class TypeScriptClientGenerator
 
     private static string? GetString(JsonObject node, string propertyName)
     {
-        return node[propertyName]?.GetValue<string>();
+        return node[propertyName] is JsonValue value && value.TryGetValue<string>(out string? result)
+            ? result
+            : null;
     }
 
     private static bool TryGetProperties(JsonObject schema, out JsonObject properties)
@@ -739,6 +808,7 @@ internal static class TypeScriptClientGenerator
         string OperationId,
         IReadOnlyList<ApiParameter> PathParameters,
         IReadOnlyList<ApiParameter> QueryParameters,
+        IReadOnlyList<ApiParameter> HeaderParameters,
         string? BodyTypeName,
         bool BodyRequired,
         string ResponseTypeName)
@@ -746,11 +816,13 @@ internal static class TypeScriptClientGenerator
         public bool HasRequestType =>
             PathParameters.Count > 0 ||
             QueryParameters.Count > 0 ||
+            HeaderParameters.Count > 0 ||
             !string.IsNullOrWhiteSpace(BodyTypeName);
 
         public bool HasRequiredRequestFields =>
             PathParameters.Any(item => item.Required) ||
             QueryParameters.Any(item => item.Required) ||
+            HeaderParameters.Any(item => item.Required) ||
             (!string.IsNullOrWhiteSpace(BodyTypeName) && BodyRequired);
 
         public string RequestTypeName => $"{ToTypeName(OperationId)}Request";

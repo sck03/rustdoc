@@ -24,7 +24,7 @@ namespace ExportDocManager.Services.Core
             _currentUserContext = currentUserContext ?? throw new ArgumentNullException(nameof(currentUserContext));
         }
 
-        public async Task<InvoiceDataMaintenancePreview> GetPurgePreviewAsync(
+        public async Task<InvoiceDataMaintenancePreview?> GetPurgePreviewAsync(
             int invoiceId,
             CancellationToken cancellationToken = default)
         {
@@ -71,7 +71,7 @@ namespace ExportDocManager.Services.Core
                 PurgeStoragePolicy);
         }
 
-        public async Task<InvoicePurgeResult> PurgeCancelledInvoiceAsync(
+        public async Task<InvoicePurgeResult?> PurgeCancelledInvoiceAsync(
             InvoicePurgeCommand command,
             CancellationToken cancellationToken = default)
         {
@@ -182,7 +182,7 @@ namespace ExportDocManager.Services.Core
         private static AuditLog CreateMaintenanceAuditLog(
             Invoice invoice,
             string reason,
-            string username)
+            string? username)
         {
             return new AuditLog
             {

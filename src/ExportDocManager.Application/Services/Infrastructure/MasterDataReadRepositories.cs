@@ -23,7 +23,7 @@ namespace ExportDocManager.Services.Infrastructure
     {
         Task<IReadOnlyList<Payee>> QueryAsync(PayeeReadQuery query, CancellationToken cancellationToken = default);
         Task<PagedResult<Payee>> QueryPageAsync(PayeeReadQuery query, CancellationToken cancellationToken = default);
-        Task<Payee> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+        Task<Payee?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
     }
 
     public interface IProductReadRepository
@@ -37,14 +37,14 @@ namespace ExportDocManager.Services.Infrastructure
     {
         Task<IReadOnlyList<Port>> QueryAsync(PortReadQuery query, CancellationToken cancellationToken = default);
         Task<PagedResult<Port>> QueryPageAsync(PortReadQuery query, CancellationToken cancellationToken = default);
-        Task<Port> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+        Task<Port?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
     }
 
     public interface IUnitReadRepository
     {
         Task<IReadOnlyList<Unit>> QueryAsync(UnitReadQuery query, CancellationToken cancellationToken = default);
         Task<PagedResult<Unit>> QueryPageAsync(UnitReadQuery query, CancellationToken cancellationToken = default);
-        Task<Unit> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+        Task<Unit?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
     }
 
     public interface IHsCodeReadRepository
@@ -53,9 +53,9 @@ namespace ExportDocManager.Services.Infrastructure
 
         Task<PagedResult<HsCode>> QueryPageAsync(HsCodeReadQuery query, CancellationToken cancellationToken = default);
 
-        Task<HsCode> GetByCodeAsync(string code, CancellationToken cancellationToken = default);
+        Task<HsCode?> GetByCodeAsync(string code, CancellationToken cancellationToken = default);
 
-        Task<HsCode> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+        Task<HsCode?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
         Task<IReadOnlyList<int>> FindExistingIdsAsync(
             IReadOnlyCollection<int> ids,

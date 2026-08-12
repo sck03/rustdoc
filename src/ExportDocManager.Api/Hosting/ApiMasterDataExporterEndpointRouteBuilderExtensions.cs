@@ -4,6 +4,7 @@ using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -11,7 +12,9 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapExporterMasterDataEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/master-data/exporters", async (
+            endpoints.MapGet("/api/master-data/exporters", async Task<Results<
+                Ok<IReadOnlyList<ApiExporterDto>>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterReadRepository repository,
@@ -20,18 +23,20 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 var rows = await repository.QueryAsync(
                     new ExporterReadQuery { Keyword = keyword ?? string.Empty },
                     cancellationToken);
 
-                return Results.Ok(ApiMasterDataDtoFactory.FromExporters(rows));
+                return TypedResults.Ok(ApiMasterDataDtoFactory.FromExporters(rows));
             })
             .WithName("ListExporters");
 
-            endpoints.MapGet("/api/master-data/exporters/page", async (
+            endpoints.MapGet("/api/master-data/exporters/page", async Task<Results<
+                Ok<ApiPagedResponse<ApiExporterDto>>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterReadRepository repository,
@@ -40,18 +45,22 @@ namespace ExportDocManager.Api.Hosting
                 string? keyword,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
+                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return TypedResults.Unauthorized();
                 var page = await repository.QueryPageAsync(new ExporterReadQuery
                 {
                     PageNumber = pageNumber,
                     PageSize = pageSize,
                     Keyword = keyword ?? string.Empty
                 }, cancellationToken);
-                return Results.Ok(ApiMasterDataDtoFactory.FromPage(page, ApiMasterDataDtoFactory.FromExporters));
+                return TypedResults.Ok(ApiMasterDataDtoFactory.FromPage(page, ApiMasterDataDtoFactory.FromExporters));
             })
             .WithName("ListExportersPage");
 
-            endpoints.MapGet("/api/master-data/exporters/{id:int}", async (
+            endpoints.MapGet("/api/master-data/exporters/{id:int}", async Task<Results<
+                Ok<ApiExporterDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterService exporterService,
@@ -60,7 +69,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -70,12 +79,18 @@ namespace ExportDocManager.Api.Hosting
 
                 var exporter = await exporterService.GetExporterByIdAsync(id, cancellationToken);
                 return exporter == null
-                    ? Results.NotFound()
-                    : Results.Ok(ApiMasterDataDtoFactory.FromExporter(exporter));
+                    ? TypedResults.NotFound()
+                    : TypedResults.Ok(ApiMasterDataDtoFactory.FromExporter(exporter));
             })
             .WithName("GetExporter");
 
-            endpoints.MapPost("/api/master-data/exporters/{id:int}/seals/{sealType}/upload", async (
+            endpoints.MapPost("/api/master-data/exporters/{id:int}/seals/{sealType}/upload", async Task<Results<
+                Ok<ApiExporterDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound<ApiErrorResponse>,
+                JsonHttpResult<ApiErrorResponse>,
+                StatusCodeHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterSealService sealService,
@@ -86,7 +101,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -96,19 +111,19 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!TryParseExporterSealKind(sealType, out var sealKind))
                 {
-                    return Results.BadRequest(new ApiErrorResponse("印章类型必须是 document 或 customs。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("印章类型必须是 document 或 customs。"));
                 }
 
-                string safeFileName = NormalizeExporterSealFileName(fileName);
+                string safeFileName = NormalizeExporterSealFileName(fileName ?? string.Empty);
                 if (string.IsNullOrWhiteSpace(safeFileName))
                 {
-                    return Results.BadRequest(new ApiErrorResponse("请选择有效的印章图片文件。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("请选择有效的印章图片文件。"));
                 }
 
                 string extension = Path.GetExtension(safeFileName);
                 if (!IsSupportedExporterSealExtension(extension))
                 {
-                    return Results.BadRequest(new ApiErrorResponse("印章图片仅支持 PNG、JPEG、GIF 或 WebP。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("印章图片仅支持 PNG、JPEG、GIF 或 WebP。"));
                 }
 
                 try
@@ -121,7 +136,7 @@ namespace ExportDocManager.Api.Hosting
                         cancellationToken);
                     if (content.Length == 0)
                     {
-                        return Results.BadRequest(new ApiErrorResponse("上传的印章图片为空。"));
+                        return TypedResults.BadRequest(new ApiErrorResponse("上传的印章图片为空。"));
                     }
 
                     var exporter = await sealService.SaveSealAsync(
@@ -130,28 +145,41 @@ namespace ExportDocManager.Api.Hosting
                         safeFileName,
                         content.ToArray(),
                         cancellationToken);
-                    return Results.Ok(ApiMasterDataDtoFactory.FromExporter(exporter));
+                    return TypedResults.Ok(ApiMasterDataDtoFactory.FromExporter(exporter));
                 }
                 catch (PayloadLimitExceededException ex)
                 {
-                    return WritePayloadTooLarge(ex);
+                    return TypedResults.Json(
+                        new ApiErrorResponse(ex.Message),
+                        statusCode: StatusCodes.Status413PayloadTooLarge);
                 }
                 catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
                 {
-                    return Results.StatusCode(StatusCodes.Status499ClientClosedRequest);
+                    return TypedResults.StatusCode(StatusCodes.Status499ClientClosedRequest);
                 }
                 catch (KeyNotFoundException ex)
                 {
-                    return Results.NotFound(new ApiErrorResponse(ex.Message));
+                    return TypedResults.NotFound(new ApiErrorResponse(ex.Message));
                 }
                 catch (Exception ex) when (ex is ArgumentException || ex is InvalidDataException)
                 {
-                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
+                    return TypedResults.BadRequest(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("UploadExporterSeal");
+            .Accepts<IFormFile>(
+                "application/octet-stream",
+                "image/png",
+                "image/jpeg",
+                "image/gif",
+                "image/webp")
+            .WithName("UploadExporterSeal")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict)
+            .Produces<ApiErrorResponse>(StatusCodes.Status413PayloadTooLarge);
 
-            endpoints.MapPost("/api/master-data/exporters", async (
+            endpoints.MapPost("/api/master-data/exporters", async Task<Results<
+                Created<ApiExporterDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterService exporterService,
@@ -160,17 +188,17 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (request == null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("出口商请求体不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("出口商请求体不能为空。"));
                 }
 
                 if (request.Id > 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("新增出口商不能包含已有ID。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("新增出口商不能包含已有ID。"));
                 }
 
                 Exporter exporter;
@@ -188,13 +216,18 @@ namespace ExportDocManager.Api.Hosting
 
                 int savedId = await exporterService.SaveExporterAsync(exporter, cancellationToken);
                 var saved = await exporterService.GetExporterByIdAsync(savedId, cancellationToken) ?? exporter;
-                return Results.Created(
+                return TypedResults.Created(
                     $"/api/master-data/exporters/{savedId}",
                     ApiMasterDataDtoFactory.FromExporter(saved));
             })
-            .WithName("CreateExporter");
+            .WithName("CreateExporter")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
-            endpoints.MapPut("/api/master-data/exporters/{id:int}", async (
+            endpoints.MapPut("/api/master-data/exporters/{id:int}", async Task<Results<
+                Ok<ApiExporterDto>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterService exporterService,
@@ -204,7 +237,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -214,17 +247,17 @@ namespace ExportDocManager.Api.Hosting
 
                 if (request == null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("出口商请求体不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("出口商请求体不能为空。"));
                 }
 
                 if (request.Id > 0 && request.Id != id)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("请求体出口商ID与路径ID不一致。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("请求体出口商ID与路径ID不一致。"));
                 }
 
                 if (await exporterService.GetExporterByIdAsync(id, cancellationToken) == null)
                 {
-                    return Results.NotFound();
+                    return TypedResults.NotFound();
                 }
 
                 Exporter exporter;
@@ -241,11 +274,16 @@ namespace ExportDocManager.Api.Hosting
 
                 int savedId = await exporterService.SaveExporterAsync(exporter, cancellationToken);
                 var saved = await exporterService.GetExporterByIdAsync(savedId, cancellationToken) ?? exporter;
-                return Results.Ok(ApiMasterDataDtoFactory.FromExporter(saved));
+                return TypedResults.Ok(ApiMasterDataDtoFactory.FromExporter(saved));
             })
-            .WithName("UpdateExporter");
+            .WithName("UpdateExporter")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
-            endpoints.MapDelete("/api/master-data/exporters/{id:int}", async (
+            endpoints.MapDelete("/api/master-data/exporters/{id:int}", async Task<Results<
+                Ok<ApiCommandResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                NotFound>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterService exporterService,
@@ -254,7 +292,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (id <= 0)
@@ -264,13 +302,14 @@ namespace ExportDocManager.Api.Hosting
 
                 if (await exporterService.GetExporterByIdAsync(id, cancellationToken) == null)
                 {
-                    return Results.NotFound();
+                    return TypedResults.NotFound();
                 }
 
                 await exporterService.DeleteExporterAsync(id, cancellationToken);
-                return Results.Ok(new ApiCommandResponse(true, "出口商已删除。"));
+                return TypedResults.Ok(new ApiCommandResponse(true, "出口商已删除。"));
             })
-            .WithName("DeleteExporter");
+            .WithName("DeleteExporter")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
         }
 
         private static bool TryParseExporterSealKind(string value, out ExporterSealKind sealKind)

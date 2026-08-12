@@ -12,7 +12,7 @@ namespace ExportDocManager.Services.SingleWindow
             IrregularCode
         ];
 
-        public static string NormalizeOrDefault(string value)
+        public static string NormalizeOrDefault(string? value)
         {
             string normalized = value?.Trim() ?? string.Empty;
             return string.Equals(normalized, RegularCode, StringComparison.Ordinal) ||
@@ -21,7 +21,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : DefaultCode;
         }
 
-        public static bool IsIrregular(string value)
+        public static bool IsIrregular(string? value)
         {
             return string.Equals(NormalizeOrDefault(value), IrregularCode, StringComparison.Ordinal);
         }

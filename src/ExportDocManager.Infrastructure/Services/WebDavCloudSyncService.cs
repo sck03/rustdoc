@@ -314,15 +314,14 @@ namespace ExportDocManager.Services.Infrastructure
             return document
                 .Descendants(dav + "response")
                 .Select(response => ParsePropFindBackupFile(response, dav))
-                .Where(file => file != null)
-                .Select(file => file)
+                .OfType<CloudBackupFileInfo>()
                 .Where(file => file.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(file => file.LastModified)
                 .ThenByDescending(file => file.FileName, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
 
-        private static CloudBackupFileInfo ParsePropFindBackupFile(XElement response, XNamespace dav)
+        private static CloudBackupFileInfo? ParsePropFindBackupFile(XElement response, XNamespace dav)
         {
             var prop = response
                 .Elements(dav + "propstat")

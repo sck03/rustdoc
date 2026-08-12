@@ -287,7 +287,7 @@ public sealed class SettingsServiceTests
 
     private static async Task WithLocalKeyFileModeAsync(Func<Task> action)
     {
-        string previous = Environment.GetEnvironmentVariable(LocalSecretProtector.MasterKeyEnvironmentVariable);
+        string? previous = Environment.GetEnvironmentVariable(LocalSecretProtector.MasterKeyEnvironmentVariable);
         Environment.SetEnvironmentVariable(LocalSecretProtector.MasterKeyEnvironmentVariable, null);
         try
         {
@@ -314,7 +314,7 @@ public sealed class SettingsServiceTests
 
     private static string FindRepositoryRoot()
     {
-        string directory = AppContext.BaseDirectory;
+        string? directory = AppContext.BaseDirectory;
         while (!string.IsNullOrWhiteSpace(directory))
         {
             if (File.Exists(Path.Combine(directory, "ExportDocManager.sln")))

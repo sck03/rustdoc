@@ -33,7 +33,7 @@ namespace ExportDocManager.Services.Suppliers
         }
 
         public async Task<PagedResult<SupplierRecord>> QueryAsync(
-            string keyword, string status, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+            string? keyword, string? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
         {
             pageNumber = Math.Max(pageNumber, 1);
             pageSize = Math.Clamp(pageSize, 10, 100);
@@ -260,7 +260,7 @@ namespace ExportDocManager.Services.Suppliers
         }
 
         public async Task<IReadOnlyList<SupplierProductOptionRecord>> SearchProductsAsync(
-            string keyword, CancellationToken cancellationToken = default)
+            string? keyword, CancellationToken cancellationToken = default)
         {
             keyword = Clean(keyword);
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
@@ -364,7 +364,7 @@ namespace ExportDocManager.Services.Suppliers
             new(item.Id, item.Name, item.CountryRegion, item.Category, item.Website, item.Status, item.MainProducts,
                 item.Notes, item.VersionNumber);
         private static string Required(string value, string field) => string.IsNullOrWhiteSpace(value) ? throw new ArgumentException($"{field}不能为空。") : value.Trim();
-        private static string Clean(string value) => (value ?? string.Empty).Trim();
+        private static string Clean(string? value) => (value ?? string.Empty).Trim();
 
         private static void EnsureExpectedVersion(int expectedVersion, int currentVersion, string entityName)
         {

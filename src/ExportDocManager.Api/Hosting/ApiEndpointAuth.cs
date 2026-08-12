@@ -7,7 +7,7 @@ namespace ExportDocManager.Api.Hosting
     {
         public const string AuthenticatedUserItemKey = "__ExportDocManagerApiUser";
 
-        public static User RequireUser(HttpContext context, IApiSessionTokenService tokenService)
+        public static User? RequireUser(HttpContext context, IApiSessionTokenService tokenService)
         {
             ArgumentNullException.ThrowIfNull(tokenService);
             return ApiCurrentUserResolver.ResolveCachedUser(context);
@@ -179,7 +179,7 @@ namespace ExportDocManager.Api.Hosting
 
             var user = currentUserResolver.ResolveCached(context);
             string requiredAccessLevel = GetRequiredAccessLevel(context.Request.Path, context.Request.Method);
-            if (!authorizationService.CanUseModule(user, requiredModule, requiredAccessLevel))
+            if (user is null || !authorizationService.CanUseModule(user, requiredModule, requiredAccessLevel))
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 return;
@@ -188,7 +188,7 @@ namespace ExportDocManager.Api.Hosting
             await _next(context);
         }
 
-        public static string GetRequiredWorkspace(PathString path)
+        public static string? GetRequiredWorkspace(PathString path)
         {
             if (path.StartsWithSegments("/api/crm", StringComparison.OrdinalIgnoreCase) ||
                 path.StartsWithSegments("/api/suppliers", StringComparison.OrdinalIgnoreCase) ||
@@ -220,20 +220,20 @@ namespace ExportDocManager.Api.Hosting
                 : null;
         }
 
-        public static string GetRequiredModule(PathString path)
+        public static string? GetRequiredModule(PathString path)
         {
             return GetRequiredModule(path, HttpMethods.Get);
         }
 
-        public static string GetRequiredModule(PathString path, string method)
+        public static string? GetRequiredModule(PathString path, string method)
         {
             return GetRequiredModule(path, method, null);
         }
 
-        public static string GetRequiredModule(
+        public static string? GetRequiredModule(
             PathString path,
             string method,
-            IQueryCollection query)
+            IQueryCollection? query)
         {
             if (path.StartsWithSegments("/api/crm/opportunities", StringComparison.OrdinalIgnoreCase))
                 return PermissionModuleCatalog.SalesOpportunities;
@@ -304,10 +304,10 @@ namespace ExportDocManager.Api.Hosting
             return null;
         }
 
-        private static bool IsPaymentReportType(string reportType) =>
+        private static bool IsPaymentReportType(string? reportType) =>
             string.Equals(reportType, "PaymentVoucher", StringComparison.OrdinalIgnoreCase);
 
-        private static bool IsInvoiceReportType(string reportType) =>
+        private static bool IsInvoiceReportType(string? reportType) =>
             string.Equals(reportType, "ExportDocument", StringComparison.OrdinalIgnoreCase);
 
         public static string GetRequiredAccessLevel(string method) =>

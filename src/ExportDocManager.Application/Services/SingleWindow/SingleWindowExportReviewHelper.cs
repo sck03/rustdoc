@@ -398,7 +398,9 @@ namespace ExportDocManager.Services.SingleWindow
             return (AgentConsignmentDefaultSectionKey, AgentConsignmentDefaultSectionKey, true, AgentConsignmentDefaultSectionKey, propertyKey, 0);
         }
 
-        private static bool TryGetAgentConsignmentPropertyGroup(string propertyName, out string groupKey)
+        private static bool TryGetAgentConsignmentPropertyGroup(
+            string propertyName,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out string? groupKey)
         {
             return AgentConsignmentPropertySectionKeys.TryGetValue(propertyName ?? string.Empty, out groupKey);
         }

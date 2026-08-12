@@ -197,7 +197,7 @@ export function PermissionTemplateManagementPanel({
       return;
     }
     saveMutation.mutate({
-      id: draft.id || undefined,
+      id: draft.id,
       code: draft.code.trim(),
       name: draft.name.trim(),
       description: draft.description.trim(),

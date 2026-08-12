@@ -23,7 +23,7 @@ namespace ExportDocManager.Services.Infrastructure
 
         public LocalMasterDataReadRepository(
             IDbContextFactory<AppDbContext> contextFactory,
-            BusinessDataAccessScope accessScope = null)
+            BusinessDataAccessScope? accessScope = null)
         {
             _contextFactory = contextFactory;
             _accessScope = accessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
@@ -121,7 +121,7 @@ namespace ExportDocManager.Services.Infrastructure
             int normalizedMaxCount = Math.Clamp(maxCount, 1, 10);
             return await _accessScope.ApplyExporterScope(context.Exporters.AsNoTracking())
                 .Where(exporter => exporter.ExporterNameCN != null && exporter.ExporterNameCN != string.Empty)
-                .Select(exporter => exporter.ExporterNameCN.Trim())
+                .Select(exporter => (exporter.ExporterNameCN ?? string.Empty).Trim())
                 .Where(name => name != string.Empty)
                 .Distinct()
                 .OrderBy(name => name)
@@ -172,7 +172,7 @@ namespace ExportDocManager.Services.Infrastructure
             return new PagedResult<Payee>(items, totalCount, pageNumber, pageSize);
         }
 
-        async Task<Payee> IPayeeReadRepository.GetByIdAsync(
+        async Task<Payee?> IPayeeReadRepository.GetByIdAsync(
             int id,
             CancellationToken cancellationToken)
         {
@@ -277,7 +277,7 @@ namespace ExportDocManager.Services.Infrastructure
             return new PagedResult<Port>(items, totalCount, pageNumber, pageSize);
         }
 
-        async Task<Port> IPortReadRepository.GetByIdAsync(
+        async Task<Port?> IPortReadRepository.GetByIdAsync(
             int id,
             CancellationToken cancellationToken)
         {
@@ -325,7 +325,7 @@ namespace ExportDocManager.Services.Infrastructure
             return new PagedResult<Unit>(items, totalCount, pageNumber, pageSize);
         }
 
-        async Task<Unit> IUnitReadRepository.GetByIdAsync(
+        async Task<Unit?> IUnitReadRepository.GetByIdAsync(
             int id,
             CancellationToken cancellationToken)
         {
@@ -371,7 +371,7 @@ namespace ExportDocManager.Services.Infrastructure
             return new PagedResult<HsCode>(items, totalCount, normalizedPageNumber, normalizedPageSize);
         }
 
-        public async Task<HsCode> GetByCodeAsync(string code, CancellationToken cancellationToken = default)
+        public async Task<HsCode?> GetByCodeAsync(string code, CancellationToken cancellationToken = default)
         {
             var normalizedCode = TextSearchHelper.NormalizeFilter(code);
             if (string.IsNullOrWhiteSpace(normalizedCode))
@@ -391,7 +391,7 @@ namespace ExportDocManager.Services.Infrastructure
                 .FirstOrDefaultAsync(hsCode => hsCode.NormalizedCode == normalizedCodeKey, cancellationToken);
         }
 
-        public async Task<HsCode> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+        public async Task<HsCode?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
         {
             if (id <= 0)
             {

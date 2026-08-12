@@ -13,10 +13,10 @@ namespace ExportDocManager.Services.Core
 {
     public partial class InvoiceService
     {
-        public async Task<Invoice> CopyInvoiceAsync(
+        public async Task<Invoice?> CopyInvoiceAsync(
             int originalId,
             string newInvoiceNo,
-            InvoiceCloneOptions options = null,
+            InvoiceCloneOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(newInvoiceNo);
@@ -66,10 +66,10 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<Invoice> CopyInvoiceAsTypeAsync(
+        public async Task<Invoice?> CopyInvoiceAsTypeAsync(
             int originalId,
             string targetType,
-            InvoiceCloneOptions options = null,
+            InvoiceCloneOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(targetType);

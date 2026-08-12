@@ -16,7 +16,7 @@ namespace ExportDocManager.Services.BrowserRuntime
         private readonly IAppPathProvider _pathProvider;
         private readonly Action<string> _versionProbe;
         private readonly object _cacheSync = new();
-        private string _cachedExecutable;
+        private string? _cachedExecutable;
 
         public BrowserExecutableResolver(IAppPathProvider pathProvider) =>
             (_pathProvider, _versionProbe) =
@@ -32,7 +32,7 @@ namespace ExportDocManager.Services.BrowserRuntime
 
         public string Resolve()
         {
-            string configuredPath = Environment.GetEnvironmentVariable(ChromiumExecutableEnvironmentVariable);
+            string? configuredPath = Environment.GetEnvironmentVariable(ChromiumExecutableEnvironmentVariable);
             if (!string.IsNullOrWhiteSpace(configuredPath))
             {
                 string fullPath = Path.GetFullPath(configuredPath.Trim().Trim('"'));
@@ -46,7 +46,7 @@ namespace ExportDocManager.Services.BrowserRuntime
                 {
                     if (string.Equals(_cachedExecutable, fullPath, PathComparison))
                     {
-                        return _cachedExecutable;
+                        return fullPath;
                     }
                 }
 
@@ -266,10 +266,11 @@ namespace ExportDocManager.Services.BrowserRuntime
 
         private static void ValidateHeadlessShellBundle(string executablePath)
         {
-            string root = Path.GetDirectoryName(executablePath)!;
+            string root = Path.GetDirectoryName(executablePath)
+                ?? throw new InfrastructureServiceException("无法解析浏览器可执行文件所在目录。");
             string runtimePlatform = GetRuntimePlatform();
             IReadOnlyList<string> requiredFiles = GetRequiredHeadlessShellFiles(runtimePlatform);
-            string missing = requiredFiles.FirstOrDefault(file =>
+            string? missing = requiredFiles.FirstOrDefault(file =>
             {
                 string path = Path.Combine(root, file);
                 return !File.Exists(path) || new FileInfo(path).Length == 0;
@@ -334,7 +335,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             };
             startInfo.ArgumentList.Add("--version");
 
-            Process process = null;
+            Process? process = null;
             uint previousErrorMode = 0;
             bool restoreErrorMode = false;
             try
@@ -424,7 +425,7 @@ namespace ExportDocManager.Services.BrowserRuntime
                 "win32", "win64", "win-arm64", "linux32", "linux64", "linux-arm64",
                 "mac-x64", "mac-arm64"
             };
-            string embeddedPlatform = knownPlatforms.FirstOrDefault(platform =>
+            string? embeddedPlatform = knownPlatforms.FirstOrDefault(platform =>
                 normalized.Contains($"/{platform}/", StringComparison.OrdinalIgnoreCase));
             return string.IsNullOrWhiteSpace(embeddedPlatform) ||
                    string.Equals(embeddedPlatform, expectedPlatform, StringComparison.OrdinalIgnoreCase);

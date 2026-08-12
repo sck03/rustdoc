@@ -89,11 +89,11 @@ namespace ExportDocManager.Services.SingleWindow
             var normalized = NormalizeInput(input);
             var now = DateTime.Now;
 
-            CustomsCooProducerProfile entity = null;
+            CustomsCooProducerProfile? entity = null;
             if (profileId.GetValueOrDefault() > 0)
             {
                 entity = await context.CustomsCooProducerProfiles
-                    .FirstOrDefaultAsync(item => item.Id == profileId.Value, cancellationToken)
+                    .FirstOrDefaultAsync(item => item.Id == profileId.GetValueOrDefault(), cancellationToken)
                     .ConfigureAwait(false);
             }
 
@@ -172,7 +172,7 @@ namespace ExportDocManager.Services.SingleWindow
             DateTime now = DateTime.Now;
             foreach (CustomsCooProducerProfileInput input in normalizedInputs)
             {
-                CustomsCooProducerProfile entity = ResolveExisting(input, byCode, byName);
+                CustomsCooProducerProfile? entity = ResolveExisting(input, byCode, byName);
                 if (entity == null)
                 {
                     entity = new CustomsCooProducerProfile { CreatedAt = now };
@@ -218,24 +218,24 @@ namespace ExportDocManager.Services.SingleWindow
                 .ConfigureAwait(false);
         }
 
-        private static CustomsCooProducerProfile ResolveExisting(
+        private static CustomsCooProducerProfile? ResolveExisting(
             CustomsCooProducerProfileInput input,
             IReadOnlyDictionary<string, CustomsCooProducerProfile> byCode,
             IReadOnlyDictionary<string, CustomsCooProducerProfile> byName)
         {
             string code = NormalizeUpperValue(input.CiqRegNo);
-            if (code.Length > 0 && byCode.TryGetValue(code, out CustomsCooProducerProfile codeMatch))
+            if (code.Length > 0 && byCode.TryGetValue(code, out var codeMatch))
             {
                 return codeMatch;
             }
 
             string name = NormalizeText(input.PrdcEtpsName);
-            return name.Length > 0 && byName.TryGetValue(name, out CustomsCooProducerProfile nameMatch)
+            return name.Length > 0 && byName.TryGetValue(name, out var nameMatch)
                 ? nameMatch
                 : null;
         }
 
-        private static async Task<CustomsCooProducerProfile> FindExistingAsync(
+        private static async Task<CustomsCooProducerProfile?> FindExistingAsync(
             AppDbContext context,
             CustomsCooProducerProfileInput input,
             CancellationToken cancellationToken)
@@ -321,12 +321,12 @@ namespace ExportDocManager.Services.SingleWindow
             return "NAME:" + NormalizeText(input?.PrdcEtpsName).ToUpperInvariant();
         }
 
-        private static string NormalizeText(string value)
+        private static string NormalizeText(string? value)
         {
             return TextSearchHelper.NormalizeValue(value);
         }
 
-        private static string NormalizeUpperValue(string value)
+        private static string NormalizeUpperValue(string? value)
         {
             return TextSearchHelper.NormalizeUpperValue(value);
         }

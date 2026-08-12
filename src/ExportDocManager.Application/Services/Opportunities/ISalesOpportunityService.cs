@@ -30,7 +30,7 @@ namespace ExportDocManager.Services.Opportunities
     public interface ISalesOpportunityService
     {
         Task<PagedResult<SalesOpportunityRecord>> QueryAsync(
-            string keyword, string stage, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
+            string? keyword, string? stage, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
         Task<SalesOpportunityRecord> SaveAsync(SalesOpportunitySaveRequest request, CancellationToken cancellationToken = default);
         Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<SalesOpportunityHistoryRecord>> ListHistoryAsync(int opportunityId, CancellationToken cancellationToken = default);

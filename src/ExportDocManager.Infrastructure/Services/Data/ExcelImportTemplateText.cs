@@ -4,7 +4,7 @@ namespace ExportDocManager.Services.Data
     {
         public const string ExporterPlaceholderText = "请填写出口商中文名称";
 
-        public static bool IsExporterPlaceholder(string value)
+        public static bool IsExporterPlaceholder(string? value)
         {
             return string.Equals(
                 value?.Trim(),

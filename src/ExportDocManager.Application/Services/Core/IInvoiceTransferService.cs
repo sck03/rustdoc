@@ -13,7 +13,7 @@ namespace ExportDocManager.Services.Core
         Task<InvoiceImportResult> ImportAsync(
             InvoiceTransferPackage pkg,
             InvoiceImportConflictAction action,
-            string newInvoiceNo = null,
+            string? newInvoiceNo = null,
             CancellationToken cancellationToken = default);
     }
 }

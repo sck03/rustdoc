@@ -228,7 +228,7 @@ namespace ExportDocManager.Services.SingleWindow
             return score;
         }
 
-        private async Task<SingleWindowReceiptParseResult> TryParseReceiptAsync(
+        private async Task<SingleWindowReceiptParseResult?> TryParseReceiptAsync(
             SwSubmissionBatch batch,
             string path,
             CancellationToken cancellationToken)

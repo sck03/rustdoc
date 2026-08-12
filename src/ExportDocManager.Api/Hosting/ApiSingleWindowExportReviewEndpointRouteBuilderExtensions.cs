@@ -42,7 +42,13 @@ namespace ExportDocManager.Api.Hosting
                     invoiceId,
                     cancellationToken);
             })
-            .WithName("GetSingleWindowExportReview");
+            .WithName("GetSingleWindowExportReview")
+            .Produces<SingleWindowExportReview>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/coo/{invoiceId:int}/export-review", async (
                 HttpContext context,
@@ -69,7 +75,13 @@ namespace ExportDocManager.Api.Hosting
                     invoiceId,
                     cancellationToken);
             })
-            .WithName("BuildCustomsCooExportReview");
+            .WithName("BuildCustomsCooExportReview")
+            .Produces<SingleWindowExportReview>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/acd/{invoiceId:int}/export-review", async (
                 HttpContext context,
@@ -96,7 +108,13 @@ namespace ExportDocManager.Api.Hosting
                     invoiceId,
                     cancellationToken);
             })
-            .WithName("BuildAgentConsignmentExportReview");
+            .WithName("BuildAgentConsignmentExportReview")
+            .Produces<SingleWindowExportReview>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/export-review/{businessType}/{invoiceId:int}/repair", async (
                 HttpContext context,
@@ -162,7 +180,13 @@ namespace ExportDocManager.Api.Hosting
                         statusCode: StatusCodes.Status403Forbidden);
                 }
             })
-            .WithName("RepairSingleWindowExportReviewGroups");
+            .WithName("RepairSingleWindowExportReviewGroups")
+            .Produces<ApiSingleWindowRepairGroupsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
         }
     }
 }

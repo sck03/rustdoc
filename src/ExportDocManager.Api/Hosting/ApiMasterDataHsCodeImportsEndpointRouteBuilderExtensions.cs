@@ -47,7 +47,12 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return WriteServiceException(ex);
                 }
-            }).WithName("PreviewHsCodesImportFromPath");
+            }).WithName("PreviewHsCodesImportFromPath")
+            .Produces<ApiHsCodeImportPreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/master-data/hs-codes/import-preview-upload", async (
                 HttpContext context,
@@ -55,14 +60,18 @@ namespace ExportDocManager.Api.Hosting
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IHsCodeService hsCodeService,
                 IAppPathProvider pathProvider,
+                string? fileName,
+                string? mode,
+                string? sourceName,
+                int? effectiveYear,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
                 string tempRoot = RuntimeCachePathHelper.CreateUniqueDirectory(pathProvider, "HsCodeImports", "hs-preview");
                 try
                 {
-                    string fileName = NormalizeUploadedHsCodeImportFileName(context.Request.Query["fileName"].ToString());
-                    string importPath = Path.Combine(tempRoot, fileName);
+                    string safeFileName = NormalizeUploadedHsCodeImportFileName(fileName ?? string.Empty);
+                    string importPath = Path.Combine(tempRoot, safeFileName);
                     await using (var output = File.Create(importPath))
                     {
                         await ApiUploadLimits.CopyRequestBodyAsync(
@@ -74,9 +83,9 @@ namespace ExportDocManager.Api.Hosting
                     if (new FileInfo(importPath).Length == 0) return Results.BadRequest(new ApiErrorResponse("HS编码导入文件不能为空。"));
                     var preview = await hsCodeService.PreviewImportAsync(
                         importPath,
-                        ParseHsCodeImportMode(context.Request.Query["mode"].ToString()),
-                        context.Request.Query["sourceName"].ToString(),
-                        int.TryParse(context.Request.Query["effectiveYear"], out int year) ? year : null,
+                        ParseHsCodeImportMode(mode ?? string.Empty),
+                        sourceName ?? string.Empty,
+                        effectiveYear,
                         cancellationToken);
                     return Results.Ok(await StoreHsCodeImportPreviewAsync(pathProvider, preview, cancellationToken));
                 }
@@ -92,7 +101,11 @@ namespace ExportDocManager.Api.Hosting
                 {
                     AtomicFileHelper.TryDeleteDirectory(tempRoot);
                 }
-            }).WithName("PreviewHsCodesImportUpload");
+            }).Accepts<IFormFile>("application/octet-stream").WithName("PreviewHsCodesImportUpload")
+            .Produces<ApiHsCodeImportPreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/master-data/hs-codes/import-commit", async (
                 HttpContext context,
@@ -131,7 +144,13 @@ namespace ExportDocManager.Api.Hosting
                 {
                     AtomicFileHelper.TryDeleteFile(previewPath);
                 }
-            }).WithName("CommitHsCodesImport");
+            }).WithName("CommitHsCodesImport")
+            .Produces<ApiHsCodeImportCommitResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/master-data/hs-codes/import-path", async (
                 HttpContext context,
@@ -190,7 +209,13 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("ImportHsCodesFromPath");
+            .WithName("ImportHsCodesFromPath")
+            .Produces<ApiHsCodeImportResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/master-data/hs-codes/import-upload", async (
                 HttpContext context,
@@ -198,6 +223,7 @@ namespace ExportDocManager.Api.Hosting
                 IHsCodeService hsCodeService,
                 IHsCodeReadRepository repository,
                 IAppPathProvider pathProvider,
+                string? fileName,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -212,9 +238,8 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    string fileName = NormalizeUploadedHsCodeImportFileName(
-                        context.Request.Query["fileName"].ToString());
-                    string importPath = Path.Combine(tempRoot, fileName);
+                    string safeFileName = NormalizeUploadedHsCodeImportFileName(fileName ?? string.Empty);
+                    string importPath = Path.Combine(tempRoot, safeFileName);
                     await using (var output = File.Create(importPath))
                     {
                         await ApiUploadLimits.CopyRequestBodyAsync(
@@ -230,7 +255,7 @@ namespace ExportDocManager.Api.Hosting
                     }
 
                     await hsCodeService.ImportAsync(importPath);
-                    return Results.Ok(await BuildHsCodeImportResponseAsync(repository, fileName, cancellationToken));
+                    return Results.Ok(await BuildHsCodeImportResponseAsync(repository, safeFileName, cancellationToken));
                 }
                 catch (ArgumentException ex)
                 {
@@ -253,7 +278,13 @@ namespace ExportDocManager.Api.Hosting
                     AtomicFileHelper.TryDeleteDirectory(tempRoot);
                 }
             })
-            .WithName("UploadHsCodesImportFile");
+            .Accepts<IFormFile>("application/octet-stream")
+            .WithName("UploadHsCodesImportFile")
+            .Produces<ApiHsCodeImportResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
         }
     }
 }

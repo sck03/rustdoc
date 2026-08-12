@@ -150,7 +150,7 @@ export function formatOptionLabel(value: string | undefined, options: Array<{ va
   return options.find((option) => option.value.toLowerCase() === value.toLowerCase())?.label ?? value;
 }
 
-export function formatDateTime(value?: string) {
+export function formatDateTime(value?: string | null) {
   if (!value) {
     return "-";
   }

@@ -31,7 +31,7 @@ namespace ExportDocManager.Services.SingleWindow
             return Math.Round(value, decimals).ToString($"F{decimals}", CultureInfo.InvariantCulture).TrimEnd('0').TrimEnd('.');
         }
 
-        public static void ValidateMaxLength(string value, int maxLength, string fieldName, ICollection<string> errors)
+        public static void ValidateMaxLength(string? value, int maxLength, string fieldName, ICollection<string> errors)
         {
             if (!string.IsNullOrWhiteSpace(value) && value.Trim().Length > maxLength)
             {
@@ -39,7 +39,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        public static void ValidateExactDate(string value, string format, string fieldName, ICollection<string> errors)
+        public static void ValidateExactDate(string? value, string format, string fieldName, ICollection<string> errors)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -57,7 +57,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        public static void ValidateDecimal(string value, int maxIntegerDigits, int maxScale, string fieldName, ICollection<string> errors)
+        public static void ValidateDecimal(string? value, int maxIntegerDigits, int maxScale, string fieldName, ICollection<string> errors)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -91,7 +91,7 @@ namespace ExportDocManager.Services.SingleWindow
         }
 
         public static void ValidatePercentText(
-            string value,
+            string? value,
             decimal maxPercent,
             int maxScale,
             string fieldName,
@@ -131,7 +131,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        public static void ValidateDigits(string value, int exactLength, string fieldName, ICollection<string> errors)
+        public static void ValidateDigits(string? value, int exactLength, string fieldName, ICollection<string> errors)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -145,7 +145,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        public static void ValidateAllowedValues(string value, IReadOnlyList<string> allowedValues, string fieldName, ICollection<string> errors)
+        public static void ValidateAllowedValues(string? value, IReadOnlyList<string> allowedValues, string fieldName, ICollection<string> errors)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -158,7 +158,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        public static void AddIfMissing(string value, string message, ICollection<string> warnings)
+        public static void AddIfMissing(string? value, string message, ICollection<string> warnings)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -166,7 +166,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        public static void RequireValue(string value, string fieldName, ICollection<string> errors)
+        public static void RequireValue(string? value, string fieldName, ICollection<string> errors)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -174,10 +174,10 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        public static string PreferValue(string preferredValue, string fallbackValue)
+        public static string PreferValue(string? preferredValue, string? fallbackValue)
         {
             return string.IsNullOrWhiteSpace(preferredValue)
-                ? fallbackValue
+                ? fallbackValue ?? string.Empty
                 : preferredValue.Trim();
         }
     }

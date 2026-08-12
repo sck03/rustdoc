@@ -129,8 +129,7 @@ public sealed class ApiBackgroundJobRunnerLifecycleTests
 
         foreach (BackgroundJobSnapshot job in jobs)
         {
-            BackgroundJobSnapshot final = await jobService.GetAsync(job.JobId);
-            Assert.NotNull(final);
+            BackgroundJobSnapshot final = Assert.IsType<BackgroundJobSnapshot>(await jobService.GetAsync(job.JobId));
             Assert.True(BackgroundJobStatusCatalog.IsTerminal(final.Status));
         }
     }

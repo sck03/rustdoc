@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Security;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -6,7 +7,9 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapLicenseEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/system/license", async (
+            endpoints.MapGet("/api/system/license", async Task<Results<
+                Ok<ApiLicenseStatusResponse>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ILicenseService licenseService,
@@ -15,17 +18,21 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 var status = await licenseService.GetStatusAsync(cancellationToken);
-                return Results.Ok(ApiLicenseDtoFactory.FromStatus(
+                return TypedResults.Ok(ApiLicenseDtoFactory.FromStatus(
                     status,
                     ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
             })
             .WithName("GetLicenseStatus");
 
-            endpoints.MapPost("/api/system/license/register", async (
+            endpoints.MapPost("/api/system/license/register", async Task<Results<
+                Ok<ApiLicenseRegisterResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                JsonHttpResult<ApiErrorResponse>>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -37,34 +44,33 @@ namespace ExportDocManager.Api.Hosting
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (!authorizationService.CanManageSettings(user))
                 {
-                    return Results.Json(
+                    return TypedResults.Json(
                         new ApiErrorResponse("只有管理员可以注册或更换系统授权。"),
                         statusCode: StatusCodes.Status403Forbidden);
                 }
 
-                if (request == null || string.IsNullOrWhiteSpace(request.LicenseKey))
+                if (request is null || string.IsNullOrWhiteSpace(request.LicenseKey))
                 {
-                    return Results.BadRequest(new ApiErrorResponse("注册码不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("注册码不能为空。"));
                 }
 
                 var result = await licenseService.RegisterAsync(request.LicenseKey, cancellationToken);
                 if (!result.Success)
                 {
-                    return Results.BadRequest(ApiLicenseDtoFactory.FromResult(
-                        result,
-                        ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
+                    return TypedResults.BadRequest(new ApiErrorResponse(result.Message));
                 }
 
-                return Results.Ok(ApiLicenseDtoFactory.FromResult(
+                return TypedResults.Ok(ApiLicenseDtoFactory.FromResult(
                     result,
                     ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
             })
-            .WithName("RegisterLicense");
+            .WithName("RegisterLicense")
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
         }
     }
 }

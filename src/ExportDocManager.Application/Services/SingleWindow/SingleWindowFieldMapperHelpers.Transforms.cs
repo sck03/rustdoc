@@ -5,11 +5,11 @@ namespace ExportDocManager.Services.SingleWindow
 {
     public static partial class SingleWindowFieldMapperHelpers
     {
-        public static string NormalizeText(string value) => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+        public static string NormalizeText(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
 
-        public static string NormalizeUpperText(string value) => NormalizeText(value).ToUpperInvariant();
+        public static string NormalizeUpperText(string? value) => NormalizeText(value).ToUpperInvariant();
 
-        public static string NormalizeCountryCode(string value)
+        public static string NormalizeCountryCode(string? value)
         {
             if (TryResolveCountry(value, out var entry))
             {
@@ -22,7 +22,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : string.Empty;
         }
 
-        public static string NormalizeAcdOriginCountryCode(string value)
+        public static string NormalizeAcdOriginCountryCode(string? value)
         {
             var normalized = NormalizeText(value);
             if (string.IsNullOrWhiteSpace(normalized))
@@ -52,26 +52,26 @@ namespace ExportDocManager.Services.SingleWindow
             return "142";
         }
 
-        public static string ResolveAcdOriginCountryCode(string value)
+        public static string ResolveAcdOriginCountryCode(string? value)
         {
             return NormalizeAcdOriginCountryCode(value);
         }
 
-        public static string NormalizeCountryNameEnglish(string value)
+        public static string NormalizeCountryNameEnglish(string? value)
         {
             return TryResolveCountry(value, out var entry)
                 ? entry.EnglishName
                 : NormalizeUpperText(value);
         }
 
-        public static string NormalizeCountryNameChinese(string value)
+        public static string NormalizeCountryNameChinese(string? value)
         {
             return TryResolveCountry(value, out var entry)
                 ? entry.ChineseName
                 : NormalizeText(value);
         }
 
-        public static string NormalizeCurrencyText(string value)
+        public static string NormalizeCurrencyText(string? value)
         {
             if (TryResolveCurrencyByText(value, out var entry))
             {
@@ -81,7 +81,7 @@ namespace ExportDocManager.Services.SingleWindow
             return NormalizeUpperText(value);
         }
 
-        public static string NormalizePriceTerms(string value)
+        public static string NormalizePriceTerms(string? value)
         {
             string normalized = NormalizeUpperText(value);
             if (string.IsNullOrWhiteSpace(normalized))
@@ -122,7 +122,7 @@ namespace ExportDocManager.Services.SingleWindow
             return normalized;
         }
 
-        public static string NormalizeCurrencyCode(string value)
+        public static string NormalizeCurrencyCode(string? value)
         {
             string normalized = NormalizeText(value);
             if (TryResolveCurrencyByAcdCode(normalized, out var acdEntry))
@@ -140,7 +140,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : string.Empty;
         }
 
-        public static string NormalizeCustomsCode(string value)
+        public static string NormalizeCustomsCode(string? value)
         {
             var normalized = NormalizeText(value);
             return normalized.Length == 10 && normalized.All(char.IsDigit)
@@ -148,19 +148,19 @@ namespace ExportDocManager.Services.SingleWindow
                 : string.Empty;
         }
 
-        public static string ResolveEnterpriseCustomsCode(Invoice invoice, Exporter exporter)
+        public static string ResolveEnterpriseCustomsCode(Invoice? invoice, Exporter? exporter)
         {
             return FirstNonEmpty(
                 NormalizeCustomsCode(invoice?.ExporterCustomsCode),
                 NormalizeCustomsCode(exporter?.CustomsCode));
         }
 
-        public static string NormalizeUnitEnglish(string value)
+        public static string NormalizeUnitEnglish(string? value)
         {
             return SingleWindowUnitNormalizer.NormalizeEnglish(value);
         }
 
-        public static string NormalizeUnitChinese(string value)
+        public static string NormalizeUnitChinese(string? value)
         {
             return SingleWindowUnitNormalizer.NormalizeChinese(value);
         }
@@ -169,7 +169,7 @@ namespace ExportDocManager.Services.SingleWindow
             string packQty,
             string packUnit,
             string goodsNameEnglish,
-            string goodsNameChinese = "")
+            string? goodsNameChinese = "")
         {
             return CustomsCooGoodsDescriptionTemplateCatalog.BuildTemplate(
                 packQty,
@@ -183,7 +183,7 @@ namespace ExportDocManager.Services.SingleWindow
             return CustomsCooGoodsDescriptionTemplateCatalog.BuildPackingSummary(packQty, packUnit);
         }
 
-        public static string NormalizeTransportMode(string value)
+        public static string NormalizeTransportMode(string? value)
         {
             string normalized = NormalizeLookupKey(value);
             if (string.IsNullOrWhiteSpace(normalized))
@@ -200,7 +200,7 @@ namespace ExportDocManager.Services.SingleWindow
             return NormalizeUpperText(value);
         }
 
-        public static string NormalizePort(string value)
+        public static string NormalizePort(string? value)
         {
             string normalized = NormalizeLookupKey(value);
             if (string.IsNullOrWhiteSpace(normalized))
@@ -213,7 +213,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : NormalizeUpperText(value);
         }
 
-        public static string NormalizePhone(string value)
+        public static string NormalizePhone(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -226,7 +226,7 @@ namespace ExportDocManager.Services.SingleWindow
             return new string(chars);
         }
 
-        public static string NormalizeTradeModeCode(string value)
+        public static string NormalizeTradeModeCode(string? value)
         {
             var normalized = NormalizeText(value);
             if (normalized.Length == 4 && normalized.All(char.IsDigit))
@@ -239,7 +239,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : string.Empty;
         }
 
-        public static string NormalizeAcdTradeModeDisplayText(string value)
+        public static string NormalizeAcdTradeModeDisplayText(string? value)
         {
             if (!TryResolveAcdTradeMode(value, out var entry))
             {
@@ -251,21 +251,21 @@ namespace ExportDocManager.Services.SingleWindow
                 : $"{entry.Code}：{entry.Name} - {entry.Description}";
         }
 
-        public static string NormalizeCooTradeModeCode(string value)
+        public static string NormalizeCooTradeModeCode(string? value)
         {
             return CustomsCooTradeModeCatalog.NormalizeCode(value);
         }
 
-        public static string PreferCooTradeModeCode(string preferredValue, string fallbackValue)
+        public static string PreferCooTradeModeCode(string? preferredValue, string? fallbackValue)
         {
             return CustomsCooTradeModeCatalog.PreferCode(preferredValue, fallbackValue);
         }
 
         public static string BuildCooTransportDetails(
-            string loadPort,
-            string unloadPort,
-            string transPort,
-            string transMeans)
+            string? loadPort,
+            string? unloadPort,
+            string? transPort,
+            string? transMeans)
         {
             var parts = new List<string>();
             string normalizedLoadPort = NormalizePort(loadPort);
@@ -298,7 +298,7 @@ namespace ExportDocManager.Services.SingleWindow
             return string.Join(" ", parts);
         }
 
-        public static string FirstNonEmpty(params string[] values)
+        public static string FirstNonEmpty(params string?[] values)
         {
             foreach (var value in values)
             {
@@ -311,32 +311,42 @@ namespace ExportDocManager.Services.SingleWindow
             return string.Empty;
         }
 
-        public static bool TryResolveCountry(string value, out CountryCatalogEntry entry)
+        public static bool TryResolveCountry(
+            string? value,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out CountryCatalogEntry? entry)
         {
             return CurrentReferenceCatalogState.CountryLookup.TryGetValue(NormalizeLookupKey(value), out entry);
         }
 
-        private static bool TryResolveAcdCountry(string value, out AcdCountryCatalogEntry entry)
+        private static bool TryResolveAcdCountry(
+            string? value,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out AcdCountryCatalogEntry? entry)
         {
             return CurrentReferenceCatalogState.AcdCountryLookup.TryGetValue(NormalizeLookupKey(value), out entry);
         }
 
-        private static bool TryResolveCurrencyByText(string value, out CurrencyCatalogEntry entry)
+        private static bool TryResolveCurrencyByText(
+            string? value,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out CurrencyCatalogEntry? entry)
         {
             return CurrentReferenceCatalogState.CurrencyTextLookup.TryGetValue(NormalizeLookupKey(value), out entry);
         }
 
-        private static bool TryResolveCurrencyByAcdCode(string value, out CurrencyCatalogEntry entry)
+        private static bool TryResolveCurrencyByAcdCode(
+            string? value,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out CurrencyCatalogEntry? entry)
         {
             return CurrentReferenceCatalogState.CurrencyAcdCodeLookup.TryGetValue(NormalizeLookupKey(value), out entry);
         }
 
-        private static bool TryResolveAcdTradeMode(string value, out AcdTradeModeCatalogEntry entry)
+        private static bool TryResolveAcdTradeMode(
+            string? value,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out AcdTradeModeCatalogEntry? entry)
         {
             return CurrentReferenceCatalogState.AcdTradeModeLookup.TryGetValue(NormalizeLookupKey(value), out entry);
         }
 
-        private static string NormalizeLookupKey(string value)
+        private static string NormalizeLookupKey(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
             {

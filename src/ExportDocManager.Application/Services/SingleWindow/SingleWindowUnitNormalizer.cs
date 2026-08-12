@@ -56,7 +56,7 @@ namespace ExportDocManager.Services.SingleWindow
             ["公斤"] = "千克"
         };
 
-        public static string NormalizeEnglish(string value)
+        public static string NormalizeEnglish(string? value)
         {
             string key = NormalizeLookupKey(value);
             return UnitEnglishLookup.TryGetValue(key, out var mapped)
@@ -64,7 +64,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : NormalizeUpperText(value);
         }
 
-        public static string NormalizeChinese(string value)
+        public static string NormalizeChinese(string? value)
         {
             string key = NormalizeLookupKey(value);
             return UnitChineseLookup.TryGetValue(key, out var mapped)
@@ -72,7 +72,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : NormalizeText(value);
         }
 
-        private static string NormalizeLookupKey(string value)
+        private static string NormalizeLookupKey(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -86,9 +86,9 @@ namespace ExportDocManager.Services.SingleWindow
                 .ToArray());
         }
 
-        private static string NormalizeUpperText(string value) => NormalizeText(value).ToUpperInvariant();
+        private static string NormalizeUpperText(string? value) => NormalizeText(value).ToUpperInvariant();
 
-        private static string NormalizeText(string value)
+        private static string NormalizeText(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
         }

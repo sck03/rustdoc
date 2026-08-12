@@ -87,7 +87,7 @@ public sealed class ApiReadinessProbe : IApiReadinessProbe
     private static async Task<bool> CanReachConfiguredBrowserAsync(
         CancellationToken cancellationToken)
     {
-        if (!BrowserCdpEndpointPolicy.TryResolve(out Uri endpoint))
+        if (!BrowserCdpEndpointPolicy.TryResolve(out Uri? endpoint))
         {
             // Desktop and non-container server packages use an on-demand local
             // renderer. Starting a browser from a health probe would consume

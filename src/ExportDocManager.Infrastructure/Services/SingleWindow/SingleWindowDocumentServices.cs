@@ -24,8 +24,8 @@ namespace ExportDocManager.Services.SingleWindow
         private sealed record EditorSourceContext(
             Invoice Invoice,
             IReadOnlyList<Item> InvoiceItems,
-            Customer Customer,
-            Exporter Exporter);
+            Customer? Customer,
+            Exporter? Exporter);
 
         public SingleWindowDocumentPersistenceService(
             IDbContextFactory<AppDbContext> contextFactory,
@@ -34,7 +34,7 @@ namespace ExportDocManager.Services.SingleWindow
             ISettingsService settingsService,
             ICustomsCooProducerProfileService producerProfileService,
             DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope businessDataAccessScope = null)
+            BusinessDataAccessScope? businessDataAccessScope = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _customsCooFieldMapper = customsCooFieldMapper ?? throw new ArgumentNullException(nameof(customsCooFieldMapper));
@@ -83,7 +83,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            Customer customer = null;
+            Customer? customer = null;
             if (invoice.CustomerId > 0)
             {
                 customer = await context.Customers
@@ -92,7 +92,7 @@ namespace ExportDocManager.Services.SingleWindow
                     .ConfigureAwait(false);
             }
 
-            Exporter exporter = null;
+            Exporter? exporter = null;
             if (invoice.ExporterId > 0)
             {
                 exporter = await context.Exporters
@@ -104,7 +104,7 @@ namespace ExportDocManager.Services.SingleWindow
             return new EditorSourceContext(invoice, invoiceItems, customer, exporter);
         }
 
-        private static string BuildWarningSummary(IReadOnlyList<string> warnings)
+        private static string BuildWarningSummary(IReadOnlyList<string>? warnings)
         {
             if (warnings == null || warnings.Count == 0)
             {

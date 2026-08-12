@@ -9,7 +9,7 @@ namespace ExportDocManager.Services.MasterData
     public sealed partial class HsCodeKnowledgeService
     {
         public async Task<HsCodeHistoryCandidatePage> DiscoverHistoryCandidatesAsync(
-            string keyword, int pageNumber = 1, int pageSize = 30, CancellationToken cancellationToken = default)
+            string? keyword, int pageNumber = 1, int pageSize = 30, CancellationToken cancellationToken = default)
         {
             pageNumber = Math.Max(pageNumber, 1);
             pageSize = Math.Clamp(pageSize, 1, 100);
@@ -138,7 +138,7 @@ namespace ExportDocManager.Services.MasterData
             {
                 string codePrefix = HsCodeTextHelper.NormalizeCodeSearchKeyword(keyword);
                 query = !string.IsNullOrWhiteSpace(codePrefix) && codePrefix.All(char.IsDigit)
-                    ? query.Where(item => item.HSCode.StartsWith(codePrefix))
+                    ? query.Where(item => item.HSCode != null && item.HSCode.StartsWith(codePrefix))
                     : query.Where(item =>
                         (item.HSCode != null && item.HSCode.Contains(keyword)) ||
                         (item.ProductCode != null && item.ProductCode.Contains(keyword)) ||
@@ -183,7 +183,7 @@ namespace ExportDocManager.Services.MasterData
             {
                 string codePrefix = HsCodeTextHelper.NormalizeCodeSearchKeyword(keyword);
                 query = !string.IsNullOrWhiteSpace(codePrefix) && codePrefix.All(char.IsDigit)
-                    ? query.Where(item => item.HSCode.StartsWith(codePrefix))
+                    ? query.Where(item => item.HSCode != null && item.HSCode.StartsWith(codePrefix))
                     : query.Where(item =>
                         (item.HSCode != null && item.HSCode.Contains(keyword)) ||
                         (item.StyleNo != null && item.StyleNo.Contains(keyword)) ||
@@ -271,7 +271,7 @@ namespace ExportDocManager.Services.MasterData
 
         private static HistorySourceRow ToHistorySourceRow(HistorySourceProjection row) =>
             new(
-                row.Code,
+                row.Code ?? string.Empty,
                 Prefer(row.NamePrimary, row.NameFallback),
                 JoinHistorySpecification(
                     row.SpecificationOne,
@@ -279,7 +279,7 @@ namespace ExportDocManager.Services.MasterData
                     row.SpecificationThree,
                     row.SpecificationFour),
                 row.Source,
-                row.Variant);
+                row.Variant ?? string.Empty);
 
     }
 }

@@ -18,7 +18,7 @@ namespace ExportDocManager.Services.Reporting
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
         }
 
-        public async Task<Invoice> LoadInvoiceAsync(int invoiceId, CancellationToken cancellationToken = default)
+        public async Task<Invoice?> LoadInvoiceAsync(int invoiceId, CancellationToken cancellationToken = default)
         {
             await using var dbContext = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
             return await _accessScope.ApplyInvoiceScope(dbContext.Invoices)
@@ -28,7 +28,7 @@ namespace ExportDocManager.Services.Reporting
                 .ConfigureAwait(false);
         }
 
-        public async Task<Payment> LoadPaymentAsync(int paymentId, CancellationToken cancellationToken = default)
+        public async Task<Payment?> LoadPaymentAsync(int paymentId, CancellationToken cancellationToken = default)
         {
             await using var dbContext = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
             return await _accessScope.ApplyPaymentScope(dbContext.Payments)
@@ -66,7 +66,7 @@ namespace ExportDocManager.Services.Reporting
             return (customer, exporter);
         }
 
-        public async Task<Payee> LoadPaymentVoucherEntitiesAsync(
+        public async Task<Payee?> LoadPaymentVoucherEntitiesAsync(
             Payment payment,
             CancellationToken cancellationToken = default)
         {

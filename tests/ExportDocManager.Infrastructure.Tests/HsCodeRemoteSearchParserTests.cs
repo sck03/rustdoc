@@ -101,7 +101,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 new HsCode { Code = "6109100010", Name = "棉制针织男T恤衫", Description = "针织|男式|62%棉38%涤" },
                 new HsCode { Code = "6109100010", Name = "男T恤", Description = "针织|男式|100%棉" }
             ]);
-            using var service = new HsCodeService(null, null, [provider]);
+            using var service = new HsCodeService(null!, null!, [provider]);
 
             var results = await service.SearchRemoteAsync("男T恤");
 
@@ -144,7 +144,7 @@ namespace ExportDocManager.Infrastructure.Tests
                         [CreateRecord("6109909000", "其他纺材制针织或钩编的T恤衫", string.Empty, HsCodeRemoteRecordKind.StandardCode)],
                         [])
                 });
-            using var service = new HsCodeService(null, null, [provider]);
+            using var service = new HsCodeService(null!, null!, [provider]);
 
             var bundle = await service.SearchRemoteEvidenceAsync("男T恤");
 
@@ -387,7 +387,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             public string Name => "stub";
             public int Priority => 1;
-            public bool CanHandleDetailUrl(string detailUrl) => false;
+            public bool CanHandleDetailUrl(string? detailUrl) => false;
             public Task<IReadOnlyList<HsCode>> SearchAsync(string keyword, CancellationToken cancellationToken = default) => Task.FromResult(rows);
             public Task<HsCode> FetchDetailAsync(HsCode item, CancellationToken cancellationToken = default) => Task.FromResult(item);
             public Task<HsCodeRemoteSourceHealth> CheckHealthAsync(CancellationToken cancellationToken = default) =>
@@ -426,7 +426,7 @@ namespace ExportDocManager.Infrastructure.Tests
             public Dictionary<string, int> DetailFetchCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
             public string Name => "stub";
             public int Priority => 1;
-            public bool CanHandleDetailUrl(string detailUrl) => !string.IsNullOrWhiteSpace(detailUrl);
+            public bool CanHandleDetailUrl(string? detailUrl) => !string.IsNullOrWhiteSpace(detailUrl);
             public Task<IReadOnlyList<HsCode>> SearchAsync(string keyword, CancellationToken cancellationToken = default) =>
                 Task.FromResult<IReadOnlyList<HsCode>>([]);
             public Task<HsCode> FetchDetailAsync(HsCode item, CancellationToken cancellationToken = default) =>

@@ -12,7 +12,7 @@ namespace ExportDocManager.Api.Hosting
             typeof(DateTime)
         ];
 
-        public static IReadOnlyList<string> NormalizeGroupKeys(IEnumerable<string> groupKeys)
+        public static IReadOnlyList<string> NormalizeGroupKeys(IEnumerable<string>? groupKeys)
         {
             return (groupKeys ?? Enumerable.Empty<string>())
                 .Where(item => !string.IsNullOrWhiteSpace(item))
@@ -41,7 +41,7 @@ namespace ExportDocManager.Api.Hosting
                     continue;
                 }
 
-                object value = sourceProperty.GetValue(source);
+                object? value = sourceProperty.GetValue(source);
                 if (targetProperty.PropertyType == typeof(string) && value == null)
                 {
                     value = string.Empty;

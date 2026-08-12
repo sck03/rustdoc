@@ -1,5 +1,7 @@
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -7,7 +9,10 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapAuthEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapPost("/api/auth/login", async (
+            endpoints.MapPost("/api/auth/login", async Task<Results<
+                Ok<ApiLoginResponse>,
+                BadRequest<ApiErrorResponse>,
+                JsonHttpResult<ApiErrorResponse>>>(
                 HttpContext context,
                 ApiLoginRequest request,
                 IDatabaseInitializationService databaseInitializationService,
@@ -17,11 +22,12 @@ namespace ExportDocManager.Api.Hosting
                 ApiLoginAttemptService loginAttempts,
                 ApiDownloadTicketService downloadTicketService,
                 ApiDesktopAccessOptions desktopAccessOptions,
+                [FromHeader(Name = ApiRuntimeOptions.BootstrapTokenHeaderName)] string? bootstrapToken,
                 ILogger<ApiLoginAttemptService> logger) =>
             {
-                if (string.IsNullOrWhiteSpace(request?.Username))
+                if (request is null || string.IsNullOrWhiteSpace(request.Username))
                 {
-                    return Results.BadRequest(new ApiErrorResponse("用户名不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("用户名不能为空。"));
                 }
 
                 string username = request.Username.Trim();
@@ -31,16 +37,15 @@ namespace ExportDocManager.Api.Hosting
                 if (!attemptDecision.Allowed)
                 {
                     SetRetryAfter(context, attemptDecision.RetryAfter);
-                    return Results.Json(
+                    return TypedResults.Json(
                         new ApiErrorResponse("登录尝试过于频繁，请稍后再试。"),
                         statusCode: StatusCodes.Status429TooManyRequests);
                 }
 
-                string bootstrapToken = context.Request.Headers[ApiRuntimeOptions.BootstrapTokenHeaderName].ToString();
                 var initializationResult = await databaseInitializationService.InitializeAsync(
                     username,
                     password,
-                    bootstrapToken);
+                    bootstrapToken ?? string.Empty);
                 if (!initializationResult.IsSuccess)
                 {
                     if (initializationResult.IsAuthenticationFailure)
@@ -54,17 +59,17 @@ namespace ExportDocManager.Api.Hosting
                         if (!failureDecision.Allowed)
                         {
                             SetRetryAfter(context, failureDecision.RetryAfter);
-                            return Results.Json(
+                            return TypedResults.Json(
                                 new ApiErrorResponse("登录尝试过于频繁，请稍后再试。"),
                                 statusCode: StatusCodes.Status429TooManyRequests);
                         }
 
-                        return Results.Json(
+                        return TypedResults.Json(
                             new ApiErrorResponse(initializationResult.ErrorMessage),
                             statusCode: StatusCodes.Status401Unauthorized);
                     }
 
-                    return Results.Json(
+                    return TypedResults.Json(
                         new ApiErrorResponse(initializationResult.ErrorMessage),
                         statusCode: StatusCodes.Status503ServiceUnavailable);
                 }
@@ -81,11 +86,13 @@ namespace ExportDocManager.Api.Hosting
                     if (!failureDecision.Allowed)
                     {
                         SetRetryAfter(context, failureDecision.RetryAfter);
-                        return Results.Json(
+                        return TypedResults.Json(
                             new ApiErrorResponse("登录尝试过于频繁，请稍后再试。"),
                             statusCode: StatusCodes.Status429TooManyRequests);
                     }
-                    return Results.Unauthorized();
+                    return TypedResults.Json(
+                        new ApiErrorResponse("用户名或密码错误。"),
+                        statusCode: StatusCodes.Status401Unauthorized);
                 }
 
                 loginAttempts.RecordSuccess(username, remoteAddress);
@@ -93,27 +100,30 @@ namespace ExportDocManager.Api.Hosting
                     context,
                     revokeUnboundDesktopTickets: ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions));
                 var token = await tokenService.IssueAsync(user, cancellationToken: context.RequestAborted);
-                return Results.Ok(new ApiLoginResponse(
+                return TypedResults.Ok(new ApiLoginResponse(
                     "Bearer",
                     token.AccessToken,
                     token.ExpiresAt,
                     ApiUserDtoFactory.FromUser(user, authorizationService)));
             })
-            .WithName("Login");
+            .WithName("Login")
+            .Produces<ApiErrorResponse>(StatusCodes.Status401Unauthorized)
+            .Produces<ApiErrorResponse>(StatusCodes.Status429TooManyRequests)
+            .Produces<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable);
 
-            endpoints.MapGet("/api/auth/me", (
+            endpoints.MapGet("/api/auth/me", Results<Ok<ApiUserDto>, UnauthorizedHttpResult> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 return user == null
-                    ? Results.Unauthorized()
-                    : Results.Ok(ApiUserDtoFactory.FromUser(user, authorizationService));
+                    ? TypedResults.Unauthorized()
+                    : TypedResults.Ok(ApiUserDtoFactory.FromUser(user, authorizationService));
             })
-            .WithName("CurrentUser");
+            .WithName("getCurrentUser");
 
-            endpoints.MapPost("/api/auth/renew", async (
+            endpoints.MapPost("/api/auth/renew", async Task<Results<Ok<ApiLoginResponse>, UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService) =>
@@ -122,7 +132,7 @@ namespace ExportDocManager.Api.Hosting
                 string currentToken = ApiCurrentUserContext.GetBearerToken(context);
                 if (user == null || string.IsNullOrWhiteSpace(currentToken))
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 var renewed = await tokenService.IssueAsync(
@@ -131,10 +141,10 @@ namespace ExportDocManager.Api.Hosting
                 if (!await tokenService.RevokeAsync(currentToken, context.RequestAborted))
                 {
                     await tokenService.RevokeAsync(renewed.AccessToken, context.RequestAborted);
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
-                return Results.Ok(new ApiLoginResponse(
+                return TypedResults.Ok(new ApiLoginResponse(
                     "Bearer",
                     renewed.AccessToken,
                     renewed.ExpiresAt,
@@ -142,7 +152,7 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("RenewSession");
 
-            endpoints.MapPost("/api/auth/logout", async (
+            endpoints.MapPost("/api/auth/logout", async Task<Ok<ApiLogoutResponse>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiDownloadTicketService downloadTicketService) =>
@@ -159,7 +169,7 @@ namespace ExportDocManager.Api.Hosting
                 {
                     downloadTicketService.ResetSession(context);
                 }
-                return Results.Ok(new ApiLogoutResponse(revoked));
+                return TypedResults.Ok(new ApiLogoutResponse(revoked));
             })
             .WithName("Logout");
         }

@@ -455,7 +455,7 @@ namespace ExportDocManager.DataAccess
                 : Path.GetFullPath(Path.Combine(_pathProvider.ConfigRoot, trimmed));
         }
 
-        private static bool TryEnsureDirectory(string directoryPath)
+        private static bool TryEnsureDirectory(string? directoryPath)
         {
             if (string.IsNullOrWhiteSpace(directoryPath))
             {
@@ -475,7 +475,7 @@ namespace ExportDocManager.DataAccess
 
         private sealed class DatabaseSettingsFile
         {
-            public DatabaseSystemSettings System { get; set; }
+            public DatabaseSystemSettings System { get; set; } = new();
         }
 
         private sealed class DatabaseSystemSettings

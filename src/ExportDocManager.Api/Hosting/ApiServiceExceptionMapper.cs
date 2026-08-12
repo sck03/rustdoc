@@ -10,11 +10,11 @@ namespace ExportDocManager.Api.Hosting;
 
 internal static class ApiServiceExceptionMapper
 {
-    private static readonly AsyncLocal<string> CurrentCorrelationId = new();
+    private static readonly AsyncLocal<string?> CurrentCorrelationId = new();
 
     internal static IDisposable PushCorrelationId(string correlationId)
     {
-        string previous = CurrentCorrelationId.Value;
+        string? previous = CurrentCorrelationId.Value;
         CurrentCorrelationId.Value = correlationId;
         return new CorrelationScope(previous);
     }
@@ -26,13 +26,13 @@ internal static class ApiServiceExceptionMapper
         return Results.Json(new ApiErrorResponse(message), statusCode: statusCode);
     }
 
-    public static (int StatusCode, string Message) Map(Exception exception, string correlationId)
+    public static (int StatusCode, string Message) Map(Exception exception, string? correlationId)
     {
         ArgumentNullException.ThrowIfNull(exception);
         // Explicit application classifications always win over nested system
         // exceptions. For example, a missing managed DLL wrapped in an
         // InfrastructureServiceException is a 503, not a business-resource 404.
-        ServiceException classified = Enumerate(exception)
+        ServiceException? classified = Enumerate(exception)
             .OfType<ServiceException>()
             .FirstOrDefault();
         if (classified != null)
@@ -185,10 +185,10 @@ internal static class ApiServiceExceptionMapper
 
     private sealed class CorrelationScope : IDisposable
     {
-        private readonly string _previous;
+        private readonly string? _previous;
         private bool _disposed;
 
-        public CorrelationScope(string previous)
+        public CorrelationScope(string? previous)
         {
             _previous = previous;
         }

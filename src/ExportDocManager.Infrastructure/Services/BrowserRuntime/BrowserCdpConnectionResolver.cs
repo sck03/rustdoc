@@ -69,7 +69,7 @@ public static class BrowserCdpConnectionResolver
                 .ConfigureAwait(false);
             if (!document.RootElement.TryGetProperty("webSocketDebuggerUrl", out JsonElement property) ||
                 property.ValueKind != JsonValueKind.String ||
-                !Uri.TryCreate(property.GetString(), UriKind.Absolute, out Uri discoveredWebSocket) ||
+                !Uri.TryCreate(property.GetString(), UriKind.Absolute, out Uri? discoveredWebSocket) ||
                 discoveredWebSocket.Scheme is not ("ws" or "wss") ||
                 !string.IsNullOrEmpty(discoveredWebSocket.UserInfo) ||
                 !string.IsNullOrEmpty(discoveredWebSocket.Query) ||
@@ -125,7 +125,7 @@ public static class BrowserCdpConnectionResolver
             throw new IOException("Chromium container service name could not be resolved.", ex);
         }
 
-        IPAddress address = addresses
+        IPAddress? address = addresses
             .Where(BrowserCdpEndpointPolicy.IsTrustedHttpAddress)
             .Distinct()
             .OrderBy(candidate => candidate.AddressFamily == AddressFamily.InterNetwork ? 0 : 1)

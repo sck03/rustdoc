@@ -212,7 +212,9 @@ internal sealed class ServerMigrationPackageGenerator
     private static void EnsureMasterKeyFile(string path)
     {
         string configured = Environment.GetEnvironmentVariable(LocalSecretProtector.MasterKeyEnvironmentVariable)?.Trim() ?? string.Empty;
-        byte[] configuredKey = string.IsNullOrWhiteSpace(configured) ? null : ServerMigrationService.ParseConfiguredMasterKey(configured);
+        byte[]? configuredKey = string.IsNullOrWhiteSpace(configured)
+            ? null
+            : ServerMigrationService.ParseConfiguredMasterKey(configured);
         try
         {
             if (File.Exists(path))

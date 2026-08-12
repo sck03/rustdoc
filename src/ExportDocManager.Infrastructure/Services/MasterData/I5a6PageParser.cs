@@ -166,19 +166,19 @@ internal static class I5a6PageParser
         return document;
     }
 
-    private static HtmlNode SelectStandardTable(HtmlDocument document) =>
+    private static HtmlNode? SelectStandardTable(HtmlDocument document) =>
         SelectHighestScoringTable(document, ScoreStandardTable, minimumScore: 11);
 
-    private static bool HasStandardHeaders(HtmlNode table)
+    private static bool HasStandardHeaders(HtmlNode? table)
     {
         if (table == null) return false;
         return ScoreStandardTable(table) >= 11;
     }
 
-    private static HtmlNode SelectDeclarationTable(HtmlDocument document) =>
+    private static HtmlNode? SelectDeclarationTable(HtmlDocument document) =>
         SelectHighestScoringTable(document, ScoreDeclarationTable, minimumScore: 11);
 
-    private static HtmlNode SelectHighestScoringTable(
+    private static HtmlNode? SelectHighestScoringTable(
         HtmlDocument document,
         Func<HtmlNode, int> scorer,
         int minimumScore)
@@ -238,7 +238,7 @@ internal static class I5a6PageParser
         }, minimumScore: 9) ?? document.DocumentNode;
     }
 
-    private static HtmlNode SelectFollowingSemanticTable(HtmlDocument document, params string[] labels)
+    private static HtmlNode? SelectFollowingSemanticTable(HtmlDocument document, params string[] labels)
     {
         foreach (var node in document.DocumentNode.SelectNodes("//div|//h1|//h2|//h3|//h4|//caption|//header|//section") ?? Enumerable.Empty<HtmlNode>())
         {
@@ -251,7 +251,7 @@ internal static class I5a6PageParser
         return null;
     }
 
-    private static HtmlNode FindHeaderRow(HtmlNode table, Func<IReadOnlyList<string>, bool> predicate)
+    private static HtmlNode? FindHeaderRow(HtmlNode? table, Func<IReadOnlyList<string>, bool> predicate)
     {
         return table?.SelectNodes(".//tr")?
             .Take(8)
@@ -291,7 +291,7 @@ internal static class I5a6PageParser
             .Select(child => child.InnerText) ?? []));
 
     private static void ParseStandardTable(
-        HtmlNode table,
+        HtmlNode? table,
         List<HsCodeRemoteSearchRecord> records,
         List<HsCodeRemoteReplacementEvidence> replacements,
         DateTimeOffset observedAt,
@@ -352,7 +352,7 @@ internal static class I5a6PageParser
     }
 
     private static List<HsCodeRemoteSearchRecord> ParseDeclarationTable(
-        HtmlNode table,
+        HtmlNode? table,
         DateTimeOffset observedAt,
         string evidenceUrl = "",
         string fallbackCode = "",
@@ -510,7 +510,7 @@ internal static class I5a6PageParser
         return fields;
     }
 
-    private static IReadOnlyList<HsCodeRemoteReferenceEntry> ParseReferenceEntries(HtmlNode table)
+    private static IReadOnlyList<HsCodeRemoteReferenceEntry> ParseReferenceEntries(HtmlNode? table)
     {
         var result = new List<HsCodeRemoteReferenceEntry>();
         foreach (var row in table?.SelectNodes(".//tr") ?? Enumerable.Empty<HtmlNode>())
@@ -557,7 +557,7 @@ internal static class I5a6PageParser
         return string.Empty;
     }
 
-    private static string FindSummaryUrl(HtmlNode cell, out int? count)
+    private static string FindSummaryUrl(HtmlNode? cell, out int? count)
     {
         count = null;
         var link = cell?.SelectSingleNode(".//a[contains(@href, '/hscode/detail/')]");
@@ -567,13 +567,13 @@ internal static class I5a6PageParser
         return count.HasValue || href.Contains("#sbsl", StringComparison.OrdinalIgnoreCase) ? href : string.Empty;
     }
 
-    private static int? ParseCount(string value)
+    private static int? ParseCount(string? value)
     {
         string raw = CountRegex.Match(value ?? string.Empty).Groups[1].Value.Replace(",", string.Empty);
         return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int count) ? count : null;
     }
 
-    private static IReadOnlyList<string> ReadHeaders(HtmlNode row) =>
+    private static IReadOnlyList<string> ReadHeaders(HtmlNode? row) =>
         row?.SelectNodes("th|td")?.Select(cell => NormalizeText(cell.InnerText)).ToList() ?? [];
 
     private static int FindHeader(IReadOnlyList<string> headers, params string[] names)
@@ -620,7 +620,8 @@ internal static class I5a6PageParser
         UpdateTime = source.UpdateTime
     };
 
-    private static string Prefer(string primary, string fallback) => string.IsNullOrWhiteSpace(primary) ? fallback : primary.Trim();
+    private static string Prefer(string? primary, string? fallback) =>
+        string.IsNullOrWhiteSpace(primary) ? fallback?.Trim() ?? string.Empty : primary.Trim();
     private static string BuildSourceName(string source, HsCodeRemoteRecordKind kind)
     {
         string normalized = (source ?? string.Empty).Trim();
@@ -635,7 +636,7 @@ internal static class I5a6PageParser
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Contains(className, StringComparer.OrdinalIgnoreCase);
 
-    private static string NormalizeText(string value) => WhitespaceRegex.Replace(WebUtility.HtmlDecode(value ?? string.Empty), " ").Trim();
+    private static string NormalizeText(string? value) => WhitespaceRegex.Replace(WebUtility.HtmlDecode(value ?? string.Empty), " ").Trim();
     private static string NormalizeUrl(string href)
     {
         if (string.IsNullOrWhiteSpace(href)) return string.Empty;

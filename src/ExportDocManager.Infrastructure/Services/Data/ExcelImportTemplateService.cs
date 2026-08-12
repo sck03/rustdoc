@@ -153,7 +153,7 @@ namespace ExportDocManager.Services.Data
         private static string PrepareTargetPath(string targetFilePath, bool overwrite)
         {
             string normalizedTargetPath = Path.GetFullPath(targetFilePath);
-            string targetDirectory = Path.GetDirectoryName(normalizedTargetPath);
+            string? targetDirectory = Path.GetDirectoryName(normalizedTargetPath);
             if (!string.IsNullOrWhiteSpace(targetDirectory))
             {
                 Directory.CreateDirectory(targetDirectory);
@@ -254,7 +254,7 @@ namespace ExportDocManager.Services.Data
             WriteCell(worksheet, row, settings.TotalPriceCol, item.TotalPrice);
         }
 
-        private static void WriteLines(IXLWorksheet worksheet, string startCellAddress, int lineCount, string value)
+        private static void WriteLines(IXLWorksheet worksheet, string startCellAddress, int lineCount, string? value)
         {
             var startCell = worksheet.Cell(startCellAddress);
             int row = startCell.Address.RowNumber;
@@ -268,7 +268,7 @@ namespace ExportDocManager.Services.Data
             }
         }
 
-        private static IReadOnlyList<string> SplitLines(string value)
+        private static IReadOnlyList<string> SplitLines(string? value)
         {
             return (value ?? string.Empty)
                 .Replace("\r\n", "\n", StringComparison.Ordinal)
@@ -279,7 +279,7 @@ namespace ExportDocManager.Services.Data
                 .ToList();
         }
 
-        private static void WriteCell(IXLWorksheet worksheet, string cellAddress, string value)
+        private static void WriteCell(IXLWorksheet worksheet, string cellAddress, string? value)
         {
             if (!string.IsNullOrWhiteSpace(cellAddress))
             {
@@ -287,7 +287,7 @@ namespace ExportDocManager.Services.Data
             }
         }
 
-        private static void WriteCell(IXLWorksheet worksheet, int row, int column, string value)
+        private static void WriteCell(IXLWorksheet worksheet, int row, int column, string? value)
         {
             if (row > 0 && column > 0)
             {
@@ -338,6 +338,7 @@ namespace ExportDocManager.Services.Data
                     .ConfigureAwait(false))
                 .Select(name => name?.Trim())
                 .Where(name => !string.IsNullOrWhiteSpace(name))
+                .OfType<string>()
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 

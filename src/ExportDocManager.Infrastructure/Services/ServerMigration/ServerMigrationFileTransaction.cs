@@ -137,7 +137,7 @@ namespace ExportDocManager.Services.Infrastructure
 
         public static void Rollback(string safetyRoot)
         {
-            ServerMigrationFileTransactionState state = ReadState(safetyRoot);
+            ServerMigrationFileTransactionState? state = ReadState(safetyRoot);
             if (state == null || !state.FullMigration)
             {
                 return;
@@ -226,7 +226,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
         }
 
-        public static ServerMigrationFileTransactionState ReadState(string safetyRoot)
+        public static ServerMigrationFileTransactionState? ReadState(string safetyRoot)
         {
             string path = Path.Combine(safetyRoot, StateFileName);
             if (!File.Exists(path))
@@ -458,7 +458,7 @@ namespace ExportDocManager.Services.Infrastructure
 
         private static void EnsureNoReparsePoint(string target)
         {
-            string current = Path.GetFullPath(target);
+            string? current = Path.GetFullPath(target);
             while (!string.IsNullOrWhiteSpace(current))
             {
                 if (File.Exists(current) || Directory.Exists(current))

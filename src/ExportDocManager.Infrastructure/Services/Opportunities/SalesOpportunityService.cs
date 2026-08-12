@@ -20,7 +20,7 @@ namespace ExportDocManager.Services.Opportunities
         }
 
         public async Task<PagedResult<SalesOpportunityRecord>> QueryAsync(
-            string keyword, string stage, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+            string? keyword, string? stage, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
         {
             keyword = Clean(keyword); stage = Clean(stage);
             pageNumber = Math.Max(pageNumber, 1); pageSize = Math.Clamp(pageSize, 10, 100);
@@ -67,7 +67,7 @@ namespace ExportDocManager.Services.Opportunities
             var customer = await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking())
                 .FirstOrDefaultAsync(item => item.Id == request.CrmCustomerId, cancellationToken)
                 ?? throw new KeyNotFoundException("CRM 客户不存在或无权访问。");
-            Product product = null;
+            Product? product = null;
             if (request.ProductId is > 0)
                 product = await context.Products.AsNoTracking().FirstOrDefaultAsync(item => item.Id == request.ProductId, cancellationToken)
                     ?? throw new KeyNotFoundException("产品不存在。");
@@ -230,6 +230,6 @@ namespace ExportDocManager.Services.Opportunities
 
         private static string Required(string value, string field) => string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException($"{field}不能为空。") : value.Trim();
-        private static string Clean(string value) => (value ?? string.Empty).Trim();
+        private static string Clean(string? value) => (value ?? string.Empty).Trim();
     }
 }

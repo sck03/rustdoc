@@ -33,6 +33,7 @@ namespace ExportDocManager.Application.Tests
                 stored,
                 [new Item()]);
 
+            Assert.NotNull(overlay);
             Assert.Equal("MANUAL PRODUCER", overlay.Producer);
             Assert.Equal(string.Empty, overlay.DestCountry);
             var item = Assert.Single(overlay.Items);

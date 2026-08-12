@@ -161,14 +161,21 @@ namespace ExportDocManager.Services.Data
                         cancellationToken.ThrowIfCancellationRequested();
 
                         rowNumber++;
-                        worksheetBudget.RegisterRow(rowNumber, reader.FieldCount, reader.FieldCount);
-                        var values = new object[reader.FieldCount];
-                        for (int index = 0; index < reader.FieldCount; index++)
+                        int lastValueIndex = FindLastPopulatedFieldIndex(reader);
+                        int logicalColumnCount = lastValueIndex + 1;
+                        worksheetBudget.RegisterRow(rowNumber, logicalColumnCount, logicalColumnCount);
+                        var values = new object[logicalColumnCount];
+                        for (int index = 0; index < logicalColumnCount; index++)
                         {
                             values[index] = reader.GetValue(index);
                         }
 
                         rows.Add(values);
+                    }
+
+                    while (rows.Count > 0 && rows[^1].Length == 0)
+                    {
+                        rows.RemoveAt(rows.Count - 1);
                     }
 
                     worksheets.Add(new BinaryExcelImportWorksheet(reader.Name, rows));
@@ -187,6 +194,20 @@ namespace ExportDocManager.Services.Data
 
             public void Dispose()
             {
+            }
+
+            private static int FindLastPopulatedFieldIndex(IExcelDataReader reader)
+            {
+                for (int index = reader.FieldCount - 1; index >= 0; index--)
+                {
+                    object value = reader.GetValue(index);
+                    if (value is not null && value is not DBNull)
+                    {
+                        return index;
+                    }
+                }
+
+                return -1;
             }
         }
 
@@ -234,9 +255,9 @@ namespace ExportDocManager.Services.Data
         {
             public static readonly BinaryExcelImportCell Empty = new(null);
 
-            private readonly object _value;
+            private readonly object? _value;
 
-            public BinaryExcelImportCell(object value)
+            public BinaryExcelImportCell(object? value)
             {
                 _value = value;
             }

@@ -18,6 +18,7 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ISettingsService settingsService,
                 IExchangeRateService exchangeRateService,
+                bool? forceRefresh,
                 CancellationToken cancellationToken) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
@@ -25,14 +26,10 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Unauthorized();
                 }
 
-                bool forceRefresh = bool.TryParse(
-                    context.Request.Query["forceRefresh"].FirstOrDefault(),
-                    out bool parsedForceRefresh) && parsedForceRefresh;
-
                 try
                 {
                     await settingsService.LoadAsync();
-                    if (forceRefresh)
+                    if (forceRefresh == true)
                     {
                         exchangeRateService.ClearCache();
                     }
@@ -73,7 +70,10 @@ namespace ExportDocManager.Api.Hosting
                     return WriteInfrastructureFailure("汇率查询服务暂时不可用，请稍后重试。", ex);
                 }
             })
-            .WithName("ListExchangeRates");
+            .WithName("ListExchangeRates")
+            .Produces<ApiExchangeRateListResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapGet("/api/tools/exchange-rates/available-currencies", async (
                 HttpContext context,
@@ -121,7 +121,10 @@ namespace ExportDocManager.Api.Hosting
                     return WriteInfrastructureFailure("货币列表服务暂时不可用，请稍后重试。", ex);
                 }
             })
-            .WithName("ListAvailableExchangeRateCurrencies");
+            .WithName("ListAvailableExchangeRateCurrencies")
+            .Produces<ApiExchangeRateAvailableCurrenciesResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
         }
 
         private static ExchangeRateSettings EnsureExchangeRateSettings(AppSettings settings)

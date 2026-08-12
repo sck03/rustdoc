@@ -10,13 +10,13 @@ namespace ExportDocManager.Models.Entities
 
         public static readonly IReadOnlyList<string> Types = [Actual, Customs];
 
-        public static bool IsKnown(string value)
+        public static bool IsKnown(string? value)
         {
             string normalized = value?.Trim() ?? string.Empty;
             return Types.Contains(normalized, StringComparer.Ordinal);
         }
 
-        public static string Normalize(string value)
+        public static string Normalize(string? value)
         {
             string normalized = value?.Trim() ?? string.Empty;
             return string.IsNullOrWhiteSpace(normalized) ? Actual : normalized;

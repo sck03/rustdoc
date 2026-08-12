@@ -40,13 +40,13 @@ namespace ExportDocManager.Services.Infrastructure
         public async Task<QueryResultExportResult> ExportToExcelAsync(
             QueryPageQuery query,
             string filePath,
-            IProgress<OperationProgressUpdate> progress = null,
+            IProgress<OperationProgressUpdate>? progress = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
             string destinationPath = Path.GetFullPath(filePath);
-            string destinationDirectory = Path.GetDirectoryName(destinationPath);
+            string? destinationDirectory = Path.GetDirectoryName(destinationPath);
             if (!string.IsNullOrWhiteSpace(destinationDirectory))
             {
                 Directory.CreateDirectory(destinationDirectory);
@@ -95,7 +95,7 @@ namespace ExportDocManager.Services.Infrastructure
             string tempFilePath,
             QueryPageQuery query,
             PagedResult<Invoice> firstPage,
-            IProgress<OperationProgressUpdate> progress,
+            IProgress<OperationProgressUpdate>? progress,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -115,7 +115,7 @@ namespace ExportDocManager.Services.Infrastructure
             IXLWorkbook workbook,
             QueryPageQuery query,
             PagedResult<Invoice> firstPage,
-            IProgress<OperationProgressUpdate> progress,
+            IProgress<OperationProgressUpdate>? progress,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -185,7 +185,7 @@ namespace ExportDocManager.Services.Infrastructure
             IReadOnlyList<Invoice> invoices,
             int startRowNumber,
             int totalCount,
-            IProgress<OperationProgressUpdate> progress,
+            IProgress<OperationProgressUpdate>? progress,
             CancellationToken cancellationToken)
         {
             int rowNumber = Math.Max(2, startRowNumber);
@@ -221,7 +221,7 @@ namespace ExportDocManager.Services.Infrastructure
         }
 
         private static void ReportExportProgress(
-            IProgress<OperationProgressUpdate> progress,
+            IProgress<OperationProgressUpdate>? progress,
             int writtenCount,
             int totalCount)
         {

@@ -75,7 +75,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
         private static string ResolveInfrastructureSourceRoot()
         {
-            string directory = AppContext.BaseDirectory;
+            string? directory = AppContext.BaseDirectory;
             while (!string.IsNullOrWhiteSpace(directory))
             {
                 string candidate = Path.Combine(directory, "src", "ExportDocManager.Infrastructure");

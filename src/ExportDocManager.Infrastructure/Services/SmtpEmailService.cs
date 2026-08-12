@@ -30,7 +30,7 @@ namespace ExportDocManager.Services.Infrastructure
             string to,
             string subject,
             string body,
-            List<string> attachments = null,
+            List<string>? attachments = null,
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -38,7 +38,7 @@ namespace ExportDocManager.Services.Infrastructure
             var smtpHost = RequireValue(config.SmtpHost, "SMTP 服务器未配置，请先到“系统设置 > 邮件设置”中填写。");
             var fromAddress = ResolveFromAddress(config);
             var recipientAddress = RequireValue(to, "收件人地址不能为空。");
-            var attachmentPaths = EmailAttachmentPolicy.ValidateAndNormalize(attachments);
+            var attachmentPaths = EmailAttachmentPolicy.ValidateAndNormalize(attachments ?? []);
 
             using var message = new MailMessage
             {
@@ -159,7 +159,7 @@ namespace ExportDocManager.Services.Infrastructure
             return client;
         }
 
-        private static MailAddress CreateMailAddress(string address, string displayName = null)
+        private static MailAddress CreateMailAddress(string address, string? displayName = null)
         {
             return string.IsNullOrWhiteSpace(displayName)
                 ? new MailAddress(address)

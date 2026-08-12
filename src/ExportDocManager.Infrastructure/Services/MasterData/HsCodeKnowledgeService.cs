@@ -26,7 +26,7 @@ namespace ExportDocManager.Services.MasterData
 
         public HsCodeKnowledgeService(
             IDbContextFactory<AppDbContext> dbContextFactory,
-            BusinessDataAccessScope businessDataAccessScope = null)
+            BusinessDataAccessScope? businessDataAccessScope = null)
         {
             _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
             _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());

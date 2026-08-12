@@ -1,6 +1,7 @@
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -9,7 +10,7 @@ namespace ExportDocManager.Api.Hosting
         private readonly ApiBackgroundJobService _jobs;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<ApiBackgroundJobRunner> _logger;
-        private readonly ICurrentUserContext _currentUserContext;
+        private readonly ICurrentUserContext? _currentUserContext;
         private readonly SemaphoreSlim _globalConcurrency;
         private readonly SemaphoreSlim _browserConcurrency;
         private readonly int _perUserConcurrencyLimit;
@@ -23,7 +24,7 @@ namespace ExportDocManager.Api.Hosting
         private readonly Lock _lifecycleSync = new();
         private int _reservedJobs;
         private int _stopping;
-        private Task _shutdownTask;
+        private Task? _shutdownTask;
 
         public ApiBackgroundJobRunner(
             ApiBackgroundJobService jobs,
@@ -46,7 +47,7 @@ namespace ExportDocManager.Api.Hosting
             ApiBackgroundJobService jobs,
             IServiceScopeFactory scopeFactory,
             ILogger<ApiBackgroundJobRunner> logger,
-            ICurrentUserContext currentUserContext,
+            ICurrentUserContext? currentUserContext,
             ApiBackgroundJobConcurrencyOptions concurrencyOptions)
         {
             _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
@@ -186,7 +187,7 @@ namespace ExportDocManager.Api.Hosting
 
         private bool TryReserveQueueSlot(
             string requestedBy,
-            out UserConcurrencyState userState,
+            [NotNullWhen(true)] out UserConcurrencyState? userState,
             out string rejectionMessage)
         {
             string key = string.IsNullOrWhiteSpace(requestedBy) ? "__system__" : requestedBy.Trim();
@@ -226,7 +227,7 @@ namespace ExportDocManager.Api.Hosting
             }
         }
 
-        private void ReleaseQueueSlot(string requestedBy, UserConcurrencyState userState)
+        private void ReleaseQueueSlot(string requestedBy, UserConcurrencyState? userState)
         {
             Interlocked.Decrement(ref _reservedJobs);
             if (userState == null)

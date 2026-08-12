@@ -31,7 +31,7 @@ namespace ExportDocManager.Services.Reporting
         public async Task<ReportTemplateContentResult> CreateTemplateAsync(
             ReportDocumentType reportType,
             string templatePath,
-            string displayName = null,
+            string? displayName = null,
             CancellationToken cancellationToken = default)
         {
             string resolvedPath = ResolveTemplateLifecycleTargetPath(
@@ -267,7 +267,7 @@ namespace ExportDocManager.Services.Reporting
                 throw new ResourceNotFoundException("报表模板不存在。");
             }
 
-            string directory = Path.GetDirectoryName(resolvedPath);
+            string? directory = Path.GetDirectoryName(resolvedPath);
             if (string.IsNullOrWhiteSpace(directory))
             {
                 throw new ArgumentException("无法解析模板所在目录。", nameof(templatePath));
@@ -418,7 +418,7 @@ namespace ExportDocManager.Services.Reporting
         private static ResolvedReportTemplate CreateResolvedTemplate(
             ReportDocumentType reportType,
             string templatePath,
-            string displayName = null)
+            string? displayName = null)
         {
             return new ResolvedReportTemplate
             {

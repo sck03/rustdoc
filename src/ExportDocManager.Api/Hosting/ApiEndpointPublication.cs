@@ -45,9 +45,9 @@ internal static class ApiEndpointPublication
     internal static string ResolveApiBaseUrl(IEnumerable<string> addresses)
     {
         string[] resolved = (addresses ?? Array.Empty<string>())
-            .Select(address => Uri.TryCreate(address, UriKind.Absolute, out Uri uri) ? uri : null)
-            .Where(uri => uri != null &&
-                          uri.Scheme == Uri.UriSchemeHttp &&
+            .Select(address => Uri.TryCreate(address, UriKind.Absolute, out Uri? uri) ? uri : null)
+            .OfType<Uri>()
+            .Where(uri => uri.Scheme == Uri.UriSchemeHttp &&
                           ApiStartupValidator.IsLoopbackHost(uri.Host) &&
                           uri.Port > 0)
             .Select(uri => uri.GetLeftPart(UriPartial.Authority).TrimEnd('/'))

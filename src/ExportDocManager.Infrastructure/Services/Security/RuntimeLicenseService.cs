@@ -27,12 +27,12 @@ namespace ExportDocManager.Services.Security
 
         private readonly IAppPathProvider _pathProvider;
         private readonly Func<string> _deviceFingerprintProvider;
-        private readonly Func<string> _localBindingSecretProvider;
+        private readonly Func<string>? _localBindingSecretProvider;
         private readonly IRuntimeLicenseAnchorStore _anchorStore;
         private readonly ILicenseSignatureVerifier _signatureVerifier;
         private readonly LocalSecretProtector _secretProtector;
         private readonly SemaphoreSlim _stateGate = new(1, 1);
-        private CachedLicenseStatus _cachedStatus;
+        private CachedLicenseStatus? _cachedStatus;
 
         public RuntimeLicenseService(IAppPathProvider pathProvider)
             : this(pathProvider, null, null, null, null)
@@ -41,28 +41,28 @@ namespace ExportDocManager.Services.Security
 
         public RuntimeLicenseService(
             IAppPathProvider pathProvider,
-            IRuntimeLicenseAnchorStore anchorStore)
+            IRuntimeLicenseAnchorStore? anchorStore)
             : this(pathProvider, null, null, anchorStore, null)
         {
         }
 
         public RuntimeLicenseService(
             IAppPathProvider pathProvider,
-            IRuntimeLicenseAnchorStore anchorStore,
-            ILicenseSignatureVerifier signatureVerifier)
+            IRuntimeLicenseAnchorStore? anchorStore,
+            ILicenseSignatureVerifier? signatureVerifier)
             : this(pathProvider, null, null, anchorStore, signatureVerifier)
         {
         }
 
-        public RuntimeLicenseService(IAppPathProvider pathProvider, Func<string> deviceFingerprintProvider)
+        public RuntimeLicenseService(IAppPathProvider pathProvider, Func<string>? deviceFingerprintProvider)
             : this(pathProvider, deviceFingerprintProvider, null, null, null)
         {
         }
 
         public RuntimeLicenseService(
             IAppPathProvider pathProvider,
-            Func<string> deviceFingerprintProvider,
-            Func<string> localBindingSecretProvider)
+            Func<string>? deviceFingerprintProvider,
+            Func<string>? localBindingSecretProvider)
             : this(
                 pathProvider,
                 deviceFingerprintProvider,
@@ -74,9 +74,9 @@ namespace ExportDocManager.Services.Security
 
         public RuntimeLicenseService(
             IAppPathProvider pathProvider,
-            Func<string> deviceFingerprintProvider,
-            Func<string> localBindingSecretProvider,
-            IRuntimeLicenseAnchorStore anchorStore)
+            Func<string>? deviceFingerprintProvider,
+            Func<string>? localBindingSecretProvider,
+            IRuntimeLicenseAnchorStore? anchorStore)
             : this(
                 pathProvider,
                 deviceFingerprintProvider,
@@ -88,10 +88,10 @@ namespace ExportDocManager.Services.Security
 
         public RuntimeLicenseService(
             IAppPathProvider pathProvider,
-            Func<string> deviceFingerprintProvider,
-            Func<string> localBindingSecretProvider,
-            IRuntimeLicenseAnchorStore anchorStore,
-            ILicenseSignatureVerifier signatureVerifier)
+            Func<string>? deviceFingerprintProvider,
+            Func<string>? localBindingSecretProvider,
+            IRuntimeLicenseAnchorStore? anchorStore,
+            ILicenseSignatureVerifier? signatureVerifier)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _deviceFingerprintProvider = deviceFingerprintProvider ?? RuntimeLicenseDeviceFingerprint.Create;

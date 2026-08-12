@@ -43,7 +43,7 @@ namespace ExportDocManager.Api.Hosting
                 ';',
                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             if (listenUrls.Length != 1 ||
-                !Uri.TryCreate(listenUrls[0], UriKind.Absolute, out Uri uri) ||
+                !Uri.TryCreate(listenUrls[0], UriKind.Absolute, out Uri? uri) ||
                 uri.Scheme != Uri.UriSchemeHttp ||
                 !IsLoopbackHost(uri.Host) ||
                 uri.Port != 0)
@@ -64,7 +64,7 @@ namespace ExportDocManager.Api.Hosting
             ValidateRuntimeDirectories(pathProvider);
         }
 
-        public static void ValidateLocalListenUrls(string listenUrls)
+        public static void ValidateLocalListenUrls(string? listenUrls)
         {
             foreach (string rawUrl in (listenUrls ?? string.Empty).Split(
                 ';',
@@ -240,7 +240,7 @@ namespace ExportDocManager.Api.Hosting
         }
 
         private static void EnsureWritableDirectory(
-            string directory,
+            string? directory,
             string description,
             string dataRoot)
         {

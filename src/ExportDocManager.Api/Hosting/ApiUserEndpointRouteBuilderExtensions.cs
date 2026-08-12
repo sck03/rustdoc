@@ -1,5 +1,6 @@
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Errors;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -7,7 +8,10 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapUserEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/users", async (
+            endpoints.MapGet("/api/users", async Task<Results<
+                Ok<ApiUserListResponse>,
+                UnauthorizedHttpResult,
+                JsonHttpResult<ApiErrorResponse>>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -16,33 +20,40 @@ namespace ExportDocManager.Api.Hosting
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
+                if (user is null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (!authorizationService.CanManageUsers(user))
                 {
-                    return WriteForbidden("只有管理员可以管理用户账号。");
+                    return TypedForbidden("只有管理员可以管理用户账号。");
                 }
 
                 try
                 {
                     var users = await userService.GetUsersAsync(cancellationToken);
                     var templates = await permissionTemplateService.ListAsync(cancellationToken);
-                    return Results.Ok(new ApiUserListResponse(
+                    return TypedResults.Ok(new ApiUserListResponse(
                         users.Select(ApiUserManagementDtoFactory.FromUser).ToArray(),
                         UserRoleCatalog.Roles,
                         templates.Select(ToPermissionTemplateOptionDto).ToArray()));
                 }
                 catch (PermissionDeniedException ex)
                 {
-                    return WriteForbidden(ex.Message);
+                    return TypedForbidden(ex.Message);
                 }
             })
-            .WithName("ListUsers");
+            .WithName("ListUsers")
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
-            endpoints.MapPost("/api/users", async (
+            endpoints.MapPost("/api/users", async Task<Results<
+                Ok<ApiUserSaveResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                JsonHttpResult<ApiErrorResponse>,
+                NotFound<ApiErrorResponse>,
+                Conflict<ApiErrorResponse>>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -51,55 +62,66 @@ namespace ExportDocManager.Api.Hosting
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
+                if (user is null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (!authorizationService.CanManageUsers(user))
                 {
-                    return WriteForbidden("只有管理员可以管理用户账号。");
+                    return TypedForbidden("只有管理员可以管理用户账号。");
                 }
 
-                if (request == null)
+                if (request is null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("用户请求体不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("用户请求体不能为空。"));
                 }
 
                 if (string.IsNullOrWhiteSpace(request.ResetPassword))
                 {
-                    return Results.BadRequest(new ApiErrorResponse("新增用户需要填写初始密码。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("新增用户需要填写初始密码。"));
                 }
 
                 try
                 {
                     UserPasswordPolicy.EnsureValid(request.ResetPassword, "初始密码");
-                }
-                catch (ServiceValidationException ex)
-                {
-                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
-                }
-
-                try
-                {
                     int savedUserId = await userService.SaveUserAsync(
                         ApiUserManagementDtoFactory.ToUser(request, 0),
                         request.ResetPassword ?? string.Empty,
                         cancellationToken);
                     var savedUser = await FindUserByIdAsync(userService, savedUserId, cancellationToken);
-                    return Results.Ok(new ApiUserSaveResponse(
+                    return TypedResults.Ok(new ApiUserSaveResponse(
                         true,
                         "用户已保存。",
                         ApiUserManagementDtoFactory.FromUser(savedUser)));
                 }
-                catch (ServiceException ex)
+                catch (ServiceValidationException ex)
                 {
-                    return WriteServiceException(ex);
+                    return TypedResults.BadRequest(new ApiErrorResponse(ex.Message));
+                }
+                catch (PermissionDeniedException ex)
+                {
+                    return TypedForbidden(ex.Message);
+                }
+                catch (ResourceNotFoundException ex)
+                {
+                    return TypedResults.NotFound(new ApiErrorResponse(ex.Message));
+                }
+                catch (ResourceConflictException ex)
+                {
+                    return TypedResults.Conflict(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("CreateUser");
+            .WithName("createUserAccount")
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
-            endpoints.MapPut("/api/users/{id:int}", async (
+            endpoints.MapPut("/api/users/{id:int}", async Task<Results<
+                Ok<ApiUserSaveResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                JsonHttpResult<ApiErrorResponse>,
+                NotFound<ApiErrorResponse>,
+                Conflict<ApiErrorResponse>>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -109,59 +131,71 @@ namespace ExportDocManager.Api.Hosting
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
+                if (user is null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (!authorizationService.CanManageUsers(user))
                 {
-                    return WriteForbidden("只有管理员可以管理用户账号。");
+                    return TypedForbidden("只有管理员可以管理用户账号。");
                 }
 
                 if (id <= 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("用户 ID 无效。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("用户 ID 无效。"));
                 }
 
-                if (request == null)
+                if (request is null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("用户请求体不能为空。"));
-                }
-
-                if (!string.IsNullOrEmpty(request.ResetPassword))
-                {
-                    try
-                    {
-                        UserPasswordPolicy.EnsureValid(request.ResetPassword, "重置密码");
-                    }
-                    catch (ServiceValidationException ex)
-                    {
-                        return Results.BadRequest(new ApiErrorResponse(ex.Message));
-                    }
+                    return TypedResults.BadRequest(new ApiErrorResponse("用户请求体不能为空。"));
                 }
 
                 try
                 {
+                    if (!string.IsNullOrEmpty(request.ResetPassword))
+                    {
+                        UserPasswordPolicy.EnsureValid(request.ResetPassword, "重置密码");
+                    }
+
                     int savedUserId = await userService.SaveUserAsync(
                         ApiUserManagementDtoFactory.ToUser(request, id),
                         request.ResetPassword ?? string.Empty,
                         cancellationToken);
                     await tokenService.RevokeUserSessionsAsync(savedUserId, cancellationToken);
                     var savedUser = await FindUserByIdAsync(userService, savedUserId, cancellationToken);
-                    return Results.Ok(new ApiUserSaveResponse(
+                    return TypedResults.Ok(new ApiUserSaveResponse(
                         true,
                         "用户已保存。",
                         ApiUserManagementDtoFactory.FromUser(savedUser)));
                 }
-                catch (ServiceException ex)
+                catch (ServiceValidationException ex)
                 {
-                    return WriteServiceException(ex);
+                    return TypedResults.BadRequest(new ApiErrorResponse(ex.Message));
+                }
+                catch (PermissionDeniedException ex)
+                {
+                    return TypedForbidden(ex.Message);
+                }
+                catch (ResourceNotFoundException ex)
+                {
+                    return TypedResults.NotFound(new ApiErrorResponse(ex.Message));
+                }
+                catch (ResourceConflictException ex)
+                {
+                    return TypedResults.Conflict(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("UpdateUser");
+            .WithName("updateUserAccount")
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
-            endpoints.MapDelete("/api/users/{id:int}", async (
+            endpoints.MapDelete("/api/users/{id:int}", async Task<Results<
+                Ok<ApiCommandResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                JsonHttpResult<ApiErrorResponse>,
+                NotFound<ApiErrorResponse>,
+                Conflict<ApiErrorResponse>>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -170,19 +204,19 @@ namespace ExportDocManager.Api.Hosting
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
+                if (user is null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (!authorizationService.CanManageUsers(user))
                 {
-                    return WriteForbidden("只有管理员可以管理用户账号。");
+                    return TypedForbidden("只有管理员可以管理用户账号。");
                 }
 
                 if (id <= 0)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("用户 ID 无效。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("用户 ID 无效。"));
                 }
 
                 try
@@ -193,15 +227,24 @@ namespace ExportDocManager.Api.Hosting
                         await tokenService.RevokeUserSessionsAsync(id, cancellationToken);
                     }
                     return deleted
-                        ? Results.Ok(new ApiCommandResponse(true, "用户已删除。"))
-                        : Results.NotFound(new ApiErrorResponse("未找到要删除的用户。"));
+                        ? TypedResults.Ok(new ApiCommandResponse(true, "用户已删除。"))
+                        : TypedResults.NotFound(new ApiErrorResponse("未找到要删除的用户。"));
                 }
-                catch (ServiceException ex)
+                catch (ServiceValidationException ex)
                 {
-                    return WriteServiceException(ex);
+                    return TypedResults.BadRequest(new ApiErrorResponse(ex.Message));
+                }
+                catch (PermissionDeniedException ex)
+                {
+                    return TypedForbidden(ex.Message);
+                }
+                catch (ResourceConflictException ex)
+                {
+                    return TypedResults.Conflict(new ApiErrorResponse(ex.Message));
                 }
             })
-            .WithName("DeleteUser");
+            .WithName("deleteUserAccount")
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
         }
 
         private static ApiPermissionTemplateOptionDto ToPermissionTemplateOptionDto(PermissionTemplateRecord template) =>

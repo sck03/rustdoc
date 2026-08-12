@@ -15,7 +15,7 @@ namespace ExportDocManager.Services.SingleWindow
         string PropertyName,
         AgentConsignmentEditorFieldKind FieldKind = AgentConsignmentEditorFieldKind.TextBox,
         int Height = 32,
-        IReadOnlyList<SelectionOption<string>> Options = null,
+        IReadOnlyList<SelectionOption<string>>? Options = null,
         bool IsReadOnly = false);
 
     public static class AgentConsignmentEditorCatalog
@@ -283,7 +283,9 @@ namespace ExportDocManager.Services.SingleWindow
                 : ReceiptSectionKey;
         }
 
-        public static bool TryGetPropertyGroup(string propertyName, out string groupKey)
+        public static bool TryGetPropertyGroup(
+            string propertyName,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out string? groupKey)
         {
             return PropertySectionKeys.TryGetValue(propertyName ?? string.Empty, out groupKey);
         }

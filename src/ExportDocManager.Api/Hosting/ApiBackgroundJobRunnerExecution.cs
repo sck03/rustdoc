@@ -30,7 +30,7 @@ namespace ExportDocManager.Api.Hosting
                 await _globalConcurrency.WaitAsync(cancellationSource.Token).ConfigureAwait(false);
                 globalAcquired = true;
 
-                BackgroundJobSnapshot runningJob = _jobs.Update(jobId, current =>
+                BackgroundJobSnapshot? runningJob = _jobs.Update(jobId, current =>
                 {
                     ThrowIfCancellationWon(current, cancellationSource);
                     if (BackgroundJobStatusCatalog.IsTerminal(current.Status))
@@ -80,7 +80,7 @@ namespace ExportDocManager.Api.Hosting
                 var context = new ApiBackgroundJobExecutionContext(_jobs, initial, cancellationSource.Token);
                 producedOutputPath = await executeAsync(scope.ServiceProvider, context) ?? string.Empty;
 
-                BackgroundJobSnapshot completedJob = _jobs.Update(jobId, current =>
+                BackgroundJobSnapshot? completedJob = _jobs.Update(jobId, current =>
                 {
                     ThrowIfCancellationWon(current, cancellationSource);
                     if (BackgroundJobStatusCatalog.IsTerminal(current.Status))
@@ -148,7 +148,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 _jobs.CleanupControlledOutputPath(producedOutputPath);
                 _jobs.CleanupControlledOutputForJob(jobId);
-                BackgroundJobSnapshot failedJob = _jobs.Update(jobId, current =>
+                BackgroundJobSnapshot? failedJob = _jobs.Update(jobId, current =>
                 {
                     bool cancellationWon = cancellationSource.IsCancellationRequested ||
                         string.Equals(
@@ -223,7 +223,7 @@ namespace ExportDocManager.Api.Hosting
             cancellationSource.Token.ThrowIfCancellationRequested();
         }
 
-        private static async Task<User> ResolveBackgroundUserAsync(
+        private static async Task<User?> ResolveBackgroundUserAsync(
             IServiceProvider provider,
             int requestedByUserId,
             string requestedBy,

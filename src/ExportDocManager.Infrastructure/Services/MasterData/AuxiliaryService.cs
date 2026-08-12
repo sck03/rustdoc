@@ -146,8 +146,8 @@ namespace ExportDocManager.Services.MasterData
             return await context.Units
                 .AsNoTracking()
                 .Where(unit => unit.NameEN != null && unit.NameEN.ToUpper() == normalizedName)
-                .Select(u => u.NameCN)
-                .Where(name => name != null && name != string.Empty)
+                .Select(u => u.NameCN ?? string.Empty)
+                .Where(name => name != string.Empty)
                 .Distinct()
                 .ToListAsync(cancellationToken);
         }

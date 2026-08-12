@@ -8,7 +8,7 @@ namespace ExportDocManager.Domain.Tests
         [InlineData(null, "")]
         [InlineData("   ", "")]
         [InlineData("  abc  ", "abc")]
-        public void NormalizeValue_ShouldTrimAndEmptyNullishInput(string value, string expected)
+        public void NormalizeValue_ShouldTrimAndEmptyNullishInput(string? value, string expected)
         {
             Assert.Equal(expected, TextSearchHelper.NormalizeValue(value));
         }
@@ -16,7 +16,7 @@ namespace ExportDocManager.Domain.Tests
         [Theory]
         [InlineData("  cn-01  ", "CN-01")]
         [InlineData(null, "")]
-        public void NormalizeUpperValue_ShouldTrimAndUppercase(string value, string expected)
+        public void NormalizeUpperValue_ShouldTrimAndUppercase(string? value, string expected)
         {
             Assert.Equal(expected, TextSearchHelper.NormalizeUpperValue(value));
         }
@@ -49,9 +49,9 @@ namespace ExportDocManager.Domain.Tests
 
         private sealed class SearchRow
         {
-            public string Code { get; init; }
+            public string Code { get; init; } = string.Empty;
 
-            public string Name { get; init; }
+            public string? Name { get; init; }
         }
     }
 }

@@ -38,7 +38,10 @@ namespace ExportDocManager.Api.Hosting
                         .Select(item => ToSharedDatabaseBackupItemDto(item, revealPaths))
                         .ToArray()));
             })
-            .WithName("ListPostgreSqlPhysicalBackups");
+            .WithName("ListPostgreSqlPhysicalBackups")
+            .Produces<ApiPostgreSqlPhysicalBackupListResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/postgresql-maintenance/backups", (
                 HttpContext context,
@@ -90,7 +93,13 @@ namespace ExportDocManager.Api.Hosting
                     });
                 return AcceptedBackgroundJob(job);
             })
-            .WithName("CreatePostgreSqlPhysicalBackup");
+            .WithName("CreatePostgreSqlPhysicalBackup")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status503ServiceUnavailable)
+            .Produces(StatusCodes.Status429TooManyRequests);
 
             endpoints.MapPost("/api/postgresql-maintenance/restore-plan", async (
                 HttpContext context,
@@ -143,7 +152,13 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("CreatePostgreSqlRestorePlan");
+            .WithName("CreatePostgreSqlRestorePlan")
+            .Produces<ApiPostgreSqlRestorePlanResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapGet("/api/shared-database/ownership", async (
                 HttpContext context,
@@ -174,7 +189,10 @@ namespace ExportDocManager.Api.Hosting
                     summary.Owners.Select(ToSharedDatabaseOwnerSummaryItemDto).ToArray(),
                     summary.StoragePolicy));
             })
-            .WithName("GetSharedDatabaseOwnershipSummary");
+            .WithName("GetSharedDatabaseOwnershipSummary")
+            .Produces<ApiSharedDatabaseOwnershipSummaryResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/shared-database/ownership/transfer", async (
                 HttpContext context,
@@ -233,7 +251,14 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("TransferSharedDatabaseOwnership");
+            .WithName("TransferSharedDatabaseOwnership")
+            .Produces<ApiSharedDatabaseOwnershipTransferResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/support-package/save-to-runtime", async (
                 HttpContext context,
@@ -263,7 +288,7 @@ namespace ExportDocManager.Api.Hosting
                 var includeOptional = request?.IncludeLatestDatabaseBackup == true || request?.IncludeSampleFiles == true;
                 if (includeOptional)
                 {
-                    IResult transportError = RequireSecureDisasterRecoveryTransport(context);
+                    IResult? transportError = RequireSecureDisasterRecoveryTransport(context);
                     if (transportError != null) return transportError;
                 }
                 if (includeOptional &&
@@ -299,7 +324,12 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("SaveSupportPackageToRuntime");
+            .WithName("SaveSupportPackageToRuntime")
+            .Produces<ApiSupportPackageResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/support-package/download", (
                 HttpContext context,
@@ -324,7 +354,7 @@ namespace ExportDocManager.Api.Hosting
                 var includeOptional = request?.IncludeLatestDatabaseBackup == true || request?.IncludeSampleFiles == true;
                 if (includeOptional)
                 {
-                    IResult transportError = RequireSecureDisasterRecoveryTransport(context);
+                    IResult? transportError = RequireSecureDisasterRecoveryTransport(context);
                     if (transportError != null) return transportError;
                 }
                 if (includeOptional &&
@@ -348,7 +378,7 @@ namespace ExportDocManager.Api.Hosting
                         ISharedDatabaseMaintenanceService maintenanceService =
                             services.GetRequiredService<ISharedDatabaseMaintenanceService>();
                         jobContext.Report(5, "收集诊断信息", "正在生成脱敏支持包。可离开本页，任务会继续运行。");
-                        SupportPackageResult result = null;
+                        SupportPackageResult? result = null;
                         string outputPath = string.Empty;
                         try
                         {
@@ -375,7 +405,13 @@ namespace ExportDocManager.Api.Hosting
                     });
                 return AcceptedBackgroundJob(job);
             })
-            .WithName("DownloadSupportPackage");
+            .WithName("DownloadSupportPackage")
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status426UpgradeRequired)
+            .Produces(StatusCodes.Status429TooManyRequests);
         }
 
         private static ApiPostgreSqlMaintenanceStatusResponse ToPostgreSqlMaintenanceStatusResponse(

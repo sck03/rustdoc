@@ -63,7 +63,7 @@ namespace ExportDocManager.Services.Security
             DateTime now,
             CancellationToken cancellationToken)
         {
-            RuntimeLicenseAnchorData anchor = await LoadMachineAnchorAsync(cancellationToken)
+            RuntimeLicenseAnchorData? anchor = await LoadMachineAnchorAsync(cancellationToken)
                 .ConfigureAwait(false);
 
             bool changed = false;
@@ -156,7 +156,7 @@ namespace ExportDocManager.Services.Security
             }
         }
 
-        private async Task<RuntimeLicenseAnchorData> LoadMachineAnchorAsync(CancellationToken cancellationToken)
+        private async Task<RuntimeLicenseAnchorData?> LoadMachineAnchorAsync(CancellationToken cancellationToken)
         {
             try
             {

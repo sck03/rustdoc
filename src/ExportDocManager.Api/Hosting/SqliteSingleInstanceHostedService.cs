@@ -7,7 +7,7 @@ namespace ExportDocManager.Api.Hosting
     {
         private readonly IAppPathProvider _pathProvider;
         private readonly DatabaseConnectionSettings _databaseSettings;
-        private FileStream _leaseStream;
+        private FileStream? _leaseStream;
         private string _leasePath = string.Empty;
         private bool _ownsLease;
 

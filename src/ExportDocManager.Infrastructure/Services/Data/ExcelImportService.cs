@@ -127,7 +127,7 @@ namespace ExportDocManager.Services.Data
             }
         }
 
-        private IExcelImportWorksheet FindAppropriateWorksheet(IExcelImportWorkbook workbook, ExcelImportAnalysisReport analysisReport)
+        private IExcelImportWorksheet? FindAppropriateWorksheet(IExcelImportWorkbook workbook, ExcelImportAnalysisReport analysisReport)
         {
             if (!string.IsNullOrWhiteSpace(analysisReport?.SelectedWorksheetName))
             {

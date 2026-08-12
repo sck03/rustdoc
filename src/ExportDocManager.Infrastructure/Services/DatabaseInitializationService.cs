@@ -21,7 +21,7 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly DatabaseInitializationCoordinator _coordinator;
         private readonly bool _requireBootstrapToken;
         private readonly string _expectedBootstrapToken;
-        private readonly IAppPathProvider _pathProvider;
+        private readonly IAppPathProvider? _pathProvider;
 
         public DatabaseInitializationService(
             IDbContextFactory<AppDbContext> dbContextFactory,
@@ -53,7 +53,7 @@ namespace ExportDocManager.Services.Infrastructure
             DatabaseInitializationCoordinator coordinator,
             bool requireBootstrapToken,
             string expectedBootstrapToken,
-            IAppPathProvider pathProvider)
+            IAppPathProvider? pathProvider)
         {
             _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
             _databaseSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
@@ -66,7 +66,7 @@ namespace ExportDocManager.Services.Infrastructure
         public Task<DatabaseInitializationResult> InitializeAsync(
             string username,
             string password,
-            string bootstrapToken = null)
+            string? bootstrapToken = null)
         {
             return _coordinator.InitializeOnceAsync(() =>
                 InitializeCoreAsync(username, password, bootstrapToken));
@@ -75,12 +75,12 @@ namespace ExportDocManager.Services.Infrastructure
         private async Task<DatabaseInitializationResult> InitializeCoreAsync(
             string username,
             string password,
-            string bootstrapToken)
+            string? bootstrapToken)
         {
             bool usesPostgreSql = DatabaseModeHelper.UsesPostgreSql(_databaseSettings);
             bool advisoryLockAcquired = false;
-            AppDbContext context = null;
-            PostgreSqlMaintenanceConnectionProfile maintenanceProfile = null;
+            AppDbContext? context = null;
+            PostgreSqlMaintenanceConnectionProfile? maintenanceProfile = null;
 
             try
             {
@@ -92,7 +92,9 @@ namespace ExportDocManager.Services.Infrastructure
                 }
 
                 context = maintenanceProfile?.UsesDedicatedCredentials == true
-                    ? CreatePostgreSqlContext(maintenanceProfile.ConnectionSettings, _pathProvider)
+                    ? CreatePostgreSqlContext(
+                        maintenanceProfile.ConnectionSettings,
+                        _pathProvider ?? throw new InvalidOperationException("PostgreSQL 维护连接需要有效的运行路径提供器。"))
                     : await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
                 if (usesPostgreSql)
                 {
@@ -269,7 +271,7 @@ namespace ExportDocManager.Services.Infrastructure
                 : string.Empty;
         }
 
-        private static bool FixedTimeEquals(string expected, string actual)
+        private static bool FixedTimeEquals(string expected, string? actual)
         {
             byte[] expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(expected ?? string.Empty));
             byte[] actualHash = SHA256.HashData(Encoding.UTF8.GetBytes(actual ?? string.Empty));

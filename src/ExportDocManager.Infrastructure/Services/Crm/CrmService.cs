@@ -21,7 +21,7 @@ namespace ExportDocManager.Services.Crm
         }
 
         public async Task<PagedResult<CrmCustomerRecord>> QueryCustomersAsync(
-            string keyword, string status, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+            string? keyword, string? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
         {
             pageNumber = Math.Max(pageNumber, 1);
             pageSize = Math.Clamp(pageSize, 10, 100);
@@ -317,7 +317,7 @@ namespace ExportDocManager.Services.Crm
             var customer = await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers)
                 .FirstOrDefaultAsync(item => item.Id == request.CrmCustomerId, cancellationToken)
                 ?? throw new ResourceNotFoundException("CRM 客户不存在或无权访问。");
-            CrmContact contact = null;
+            CrmContact? contact = null;
             if (request.CrmContactId is > 0)
             {
                 contact = await context.CrmContacts.FirstOrDefaultAsync(
@@ -407,7 +407,7 @@ namespace ExportDocManager.Services.Crm
             return normalized.Length == 0 ? throw new ServiceValidationException($"{fieldName}不能为空。") : normalized;
         }
 
-        private static string Clean(string value) => (value ?? string.Empty).Trim();
+        private static string Clean(string? value) => (value ?? string.Empty).Trim();
 
         private static void EnsureExpectedVersion(int expectedVersion, int currentVersion, string entityName)
         {

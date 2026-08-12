@@ -42,8 +42,8 @@ namespace ExportDocManager.Infrastructure.Tests
             var project = CreateProject("并发方案");
             await service.SaveProjectAsync(project, CreateItems());
 
-            var firstCopy = await service.GetProjectAsync(project.Id);
-            var staleCopy = await service.GetProjectAsync(project.Id);
+            var firstCopy = Assert.IsType<ContainerProject>(await service.GetProjectAsync(project.Id));
+            var staleCopy = Assert.IsType<ContainerProject>(await service.GetProjectAsync(project.Id));
             firstCopy.Name = "第一个会话已保存";
             staleCopy.Name = "旧页面覆盖";
 
@@ -52,7 +52,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 () => service.SaveProjectAsync(staleCopy, CreateItems()));
 
             Assert.Contains("其他会话修改", exception.Message, StringComparison.Ordinal);
-            var saved = await service.GetProjectAsync(project.Id);
+            var saved = Assert.IsType<ContainerProject>(await service.GetProjectAsync(project.Id));
             Assert.Equal("第一个会话已保存", saved.Name);
             Assert.Equal(2, saved.VersionNumber);
         }

@@ -103,9 +103,11 @@ namespace ExportDocManager.Api.Hosting
             CustomsCooProducerProfile profile,
             string message)
         {
+            ArgumentNullException.ThrowIfNull(profile);
+
             return new ApiCustomsCooProducerProfileSaveResponse(
                 true,
-                profile?.Id ?? 0,
+                profile.Id,
                 FromCustomsCooProducerProfile(profile),
                 string.IsNullOrWhiteSpace(message) ? "生产企业资料已保存。" : message,
                 CustomsCooProducerProfileStoragePolicy);

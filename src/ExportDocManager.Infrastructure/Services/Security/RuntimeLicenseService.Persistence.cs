@@ -11,7 +11,7 @@ namespace ExportDocManager.Services.Security
 {
     public sealed partial class RuntimeLicenseService
     {
-        private async Task<RuntimeLicenseData> LoadLicenseDataAsync(CancellationToken cancellationToken)
+        private async Task<RuntimeLicenseData?> LoadLicenseDataAsync(CancellationToken cancellationToken)
         {
             try
             {
@@ -22,7 +22,7 @@ namespace ExportDocManager.Services.Security
                 }
 
                 string encrypted = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
-                string json = _secretProtector.Unprotect(encrypted);
+                string? json = _secretProtector.Unprotect(encrypted);
                 if (string.IsNullOrWhiteSpace(json))
                 {
                     return null;
@@ -53,7 +53,7 @@ namespace ExportDocManager.Services.Security
                 .ConfigureAwait(false);
         }
 
-        private static RuntimeLicenseData NormalizeLoadedData(RuntimeLicenseData data)
+        private static RuntimeLicenseData? NormalizeLoadedData(RuntimeLicenseData? data)
         {
             if (data == null)
             {

@@ -19,17 +19,17 @@ namespace ExportDocManager.Services.Tools
         private readonly SemaphoreSlim _gate = new(1, 1);
         private readonly CancellationTokenSource _shutdownSource = new();
         private static readonly TimeSpan QueueWaitLimit = TimeSpan.FromSeconds(30);
-        private Process _process;
-        private StreamWriter _stdin;
-        private BoundedTextLineReader _stdout;
-        private BoundedTextCollector _stderr;
+        private Process? _process;
+        private StreamWriter? _stdin;
+        private BoundedTextLineReader? _stdout;
+        private BoundedTextCollector? _stderr;
         private int _disposed;
 
         public RustOcrSidecarHost(IAppPathProvider paths) => _paths = paths ?? throw new ArgumentNullException(nameof(paths));
 
         public static string FindExecutable(IAppPathProvider paths)
         {
-            string configured = Environment.GetEnvironmentVariable(ExecutableEnvironmentVariable);
+            string? configured = Environment.GetEnvironmentVariable(ExecutableEnvironmentVariable);
             if (!string.IsNullOrWhiteSpace(configured)) return Path.GetFullPath(configured.Trim().Trim('"'));
             string file = OperatingSystem.IsWindows() ? "exportdoc-ocr.exe" : "exportdoc-ocr";
             return new[] { Path.Combine(paths.AppRoot, "sidecar", "ocr", file), Path.Combine(paths.AppRoot, "ocr", file), Path.Combine(paths.AppRoot, file) }.FirstOrDefault(File.Exists) ?? string.Empty;
@@ -133,11 +133,13 @@ namespace ExportDocManager.Services.Tools
         private async Task<OcrResult> RecognizeCoreAsync(string imagePath, CancellationToken cancellationToken)
         {
             await EnsureStartedAsync(cancellationToken);
+            var stdin = _stdin ?? throw new EndOfStreamException("Rust OCR Sidecar 标准输入不可用。");
+            var stdout = _stdout ?? throw new EndOfStreamException("Rust OCR Sidecar 标准输出不可用。");
             string id = Guid.NewGuid().ToString("N");
             string request = JsonSerializer.Serialize(new { id, command = "recognize", imagePath }, JsonOptions);
-            await _stdin.WriteLineAsync(request.AsMemory(), cancellationToken);
-            await _stdin.FlushAsync(cancellationToken);
-            string line = await _stdout.ReadLineAsync(MaximumResponseCharacters, cancellationToken)
+            await stdin.WriteLineAsync(request.AsMemory(), cancellationToken);
+            await stdin.FlushAsync(cancellationToken);
+            string line = await stdout.ReadLineAsync(MaximumResponseCharacters, cancellationToken)
                 ?? throw new EndOfStreamException("Rust OCR Sidecar已退出且未返回结果。");
             var response = JsonSerializer.Deserialize<RustOcrResponse>(line, JsonOptions) ?? throw new InvalidDataException("Rust OCR Sidecar返回了无效响应。");
             if (!string.Equals(response.Id, id, StringComparison.Ordinal)) throw new InvalidDataException("Rust OCR Sidecar响应编号不匹配。");
@@ -156,7 +158,7 @@ namespace ExportDocManager.Services.Tools
             exception is IOException or JsonException or InvalidDataException or
                 Win32Exception or DllNotFoundException or BadImageFormatException;
 
-        private static string TrimSidecarError(string error)
+        private static string TrimSidecarError(string? error)
         {
             const int maximumErrorCharacters = 1024;
             string normalized = string.IsNullOrWhiteSpace(error) ? "未知错误" : error.Trim();
@@ -247,16 +249,17 @@ namespace ExportDocManager.Services.Tools
 
         private async Task StopAsync()
         {
-            Process process = _process;
+            Process? process = _process;
+            StreamWriter? stdin = _stdin;
             try
             {
-                if (process is { HasExited: false })
+                if (process is { HasExited: false } && stdin != null)
                 {
                     using var gracefulTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-                    await _stdin.WriteLineAsync(
+                    await stdin.WriteLineAsync(
                         "{\"id\":\"shutdown\",\"command\":\"shutdown\"}".AsMemory(),
                         gracefulTimeout.Token);
-                    await _stdin.FlushAsync(gracefulTimeout.Token);
+                    await stdin.FlushAsync(gracefulTimeout.Token);
                     if (!await process.WaitForExitAsync(TimeSpan.FromSeconds(2)))
                     {
                         process.Kill(entireProcessTree: true);
@@ -324,7 +327,7 @@ namespace ExportDocManager.Services.Tools
                 : throw new ArgumentOutOfRangeException(nameof(maximumCharacters));
         }
 
-        public void AppendLine(string value)
+        public void AppendLine(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -375,7 +378,7 @@ namespace ExportDocManager.Services.Tools
             _reader = reader ?? throw new ArgumentNullException(nameof(reader));
         }
 
-        public async Task<string> ReadLineAsync(
+        public async Task<string?> ReadLineAsync(
             int maximumCharacters,
             CancellationToken cancellationToken = default)
         {

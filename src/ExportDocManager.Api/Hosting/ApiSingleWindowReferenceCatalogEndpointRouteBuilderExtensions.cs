@@ -30,7 +30,9 @@ namespace ExportDocManager.Api.Hosting
                 var catalog = await referenceCatalogService.LoadEffectiveCatalogAsync(cancellationToken);
                 return Results.Ok(ApiSingleWindowDtoFactory.FromReferenceCatalog(catalog));
             })
-            .WithName("GetSingleWindowReferenceCatalog");
+            .WithName("GetSingleWindowReferenceCatalog")
+            .Produces<ApiSingleWindowReferenceCatalogResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapPut("/api/single-window/reference-catalog", async (
                 HttpContext context,
@@ -63,7 +65,12 @@ namespace ExportDocManager.Api.Hosting
                     catalog,
                     "单一窗口参考词典覆盖文件已保存。"));
             })
-            .WithName("UpdateSingleWindowReferenceCatalog");
+            .WithName("UpdateSingleWindowReferenceCatalog")
+            .Produces<ApiSingleWindowReferenceCatalogSaveResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/reference-catalog/import-json", async (
                 HttpContext context,
@@ -106,12 +113,32 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse($"单一窗口参考词典 JSON 格式无效：{ex.Message}"));
                 }
             })
-            .WithName("ImportSingleWindowReferenceCatalogJson");
+            .Accepts<byte[]>("application/json")
+            .WithName("ImportSingleWindowReferenceCatalogJson")
+            .Produces<ApiSingleWindowReferenceCatalogSaveResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPost("/api/single-window/reference-catalog/excel/preview", async (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ISingleWindowReferenceCatalogExcelImportService excelImportService,
+                string? fileName,
+                string? catalogKey,
+                string? sheetName,
+                int? headerRowNumber,
+                int? dataStartRowNumber,
+                int? codeColumn,
+                int? englishNameColumn,
+                int? chineseNameColumn,
+                int? acdCodeColumn,
+                int? alphaCodeColumn,
+                int? nameColumn,
+                int? descriptionColumn,
+                int? valueColumn,
+                int? aliasesColumn,
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
@@ -120,18 +147,27 @@ namespace ExportDocManager.Api.Hosting
                     return Results.Unauthorized();
                 }
 
-                string fileName = context.Request.Query["fileName"].ToString();
+                fileName ??= string.Empty;
                 if (!IsSupportedReferenceCatalogExcelFileName(fileName))
                 {
                     return Results.BadRequest(new ApiErrorResponse("参考词典 Excel 导入只支持 .xlsx 或 .xlsm 文件。"));
                 }
 
                 var options = new SingleWindowReferenceCatalogExcelImportOptions(
-                    context.Request.Query["catalogKey"].ToString(),
-                    context.Request.Query["sheetName"].ToString(),
-                    ReadPositiveQueryInt(context, "headerRowNumber", 0),
-                    ReadPositiveQueryInt(context, "dataStartRowNumber", 2),
-                    ReadReferenceCatalogExcelColumnMap(context));
+                    catalogKey ?? string.Empty,
+                    sheetName ?? string.Empty,
+                    headerRowNumber is > 0 ? headerRowNumber.Value : 0,
+                    dataStartRowNumber is > 0 ? dataStartRowNumber.Value : 2,
+                    BuildReferenceCatalogExcelColumnMap(
+                        codeColumn,
+                        englishNameColumn,
+                        chineseNameColumn,
+                        acdCodeColumn,
+                        alphaCodeColumn,
+                        nameColumn,
+                        descriptionColumn,
+                        valueColumn,
+                        aliasesColumn));
 
                 try
                 {
@@ -170,7 +206,13 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("PreviewSingleWindowReferenceCatalogExcelImport");
+            .Accepts<IFormFile>("application/octet-stream")
+            .WithName("PreviewSingleWindowReferenceCatalogExcelImport")
+            .Produces<ApiSingleWindowReferenceCatalogExcelImportPreviewResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapDelete("/api/single-window/reference-catalog", async (
                 HttpContext context,
@@ -190,7 +232,11 @@ namespace ExportDocManager.Api.Hosting
                     catalog,
                     "单一窗口参考词典覆盖文件已清除，已恢复内置词典。"));
             })
-            .WithName("ResetSingleWindowReferenceCatalog");
+            .WithName("ResetSingleWindowReferenceCatalog")
+            .Produces<ApiSingleWindowReferenceCatalogSaveResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict);
         }
 
         private static IReadOnlyList<string> ValidateReferenceCatalog(SingleWindowReferenceCatalogModel catalog)
@@ -274,43 +320,43 @@ namespace ExportDocManager.Api.Hosting
                 string.Equals(extension, ".xlsm", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static int ReadPositiveQueryInt(HttpContext context, string key, int fallback)
-        {
-            string rawValue = context.Request.Query[key].ToString();
-            return int.TryParse(rawValue, out int value) && value > 0
-                ? value
-                : fallback;
-        }
-
-        private static IReadOnlyDictionary<string, int> ReadReferenceCatalogExcelColumnMap(HttpContext context)
+        private static IReadOnlyDictionary<string, int> BuildReferenceCatalogExcelColumnMap(
+            int? codeColumn,
+            int? englishNameColumn,
+            int? chineseNameColumn,
+            int? acdCodeColumn,
+            int? alphaCodeColumn,
+            int? nameColumn,
+            int? descriptionColumn,
+            int? valueColumn,
+            int? aliasesColumn)
         {
             var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            AddColumn("code", "codeColumn");
-            AddColumn("englishName", "englishNameColumn");
-            AddColumn("chineseName", "chineseNameColumn");
-            AddColumn("acdCode", "acdCodeColumn");
-            AddColumn("alphaCode", "alphaCodeColumn");
-            AddColumn("name", "nameColumn");
-            AddColumn("description", "descriptionColumn");
-            AddColumn("value", "valueColumn");
-            AddColumn("aliases", "aliasesColumn");
+            AddColumn("code", codeColumn);
+            AddColumn("englishName", englishNameColumn);
+            AddColumn("chineseName", chineseNameColumn);
+            AddColumn("acdCode", acdCodeColumn);
+            AddColumn("alphaCode", alphaCodeColumn);
+            AddColumn("name", nameColumn);
+            AddColumn("description", descriptionColumn);
+            AddColumn("value", valueColumn);
+            AddColumn("aliases", aliasesColumn);
             return map;
 
-            void AddColumn(string fieldKey, string queryKey)
+            void AddColumn(string fieldKey, int? columnNumber)
             {
-                int columnNumber = ReadPositiveQueryInt(context, queryKey, 0);
-                if (columnNumber > 0)
+                if (columnNumber is > 0)
                 {
-                    map[fieldKey] = columnNumber;
+                    map[fieldKey] = columnNumber.Value;
                 }
             }
         }
 
-        private static void ValidateDuplicateKeys(IEnumerable<string> values, string label, ICollection<string> errors)
+        private static void ValidateDuplicateKeys(IEnumerable<string?>? values, string label, ICollection<string> errors)
         {
             var duplicates = (values ?? [])
                 .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Select(value => value.Trim())
+                .Select(value => value?.Trim() ?? string.Empty)
                 .GroupBy(value => value, StringComparer.OrdinalIgnoreCase)
                 .Where(group => group.Count() > 1)
                 .Select(group => group.Key)

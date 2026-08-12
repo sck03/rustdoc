@@ -24,12 +24,12 @@ namespace ExportDocManager.Services.BrowserRuntime
         private readonly CancellationTokenSource _shutdownSource = new();
         private readonly AsyncIdleActionScheduler _idleRecycleScheduler;
         private readonly object _disposeSync = new();
-        private IPlaywright _playwright;
-        private IBrowser _browser;
-        private Process _process;
-        private BrowserProcessRegistration _registration;
-        private string _profileRoot;
-        private string _artifactsRoot;
+        private IPlaywright? _playwright;
+        private IBrowser? _browser;
+        private Process? _process;
+        private BrowserProcessRegistration? _registration;
+        private string? _profileRoot;
+        private string? _artifactsRoot;
         private DateTimeOffset _startedAt;
         private bool _remoteBrowser;
         private int _useCount;
@@ -37,8 +37,8 @@ namespace ExportDocManager.Services.BrowserRuntime
         private bool _recycleRequested;
         private bool _stopping;
         private int _disposed;
-        private TaskCompletionSource<bool> _operationsDrained;
-        private Task _disposeTask;
+        private TaskCompletionSource<bool>? _operationsDrained;
+        private Task? _disposeTask;
 
         public ManagedPlaywrightBrowserHost(
             BrowserRuntimeManager runtime,
@@ -58,7 +58,7 @@ namespace ExportDocManager.Services.BrowserRuntime
         {
             try
             {
-                if (BrowserCdpEndpointPolicy.TryResolve(out Uri endpoint))
+                if (BrowserCdpEndpointPolicy.TryResolve(out Uri? endpoint))
                 {
                     return $"隔离浏览器服务已配置：{endpoint.GetLeftPart(UriPartial.Authority)}；" +
                            "Chromium 与数据库维护凭据不在同一进程。";
@@ -109,8 +109,8 @@ namespace ExportDocManager.Services.BrowserRuntime
                 timeoutCts.Token,
                 _shutdownSource.Token);
 
-            IBrowserContext context = null;
-            IPage page = null;
+            IBrowserContext? context = null;
+            IPage? page = null;
             bool recycleBrowser = false;
             bool operationStarted = false;
             try
@@ -204,7 +204,7 @@ namespace ExportDocManager.Services.BrowserRuntime
                 }
 
                 _activeOperations++;
-                return _browser;
+                return _browser ?? throw new InfrastructureServiceException("受控浏览器启动后未建立连接。");
             }
             catch
             {
@@ -252,7 +252,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             CancellationToken cancellationToken)
         {
             int maximumAttempts = BrowserCdpEndpointPolicy.TryResolve(out _) ? 5 : 3;
-            Exception lastTransientError = null;
+            Exception? lastTransientError = null;
             for (int attempt = 1; attempt <= maximumAttempts; attempt++)
             {
                 try
@@ -299,7 +299,7 @@ namespace ExportDocManager.Services.BrowserRuntime
         {
             TimeSpan startupTimeout = TimeSpan.FromSeconds(
                 ReadPositiveInt(StartupTimeoutEnvironmentVariable, 15, 5, 60));
-            if (BrowserCdpEndpointPolicy.TryResolve(out Uri remoteEndpoint))
+            if (BrowserCdpEndpointPolicy.TryResolve(out Uri? remoteEndpoint))
             {
                 await ConnectRemoteBrowserCoreAsync(
                         remoteEndpoint,
@@ -488,7 +488,7 @@ namespace ExportDocManager.Services.BrowserRuntime
                 return true;
             }
 
-            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri))
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri))
             {
                 return false;
             }
@@ -621,7 +621,7 @@ namespace ExportDocManager.Services.BrowserRuntime
         private async Task StopBrowserCoreAsync()
         {
             _idleRecycleScheduler.Cancel();
-            IBrowser browser = _browser;
+            IBrowser? browser = _browser;
             _browser = null;
             if (browser != null)
             {
@@ -656,7 +656,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             _useCount = 0;
         }
 
-        private static async Task DeleteRuntimeDirectoryAsync(string path)
+        private static async Task DeleteRuntimeDirectoryAsync(string? path)
         {
             if (string.IsNullOrWhiteSpace(path))
             {

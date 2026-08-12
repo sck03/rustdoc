@@ -18,7 +18,7 @@ namespace ExportDocManager.Services.Core
             Invoice invoice,
             IReadOnlyList<Item> items,
             bool isNew,
-            string existingStatus,
+            string? existingStatus,
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(context);
@@ -140,7 +140,7 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        private static void ValidateInvoiceHeader(Invoice invoice, bool isNew, string existingStatus)
+        private static void ValidateInvoiceHeader(Invoice invoice, bool isNew, string? existingStatus)
         {
             if (!InvoiceTypeCatalog.IsKnown(invoice.Type))
             {
@@ -267,6 +267,7 @@ namespace ExportDocManager.Services.Core
             string[] codes = items
                 .Select(item => item.HSCode)
                 .Where(code => !string.IsNullOrWhiteSpace(code))
+                .OfType<string>()
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             if (codes.Length == 0)
@@ -366,7 +367,7 @@ namespace ExportDocManager.Services.Core
                 : 0m;
         }
 
-        private static string NormalizeText(string value, int maximumLength, string fieldName, bool required = false)
+        private static string NormalizeText(string? value, int maximumLength, string fieldName, bool required = false)
         {
             string normalized = value?.Trim() ?? string.Empty;
             if (required && string.IsNullOrWhiteSpace(normalized))
@@ -382,7 +383,7 @@ namespace ExportDocManager.Services.Core
             return normalized;
         }
 
-        private static string NormalizeJson(string value, int maximumLength, string fieldName)
+        private static string NormalizeJson(string? value, int maximumLength, string fieldName)
         {
             string normalized = NormalizeText(value, maximumLength, fieldName);
             if (string.IsNullOrWhiteSpace(normalized))

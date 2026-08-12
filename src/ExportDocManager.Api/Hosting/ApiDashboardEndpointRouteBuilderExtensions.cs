@@ -1,6 +1,7 @@
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Dashboard;
 using ExportDocManager.Services.Security;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -8,7 +9,9 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapDashboardEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/dashboard", async (
+            endpoints.MapGet("/api/dashboard", async Task<Results<
+                Ok<ApiDashboardResponse>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IDashboardService dashboardService,
@@ -16,11 +19,11 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 var dashboard = await dashboardService.GetDashboardAsync(cancellationToken);
-                return Results.Ok(ToDashboardResponse(dashboard));
+                return TypedResults.Ok(ToDashboardResponse(dashboard));
             })
             .WithName("GetDashboard");
         }

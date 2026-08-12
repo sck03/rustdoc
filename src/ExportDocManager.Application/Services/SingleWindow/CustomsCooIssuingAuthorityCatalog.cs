@@ -13,7 +13,7 @@ namespace ExportDocManager.Services.SingleWindow
 
     public static class CustomsCooIssuingAuthorityCatalog
     {
-        private static Func<IReadOnlyList<CustomsCooIssuingAuthorityEntry>> _entrySnapshotLoader;
+        private static Func<IReadOnlyList<CustomsCooIssuingAuthorityEntry>>? _entrySnapshotLoader;
         private static IReadOnlyList<CustomsCooIssuingAuthorityEntry> _entries = [];
         private static IReadOnlyDictionary<string, CustomsCooIssuingAuthorityEntry> _lookup =
             new Dictionary<string, CustomsCooIssuingAuthorityEntry>(StringComparer.OrdinalIgnoreCase);
@@ -79,7 +79,9 @@ namespace ExportDocManager.Services.SingleWindow
                 : string.Empty;
         }
 
-        private static bool TryResolve(string value, out CustomsCooIssuingAuthorityEntry entry)
+        private static bool TryResolve(
+            string? value,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out CustomsCooIssuingAuthorityEntry? entry)
         {
             return Volatile.Read(ref _lookup).TryGetValue(NormalizeLookupKey(value), out entry);
         }
@@ -159,7 +161,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .ToList();
         }
 
-        private static CustomsCooIssuingAuthorityEntry NormalizeEntry(CustomsCooIssuingAuthorityEntry entry)
+        private static CustomsCooIssuingAuthorityEntry? NormalizeEntry(CustomsCooIssuingAuthorityEntry? entry)
         {
             if (entry == null)
             {
@@ -233,7 +235,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        private static string NormalizeLookupKey(string value)
+        private static string NormalizeLookupKey(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
             {

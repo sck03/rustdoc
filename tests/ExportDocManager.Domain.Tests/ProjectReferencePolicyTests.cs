@@ -116,7 +116,7 @@ namespace ExportDocManager.Domain.Tests
 
         private static string ResolveRepositoryRoot()
         {
-            string directory = AppContext.BaseDirectory;
+            string? directory = AppContext.BaseDirectory;
             while (!string.IsNullOrWhiteSpace(directory))
             {
                 if (File.Exists(Path.Combine(directory, "ExportDocManager.sln")))

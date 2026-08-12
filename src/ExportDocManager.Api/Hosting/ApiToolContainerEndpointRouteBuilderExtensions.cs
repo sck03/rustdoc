@@ -28,6 +28,11 @@ namespace ExportDocManager.Api.Hosting
                     return validation;
                 }
 
+                if (packingRequest is null)
+                {
+                    return Results.BadRequest(new ApiErrorResponse("装箱分析请求体无效。"));
+                }
+
                 try
                 {
                     var analysis = await packingEngine
@@ -46,7 +51,10 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("AnalyzeContainerPacking");
+            .WithName("AnalyzeContainerPacking")
+            .Produces<ApiContainerPackingAnalyzeResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapGet("/api/tools/container-packing/projects", async (
                 HttpContext context,
@@ -67,7 +75,9 @@ namespace ExportDocManager.Api.Hosting
                     projects.Select(ApiContainerPackingProjectDtoFactory.FromProjectSummary).ToList(),
                     ApiContainerPackingProjectDtoFactory.StoragePolicy));
             })
-            .WithName("ListContainerPackingProjects");
+            .WithName("ListContainerPackingProjects")
+            .Produces<ApiContainerPackingProjectListResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapGet("/api/tools/container-packing/projects/{id:int}", async (
                 HttpContext context,
@@ -97,7 +107,11 @@ namespace ExportDocManager.Api.Hosting
                     ApiContainerPackingProjectDtoFactory.FromProject(project, items),
                     ApiContainerPackingProjectDtoFactory.StoragePolicy));
             })
-            .WithName("GetContainerPackingProject");
+            .WithName("GetContainerPackingProject")
+            .Produces<ApiContainerPackingProjectResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapPost("/api/tools/container-packing/projects", async (
                 HttpContext context,
@@ -136,7 +150,11 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("SaveContainerPackingProject");
+            .WithName("SaveContainerPackingProject")
+            .Produces<ApiContainerPackingProjectSaveResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapDelete("/api/tools/container-packing/projects/{id:int}", async (
                 HttpContext context,
@@ -164,7 +182,11 @@ namespace ExportDocManager.Api.Hosting
                 await containerLoadingService.DeleteProjectAsync(id, cancellationToken);
                 return Results.Ok(new ApiCommandResponse(true, "装柜方案已删除。"));
             })
-            .WithName("DeleteContainerPackingProject");
+            .WithName("DeleteContainerPackingProject")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapGet("/api/tools/container-packing/container-types", async (
                 HttpContext context,
@@ -182,7 +204,9 @@ namespace ExportDocManager.Api.Hosting
                     containerTypes.Select(ApiContainerPackingProjectDtoFactory.FromContainerType).ToList(),
                     ApiContainerPackingProjectDtoFactory.StoragePolicy));
             })
-            .WithName("ListContainerPackingContainerTypes");
+            .WithName("ListContainerPackingContainerTypes")
+            .Produces<ApiContainerTypeListResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapPost("/api/tools/container-packing/container-types", async (
                 HttpContext context,
@@ -218,7 +242,11 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             })
-            .WithName("SaveContainerPackingContainerType");
+            .WithName("SaveContainerPackingContainerType")
+            .Produces<ApiContainerTypeSaveResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapDelete("/api/tools/container-packing/container-types/{id:int}", async (
                 HttpContext context,
@@ -252,12 +280,17 @@ namespace ExportDocManager.Api.Hosting
                 await containerLoadingService.DeleteContainerTypeAsync(id, cancellationToken);
                 return Results.Ok(new ApiCommandResponse(true, "柜型已删除。"));
             })
-            .WithName("DeleteContainerPackingContainerType");
+            .WithName("DeleteContainerPackingContainerType")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
         }
 
-        private static IResult ValidateContainerPackingAnalyzeRequest(
-            ApiContainerPackingAnalyzeRequest request,
-            out ContainerPackingRequest packingRequest)
+        private static IResult? ValidateContainerPackingAnalyzeRequest(
+            ApiContainerPackingAnalyzeRequest? request,
+            out ContainerPackingRequest? packingRequest)
         {
             packingRequest = null;
 
@@ -314,8 +347,8 @@ namespace ExportDocManager.Api.Hosting
             return null;
         }
 
-        private static IResult ValidateContainerPackingProjectSaveRequest(
-            ApiContainerPackingProjectSaveRequest request)
+        private static IResult? ValidateContainerPackingProjectSaveRequest(
+            ApiContainerPackingProjectSaveRequest? request)
         {
             if (request == null)
             {
@@ -374,7 +407,7 @@ namespace ExportDocManager.Api.Hosting
             return null;
         }
 
-        private static IResult ValidateContainerTypeSaveRequest(ApiContainerTypeSaveRequest request)
+        private static IResult? ValidateContainerTypeSaveRequest(ApiContainerTypeSaveRequest? request)
         {
             if (request == null)
             {
@@ -413,7 +446,7 @@ namespace ExportDocManager.Api.Hosting
             return null;
         }
 
-        private static IResult ValidateContainerDimensions(ApiContainerDimensionsDto container)
+        private static IResult? ValidateContainerDimensions(ApiContainerDimensionsDto? container)
         {
             if (container == null)
             {
@@ -428,7 +461,7 @@ namespace ExportDocManager.Api.Hosting
             return null;
         }
 
-        private static bool IsValidCargoItem(ApiContainerPackingCargoInputDto item)
+        private static bool IsValidCargoItem(ApiContainerPackingCargoInputDto? item)
         {
             return item != null &&
                 item.Quantity > 0 &&

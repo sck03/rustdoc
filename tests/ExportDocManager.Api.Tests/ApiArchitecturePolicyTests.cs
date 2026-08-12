@@ -99,6 +99,120 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public void ApiOpenApi_ShouldRemainOfficialMetadataOnly()
+        {
+            string sourceRoot = ResolveSourceRoot("src", "ExportDocManager.Api");
+            string hostingRoot = Path.Combine(sourceRoot, "Hosting");
+            string[] obsoleteFiles = Directory
+                .EnumerateFiles(hostingRoot, "OpenApiDocument*.cs", SearchOption.TopDirectoryOnly)
+                .Concat(Directory.EnumerateFiles(
+                    hostingRoot,
+                    "LegacyOpenApiResponseContractTransformer.cs",
+                    SearchOption.TopDirectoryOnly))
+                .Select(Path.GetFileName)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToArray()!;
+
+            Assert.Empty(obsoleteFiles);
+            string registrations = File.ReadAllText(Path.Combine(hostingRoot, "ApiServiceCollectionExtensions.cs"));
+            Assert.Contains("services.AddOpenApi(\"v1\"", registrations, StringComparison.Ordinal);
+            Assert.Contains("NullableOpenApiSchemaTransformer", registrations, StringComparison.Ordinal);
+            Assert.Contains("ApiOpenApiDocumentTransformer", registrations, StringComparison.Ordinal);
+            Assert.DoesNotContain("RespectRequiredConstructorParameters", registrations, StringComparison.Ordinal);
+            Assert.DoesNotContain("Legacy", registrations, StringComparison.Ordinal);
+
+            string systemEndpoints = File.ReadAllText(Path.Combine(hostingRoot, "ApiSystemEndpointRouteBuilderExtensions.cs"));
+            Assert.Contains("MapOpenApi", systemEndpoints, StringComparison.Ordinal);
+            Assert.DoesNotContain("OpenApiDocumentFactory", systemEndpoints, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void ApiOpenApiMigratedModules_ShouldUseTypedResultsAsResponseMetadataSource()
+        {
+            string hostingRoot = ResolveSourceRoot("src", "ExportDocManager.Api", "Hosting");
+            string[] migratedModules =
+            [
+                "ApiAuthEndpointRouteBuilderExtensions.cs",
+                "ApiCustomOptionEndpointRouteBuilderExtensions.cs",
+                "ApiDashboardEndpointRouteBuilderExtensions.cs",
+                "ApiEmailTemplateEndpointRouteBuilderExtensions.cs",
+                "ApiInvoiceDataMaintenanceEndpointRouteBuilderExtensions.cs",
+                "ApiLicenseEndpointRouteBuilderExtensions.cs",
+                "ApiMasterDataCustomerEndpointRouteBuilderExtensions.cs",
+                "ApiMasterDataExporterEndpointRouteBuilderExtensions.cs",
+                "ApiMasterDataPayeeEndpointRouteBuilderExtensions.cs",
+                "ApiMasterDataPortEndpointRouteBuilderExtensions.cs",
+                "ApiMasterDataProductEndpointRouteBuilderExtensions.cs",
+                "ApiMasterDataUnitEndpointRouteBuilderExtensions.cs",
+                "ApiPaymentEndpointRouteBuilderExtensions.cs",
+                "ApiPermissionTemplateEndpointRouteBuilderExtensions.cs",
+                "ApiQueryEndpointRouteBuilderExtensions.cs",
+                "ApiSalesOpportunityEndpointRouteBuilderExtensions.cs",
+                "ApiSettingsEndpointRouteBuilderExtensions.cs",
+                "ApiSingleWindowIssuingAuthorityEndpointRouteBuilderExtensions.cs",
+                "ApiSingleWindowOperationCenterEndpointRouteBuilderExtensions.cs",
+                "ApiSingleWindowProducerProfileEndpointRouteBuilderExtensions.cs",
+                "ApiUserEndpointRouteBuilderExtensions.cs"
+            ];
+
+            foreach (string fileName in migratedModules)
+            {
+                string content = File.ReadAllText(Path.Combine(hostingRoot, fileName));
+                Assert.Contains("Results<", content, StringComparison.Ordinal);
+                Assert.Contains("TypedResults.", content, StringComparison.Ordinal);
+            }
+
+            foreach (string fileName in migratedModules.Where(fileName =>
+                         !string.Equals(
+                             fileName,
+                             "ApiQueryEndpointRouteBuilderExtensions.cs",
+                             StringComparison.Ordinal)))
+            {
+                string content = File.ReadAllText(Path.Combine(hostingRoot, fileName));
+                Assert.DoesNotContain("return Results.", content, StringComparison.Ordinal);
+                Assert.DoesNotContain("? Results.", content, StringComparison.Ordinal);
+                Assert.DoesNotContain(": Results.", content, StringComparison.Ordinal);
+            }
+
+            Assert.DoesNotContain(
+                ".Produces",
+                File.ReadAllText(Path.Combine(hostingRoot, "ApiDashboardEndpointRouteBuilderExtensions.cs")),
+                StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                ".Produces",
+                File.ReadAllText(Path.Combine(hostingRoot, "ApiCustomOptionEndpointRouteBuilderExtensions.cs")),
+                StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                ".Produces",
+                File.ReadAllText(Path.Combine(hostingRoot, "ApiEmailTemplateEndpointRouteBuilderExtensions.cs")),
+                StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                ".Produces",
+                File.ReadAllText(Path.Combine(hostingRoot, "ApiSalesOpportunityEndpointRouteBuilderExtensions.cs")),
+                StringComparison.Ordinal);
+
+            foreach (string fileName in new[]
+            {
+                "ApiInvoiceDataMaintenanceEndpointRouteBuilderExtensions.cs",
+                "ApiPermissionTemplateEndpointRouteBuilderExtensions.cs",
+                "ApiUserEndpointRouteBuilderExtensions.cs"
+            })
+            {
+                string content = File.ReadAllText(Path.Combine(hostingRoot, fileName));
+                string withoutTypedForbiddenMetadata = content.Replace(
+                    ".Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);",
+                    string.Empty,
+                    StringComparison.Ordinal);
+                Assert.DoesNotContain(".Produces", withoutTypedForbiddenMetadata, StringComparison.Ordinal);
+            }
+
+            Assert.DoesNotContain(
+                ".Produces",
+                File.ReadAllText(Path.Combine(hostingRoot, "ApiSingleWindowIssuingAuthorityEndpointRouteBuilderExtensions.cs")),
+                StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void ApiToolEndpointCompositionRoot_ShouldOnlyDelegateToToolModules()
         {
             string sourceRoot = ResolveSourceRoot("src", "ExportDocManager.Api");
@@ -916,7 +1030,7 @@ namespace ExportDocManager.Api.Tests
 
         private static string ResolveSourceRoot(params string[] segments)
         {
-            string directory = AppContext.BaseDirectory;
+            string? directory = AppContext.BaseDirectory;
             while (!string.IsNullOrWhiteSpace(directory))
             {
                 string candidate = Path.Combine(new[] { directory }.Concat(segments).ToArray());

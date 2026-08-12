@@ -157,7 +157,7 @@ namespace ExportDocManager.Services.Reporting
             }
 
             int searchIndex = 0;
-            StringBuilder decoded = null;
+            StringBuilder? decoded = null;
             while (searchIndex < html.Length)
             {
                 int blockStart = html.IndexOf("{{", searchIndex, StringComparison.Ordinal);
@@ -208,7 +208,7 @@ namespace ExportDocManager.Services.Reporting
             }
 
             TemplateCacheOrder.Enqueue(key);
-            while (TemplateCache.Count > MaximumCachedTemplates && TemplateCacheOrder.TryDequeue(out string oldestKey))
+            while (TemplateCache.Count > MaximumCachedTemplates && TemplateCacheOrder.TryDequeue(out string? oldestKey))
             {
                 TemplateCache.TryRemove(oldestKey, out _);
             }

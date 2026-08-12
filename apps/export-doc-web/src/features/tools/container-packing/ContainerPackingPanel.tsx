@@ -180,10 +180,14 @@ export function ContainerPackingPanel({
       }
 
       setResponse(nextResponse);
+      const analyzedContainer = variables.request.container;
+      if (!analyzedContainer) {
+        throw new Error("装柜分析请求缺少柜型尺寸。");
+      }
       setAnalysisDimensions({
-        length: variables.request.container.length,
-        width: variables.request.container.width,
-        height: variables.request.container.height,
+        length: analyzedContainer.length ?? 0,
+        width: analyzedContainer.width ?? 0,
+        height: analyzedContainer.height ?? 0,
       });
       setAutoRefreshState("complete");
       setAutoRefreshText(
@@ -587,20 +591,20 @@ export function ContainerPackingPanel({
       maxWeight: formatFormNumber(project.container.maxWeight),
     });
     setRules({
-      allowRotation: project.rules.allowRotation,
-      usePalletConstraints: project.rules.usePalletConstraints,
+      allowRotation: project.rules.allowRotation ?? true,
+      usePalletConstraints: project.rules.usePalletConstraints ?? false,
       defaultPalletLength: String(project.rules.defaultPalletLength || 120),
       defaultPalletWidth: String(project.rules.defaultPalletWidth || 100),
       defaultPalletHeight: String(project.rules.defaultPalletHeight ?? 15),
       defaultPalletWeight: formatFormNumber(project.rules.defaultPalletWeight),
-      enforceCenterOfGravity: project.rules.enforceCenterOfGravity,
+      enforceCenterOfGravity: project.rules.enforceCenterOfGravity ?? false,
       centerOfGravityTolerancePercent: formatFormNumber(
         project.rules.centerOfGravityTolerancePercent,
       ),
       minimumSupportAreaPercent: formatFormNumber(
         project.rules.minimumSupportAreaPercent,
       ),
-      requireSameFootprintStacking: project.rules.requireSameFootprintStacking,
+      requireSameFootprintStacking: project.rules.requireSameFootprintStacking ?? false,
     });
     setCargoRows(
       project.cargoItems.length > 0
@@ -612,7 +616,7 @@ export function ContainerPackingPanel({
               height: formatFormNumber(item.height),
               weight: formatFormNumber(item.weight),
               quantity: String(item.quantity || 1),
-              colorHex: signedArgbToColorHex(item.colorArgb),
+              colorHex: signedArgbToColorHex(item.colorArgb ?? -12417035),
               usePallet: item.usePallet,
               unitsPerPallet: String(item.unitsPerPallet || 1),
               maxTopLoadWeight: formatFormNumber(item.maxTopLoadWeight),

@@ -22,7 +22,7 @@ export function setNestedValue(settings: SettingsRecord, path: string[], value: 
 }
 
 export function cloneSettings(settings: SettingsRecord) { return JSON.parse(JSON.stringify(settings)) as SettingsRecord; }
-export function isRecord(value: unknown): value is SettingsRecord { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
+export function isRecord(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
 
 export function normalizeSettingText(value: string) { return value.trim().toUpperCase(); }
 

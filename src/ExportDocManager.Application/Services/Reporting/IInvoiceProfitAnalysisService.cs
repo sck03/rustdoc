@@ -54,7 +54,7 @@ namespace ExportDocManager.Services.Reporting
                 $"{margin:P2}");
         }
 
-        private static bool IsRmbCurrency(string currency)
+        private static bool IsRmbCurrency(string? currency)
         {
             return string.Equals(currency, "CNY", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(currency, "RMB", StringComparison.OrdinalIgnoreCase);

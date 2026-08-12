@@ -16,7 +16,7 @@ namespace ExportDocManager.Services.MasterData
         Task<HsCodeImportPreview> PreviewImportAsync(
             string filePath,
             HsCodeImportMode mode = HsCodeImportMode.Incremental,
-            string sourceName = null,
+            string? sourceName = null,
             int? effectiveYear = null,
             CancellationToken cancellationToken = default);
 
@@ -43,7 +43,7 @@ namespace ExportDocManager.Services.MasterData
         /// <summary>
         /// 后台逐步处理剩余条目的详情
         /// </summary>
-        Task ProcessRemainingDetailsAsync(List<HsCode> items, Action<HsCode> onItemUpdated, Action<HsCode> onItemRemoved, Action<List<HsCode>> onItemsAdded = null, System.Threading.CancellationToken cancellationToken = default);
+        Task ProcessRemainingDetailsAsync(List<HsCode> items, Action<HsCode>? onItemUpdated, Action<HsCode>? onItemRemoved, Action<List<HsCode>>? onItemsAdded = null, System.Threading.CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Fetches detailed information for a specific HS code from the remote source.
@@ -75,7 +75,7 @@ namespace ExportDocManager.Services.MasterData
         /// <summary>
         /// Gets a paged list of HS codes from the local database.
         /// </summary>
-        Task<PagedResult<HsCode>> GetPagedLocalAsync(int pageNumber, int pageSize, string keyword = null);
+        Task<PagedResult<HsCode>> GetPagedLocalAsync(int pageNumber, int pageSize, string? keyword = null);
         
         /// <summary>
         /// Clears all HS codes from the local database.
@@ -187,7 +187,7 @@ namespace ExportDocManager.Services.MasterData
     {
         string Name { get; }
         int Priority { get; }
-        bool CanHandleDetailUrl(string detailUrl);
+        bool CanHandleDetailUrl(string? detailUrl);
         Task<IReadOnlyList<HsCode>> SearchAsync(string keyword, CancellationToken cancellationToken = default);
         Task<HsCode> FetchDetailAsync(HsCode item, CancellationToken cancellationToken = default);
         Task<HsCodeRemoteSourceHealth> CheckHealthAsync(CancellationToken cancellationToken = default);
@@ -237,7 +237,7 @@ namespace ExportDocManager.Services.MasterData
 
     public sealed class HsCodeRemoteExpiredException : ResourceConflictException
     {
-        public HsCodeRemoteExpiredException(IEnumerable<string> recommendedKeywords = null)
+        public HsCodeRemoteExpiredException(IEnumerable<string>? recommendedKeywords = null)
             : base("该 HS 编码已作废")
         {
             RecommendedKeywords = (recommendedKeywords ?? Enumerable.Empty<string>())

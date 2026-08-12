@@ -11,9 +11,9 @@ namespace ExportDocManager.Services.MasterData
 
         public async Task ProcessRemainingDetailsAsync(
             List<HsCode> items,
-            Action<HsCode> onItemUpdated,
-            Action<HsCode> onItemRemoved,
-            Action<List<HsCode>> onItemsAdded = null,
+            Action<HsCode>? onItemUpdated,
+            Action<HsCode>? onItemRemoved,
+            Action<List<HsCode>>? onItemsAdded = null,
             CancellationToken cancellationToken = default)
         {
             var pendingItems = (items ?? [])
@@ -286,7 +286,8 @@ namespace ExportDocManager.Services.MasterData
             HsCode hsCode,
             CancellationToken cancellationToken = default)
         {
-            var provider = _remoteProviders.FirstOrDefault(item => item.CanHandleDetailUrl(hsCode?.DetailUrl));
+            ArgumentNullException.ThrowIfNull(hsCode);
+            var provider = _remoteProviders.FirstOrDefault(item => item.CanHandleDetailUrl(hsCode.DetailUrl));
             if (provider == null)
                 throw new ArgumentException("没有可处理该HS编码详情地址的联网 Provider。", nameof(hsCode));
             return await provider.FetchDetailAsync(hsCode, cancellationToken).ConfigureAwait(false);
@@ -306,9 +307,9 @@ namespace ExportDocManager.Services.MasterData
         private async Task<bool> TryReplaceItemAsync(
             HsCode item,
             IEnumerable<string> recommendedKeywords,
-            Action<HsCode> onItemUpdated,
-            Action<HsCode> onItemRemoved,
-            Action<List<HsCode>> onItemsAdded,
+            Action<HsCode>? onItemUpdated,
+            Action<HsCode>? onItemRemoved,
+            Action<List<HsCode>>? onItemsAdded,
             CancellationToken cancellationToken)
         {
             var replacements = await ResolveReplacementResultsAsync(item, recommendedKeywords, cancellationToken)
@@ -330,8 +331,9 @@ namespace ExportDocManager.Services.MasterData
             IEnumerable<string> recommendedKeywords,
             CancellationToken cancellationToken)
         {
+            ArgumentNullException.ThrowIfNull(originalItem);
             var searchKeywords = (recommendedKeywords ?? [])
-                .Append(originalItem?.Code)
+                .Append(originalItem.Code)
                 .Select(HsCodeTextHelper.NormalizeCode)
                 .Where(code => !string.IsNullOrWhiteSpace(code))
                 .Distinct(StringComparer.OrdinalIgnoreCase);
@@ -347,9 +349,9 @@ namespace ExportDocManager.Services.MasterData
 
         private async Task PopulateReplacementDetailsAsync(
             IEnumerable<HsCode> items,
-            Action<HsCode> onItemUpdated,
-            Action<HsCode> onItemRemoved,
-            Action<List<HsCode>> onItemsAdded,
+            Action<HsCode>? onItemUpdated,
+            Action<HsCode>? onItemRemoved,
+            Action<List<HsCode>>? onItemsAdded,
             CancellationToken cancellationToken)
         {
             foreach (var item in items ?? [])

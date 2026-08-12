@@ -106,10 +106,10 @@ namespace ExportDocManager.Services.SingleWindow
         public static bool UsesGoodsProducerContactFields(string certType) =>
             string.Equals(Normalize(certType), "H", StringComparison.OrdinalIgnoreCase);
 
-        public static bool UsesGoodsRcepFields(string certType) =>
+        public static bool UsesGoodsRcepFields(string? certType) =>
             string.Equals(Normalize(certType), "RC", StringComparison.OrdinalIgnoreCase);
 
-        public static bool UsesGoodsOriginCriteria(string certType) =>
+        public static bool UsesGoodsOriginCriteria(string? certType) =>
             !GoodsOriginCriteriaHiddenCertTypes.Contains(Normalize(certType));
 
         public static bool UsesRcepInvoiceInfo(string certType) =>
@@ -135,6 +135,6 @@ namespace ExportDocManager.Services.SingleWindow
                    string.Equals(certStatus?.Trim(), "3", StringComparison.Ordinal);
         }
 
-        private static string Normalize(string value) => value?.Trim().ToUpperInvariant() ?? string.Empty;
+        private static string Normalize(string? value) => value?.Trim().ToUpperInvariant() ?? string.Empty;
     }
 }

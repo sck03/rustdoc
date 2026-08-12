@@ -11,12 +11,12 @@ namespace ExportDocManager.Api.Hosting
             _tokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
         }
 
-        public User ResolveCached(HttpContext context)
+        public User? ResolveCached(HttpContext context)
         {
             return ResolveCachedUser(context);
         }
 
-        public async Task<User> ResolveAsync(HttpContext context, CancellationToken cancellationToken = default)
+        public async Task<User?> ResolveAsync(HttpContext context, CancellationToken cancellationToken = default)
         {
             var cachedUser = ResolveCachedUser(context);
             if (cachedUser != null)
@@ -34,7 +34,7 @@ namespace ExportDocManager.Api.Hosting
             return user;
         }
 
-        internal static User ResolveCachedUser(HttpContext context)
+        internal static User? ResolveCachedUser(HttpContext? context)
         {
             return context?.Items.TryGetValue(ApiEndpointAuth.AuthenticatedUserItemKey, out var item) == true
                 ? item as User

@@ -25,7 +25,7 @@ namespace ExportDocManager.Services.Reporting
         private readonly IAppPathProvider _pathProvider;
         private readonly BrowserExecutableResolver _executableResolver;
         private readonly BrowserRuntimeManager _browserRuntime;
-        private readonly ManagedPlaywrightBrowserHost _browserHost;
+        private readonly ManagedPlaywrightBrowserHost? _browserHost;
         private static readonly BrowserRuntimeManager StandaloneBrowserRuntime = new();
         private static readonly Lock AbandonedDirectoryCleanupGate = new();
         private static readonly HashSet<string> CleanedReportRoots = new(
@@ -33,9 +33,9 @@ namespace ExportDocManager.Services.Reporting
 
         public ChromiumHtmlToPdfService(
             IAppPathProvider pathProvider,
-            BrowserRuntimeManager browserRuntime = null,
-            ManagedPlaywrightBrowserHost browserHost = null,
-            BrowserExecutableResolver executableResolver = null)
+            BrowserRuntimeManager? browserRuntime = null,
+            ManagedPlaywrightBrowserHost? browserHost = null,
+            BrowserExecutableResolver? executableResolver = null)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _executableResolver = executableResolver ?? new BrowserExecutableResolver(pathProvider);
@@ -48,7 +48,7 @@ namespace ExportDocManager.Services.Reporting
         public async Task<HtmlToPdfRenderResult> RenderAsync(
             string html,
             string destinationPath,
-            HtmlToPdfRenderOptions options = null,
+            HtmlToPdfRenderOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
@@ -102,11 +102,11 @@ namespace ExportDocManager.Services.Reporting
         }
 
         public string ResolveRendererExecutablePath() =>
-            BrowserCdpEndpointPolicy.TryResolve(out Uri endpoint)
+            BrowserCdpEndpointPolicy.TryResolve(out Uri? endpoint)
                 ? endpoint.ToString().TrimEnd('/')
                 : _executableResolver.Resolve();
 
-        internal string PrepareHtml(string html, HtmlToPdfRenderOptions options)
+        internal string PrepareHtml(string html, HtmlToPdfRenderOptions? options)
         {
             string content = html ?? string.Empty;
             if (string.IsNullOrWhiteSpace(content))
@@ -114,7 +114,7 @@ namespace ExportDocManager.Services.Reporting
                 content = "<!doctype html><html><head><meta charset=\"utf-8\"></head><body></body></html>";
             }
 
-            string baseDirectory = options?.BaseDirectory;
+            string? baseDirectory = options?.BaseDirectory;
             if (!string.IsNullOrWhiteSpace(baseDirectory)
                 && content.IndexOf("<base", StringComparison.OrdinalIgnoreCase) < 0)
             {
@@ -216,7 +216,7 @@ namespace ExportDocManager.Services.Reporting
             TimeSpan renderTimeout,
             CancellationToken cancellationToken)
         {
-            ManagedPlaywrightBrowserHost browserHost = _browserHost;
+            ManagedPlaywrightBrowserHost? browserHost = _browserHost;
             bool disposeBrowserHost = browserHost == null;
             browserHost ??= new ManagedPlaywrightPdfBrowserHost(
                 _browserRuntime,
@@ -287,7 +287,7 @@ namespace ExportDocManager.Services.Reporting
 
         private static TimeSpan ResolveRenderTimeout()
         {
-            string configuredSeconds = Environment.GetEnvironmentVariable(ChromiumTimeoutEnvironmentVariable);
+            string? configuredSeconds = Environment.GetEnvironmentVariable(ChromiumTimeoutEnvironmentVariable);
             if (string.IsNullOrWhiteSpace(configuredSeconds))
             {
                 return DefaultRenderTimeout;

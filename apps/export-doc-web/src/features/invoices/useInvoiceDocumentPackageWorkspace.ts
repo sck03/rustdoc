@@ -206,9 +206,15 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     onError: (error) => feedback.showError(readApiError(error)),
   });
   const saveConfigMutation = useMutation({
-    mutationFn: (draft: BatchExportConfigDraft) => runAbortableOperation((signal) => client.updateSettings({
-      body: { settings: buildSettingsWithBatchExportConfig(settingsResponse?.settings ?? {}, draft), updateSecrets: false },
-    }, { signal })),
+    mutationFn: (draft: BatchExportConfigDraft) => runAbortableOperation((signal) => {
+      if (!settingsResponse) {
+        throw new Error("系统设置尚未加载完成，请稍后重试。");
+      }
+
+      return client.updateSettings({
+        body: { settings: buildSettingsWithBatchExportConfig(settingsResponse.settings, draft), updateSecrets: false },
+      }, { signal });
+    }),
     onSuccess: async (response) => {
       const nextDraft = buildBatchExportConfigDraft(response.settings, templates);
       setConfigDraft(nextDraft);

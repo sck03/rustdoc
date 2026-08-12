@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Infrastructure;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -6,7 +7,9 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapSettingsEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/settings", async (
+            endpoints.MapGet("/api/settings", async Task<Results<
+                Ok<ApiSettingsResponse>,
+                UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -16,18 +19,22 @@ namespace ExportDocManager.Api.Hosting
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 await settingsService.LoadAsync();
-                return Results.Ok(ApiSettingsDtoFactory.FromSettingsForUser(
+                return TypedResults.Ok(ApiSettingsDtoFactory.FromSettingsForUser(
                     settingsService.Settings,
                     authorizationService.CanManageSettings(user),
                     ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
             })
             .WithName("GetSettings");
 
-            endpoints.MapPost("/api/settings/validate", async (
+            endpoints.MapPost("/api/settings/validate", async Task<Results<
+                Ok<ApiSettingsValidationResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                JsonHttpResult<ApiErrorResponse>>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -37,31 +44,36 @@ namespace ExportDocManager.Api.Hosting
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (!authorizationService.CanManageSettings(user))
                 {
-                    return Results.Json(
+                    return TypedResults.Json(
                         new ApiErrorResponse("只有管理员可以校验系统设置。"),
                         statusCode: StatusCodes.Status403Forbidden);
                 }
 
-                if (request?.Settings == null)
+                if (request is null || request.Settings == null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("设置校验请求体不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("设置校验请求体不能为空。"));
                 }
 
                 await settingsService.LoadAsync();
-                return Results.Ok(ApiSettingsDtoFactory.ValidateDraft(
+                return TypedResults.Ok(ApiSettingsDtoFactory.ValidateDraft(
                     request.Settings,
                     settingsService.Settings,
                     request.UpdateSecrets,
                     revealLocalPaths: false));
             })
-            .WithName("ValidateSettings");
+            .WithName("ValidateSettings")
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
-            endpoints.MapPut("/api/settings", async (
+            endpoints.MapPut("/api/settings", async Task<Results<
+                Ok<ApiSettingsSaveResponse>,
+                BadRequest<ApiErrorResponse>,
+                UnauthorizedHttpResult,
+                JsonHttpResult<ApiErrorResponse>>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -72,19 +84,19 @@ namespace ExportDocManager.Api.Hosting
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 if (user == null)
                 {
-                    return Results.Unauthorized();
+                    return TypedResults.Unauthorized();
                 }
 
                 if (!authorizationService.CanManageSettings(user))
                 {
-                    return Results.Json(
+                    return TypedResults.Json(
                         new ApiErrorResponse("只有管理员可以保存系统设置。"),
                         statusCode: StatusCodes.Status403Forbidden);
                 }
 
-                if (request?.Settings == null)
+                if (request is null || request.Settings == null)
                 {
-                    return Results.BadRequest(new ApiErrorResponse("设置请求体不能为空。"));
+                    return TypedResults.BadRequest(new ApiErrorResponse("设置请求体不能为空。"));
                 }
 
                 await settingsService.LoadAsync();
@@ -100,7 +112,7 @@ namespace ExportDocManager.Api.Hosting
                         validation.Messages
                             .Where(message => string.Equals(message.Level, "error", StringComparison.OrdinalIgnoreCase))
                             .Select(message => message.Message));
-                    return Results.BadRequest(new ApiErrorResponse(
+                    return TypedResults.BadRequest(new ApiErrorResponse(
                         string.IsNullOrWhiteSpace(errors)
                             ? "设置包含无效内容，请先运行设置校验。"
                             : errors));
@@ -120,7 +132,7 @@ namespace ExportDocManager.Api.Hosting
                     return true;
                 });
 
-                return Results.Ok(ApiSettingsDtoFactory.FromSavedSettings(
+                return TypedResults.Ok(ApiSettingsDtoFactory.FromSavedSettings(
                     settingsService.Settings,
                     requiresRestart,
                     ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions),
@@ -128,7 +140,9 @@ namespace ExportDocManager.Api.Hosting
                         ? "设置已保存，数据库连接变更需要重启 sidecar 后生效。"
                         : "设置已保存。"));
             })
-            .WithName("UpdateSettings");
+            .WithName("UpdateSettings")
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden)
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
         }
     }
 }

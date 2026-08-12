@@ -5,7 +5,7 @@ namespace ExportDocManager.Services.SingleWindow
 {
     public static class CustomsCooDefaultProfileApplicator
     {
-        public static void Apply(CooMappedDocument document, CustomsCooDefaultProfile defaults)
+        public static void Apply(CooMappedDocument? document, CustomsCooDefaultProfile? defaults)
         {
             if (document == null || defaults == null)
             {

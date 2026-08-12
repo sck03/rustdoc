@@ -46,8 +46,10 @@ export function buildInvoiceSnapshot(invoice: ApiInvoiceDetailDto, id: number, p
   return JSON.stringify(normalizeInvoiceForSave(invoice, id, pendingHsFeedback));
 }
 
-export function readInvoiceItemBlankRowCount(settings?: Record<string, unknown>) {
-  const system = settings && typeof settings === "object" ? settings.system : null;
+export function readInvoiceItemBlankRowCount(settings?: object) {
+  const system = settings && typeof settings === "object"
+    ? (settings as { system?: unknown }).system
+    : null;
   const systemSettings = system && typeof system === "object" ? (system as Record<string, unknown>) : null;
   const value = Number(systemSettings?.itemEntryBlankRowCount);
   return Number.isFinite(value) ? Math.max(1, Math.min(500, Math.trunc(value))) : 20;

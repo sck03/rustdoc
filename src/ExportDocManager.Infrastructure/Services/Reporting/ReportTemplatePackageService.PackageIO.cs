@@ -13,7 +13,7 @@ namespace ExportDocManager.Services.Reporting
             string sourceRoot,
             string targetRoot,
             bool overwrite,
-            IProgress<OperationProgressUpdate> progress,
+            IProgress<OperationProgressUpdate>? progress,
             CancellationToken cancellationToken,
             string statusText,
             int startPercent,
@@ -34,7 +34,7 @@ namespace ExportDocManager.Services.Reporting
                 string file = files[index];
                 string relativePath = Path.GetRelativePath(sourceRoot, file);
                 string targetFile = Path.Combine(targetRoot, relativePath);
-                string targetDirectory = Path.GetDirectoryName(targetFile);
+                string? targetDirectory = Path.GetDirectoryName(targetFile);
                 if (!string.IsNullOrWhiteSpace(targetDirectory))
                 {
                     Directory.CreateDirectory(targetDirectory);

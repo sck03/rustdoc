@@ -8,7 +8,7 @@ namespace ExportDocManager.Api.Hosting
         public static ApiExcelImportPreviewResponse FromImportResult(
             string sourcePath,
             ImportResult result,
-            string storagePolicy = null)
+            string? storagePolicy = null)
         {
             result ??= new ImportResult();
 
@@ -23,7 +23,7 @@ namespace ExportDocManager.Api.Hosting
                 storagePolicy ?? "Excel 导入只读取用户显式选择或输入的源文件路径，解析结果随响应返回；不会写入数据库，也不会创建系统 C 盘默认落点。内置导入模板仍随程序放在 Resources/ExcelTemplates/ 下。");
         }
 
-        private static ApiExcelImportAnalysisReportDto FromAnalysisReport(ExcelImportAnalysisReport report)
+        private static ApiExcelImportAnalysisReportDto? FromAnalysisReport(ExcelImportAnalysisReport? report)
         {
             return report == null
                 ? null
@@ -64,7 +64,7 @@ namespace ExportDocManager.Api.Hosting
                         issue.FieldKey ?? string.Empty)).ToList() ?? new List<ApiExcelImportAnalysisIssueDto>());
         }
 
-        private static ApiExcelImportItemColumnAnalysisDto FromItemColumns(ExcelImportItemColumnAnalysis columns)
+        private static ApiExcelImportItemColumnAnalysisDto FromItemColumns(ExcelImportItemColumnAnalysis? columns)
         {
             columns ??= new ExcelImportItemColumnAnalysis();
             return new ApiExcelImportItemColumnAnalysisDto(
@@ -94,7 +94,7 @@ namespace ExportDocManager.Api.Hosting
                 columns.TotalPriceCol);
         }
 
-        private static ApiImportedCustomerDto FromCustomer(Customer customer, Invoice invoice)
+        private static ApiImportedCustomerDto? FromCustomer(Customer? customer, Invoice? invoice)
         {
             string fallbackName = invoice?.CustomerNameEN ?? string.Empty;
             string fallbackAddress = invoice?.CustomerAddressEN ?? string.Empty;
@@ -122,12 +122,12 @@ namespace ExportDocManager.Api.Hosting
             };
         }
 
-        private static string FirstNonBlank(string value, string fallback)
+        private static string FirstNonBlank(string? value, string? fallback)
         {
             return !string.IsNullOrWhiteSpace(value) ? value : fallback ?? string.Empty;
         }
 
-        private static ApiImportedExporterDto FromExporter(Exporter exporter)
+        private static ApiImportedExporterDto? FromExporter(Exporter? exporter)
         {
             return exporter == null
                 ? null

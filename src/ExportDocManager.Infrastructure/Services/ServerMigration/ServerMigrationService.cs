@@ -52,7 +52,7 @@ public sealed class ServerMigrationService : IServerMigrationService
         PostgreSqlToolPaths tools = PostgreSqlToolLocator.Resolve(_pathProvider);
         bool configured = DatabaseModeHelper.UsesSharedDatabase(_databaseSettings);
         bool pending = ServerMigrationManager.HasPendingRestore(_pathProvider);
-        ServerMigrationRestoreStatusSnapshot lastRestore = ServerMigrationManager.ReadStatus(_pathProvider);
+        ServerMigrationRestoreStatusSnapshot? lastRestore = ServerMigrationManager.ReadStatus(_pathProvider);
         string message = pending
             ? "服务器迁移已排队，将在服务下次启动、建立数据库连接前执行。"
             : configured && tools.ToolsReady

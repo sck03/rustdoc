@@ -67,7 +67,7 @@ namespace ExportDocManager.Api.Tests
                     new()
                     {
                         InvoiceDate = DateTime.UtcNow,
-                        Status = null
+                        Status = string.Empty
                     }
                 },
                 totalCount: 1,
