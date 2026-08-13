@@ -26,6 +26,6 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(100)]
         public string? UserId { get; set; } // Useful for multi-user phase
         
-        public DateTime Timestamp { get; set; }
+        public DateTimeOffset Timestamp { get; set; }
     }
 }

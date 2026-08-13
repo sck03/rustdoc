@@ -251,8 +251,8 @@ namespace ExportDocManager.Infrastructure.Tests
                 var firstStatus = await firstService.GetStatusAsync();
 
                 var anchor = Assert.IsType<RuntimeLicenseAnchorData>(await anchorStore.LoadAsync());
-                anchor.InstallDate = DateTime.Now.AddDays(-8);
-                anchor.LastRunDate = DateTime.Now;
+                anchor.InstallDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-8));
+                anchor.LastRunDate = DateOnly.FromDateTime(DateTime.Today);
                 await anchorStore.SaveAsync(anchor);
 
                 DeleteDirectory(firstAppRoot);
@@ -399,9 +399,9 @@ namespace ExportDocManager.Infrastructure.Tests
             public const string ValidLicenseKey = "EDM2-TEST-LICENSE";
             public static readonly TestLicenseSignatureVerifier Instance = new();
 
-            public bool TryValidate(string machineId, string licenseKey, out DateTime expireDate)
+            public bool TryValidate(string machineId, string licenseKey, out DateOnly expireDate)
             {
-                expireDate = DateTime.Today.AddYears(1).Date.AddDays(1).AddTicks(-1);
+                expireDate = DateOnly.FromDateTime(DateTime.Today.AddYears(1));
                 return !string.IsNullOrWhiteSpace(machineId) &&
                     string.Equals(licenseKey, ValidLicenseKey, StringComparison.Ordinal);
             }

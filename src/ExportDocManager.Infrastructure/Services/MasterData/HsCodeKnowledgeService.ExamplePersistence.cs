@@ -12,7 +12,7 @@ namespace ExportDocManager.Services.MasterData
         internal static async Task UpsertExampleInContextAsync(
             AppDbContext context,
             HsCodeExampleInput input,
-            DateTime now,
+            DateTimeOffset now,
             CancellationToken cancellationToken,
             bool incrementUseCount = true)
         {
@@ -90,7 +90,7 @@ namespace ExportDocManager.Services.MasterData
                     var resolution = ResolveCurrentCode(example, map, relations);
                     example.ResolvedCurrentHsCode = resolution.CurrentCode;
                     example.ResolutionStatus = resolution.Status;
-                    example.UpdatedAt = DateTime.UtcNow;
+                    example.UpdatedAt = DateTimeOffset.UtcNow;
                 }
 
                 await context.SaveChangesAsync(cancellationToken);

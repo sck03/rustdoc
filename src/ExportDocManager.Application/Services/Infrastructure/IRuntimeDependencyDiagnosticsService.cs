@@ -1,5 +1,10 @@
 namespace ExportDocManager.Services.Infrastructure
 {
+    public interface IRuntimeDependencyDiagnosticContributor
+    {
+        IReadOnlyList<RuntimeDependencyDiagnostic> Inspect();
+    }
+
     public interface IRuntimeDependencyDiagnosticsService
     {
         IReadOnlyList<RuntimeDependencyDiagnostic> Inspect();

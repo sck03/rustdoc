@@ -9,7 +9,8 @@ namespace ExportDocManager.Api.Hosting
             typeof(string),
             typeof(int),
             typeof(bool),
-            typeof(DateTime)
+            typeof(DateOnly),
+            typeof(DateTimeOffset)
         ];
 
         public static IReadOnlyList<string> NormalizeGroupKeys(IEnumerable<string>? groupKeys)

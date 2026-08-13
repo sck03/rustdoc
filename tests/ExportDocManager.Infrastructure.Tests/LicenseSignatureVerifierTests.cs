@@ -15,14 +15,16 @@ namespace ExportDocManager.Infrastructure.Tests
             bool accepted = verifier.TryValidate(
                 "PUBLIC-TEST-MACHINE",
                 PublicTestVector,
-                out DateTime expireDate);
+                out DateOnly expireDate);
             bool rejected = verifier.TryValidate(
                 "ANOTHER-MACHINE",
                 PublicTestVector,
                 out _);
 
             Assert.True(accepted);
-            Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1924991999).LocalDateTime, expireDate);
+            Assert.Equal(
+                DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(1924991999).LocalDateTime),
+                expireDate);
             Assert.False(rejected);
         }
     }

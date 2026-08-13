@@ -2,7 +2,8 @@ using System;
 using ExportDocManager.Models;
 using Microsoft.EntityFrameworkCore;
 using ExportDocManager.Models.Entities;
-using ExportDocManager.Utils;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace ExportDocManager.DataAccess
 {
@@ -67,50 +68,6 @@ namespace ExportDocManager.DataAccess
         {
         }
 
-        public override int SaveChanges(bool acceptAllChangesOnSuccess)
-        {
-            NormalizePostgreSqlDateTimes();
-            return base.SaveChanges(acceptAllChangesOnSuccess);
-        }
-
-        public override Task<int> SaveChangesAsync(
-            bool acceptAllChangesOnSuccess,
-            CancellationToken cancellationToken = default)
-        {
-            NormalizePostgreSqlDateTimes();
-            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-        }
-
-        private void NormalizePostgreSqlDateTimes()
-        {
-            if (!Database.IsNpgsql())
-            {
-                return;
-            }
-
-            foreach (var entry in ChangeTracker.Entries())
-            {
-                if (entry.State is not (EntityState.Added or EntityState.Modified))
-                {
-                    continue;
-                }
-
-                foreach (var property in entry.Properties)
-                {
-                    if (property.Metadata.ClrType == typeof(DateTime) &&
-                        property.CurrentValue is DateTime timestamp)
-                    {
-                        property.CurrentValue = DateTimeValueHelper.NormalizeUtcTimestamp(timestamp);
-                    }
-                    else if (property.Metadata.ClrType == typeof(DateTime?) &&
-                             property.CurrentValue is DateTime nullableTimestamp)
-                    {
-                        property.CurrentValue = DateTimeValueHelper.NormalizeUtcTimestamp(nullableTimestamp);
-                    }
-                }
-            }
-        }
-
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Invoice>()
@@ -122,6 +79,20 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<Invoice>()
                 .HasIndex(i => new { i.CompanyScope, i.InvoiceNo, i.Type })
                 .IsUnique();
+
+            modelBuilder.Entity<Invoice>()
+                .Property(i => i.NotifyPartyMode)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+            modelBuilder.Entity<Invoice>().Property(i => i.InvoiceDate).HasColumnType("date");
+            modelBuilder.Entity<Invoice>().Property(i => i.ShipmentDate).HasColumnType("date");
+            modelBuilder.Entity<Payment>().Property(i => i.PaymentDate).HasColumnType("date");
+            modelBuilder.Entity<Payment>().Property(i => i.ShipmentDate).HasColumnType("date");
+            modelBuilder.Entity<Payment>().Property(i => i.ReceiptDate).HasColumnType("date");
+            modelBuilder.Entity<Customer>()
+                .Property(i => i.NotifyPartyMode)
+                .HasConversion<string>()
+                .HasMaxLength(32);
 
             modelBuilder.Entity<InvoiceStatusHistory>()
                 .HasIndex(item => new { item.InvoiceId, item.ChangedAt });
@@ -552,6 +523,42 @@ namespace ExportDocManager.DataAccess
 
             paymentEntity.Property(p => p.DepartmentId).HasMaxLength(50);
             paymentEntity.Property(p => p.CompanyScope).HasMaxLength(50);
+
+            ConfigureTemporalStorage(modelBuilder);
+        }
+
+        private void ConfigureTemporalStorage(ModelBuilder modelBuilder)
+        {
+            foreach (IMutableEntityType entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                foreach (IMutableProperty property in entityType.GetProperties())
+                {
+                    Type modelType = property.ClrType;
+                    if (modelType == typeof(DateOnly) || modelType == typeof(DateOnly?))
+                    {
+                        property.SetColumnType("date");
+                        continue;
+                    }
+
+                    if (!Database.IsSqlite())
+                    {
+                        continue;
+                    }
+
+                    if (modelType == typeof(DateTimeOffset))
+                    {
+                        property.SetValueConverter(new ValueConverter<DateTimeOffset, long>(
+                            value => value.UtcTicks,
+                            value => new DateTimeOffset(value, TimeSpan.Zero)));
+                    }
+                    else if (modelType == typeof(DateTimeOffset?))
+                    {
+                        property.SetValueConverter(new ValueConverter<DateTimeOffset?, long?>(
+                            value => value.HasValue ? value.Value.UtcTicks : null,
+                            value => value.HasValue ? new DateTimeOffset(value.Value, TimeSpan.Zero) : null));
+                    }
+                }
+            }
         }
     }
 }

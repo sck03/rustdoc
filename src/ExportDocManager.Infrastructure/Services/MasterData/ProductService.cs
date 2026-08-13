@@ -65,8 +65,8 @@ namespace ExportDocManager.Services.MasterData
 
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             NormalizeProduct(product);
-            product.CreatedAt = DateTime.Now;
-            product.UpdatedAt = DateTime.Now;
+            product.CreatedAt = DateTimeOffset.UtcNow;
+            product.UpdatedAt = product.CreatedAt;
             context.Products.Add(product);
             await context.SaveChangesAsync(cancellationToken);
             return product.Id;
@@ -87,7 +87,7 @@ namespace ExportDocManager.Services.MasterData
                 NormalizeProduct(product);
                 context.Entry(existing).CurrentValues.SetValues(product);
                 context.Entry(existing).Property(item => item.RowVersion).OriginalValue = product.RowVersion;
-                existing.UpdatedAt = DateTime.Now;
+                existing.UpdatedAt = DateTimeOffset.UtcNow;
                 await context.SaveChangesAsync(cancellationToken);
                 product.RowVersion = existing.RowVersion?.ToArray();
                 return true;

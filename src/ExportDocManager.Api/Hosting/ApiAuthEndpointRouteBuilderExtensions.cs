@@ -106,6 +106,7 @@ namespace ExportDocManager.Api.Hosting
                     token.ExpiresAt,
                     ApiUserDtoFactory.FromUser(user, authorizationService)));
             })
+            .WithApiAccess(false, true, false)
             .WithName("Login")
             .Produces<ApiErrorResponse>(StatusCodes.Status401Unauthorized)
             .Produces<ApiErrorResponse>(StatusCodes.Status429TooManyRequests)
@@ -121,7 +122,8 @@ namespace ExportDocManager.Api.Hosting
                     ? TypedResults.Unauthorized()
                     : TypedResults.Ok(ApiUserDtoFactory.FromUser(user, authorizationService));
             })
-            .WithName("getCurrentUser");
+            .WithName("getCurrentUser")
+            .WithApiAccess(true, true, false);
 
             endpoints.MapPost("/api/auth/renew", async Task<Results<Ok<ApiLoginResponse>, UnauthorizedHttpResult>>(
                 HttpContext context,
@@ -150,7 +152,8 @@ namespace ExportDocManager.Api.Hosting
                     renewed.ExpiresAt,
                     ApiUserDtoFactory.FromUser(user, authorizationService)));
             })
-            .WithName("RenewSession");
+            .WithName("RenewSession")
+            .WithApiAccess(true, true, false);
 
             endpoints.MapPost("/api/auth/logout", async Task<Ok<ApiLogoutResponse>>(
                 HttpContext context,
@@ -171,7 +174,8 @@ namespace ExportDocManager.Api.Hosting
                 }
                 return TypedResults.Ok(new ApiLogoutResponse(revoked));
             })
-            .WithName("Logout");
+            .WithName("Logout")
+            .WithApiAccess(true, true, false);
         }
 
         private static void SetRetryAfter(HttpContext context, TimeSpan retryAfter)

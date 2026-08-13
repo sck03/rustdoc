@@ -83,22 +83,22 @@ namespace ExportDocManager.Services.SingleWindow
 
         private static string ResolveYear(string? aplDate)
         {
-            if (DateTime.TryParseExact(
+            if (DateOnly.TryParseExact(
                     NormalizeText(aplDate),
                     "yyyy-MM-dd",
                     CultureInfo.InvariantCulture,
                     DateTimeStyles.None,
-                    out DateTime exactDate))
+                    out DateOnly exactDate))
             {
                 return exactDate.ToString("yy", CultureInfo.InvariantCulture);
             }
 
-            if (DateTime.TryParse(aplDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate))
+            if (DateOnly.TryParse(aplDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly parsedDate))
             {
                 return parsedDate.ToString("yy", CultureInfo.InvariantCulture);
             }
 
-            return DateTime.Today.ToString("yy", CultureInfo.InvariantCulture);
+            return DateOnly.FromDateTime(DateTime.Today).ToString("yy", CultureInfo.InvariantCulture);
         }
 
         private static string NormalizeCertType(string? certType)

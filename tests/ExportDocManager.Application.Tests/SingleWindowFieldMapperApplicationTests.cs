@@ -21,8 +21,8 @@ namespace ExportDocManager.Application.Tests
                     PortOfDestination = "jakarta",
                     TransportMode = "海运",
                     SupervisionMode = "一般贸易",
-                    ShipmentDate = new DateTime(2026, 4, 17),
-                    InvoiceDate = new DateTime(2026, 4, 15),
+                    ShipmentDate = new DateOnly(2026, 4, 17),
+                    InvoiceDate = new DateOnly(2026, 4, 15),
                     TradeTerms = "fob ningbo",
                     ShippingMarks = "N/M",
                     SpecialTerms = "SPECIAL CLAUSE",
@@ -154,8 +154,8 @@ namespace ExportDocManager.Application.Tests
                 Invoice = new Invoice
                 {
                     InvoiceNo = "INV-002",
-                    InvoiceDate = new DateTime(2026, 4, 17),
-                    ShipmentDate = DateTime.MinValue,
+                    InvoiceDate = new DateOnly(2026, 4, 17),
+                    ShipmentDate = DateOnly.MinValue,
                     Currency = "usd",
                     TotalAmount = 1020m,
                     TotalGrossWeight = 88m,

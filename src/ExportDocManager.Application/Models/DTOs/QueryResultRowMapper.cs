@@ -18,7 +18,7 @@ namespace ExportDocManager.Models.DTOs
                 ExporterName = invoice.ExporterNameEN ?? invoice.ExporterNameCN ?? string.Empty,
                 DestinationCountry = invoice.DestinationCountry ?? string.Empty,
                 TradeTerms = invoice.TradeTerms ?? string.Empty,
-                ShipmentDate = invoice.ShipmentDate == DateTime.MinValue
+                ShipmentDate = invoice.ShipmentDate == default
                     ? string.Empty
                     : invoice.ShipmentDate.ToString("yyyy-MM-dd"),
                 TransportMode = invoice.TransportMode ?? string.Empty,

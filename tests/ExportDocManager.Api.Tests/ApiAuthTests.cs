@@ -129,53 +129,9 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
-        public void AuthenticationMiddleware_ShouldRequireTokenForApiExceptLogin()
-        {
-            Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/healthz"));
-            Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/readyz"));
-            Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/livez"));
-            Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/openapi/v1.json"));
-            Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/api/auth/login"));
-            Assert.False(ApiAuthenticationMiddleware.RequiresAuthentication("/api/system/shutdown-maintenance"));
-            Assert.True(ApiAuthenticationMiddleware.RequiresAuthentication("/api/auth/me"));
-            Assert.True(ApiAuthenticationMiddleware.RequiresAuthentication("/api/invoices"));
-        }
-
-        [Fact]
-        public void DesktopAccessMiddleware_ShouldRequireDesktopTokenForApiWhenEnabled()
-        {
-            Assert.False(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/healthz"));
-            Assert.False(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/readyz"));
-            Assert.False(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/livez"));
-            Assert.False(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/openapi/v1.json"));
-            Assert.True(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/api/auth/login"));
-            Assert.True(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/api/invoices"));
-            Assert.True(ApiDesktopAccessMiddleware.RequiresDesktopAccess("/api/system/shutdown-maintenance"));
-        }
-
-        [Fact]
-        public void LicenseRequirementMiddleware_ShouldAllowOnlyBootstrapAndLicenseApis()
-        {
-            Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/healthz"));
-            Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/readyz"));
-            Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/livez"));
-            Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/openapi/v1.json"));
-            Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/api/auth/login"));
-            Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/api/auth/me"));
-            Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/api/auth/logout"));
-            Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/api/system/license"));
-            Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/api/system/license/register"));
-            Assert.False(ApiLicenseRequirementMiddleware.RequiresValidLicense("/api/system/shutdown-maintenance"));
-            Assert.True(ApiLicenseRequirementMiddleware.RequiresValidLicense("/api/invoices"));
-            Assert.True(ApiLicenseRequirementMiddleware.RequiresValidLicense("/api/dashboard"));
-            Assert.True(ApiLicenseRequirementMiddleware.RequiresValidLicense("/api/system/update"));
-        }
-
-        [Fact]
         public async Task AuthenticationMiddleware_ShouldRejectProtectedApiWithoutToken()
         {
-            var context = new DefaultHttpContext();
-            context.Request.Path = "/api/invoices";
+            var context = CreateApiContext(requiresAuthentication: true);
 
             bool nextCalled = false;
             var middleware = new ApiAuthenticationMiddleware(_ =>
@@ -198,8 +154,7 @@ namespace ExportDocManager.Api.Tests
             var tokenService = new InMemoryApiSessionTokenService();
             var issued = tokenService.Issue(
                 new User { Id = 2, Username = "operator", PasswordHash = string.Empty, Role = "User", IsActive = true });
-            var context = new DefaultHttpContext();
-            context.Request.Path = "/api/invoices";
+            var context = CreateApiContext(requiresAuthentication: true);
             context.Request.Headers.Authorization = $"Bearer {issued.AccessToken}";
 
             bool nextCalled = false;
@@ -214,6 +169,31 @@ namespace ExportDocManager.Api.Tests
             Assert.True(nextCalled);
             var cachedUser = Assert.IsType<User>(context.Items[ApiEndpointAuth.AuthenticatedUserItemKey]);
             Assert.Equal("operator", cachedUser.Username);
+        }
+
+        [Fact]
+        public async Task CrossCuttingAccessMiddleware_ShouldIgnoreUnmatchedApiPathWithoutEndpointMetadata()
+        {
+            var context = new DefaultHttpContext();
+            context.Request.Path = "/api/removed-feature";
+            int nextCalls = 0;
+            RequestDelegate next = _ =>
+            {
+                nextCalls++;
+                return Task.CompletedTask;
+            };
+
+            await new ApiDesktopAccessMiddleware(next).InvokeAsync(
+                context,
+                new ApiDesktopAccessOptions { Token = "desktop-secret" });
+            await new ApiAuthenticationMiddleware(next).InvokeAsync(
+                context,
+                new ApiCurrentUserResolver(new InMemoryApiSessionTokenService()));
+            await new ApiLicenseRequirementMiddleware(next).InvokeAsync(
+                context,
+                new StubLicenseService(new LicenseStatus { IsTrialExpired = true }));
+
+            Assert.Equal(3, nextCalls);
         }
 
         [Fact]
@@ -237,8 +217,7 @@ namespace ExportDocManager.Api.Tests
         [Fact]
         public async Task DesktopAccessMiddleware_ShouldRejectApiWhenEnabledAndHeaderMissing()
         {
-            var context = new DefaultHttpContext();
-            context.Request.Path = "/api/auth/login";
+            var context = CreateApiContext(requiresAuthentication: false, requiresDesktopAccess: true);
 
             bool nextCalled = false;
             var middleware = new ApiDesktopAccessMiddleware(_ =>
@@ -256,8 +235,7 @@ namespace ExportDocManager.Api.Tests
         [Fact]
         public async Task DesktopAccessMiddleware_ShouldAllowApiWhenHeaderMatches()
         {
-            var context = new DefaultHttpContext();
-            context.Request.Path = "/api/auth/login";
+            var context = CreateApiContext(requiresAuthentication: false, requiresDesktopAccess: true);
             context.Request.Headers[ApiDesktopAccessOptions.HeaderName] = "desktop-secret";
 
             bool nextCalled = false;
@@ -275,8 +253,7 @@ namespace ExportDocManager.Api.Tests
         [Fact]
         public async Task LicenseRequirementMiddleware_ShouldRejectBusinessApiWhenTrialExpired()
         {
-            var context = new DefaultHttpContext();
-            context.Request.Path = "/api/invoices";
+            var context = CreateApiContext(requiresLicense: true);
 
             bool nextCalled = false;
             var middleware = new ApiLicenseRequirementMiddleware(_ =>
@@ -302,6 +279,10 @@ namespace ExportDocManager.Api.Tests
         {
             var context = new DefaultHttpContext();
             context.Request.Path = "/api/system/license";
+            context.SetEndpoint(new Endpoint(
+                _ => Task.CompletedTask,
+                new EndpointMetadataCollection(new ApiEndpointAccessMetadata(true, true, false)),
+                "GetLicenseStatus"));
 
             bool nextCalled = false;
             var middleware = new ApiLicenseRequirementMiddleware(_ =>
@@ -325,6 +306,22 @@ namespace ExportDocManager.Api.Tests
         {
             var context = new DefaultHttpContext();
             context.Request.Headers.Authorization = $"Bearer {accessToken}";
+            return context;
+        }
+
+        private static DefaultHttpContext CreateApiContext(
+            bool requiresAuthentication = true,
+            bool requiresDesktopAccess = true,
+            bool requiresLicense = true)
+        {
+            var context = new DefaultHttpContext();
+            context.SetEndpoint(new Endpoint(
+                _ => Task.CompletedTask,
+                new EndpointMetadataCollection(new ApiEndpointAccessMetadata(
+                    requiresAuthentication,
+                    requiresDesktopAccess,
+                    requiresLicense)),
+                "TestApiEndpoint"));
             return context;
         }
 

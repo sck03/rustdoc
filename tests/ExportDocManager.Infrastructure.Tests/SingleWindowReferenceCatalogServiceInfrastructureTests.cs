@@ -32,7 +32,9 @@ namespace ExportDocManager.Infrastructure.Tests
                     }));
 
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
-                var service = new SingleWindowReferenceCatalogService(pathProvider);
+                var snapshotStore = new SingleWindowReferenceCatalogSnapshotStore(
+                    SingleWindowReferenceCatalogService.CreateSnapshot(pathProvider));
+                var service = new SingleWindowReferenceCatalogService(pathProvider, snapshotStore);
 
                 var bundledCatalog = await service.LoadEffectiveCatalogAsync();
                 string overridePath = service.GetOverrideCatalogPath();
@@ -60,6 +62,10 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.True(File.Exists(overridePath));
                 var effectiveCatalog = await service.LoadEffectiveCatalogAsync();
                 Assert.Equal("OVERRIDE PORT", Assert.Single(effectiveCatalog.Ports).Value);
+                Assert.Equal("OVERRIDE PORT", snapshotStore.Current.FieldMapper.NormalizePort("覆盖港"));
+
+                await service.ResetToBundledCatalogAsync();
+                Assert.Equal("BUNDLED PORT", snapshotStore.Current.FieldMapper.NormalizePort("内置港"));
             }
             finally
             {

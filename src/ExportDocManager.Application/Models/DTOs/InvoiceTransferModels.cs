@@ -8,7 +8,7 @@ namespace ExportDocManager.Models.DTOs
     {
         public string SchemaVersion { get; set; } = string.Empty;
         public string AppVersion { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
         public Invoice Invoice { get; set; } = new();
         public List<Item> Items { get; set; } = [];
         public Customer? Customer { get; set; }

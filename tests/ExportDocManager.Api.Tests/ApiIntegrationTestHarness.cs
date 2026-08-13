@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Infrastructure;
@@ -17,7 +18,7 @@ namespace ExportDocManager.Api.Tests
 {
     internal sealed class ApiIntegrationTestHarness : IAsyncDisposable
     {
-        private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+        private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
         private readonly WebApplication _app;
         private readonly string _baseUrl;
@@ -148,6 +149,7 @@ namespace ExportDocManager.Api.Tests
                 app.UseExportDocManagerApiSafety();
                 app.UseCors(ApiCorsPolicy.LocalFrontendPolicyName);
                 app.UseExportDocManagerReadiness(databaseSettings, runtimeOptions);
+                app.UseRouting();
                 app.UseExportDocManagerDesktopAccess();
                 app.UseExportDocManagerApiAuthentication();
                 app.UseExportDocManagerWorkspaceAccess();
@@ -229,6 +231,13 @@ namespace ExportDocManager.Api.Tests
             string json = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<T>(json, JsonOptions)
                 ?? throw new InvalidOperationException($"无法解析 API 响应: {json}");
+        }
+
+        private static JsonSerializerOptions CreateJsonOptions()
+        {
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            options.Converters.Add(new JsonStringEnumConverter());
+            return options;
         }
 
         public async ValueTask DisposeAsync()
@@ -336,9 +345,9 @@ namespace ExportDocManager.Api.Tests
         public const string ValidLicenseKey = "EDM2-API-TEST-LICENSE";
         public static readonly ApiTestLicenseSignatureVerifier Instance = new();
 
-        public bool TryValidate(string machineId, string licenseKey, out DateTime expireDate)
+        public bool TryValidate(string machineId, string licenseKey, out DateOnly expireDate)
         {
-            expireDate = DateTime.Today.AddYears(1).Date.AddDays(1).AddTicks(-1);
+            expireDate = DateOnly.FromDateTime(DateTime.Today.AddYears(1));
             return !string.IsNullOrWhiteSpace(machineId) &&
                 string.Equals(licenseKey, ValidLicenseKey, StringComparison.Ordinal);
         }

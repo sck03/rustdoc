@@ -8,34 +8,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ClosedXML" />
-    <PackageReference Include="ExcelDataReader" />
     <PackageReference Include="HtmlAgilityPack" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite.Core" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" GeneratePathProperty="true" ExcludeAssets="compile;runtime" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.Playwright" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
-    <PackageReference Include="PDFsharp" />
-    <PackageReference Include="PDFtoImage" />
-    <PackageReference Include="PdfPig" />
     <PackageReference Include="Scriban" />
     <PackageReference Include="Serilog" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     <PackageReference Include="System.Security.Cryptography.Xml" />
-  </ItemGroup>
-
-  <PropertyGroup>
-    <ExportDocIncludeOcrRuntime Condition="'$(ExportDocIncludeOcrRuntime)' == ''">true</ExportDocIncludeOcrRuntime>
-    <_ExportDocOnnxRuntimeDirectory Condition="'$(_ExportDocOnnxRuntimeFile)' != ''">$([System.IO.Path]::Combine('$(PkgMicrosoft_ML_OnnxRuntime)', 'runtimes', '$(RuntimeIdentifier)', 'native'))</_ExportDocOnnxRuntimeDirectory>
-    <_ExportDocOnnxRuntimeSource Condition="'$(_ExportDocOnnxRuntimeFile)' != ''">$([System.IO.Path]::Combine('$(_ExportDocOnnxRuntimeDirectory)', '$(_ExportDocOnnxRuntimeFile)'))</_ExportDocOnnxRuntimeSource>
-  </PropertyGroup>
-
-  <ItemGroup Condition="'$(ExportDocIncludeOcrRuntime)' == 'true' and Exists('$(_ExportDocOnnxRuntimeSource)')">
-    <None Include="$(_ExportDocOnnxRuntimeSource)" Link="$(_ExportDocOnnxRuntimeFile)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

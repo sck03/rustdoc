@@ -9,8 +9,8 @@ namespace ExportDocManager.Services.Infrastructure
         string FileName,
         string FullPath,
         long SizeBytes,
-        DateTime CreatedAt,
-        DateTime LastWriteTime);
+        DateTimeOffset CreatedAt,
+        DateTimeOffset LastWriteTime);
 
     public sealed record SharedDatabaseOwnershipSummary(
         int TotalInvoices,

@@ -98,8 +98,8 @@ namespace ExportDocManager.Api.Hosting
         {
             string fallbackName = invoice?.CustomerNameEN ?? string.Empty;
             string fallbackAddress = invoice?.CustomerAddressEN ?? string.Empty;
-            string fallbackNotifyName = invoice?.NotifyPartyName ?? string.Empty;
-            string fallbackNotifyAddress = invoice?.NotifyPartyAddress ?? string.Empty;
+            string fallbackNotifyName = invoice?.NotifyPartyMode == NotifyPartyMode.Separate ? invoice.NotifyPartyName ?? string.Empty : string.Empty;
+            string fallbackNotifyAddress = invoice?.NotifyPartyMode == NotifyPartyMode.Separate ? invoice.NotifyPartyAddress ?? string.Empty : string.Empty;
 
             if (customer == null && string.IsNullOrWhiteSpace(fallbackName))
             {
@@ -111,9 +111,14 @@ namespace ExportDocManager.Api.Hosting
                 Id = customer?.Id ?? 0,
                 CustomerNameEN = FirstNonBlank(customer?.CustomerNameEN, fallbackName),
                 DisplayName = FirstNonBlank(customer?.DisplayName, fallbackName),
-                NotifyPartyName = FirstNonBlank(customer?.NotifyPartyName, fallbackNotifyName),
+                NotifyPartyMode = customer?.NotifyPartyMode ?? invoice?.NotifyPartyMode ?? NotifyPartyMode.None,
+                NotifyPartyName = customer?.NotifyPartyMode == NotifyPartyMode.Separate
+                    ? FirstNonBlank(customer.NotifyPartyName, fallbackNotifyName)
+                    : fallbackNotifyName,
                 AddressEN = FirstNonBlank(customer?.AddressEN, fallbackAddress),
-                NotifyPartyAddress = FirstNonBlank(customer?.NotifyPartyAddress, fallbackNotifyAddress),
+                NotifyPartyAddress = customer?.NotifyPartyMode == NotifyPartyMode.Separate
+                    ? FirstNonBlank(customer.NotifyPartyAddress, fallbackNotifyAddress)
+                    : fallbackNotifyAddress,
                 ContactPerson = customer?.ContactPerson ?? string.Empty,
                 Phone = customer?.Phone ?? string.Empty,
                 Email = customer?.Email ?? string.Empty,

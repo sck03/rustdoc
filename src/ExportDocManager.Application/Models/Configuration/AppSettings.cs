@@ -261,7 +261,7 @@ namespace ExportDocManager.Models
         };
 
         [Browsable(false)]
-        public DateTime? LastCurrencyListUpdateTime { get; set; }
+        public DateTimeOffset? LastCurrencyListUpdateTime { get; set; }
     }
 
     [TypeDescriptionProvider(typeof(OrderedTypeDescriptionProvider))]

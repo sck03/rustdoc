@@ -331,7 +331,9 @@ export function MasterDataEditorPage({
       return;
     }
 
-    setRecord((current) => (current ? { ...current, [name]: value } : current));
+    setRecord((current) => current
+      ? config.applyFieldChange?.(current, name, value) ?? { ...current, [name]: value }
+      : current);
     if (isProductUnitTargetField(name)) {
       setAutoFilledProductUnits((current) => {
         const currentAutoValue = current[name];
@@ -546,7 +548,7 @@ export function MasterDataEditorPage({
                 ) : null}
               </div>
               <div className="field-grid">
-                {section.fields.map((field) => (
+                {section.fields.filter((field) => !field.visibleWhen || field.visibleWhen(record)).map((field) => (
                   <MasterDataField
                     field={field}
                     isEdit={!isNew}

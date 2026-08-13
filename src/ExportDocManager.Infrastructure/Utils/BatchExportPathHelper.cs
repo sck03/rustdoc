@@ -10,7 +10,7 @@ namespace ExportDocManager.Utils
             string folderPattern,
             string invoiceNo,
             string customerName,
-            DateTime exportDate)
+            DateOnly exportDate)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
 
@@ -38,7 +38,7 @@ namespace ExportDocManager.Utils
             string invoiceNo,
             string customerName,
             string documentName,
-            DateTime exportDate)
+            DateOnly exportDate)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(directory);
 
@@ -62,7 +62,7 @@ namespace ExportDocManager.Utils
             string directory,
             string invoiceNo,
             string customerName,
-            DateTime exportDate)
+            DateOnly exportDate)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(directory);
 
@@ -80,7 +80,7 @@ namespace ExportDocManager.Utils
             string directory,
             string invoiceNo,
             string customerName,
-            DateTime exportDate)
+            DateOnly exportDate)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(directory);
 

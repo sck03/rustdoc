@@ -120,7 +120,7 @@ namespace ExportDocManager.Services.SingleWindow
                     batch.AssignedProfileKey = profile.ProfileKey;
                     batch.AssignedCardIdentifier = profile.CardIdentifier;
                     batch.LastError = string.Empty;
-                    batch.UpdatedAt = DateTime.UtcNow;
+                    batch.UpdatedAt = DateTimeOffset.UtcNow;
                     await context.SaveChangesAsync(token);
                     return new ClientDispatchReservation(
                         batch.Id,
@@ -158,7 +158,7 @@ namespace ExportDocManager.Services.SingleWindow
                         throw new ServiceConcurrencyException("客户端派发状态已被其他操作修改，不能确认完成。");
                     }
 
-                    DateTime nowUtc = DateTime.UtcNow;
+                    DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
                     batch.Status = SingleWindowBatchStatusCatalog.QueuedToClient;
                     batch.ClientDispatchPath = outBoxPath;
                     batch.LastClientDispatchAt = nowUtc;
@@ -212,7 +212,7 @@ namespace ExportDocManager.Services.SingleWindow
                 batch.LastError = string.IsNullOrWhiteSpace(errorMessage)
                     ? "写入官方客户端目录失败。"
                     : errorMessage.Trim()[..Math.Min(errorMessage.Trim().Length, 2000)];
-                batch.UpdatedAt = DateTime.UtcNow;
+                batch.UpdatedAt = DateTimeOffset.UtcNow;
                 await context.SaveChangesAsync(cancellationToken);
             }
             catch (Exception trackingException)

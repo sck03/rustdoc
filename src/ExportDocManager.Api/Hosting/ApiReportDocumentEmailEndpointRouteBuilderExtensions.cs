@@ -283,7 +283,7 @@ namespace ExportDocManager.Api.Hosting
                 : configuredTemplate;
             string invoiceNo = documentSet?.InvoiceNo ?? string.Empty;
             string customerName = documentSet?.CustomerName ?? string.Empty;
-            string dateText = (documentSet?.ExportDate ?? DateTime.Now).ToString("yyyyMMdd");
+            string dateText = (documentSet?.ExportDate ?? DateOnly.FromDateTime(DateTime.Today)).ToString("yyyyMMdd");
 
             return template
                 .Replace("{InvoiceNo}", invoiceNo, StringComparison.OrdinalIgnoreCase)

@@ -21,6 +21,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapGet("/", () => File.Exists(frontendIndexPath)
                 ? Results.File(frontendIndexPath, "text/html; charset=utf-8")
                 : Results.Redirect("/swagger"))
+                .AllowAnonymousApi()
                 .ExcludeFromDescription();
 
             endpoints.MapMethods("/livez", [HttpMethods.Get, HttpMethods.Head], async (HttpContext context) =>
@@ -29,6 +30,7 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Empty;
             })
                 .WithName("getLiveness")
+            .AllowAnonymousApi()
             .Produces(StatusCodes.Status200OK);
 
             endpoints.MapMethods("/readyz", [HttpMethods.Get, HttpMethods.Head], async (
@@ -41,6 +43,7 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Empty;
             })
                 .WithName("getReadiness")
+            .AllowAnonymousApi()
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status503ServiceUnavailable);
 
@@ -82,10 +85,12 @@ namespace ExportDocManager.Api.Hosting
                     hasDesktopAccess);
                 return Results.Ok(response);
             })
-            .WithName("getHealth")
-            .Produces<ApiHealthResponse>(StatusCodes.Status200OK);
+                .WithName("getHealth")
+            .AllowAnonymousApi()
+                .Produces<ApiHealthResponse>(StatusCodes.Status200OK);
 
-            var officialOpenApi = endpoints.MapGroup(string.Empty);
+            var officialOpenApi = endpoints.MapGroup(string.Empty).WithApiAccess(
+                new ApiEndpointAccessMetadata(runtimeOptions.NetworkMode, false, false));
             officialOpenApi.AddEndpointFilter(async (invocationContext, next) =>
             {
                 var context = invocationContext.HttpContext;
@@ -128,6 +133,7 @@ namespace ExportDocManager.Api.Hosting
                     "text/html; charset=utf-8");
             })
                 .WithName("Swagger")
+                .AllowAnonymousApi()
                 .ExcludeFromDescription();
 
             endpoints.MapPost("/api/system/shutdown-maintenance", async (
@@ -183,6 +189,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("RunShutdownMaintenance")
+            .WithApiAccess(false, true, false)
             .Produces<ApiShutdownMaintenanceResponse>(StatusCodes.Status200OK)
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 

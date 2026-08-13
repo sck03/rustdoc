@@ -19,7 +19,6 @@ namespace ExportDocManager.DataAccess
         public const string PostgreSqlMaximumPoolSizeEnvironmentVariable = "EXPORTDOCMANAGER_DB_MAX_POOL_SIZE";
         public const string PostgreSqlPasswordEnvironmentVariable = PostgreSqlPasswordResolver.PasswordEnvironmentVariable;
         public const string PostgreSqlPasswordFileEnvironmentVariable = PostgreSqlPasswordResolver.PasswordFileEnvironmentVariable;
-        private static IAppPathProvider _pathProvider = new RuntimeAppPathProvider();
         private static readonly HashSet<string> AllowedPostgreSqlAdditionalOptionNames =
             new(StringComparer.OrdinalIgnoreCase)
             {
@@ -64,12 +63,6 @@ namespace ExportDocManager.DataAccess
                 ["Command Timeout"] = (1, 600)
             };
 
-        public static void ConfigurePathProvider(IAppPathProvider pathProvider)
-        {
-            _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
-            SecurityHelper.ConfigurePathProvider(_pathProvider);
-        }
-
         public static string BuildConnectionString(string path)
         {
             var builder = new SqliteConnectionStringBuilder
@@ -85,22 +78,33 @@ namespace ExportDocManager.DataAccess
             return builder.ToString();
         }
 
-        public static DatabaseConnectionSettings LoadDatabaseSettings()
+        public static DatabaseConnectionSettings LoadDatabaseSettings(IAppPathProvider pathProvider)
         {
-            return LoadDatabaseSettingsFromPath(Path.Combine(_pathProvider.ConfigRoot, "appsettings.json"));
+            ArgumentNullException.ThrowIfNull(pathProvider);
+            return LoadDatabaseSettingsFromPath(
+                Path.Combine(pathProvider.ConfigRoot, "appsettings.json"),
+                pathProvider);
         }
 
-        public static DatabaseConnectionSettings LoadDatabaseSettings(string settingsPath)
+        public static DatabaseConnectionSettings LoadDatabaseSettings(
+            IAppPathProvider pathProvider,
+            string settingsPath)
         {
+            ArgumentNullException.ThrowIfNull(pathProvider);
             if (string.IsNullOrWhiteSpace(settingsPath))
             {
                 throw new ArgumentException("数据库设置文件路径不能为空。", nameof(settingsPath));
             }
 
-            return LoadDatabaseSettingsFromPath(ResolveFromConfigRoot(settingsPath));
+            string resolved = Path.IsPathRooted(settingsPath)
+                ? Path.GetFullPath(settingsPath)
+                : Path.GetFullPath(Path.Combine(pathProvider.ConfigRoot, settingsPath));
+            return LoadDatabaseSettingsFromPath(resolved, pathProvider);
         }
 
-        private static DatabaseConnectionSettings LoadDatabaseSettingsFromPath(string resolvedSettingsPath)
+        private static DatabaseConnectionSettings LoadDatabaseSettingsFromPath(
+            string resolvedSettingsPath,
+            IAppPathProvider pathProvider)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(resolvedSettingsPath);
 
@@ -127,7 +131,7 @@ namespace ExportDocManager.DataAccess
                     PostgreSqlPort = NormalizePostgreSqlPort(system.PostgreSqlPort),
                     PostgreSqlDatabase = NormalizePostgreSqlText(system.PostgreSqlDatabase),
                     PostgreSqlUsername = NormalizePostgreSqlText(system.PostgreSqlUsername),
-                    PostgreSqlPassword = NormalizePostgreSqlPassword(system.PostgreSqlPassword),
+                    PostgreSqlPassword = PostgreSqlPasswordResolver.Resolve(system.PostgreSqlPassword, pathProvider),
                     PostgreSqlAdditionalOptions = NormalizePostgreSqlAdditionalOptions(system.PostgreSqlAdditionalOptions)
                 };
             }
@@ -158,13 +162,6 @@ namespace ExportDocManager.DataAccess
 
         public static void ConfigureDbContextOptions(
             DbContextOptionsBuilder options,
-            DatabaseConnectionSettings databaseSettings)
-        {
-            ConfigureDbContextOptions(options, databaseSettings, _pathProvider);
-        }
-
-        public static void ConfigureDbContextOptions(
-            DbContextOptionsBuilder options,
             DatabaseConnectionSettings databaseSettings,
             IAppPathProvider pathProvider)
         {
@@ -190,22 +187,20 @@ namespace ExportDocManager.DataAccess
             options.UseSqlite(connectionString);
         }
 
-        public static AppDbContext CreateDbContext()
-        {
-            return CreateDbContext(LoadDatabaseSettings());
-        }
-
-        public static AppDbContext CreateDbContext(DatabaseConnectionSettings databaseSettings)
+        public static AppDbContext CreateDbContext(
+            DatabaseConnectionSettings databaseSettings,
+            IAppPathProvider pathProvider)
         {
             ArgumentNullException.ThrowIfNull(databaseSettings);
 
             var options = new DbContextOptionsBuilder<AppDbContext>();
-            ConfigureDbContextOptions(options, databaseSettings);
+            ConfigureDbContextOptions(options, databaseSettings, pathProvider);
             return new AppDbContext(options.Options);
         }
 
-        public static string GetDatabasePath(string dbFileName)
+        public static string GetDatabasePath(IAppPathProvider pathProvider, string dbFileName)
         {
+            ArgumentNullException.ThrowIfNull(pathProvider);
             string normalizedFileName = string.IsNullOrWhiteSpace(dbFileName)
                 ? DatabaseConnectionSettings.DefaultSqliteDatabaseFileName
                 : dbFileName.Trim();
@@ -219,7 +214,7 @@ namespace ExportDocManager.DataAccess
             var pathSegments = normalizedFileName
                 .Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries);
 
-            var databasePath = _pathProvider.DatabaseRoot;
+            var databasePath = pathProvider.DatabaseRoot;
             foreach (var segment in pathSegments)
             {
                 databasePath = Path.Combine(databasePath, segment.Trim());
@@ -440,19 +435,6 @@ namespace ExportDocManager.DataAccess
             }
 
             return Math.Clamp(parsed, bounds.Minimum, bounds.Maximum);
-        }
-
-        public static string NormalizePostgreSqlPassword(string value)
-        {
-            return PostgreSqlPasswordResolver.Resolve(value, _pathProvider);
-        }
-
-        private static string ResolveFromConfigRoot(string path)
-        {
-            var trimmed = path.Trim();
-            return Path.IsPathRooted(trimmed)
-                ? trimmed
-                : Path.GetFullPath(Path.Combine(_pathProvider.ConfigRoot, trimmed));
         }
 
         private static bool TryEnsureDirectory(string? directoryPath)

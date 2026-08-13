@@ -97,7 +97,7 @@ namespace ExportDocManager.Services.MasterData
             var entity = await context.HsCodeSearchFeedback
                 .FirstOrDefaultAsync(item => item.Fingerprint == fingerprint, cancellationToken)
                 .ConfigureAwait(false);
-            DateTime now = DateTime.UtcNow;
+            DateTimeOffset now = DateTimeOffset.UtcNow;
             if (entity == null)
             {
                 entity = new HsCodeSearchFeedback { Fingerprint = fingerprint };
@@ -130,7 +130,7 @@ namespace ExportDocManager.Services.MasterData
                         string.IsNullOrWhiteSpace(productName) ? queryText : productName,
                         specification,
                         "ConsensusConfirmed",
-                        DateTime.Now.Year,
+                        DateOnly.FromDateTime(DateTime.Today).Year,
                         "ManuallyVerified",
                         true),
                     now,

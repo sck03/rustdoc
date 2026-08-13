@@ -102,7 +102,7 @@ try {
             && value.mobileTouchTargetFailures.length === 0
             && (pageName !== "globalStyles" || value.fieldGridMaximumColumnCount === expectedFieldGridColumns)
             && (pageName !== "invoiceParties" || value.invoicePartyGridContractPassed)
-            && (pageName !== "query" || value.queryFilterContractPassed)
+            && (pageName !== "query" || (value.queryFilterContractPassed && value.queryExportSummaryCompact))
             && (pageName !== "globalStyles" || value.globalStyleContractPassed);
 
           let screenshotPath = null;
@@ -249,6 +249,11 @@ function buildAuditExpression(isMobile) {
       };
     })();
     const queryFilterContractPassed = queryFilterContractDetails?.passed ?? true;
+    const queryExportSummary = document.querySelector(".query-export-panel:not([open]) > .query-export-summary");
+    const queryExportSummaryHeight = queryExportSummary instanceof HTMLElement
+      ? queryExportSummary.getBoundingClientRect().height
+      : null;
+    const queryExportSummaryCompact = queryExportSummaryHeight === null || queryExportSummaryHeight <= 36;
     const contractStyle = (name) => {
       const element = document.querySelector('[data-style-contract="' + name + '"]');
       return element ? getComputedStyle(element) : null;
@@ -347,6 +352,8 @@ function buildAuditExpression(isMobile) {
       invoicePartyGridContractPassed,
       queryFilterContractPassed,
       queryFilterContractDetails,
+      queryExportSummaryHeight,
+      queryExportSummaryCompact,
       globalStyleContractPassed,
       globalStyleContractDetails,
       narrowWorkspaceMediaMatched: matchMedia("(max-width: 860px)").matches,

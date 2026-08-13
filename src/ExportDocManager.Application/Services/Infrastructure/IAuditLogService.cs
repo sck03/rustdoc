@@ -12,8 +12,8 @@ namespace ExportDocManager.Services.Infrastructure
         public string? EntityName { get; set; }
         public string? Action { get; set; }
         public string? UserId { get; set; }
-        public DateTime? StartTime { get; set; }
-        public DateTime? EndTime { get; set; }
+        public DateTimeOffset? StartTime { get; set; }
+        public DateTimeOffset? EndTime { get; set; }
         public string? Keyword { get; set; }
     }
 
@@ -37,8 +37,20 @@ namespace ExportDocManager.Services.Infrastructure
             int maxCount = 50000,
             CancellationToken cancellationToken = default);
         Task<int> DeleteOlderThanAsync(
-            DateTime cutoffUtc,
+            DateTimeOffset cutoffUtc,
             int maxCount = 200000,
+            CancellationToken cancellationToken = default);
+    }
+
+    public interface IAuditLogExcelExporter
+    {
+        Task ExportAsync(
+            IReadOnlyList<AuditLog> rows,
+            string destinationPath,
+            CancellationToken cancellationToken = default);
+
+        Task<byte[]> ExportBytesAsync(
+            IReadOnlyList<AuditLog> rows,
             CancellationToken cancellationToken = default);
     }
 }

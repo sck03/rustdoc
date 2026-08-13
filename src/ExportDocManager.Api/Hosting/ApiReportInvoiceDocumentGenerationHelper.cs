@@ -38,7 +38,7 @@ namespace ExportDocManager.Api.Hosting
 
             string invoiceNo = invoice.InvoiceNo ?? $"Invoice_{invoiceId}";
             string customerName = invoice.CustomerNameEN ?? string.Empty;
-            var exportDate = DateTime.Now;
+            var exportDate = DateOnly.FromDateTime(DateTime.Today);
             var generatedFiles = new List<string>();
             var entries = new List<ApiInvoiceGeneratedDocumentEntry>();
             int renderProgressRange = Math.Max(1, endProgress - startProgress - 12);
@@ -113,7 +113,7 @@ namespace ExportDocManager.Api.Hosting
                 string invoiceNo,
                 string customerName,
                 int customerId,
-                DateTime exportDate,
+                DateOnly exportDate,
                 IReadOnlyList<string> generatedFiles,
                 IReadOnlyList<ApiInvoiceGeneratedDocumentEntry> entries)
             {
@@ -131,7 +131,7 @@ namespace ExportDocManager.Api.Hosting
 
             public int CustomerId { get; }
 
-            public DateTime ExportDate { get; }
+            public DateOnly ExportDate { get; }
 
             public IReadOnlyList<string> GeneratedFiles { get; }
 

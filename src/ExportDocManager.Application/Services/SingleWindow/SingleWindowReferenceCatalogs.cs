@@ -1,35 +1,27 @@
-using System.Threading;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.ViewModels;
 
 namespace ExportDocManager.Services.SingleWindow
 {
-    public static class SingleWindowReferenceCatalogs
+    public sealed class SingleWindowReferenceCatalogs
     {
-        private static Func<SingleWindowReferenceCatalogModel>? _referenceCatalogSnapshotLoader;
-        private static Lazy<IReadOnlyList<SelectionOption<string>>> _acdTradeModeOptionsHolder = new(BuildAcdTradeModeOptions);
-        private static Lazy<IReadOnlyList<SelectionOption<string>>> _acdCountryOptionsHolder = new(BuildAcdCountryOptions);
+        private readonly IReadOnlyList<SelectionOption<string>> _acdTradeModeOptions;
+        private readonly IReadOnlyList<SelectionOption<string>> _acdCountryOptions;
 
-        public static void ConfigureReferenceCatalogSnapshotLoader(Func<SingleWindowReferenceCatalogModel> loader)
+        public SingleWindowReferenceCatalogs(SingleWindowReferenceCatalogModel? catalog = null)
         {
-            ArgumentNullException.ThrowIfNull(loader);
-            Volatile.Write(ref _referenceCatalogSnapshotLoader, loader);
-            Reload();
+            catalog ??= new SingleWindowReferenceCatalogModel();
+            _acdTradeModeOptions = BuildAcdTradeModeOptions(catalog);
+            _acdCountryOptions = BuildAcdCountryOptions(catalog);
         }
 
-        public static IReadOnlyList<SelectionOption<string>> GetAcdTradeModeOptions() => _acdTradeModeOptionsHolder.Value;
+        public IReadOnlyList<SelectionOption<string>> GetAcdTradeModeOptions() => _acdTradeModeOptions;
 
-        public static IReadOnlyList<SelectionOption<string>> GetAcdCountryOptions() => _acdCountryOptionsHolder.Value;
+        public IReadOnlyList<SelectionOption<string>> GetAcdCountryOptions() => _acdCountryOptions;
 
-        public static void Reload()
+        private static IReadOnlyList<SelectionOption<string>> BuildAcdTradeModeOptions(
+            SingleWindowReferenceCatalogModel catalog)
         {
-            ResetLazy(ref _acdTradeModeOptionsHolder, BuildAcdTradeModeOptions);
-            ResetLazy(ref _acdCountryOptionsHolder, BuildAcdCountryOptions);
-        }
-
-        private static IReadOnlyList<SelectionOption<string>> BuildAcdTradeModeOptions()
-        {
-            var catalog = LoadReferenceCatalogSnapshot();
             var source = catalog.AcdTradeModes?.Count > 0
                 ? catalog.AcdTradeModes
                 : BuildFallbackCatalog().AcdTradeModes;
@@ -46,9 +38,9 @@ namespace ExportDocManager.Services.SingleWindow
                 .ToList();
         }
 
-        private static IReadOnlyList<SelectionOption<string>> BuildAcdCountryOptions()
+        private static IReadOnlyList<SelectionOption<string>> BuildAcdCountryOptions(
+            SingleWindowReferenceCatalogModel catalog)
         {
-            var catalog = LoadReferenceCatalogSnapshot();
             var source = catalog.AcdCountries?.Count > 0
                 ? catalog.AcdCountries
                 : BuildFallbackCatalog().AcdCountries;
@@ -62,19 +54,6 @@ namespace ExportDocManager.Services.SingleWindow
                     (string.IsNullOrWhiteSpace(item.EnglishName) ? string.Empty : $" / {item.EnglishName.Trim()}")))
                 .Prepend(new SelectionOption<string>(string.Empty, string.Empty))
                 .ToList();
-        }
-
-        private static SingleWindowReferenceCatalogModel LoadReferenceCatalogSnapshot()
-        {
-            try
-            {
-                var loader = Volatile.Read(ref _referenceCatalogSnapshotLoader);
-                return loader?.Invoke() ?? BuildFallbackCatalog();
-            }
-            catch
-            {
-                return BuildFallbackCatalog();
-            }
         }
 
         private static SingleWindowReferenceCatalogModel BuildFallbackCatalog()
@@ -137,11 +116,5 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        private static void ResetLazy(
-            ref Lazy<IReadOnlyList<SelectionOption<string>>> holder,
-            Func<IReadOnlyList<SelectionOption<string>>> factory)
-        {
-            holder = new Lazy<IReadOnlyList<SelectionOption<string>>>(factory);
-        }
     }
 }

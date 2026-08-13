@@ -156,7 +156,7 @@ namespace ExportDocManager.Api.Tests
             decimal taxRebateRate,
             string type = "实际数据")
         {
-            var invoiceDate = DateTime.Today;
+            var invoiceDate = DateOnly.FromDateTime(DateTime.Today);
             var response = await client.PostAsJsonAsync(
                 "/api/invoices",
                 new ApiInvoiceDetailDto

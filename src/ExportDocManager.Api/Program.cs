@@ -16,23 +16,15 @@ var pathProvider = string.IsNullOrWhiteSpace(runtimeOptions.DataRoot)
 // Validate the complete existing path chain before any runtime directory,
 // recovery marker, cache file or database setting can be created.
 ApiStartupValidator.PrepareRuntimeDirectories(pathProvider);
-DbHelper.ConfigurePathProvider(pathProvider);
 // ASP.NET Core form buffering otherwise falls back to the process/system temp
 // directory for multipart requests.  Keep that transient data under the same
 // runtime root as uploads, browser profiles and other disposable caches.
 string aspNetTempRoot = Path.Combine(pathProvider.CacheRoot, "AspNetTemp");
 Directory.CreateDirectory(aspNetTempRoot);
 Environment.SetEnvironmentVariable("ASPNETCORE_TEMP", aspNetTempRoot);
-if (args.Any(value => string.Equals(value, "--verify-ocr-runtime", StringComparison.OrdinalIgnoreCase)))
-{
-    var verification = await OcrRuntimeVerifier.VerifyAsync(pathProvider);
-    Console.WriteLine($"PP-OCRv6 verification passed. Platform={verification.Platform}; Engine={verification.Engine}; Text={verification.RecognizedText}");
-    return;
-}
-
 await ServerMigrationRecoveryStateMachine.ApplyAsync(pathProvider);
 SingleWindowDisasterRecoveryManager.ApplyPendingRestore(pathProvider);
-var databaseSettings = DbHelper.LoadDatabaseSettings();
+var databaseSettings = DbHelper.LoadDatabaseSettings(pathProvider);
 ApiStartupValidator.Validate(pathProvider, databaseSettings, runtimeOptions);
 
 var builder = WebApplication.CreateBuilder(args);
@@ -49,6 +41,14 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 builder.Services.AddExportDocManagerApiServices(pathProvider, databaseSettings, runtimeOptions);
 
 await using var app = builder.Build();
+if (args.Any(value => string.Equals(value, "--verify-ocr-runtime", StringComparison.OrdinalIgnoreCase)))
+{
+    var verifier = app.Services.GetService<IOcrRuntimeVerifier>()
+        ?? throw new InvalidOperationException("当前发布包未包含 PDF/OCR 能力模块。");
+    var verification = await verifier.VerifyAsync();
+    Console.WriteLine($"PP-OCRv6 verification passed. Platform={verification.Platform}; Engine={verification.Engine}; Text={verification.RecognizedText}");
+    return;
+}
 if (args.Any(value => string.Equals(value, "--verify-browser-runtime", StringComparison.OrdinalIgnoreCase)))
 {
     await VerifyBrowserRuntimeAsync(app.Services, pathProvider);
@@ -59,6 +59,10 @@ app.UseExportDocManagerForwardedHeaders(runtimeOptions);
 app.UseExportDocManagerApiSafety();
 app.UseCors(ApiCorsPolicy.LocalFrontendPolicyName);
 app.UseExportDocManagerReadiness(databaseSettings, runtimeOptions);
+// Endpoint access metadata must be available to the cross-cutting middleware
+// and to the endpoint itself.  Route selection therefore intentionally occurs
+// before authentication/license/workspace policy evaluation.
+app.UseRouting();
 app.UseExportDocManagerDesktopAccess();
 app.UseExportDocManagerApiAuthentication();
 app.UseExportDocManagerWorkspaceAccess();

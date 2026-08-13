@@ -25,7 +25,6 @@ namespace ExportDocManager.Infrastructure.Tests
                 Directory.CreateDirectory(paths.DatabaseRoot);
                 Directory.CreateDirectory(paths.ConfigRoot);
                 Directory.CreateDirectory(paths.SecurityRoot);
-                DbHelper.ConfigurePathProvider(paths);
                 var settings = new DatabaseConnectionSettings
                 {
                     Provider = DatabaseConnectionSettings.SqliteProvider,
@@ -90,7 +89,6 @@ namespace ExportDocManager.Infrastructure.Tests
             finally
             {
                 SqliteConnection.ClearAllPools();
-                DbHelper.ConfigurePathProvider(new RuntimeAppPathProvider());
                 if (Directory.Exists(root))
                 {
                     Directory.Delete(root, recursive: true);

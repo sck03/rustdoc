@@ -19,7 +19,7 @@ namespace ExportDocManager.Services.Security
             await MirrorMachineSeedAsync(seed, cancellationToken).ConfigureAwait(false);
 
             string deviceFingerprint = _deviceFingerprintProvider() ?? string.Empty;
-            string deviceFingerprintHash = SecurityHelper.ComputeHash($"device-v{DeviceBindingVersion}|{deviceFingerprint}");
+            string deviceFingerprintHash = ComputeSha256($"device-v{DeviceBindingVersion}|{deviceFingerprint}");
             string localBindingSecret = _localBindingSecretProvider != null
                 ? _localBindingSecretProvider() ?? string.Empty
                 : anchor.LocalBindingSecret ?? string.Empty;
@@ -29,10 +29,13 @@ namespace ExportDocManager.Services.Security
                 await MirrorLocalBindingSecretFileAsync(localBindingSecret, cancellationToken).ConfigureAwait(false);
             }
 
-            string localBindingSecretHash = SecurityHelper.ComputeHash($"local-binding-v{DeviceBindingVersion}|{localBindingSecret}");
-            string machineId = SecurityHelper.ComputeHash($"license-v{DeviceBindingVersion}|{seed}|{deviceFingerprintHash}|{localBindingSecretHash}");
+            string localBindingSecretHash = ComputeSha256($"local-binding-v{DeviceBindingVersion}|{localBindingSecret}");
+            string machineId = ComputeSha256($"license-v{DeviceBindingVersion}|{seed}|{deviceFingerprintHash}|{localBindingSecretHash}");
             return new RuntimeLicenseIdentity(machineId, deviceFingerprintHash, localBindingSecretHash);
         }
+
+        private static string ComputeSha256(string value) =>
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
         private async Task MirrorMachineSeedAsync(
             string seed,
@@ -60,7 +63,7 @@ namespace ExportDocManager.Services.Security
         }
 
         private async Task<RuntimeLicenseAnchorData> ReadOrCreateMachineAnchorAsync(
-            DateTime now,
+            DateOnly now,
             CancellationToken cancellationToken)
         {
             RuntimeLicenseAnchorData? anchor = await LoadMachineAnchorAsync(cancellationToken)
@@ -225,19 +228,19 @@ namespace ExportDocManager.Services.Security
             }
         }
 
-        private static DateTime NormalizeAnchorDate(DateTime value, DateTime fallback)
+        private static DateOnly NormalizeAnchorDate(DateOnly value, DateOnly fallback)
         {
             return value == default ? fallback : value;
         }
 
-        private static DateTime MaxDate(DateTime first, DateTime second)
+        private static DateOnly MaxDate(DateOnly first, DateOnly second)
         {
             return first >= second ? first : second;
         }
 
-        private static bool ShouldAdvancePersistedLastRunDate(DateTime lastRunDate, DateTime now)
+        private static bool ShouldAdvancePersistedLastRunDate(DateOnly lastRunDate, DateOnly now)
         {
-            return lastRunDate == default || now.Date > lastRunDate.Date;
+            return lastRunDate == default || now > lastRunDate;
         }
 
         private static async Task<bool> FileTextEqualsAsync(
@@ -293,7 +296,7 @@ namespace ExportDocManager.Services.Security
         private static bool SetAnchorRegistration(
             RuntimeLicenseAnchorData anchor,
             string licenseKey,
-            DateTime expireDate)
+            DateOnly expireDate)
         {
             string normalizedKey = LicenseValueNormalizer.NormalizeLicenseKey(licenseKey);
             if (string.Equals(anchor.LicenseKey, normalizedKey, StringComparison.OrdinalIgnoreCase) &&

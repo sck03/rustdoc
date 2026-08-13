@@ -19,7 +19,7 @@ namespace ExportDocManager.Models.Entities
 
         public bool IsActive { get; set; } = true;
 
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
         public List<PermissionTemplateModule> Modules { get; set; } = [];
     }

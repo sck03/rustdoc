@@ -163,7 +163,7 @@ namespace ExportDocManager.Services.Core
 
             if (options.ResetDates || !options.CopyHeader)
             {
-                var today = DateTime.Now;
+                var today = DateOnly.FromDateTime(DateTime.Today);
                 newInvoice.InvoiceDate = today;
                 newInvoice.ShipmentDate = today;
             }

@@ -52,7 +52,7 @@ namespace ExportDocManager.Services.Security
                 };
             }
 
-            var now = DateTime.Now;
+            var now = DateOnly.FromDateTime(DateTime.Today);
             var anchor = await ReadOrCreateMachineAnchorAsync(now, cancellationToken).ConfigureAwait(false);
             var identity = await GetLicenseIdentityAsync(anchor, cancellationToken).ConfigureAwait(false);
             var machineId = identity.MachineId;
@@ -61,7 +61,7 @@ namespace ExportDocManager.Services.Security
             if (!_signatureVerifier.TryValidate(
                     machineId,
                     normalizedKey,
-                    out DateTime expireDate))
+                    out DateOnly expireDate))
             {
                 return new LicenseRegistrationResult
                 {

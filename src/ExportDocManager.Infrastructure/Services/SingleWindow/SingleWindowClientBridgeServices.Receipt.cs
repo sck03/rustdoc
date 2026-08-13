@@ -149,15 +149,10 @@ namespace ExportDocManager.Services.SingleWindow
 
             if (batch.LastClientDispatchAt.HasValue)
             {
-                DateTime dispatchAt = batch.LastClientDispatchAt.Value;
-                DateTime dispatchAtUtc = dispatchAt.Kind switch
-                {
-                    DateTimeKind.Utc => dispatchAt,
-                    DateTimeKind.Local => dispatchAt.ToUniversalTime(),
-                    _ => DateTime.SpecifyKind(dispatchAt, DateTimeKind.Utc)
-                };
-                DateTime earliestExpectedWriteUtc = dispatchAtUtc.AddMinutes(-5);
-                if (File.GetLastWriteTimeUtc(path) < earliestExpectedWriteUtc)
+                DateTimeOffset earliestExpectedWriteUtc = batch.LastClientDispatchAt.Value
+                    .ToUniversalTime()
+                    .AddMinutes(-5);
+                if (File.GetLastWriteTimeUtc(path) < earliestExpectedWriteUtc.UtcDateTime)
                 {
                     return 0;
                 }

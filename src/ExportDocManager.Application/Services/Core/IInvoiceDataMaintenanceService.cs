@@ -8,7 +8,7 @@ namespace ExportDocManager.Services.Core
         string Type,
         string Status,
         string StatusDisplayName,
-        DateTime InvoiceDate,
+        DateOnly InvoiceDate,
         string CustomerName,
         bool CanPurge,
         string Guidance,

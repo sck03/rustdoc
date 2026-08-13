@@ -13,6 +13,7 @@ namespace ExportDocManager.Services.MasterData
             customer.NotifyPartyName = TextSearchHelper.NormalizeValue(customer.NotifyPartyName);
             customer.AddressEN = TextSearchHelper.NormalizeValue(customer.AddressEN);
             customer.NotifyPartyAddress = TextSearchHelper.NormalizeValue(customer.NotifyPartyAddress);
+            NotifyPartyModePolicy.Normalize(customer);
             customer.ContactPerson = TextSearchHelper.NormalizeValue(customer.ContactPerson);
             customer.Phone = TextSearchHelper.NormalizeValue(customer.Phone);
             customer.Email = TextSearchHelper.NormalizeValue(customer.Email);

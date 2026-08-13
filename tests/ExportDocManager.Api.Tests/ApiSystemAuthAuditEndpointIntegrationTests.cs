@@ -85,10 +85,10 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("/api/system/license", openApiJson, StringComparison.Ordinal);
 
             var anonymousUpdateResponse = await anonymousClient.GetAsync("/api/system/update");
-            Assert.Equal(HttpStatusCode.Unauthorized, anonymousUpdateResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, anonymousUpdateResponse.StatusCode);
 
             var anonymousStageUpdateResponse = await anonymousClient.PostAsync("/api/system/update/stage", content: null);
-            Assert.Equal(HttpStatusCode.Unauthorized, anonymousStageUpdateResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, anonymousStageUpdateResponse.StatusCode);
 
             var anonymousLicenseResponse = await anonymousClient.GetAsync("/api/system/license");
             Assert.Equal(HttpStatusCode.Unauthorized, anonymousLicenseResponse.StatusCode);
@@ -251,8 +251,8 @@ namespace ExportDocManager.Api.Tests
             var anchor = await anchorStore.LoadAsync()
                 ?? throw new InvalidOperationException("测试授权锚点尚未创建。");
 
-            anchor.InstallDate = DateTime.Now.AddDays(-8);
-            anchor.LastRunDate = DateTime.Now;
+            anchor.InstallDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-8));
+            anchor.LastRunDate = DateOnly.FromDateTime(DateTime.Today);
             anchor.LicenseKey = string.Empty;
             anchor.LicenseExpireDate = default;
             await anchorStore.SaveAsync(anchor);

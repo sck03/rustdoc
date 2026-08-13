@@ -68,7 +68,7 @@ namespace ExportDocManager.Api.Hosting
                 request.InstanceCount,
                 request.SummaryUrl ?? string.Empty,
                 string.IsNullOrWhiteSpace(request.EvidenceUrl) ? request.DetailUrl ?? string.Empty : request.EvidenceUrl,
-                request.ObservedAt.HasValue ? new DateTimeOffset(request.ObservedAt.Value) : DateTimeOffset.UtcNow);
+                request.ObservedAt ?? DateTimeOffset.UtcNow);
             var evidence = await hsCodeService.FetchRemoteDetailEvidenceAsync(record, cancellationToken);
             await knowledgeService.CaptureRemoteDetailEvidenceAsync(request.Name, evidence, cancellationToken);
 

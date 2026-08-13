@@ -117,8 +117,8 @@ namespace ExportDocManager.Services.Infrastructure
                 file.Name,
                 file.FullName,
                 file.Exists ? file.Length : 0,
-                file.CreationTime,
-                file.LastWriteTime);
+                new DateTimeOffset(file.CreationTime),
+                new DateTimeOffset(file.LastWriteTime));
         }
 
         private string EnsureDirectory(string path)

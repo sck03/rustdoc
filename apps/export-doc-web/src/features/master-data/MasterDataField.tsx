@@ -1,4 +1,4 @@
-import { EditableComboField,NumberField,TextAreaField,TextField } from "../../ui/FormFields.tsx";
+import { EditableComboField,NumberField,SelectField,TextAreaField,TextField } from "../../ui/FormFields.tsx";
 import type { CustomOptionMap } from "../custom-options/customOptionModel.ts";
 import { getCustomOptions } from "../custom-options/customOptionModel.ts";
 import {
@@ -51,6 +51,20 @@ export function MasterDataField({
   pathActionTitle?: string;
 }) {
   const disabled = Boolean(field.readOnlyOnEdit && isEdit);
+
+  if (field.options) {
+    return (
+      <SelectField
+        className={field.className}
+        disabled={disabled}
+        label={field.label}
+        includeEmptyOption={false}
+        value={readString(record, field.name)}
+        options={field.options}
+        onChange={onChange}
+      />
+    );
+  }
 
   if (field.type === "number") {
     return (

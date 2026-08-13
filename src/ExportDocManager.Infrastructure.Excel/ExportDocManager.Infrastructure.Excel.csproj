@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>ExportDocManager.Infrastructure.Excel</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" />
+    <PackageReference Include="ExcelDataReader" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\ExportDocManager.Application\ExportDocManager.Application.csproj" />
+    <ProjectReference Include="..\ExportDocManager.Domain\ExportDocManager.Domain.csproj" />
+    <ProjectReference Include="..\ExportDocManager.Infrastructure\ExportDocManager.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

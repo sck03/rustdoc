@@ -155,7 +155,7 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        private static void EnsureDate(DateTime value, string label)
+        private static void EnsureDate(DateOnly value, string label)
         {
             if (value == default || value.Year is < 1900 or > 2100)
             {
@@ -163,7 +163,7 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        private static void EnsureOptionalDate(DateTime? value, string label)
+        private static void EnsureOptionalDate(DateOnly? value, string label)
         {
             if (value.HasValue)
             {

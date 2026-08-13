@@ -8,7 +8,7 @@ namespace ExportDocManager.Api.Hosting
         int Id,
         string InvoiceNo,
         string ContractNo,
-        DateTime InvoiceDate,
+        DateOnly InvoiceDate,
         string CustomerName,
         string ExporterName,
         string DestinationCountry,
@@ -27,7 +27,7 @@ namespace ExportDocManager.Api.Hosting
         public string CompanyScope { get; init; } = string.Empty;
         public string InvoiceNo { get; init; } = string.Empty;
         public string ContractNo { get; init; } = string.Empty;
-        public DateTime InvoiceDate { get; init; }
+        public DateOnly InvoiceDate { get; init; }
         public string LetterOfCreditNo { get; init; } = string.Empty;
         public string LetterOfCreditSourcePath { get; init; } = string.Empty;
         public string LetterOfCreditContent { get; init; } = string.Empty;
@@ -47,7 +47,7 @@ namespace ExportDocManager.Api.Hosting
         public string ShippingMarksImage { get; init; } = string.Empty;
         public string TradeTerms { get; init; } = string.Empty;
         public string TransportMode { get; init; } = string.Empty;
-        public DateTime ShipmentDate { get; init; }
+        public DateOnly ShipmentDate { get; init; }
         public int ExporterId { get; init; }
         public int CustomerId { get; init; }
         public decimal TotalCartons { get; init; }
@@ -65,6 +65,7 @@ namespace ExportDocManager.Api.Hosting
         public string SupervisionMode { get; init; } = string.Empty;
         public string CustomerNameEN { get; init; } = string.Empty;
         public string CustomerAddressEN { get; init; } = string.Empty;
+        public NotifyPartyMode NotifyPartyMode { get; init; }
         public string NotifyPartyName { get; init; } = string.Empty;
         public string NotifyPartyAddress { get; init; } = string.Empty;
         public string ExporterNameEN { get; init; } = string.Empty;
@@ -171,7 +172,7 @@ namespace ExportDocManager.Api.Hosting
         string Note,
         int? ChangedByUserId,
         string ChangedByUsername,
-        DateTime ChangedAt);
+        DateTimeOffset ChangedAt);
 
     public sealed class ApiShippingMarkImageSaveRequest
     {

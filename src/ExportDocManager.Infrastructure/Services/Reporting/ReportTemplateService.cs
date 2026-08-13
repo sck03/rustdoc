@@ -502,8 +502,8 @@ namespace ExportDocManager.Services.Reporting
             {
                 Id = 1001,
                 InvoiceNo = "PREVIEW-INTERNAL-001",
-                PaymentDate = DateTime.Today,
-                ShipmentDate = DateTime.Today.AddDays(-3),
+                PaymentDate = DateOnly.FromDateTime(DateTime.Today),
+                ShipmentDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-3)),
                 PayerName = "示例付款单位",
                 PayeeName = payee.Name,
                 PaymentMethod = "Bank Transfer",
@@ -524,8 +524,8 @@ namespace ExportDocManager.Services.Reporting
             {
                 InvoiceNo = "PREVIEW-EXPORT-001",
                 ContractNo = "CN-2026-001",
-                InvoiceDate = DateTime.Today,
-                ShipmentDate = DateTime.Today.AddDays(10),
+                InvoiceDate = DateOnly.FromDateTime(DateTime.Today),
+                ShipmentDate = DateOnly.FromDateTime(DateTime.Today.AddDays(10)),
                 CustomerNameEN = "SAMPLE CUSTOMER LTD.",
                 ExporterNameEN = "SAMPLE EXPORTER CO., LTD.",
                 PortOfLoading = "NINGBO",

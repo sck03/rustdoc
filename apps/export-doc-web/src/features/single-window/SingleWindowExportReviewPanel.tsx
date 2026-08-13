@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckSquare, RefreshCw } from "lucide-react";
 import {
   SingleWindowEditorNavigationTarget,
+  SingleWindowExportIssueSeverity,
   SingleWindowExportIssueGroup,
   SingleWindowExportReview,
 } from "../../api/index.ts";
@@ -225,24 +226,24 @@ function formatNavigationTarget(target?: SingleWindowEditorNavigationTarget) {
   return target.goodsLineNo > 0 ? `第 ${target.goodsLineNo} 行 · ${field}` : field || "-";
 }
 
-function formatSeverity(severity: number) {
-  if (severity >= 2) {
+function formatSeverity(severity: SingleWindowExportIssueSeverity) {
+  if (severity === "Error") {
     return "错误";
   }
 
-  if (severity === 1) {
+  if (severity === "Warning") {
     return "警告";
   }
 
   return "提示";
 }
 
-function formatSeverityKey(severity: number) {
-  if (severity >= 2) {
+function formatSeverityKey(severity: SingleWindowExportIssueSeverity) {
+  if (severity === "Error") {
     return "error";
   }
 
-  if (severity === 1) {
+  if (severity === "Warning") {
     return "warning";
   }
 

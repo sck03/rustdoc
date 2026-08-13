@@ -12,6 +12,9 @@ import {
 customerTextFields,
 encodeRouteId,
 exporterTextFields,
+applyCustomerFieldChange,
+isSeparateNotifyParty,
+normalizeCustomerRecord,
 normalizeHsCodeRecord,
 normalizeProductRecord,
 normalizeTextFields,
@@ -48,7 +51,12 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
         title: "基础信息",
         fields: [
           { name: "customerNameEN", label: "客户英文名", required: true, className: "field-grid-span-2" },
-          { name: "notifyPartyName", label: "通知人" },
+          { name: "notifyPartyMode", label: "通知人方式", options: [
+            { value: "None", label: "无通知人" },
+            { value: "SameAsConsignee", label: "同收货人" },
+            { value: "Separate", label: "独立通知人" },
+          ] },
+          { name: "notifyPartyName", label: "独立通知人名称", visibleWhen: isSeparateNotifyParty },
           { name: "contactPerson", label: "联系人" },
           { name: "phone", label: "电话" },
           { name: "email", label: "邮箱" },
@@ -59,7 +67,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
         title: "地址和备注",
         fields: [
           { name: "addressEN", label: "客户地址", type: "textarea", className: "field-grid-span-2" },
-          { name: "notifyPartyAddress", label: "通知人地址", type: "textarea", className: "field-grid-span-2" },
+          { name: "notifyPartyAddress", label: "独立通知人地址", type: "textarea", className: "field-grid-span-2", visibleWhen: isSeparateNotifyParty },
           { name: "notes", label: "备注", type: "textarea", className: "field-grid-span-2" },
         ],
       },
@@ -68,6 +76,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       id: 0,
       customerNameEN: "",
       displayName: "",
+      notifyPartyMode: "None",
       notifyPartyName: "",
       addressEN: "",
       notifyPartyAddress: "",
@@ -78,7 +87,8 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       notes: "",
       rowVersion: "",
     }),
-    normalizeRecord: (record, id) => normalizeTextFields(record, id, customerTextFields),
+    applyFieldChange: applyCustomerFieldChange,
+    normalizeRecord: normalizeCustomerRecord,
     list: async (client, request, signal) =>
       toMasterDataPage(await client.listCustomersPage({
         keyword: request.keyword || undefined,

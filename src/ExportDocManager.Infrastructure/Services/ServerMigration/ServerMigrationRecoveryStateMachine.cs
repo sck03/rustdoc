@@ -114,7 +114,7 @@ public static partial class ServerMigrationRecoveryStateMachine
             }
             ValidateStagedManifest(stagingRoot, marker.Manifest);
             ValidateMasterKeyCompatibility(stagingRoot, marker.Manifest);
-            applicationSettings = DbHelper.LoadDatabaseSettings();
+            applicationSettings = DbHelper.LoadDatabaseSettings(pathProvider);
             if (!DatabaseModeHelper.UsesSharedDatabase(applicationSettings))
             {
                 throw new ServiceValidationException(
@@ -272,7 +272,7 @@ public static partial class ServerMigrationRecoveryStateMachine
         PostgreSqlToolPaths? tools = null;
         try
         {
-            DatabaseConnectionSettings applicationSettings = DbHelper.LoadDatabaseSettings();
+            DatabaseConnectionSettings applicationSettings = DbHelper.LoadDatabaseSettings(pathProvider);
             settings = PostgreSqlMaintenanceConnectionResolver.Resolve(
                 applicationSettings,
                 pathProvider).ConnectionSettings;

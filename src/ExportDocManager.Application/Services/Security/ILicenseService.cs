@@ -17,7 +17,7 @@ namespace ExportDocManager.Services.Security
         public int DaysRemaining { get; init; }
         public string MachineId { get; init; } = string.Empty;
         public string Message { get; init; } = string.Empty;
-        public DateTime ExpireDate { get; init; }
+        public DateOnly ExpireDate { get; init; }
         public string LicenseStoragePath { get; init; } = string.Empty;
         public string StoragePolicy { get; init; } = string.Empty;
     }

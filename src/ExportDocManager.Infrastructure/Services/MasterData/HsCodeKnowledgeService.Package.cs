@@ -21,7 +21,7 @@ namespace ExportDocManager.Services.MasterData
             }
 
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            DateTime? sinceUtc = since?.UtcDateTime;
+            DateTimeOffset? sinceUtc = since?.ToUniversalTime();
 
             await using (var boundedOutput = new MaximumLengthWriteStream(
                              destination,

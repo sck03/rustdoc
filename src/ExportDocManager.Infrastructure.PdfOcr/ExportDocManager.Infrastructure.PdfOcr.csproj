@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>ExportDocManager.Infrastructure.PdfOcr</RootNamespace>
+    <ExportDocIncludeOcrRuntime Condition="'$(ExportDocIncludeOcrRuntime)' == ''">true</ExportDocIncludeOcrRuntime>
+    <_ExportDocOnnxRuntimeDirectory Condition="'$(_ExportDocOnnxRuntimeFile)' != ''">$([System.IO.Path]::Combine('$(PkgMicrosoft_ML_OnnxRuntime)', 'runtimes', '$(RuntimeIdentifier)', 'native'))</_ExportDocOnnxRuntimeDirectory>
+    <_ExportDocOnnxRuntimeSource Condition="'$(_ExportDocOnnxRuntimeFile)' != ''">$([System.IO.Path]::Combine('$(_ExportDocOnnxRuntimeDirectory)', '$(_ExportDocOnnxRuntimeFile)'))</_ExportDocOnnxRuntimeSource>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" GeneratePathProperty="true" ExcludeAssets="compile;runtime" PrivateAssets="all" />
+    <PackageReference Include="PDFsharp" />
+    <PackageReference Include="PDFtoImage" />
+    <PackageReference Include="PdfPig" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ExportDocIncludeOcrRuntime)' == 'true' and Exists('$(_ExportDocOnnxRuntimeSource)')">
+    <None Include="$(_ExportDocOnnxRuntimeSource)" Link="$(_ExportDocOnnxRuntimeFile)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\ExportDocManager.Application\ExportDocManager.Application.csproj" />
+    <ProjectReference Include="..\ExportDocManager.Domain\ExportDocManager.Domain.csproj" />
+    <ProjectReference Include="..\ExportDocManager.Infrastructure\ExportDocManager.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

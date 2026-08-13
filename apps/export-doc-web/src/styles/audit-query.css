@@ -473,11 +473,12 @@
 
 .query-export-summary {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
-  min-height: 44px;
-  padding: 12px 16px;
+  min-height: 32px;
+  padding: 5px 12px;
   color: var(--edm-ink-800);
+  font-size: var(--edm-font-size-sm);
   font-weight: 750;
   cursor: pointer;
   list-style: none;
@@ -492,7 +493,7 @@
   content: "›";
   flex: 0 0 auto;
   color: var(--edm-ink-500);
-  font-size: 20px;
+  font-size: 17px;
   line-height: 1;
   transform: rotate(0deg);
   transition: transform 140ms ease;

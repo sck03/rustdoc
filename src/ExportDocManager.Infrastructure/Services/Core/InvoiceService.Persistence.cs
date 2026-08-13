@@ -346,7 +346,7 @@ namespace ExportDocManager.Services.Core
                 Note = note,
                 ChangedByUserId = currentUser?.Id > 0 ? currentUser.Id : null,
                 ChangedByUsername = currentUser?.Username?.Trim() ?? string.Empty,
-                ChangedAt = DateTime.UtcNow
+                ChangedAt = DateTimeOffset.UtcNow
             }, cancellationToken);
         }
 
@@ -392,8 +392,6 @@ namespace ExportDocManager.Services.Core
                 {
                     invoice.CustomerNameEN = PreferExistingValue(invoice.CustomerNameEN, customer.CustomerNameEN);
                     invoice.CustomerAddressEN = PreferExistingValue(invoice.CustomerAddressEN, customer.AddressEN);
-                    invoice.NotifyPartyName = PreferExistingValue(invoice.NotifyPartyName, customer.NotifyPartyName);
-                    invoice.NotifyPartyAddress = PreferExistingValue(invoice.NotifyPartyAddress, customer.NotifyPartyAddress);
                 }
             }
 
@@ -421,9 +419,7 @@ namespace ExportDocManager.Services.Core
         private static bool HasMissingCustomerSnapshot(Invoice invoice)
         {
             return string.IsNullOrWhiteSpace(invoice.CustomerNameEN) ||
-                   string.IsNullOrWhiteSpace(invoice.CustomerAddressEN) ||
-                   string.IsNullOrWhiteSpace(invoice.NotifyPartyName) ||
-                   string.IsNullOrWhiteSpace(invoice.NotifyPartyAddress);
+                   string.IsNullOrWhiteSpace(invoice.CustomerAddressEN);
         }
 
         private static bool HasMissingExporterSnapshot(Invoice invoice)
@@ -446,8 +442,14 @@ namespace ExportDocManager.Services.Core
 
         private static void NormalizeInvoiceDates(Invoice invoice)
         {
-            invoice.InvoiceDate = DateTimeValueHelper.NormalizeBusinessDate(invoice.InvoiceDate);
-            invoice.ShipmentDate = DateTimeValueHelper.NormalizeBusinessDate(invoice.ShipmentDate, invoice.InvoiceDate);
+            if (invoice.InvoiceDate == default)
+            {
+                invoice.InvoiceDate = DateOnly.FromDateTime(DateTime.Today);
+            }
+            if (invoice.ShipmentDate == default)
+            {
+                invoice.ShipmentDate = invoice.InvoiceDate;
+            }
         }
 
     }

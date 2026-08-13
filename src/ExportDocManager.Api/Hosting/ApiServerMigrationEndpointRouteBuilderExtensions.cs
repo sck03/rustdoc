@@ -189,6 +189,7 @@ namespace ExportDocManager.Api.Hosting
                         enableRangeProcessing: true);
             })
             .WithName("DownloadPostgreSqlPhysicalBackupWithTicket")
+            .WithApiAccess(false, true, false)
             .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status426UpgradeRequired);

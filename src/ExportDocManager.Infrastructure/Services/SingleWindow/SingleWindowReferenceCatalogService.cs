@@ -15,18 +15,15 @@ namespace ExportDocManager.Services.SingleWindow
         };
 
         private readonly IAppPathProvider _pathProvider;
+        private readonly SingleWindowReferenceCatalogSnapshotStore? _snapshotStore;
 
-        public SingleWindowReferenceCatalogService()
-            : this(new RuntimeAppPathProvider())
-        {
-        }
-
-        public SingleWindowReferenceCatalogService(IAppPathProvider pathProvider)
+        public SingleWindowReferenceCatalogService(
+            IAppPathProvider pathProvider,
+            SingleWindowReferenceCatalogSnapshotStore? snapshotStore = null)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            _snapshotStore = snapshotStore;
         }
-
-        public static event Action? ReferenceCatalogChanged;
 
         public async Task<SingleWindowReferenceCatalogModel> LoadEffectiveCatalogAsync(CancellationToken cancellationToken = default)
         {
@@ -47,7 +44,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
             string json = JsonSerializer.Serialize(NormalizeCatalog(catalog), JsonOptions);
             await AtomicFileHelper.WriteAllTextAtomicAsync(overridePath, json, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
-            OnReferenceCatalogChanged();
+            RefreshSnapshot();
         }
 
         public async Task ImportCatalogAsync(string filePath, CancellationToken cancellationToken = default)
@@ -84,7 +81,7 @@ namespace ExportDocManager.Services.SingleWindow
         {
             cancellationToken.ThrowIfCancellationRequested();
             AtomicFileHelper.TryDeleteFile(GetOverrideCatalogPath());
-            OnReferenceCatalogChanged();
+            RefreshSnapshot();
 
             return Task.CompletedTask;
         }
@@ -94,9 +91,25 @@ namespace ExportDocManager.Services.SingleWindow
             return GetOverrideCatalogPath(_pathProvider);
         }
 
-        public static SingleWindowReferenceCatalogModel LoadEffectiveCatalogSnapshot()
+        private void RefreshSnapshot()
         {
-            return LoadEffectiveCatalogSnapshot(new RuntimeAppPathProvider());
+            if (_snapshotStore == null)
+            {
+                return;
+            }
+
+            _snapshotStore.Replace(CreateSnapshot(_pathProvider));
+        }
+
+        public static SingleWindowReferenceCatalogSnapshot CreateSnapshot(IAppPathProvider pathProvider)
+        {
+            ArgumentNullException.ThrowIfNull(pathProvider);
+            var catalog = LoadEffectiveCatalogSnapshot(pathProvider);
+            var issuingAuthorities = CustomsCooIssuingAuthorityFileLoader.LoadEntriesFromFiles(
+                Path.Combine(pathProvider.ResourceRoot, "SingleWindow", "customs_coo_issuing_authorities.json"),
+                Path.Combine(pathProvider.ResourceRoot, "SingleWindow", "customs_coo_issuing_authorities.address_overrides.json"),
+                Path.Combine(pathProvider.SingleWindowRoot, "customs_coo_issuing_authorities.override.json"));
+            return new SingleWindowReferenceCatalogSnapshot(catalog, issuingAuthorities);
         }
 
         public static SingleWindowReferenceCatalogModel LoadEffectiveCatalogSnapshot(IAppPathProvider pathProvider)
@@ -276,9 +289,5 @@ namespace ExportDocManager.Services.SingleWindow
             return Path.Combine(pathProvider.SingleWindowRoot, "singlewindow_reference_catalogs.override.json");
         }
 
-        private static void OnReferenceCatalogChanged()
-        {
-            ReferenceCatalogChanged?.Invoke();
-        }
     }
 }

@@ -57,7 +57,7 @@ namespace ExportDocManager.Api.Tests
                         invoiceNo = "ANON-DRAFT",
                         payeeName = "Anonymous",
                         payerName = "Anonymous",
-                        paymentDate = new DateTime(2026, 6, 2)
+                        paymentDate = new DateOnly(2026, 6, 2)
                     }
                 });
             Assert.Equal(HttpStatusCode.Unauthorized, anonymousPaymentDraftPreviewResponse.StatusCode);
@@ -186,7 +186,7 @@ namespace ExportDocManager.Api.Tests
             var createPaymentResponse = await adminClient.PostAsJsonAsync("/api/payments", new
             {
                 invoiceNo = "PAY-RPT-001",
-                shipmentDate = new DateTime(2026, 6, 1),
+                shipmentDate = new DateOnly(2026, 6, 1),
                 payeeId = 0,
                 department = "Finance",
                 project = "Payment Reports",
@@ -198,11 +198,11 @@ namespace ExportDocManager.Api.Tests
                 bankName = "Bank",
                 accountNo = "ACC-REPORT",
                 notes = "Created from report endpoint test",
-                paymentDate = new DateTime(2026, 6, 2),
+                paymentDate = new DateOnly(2026, 6, 2),
                 goodsName = "Service",
                 quantity = "1",
                 shipmentCountry = "CN",
-                receiptDate = new DateTime(2026, 6, 3),
+                receiptDate = new DateOnly(2026, 6, 3),
                 travelExpense = 11.11m,
                 businessEntertainmentExpense = 0m,
                 telephoneExpense = 0m,
@@ -738,7 +738,7 @@ namespace ExportDocManager.Api.Tests
             var createPaymentResponse = await adminClient.PostAsJsonAsync("/api/payments", new
             {
                 invoiceNo = sharedReference,
-                shipmentDate = new DateTime(2026, 6, 1),
+                shipmentDate = new DateOnly(2026, 6, 1),
                 payeeId = 0,
                 department = "Finance",
                 project = "Domain Boundary",
@@ -750,11 +750,11 @@ namespace ExportDocManager.Api.Tests
                 bankName = "Boundary Bank",
                 accountNo = "BOUNDARY-ACCOUNT",
                 notes = "Payment created for report domain boundary verification.",
-                paymentDate = new DateTime(2026, 6, 2),
+                paymentDate = new DateOnly(2026, 6, 2),
                 goodsName = "Service",
                 quantity = "1",
                 shipmentCountry = "CN",
-                receiptDate = new DateTime(2026, 6, 3),
+                receiptDate = new DateOnly(2026, 6, 3),
                 travelExpense = 0m,
                 businessEntertainmentExpense = 0m,
                 telephoneExpense = 0m,
@@ -879,7 +879,7 @@ namespace ExportDocManager.Api.Tests
                     {
                         id = 0,
                         invoiceNo = sharedReference,
-                        shipmentDate = new DateTime(2026, 6, 1),
+                        shipmentDate = new DateOnly(2026, 6, 1),
                         payeeId = 0,
                         department = "Finance",
                         project = "Draft Domain Boundary",
@@ -891,11 +891,11 @@ namespace ExportDocManager.Api.Tests
                         bankName = "Draft Bank",
                         accountNo = "DRAFT-ACCOUNT",
                         notes = "Unsaved payment draft preview.",
-                        paymentDate = new DateTime(2026, 6, 2),
+                        paymentDate = new DateOnly(2026, 6, 2),
                         goodsName = "Draft Service",
                         quantity = "1",
                         shipmentCountry = "CN",
-                        receiptDate = new DateTime(2026, 6, 3),
+                        receiptDate = new DateOnly(2026, 6, 3),
                         travelExpense = 0m,
                         businessEntertainmentExpense = 0m,
                         telephoneExpense = 0m,
@@ -955,8 +955,8 @@ namespace ExportDocManager.Api.Tests
                 Id = id,
                 InvoiceNo = invoiceNo,
                 ContractNo = contractNo,
-                InvoiceDate = new DateTime(2026, 6, 1),
-                ShipmentDate = new DateTime(2026, 6, 20),
+                InvoiceDate = new DateOnly(2026, 6, 1),
+                ShipmentDate = new DateOnly(2026, 6, 20),
                 CustomerNameEN = customerName,
                 CustomerAddressEN = "1 Boundary Road",
                 ExporterNameEN = "Boundary Exporter",

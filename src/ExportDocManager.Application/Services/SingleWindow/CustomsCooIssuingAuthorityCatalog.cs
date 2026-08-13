@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using System.Threading;
 using ExportDocManager.ViewModels;
 
 namespace ExportDocManager.Services.SingleWindow
@@ -11,40 +10,22 @@ namespace ExportDocManager.Services.SingleWindow
         string AbbreviationName,
         params string[] Aliases);
 
-    public static class CustomsCooIssuingAuthorityCatalog
+    public sealed class CustomsCooIssuingAuthorityCatalog
     {
-        private static Func<IReadOnlyList<CustomsCooIssuingAuthorityEntry>>? _entrySnapshotLoader;
-        private static IReadOnlyList<CustomsCooIssuingAuthorityEntry> _entries = [];
-        private static IReadOnlyDictionary<string, CustomsCooIssuingAuthorityEntry> _lookup =
-            new Dictionary<string, CustomsCooIssuingAuthorityEntry>(StringComparer.OrdinalIgnoreCase);
-        private static IReadOnlyList<SelectionOption<string>> _options = [];
+        private readonly IReadOnlyDictionary<string, CustomsCooIssuingAuthorityEntry> _lookup;
+        private readonly IReadOnlyList<SelectionOption<string>> _options;
 
-        static CustomsCooIssuingAuthorityCatalog()
+        public CustomsCooIssuingAuthorityCatalog(
+            IEnumerable<CustomsCooIssuingAuthorityEntry>? entries = null)
         {
-            ReloadEntries();
+            var normalizedEntries = NormalizeEntries(entries ?? []);
+            _lookup = BuildLookup(normalizedEntries);
+            _options = BuildOptions(normalizedEntries);
         }
 
-        public static void ConfigureEntrySnapshotLoader(Func<IReadOnlyList<CustomsCooIssuingAuthorityEntry>> loader)
-        {
-            ArgumentNullException.ThrowIfNull(loader);
-            Volatile.Write(ref _entrySnapshotLoader, loader);
-            ReloadEntries();
-        }
+        public IReadOnlyList<SelectionOption<string>> GetOptions() => _options;
 
-        public static void ReloadEntries()
-        {
-            var entries = LoadEntries();
-            var lookup = BuildLookup(entries);
-            var options = BuildOptions(entries);
-
-            Volatile.Write(ref _entries, entries);
-            Volatile.Write(ref _lookup, lookup);
-            Volatile.Write(ref _options, options);
-        }
-
-        public static IReadOnlyList<SelectionOption<string>> GetOptions() => Volatile.Read(ref _options);
-
-        public static string ParseCode(string value)
+        public string ParseCode(string value)
         {
             string normalized = NormalizeText(value);
             if (string.IsNullOrWhiteSpace(normalized))
@@ -63,7 +44,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : normalized;
         }
 
-        public static string GetDisplayText(string value)
+        public string GetDisplayText(string value)
         {
             string code = ParseCode(value);
             return TryResolve(code, out var entry)
@@ -71,7 +52,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : code;
         }
 
-        public static string ResolveApplicationAddress(string value)
+        public string ResolveApplicationAddress(string value)
         {
             string code = ParseCode(value);
             return TryResolve(code, out var entry)
@@ -79,11 +60,11 @@ namespace ExportDocManager.Services.SingleWindow
                 : string.Empty;
         }
 
-        private static bool TryResolve(
+        private bool TryResolve(
             string? value,
             [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out CustomsCooIssuingAuthorityEntry? entry)
         {
-            return Volatile.Read(ref _lookup).TryGetValue(NormalizeLookupKey(value), out entry);
+            return _lookup.TryGetValue(NormalizeLookupKey(value), out entry);
         }
 
         private static Dictionary<string, CustomsCooIssuingAuthorityEntry> BuildLookup(
@@ -113,24 +94,6 @@ namespace ExportDocManager.Services.SingleWindow
                 .OrderBy(entry => entry.Code, StringComparer.Ordinal)
                 .Select(entry => new SelectionOption<string>(entry.Code, BuildDisplayText(entry)))
                 .ToList();
-        }
-
-        private static IReadOnlyList<CustomsCooIssuingAuthorityEntry> LoadEntries()
-        {
-            try
-            {
-                var loader = Volatile.Read(ref _entrySnapshotLoader);
-                var entries = loader?.Invoke();
-                if (entries != null && entries.Count > 0)
-                {
-                    return NormalizeEntries(entries);
-                }
-            }
-            catch
-            {
-            }
-
-            return NormalizeEntries(GetFallbackEntries());
         }
 
         private static IReadOnlyList<CustomsCooIssuingAuthorityEntry> NormalizeEntries(

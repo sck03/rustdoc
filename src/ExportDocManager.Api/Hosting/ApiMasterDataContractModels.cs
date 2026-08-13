@@ -1,3 +1,5 @@
+using ExportDocManager.Models.Entities;
+
 namespace ExportDocManager.Api.Hosting
 {
     public sealed record ApiCustomerDto(
@@ -12,7 +14,8 @@ namespace ExportDocManager.Api.Hosting
         string Email,
         string TaxId,
         string Notes,
-        string RowVersion);
+        string RowVersion,
+        NotifyPartyMode NotifyPartyMode = NotifyPartyMode.None);
 
     public sealed record ApiExporterDto(
         int Id,
@@ -69,8 +72,8 @@ namespace ExportDocManager.Api.Hosting
         string PackageUnitEN,
         string PackageUnitCN,
         decimal DefaultPrice,
-        DateTime CreatedAt,
-        DateTime UpdatedAt,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset UpdatedAt,
         string RowVersion = "");
 
     public sealed record ApiPortDto(
@@ -99,12 +102,12 @@ namespace ExportDocManager.Api.Hosting
         string SupervisionConditions,
         string InspectionCategory,
         string RebateRate,
-        DateTime? UpdateTime,
+        DateTimeOffset? UpdateTime,
         string DetailUrl,
         string Status = "ReferenceOnly",
         string SourceName = "",
         int? EffectiveYear = null,
-        DateTime? LastVerifiedAt = null,
+        DateTimeOffset? LastVerifiedAt = null,
         string ReplacedByCodes = "",
         string NormalTariffRate = "",
         string PreferentialTariffRate = "",
@@ -116,7 +119,7 @@ namespace ExportDocManager.Api.Hosting
         int? InstanceCount = null,
         string SummaryUrl = "",
         string EvidenceUrl = "",
-        DateTime? ObservedAt = null,
+        DateTimeOffset? ObservedAt = null,
         IReadOnlyList<string>? RecommendedKeywords = null,
         string PersonalPostalTaxCode = "",
         IReadOnlyList<ApiHsCodeRemoteReferenceEntry>? CiqEntries = null,

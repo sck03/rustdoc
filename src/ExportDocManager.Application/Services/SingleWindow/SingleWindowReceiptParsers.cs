@@ -169,9 +169,9 @@ namespace ExportDocManager.Services.SingleWindow
                 ?.Trim() ?? string.Empty;
         }
 
-        private static DateTime? ParseDateTime(string value)
+        private static DateTimeOffset? ParseDateTime(string value)
         {
-            return DateTime.TryParse(value, out var result) ? result : null;
+            return DateTimeOffset.TryParse(value, out var result) ? result : null;
         }
 
         private static SingleWindowReceiptBusinessStatus ParseCustomsCooBusinessStatus(string channel, string repType)

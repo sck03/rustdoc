@@ -5,7 +5,7 @@ namespace ExportDocManager.Services.SingleWindow
         public const string GeneratedStatus = "Generated";
         public const string NotGeneratedDisplay = "未生成";
 
-        public static string ResolveDisplayStatus(string status, DateTime lastGeneratedAt, int draftRevision)
+        public static string ResolveDisplayStatus(string status, DateTimeOffset? lastGeneratedAt, int draftRevision)
         {
             string normalizedStatus = Normalize(status);
             if (string.IsNullOrWhiteSpace(normalizedStatus))
@@ -14,7 +14,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
 
             return string.Equals(normalizedStatus, GeneratedStatus, StringComparison.Ordinal) &&
-                   lastGeneratedAt <= DateTime.MinValue &&
+                   !lastGeneratedAt.HasValue &&
                    draftRevision <= 0
                 ? NotGeneratedDisplay
                 : normalizedStatus;
@@ -29,10 +29,10 @@ namespace ExportDocManager.Services.SingleWindow
                 : normalizedStatus;
         }
 
-        public static string FormatLastGeneratedAt(DateTime lastGeneratedAt)
+        public static string FormatLastGeneratedAt(DateTimeOffset? lastGeneratedAt)
         {
-            return lastGeneratedAt > DateTime.MinValue
-                ? lastGeneratedAt.ToString("yyyy-MM-dd HH:mm")
+            return lastGeneratedAt.HasValue
+                ? lastGeneratedAt.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
                 : string.Empty;
         }
 

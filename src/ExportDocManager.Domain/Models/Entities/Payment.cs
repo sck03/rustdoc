@@ -10,7 +10,7 @@ namespace ExportDocManager.Models.Entities
         public string DepartmentId { get; set; } = string.Empty;
         public string CompanyScope { get; set; } = string.Empty;
         public string? InvoiceNo { get; set; }
-        public DateTime? ShipmentDate { get; set; }
+        public DateOnly? ShipmentDate { get; set; }
         public int PayeeId { get; set; }
         public string? Department { get; set; }
         public string? Project { get; set; }
@@ -22,12 +22,12 @@ namespace ExportDocManager.Models.Entities
         public string? BankName { get; set; }
         public string? AccountNo { get; set; }
         public string? Notes { get; set; }
-        public DateTime? PaymentDate { get; set; }
+        public DateOnly? PaymentDate { get; set; }
 
         public string? GoodsName { get; set; }
         public string? Quantity { get; set; }
         public string? ShipmentCountry { get; set; }
-        public DateTime? ReceiptDate { get; set; }
+        public DateOnly? ReceiptDate { get; set; }
 
         public decimal TravelExpense { get; set; }
         public decimal BusinessEntertainmentExpense { get; set; }

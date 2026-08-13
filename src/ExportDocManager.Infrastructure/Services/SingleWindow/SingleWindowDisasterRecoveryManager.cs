@@ -130,7 +130,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
 
             string settingsPath = ResolveStagedPath(stagingRoot, SingleWindowDisasterRecoveryLayout.AppSettingsEntry);
-            DatabaseConnectionSettings settings = DbHelper.LoadDatabaseSettings(settingsPath);
+            DatabaseConnectionSettings settings = DbHelper.LoadDatabaseSettings(pathProvider, settingsPath);
             if (DatabaseModeHelper.UsesPostgreSql(settings))
             {
                 throw new InvalidDataException("持卡机灾难恢复只支持 SQLite 单机版，恢复包不能配置 PostgreSQL。");

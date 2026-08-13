@@ -65,7 +65,7 @@ export function formatScopedClearResultMessage(request: AgentScopedClearRequest,
     : `“${request.groupKey}”分组当前已经是建议值，无需恢复。`;
 }
 
-export function formatAgentDateTime(value?: string) {
+export function formatAgentDateTime(value?: string | null) {
   if (!value) return "-";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });

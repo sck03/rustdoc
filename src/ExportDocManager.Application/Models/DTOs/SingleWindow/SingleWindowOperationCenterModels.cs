@@ -78,9 +78,9 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public string AssignedCardIdentifier { get; init; } = string.Empty;
 
-        public DateTime CreatedAt { get; init; }
+        public DateTimeOffset CreatedAt { get; init; }
 
-        public DateTime UpdatedAt { get; init; }
+        public DateTimeOffset UpdatedAt { get; init; }
 
         public int ReceiptCount { get; init; }
     }
@@ -97,7 +97,7 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public int WarningCount { get; init; }
 
-        public DateTime CreatedAt { get; init; }
+        public DateTimeOffset CreatedAt { get; init; }
     }
 
     public sealed class SingleWindowOperationCenterReceiptRecord
@@ -114,9 +114,9 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public string SourceFileName { get; init; } = string.Empty;
 
-        public DateTime ImportedAt { get; init; }
+        public DateTimeOffset ImportedAt { get; init; }
 
-        public DateTime? OccurredAt { get; init; }
+        public DateTimeOffset? OccurredAt { get; init; }
     }
 
     public sealed class SingleWindowOperationCenterDetail
@@ -151,13 +151,13 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public int WarningCount { get; init; }
 
-        public DateTime CreatedAt { get; init; }
+        public DateTimeOffset CreatedAt { get; init; }
 
-        public DateTime UpdatedAt { get; init; }
+        public DateTimeOffset UpdatedAt { get; init; }
 
-        public DateTime? LastReceiptAt { get; init; }
+        public DateTimeOffset? LastReceiptAt { get; init; }
 
-        public DateTime? LastClientDispatchAt { get; init; }
+        public DateTimeOffset? LastClientDispatchAt { get; init; }
 
         public IReadOnlyList<SingleWindowOperationCenterPackageRecord> PackageRecords { get; init; } = [];
 

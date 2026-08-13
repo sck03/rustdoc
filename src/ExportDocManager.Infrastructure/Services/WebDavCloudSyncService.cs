@@ -341,11 +341,11 @@ namespace ExportDocManager.Services.Infrastructure
             }
 
             _ = long.TryParse(prop.Element(dav + "getcontentlength")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long sizeBytes);
-            DateTime lastModified = DateTime.MinValue;
+            DateTimeOffset lastModified = DateTimeOffset.MinValue;
             string modifiedText = prop.Element(dav + "getlastmodified")?.Value ?? string.Empty;
             if (DateTimeOffset.TryParse(modifiedText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsedModified))
             {
-                lastModified = parsedModified.UtcDateTime;
+                lastModified = parsedModified.ToUniversalTime();
             }
 
             return new CloudBackupFileInfo(fileName, Math.Max(sizeBytes, 0), lastModified);

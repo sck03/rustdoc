@@ -630,7 +630,7 @@ export function resolveCooAttachmentFileType(fileName: string) {
   return "7";
 }
 
-export function formatDateTime(value?: string) {
+export function formatDateTime(value?: string | null) {
   if (!value) {
     return "-";
   }

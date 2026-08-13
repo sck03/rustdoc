@@ -51,7 +51,7 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(64)]
         public string ContentDigest { get; set; } = string.Empty;
 
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
         public string ManifestJson { get; set; } = string.Empty;
 

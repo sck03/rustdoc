@@ -54,7 +54,7 @@ namespace ExportDocManager.Services.SingleWindow
                 ClientProfileName = manifest.ClientProfileName ?? string.Empty,
                 CreatedOnMachine = manifest.CreatedOnMachine ?? string.Empty,
                 CreatedAt = manifest.CreatedAt,
-                UpdatedAt = DateTime.Now
+                UpdatedAt = DateTimeOffset.UtcNow
             };
 
             await context.SwSubmissionBatches.AddAsync(batch, cancellationToken);
@@ -228,7 +228,7 @@ namespace ExportDocManager.Services.SingleWindow
                 AttachmentFileCount = manifest.AttachmentFiles.Count,
                 WarningCount = manifest.Warnings.Count,
                 ContentDigest = manifest.ContentDigest ?? string.Empty,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = DateTimeOffset.UtcNow,
                 ManifestJson = JsonSerializer.Serialize(manifest, JsonOptions)
             };
         }
@@ -255,7 +255,7 @@ namespace ExportDocManager.Services.SingleWindow
             return (parsedReceipts ?? [])
                 .Where(item => item != null)
                 .OrderByDescending(item => GetStatusRank(item.BusinessStatus))
-                .ThenByDescending(item => item.OccurredAt ?? DateTime.MinValue)
+                .ThenByDescending(item => item.OccurredAt ?? DateTimeOffset.MinValue)
                 .FirstOrDefault();
         }
 

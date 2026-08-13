@@ -29,9 +29,9 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(260)]
         public string SourceFileName { get; set; } = string.Empty;
 
-        public DateTime ImportedAt { get; set; } = DateTime.Now;
+        public DateTimeOffset ImportedAt { get; set; } = DateTimeOffset.UtcNow;
 
-        public DateTime? OccurredAt { get; set; }
+        public DateTimeOffset? OccurredAt { get; set; }
 
         public string RawContent { get; set; } = string.Empty;
 

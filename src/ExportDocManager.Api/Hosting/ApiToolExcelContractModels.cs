@@ -1,3 +1,5 @@
+using ExportDocManager.Models.Entities;
+
 namespace ExportDocManager.Api.Hosting
 {
     public sealed class ApiExcelImportPreviewRequest
@@ -138,6 +140,8 @@ namespace ExportDocManager.Api.Hosting
         public string CustomerNameEN { get; init; } = string.Empty;
 
         public string DisplayName { get; init; } = string.Empty;
+
+        public NotifyPartyMode NotifyPartyMode { get; init; }
 
         public string NotifyPartyName { get; init; } = string.Empty;
 

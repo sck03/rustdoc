@@ -1,5 +1,4 @@
 using ExportDocManager.DataAccess;
-using ExportDocManager.Services.BrowserRuntime;
 using ExportDocManager.Services.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,13 +24,16 @@ public sealed class ApiReadinessProbe : IApiReadinessProbe
     private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(2);
     private readonly IDbContextFactory<AppDbContext> _contextFactory;
     private readonly IAppPathProvider _pathProvider;
+    private readonly IBrowserRuntimeProbe? _browserRuntimeProbe;
 
     public ApiReadinessProbe(
         IDbContextFactory<AppDbContext> contextFactory,
-        IAppPathProvider pathProvider)
+        IAppPathProvider pathProvider,
+        IBrowserRuntimeProbe? browserRuntimeProbe = null)
     {
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+        _browserRuntimeProbe = browserRuntimeProbe;
     }
 
     public async Task<ApiReadinessSnapshot> CheckAsync(
@@ -41,7 +43,8 @@ public sealed class ApiReadinessProbe : IApiReadinessProbe
         timeout.CancelAfter(ProbeTimeout);
 
         Task<bool> databaseCheck = CanConnectDatabaseAsync(timeout.Token);
-        Task<bool> browserCheck = CanReachConfiguredBrowserAsync(timeout.Token);
+        Task<bool> browserCheck = _browserRuntimeProbe?.IsReadyAsync(timeout.Token)
+            ?? Task.FromResult(true);
         bool runtimeDirectoriesReady = RequiredRuntimeDirectoriesExist();
 
         bool databaseReady;
@@ -79,32 +82,6 @@ public sealed class ApiReadinessProbe : IApiReadinessProbe
             return await context.Database.CanConnectAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
-        {
-            return false;
-        }
-    }
-
-    private static async Task<bool> CanReachConfiguredBrowserAsync(
-        CancellationToken cancellationToken)
-    {
-        if (!BrowserCdpEndpointPolicy.TryResolve(out Uri? endpoint))
-        {
-            // Desktop and non-container server packages use an on-demand local
-            // renderer. Starting a browser from a health probe would consume
-            // substantial resources, so only configured remote CDP is probed.
-            return true;
-        }
-
-        try
-        {
-            await BrowserCdpConnectionResolver
-                .ResolveWebSocketEndpointAsync(endpoint, cancellationToken)
-                .ConfigureAwait(false);
-            return true;
-        }
-        catch (Exception ex) when (
-            ex is not OperationCanceledException ||
-            !cancellationToken.IsCancellationRequested)
         {
             return false;
         }

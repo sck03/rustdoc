@@ -35,7 +35,7 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public SingleWindowReceiptBusinessStatus BusinessStatus { get; init; }
 
-        public DateTime? OccurredAt { get; init; }
+        public DateTimeOffset? OccurredAt { get; init; }
 
         public string SourceFileName { get; init; } = string.Empty;
     }

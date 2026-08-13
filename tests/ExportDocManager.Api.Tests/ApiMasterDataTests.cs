@@ -38,7 +38,7 @@ namespace ExportDocManager.Api.Tests
 
             Assert.Equal(1, customerDto.Id);
             Assert.Equal("Buyer", customerDto.CustomerNameEN);
-            Assert.Equal("Buyer (Notify)", customerDto.DisplayName);
+            Assert.Equal("Buyer", customerDto.DisplayName);
             Assert.Equal(Convert.ToBase64String(new byte[] { 1, 2, 3 }), customerDto.RowVersion);
             Assert.Equal(2, exporterDto.Id);
             Assert.Equal("Exporter EN", exporterDto.ExporterNameEN);

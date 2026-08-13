@@ -1,6 +1,6 @@
 namespace ExportDocManager.Utils
 {
-    internal static class LocalFileUriHelper
+    public static class LocalFileUriHelper
     {
         public static string FromPath(string localPath)
         {

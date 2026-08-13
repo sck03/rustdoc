@@ -12,37 +12,37 @@ namespace ExportDocManager.Api.Hosting
             ArgumentNullException.ThrowIfNull(runtimeOptions);
             ArgumentNullException.ThrowIfNull(databaseSettings);
 
-            endpoints.MapSystemEndpoints(runtimeOptions, databaseSettings);
-            endpoints.MapLicenseEndpoints();
-            endpoints.MapAuthEndpoints();
-            endpoints.MapUserEndpoints();
-            endpoints.MapPermissionTemplateEndpoints();
-            endpoints.MapSettingsEndpoints();
-            endpoints.MapBackupEndpoints();
-            endpoints.MapSharedDatabaseMaintenanceEndpoints();
-            endpoints.MapServerMigrationEndpoints();
-            endpoints.MapInvoiceDataMaintenanceEndpoints();
-            endpoints.MapDashboardEndpoints();
-            endpoints.MapInvoiceEndpoints();
-            endpoints.MapInvoiceShippingMarkEndpoints();
-            endpoints.MapInvoiceTransferEndpoints();
-            endpoints.MapQueryEndpoints();
-            endpoints.MapPaymentEndpoints();
-            endpoints.MapAuditLogEndpoints();
-            endpoints.MapJobEndpoints();
-            endpoints.MapCustomOptionEndpoints();
-            endpoints.MapToolEndpoints();
-            endpoints.MapReportEndpoints();
-            endpoints.MapMasterDataEndpoints();
-            endpoints.MapCrmEndpoints();
-            endpoints.MapSupplierEndpoints();
-            endpoints.MapEmailTemplateEndpoints();
-            endpoints.MapSalesOpportunityEndpoints();
-            endpoints.MapSingleWindowEndpoints();
+            var api = endpoints.MapGroup(string.Empty).WithMetadata(
+                new ApiEndpointAccessMetadata(true, true, true));
+            api.MapSystemEndpoints(runtimeOptions, databaseSettings);
+            api.MapLicenseEndpoints();
+            api.MapAuthEndpoints();
+            api.MapUserEndpoints();
+            api.MapPermissionTemplateEndpoints();
+            api.MapSettingsEndpoints();
+            api.MapBackupEndpoints();
+            api.MapSharedDatabaseMaintenanceEndpoints();
+            api.MapServerMigrationEndpoints();
+            api.MapInvoiceDataMaintenanceEndpoints();
+            api.MapDashboardEndpoints();
+            api.MapInvoiceEndpoints();
+            api.MapInvoiceShippingMarkEndpoints();
+            api.MapInvoiceTransferEndpoints();
+            api.MapQueryEndpoints();
+            api.MapPaymentEndpoints();
+            api.MapAuditLogEndpoints();
+            api.MapJobEndpoints();
+            api.MapCustomOptionEndpoints();
+            api.MapToolEndpoints();
+            api.MapReportEndpoints();
+            api.MapMasterDataEndpoints();
+            api.MapCrmEndpoints();
+            api.MapSupplierEndpoints();
+            api.MapEmailTemplateEndpoints();
+            api.MapSalesOpportunityEndpoints();
+            api.MapSingleWindowEndpoints();
 
             return endpoints;
         }
     }
 }
-
-

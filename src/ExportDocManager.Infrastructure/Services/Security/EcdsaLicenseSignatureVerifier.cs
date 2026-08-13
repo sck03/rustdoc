@@ -4,7 +4,7 @@ namespace ExportDocManager.Services.Security
 {
     public sealed class EcdsaLicenseSignatureVerifier : ILicenseSignatureVerifier
     {
-        public bool TryValidate(string machineId, string licenseKey, out DateTime expireDate)
+        public bool TryValidate(string machineId, string licenseKey, out DateOnly expireDate)
         {
             return LicenseKeyCodec.TryValidateSigned(
                 machineId,

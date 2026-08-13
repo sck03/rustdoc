@@ -237,8 +237,8 @@ namespace ExportDocManager.Services.SingleWindow
                     new("申报员姓名", "ApplName"),
                     new("申报员身份证号", "Applicant"),
                     new("申报员电话", "ApplTel"),
-                    new("签证机构代码(4位)", "OrgCode", CustomsCooEditorFieldKind.EditableComboBox, Options: CustomsCooIssuingAuthorityCatalog.GetOptions()),
-                    new("领证机构代码(4位)", "FetchPlace", CustomsCooEditorFieldKind.EditableComboBox, Options: CustomsCooIssuingAuthorityCatalog.GetOptions()),
+                    new("签证机构代码(4位)", "OrgCode", CustomsCooEditorFieldKind.EditableComboBox),
+                    new("领证机构代码(4位)", "FetchPlace", CustomsCooEditorFieldKind.EditableComboBox),
                     new("申请地址(机构所在地)", "AplAdd"),
                     new("发票日期", "InvDate"),
                     new("发票号", "InvNo"),
@@ -324,13 +324,28 @@ namespace ExportDocManager.Services.SingleWindow
                 return lookup;
             });
 
-        public static IReadOnlyList<CustomsCooEditorFieldDefinition> GetHeaderSectionFields(string sectionKey)
+        public static IReadOnlyList<CustomsCooEditorFieldDefinition> GetHeaderSectionFields(
+            string sectionKey,
+            CustomsCooIssuingAuthorityCatalog? issuingAuthorityCatalog = null)
         {
-            return HeaderSectionFields.TryGetValue(
+            issuingAuthorityCatalog ??= new CustomsCooIssuingAuthorityCatalog();
+            var fields = HeaderSectionFields.TryGetValue(
                 string.IsNullOrWhiteSpace(sectionKey) ? DefaultHeaderSectionKey : sectionKey.Trim(),
-                out var fields)
-                ? fields
+                out var sectionFields)
+                ? sectionFields
                 : Array.Empty<CustomsCooEditorFieldDefinition>();
+
+            if (!string.Equals(sectionKey?.Trim(), "申报与对象", StringComparison.Ordinal))
+            {
+                return fields;
+            }
+
+            var options = issuingAuthorityCatalog.GetOptions();
+            return fields
+                .Select(field => field.PropertyName is "OrgCode" or "FetchPlace"
+                    ? field with { Options = options }
+                    : field)
+                .ToArray();
         }
 
         public static string GetHeaderSectionDescription(string sectionKey)

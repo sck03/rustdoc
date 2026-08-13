@@ -8,11 +8,9 @@ namespace ExportDocManager.Application.Tests
         [Fact]
         public void Helpers_ShouldUseConfiguredReferenceCatalogSnapshot()
         {
-            try
-            {
-                SingleWindowFieldMapperHelpers.ConfigureReferenceCatalogSnapshotLoader(
-                    () => new SingleWindowReferenceCatalogModel
-                    {
+            var helpers = new SingleWindowFieldMapperHelpers(
+                new SingleWindowReferenceCatalogModel
+                {
                         Countries =
                         [
                             new()
@@ -69,21 +67,15 @@ namespace ExportDocManager.Application.Tests
                                 Aliases = ["测试港"]
                             }
                         ]
-                    });
+                });
 
-                Assert.Equal("998", SingleWindowFieldMapperHelpers.NormalizeCountryCode("测试国"));
-                Assert.Equal("997", SingleWindowFieldMapperHelpers.NormalizeAcdOriginCountryCode("测试货源"));
-                Assert.Equal("996", SingleWindowFieldMapperHelpers.NormalizeCurrencyCode("测试币"));
-                Assert.Equal("TST", SingleWindowFieldMapperHelpers.NormalizeCurrencyText("测试币"));
-                Assert.Equal("9999", SingleWindowFieldMapperHelpers.NormalizeTradeModeCode("测试模式"));
-                Assert.Equal("BY TEST", SingleWindowFieldMapperHelpers.NormalizeTransportMode("测试航线"));
-                Assert.Equal("TEST PORT", SingleWindowFieldMapperHelpers.NormalizePort("测试港"));
-            }
-            finally
-            {
-                SingleWindowFieldMapperHelpers.ConfigureReferenceCatalogSnapshotLoader(
-                    () => new SingleWindowReferenceCatalogModel());
-            }
+            Assert.Equal("998", helpers.NormalizeCountryCode("测试国"));
+            Assert.Equal("997", helpers.NormalizeAcdOriginCountryCode("测试货源"));
+            Assert.Equal("996", helpers.NormalizeCurrencyCode("测试币"));
+            Assert.Equal("TST", helpers.NormalizeCurrencyText("测试币"));
+            Assert.Equal("9999", helpers.NormalizeTradeModeCode("测试模式"));
+            Assert.Equal("BY TEST", helpers.NormalizeTransportMode("测试航线"));
+            Assert.Equal("TEST PORT", helpers.NormalizePort("测试港"));
         }
     }
 }

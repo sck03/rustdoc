@@ -13,6 +13,9 @@ $requiresDocumentResources = $true
 $requiresOcrRuntime = $true
 $requiresBrowserRuntime = $Profile -ne "Container"
 $requiresExcelAnalyzer = $true
+$requiresExcelModule = $true
+$requiresBrowserModule = $true
+$requiresPdfOcrModule = $true
 
 $allEntries = @(Get-ChildItem -LiteralPath $root -Force -Recurse)
 $forbiddenTopLevelDirectories = @("App_Data", "Database", "Security", "Backups", "Cache", "Config", "Logs", "WebView")
@@ -85,6 +88,9 @@ if ($Profile -eq "Desktop") {
     $requiresOcrRuntime = [bool]$editionManifest.resourceProfile.ocr
     $requiresBrowserRuntime = [bool]$editionManifest.resourceProfile.browserRenderer
     $requiresExcelAnalyzer = [bool]$editionManifest.resourceProfile.excelAnalyzer
+    $requiresExcelModule = $requiresExcelAnalyzer
+    $requiresBrowserModule = $requiresBrowserRuntime
+    $requiresPdfOcrModule = $requiresOcrRuntime
     $directoryCapabilities = [ordered]@{
         Templates = $requiresDocumentResources
         Resources = $requiresDocumentResources
@@ -113,6 +119,39 @@ if ($Profile -eq "Desktop") {
     }
     if ($playwrightRoots.Count -ne $expectedPlaywrightRootCount) {
         throw "Desktop/$Edition payload expected $expectedPlaywrightRootCount Playwright runtime root, found $($playwrightRoots.Count)."
+    }
+}
+
+$moduleAssemblies = [ordered]@{
+    "ExportDocManager.Infrastructure.Excel.dll" = $requiresExcelModule
+    "ExportDocManager.Infrastructure.Browser.dll" = $requiresBrowserModule
+    "ExportDocManager.Infrastructure.PdfOcr.dll" = $requiresPdfOcrModule
+}
+foreach ($moduleAssembly in $moduleAssemblies.Keys) {
+    $matches = @($allEntries | Where-Object { -not $_.PSIsContainer -and $_.Name -eq $moduleAssembly })
+    $expectedCount = if ([bool]$moduleAssemblies[$moduleAssembly]) { 1 } else { 0 }
+    if ($matches.Count -ne $expectedCount) {
+        throw "$Profile/$Edition payload expected $expectedCount '$moduleAssembly', found $($matches.Count)."
+    }
+}
+
+$optionalDependencyFamilies = [ordered]@{
+    Excel = @("ClosedXML.dll", "ExcelDataReader.dll", "DocumentFormat.OpenXml.dll")
+    Browser = @("Microsoft.Playwright.dll")
+    PdfOcr = @("PdfSharp.dll", "PDFtoImage.dll", "UglyToad.PdfPig.dll", "SkiaSharp.dll")
+}
+$optionalDependencyRequirements = [ordered]@{
+    Excel = $requiresExcelModule
+    Browser = $requiresBrowserModule
+    PdfOcr = $requiresPdfOcrModule
+}
+foreach ($family in $optionalDependencyFamilies.Keys) {
+    if ([bool]$optionalDependencyRequirements[$family]) { continue }
+    $forbiddenDependencies = @($allEntries | Where-Object {
+        -not $_.PSIsContainer -and $optionalDependencyFamilies[$family] -contains $_.Name
+    })
+    if ($forbiddenDependencies.Count) {
+        throw "$Profile/$Edition payload contains dependencies from disabled $family module: $($forbiddenDependencies.FullName -join '; ')"
     }
 }
 

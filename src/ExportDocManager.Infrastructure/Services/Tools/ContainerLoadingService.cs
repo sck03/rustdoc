@@ -92,7 +92,7 @@ namespace ExportDocManager.Services.Tools
                 _contextFactory,
                 async (context, token) =>
                 {
-                    var now = DateTime.Now;
+                    var now = DateTimeOffset.UtcNow;
                     ContainerProject targetProject;
 
                     if (project.Id == 0)
@@ -290,7 +290,7 @@ namespace ExportDocManager.Services.Tools
             };
         }
 
-        private static void ApplyProjectValues(ContainerProject target, ContainerProject source, DateTime updatedAt)
+        private static void ApplyProjectValues(ContainerProject target, ContainerProject source, DateTimeOffset updatedAt)
         {
             target.Name = NormalizeProjectName(source.Name);
             target.ContainerType = NormalizeContainerType(source.ContainerType);

@@ -1,170 +1,34 @@
-using ExportDocManager.Services;
-using ExportDocManager.Services.Reporting;
-using ExportDocManager.Services.Tools;
-using ExportDocManager.Services.BrowserRuntime;
-using ExportDocManager.Services.Errors;
-
 namespace ExportDocManager.Services.Infrastructure
 {
     public sealed class RuntimeDependencyDiagnosticsService : IRuntimeDependencyDiagnosticsService
     {
         private readonly IAppPathProvider _pathProvider;
-        private readonly BrowserExecutableResolver _browserExecutableResolver;
+        private readonly IReadOnlyList<IRuntimeDependencyDiagnosticContributor> _contributors;
 
         public RuntimeDependencyDiagnosticsService(IAppPathProvider pathProvider)
-            : this(pathProvider, new BrowserExecutableResolver(pathProvider))
+            : this(pathProvider, [])
         {
         }
 
         public RuntimeDependencyDiagnosticsService(
             IAppPathProvider pathProvider,
-            BrowserExecutableResolver browserExecutableResolver)
+            IEnumerable<IRuntimeDependencyDiagnosticContributor> contributors)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
-            _browserExecutableResolver = browserExecutableResolver ??
-                throw new ArgumentNullException(nameof(browserExecutableResolver));
+            _contributors = (contributors ?? [])
+                .Where(contributor => contributor != null)
+                .ToList();
         }
 
         public IReadOnlyList<RuntimeDependencyDiagnostic> Inspect()
         {
-            return
-            [
-                InspectReportRenderer(),
-                InspectBrowserAutomation(),
-                InspectOcrRuntime(),
-                InspectPostgreSqlTools()
-            ];
-        }
-
-        private RuntimeDependencyDiagnostic InspectBrowserAutomation()
-        {
-            try
+            var diagnostics = new List<RuntimeDependencyDiagnostic>();
+            foreach (var contributor in _contributors)
             {
-                if (BrowserCdpEndpointPolicy.TryResolve(out Uri? endpoint))
-                {
-                    return new RuntimeDependencyDiagnostic(
-                        "browser-automation",
-                        "受控网页自动化",
-                        "optional",
-                        "ready",
-                        true,
-                        endpoint.ToString().TrimEnd('/'),
-                        "Playwright 将连接隔离 Chromium 服务执行 HS 查询降级；浏览器容器不持有数据库维护凭据。");
-                }
-
-                string executablePath = _browserExecutableResolver.Resolve();
-                return new RuntimeDependencyDiagnostic(
-                    "browser-automation",
-                    "受控网页自动化",
-                    "optional",
-                    "ready",
-                    true,
-                    executablePath,
-                    "Playwright 将通过受控 Chromium/CDP 连接执行 HS 查询降级；进程由应用登记、限流和退出清理。");
+                diagnostics.AddRange(contributor.Inspect());
             }
-            catch (ServiceException ex)
-            {
-                return new RuntimeDependencyDiagnostic(
-                    "browser-automation",
-                    "受控网页自动化",
-                    "optional",
-                    "missing",
-                    false,
-                    Path.GetFullPath(_pathProvider.BrowserRoot),
-                    $"浏览器运行时配置不可用：{ex.Message} HS 本地库和静态 HTTP 查询仍可使用，只有动态网页降级不可用。");
-            }
-        }
-
-        private RuntimeDependencyDiagnostic InspectReportRenderer()
-        {
-            try
-            {
-                if (BrowserCdpEndpointPolicy.TryResolve(out Uri? endpoint))
-                {
-                    return new RuntimeDependencyDiagnostic(
-                        "report-renderer",
-                        "报表 PDF 浏览器",
-                        "feature",
-                        "ready",
-                        true,
-                        endpoint.ToString().TrimEnd('/'),
-                        "报表 PDF 将由隔离 Chromium 服务生成；临时报表目录以只读方式共享给浏览器容器。");
-                }
-
-                string executablePath = _browserExecutableResolver.Resolve();
-                return new RuntimeDependencyDiagnostic(
-                    "report-renderer",
-                    "报表 PDF 浏览器",
-                    "feature",
-                    "ready",
-                    true,
-                    executablePath,
-                    "报表 PDF 浏览器可执行文件已就绪。");
-            }
-            catch (ServiceException ex)
-            {
-                return new RuntimeDependencyDiagnostic(
-                    "report-renderer",
-                    "报表 PDF 浏览器",
-                    "feature",
-                    "missing",
-                    false,
-                    Path.GetFullPath(_pathProvider.BrowserRoot),
-                    $"报表浏览器运行时配置不可用：{ex.Message} HTML 预览仍可使用，但 PDF 生成不可用。");
-            }
-        }
-
-        private RuntimeDependencyDiagnostic InspectOcrRuntime()
-        {
-            string rustExecutable = RustOcrSidecarHost.FindExecutable(_pathProvider);
-            string modelRoot = Path.Combine(_pathProvider.OcrModelRoot, "PaddleOCR", "V6");
-            string mode = (Environment.GetEnvironmentVariable("EXPORTDOCMANAGER_OCR_RUNTIME") ?? "auto").Trim().ToLowerInvariant();
-            if (mode is "0" or "false" or "disabled" or "off" or "none" or "unsupported")
-            {
-                return new RuntimeDependencyDiagnostic(
-                    "ocr-runtime", "智能 OCR", "optional", "disabled", false,
-                    Path.GetFullPath(modelRoot),
-                    "OCR 已通过运行配置关闭；不影响其它业务功能。");
-            }
-
-            string[] requiredModels =
-            [
-                Path.Combine(modelRoot, "det", "inference.onnx"),
-                Path.Combine(modelRoot, "rec", "inference.onnx"),
-                Path.Combine(modelRoot, "rec", "inference.yml")
-            ];
-            if (!File.Exists(rustExecutable))
-            {
-                return new RuntimeDependencyDiagnostic(
-                    "ocr-runtime", "智能 OCR", "optional", "missing", false,
-                    Path.GetFullPath(Path.Combine(_pathProvider.AppRoot, "sidecar", "ocr")),
-                    "未找到Rust PP-OCRv6 Sidecar；OCR不可用，其它业务功能不受影响。");
-            }
-            if (requiredModels.Any(path => !File.Exists(path)))
-            {
-                return new RuntimeDependencyDiagnostic(
-                    "ocr-runtime", "智能 OCR", "optional", "incomplete", false,
-                    Path.GetFullPath(modelRoot),
-                    "Rust OCR Sidecar已安装，但PP-OCRv6模型文件不完整。");
-            }
-
-            string onnxRuntime = RustOcrSidecarHost.FindOnnxRuntimeLibrary(_pathProvider);
-            if (string.IsNullOrWhiteSpace(onnxRuntime) || !File.Exists(onnxRuntime))
-            {
-                return new RuntimeDependencyDiagnostic(
-                    "ocr-runtime", "智能 OCR", "optional", "incomplete", false,
-                    Path.GetFullPath(_pathProvider.AppRoot),
-                    "Rust OCR Sidecar和模型已安装，但缺少ONNX Runtime原生库。");
-            }
-
-            if (File.Exists(rustExecutable))
-            {
-                return new RuntimeDependencyDiagnostic(
-                    "ocr-runtime", "智能 OCR", "optional", "ready", true,
-                    Path.GetFullPath(rustExecutable),
-                    "Rust PP-OCRv6 Sidecar已就绪；使用ONNX Runtime和纯Rust图像处理，不依赖OpenCV。");
-            }
-            throw new InvalidOperationException("OCR runtime diagnostic reached an invalid state.");
+            diagnostics.Add(InspectPostgreSqlTools());
+            return diagnostics;
         }
 
         private RuntimeDependencyDiagnostic InspectPostgreSqlTools()

@@ -135,6 +135,60 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task SqliteTemporalStorage_ShouldUseDateTextAndUtcTicks()
+        {
+            string databasePath = Path.Combine(
+                Path.GetTempPath(),
+                "edm-temporal-storage-" + Guid.NewGuid().ToString("N") + ".db");
+            try
+            {
+                await using var connection = new SqliteConnection($"Data Source={databasePath}");
+                await connection.OpenAsync();
+                var options = new DbContextOptionsBuilder<AppDbContext>()
+                    .UseSqlite(connection)
+                    .Options;
+                await using (var context = new AppDbContext(options))
+                {
+                    await context.Database.EnsureCreatedAsync();
+                    context.Invoices.Add(new Invoice
+                    {
+                        InvoiceNo = "TEMPORAL-001",
+                        Type = "测试",
+                        InvoiceDate = new DateOnly(2026, 8, 13),
+                        ShipmentDate = new DateOnly(2026, 8, 14)
+                    });
+                    context.AuditLogs.Add(new AuditLog
+                    {
+                        EntityName = "Invoice",
+                        Action = "Insert",
+                        EntityId = "TEMPORAL-001",
+                        Timestamp = new DateTimeOffset(2026, 8, 13, 9, 30, 0, TimeSpan.FromHours(8))
+                    });
+                    await context.SaveChangesAsync();
+                }
+
+                await using var command = connection.CreateCommand();
+                command.CommandText = """
+                    SELECT i."InvoiceDate", typeof(i."InvoiceDate"), a."Timestamp", typeof(a."Timestamp")
+                    FROM "Invoices" AS i
+                    CROSS JOIN "AuditLogs" AS a
+                    WHERE i."InvoiceNo" = 'TEMPORAL-001'
+                    """;
+                await using var reader = await command.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal("2026-08-13", reader.GetString(0));
+                Assert.Equal("text", reader.GetString(1));
+                Assert.Equal(new DateTimeOffset(2026, 8, 13, 1, 30, 0, TimeSpan.Zero).UtcTicks, reader.GetInt64(2));
+                Assert.Equal("integer", reader.GetString(3));
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                if (File.Exists(databasePath)) File.Delete(databasePath);
+            }
+        }
+
+        [Fact]
         public void AppDbContext_Model_ShouldRestrictSupplierHistoryDeletion()
         {
             var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -375,7 +429,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             var databasePath = Path.Combine(
                 Path.GetTempPath(),
-                "edm-v6-schema-" + Guid.NewGuid().ToString("N") + ".db");
+                "edm-v8-schema-" + Guid.NewGuid().ToString("N") + ".db");
             using var factory = new SqliteFileDbContextFactory(databasePath);
 
             var service = new DatabaseInitializationService(
@@ -392,7 +446,7 @@ namespace ExportDocManager.Infrastructure.Tests
             int schemaVersion = await verifyContext.Database
                 .SqlQueryRaw<int>("SELECT \"Version\" AS \"Value\" FROM \"__ExportDocManagerSchema\" WHERE \"Id\" = 1")
                 .SingleAsync();
-            Assert.Equal(6, schemaVersion);
+            Assert.Equal(8, schemaVersion);
 
             var admin = await verifyContext.Users.SingleAsync(user => user.Username == "admin");
             Assert.True(PasswordHasher.VerifyPassword(admin.PasswordHash, string.Empty));
@@ -402,8 +456,8 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 InvoiceNo = "INV-V1-TYPE",
                 Type = "报关数据",
-                InvoiceDate = new DateTime(2026, 6, 25),
-                ShipmentDate = new DateTime(2026, 6, 25)
+                InvoiceDate = new DateOnly(2026, 6, 25),
+                ShipmentDate = new DateOnly(2026, 6, 25)
             });
             await verifyContext.SaveChangesAsync();
 
@@ -411,8 +465,8 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 InvoiceNo = "INV-V1-TYPE",
                 Type = "报关数据",
-                InvoiceDate = new DateTime(2026, 6, 26),
-                ShipmentDate = new DateTime(2026, 6, 26)
+                InvoiceDate = new DateOnly(2026, 6, 26),
+                ShipmentDate = new DateOnly(2026, 6, 26)
             });
             await Assert.ThrowsAsync<DbUpdateException>(() => verifyContext.SaveChangesAsync());
         }

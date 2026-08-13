@@ -9,7 +9,7 @@ namespace ExportDocManager.Services.Security
         string Description,
         bool IsSystem,
         bool IsActive,
-        DateTime UpdatedAt,
+        DateTimeOffset UpdatedAt,
         IReadOnlyList<PermissionTemplateModuleRecord> Modules);
 
     public sealed record PermissionTemplateSaveRequest(

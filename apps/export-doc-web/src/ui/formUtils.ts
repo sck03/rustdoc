@@ -74,6 +74,12 @@ export function formatDate(value?: string | null) {
     return "-";
   }
 
+  const dateOnly = toDateInputValue(value);
+  if (dateOnly) {
+    const [year, month, day] = dateOnly.split("-");
+    return `${Number(year)}/${Number(month)}/${Number(day)}`;
+  }
+
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("zh-CN");
 }

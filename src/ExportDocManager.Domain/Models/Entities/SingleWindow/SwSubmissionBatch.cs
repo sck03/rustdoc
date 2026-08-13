@@ -73,7 +73,7 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(520)]
         public string ClientDispatchPath { get; set; } = string.Empty;
 
-        public DateTime? LastClientDispatchAt { get; set; }
+        public DateTimeOffset? LastClientDispatchAt { get; set; }
 
         [MaxLength(40)]
         public string LastReceiptKind { get; set; } = string.Empty;
@@ -90,11 +90,11 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(80)]
         public string CreatedOnMachine { get; set; } = string.Empty;
 
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-        public DateTime UpdatedAt { get; set; } = DateTime.Now;
+        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-        public DateTime? LastReceiptAt { get; set; }
+        public DateTimeOffset? LastReceiptAt { get; set; }
 
         [MaxLength(64)]
         public string AssignedStationKey { get; set; } = string.Empty;

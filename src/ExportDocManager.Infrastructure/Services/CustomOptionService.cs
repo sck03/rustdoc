@@ -29,7 +29,7 @@ namespace ExportDocManager.Services.Infrastructure
             var values = await context.CustomOptions
                 .AsNoTracking()
                 .Where(option => option.OptionType == normalizedType)
-                .OrderByDescending(option => option.CreatedDate)
+                .OrderByDescending(option => option.CreatedAt)
                 .ThenByDescending(option => option.Id)
                 .Take(MaximumOptionsPerType)
                 .Select(option => option.OptionValue)
@@ -72,7 +72,7 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 OptionType = normalizedType,
                 OptionValue = normalizedValue,
-                CreatedDate = DateTime.Now
+                CreatedAt = DateTimeOffset.UtcNow
             }, cancellationToken);
             await context.SaveChangesAsync(cancellationToken);
         }

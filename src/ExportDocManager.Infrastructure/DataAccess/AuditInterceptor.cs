@@ -133,7 +133,7 @@ namespace ExportDocManager.DataAccess
                 {
                     EntityName = entry.Entity.GetType().Name,
                     Action = entry.State.ToString(),
-                    Timestamp = DateTime.UtcNow,
+                    Timestamp = DateTimeOffset.UtcNow,
                     UserId = _auditUserProvider.GetCurrentUserName()
                 };
 

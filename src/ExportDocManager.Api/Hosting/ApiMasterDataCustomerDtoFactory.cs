@@ -17,15 +17,16 @@ namespace ExportDocManager.Api.Hosting
                 customer.Id,
                 customer.CustomerNameEN ?? string.Empty,
                 customer.DisplayName ?? string.Empty,
-                customer.NotifyPartyName ?? string.Empty,
+                customer.NotifyPartyMode == NotifyPartyMode.Separate ? customer.NotifyPartyName ?? string.Empty : string.Empty,
                 customer.AddressEN ?? string.Empty,
-                customer.NotifyPartyAddress ?? string.Empty,
+                customer.NotifyPartyMode == NotifyPartyMode.Separate ? customer.NotifyPartyAddress ?? string.Empty : string.Empty,
                 customer.ContactPerson ?? string.Empty,
                 customer.Phone ?? string.Empty,
                 customer.Email ?? string.Empty,
                 customer.TaxId ?? string.Empty,
                 customer.Notes ?? string.Empty,
-                RowVersionToString(customer.RowVersion));
+                RowVersionToString(customer.RowVersion),
+                customer.NotifyPartyMode);
         }
 
         public static Customer ToCustomerForSave(ApiCustomerDto dto)
@@ -36,9 +37,10 @@ namespace ExportDocManager.Api.Hosting
             {
                 Id = dto.Id,
                 CustomerNameEN = dto.CustomerNameEN ?? string.Empty,
-                NotifyPartyName = dto.NotifyPartyName ?? string.Empty,
+                NotifyPartyMode = dto.NotifyPartyMode,
+                NotifyPartyName = dto.NotifyPartyMode == NotifyPartyMode.Separate ? dto.NotifyPartyName ?? string.Empty : string.Empty,
                 AddressEN = dto.AddressEN ?? string.Empty,
-                NotifyPartyAddress = dto.NotifyPartyAddress ?? string.Empty,
+                NotifyPartyAddress = dto.NotifyPartyMode == NotifyPartyMode.Separate ? dto.NotifyPartyAddress ?? string.Empty : string.Empty,
                 ContactPerson = dto.ContactPerson ?? string.Empty,
                 Phone = dto.Phone ?? string.Empty,
                 Email = dto.Email ?? string.Empty,

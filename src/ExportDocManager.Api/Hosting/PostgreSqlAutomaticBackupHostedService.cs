@@ -120,11 +120,11 @@ namespace ExportDocManager.Api.Hosting
             TimeSpan scheduledTime)
         {
             int daysSinceMonday = ((int)now.DayOfWeek + 6) % 7;
-            DateTime monday = now.Date.AddDays(-daysSinceMonday);
+            DateOnly monday = DateOnly.FromDateTime(now.Date).AddDays(-daysSinceMonday);
             int scheduledOffsetFromMonday = scheduledDayOfWeek == (int)DayOfWeek.Sunday
                 ? 6
                 : scheduledDayOfWeek - 1;
-            DateTime scheduledDate = monday.AddDays(scheduledOffsetFromMonday);
+            DateOnly scheduledDate = monday.AddDays(scheduledOffsetFromMonday);
             return new DateTimeOffset(
                 scheduledDate.Year,
                 scheduledDate.Month,

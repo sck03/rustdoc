@@ -80,7 +80,7 @@ namespace ExportDocManager.Api.Hosting
         public int WarningCount { get; set; }
         public string WarningSummary { get; set; } = string.Empty;
         public int DraftRevision { get; set; }
-        public DateTime LastGeneratedAt { get; set; } = DateTime.MinValue;
+        public DateTimeOffset? LastGeneratedAt { get; set; }
         public int SourceDiffCount { get; set; }
         public string SourceDiffSummary { get; set; } = string.Empty;
         public int ManualLockedFieldCount { get; set; }

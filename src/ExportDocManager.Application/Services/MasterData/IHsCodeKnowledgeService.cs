@@ -17,7 +17,7 @@ namespace ExportDocManager.Services.MasterData
         IReadOnlyList<string> ConflictWarnings,
         string StandardSource,
         int? EffectiveYear,
-        DateTime? LastVerifiedAt,
+        DateTimeOffset? LastVerifiedAt,
         bool CanUse);
 
     public sealed record HsCodeKnowledgeSearchResponse(

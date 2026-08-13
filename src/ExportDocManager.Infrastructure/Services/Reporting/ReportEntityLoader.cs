@@ -107,8 +107,15 @@ namespace ExportDocManager.Services.Reporting
         {
             if (!string.IsNullOrEmpty(invoice.CustomerNameEN)) customer.CustomerNameEN = invoice.CustomerNameEN;
             if (!string.IsNullOrEmpty(invoice.CustomerAddressEN)) customer.AddressEN = invoice.CustomerAddressEN;
-            if (!string.IsNullOrEmpty(invoice.NotifyPartyName)) customer.NotifyPartyName = invoice.NotifyPartyName;
-            if (!string.IsNullOrEmpty(invoice.NotifyPartyAddress)) customer.NotifyPartyAddress = invoice.NotifyPartyAddress;
+            customer.NotifyPartyMode = invoice.NotifyPartyMode;
+            var notifyParty = NotifyPartyModePolicy.ResolveForDocument(
+                invoice.NotifyPartyMode,
+                invoice.CustomerNameEN,
+                invoice.CustomerAddressEN,
+                invoice.NotifyPartyName,
+                invoice.NotifyPartyAddress);
+            customer.NotifyPartyName = notifyParty.Name;
+            customer.NotifyPartyAddress = notifyParty.Address;
         }
 
         private static void ApplyExporterSnapshot(Invoice invoice, Exporter exporter)

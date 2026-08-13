@@ -8,13 +8,13 @@ using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Opportunities;
 using ExportDocManager.Services.Reporting;
-using ExportDocManager.Services.BrowserRuntime;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Services.Suppliers;
 using ExportDocManager.Services.Tools;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Text.Json.Serialization;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -40,11 +40,13 @@ namespace ExportDocManager.Api.Hosting
             services.ConfigureHttpJsonOptions(options =>
             {
                 options.SerializerOptions.RespectNullableAnnotations = true;
+                options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
             });
             services.AddOpenApi("v1", options =>
             {
                 options.AddSchemaTransformer<NullableOpenApiSchemaTransformer>();
                 options.AddDocumentTransformer<ApiOpenApiDocumentTransformer>();
+                options.AddOperationTransformer<ApiOpenApiDocumentTransformer>();
             });
             services.AddSingleton(ApiDesktopAccessOptions.FromRuntimeOptions(runtimeOptions));
             services.AddLogging();
@@ -140,11 +142,8 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<ICustomOptionService, CustomOptionService>();
             services.AddScoped<ICustomerService, CustomerService>();
             services.AddScoped<ICrmService, CrmService>();
-            services.AddScoped<ICrmCustomerImportService, CrmCustomerImportService>();
-            services.AddScoped<ICrmCustomerExportService, CrmCustomerExportService>();
             services.AddScoped<ISupplierDirectoryService, SupplierDirectoryService>();
             services.AddScoped<ISupplierAssessmentService, SupplierAssessmentService>();
-            services.AddScoped<ISupplierFileService, SupplierFileService>();
             services.AddScoped<IEmailTemplateService, EmailTemplateService>();
             services.AddScoped<ISalesOpportunityService, SalesOpportunityService>();
             services.AddScoped<IExporterService, ExporterService>();
@@ -152,38 +151,31 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IPayeeService, PayeeService>();
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<IAuxiliaryService, AuxiliaryService>();
-            services.AddSingleton<BrowserRuntimeManager>();
-            services.AddSingleton<BrowserExecutableResolver>();
-            services.AddSingleton(provider => new ManagedPlaywrightBrowserHost(
-                provider.GetRequiredService<BrowserRuntimeManager>(),
-                provider.GetRequiredService<BrowserExecutableResolver>(),
-                pathProvider,
-                BrowserNavigationPolicy.I5a6Only));
-            services.AddSingleton<ManagedPlaywrightPdfBrowserHost>();
-            services.AddSingleton<IHsCodeRemoteProvider, I5a6HsCodeProvider>();
             services.AddScoped<IHsCodeKnowledgeService, HsCodeKnowledgeService>();
             services.AddScoped<IHsCodeService, HsCodeService>();
-            services.AddScoped<IPdfMergeService, PdfMergeService>();
+            services.AddScoped<IHtmlToPdfService, UnsupportedHtmlToPdfService>();
+            services.AddScoped<IPdfMergeService, UnsupportedPdfMergeService>();
+            services.AddScoped<IOcrService, UnsupportedOcrService>();
+            services.AddScoped<ILetterOfCreditDocumentService, UnsupportedLetterOfCreditDocumentService>();
+            services.AddScoped<IExcelImportAnalyzer, UnsupportedExcelImportAnalyzer>();
+            services.AddScoped<IExcelImportService, UnsupportedExcelImportService>();
+            services.AddScoped<IExcelImportTemplateService, UnsupportedExcelImportTemplateService>();
+            services.AddScoped<ICrmCustomerImportService, UnsupportedCrmCustomerImportService>();
+            services.AddScoped<ICrmCustomerExportService, UnsupportedCrmCustomerExportService>();
+            services.AddScoped<ISupplierFileService, UnsupportedSupplierFileService>();
+            services.AddScoped<IQueryResultExportService, UnsupportedQueryResultExportService>();
+            services.AddScoped<ISingleWindowReferenceCatalogExcelImportService, UnsupportedSingleWindowReferenceCatalogExcelImportService>();
+            services.AddScoped<IHsCodeImportService, UnsupportedHsCodeImportService>();
+            services.AddSingleton<IAuditLogExcelExporter, UnsupportedAuditLogExcelExporter>();
             services.AddScoped<IEmailService, SmtpEmailService>();
-            services.AddScoped<BuiltInExcelImportAnalyzer>();
-            services.AddScoped<IExcelImportAnalyzer, HybridExcelImportAnalyzer>();
-            services.AddScoped<IExcelImportService, ExcelImportService>();
-            services.AddScoped<IExcelImportTemplateService, ExcelImportTemplateService>();
             services.AddScoped<IContainerLoadingService, ContainerLoadingService>();
             services.AddSingleton<IContainerPackingEngine, ContainerPackingEngine>();
-            services.AddScoped<IOcrService, UnsupportedOcrService>();
-            services.AddSingleton<RustOcrSidecarHost>();
-            if (ApiOcrRuntimeOptions.IsEnabled() && File.Exists(RustOcrSidecarHost.FindExecutable(pathProvider)))
-            {
-                services.AddScoped<IOcrService, RustOcrService>();
-            }
 
             services.AddScoped<IAIService>(provider =>
                 new OpenAiCompatibleService(
                     provider.GetRequiredService<IHttpClientFactory>().CreateClient("AI"),
                     provider.GetRequiredService<ISettingsService>()));
             services.AddScoped<ILetterOfCreditComplianceReviewService, LetterOfCreditComplianceReviewService>();
-            services.AddScoped<ILetterOfCreditDocumentService, LetterOfCreditDocumentService>();
             services.AddScoped<IReportHtmlService, ReportHtmlService>();
             services.AddSingleton<IInvoiceProfitAnalysisService, InvoiceProfitAnalysisService>();
             services.AddScoped<IReportTemplateService, ReportTemplateService>();
@@ -191,11 +183,6 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IReportTemplateStorageDiagnosticsService, ReportTemplateStorageDiagnosticsService>();
             services.AddScoped<IReportTemplatePackageService, ReportTemplatePackageService>();
             services.AddSingleton<IReportTemplateFieldCatalogService, ReportTemplateFieldCatalogService>();
-            services.AddScoped<IHtmlToPdfService>(provider => new ChromiumHtmlToPdfService(
-                pathProvider,
-                provider.GetRequiredService<BrowserRuntimeManager>(),
-                provider.GetRequiredService<ManagedPlaywrightPdfBrowserHost>(),
-                provider.GetRequiredService<BrowserExecutableResolver>()));
             services.AddScoped<IReportPdfRenderService, ReportPdfRenderService>();
             services.AddScoped<SingleWindowTrackingService>();
             services.AddScoped<ISingleWindowTrackingService>(provider =>
@@ -224,12 +211,18 @@ namespace ExportDocManager.Api.Hosting
                 provider.GetRequiredService<SingleWindowDocumentPersistenceService>());
             services.AddScoped<ISingleWindowExportReviewService, SingleWindowExportReviewService>();
             services.AddScoped<ISingleWindowHandoffPackageService, SingleWindowHandoffPackageService>();
-            services.AddScoped<ISingleWindowReferenceCatalogExcelImportService, SingleWindowReferenceCatalogExcelImportService>();
+            var singleWindowCatalogStore = new SingleWindowReferenceCatalogSnapshotStore(
+                SingleWindowReferenceCatalogService.CreateSnapshot(pathProvider));
+            services.AddSingleton(singleWindowCatalogStore);
+            services.AddSingleton<ISingleWindowReferenceCatalogSnapshotProvider>(singleWindowCatalogStore);
             services.AddSingleton<ISingleWindowReferenceCatalogService>(_ =>
-                new SingleWindowReferenceCatalogService(pathProvider));
-            ConfigureSingleWindowReferenceCatalogLoaders(pathProvider);
+                new SingleWindowReferenceCatalogService(pathProvider, singleWindowCatalogStore));
             services.AddMasterDataReadRepositories();
             services.AddSharedReadRepositories();
+            foreach (var module in ExportDocCapabilityModuleLoader.Load())
+            {
+                module.RegisterServices(services, pathProvider);
+            }
             services.AddDbContextFactory<AppDbContext>((serviceProvider, options) =>
             {
                 DbHelper.ConfigureDbContextOptions(options, databaseSettings, pathProvider);
@@ -237,23 +230,6 @@ namespace ExportDocManager.Api.Hosting
             });
 
             return services;
-        }
-
-        private static void ConfigureSingleWindowReferenceCatalogLoaders(IAppPathProvider pathProvider)
-        {
-            CustomsCooIssuingAuthorityCatalog.ConfigureEntrySnapshotLoader(
-                () => CustomsCooIssuingAuthorityFileLoader.LoadEntriesFromFiles(
-                    Path.Combine(pathProvider.ResourceRoot, "SingleWindow", "customs_coo_issuing_authorities.json"),
-                    Path.Combine(pathProvider.ResourceRoot, "SingleWindow", "customs_coo_issuing_authorities.address_overrides.json"),
-                    Path.Combine(pathProvider.SingleWindowRoot, "customs_coo_issuing_authorities.override.json")));
-            SingleWindowFieldMapperHelpers.ConfigureReferenceCatalogSnapshotLoader(
-                () => SingleWindowReferenceCatalogService.LoadEffectiveCatalogSnapshot(pathProvider));
-            SingleWindowReferenceCatalogs.ConfigureReferenceCatalogSnapshotLoader(
-                () => SingleWindowReferenceCatalogService.LoadEffectiveCatalogSnapshot(pathProvider));
-            SingleWindowReferenceCatalogService.ReferenceCatalogChanged -= SingleWindowFieldMapperHelpers.ReloadReferenceCatalog;
-            SingleWindowReferenceCatalogService.ReferenceCatalogChanged += SingleWindowFieldMapperHelpers.ReloadReferenceCatalog;
-            SingleWindowReferenceCatalogService.ReferenceCatalogChanged -= SingleWindowReferenceCatalogs.Reload;
-            SingleWindowReferenceCatalogService.ReferenceCatalogChanged += SingleWindowReferenceCatalogs.Reload;
         }
 
         private static IServiceCollection AddMasterDataReadRepositories(this IServiceCollection services)
@@ -290,8 +266,6 @@ namespace ExportDocManager.Api.Hosting
                 provider.GetRequiredService<LocalSharedReadRepository>());
             services.AddScoped<IAuditLogReadRepository>(provider =>
                 provider.GetRequiredService<LocalSharedReadRepository>());
-            services.AddScoped<IQueryResultExportService, QueryResultExportService>();
-
             return services;
         }
     }

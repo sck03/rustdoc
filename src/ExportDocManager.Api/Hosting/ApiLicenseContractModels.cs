@@ -9,7 +9,7 @@ namespace ExportDocManager.Api.Hosting
         int DaysRemaining,
         string MachineId,
         string Message,
-        DateTime ExpireDate,
+        DateOnly ExpireDate,
         string LicenseStoragePath,
         string StoragePolicy);
 

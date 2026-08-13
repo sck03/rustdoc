@@ -29,7 +29,7 @@ namespace ExportDocManager.DataAccess
                 return string.Empty;
             }
 
-            string? decrypted = SecurityHelper.Decrypt(configuredValue);
+            string? decrypted = new LocalSecretProtector(pathProvider).Unprotect(configuredValue);
             if (decrypted == null)
             {
                 throw new ServiceValidationException(

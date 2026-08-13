@@ -16,11 +16,11 @@ namespace ExportDocManager.Infrastructure.Tests
             await using (var context = await factory.CreateDbContextAsync())
             {
                 context.Invoices.AddRange(
-                    new Invoice { InvoiceNo = "OWN-INV", Type = "实际数据", OwnerUserId = 7, InvoiceDate = new DateTime(2026, 4, 1), ShipmentDate = new DateTime(2026, 4, 1) },
-                    new Invoice { InvoiceNo = "OTHER-INV", Type = "实际数据", OwnerUserId = 8, InvoiceDate = new DateTime(2026, 4, 2), ShipmentDate = new DateTime(2026, 4, 2) });
+                    new Invoice { InvoiceNo = "OWN-INV", Type = "实际数据", OwnerUserId = 7, InvoiceDate = new DateOnly(2026, 4, 1), ShipmentDate = new DateOnly(2026, 4, 1) },
+                    new Invoice { InvoiceNo = "OTHER-INV", Type = "实际数据", OwnerUserId = 8, InvoiceDate = new DateOnly(2026, 4, 2), ShipmentDate = new DateOnly(2026, 4, 2) });
                 context.Payments.AddRange(
-                    new Payment { InvoiceNo = "OWN-PAY", OwnerUserId = 7, PaymentDate = new DateTime(2026, 4, 1) },
-                    new Payment { InvoiceNo = "OTHER-PAY", OwnerUserId = 8, PaymentDate = new DateTime(2026, 4, 2) });
+                    new Payment { InvoiceNo = "OWN-PAY", OwnerUserId = 7, PaymentDate = new DateOnly(2026, 4, 1) },
+                    new Payment { InvoiceNo = "OTHER-PAY", OwnerUserId = 8, PaymentDate = new DateOnly(2026, 4, 2) });
                 await context.SaveChangesAsync();
             }
 
@@ -63,8 +63,8 @@ namespace ExportDocManager.Infrastructure.Tests
             await using (var context = await factory.CreateDbContextAsync())
             {
                 context.Invoices.AddRange(
-                    new Invoice { InvoiceNo = "ADMIN-OWN", Type = "实际数据", OwnerUserId = 1, InvoiceDate = new DateTime(2026, 4, 1), ShipmentDate = new DateTime(2026, 4, 1) },
-                    new Invoice { InvoiceNo = "ADMIN-OTHER", Type = "实际数据", OwnerUserId = 2, InvoiceDate = new DateTime(2026, 4, 2), ShipmentDate = new DateTime(2026, 4, 2) });
+                    new Invoice { InvoiceNo = "ADMIN-OWN", Type = "实际数据", OwnerUserId = 1, InvoiceDate = new DateOnly(2026, 4, 1), ShipmentDate = new DateOnly(2026, 4, 1) },
+                    new Invoice { InvoiceNo = "ADMIN-OTHER", Type = "实际数据", OwnerUserId = 2, InvoiceDate = new DateOnly(2026, 4, 2), ShipmentDate = new DateOnly(2026, 4, 2) });
                 await context.SaveChangesAsync();
             }
 

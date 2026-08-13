@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using ClosedXML.Excel;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Utils;
@@ -14,26 +13,18 @@ namespace ExportDocManager.Services.Infrastructure
     public class AuditLogService : IAuditLogService
     {
         private const int DeleteBatchSize = 900;
-        private static readonly IReadOnlyList<(string Header, double Width)> ExportColumns =
-        [
-            ("时间", 20),
-            ("实体", 16),
-            ("动作", 12),
-            ("实体ID", 22),
-            ("操作人", 16),
-            ("变更前", 50),
-            ("变更后", 50)
-        ];
-
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly IAuditLogReadRepository _auditLogReadRepository;
+        private readonly IAuditLogExcelExporter _excelExporter;
 
         public AuditLogService(
             IDbContextFactory<AppDbContext> contextFactory,
-            IAuditLogReadRepository auditLogReadRepository)
+            IAuditLogReadRepository auditLogReadRepository,
+            IAuditLogExcelExporter? excelExporter = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _auditLogReadRepository = auditLogReadRepository ?? throw new ArgumentNullException(nameof(auditLogReadRepository));
+            _excelExporter = excelExporter ?? new UnsupportedAuditLogExcelExporter();
         }
 
         public async Task<List<AuditLog>> QueryAsync(
@@ -68,12 +59,7 @@ namespace ExportDocManager.Services.Infrastructure
                 Math.Max(1, maxCount),
                 cancellationToken);
 
-            await AtomicFileHelper.WriteFileAtomicAsync(
-                destinationPath,
-                (tempFilePath, ct) => Task.Run(
-                    () => WriteAuditLogWorkbook(tempFilePath, rows, ct),
-                    ct),
-                cancellationToken);
+            await _excelExporter.ExportAsync(rows, destinationPath, cancellationToken);
 
             return rows.Count;
         }
@@ -88,11 +74,7 @@ namespace ExportDocManager.Services.Infrastructure
                 Math.Max(1, maxCount),
                 cancellationToken);
 
-            await using var output = new MemoryStream();
-            await Task.Run(
-                () => WriteAuditLogWorkbook(output, rows, cancellationToken),
-                cancellationToken);
-            return output.ToArray();
+            return await _excelExporter.ExportBytesAsync(rows, cancellationToken);
         }
 
         public async Task<int> DeleteByCriteriaAsync(
@@ -108,7 +90,7 @@ namespace ExportDocManager.Services.Infrastructure
         }
 
         public async Task<int> DeleteOlderThanAsync(
-            DateTime cutoffUtc,
+            DateTimeOffset cutoffUtc,
             int maxCount = 200000,
             CancellationToken cancellationToken = default)
         {
@@ -160,50 +142,5 @@ namespace ExportDocManager.Services.Infrastructure
                 cancellationToken);
         }
 
-        private static void WriteAuditLogWorkbook(
-            string filePath,
-            IReadOnlyList<AuditLog> rows,
-            CancellationToken cancellationToken)
-        {
-            using var output = File.Create(filePath);
-            WriteAuditLogWorkbook(output, rows, cancellationToken);
-        }
-
-        private static void WriteAuditLogWorkbook(
-            Stream output,
-            IReadOnlyList<AuditLog> rows,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            using var workbook = new XLWorkbook();
-            var worksheet = workbook.Worksheets.Add("AuditLogs");
-
-            for (int index = 0; index < ExportColumns.Count; index++)
-            {
-                var column = ExportColumns[index];
-                int columnNumber = index + 1;
-                worksheet.Cell(1, columnNumber).Value = column.Header;
-                worksheet.Cell(1, columnNumber).Style.Font.Bold = true;
-                worksheet.Column(columnNumber).Width = column.Width;
-            }
-
-            int rowNumber = 2;
-            foreach (var row in rows)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                worksheet.Cell(rowNumber, 1).Value = row.Timestamp.ToString("yyyy-MM-dd HH:mm:ss");
-                worksheet.Cell(rowNumber, 2).Value = row.EntityName ?? string.Empty;
-                worksheet.Cell(rowNumber, 3).Value = row.Action ?? string.Empty;
-                worksheet.Cell(rowNumber, 4).Value = row.EntityId ?? string.Empty;
-                worksheet.Cell(rowNumber, 5).Value = row.UserId ?? string.Empty;
-                worksheet.Cell(rowNumber, 6).Value = row.OldValues ?? string.Empty;
-                worksheet.Cell(rowNumber, 7).Value = row.NewValues ?? string.Empty;
-                rowNumber++;
-            }
-
-            worksheet.Range(1, 1, 1, ExportColumns.Count).SetAutoFilter();
-            worksheet.SheetView.FreezeRows(1);
-            workbook.SaveAs(output);
-        }
     }
 }

@@ -204,7 +204,7 @@ namespace ExportDocManager.Services.Core
                     Policy = "Administrator cancelled-invoice purge"
                 }),
                 UserId = string.IsNullOrWhiteSpace(username) ? "Api" : username.Trim(),
-                Timestamp = DateTime.UtcNow
+                Timestamp = DateTimeOffset.UtcNow
             };
         }
     }

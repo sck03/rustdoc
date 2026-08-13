@@ -75,9 +75,9 @@ namespace ExportDocManager.Shared.Security
             string machineId,
             string licenseKey,
             string publicKeyBase64,
-            out DateTime expireDate)
+            out DateOnly expireDate)
         {
-            expireDate = DateTime.MinValue;
+            expireDate = default;
             machineId = LicenseValueNormalizer.NormalizeMachineId(machineId);
             licenseKey = LicenseValueNormalizer.NormalizeLicenseKey(licenseKey);
             if (string.IsNullOrEmpty(machineId) ||
@@ -125,31 +125,31 @@ namespace ExportDocManager.Shared.Security
             }
             catch (CryptographicException)
             {
-                expireDate = DateTime.MinValue;
+                expireDate = default;
                 return false;
             }
             catch (FormatException)
             {
-                expireDate = DateTime.MinValue;
+                expireDate = default;
                 return false;
             }
             catch (JsonException)
             {
-                expireDate = DateTime.MinValue;
+                expireDate = default;
                 return false;
             }
             catch (ArgumentOutOfRangeException)
             {
-                expireDate = DateTime.MinValue;
+                expireDate = default;
                 return false;
             }
         }
 
-        private static DateTime DecodeSignedExpireDate(long timestamp)
+        private static DateOnly DecodeSignedExpireDate(long timestamp)
         {
             return timestamp == SignedLifetimeTimestamp
-                ? DateTime.MaxValue
-                : DateTimeOffset.FromUnixTimeSeconds(timestamp).LocalDateTime;
+                ? DateOnly.MaxValue
+                : DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(timestamp).LocalDateTime);
         }
 
         private static byte[] Base64UrlDecode(string value)

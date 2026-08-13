@@ -76,8 +76,8 @@ namespace ExportDocManager.Models.Entities
         [Display(Name = "默认单价")]
         public decimal DefaultPrice { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
-        public DateTime UpdatedAt { get; set; } = DateTime.Now;
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
         [ConcurrencyCheck]
         public byte[]? RowVersion { get; set; }

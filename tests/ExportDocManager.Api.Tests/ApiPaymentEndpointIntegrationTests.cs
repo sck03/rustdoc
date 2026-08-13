@@ -69,7 +69,7 @@ namespace ExportDocManager.Api.Tests
             {
                 invoiceNo = "PAY-SEAL-REJECT",
                 payerName = "Payment Payer",
-                paymentDate = new DateTime(2026, 6, 2),
+                paymentDate = new DateOnly(2026, 6, 2),
                 customsSealPath = "should-never-enter-payment-domain.png"
             });
             Assert.Equal(HttpStatusCode.BadRequest, sealBearingCreateResponse.StatusCode);
@@ -77,7 +77,7 @@ namespace ExportDocManager.Api.Tests
             var createResponse = await adminClient.PostAsJsonAsync("/api/payments", new
             {
                 invoiceNo = "PAY-API-001",
-                shipmentDate = new DateTime(2026, 6, 1),
+                shipmentDate = new DateOnly(2026, 6, 1),
                 payeeId = 0,
                 department = "Sales",
                 project = "Tauri",
@@ -89,11 +89,11 @@ namespace ExportDocManager.Api.Tests
                 bankName = "Bank",
                 accountNo = "ACC-001",
                 notes = "Created from API test",
-                paymentDate = new DateTime(2026, 6, 2),
+                paymentDate = new DateOnly(2026, 6, 2),
                 goodsName = "Coat",
                 quantity = "20 PCS",
                 shipmentCountry = "US",
-                receiptDate = new DateTime(2026, 6, 3),
+                receiptDate = new DateOnly(2026, 6, 3),
                 travelExpense = 1m,
                 businessEntertainmentExpense = 2m,
                 telephoneExpense = 3m,
@@ -147,7 +147,7 @@ namespace ExportDocManager.Api.Tests
             {
                 id = created.Id,
                 invoiceNo = "PAY-API-001",
-                shipmentDate = new DateTime(2026, 6, 1),
+                shipmentDate = new DateOnly(2026, 6, 1),
                 payeeId = 0,
                 department = "Finance",
                 project = "Tauri",
@@ -159,11 +159,11 @@ namespace ExportDocManager.Api.Tests
                 bankName = "Bank",
                 accountNo = "ACC-001",
                 notes = "Updated from API test",
-                paymentDate = new DateTime(2026, 6, 4),
+                paymentDate = new DateOnly(2026, 6, 4),
                 goodsName = "Coat",
                 quantity = "25 PCS",
                 shipmentCountry = "US",
-                receiptDate = new DateTime(2026, 6, 5),
+                receiptDate = new DateOnly(2026, 6, 5),
                 travelExpense = 1m,
                 businessEntertainmentExpense = 2m,
                 telephoneExpense = 3m,

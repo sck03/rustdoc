@@ -24,6 +24,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\ExportDocManager.Application\ExportDocManager.Application.csproj" />
     <ProjectReference Include="..\..\src\ExportDocManager.Infrastructure\ExportDocManager.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\ExportDocManager.Infrastructure.Excel\ExportDocManager.Infrastructure.Excel.csproj" />
+    <ProjectReference Include="..\..\src\ExportDocManager.Infrastructure.Browser\ExportDocManager.Infrastructure.Browser.csproj" />
+    <ProjectReference Include="..\..\src\ExportDocManager.Infrastructure.PdfOcr\ExportDocManager.Infrastructure.PdfOcr.csproj" />
   </ItemGroup>
 
 </Project>

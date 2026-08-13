@@ -15,14 +15,12 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             var appRoot = CreateTempDirectory();
             var dataRoot = CreateTempDirectory();
-            var previousProvider = new RuntimeAppPathProvider();
 
             try
             {
                 var provider = new RuntimeAppPathProvider(appRoot, dataRoot);
-                DbHelper.ConfigurePathProvider(provider);
 
-                var path = DbHelper.GetDatabasePath(Path.Combine("tenant-a", "exportdoc.db"));
+                var path = DbHelper.GetDatabasePath(provider, Path.Combine("tenant-a", "exportdoc.db"));
 
                 Assert.Equal(
                     Path.Combine(provider.DatabaseRoot, "tenant-a", "exportdoc.db"),
@@ -31,7 +29,6 @@ namespace ExportDocManager.Infrastructure.Tests
             }
             finally
             {
-                DbHelper.ConfigurePathProvider(previousProvider);
                 DeleteDirectory(appRoot);
                 DeleteDirectory(dataRoot);
             }
@@ -41,12 +38,10 @@ namespace ExportDocManager.Infrastructure.Tests
         public void LoadDatabaseSettings_ShouldReadOnlyDatabaseFieldsFromSettingsJson()
         {
             var appRoot = CreateTempDirectory();
-            var previousProvider = new RuntimeAppPathProvider();
 
             try
             {
                 var provider = new RuntimeAppPathProvider(appRoot);
-                DbHelper.ConfigurePathProvider(provider);
 
                 var settingsPath = Path.Combine(provider.ConfigRoot, "appsettings.json");
                 var json = JsonSerializer.Serialize(new
@@ -59,14 +54,14 @@ namespace ExportDocManager.Infrastructure.Tests
                         PostgreSqlPort = 0,
                         PostgreSqlDatabase = " exportdoc ",
                         PostgreSqlUsername = " shared_user ",
-                        PostgreSqlPassword = SecurityHelper.Encrypt("secret"),
+                        PostgreSqlPassword = new LocalSecretProtector(provider).Protect("secret"),
                         PostgreSqlAdditionalOptions = " SSL Mode=Prefer; "
                     },
                     OtherSection = new { Value = "ignored" }
                 });
                 File.WriteAllText(settingsPath, json);
 
-                var settings = DbHelper.LoadDatabaseSettings();
+                var settings = DbHelper.LoadDatabaseSettings(provider);
 
                 Assert.Equal(DatabaseConnectionSettings.PostgreSqlProvider, settings.Provider);
                 Assert.Equal("custom.db", settings.SqliteDatabaseFileName);
@@ -79,7 +74,6 @@ namespace ExportDocManager.Infrastructure.Tests
             }
             finally
             {
-                DbHelper.ConfigurePathProvider(previousProvider);
                 DeleteDirectory(appRoot);
             }
         }
@@ -88,13 +82,11 @@ namespace ExportDocManager.Infrastructure.Tests
         public void LoadDatabaseSettings_ShouldPreferRuntimePasswordEnvironmentVariable()
         {
             var appRoot = CreateTempDirectory();
-            var previousProvider = new RuntimeAppPathProvider();
             string? previousPassword = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable);
             string? previousFile = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable);
             try
             {
                 var provider = new RuntimeAppPathProvider(appRoot);
-                DbHelper.ConfigurePathProvider(provider);
                 Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable, null);
                 Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable, "environment-secret");
                 File.WriteAllText(
@@ -111,13 +103,12 @@ namespace ExportDocManager.Infrastructure.Tests
                     }
                     """);
 
-                Assert.Equal("environment-secret", DbHelper.LoadDatabaseSettings().PostgreSqlPassword);
+                Assert.Equal("environment-secret", DbHelper.LoadDatabaseSettings(provider).PostgreSqlPassword);
             }
             finally
             {
                 Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable, previousPassword);
                 Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable, previousFile);
-                DbHelper.ConfigurePathProvider(previousProvider);
                 DeleteDirectory(appRoot);
             }
         }
@@ -126,13 +117,11 @@ namespace ExportDocManager.Infrastructure.Tests
         public void LoadDatabaseSettings_ShouldReadRelativePasswordFileFromSecurityRoot()
         {
             var appRoot = CreateTempDirectory();
-            var previousProvider = new RuntimeAppPathProvider();
             string? previousPassword = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable);
             string? previousFile = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable);
             try
             {
                 var provider = new RuntimeAppPathProvider(appRoot);
-                DbHelper.ConfigurePathProvider(provider);
                 Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable, "lower-priority-secret");
                 Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable, "postgres.password");
                 File.WriteAllText(Path.Combine(provider.SecurityRoot, "postgres.password"), "file-secret\r\n");
@@ -142,13 +131,12 @@ namespace ExportDocManager.Infrastructure.Tests
                     { "System": { "DatabaseProvider": "PostgreSQL", "PostgreSqlPassword": "" } }
                     """);
 
-                Assert.Equal("file-secret", DbHelper.LoadDatabaseSettings().PostgreSqlPassword);
+                Assert.Equal("file-secret", DbHelper.LoadDatabaseSettings(provider).PostgreSqlPassword);
             }
             finally
             {
                 Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable, previousPassword);
                 Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable, previousFile);
-                DbHelper.ConfigurePathProvider(previousProvider);
                 DeleteDirectory(appRoot);
             }
         }
@@ -157,13 +145,11 @@ namespace ExportDocManager.Infrastructure.Tests
         public void LoadDatabaseSettings_ShouldRejectPlaintextConfiguredPassword()
         {
             var appRoot = CreateTempDirectory();
-            var previousProvider = new RuntimeAppPathProvider();
             string? previousPassword = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable);
             string? previousFile = Environment.GetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable);
             try
             {
                 var provider = new RuntimeAppPathProvider(appRoot);
-                DbHelper.ConfigurePathProvider(provider);
                 Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable, null);
                 Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable, null);
                 File.WriteAllText(
@@ -172,14 +158,13 @@ namespace ExportDocManager.Infrastructure.Tests
                     { "System": { "DatabaseProvider": "PostgreSQL", "PostgreSqlPassword": "plain-secret" } }
                     """);
 
-                var error = Assert.Throws<ServiceValidationException>(() => DbHelper.LoadDatabaseSettings());
+                var error = Assert.Throws<ServiceValidationException>(() => DbHelper.LoadDatabaseSettings(provider));
                 Assert.Contains("不能以明文", error.Message, StringComparison.Ordinal);
             }
             finally
             {
                 Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordEnvironmentVariable, previousPassword);
                 Environment.SetEnvironmentVariable(DbHelper.PostgreSqlPasswordFileEnvironmentVariable, previousFile);
-                DbHelper.ConfigurePathProvider(previousProvider);
                 DeleteDirectory(appRoot);
             }
         }

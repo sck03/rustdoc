@@ -1,6 +1,6 @@
 namespace ExportDocManager.Services.SingleWindow
 {
-    public static partial class SingleWindowFieldMapperHelpers
+    public sealed partial class SingleWindowFieldMapperHelpers
     {
         public static string FormatDecimal(decimal value, int decimals) =>
             SingleWindowFieldValidationHelper.FormatDecimal(value, decimals);

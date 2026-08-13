@@ -23,11 +23,9 @@ namespace ExportDocManager.Services.Infrastructure
         {
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var localNow = DateTime.Now;
-            var localStartOfMonth = new DateTime(localNow.Year, localNow.Month, 1, 0, 0, 0, DateTimeKind.Unspecified);
-            var localEndOfMonth = localStartOfMonth.AddMonths(1);
-            var startOfMonth = TimeZoneInfo.ConvertTimeToUtc(localStartOfMonth, TimeZoneInfo.Local);
-            var endOfMonth = TimeZoneInfo.ConvertTimeToUtc(localEndOfMonth, TimeZoneInfo.Local);
-            var previousStartOfMonth = TimeZoneInfo.ConvertTimeToUtc(localStartOfMonth.AddMonths(-1), TimeZoneInfo.Local);
+            var startOfMonth = new DateOnly(localNow.Year, localNow.Month, 1);
+            var endOfMonth = startOfMonth.AddMonths(1);
+            var previousStartOfMonth = startOfMonth.AddMonths(-1);
             var scopedInvoices = _businessDataAccessScope.ApplyInvoiceScope(context.Invoices.AsNoTracking());
             var activeInvoices = BuildPreferredInvoiceQuery(
                 scopedInvoices.Where(invoice => invoice.Status != InvoiceStatusCatalog.Cancelled));
@@ -93,9 +91,9 @@ namespace ExportDocManager.Services.Infrastructure
         private static async Task<DashboardPeriodAggregates> LoadPeriodAggregatesAsync(
             AppDbContext context,
             IQueryable<Invoice> activeInvoices,
-            DateTime previousStartOfMonth,
-            DateTime startOfMonth,
-            DateTime endOfMonth,
+            DateOnly previousStartOfMonth,
+            DateOnly startOfMonth,
+            DateOnly endOfMonth,
             CancellationToken cancellationToken)
         {
             var periodQuery = activeInvoices.Where(invoice =>

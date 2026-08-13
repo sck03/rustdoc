@@ -11,6 +11,9 @@
     <ExportDocIncludeOcrRuntime Condition="'$(ExportDocIncludeOcrRuntime)' == ''">true</ExportDocIncludeOcrRuntime>
     <ExportDocIncludeBusinessResources Condition="'$(ExportDocIncludeBusinessResources)' == ''">true</ExportDocIncludeBusinessResources>
     <ExportDocIncludePlaywrightRuntime Condition="'$(ExportDocIncludePlaywrightRuntime)' == ''">true</ExportDocIncludePlaywrightRuntime>
+    <ExportDocIncludeExcelModule Condition="'$(ExportDocIncludeExcelModule)' == ''">true</ExportDocIncludeExcelModule>
+    <ExportDocIncludeBrowserModule Condition="'$(ExportDocIncludeBrowserModule)' == ''">true</ExportDocIncludeBrowserModule>
+    <ExportDocIncludePdfOcrModule Condition="'$(ExportDocIncludePdfOcrModule)' == ''">true</ExportDocIncludePdfOcrModule>
     <ExportDocIncludeBundledBrowser Condition="'$(ExportDocIncludeBundledBrowser)' == '' and '$(ExportDocPackageProfile)' == 'Container'">false</ExportDocIncludeBundledBrowser>
     <ExportDocIncludeBundledBrowser Condition="'$(ExportDocIncludeBundledBrowser)' == ''">true</ExportDocIncludeBundledBrowser>
   </PropertyGroup>
@@ -19,6 +22,12 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <ProjectReference Include="..\ExportDocManager.Application\ExportDocManager.Application.csproj" />
     <ProjectReference Include="..\ExportDocManager.Infrastructure\ExportDocManager.Infrastructure.csproj" />
+    <ProjectReference Include="..\ExportDocManager.Infrastructure.Excel\ExportDocManager.Infrastructure.Excel.csproj"
+                      Condition="'$(ExportDocIncludeExcelModule)' == 'true'" />
+    <ProjectReference Include="..\ExportDocManager.Infrastructure.Browser\ExportDocManager.Infrastructure.Browser.csproj"
+                      Condition="'$(ExportDocIncludeBrowserModule)' == 'true'" />
+    <ProjectReference Include="..\ExportDocManager.Infrastructure.PdfOcr\ExportDocManager.Infrastructure.PdfOcr.csproj"
+                      Condition="'$(ExportDocIncludePdfOcrModule)' == 'true'" />
   </ItemGroup>
 
   <ItemGroup>

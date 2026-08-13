@@ -20,16 +20,16 @@ namespace ExportDocManager.Infrastructure.Tests
                         InvoiceNo = "OWN-INV",
                         Type = "实际数据",
                         OwnerUserId = 7,
-                        InvoiceDate = new DateTime(2026, 6, 22),
-                        ShipmentDate = new DateTime(2026, 6, 22)
+                        InvoiceDate = new DateOnly(2026, 6, 22),
+                        ShipmentDate = new DateOnly(2026, 6, 22)
                     },
                     new Invoice
                     {
                         InvoiceNo = "FOREIGN-INV",
                         Type = "实际数据",
                         OwnerUserId = 8,
-                        InvoiceDate = new DateTime(2026, 6, 22),
-                        ShipmentDate = new DateTime(2026, 6, 22)
+                        InvoiceDate = new DateOnly(2026, 6, 22),
+                        ShipmentDate = new DateOnly(2026, 6, 22)
                     });
                 await seedContext.SaveChangesAsync();
             }
@@ -173,16 +173,16 @@ namespace ExportDocManager.Infrastructure.Tests
                     InvoiceNo = "OWN-SW",
                     Type = "实际数据",
                     OwnerUserId = 7,
-                    InvoiceDate = new DateTime(2026, 6, 22),
-                    ShipmentDate = new DateTime(2026, 6, 22)
+                    InvoiceDate = new DateOnly(2026, 6, 22),
+                    ShipmentDate = new DateOnly(2026, 6, 22)
                 };
                 var foreignInvoice = new Invoice
                 {
                     InvoiceNo = "FOREIGN-SW",
                     Type = "实际数据",
                     OwnerUserId = 8,
-                    InvoiceDate = new DateTime(2026, 6, 22),
-                    ShipmentDate = new DateTime(2026, 6, 22)
+                    InvoiceDate = new DateOnly(2026, 6, 22),
+                    ShipmentDate = new DateOnly(2026, 6, 22)
                 };
                 seedContext.Invoices.AddRange(ownInvoice, foreignInvoice);
                 await seedContext.SaveChangesAsync();

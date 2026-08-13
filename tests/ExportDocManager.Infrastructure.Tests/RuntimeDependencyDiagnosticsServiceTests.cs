@@ -46,7 +46,10 @@ namespace ExportDocManager.Infrastructure.Tests
                 var browserResolver = new BrowserExecutableResolver(pathProvider, _ => { });
                 var missingRuntimeDiagnostics = new RuntimeDependencyDiagnosticsService(
                     pathProvider,
-                    browserResolver).Inspect();
+                    [
+                        new BrowserRuntimeDiagnosticContributor(pathProvider, browserResolver),
+                        new OcrRuntimeDiagnosticContributor(pathProvider)
+                    ]).Inspect();
                 var incompleteOcr = Assert.Single(
                     missingRuntimeDiagnostics,
                     item => item.Key == "ocr-runtime");
@@ -64,7 +67,10 @@ namespace ExportDocManager.Infrastructure.Tests
                 File.WriteAllBytes(onnxRuntime, [0x01]);
                 var diagnostics = new RuntimeDependencyDiagnosticsService(
                     pathProvider,
-                    browserResolver).Inspect();
+                    [
+                        new BrowserRuntimeDiagnosticContributor(pathProvider, browserResolver),
+                        new OcrRuntimeDiagnosticContributor(pathProvider)
+                    ]).Inspect();
 
                 var renderer = Assert.Single(diagnostics, item => item.Key == "report-renderer");
                 Assert.True(renderer.Ready);
@@ -85,7 +91,14 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 string missingAppRoot = Path.Combine(root, "missing-app");
                 var missingPaths = new RuntimeAppPathProvider(missingAppRoot, Path.Combine(root, "missing-data"));
-                var missingDiagnostics = new RuntimeDependencyDiagnosticsService(missingPaths).Inspect();
+                var missingDiagnostics = new RuntimeDependencyDiagnosticsService(
+                    missingPaths,
+                    [
+                        new BrowserRuntimeDiagnosticContributor(
+                            missingPaths,
+                            new BrowserExecutableResolver(missingPaths, _ => { })),
+                        new OcrRuntimeDiagnosticContributor(missingPaths)
+                    ]).Inspect();
                 Assert.Contains(missingDiagnostics, item => item.Key == "report-renderer" && item.Status == "missing");
                 Assert.Contains(missingDiagnostics, item => item.Key == "browser-automation" && item.Status == "missing");
                 Assert.Contains(missingDiagnostics, item => item.Key == "postgresql-tools" && item.Status == "missing");
@@ -116,8 +129,16 @@ namespace ExportDocManager.Infrastructure.Tests
                 Environment.SetEnvironmentVariable(
                     BrowserCdpEndpointPolicy.EndpointEnvironmentVariable,
                     "http://browser:9222/");
+                var paths = new RuntimeAppPathProvider(
+                    Path.Combine(root, "app"),
+                    Path.Combine(root, "data"));
                 var diagnostics = new RuntimeDependencyDiagnosticsService(
-                    new RuntimeAppPathProvider(Path.Combine(root, "app"), Path.Combine(root, "data")))
+                    paths,
+                    [
+                        new BrowserRuntimeDiagnosticContributor(
+                            paths,
+                            new BrowserExecutableResolver(paths, _ => { }))
+                    ])
                     .Inspect();
 
                 var renderer = Assert.Single(diagnostics, item => item.Key == "report-renderer");

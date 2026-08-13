@@ -29,11 +29,13 @@ export type MasterDataFieldDefinition = {
   label: string;
   className?: string;
   type?: MasterDataFieldType;
+  options?: Array<{ value: string; label: string }>;
   customOptionType?: string;
   pathPicker?: "exporterSealImage";
   productAssistanceField?: ProductAssistanceField;
   required?: boolean;
   readOnlyOnEdit?: boolean;
+  visibleWhen?: (record: MasterDataRecord) => boolean;
 };
 
 export type MasterDataSectionDefinition = {
@@ -53,6 +55,7 @@ export type MasterDataEntityConfig = {
   columns: MasterDataColumnDefinition[];
   sections: MasterDataSectionDefinition[];
   emptyRecord: () => MasterDataRecord;
+  applyFieldChange?: (record: MasterDataRecord, name: string, value: string | number) => MasterDataRecord;
   normalizeRecord: (record: MasterDataRecord, id: number) => MasterDataRecord;
   list: (client: ExportDocManagerApiClient, request: { keyword: string; pageNumber: number; pageSize: number }, signal?: AbortSignal) => Promise<MasterDataListResult>;
   get: (client: ExportDocManagerApiClient, recordKey: string, signal?: AbortSignal) => Promise<MasterDataRecord>;

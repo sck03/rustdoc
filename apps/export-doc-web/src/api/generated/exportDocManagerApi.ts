@@ -28,7 +28,7 @@ export interface ApiAgentConsignmentDocumentDto {
   id: number;
   ieDate: string;
   invoiceNo: string;
-  lastGeneratedAt: string;
+  lastGeneratedAt?: string | null;
   listNo: string;
   manualLockedFieldCount: number;
   operType: string;
@@ -517,6 +517,7 @@ export interface ApiCustomerDto {
   id: number;
   notes: string;
   notifyPartyAddress: string;
+  notifyPartyMode: NotifyPartyMode;
   notifyPartyName: string;
   phone: string;
   rowVersion: string;
@@ -587,7 +588,7 @@ export interface ApiCustomsCooDocumentDto {
   invNo: string;
   invoiceNo: string;
   items: ApiCustomsCooItemDto[];
-  lastGeneratedAt: string;
+  lastGeneratedAt?: string | null;
   lcNo: string;
   loadPort: string;
   manualLockedFieldCount: number;
@@ -1318,6 +1319,7 @@ export interface ApiImportedCustomerDto {
   id: number;
   notes: string;
   notifyPartyAddress: string;
+  notifyPartyMode: NotifyPartyMode;
   notifyPartyName: string;
   phone: string;
   taxId: string;
@@ -1414,6 +1416,7 @@ export interface ApiInvoiceDetailDto {
   letterOfCreditNo: string;
   letterOfCreditSourcePath: string;
   notifyPartyAddress: string;
+  notifyPartyMode: NotifyPartyMode;
   notifyPartyName: string;
   ownerUserId?: number | null;
   paymentTerms: string;
@@ -3358,6 +3361,8 @@ export interface InvoiceCloneOptions {
   resetDates?: boolean;
 }
 
+export type NotifyPartyMode = "None" | "SameAsConsignee" | "Separate";
+
 export interface PaymentTemplateItem {
   isEnabled: boolean;
   name: string;
@@ -3365,7 +3370,7 @@ export interface PaymentTemplateItem {
   templatePath: string;
 }
 
-export type SingleWindowBusinessType = number;
+export type SingleWindowBusinessType = "CustomsCoo" | "AgentConsignment";
 
 export interface SingleWindowClientDispatchResult {
   attachmentFileCount: number;
@@ -3401,7 +3406,7 @@ export interface SingleWindowExportIssueGroup {
   warningCount: number;
 }
 
-export type SingleWindowExportIssueSeverity = number;
+export type SingleWindowExportIssueSeverity = "Info" | "Warning" | "Error";
 
 export interface SingleWindowExportReview {
   businessType: SingleWindowBusinessType;
@@ -3531,9 +3536,9 @@ export interface SingleWindowPackageManifest {
   warnings: string[];
 }
 
-export type SingleWindowPackageType = number;
+export type SingleWindowPackageType = "SubmitPackage" | "ReceiptPackage";
 
-export type SingleWindowReceiptBusinessStatus = number;
+export type SingleWindowReceiptBusinessStatus = "Unknown" | "Received" | "Accepted" | "Rejected" | "PendingReview" | "Approved" | "Failed";
 
 export interface SingleWindowReceiptCollectionResult {
   batchId: number;
@@ -3542,7 +3547,7 @@ export interface SingleWindowReceiptCollectionResult {
   receiptRootPath: string;
 }
 
-export type SingleWindowReceiptKind = number;
+export type SingleWindowReceiptKind = "Unknown" | "CustomsCooBusinessReceipt" | "CustomsCooTechnicalReceipt" | "CustomsCooAttachmentReceipt" | "AgentConsignmentImportResponse" | "AgentConsignmentAcd002";
 
 export interface SingleWindowReceiptParseResult {
   businessStatus: SingleWindowReceiptBusinessStatus;

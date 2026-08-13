@@ -83,7 +83,7 @@ namespace ExportDocManager.Services.Security
             template.Name = name;
             template.Description = (request.Description ?? string.Empty).Trim();
             template.IsActive = template.IsSystem || request.IsActive;
-            template.UpdatedAt = DateTime.UtcNow;
+            template.UpdatedAt = DateTimeOffset.UtcNow;
             template.Modules = modules.Select(module => new PermissionTemplateModule
             {
                 ModuleKey = module.ModuleKey,

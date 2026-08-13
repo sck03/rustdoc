@@ -29,8 +29,8 @@ namespace ExportDocManager.Models.Entities
         public decimal MinimumSupportAreaPercent { get; set; } = 100m;
         public bool RequireSameFootprintStacking { get; set; }
 
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
         [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
 
         public List<ContainerProjectItem> Items { get; set; } = new();

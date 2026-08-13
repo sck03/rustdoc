@@ -39,7 +39,6 @@ internal static class OfficialOpenApiDocumentLoader
         try
         {
             ApiStartupValidator.Validate(pathProvider, databaseSettings, runtimeOptions);
-            DbHelper.ConfigurePathProvider(pathProvider);
 
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {

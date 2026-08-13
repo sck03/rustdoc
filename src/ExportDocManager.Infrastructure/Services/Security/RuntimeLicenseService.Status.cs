@@ -42,7 +42,7 @@ namespace ExportDocManager.Services.Security
 
         private async Task<LicenseStatus> GetStatusCoreAsync(CancellationToken cancellationToken)
         {
-            var now = DateTime.Now;
+            var now = DateOnly.FromDateTime(DateTime.Today);
             var anchor = await ReadOrCreateMachineAnchorAsync(now, cancellationToken).ConfigureAwait(false);
             var identity = await GetLicenseIdentityAsync(anchor, cancellationToken).ConfigureAwait(false);
             var machineId = identity.MachineId;
@@ -78,7 +78,7 @@ namespace ExportDocManager.Services.Security
                     LastRunDate = anchorLastRunDate,
                     IsRegistered = hasAnchorLicense,
                     LicenseKey = hasAnchorLicense ? anchorLicenseKey : string.Empty,
-                    ExpireDate = hasAnchorLicense ? anchor.LicenseExpireDate : DateTime.MinValue,
+                    ExpireDate = hasAnchorLicense ? anchor.LicenseExpireDate : default,
                     MachineId = machineId,
                     DeviceBindingVersion = DeviceBindingVersion,
                     DeviceFingerprintHash = identity.DeviceFingerprintHash,
@@ -162,12 +162,7 @@ namespace ExportDocManager.Services.Security
                 dataChanged = true;
             }
 
-            if (now < anchorInstallDate.AddMinutes(-10))
-            {
-                now = anchorInstallDate;
-            }
-
-            if (now < anchorLastRunDate.AddMinutes(-30))
+            if (now < anchorLastRunDate)
             {
                 now = anchorLastRunDate;
             }
@@ -190,7 +185,7 @@ namespace ExportDocManager.Services.Security
                 if (_signatureVerifier.TryValidate(
                         machineId,
                         normalizedKey,
-                        out DateTime expireDate))
+                        out DateOnly expireDate))
                 {
                     if (data.ExpireDate != expireDate)
                     {
@@ -222,7 +217,7 @@ namespace ExportDocManager.Services.Security
                         status.IsRegistered = true;
                         status.ExpireDate = expireDate;
                         status.DaysRemaining = CalculateRegisteredDaysRemaining(now, expireDate);
-                        status.Message = expireDate == DateTime.MaxValue
+                        status.Message = expireDate == DateOnly.MaxValue
                             ? "已注册 (终身授权)"
                             : $"已注册 (有效期至: {expireDate:yyyy-MM-dd})";
 
@@ -245,7 +240,7 @@ namespace ExportDocManager.Services.Security
                     hasTerminalStatus = true;
                     data.IsRegistered = false;
                     data.LicenseKey = string.Empty;
-                    data.ExpireDate = DateTime.MinValue;
+                    data.ExpireDate = default;
                     dataChanged = true;
                     if (ClearAnchorRegistration(anchor))
                     {
@@ -269,8 +264,8 @@ namespace ExportDocManager.Services.Security
                 return ToStatus(status);
             }
 
-            var daysUsed = (now - data.InstallDate).TotalDays;
-            int remaining = TrialDays - (int)daysUsed;
+            var daysUsed = now.DayNumber - data.InstallDate.DayNumber;
+            int remaining = TrialDays - daysUsed;
             status.DaysRemaining = remaining > 0 ? remaining : 0;
 
             if (daysUsed > TrialDays)
@@ -286,9 +281,9 @@ namespace ExportDocManager.Services.Security
             return ToStatus(status);
         }
 
-        private static int CalculateRegisteredDaysRemaining(DateTime now, DateTime expireDate)
+        private static int CalculateRegisteredDaysRemaining(DateOnly now, DateOnly expireDate)
         {
-            if (expireDate == DateTime.MaxValue)
+            if (expireDate == DateOnly.MaxValue)
             {
                 return int.MaxValue;
             }
@@ -298,8 +293,7 @@ namespace ExportDocManager.Services.Security
                 return 0;
             }
 
-            double daysRemaining = Math.Ceiling((expireDate - now).TotalDays);
-            return daysRemaining >= int.MaxValue ? int.MaxValue : Math.Max(0, (int)daysRemaining);
+            return Math.Max(0, expireDate.DayNumber - now.DayNumber + 1);
         }
 
     }

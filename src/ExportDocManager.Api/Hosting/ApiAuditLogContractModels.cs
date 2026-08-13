@@ -9,7 +9,7 @@ namespace ExportDocManager.Api.Hosting
         public string OldValues { get; init; } = string.Empty;
         public string NewValues { get; init; } = string.Empty;
         public string UserId { get; init; } = string.Empty;
-        public DateTime Timestamp { get; init; }
+        public DateTimeOffset Timestamp { get; init; }
         public string OldValuesPreview { get; init; } = string.Empty;
         public string NewValuesPreview { get; init; } = string.Empty;
     }
@@ -20,8 +20,8 @@ namespace ExportDocManager.Api.Hosting
         public string EntityName { get; init; } = string.Empty;
         public string Action { get; init; } = string.Empty;
         public string UserId { get; init; } = string.Empty;
-        public DateTime? StartTime { get; init; }
-        public DateTime? EndTime { get; init; }
+        public DateTimeOffset? StartTime { get; init; }
+        public DateTimeOffset? EndTime { get; init; }
         public string Keyword { get; init; } = string.Empty;
         public int MaxCount { get; init; } = 50000;
     }

@@ -9,8 +9,8 @@ namespace ExportDocManager.Infrastructure.Tests
             string project = File.ReadAllText(Path.Combine(
                 root,
                 "src",
-                "ExportDocManager.Infrastructure",
-                "ExportDocManager.Infrastructure.csproj"));
+                "ExportDocManager.Infrastructure.PdfOcr",
+                "ExportDocManager.Infrastructure.PdfOcr.csproj"));
             string apiProject = File.ReadAllText(Path.Combine(
                 root,
                 "src",

@@ -9,12 +9,6 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly string _appRoot;
         private readonly string _dataRoot;
 
-        public RuntimeAppPathProvider()
-        {
-            _appRoot = NormalizeRoot(AppContext.BaseDirectory);
-            _dataRoot = NormalizeRoot(ResolveDefaultDataRoot(_appRoot));
-        }
-
         public RuntimeAppPathProvider(string appRoot)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(appRoot);

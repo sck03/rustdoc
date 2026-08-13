@@ -20,12 +20,12 @@ namespace ExportDocManager.Models.Entities
         private string? _supervisionConditions;
         private string? _inspectionCategory;
         private string? _rebateRate;
-        private DateTime? _updateTime = DateTime.Now;
+        private DateTimeOffset? _updateTime = DateTimeOffset.UtcNow;
         private string? _detailUrl;
         private string _status = "ReferenceOnly";
         private string? _sourceName;
         private int? _effectiveYear;
-        private DateTime? _lastVerifiedAt;
+        private DateTimeOffset? _lastVerifiedAt;
         private string? _replacedByCodes;
         private string? _normalTariffRate;
         private string? _preferentialTariffRate;
@@ -134,7 +134,7 @@ namespace ExportDocManager.Models.Entities
             set => SetProperty(ref _rebateRate, value);
         } // 出口退税率
 
-        public DateTime? UpdateTime
+        public DateTimeOffset? UpdateTime
         {
             get => _updateTime;
             set => SetProperty(ref _updateTime, value);
@@ -160,7 +160,7 @@ namespace ExportDocManager.Models.Entities
             set => SetProperty(ref _effectiveYear, value);
         }
 
-        public DateTime? LastVerifiedAt
+        public DateTimeOffset? LastVerifiedAt
         {
             get => _lastVerifiedAt;
             set => SetProperty(ref _lastVerifiedAt, value);

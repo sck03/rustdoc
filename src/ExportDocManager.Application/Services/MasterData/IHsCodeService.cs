@@ -83,6 +83,22 @@ namespace ExportDocManager.Services.MasterData
         Task ClearAllLocalAsync();
     }
 
+    public interface IHsCodeImportService
+    {
+        Task ImportAsync(string filePath);
+
+        Task<HsCodeImportPreview> PreviewImportAsync(
+            string filePath,
+            HsCodeImportMode mode = HsCodeImportMode.Incremental,
+            string? sourceName = null,
+            int? effectiveYear = null,
+            CancellationToken cancellationToken = default);
+
+        Task<HsCodeImportCommitResult> CommitImportAsync(
+            HsCodeImportPreview preview,
+            CancellationToken cancellationToken = default);
+    }
+
     public enum HsCodeImportMode
     {
         Incremental = 0,

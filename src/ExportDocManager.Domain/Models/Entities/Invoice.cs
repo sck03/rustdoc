@@ -19,7 +19,7 @@ namespace ExportDocManager.Models.Entities
         [Required]
         public string InvoiceNo { get; set; } = string.Empty;
         public string? ContractNo { get; set; }
-        public DateTime InvoiceDate { get; set; }
+        public DateOnly InvoiceDate { get; set; }
         public string? LetterOfCreditNo { get; set; }
         public string? LetterOfCreditSourcePath { get; set; }
         public string? LetterOfCreditContent { get; set; }
@@ -39,7 +39,7 @@ namespace ExportDocManager.Models.Entities
         public string? ShippingMarksImage { get; set; } // Path to image file relative to App_Data
         public string? TradeTerms { get; set; }
         public string? TransportMode { get; set; }
-        public DateTime ShipmentDate { get; set; } // 船期/航期字段
+        public DateOnly ShipmentDate { get; set; } // 船期/航期字段
         public int ExporterId { get; set; }
         public int CustomerId { get; set; }
         public decimal TotalCartons { get; set; }
@@ -59,6 +59,7 @@ namespace ExportDocManager.Models.Entities
         // Buyer Information Snapshot (买方快照)
         public string? CustomerNameEN { get; set; }
         public string? CustomerAddressEN { get; set; }
+        public NotifyPartyMode NotifyPartyMode { get; set; }
         public string? NotifyPartyName { get; set; } // 通知人名称，原 CustomerNameCN
         public string? NotifyPartyAddress { get; set; } // 通知人地址，原 AddressCN
 
@@ -134,8 +135,9 @@ namespace ExportDocManager.Models.Entities
                 SupervisionMode = SupervisionMode,
                 CustomerNameEN = CustomerNameEN,
                 CustomerAddressEN = CustomerAddressEN,
-                NotifyPartyName = NotifyPartyName,
-                NotifyPartyAddress = NotifyPartyAddress,
+                NotifyPartyMode = NotifyPartyMode,
+                NotifyPartyName = NotifyPartyMode == NotifyPartyMode.Separate ? NotifyPartyName : string.Empty,
+                NotifyPartyAddress = NotifyPartyMode == NotifyPartyMode.Separate ? NotifyPartyAddress : string.Empty,
                 ExporterNameEN = ExporterNameEN,
                 ExporterNameCN = ExporterNameCN,
                 ExporterAddressEN = ExporterAddressEN,

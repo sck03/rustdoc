@@ -4,8 +4,8 @@ namespace ExportDocManager.Api.Hosting
         string FileName,
         string FullPath,
         long SizeBytes,
-        DateTime CreatedAt,
-        DateTime LastWriteTime);
+        DateTimeOffset CreatedAt,
+        DateTimeOffset LastWriteTime);
 
     public sealed record ApiSharedDatabaseOwnershipSummaryResponse(
         int TotalInvoices,

@@ -194,7 +194,7 @@ namespace ExportDocManager.DataAccess
                     Description = definition.Description,
                     IsSystem = true,
                     IsActive = true,
-                    UpdatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTimeOffset.UtcNow,
                     Modules = definition.GetModuleAccess()
                         .Select(grant => new PermissionTemplateModule
                         {

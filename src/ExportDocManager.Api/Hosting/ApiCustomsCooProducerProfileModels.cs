@@ -15,9 +15,9 @@ namespace ExportDocManager.Api.Hosting
         public string LastInvoiceNo { get; set; } = string.Empty;
         public string LastContractNo { get; set; } = string.Empty;
         public string LastSourceStyleNo { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime LastUsedAt { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
+        public DateTimeOffset LastUsedAt { get; set; }
     }
 
     public sealed record ApiCustomsCooProducerProfileResponse(

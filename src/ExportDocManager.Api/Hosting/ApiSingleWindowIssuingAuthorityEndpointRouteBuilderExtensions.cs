@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.SingleWindow;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
@@ -11,14 +12,16 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiSingleWindowIssuingAuthorityCatalogResponse>,
                 UnauthorizedHttpResult> (
                 HttpContext context,
-                IApiSessionTokenService tokenService) =>
+                IApiSessionTokenService tokenService,
+                ISingleWindowReferenceCatalogSnapshotProvider catalogProvider) =>
             {
                 if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
                 {
                     return TypedResults.Unauthorized();
                 }
 
-                return TypedResults.Ok(ApiSingleWindowDtoFactory.FromIssuingAuthorityCatalog());
+                return TypedResults.Ok(ApiSingleWindowDtoFactory.FromIssuingAuthorityCatalog(
+                    catalogProvider.Current.IssuingAuthorities));
             })
             .WithName("GetCustomsCooIssuingAuthorities");
 

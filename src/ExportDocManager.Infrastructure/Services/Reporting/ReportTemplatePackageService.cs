@@ -79,7 +79,7 @@ namespace ExportDocManager.Services.Reporting
                 var manifest = new TemplatePackageManifest
                 {
                     PackageVersion = PackageSchemaVersion,
-                    ExportedAt = DateTime.Now,
+                    ExportedAt = DateTimeOffset.UtcNow,
                     Templates = rows.Select(row => new TemplateRowManifest
                     {
                         Type = row.Type,

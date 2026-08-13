@@ -5,6 +5,7 @@ using System.Text;
 using ExportDocManager.Services.Errors;
 using HtmlAgilityPack;
 using Scriban;
+using Scriban.Parsing;
 using Scriban.Runtime;
 using Serilog;
 using HtmlDocument = HtmlAgilityPack.HtmlDocument;
@@ -61,7 +62,7 @@ namespace ExportDocManager.Services.Reporting
 
         public static string Render(string templateContent, ScriptObject globals)
         {
-            var context = new TemplateContext
+            var context = new ReportTemplateContext
             {
                 MemberRenamer = member => member.Name,
                 StrictVariables = false,
@@ -221,6 +222,20 @@ namespace ExportDocManager.Services.Reporting
             TemplateCache.Clear();
             while (TemplateCacheOrder.TryDequeue(out _))
             {
+            }
+        }
+
+        private sealed class ReportTemplateContext : TemplateContext
+        {
+            public override object? ToObject(SourceSpan span, object? value, Type destinationType)
+            {
+                Type targetType = Nullable.GetUnderlyingType(destinationType) ?? destinationType;
+                if (value is DateOnly date && targetType == typeof(DateTime))
+                {
+                    return date.ToDateTime(TimeOnly.MinValue);
+                }
+
+                return base.ToObject(span, value, destinationType);
             }
         }
     }

@@ -217,8 +217,11 @@ namespace ExportDocManager.Services.SingleWindow
             new("3", "3")
         ];
 
-        public static IReadOnlyList<AgentConsignmentEditorFieldDefinition> GetSectionFields(string sectionKey)
+        public static IReadOnlyList<AgentConsignmentEditorFieldDefinition> GetSectionFields(
+            string sectionKey,
+            SingleWindowReferenceCatalogs? referenceCatalogs = null)
         {
+            referenceCatalogs ??= new SingleWindowReferenceCatalogs();
             string normalizedSectionKey = string.IsNullOrWhiteSpace(sectionKey)
                 ? DefaultSectionKey
                 : sectionKey.Trim();
@@ -238,8 +241,8 @@ namespace ExportDocManager.Services.SingleWindow
                     new("货物总价", "DeclTotal"),
                     new("进出口日期", "IEDate"),
                     new("提单号", "ListNo"),
-                    new("贸易方式", "TradeMode", AgentConsignmentEditorFieldKind.EditableComboBox, Options: SingleWindowReferenceCatalogs.GetAcdTradeModeOptions()),
-                    new("原产地/货源地", "OriCountry", AgentConsignmentEditorFieldKind.EditableComboBox, Options: SingleWindowReferenceCatalogs.GetAcdCountryOptions()),
+                    new("贸易方式", "TradeMode", AgentConsignmentEditorFieldKind.EditableComboBox, Options: referenceCatalogs.GetAcdTradeModeOptions()),
+                    new("原产地/货源地", "OriCountry", AgentConsignmentEditorFieldKind.EditableComboBox, Options: referenceCatalogs.GetAcdCountryOptions()),
                     new("经营单位(委托方)海关10位编码", "TradeCode"),
                     new("申报单位(被委托方)海关10位编码", "AgentCode"),
                     new("币制代码", "Curr"),
@@ -298,4 +301,3 @@ namespace ExportDocManager.Services.SingleWindow
         }
     }
 }
-

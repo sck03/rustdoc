@@ -203,7 +203,7 @@ namespace ExportDocManager.Services.SingleWindow
             profile.CanSubmitAgentConsignment = update.CanSubmitAgentConsignment;
             profile.IsEnabled = true;
             profile.IsActive = true;
-            profile.UpdatedAt = DateTime.UtcNow;
+            profile.UpdatedAt = DateTimeOffset.UtcNow;
 
             EnsureClientFolderStructure(customsCooRoot);
             EnsureClientFolderStructure(agentConsignmentRoot);
@@ -254,7 +254,7 @@ namespace ExportDocManager.Services.SingleWindow
                 profile.IsActive = profile.Id == selected.Id;
             }
 
-            selected.UpdatedAt = DateTime.UtcNow;
+            selected.UpdatedAt = DateTimeOffset.UtcNow;
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
 

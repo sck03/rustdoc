@@ -14,9 +14,9 @@ namespace ExportDocManager.Infrastructure.Tests
             using (var context = factory.CreateDbContext())
             {
                 context.CustomOptions.AddRange(
-                    new CustomOption { OptionType = "PaymentMethod", OptionValue = "  TT  ", CreatedDate = new DateTime(2026, 4, 1, 8, 0, 0) },
-                    new CustomOption { OptionType = "PaymentMethod", OptionValue = "tt", CreatedDate = new DateTime(2026, 4, 1, 9, 0, 0) },
-                    new CustomOption { OptionType = "PaymentMethod", OptionValue = " OA ", CreatedDate = new DateTime(2026, 4, 1, 10, 0, 0) });
+                    new CustomOption { OptionType = "PaymentMethod", OptionValue = "  TT  ", CreatedAt = new DateTimeOffset(2026, 4, 1, 8, 0, 0, TimeSpan.Zero) },
+                    new CustomOption { OptionType = "PaymentMethod", OptionValue = "tt", CreatedAt = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero) },
+                    new CustomOption { OptionType = "PaymentMethod", OptionValue = " OA ", CreatedAt = new DateTimeOffset(2026, 4, 1, 10, 0, 0, TimeSpan.Zero) });
                 context.SaveChanges();
             }
 
@@ -31,12 +31,12 @@ namespace ExportDocManager.Infrastructure.Tests
             using var factory = new TestDbContextFactory();
             using (var context = factory.CreateDbContext())
             {
-                var createdAt = new DateTime(2026, 4, 1, 8, 0, 0);
+                var createdAt = new DateTimeOffset(2026, 4, 1, 8, 0, 0, TimeSpan.Zero);
                 context.CustomOptions.AddRange(Enumerable.Range(0, 505).Select(index => new CustomOption
                 {
                     OptionType = "PortOfLoading",
                     OptionValue = $"Value-{index:D3}",
-                    CreatedDate = createdAt.AddMinutes(index)
+                    CreatedAt = createdAt.AddMinutes(index)
                 }));
                 context.SaveChanges();
             }

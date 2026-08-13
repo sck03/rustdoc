@@ -110,7 +110,7 @@ namespace ExportDocManager.Api.Hosting
         bool CanSubmitAgentConsignment,
         bool IsEnabled,
         bool IsActive,
-        DateTime UpdatedAt);
+        DateTimeOffset UpdatedAt);
 
     public sealed record ApiSingleWindowClientProfilesResponse(
         IReadOnlyList<ApiSingleWindowClientProfileDto> Profiles,

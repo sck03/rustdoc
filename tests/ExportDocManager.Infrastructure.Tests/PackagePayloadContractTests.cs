@@ -150,7 +150,12 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("provision-report-fonts.mjs", dockerfile, StringComparison.Ordinal);
         Assert.Contains("verify-font-license-policy.mjs --require-files", dockerfile, StringComparison.Ordinal);
         Assert.Contains("COPY --from=report-fonts /src/Resources/Fonts/OpenSource/", dockerfile, StringComparison.Ordinal);
-        Assert.Contains("ExcludeAssets=\"compile;runtime\"", infrastructureProject, StringComparison.Ordinal);
+        string pdfOcrProject = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ExportDocManager.Infrastructure.PdfOcr",
+            "ExportDocManager.Infrastructure.PdfOcr.csproj"));
+        Assert.Contains("ExcludeAssets=\"compile;runtime\"", pdfOcrProject, StringComparison.Ordinal);
         Assert.Contains("RemoveReleaseNativeDebugSymbols", apiProject, StringComparison.Ordinal);
         Assert.Contains("RemovePlaywrightDeveloperUiPayload", apiProject, StringComparison.Ordinal);
         Assert.Contains(".playwright/package/lib/vite/traceViewer", apiProject, StringComparison.Ordinal);

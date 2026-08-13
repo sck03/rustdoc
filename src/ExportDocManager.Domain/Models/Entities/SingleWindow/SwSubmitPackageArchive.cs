@@ -15,7 +15,7 @@ namespace ExportDocManager.Models.Entities
 
         public byte[] Content { get; set; } = [];
 
-        public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
         public SwSubmissionBatch? Batch { get; set; }
     }

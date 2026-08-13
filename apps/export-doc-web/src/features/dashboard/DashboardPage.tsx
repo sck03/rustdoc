@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
+import { formatDate as formatBusinessDate } from "../../ui/formUtils.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -320,8 +321,4 @@ function formatCount(value: number | undefined) {
   return String(value ?? 0);
 }
 
-function formatDate(value: string) {
-  if (!value) return "-";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("zh-CN");
-}
+const formatDate = formatBusinessDate;

@@ -3,8 +3,15 @@ using Microsoft.OpenApi;
 
 namespace ExportDocManager.Api.Hosting;
 
-internal sealed class ApiOpenApiDocumentTransformer(ApiRuntimeOptions runtimeOptions) : IOpenApiDocumentTransformer
+internal sealed class ApiOpenApiDocumentTransformer : IOpenApiDocumentTransformer, IOpenApiOperationTransformer
 {
+    private readonly ApiDesktopAccessOptions _desktopAccessOptions;
+
+    public ApiOpenApiDocumentTransformer(ApiDesktopAccessOptions desktopAccessOptions)
+    {
+        _desktopAccessOptions = desktopAccessOptions ?? throw new ArgumentNullException(nameof(desktopAccessOptions));
+    }
+
     public Task TransformAsync(
         OpenApiDocument document,
         OpenApiDocumentTransformerContext context,
@@ -16,10 +23,7 @@ internal sealed class ApiOpenApiDocumentTransformer(ApiRuntimeOptions runtimeOpt
         document.Info.Title = "ExportDocManager API";
         document.Info.Version = ProductVersionProvider.ProductVersion;
         document.Info.Description = "Local sidecar API for ExportDocManager desktop and browser clients.";
-        document.Servers = runtimeOptions.ListenUrls
-            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(url => new OpenApiServer { Url = url })
-            .ToList();
+        document.Servers = [new OpenApiServer { Url = "/" }];
 
         document.Components ??= new OpenApiComponents();
         document.Components.SecuritySchemes ??=
@@ -39,6 +43,37 @@ internal sealed class ApiOpenApiDocumentTransformer(ApiRuntimeOptions runtimeOpt
             Description = "Internal desktop sidecar token used by lifecycle and local-file endpoints."
         };
 
+        return Task.CompletedTask;
+    }
+    public Task TransformAsync(
+        OpenApiOperation operation,
+        OpenApiOperationTransformerContext context,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var metadata = ApiEndpointMetadataExtensions.Resolve(
+            context.Description.ActionDescriptor.EndpointMetadata.OfType<ApiEndpointAccessMetadata>());
+        bool requiresBearer = metadata?.RequiresAuthentication ?? false;
+        bool requiresDesktop = _desktopAccessOptions.IsEnabled &&
+            (metadata?.RequiresDesktopAccess ?? false);
+        if (!requiresBearer && !requiresDesktop)
+        {
+            operation.Security = null;
+            return Task.CompletedTask;
+        }
+        var requirements = new List<OpenApiSecurityRequirement>();
+
+        var requirement = new OpenApiSecurityRequirement();
+        if (requiresBearer)
+        {
+            requirement[new OpenApiSecuritySchemeReference("BearerAuth", context.Document, null)] = [];
+        }
+        if (requiresDesktop)
+        {
+            requirement[new OpenApiSecuritySchemeReference("DesktopAccess", context.Document, null)] = [];
+        }
+        requirements.Add(requirement);
+        operation.Security = requirements;
         return Task.CompletedTask;
     }
 }

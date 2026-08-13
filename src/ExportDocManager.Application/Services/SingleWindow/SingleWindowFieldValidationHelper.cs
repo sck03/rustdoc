@@ -46,7 +46,7 @@ namespace ExportDocManager.Services.SingleWindow
                 return;
             }
 
-            if (!DateTime.TryParseExact(
+            if (!DateOnly.TryParseExact(
                     value.Trim(),
                     format,
                     CultureInfo.InvariantCulture,

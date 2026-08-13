@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\ExportDocManager.Domain\ExportDocManager.Domain.csproj" />
     <Compile Include="..\..\Shared\Security\LicenseKeyCodec.cs" Link="Shared\Security\LicenseKeyCodec.cs" />
   </ItemGroup>

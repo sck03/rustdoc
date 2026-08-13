@@ -17,18 +17,8 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly Lock _stateLock = new();
         private Dictionary<string, string> _preferenceStates;
 
-        public LocalPreferenceService()
-            : this(new RuntimeAppPathProvider())
-        {
-        }
-
         public LocalPreferenceService(IAppPathProvider pathProvider)
             : this(pathProvider, null)
-        {
-        }
-
-        public LocalPreferenceService(string filePath)
-            : this(new RuntimeAppPathProvider(), filePath)
         {
         }
 

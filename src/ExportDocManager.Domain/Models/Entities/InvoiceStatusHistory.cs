@@ -11,6 +11,6 @@ namespace ExportDocManager.Models.Entities
         public string Note { get; set; } = string.Empty;
         public int? ChangedByUserId { get; set; }
         public string ChangedByUsername { get; set; } = string.Empty;
-        public DateTime ChangedAt { get; set; }
+        public DateTimeOffset ChangedAt { get; set; }
     }
 }

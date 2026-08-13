@@ -23,7 +23,7 @@ assert(m.buildDefaultCopyInvoiceNo(" INV-1 ") === "INV-1副本", "copy number");
 assert(m.validateInvoiceCopyDraft({ newInvoiceNo: " " }) === "新发票号不能为空。", "copy validation");
 assert(m.normalizeRequiredPackagePath(" a.edpkg ").value === "a.edpkg", "path trim");
 assert(m.validateInvoiceTransferImportDraft({ packagePath: "a", previewResponse: null }) === "请先预览单据包。", "preview validation");
-assert(m.formatReviewSeverity(2) === "错误" && m.formatReviewSeverityKey(1) === "warning", "severity");
+assert(m.formatReviewSeverity("Error") === "错误" && m.formatReviewSeverityKey("Warning") === "warning", "severity");
 assert(m.formatSingleWindowBusinessType("CustomsCoo") === "COO", "business type");
 const previewResponse = { preview: { invoiceExists: true, invoiceMatches: false, invoiceNo: " INV-2 " } };
 const transferDraft = m.createInvoiceTransferImportDraft("package.edpkg", previewResponse);

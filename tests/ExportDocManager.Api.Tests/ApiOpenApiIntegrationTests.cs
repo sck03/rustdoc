@@ -6,6 +6,16 @@ namespace ExportDocManager.Api.Tests;
 
 public sealed class ApiOpenApiIntegrationTests
 {
+    private static readonly IReadOnlyDictionary<string, (bool Bearer, bool Desktop)> ExplicitSecurity =
+        new Dictionary<string, (bool Bearer, bool Desktop)>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["POST /api/auth/login"] = (false, true),
+            ["POST /api/system/shutdown-maintenance"] = (false, true),
+            ["GET /downloads/jobs/{token}"] = (false, true),
+            ["GET /downloads/postgresql-backups/{token}"] = (false, true),
+            ["GET /api/system/license"] = (true, true),
+            ["POST /api/system/license/register"] = (true, true)
+        };
     private static readonly HashSet<string> BodylessSuccessOperations = new(StringComparer.Ordinal)
     {
         "GET /livez",
@@ -58,7 +68,8 @@ public sealed class ApiOpenApiIntegrationTests
         }
 
         AssertSecuritySchemes(root);
-        AssertOperations(root, paths);
+        AssertSameOriginServer(root);
+        AssertOperations(root, paths, desktopAccessEnabled: false);
         AssertLocalReferencesResolve(root, root, "$");
         AssertCriticalRequestParameters(paths);
         AssertTypedEndpointResponseContracts(paths);
@@ -85,6 +96,24 @@ public sealed class ApiOpenApiIntegrationTests
             compatibility.RootElement.GetProperty("components").GetProperty("schemas").EnumerateObject().Select(item => item.Name).Order());
     }
 
+    [Fact]
+    public async Task OfficialOpenApiDocument_ShouldDeclareDesktopAccessOnlyWhenEnabled()
+    {
+        const string desktopToken = "openapi-desktop-token";
+        await using var harness = await ApiIntegrationTestHarness.StartAsync(
+            "api-openapi-desktop",
+            "openapi-desktop.db",
+            desktopAccessToken: desktopToken);
+        using var client = harness.CreateClient(desktopAccessToken: desktopToken);
+
+        using var response = await client.GetAsync("/openapi/v1.json");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
+        JsonElement root = document.RootElement;
+        AssertOperations(root, root.GetProperty("paths"), desktopAccessEnabled: true);
+    }
+
     private static void AssertSecuritySchemes(JsonElement root)
     {
         JsonElement schemes = root.GetProperty("components").GetProperty("securitySchemes");
@@ -97,7 +126,16 @@ public sealed class ApiOpenApiIntegrationTests
         Assert.Equal(ApiDesktopAccessOptions.HeaderName, desktop.GetProperty("name").GetString());
     }
 
-    private static void AssertOperations(JsonElement root, JsonElement paths)
+    private static void AssertSameOriginServer(JsonElement root)
+    {
+        JsonElement server = Assert.Single(root.GetProperty("servers").EnumerateArray());
+        Assert.Equal("/", server.GetProperty("url").GetString());
+    }
+
+    private static void AssertOperations(
+        JsonElement root,
+        JsonElement paths,
+        bool desktopAccessEnabled)
     {
         var operationIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int operationCount = 0;
@@ -132,12 +170,48 @@ public sealed class ApiOpenApiIntegrationTests
 
                 AssertPathParameters(path.Name, operationKey, operation);
                 AssertRequestBody(operationKey, operation);
+                AssertOperationSecurity(operationKey, operation, desktopAccessEnabled);
             }
         }
 
         Assert.True(operationCount >= 320, $"Unexpected OpenAPI operation count: {operationCount}");
         Assert.Equal(operationCount - 2, operationIds.Count);
         Assert.True(root.GetProperty("components").GetProperty("schemas").EnumerateObject().Any());
+    }
+
+    private static void AssertOperationSecurity(
+        string operationKey,
+        JsonElement operation,
+        bool desktopAccessEnabled)
+    {
+        JsonElement[] requirements = operation.TryGetProperty("security", out var security)
+            ? security.EnumerateArray().ToArray()
+            : [];
+        bool isAnonymousInfrastructure = operationKey.StartsWith("GET /healthz", StringComparison.OrdinalIgnoreCase)
+            || operationKey.StartsWith("GET /livez", StringComparison.OrdinalIgnoreCase)
+            || operationKey.StartsWith("HEAD /livez", StringComparison.OrdinalIgnoreCase)
+            || operationKey.StartsWith("GET /readyz", StringComparison.OrdinalIgnoreCase)
+            || operationKey.StartsWith("HEAD /readyz", StringComparison.OrdinalIgnoreCase);
+        var expected = ExplicitSecurity.TryGetValue(operationKey, out var explicitSecurity)
+            ? explicitSecurity
+            : isAnonymousInfrastructure
+                ? (Bearer: false, Desktop: false)
+                : (Bearer: true, Desktop: true);
+        bool requiresBearer = expected.Bearer;
+        bool requiresDesktop = desktopAccessEnabled && expected.Desktop;
+        if (!requiresBearer && !requiresDesktop)
+        {
+            Assert.True(requirements.Length == 0, $"{operationKey} unexpectedly declares security.");
+            return;
+        }
+
+        JsonElement requirement = Assert.Single(requirements);
+        Assert.True(
+            requiresBearer == requirement.TryGetProperty("BearerAuth", out _),
+            $"{operationKey} bearer metadata mismatch.");
+        Assert.True(
+            requiresDesktop == requirement.TryGetProperty("DesktopAccess", out _),
+            $"{operationKey} desktop metadata mismatch.");
     }
 
     private static void AssertPathParameters(string path, string operationKey, JsonElement operation)

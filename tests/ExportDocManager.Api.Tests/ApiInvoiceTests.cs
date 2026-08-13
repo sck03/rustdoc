@@ -9,7 +9,7 @@ namespace ExportDocManager.Api.Tests
         [Fact]
         public void InvoiceDtoFactory_ShouldMapPagedInvoiceList()
         {
-            var invoiceDate = new DateTime(2026, 6, 23);
+            var invoiceDate = new DateOnly(2026, 6, 23);
             var result = new PagedResult<Invoice>(
                 new List<Invoice>
                 {
@@ -66,7 +66,7 @@ namespace ExportDocManager.Api.Tests
                 {
                     new()
                     {
-                        InvoiceDate = DateTime.UtcNow,
+                        InvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow),
                         Status = string.Empty
                     }
                 },
@@ -99,8 +99,8 @@ namespace ExportDocManager.Api.Tests
                 CompanyScope = "C1",
                 InvoiceNo = "INV-DETAIL",
                 ContractNo = "CON-DETAIL",
-                InvoiceDate = new DateTime(2026, 6, 1),
-                ShipmentDate = new DateTime(2026, 7, 1),
+                InvoiceDate = new DateOnly(2026, 6, 1),
+                ShipmentDate = new DateOnly(2026, 7, 1),
                 CustomerNameEN = "Detail Buyer",
                 ExporterNameEN = "Detail Exporter",
                 Currency = "EUR",
@@ -165,8 +165,8 @@ namespace ExportDocManager.Api.Tests
                 CompanyScope = "External",
                 InvoiceNo = "INV-SAVE",
                 ContractNo = "CON-SAVE",
-                InvoiceDate = new DateTime(2026, 6, 23),
-                ShipmentDate = new DateTime(2026, 7, 1),
+                InvoiceDate = new DateOnly(2026, 6, 23),
+                ShipmentDate = new DateOnly(2026, 7, 1),
                 CustomerNameEN = "New Buyer",
                 CustomerAddressEN = "Buyer Address",
                 ExporterNameEN = "New Exporter",

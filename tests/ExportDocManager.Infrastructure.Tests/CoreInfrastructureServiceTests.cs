@@ -19,8 +19,8 @@ namespace ExportDocManager.Infrastructure.Tests
                 var invoice = new Invoice
                 {
                     InvoiceNo = "INV-ITEM",
-                    InvoiceDate = new DateTime(2026, 6, 22),
-                    ShipmentDate = new DateTime(2026, 6, 22)
+                    InvoiceDate = new DateOnly(2026, 6, 22),
+                    ShipmentDate = new DateOnly(2026, 6, 22)
                 };
                 context.Invoices.Add(invoice);
                 await context.SaveChangesAsync();
@@ -62,8 +62,8 @@ namespace ExportDocManager.Infrastructure.Tests
                 var invoice = new Invoice
                 {
                     InvoiceNo = "INV-CLEAR-ITEMS",
-                    InvoiceDate = new DateTime(2026, 6, 23),
-                    ShipmentDate = new DateTime(2026, 6, 23),
+                    InvoiceDate = new DateOnly(2026, 6, 23),
+                    ShipmentDate = new DateOnly(2026, 6, 23),
                     Items =
                     [
                         new Item { StyleNo = "OLD-1", StyleName = "Old Item 1" },
@@ -85,13 +85,42 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 Id = invoiceId,
                 InvoiceNo = "INV-CLEAR-ITEMS",
-                InvoiceDate = new DateTime(2026, 6, 23),
-                ShipmentDate = new DateTime(2026, 6, 23),
+                InvoiceDate = new DateOnly(2026, 6, 23),
+                ShipmentDate = new DateOnly(2026, 6, 23),
                 Items = []
             });
 
             await using var verifyContext = await factory.CreateDbContextAsync();
             Assert.Empty(await verifyContext.Items.Where(item => item.InvoiceId == invoiceId).ToListAsync());
+        }
+
+        [Fact]
+        public async Task InvoiceService_SaveInvoiceAsync_ShouldPersistSameAsConsigneeModeWithoutPartyCopies()
+        {
+            using var factory = new TestDbContextFactory();
+            var service = new InvoiceService(
+                factory,
+                new ItemService(factory),
+                new InvoicePartyResolver(),
+                new DatabaseConnectionSettings());
+
+            await service.SaveInvoiceAsync(new Invoice
+            {
+                InvoiceNo = "INV-NOTIFY-SAME",
+                InvoiceDate = new DateOnly(2026, 8, 13),
+                ShipmentDate = new DateOnly(2026, 8, 13),
+                CustomerNameEN = "Buyer Ltd.",
+                CustomerAddressEN = "1 Buyer Road",
+                NotifyPartyMode = NotifyPartyMode.SameAsConsignee,
+                NotifyPartyName = "stale copy",
+                NotifyPartyAddress = "stale address"
+            });
+
+            await using var verifyContext = await factory.CreateDbContextAsync();
+            var persisted = await verifyContext.Invoices.AsNoTracking().SingleAsync();
+            Assert.Equal(NotifyPartyMode.SameAsConsignee, persisted.NotifyPartyMode);
+            Assert.Equal(string.Empty, persisted.NotifyPartyName);
+            Assert.Equal(string.Empty, persisted.NotifyPartyAddress);
         }
 
         [Fact]

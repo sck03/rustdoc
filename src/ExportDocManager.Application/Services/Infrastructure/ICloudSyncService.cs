@@ -8,7 +8,7 @@ namespace ExportDocManager.Services.Infrastructure
     public sealed record CloudBackupFileInfo(
         string FileName,
         long SizeBytes,
-        DateTime LastModified);
+        DateTimeOffset LastModified);
 
     public interface ICloudSyncService
     {

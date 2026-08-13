@@ -25,10 +25,10 @@ namespace ExportDocManager.Services.Security
         public int SchemaVersion { get; set; } = 1;
         public string MachineSeed { get; set; } = string.Empty;
         public string LocalBindingSecret { get; set; } = string.Empty;
-        public DateTime InstallDate { get; set; }
-        public DateTime LastRunDate { get; set; }
+        public DateOnly InstallDate { get; set; }
+        public DateOnly LastRunDate { get; set; }
         public string LicenseKey { get; set; } = string.Empty;
-        public DateTime LicenseExpireDate { get; set; }
+        public DateOnly LicenseExpireDate { get; set; }
         public string Signature { get; set; } = string.Empty;
     }
 

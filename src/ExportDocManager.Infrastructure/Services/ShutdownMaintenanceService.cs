@@ -82,7 +82,7 @@ namespace ExportDocManager.Services.Infrastructure
             if (systemSettings.AuditLogRetentionDays > 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var cutoffUtc = DateTime.UtcNow.AddDays(-systemSettings.AuditLogRetentionDays);
+                var cutoffUtc = DateTimeOffset.UtcNow.AddDays(-systemSettings.AuditLogRetentionDays);
                 deletedAuditLogs = await _auditLogService
                     .DeleteOlderThanAsync(cutoffUtc, AuditLogCleanupMaxCount, cancellationToken)
                     .ConfigureAwait(false);

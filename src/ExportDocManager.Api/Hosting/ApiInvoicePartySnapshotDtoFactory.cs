@@ -16,8 +16,9 @@ namespace ExportDocManager.Api.Hosting
             {
                 CustomerNameEN = invoice.CustomerNameEN,
                 AddressEN = invoice.CustomerAddressEN,
-                NotifyPartyName = invoice.NotifyPartyName,
-                NotifyPartyAddress = invoice.NotifyPartyAddress
+                NotifyPartyMode = invoice.NotifyPartyMode,
+                NotifyPartyName = invoice.NotifyPartyMode == NotifyPartyMode.Separate ? invoice.NotifyPartyName : string.Empty,
+                NotifyPartyAddress = invoice.NotifyPartyMode == NotifyPartyMode.Separate ? invoice.NotifyPartyAddress : string.Empty
             };
         }
 
@@ -61,8 +62,7 @@ namespace ExportDocManager.Api.Hosting
         {
             return !string.IsNullOrWhiteSpace(invoice.CustomerNameEN) ||
                    !string.IsNullOrWhiteSpace(invoice.CustomerAddressEN) ||
-                   !string.IsNullOrWhiteSpace(invoice.NotifyPartyName) ||
-                   !string.IsNullOrWhiteSpace(invoice.NotifyPartyAddress);
+                   invoice.NotifyPartyMode != NotifyPartyMode.None;
         }
 
         private static bool HasExporterSnapshot(Invoice invoice)

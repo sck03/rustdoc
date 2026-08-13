@@ -513,7 +513,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 _expectedMaxCount = expectedMaxCount;
             }
 
-            public DateTime CutoffUtc { get; private set; }
+            public DateTimeOffset CutoffUtc { get; private set; }
 
             public Task<List<ExportDocManager.Models.Entities.AuditLog>> QueryAsync(
                 AuditLogQueryCriteria criteria,
@@ -549,7 +549,7 @@ namespace ExportDocManager.Infrastructure.Tests
             }
 
             public Task<int> DeleteOlderThanAsync(
-                DateTime cutoffUtc,
+                DateTimeOffset cutoffUtc,
                 int maxCount = 200000,
                 CancellationToken cancellationToken = default)
             {

@@ -106,7 +106,7 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(80)]
         public string SourceBaselineHash { get; set; } = string.Empty;
 
-        public DateTime LastGeneratedAt { get; set; } = DateTime.MinValue;
+        public DateTimeOffset? LastGeneratedAt { get; set; }
 
         [NotMapped]
         public int SourceDiffCount { get; set; }

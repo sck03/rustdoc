@@ -115,7 +115,7 @@ namespace ExportDocManager.Api.Tests
                         created.VersionNumber)));
 
                 var now = DateTime.UtcNow;
-                var startOfMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+                var startOfMonth = new DateOnly(now.Year, now.Month, 1);
                 await using (var context = factory.CreateDbContext())
                 {
                     context.Invoices.AddRange(
@@ -184,8 +184,8 @@ namespace ExportDocManager.Api.Tests
                     new BusinessDataAccessScope(settings, new FixedCurrentUserContext(admin)));
                 var queryPage = await queryRepository.QueryPageAsync(new QueryPageQuery
                 {
-                    StartDate = DateTime.SpecifyKind(startOfMonth.AddDays(1), DateTimeKind.Unspecified),
-                    EndDateExclusive = DateTime.SpecifyKind(startOfMonth.AddDays(4), DateTimeKind.Unspecified),
+                    StartDate = startOfMonth.AddDays(1),
+                    EndDateExclusive = startOfMonth.AddDays(4),
                     PageNumber = 1,
                     PageSize = 10
                 });

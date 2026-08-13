@@ -13,7 +13,7 @@ namespace ExportDocManager.Services.Infrastructure
     /// </summary>
     internal static class DatabaseSchemaBaseline
     {
-        internal const int CurrentVersion = 6;
+        internal const int CurrentVersion = 8;
         internal const string MetadataTableName = "__ExportDocManagerSchema";
 
         public static async Task EnsureCurrentAsync(AppDbContext context, bool usesPostgreSql)

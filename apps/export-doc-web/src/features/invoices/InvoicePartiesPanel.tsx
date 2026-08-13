@@ -5,7 +5,7 @@ import type {
   ApiInvoiceDetailDto,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
-import { NumberField, TextAreaField, TextField } from "../../ui/FormFields.tsx";
+import { NumberField, SelectField, TextAreaField, TextField } from "../../ui/FormFields.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { RemoteSelectField } from "../../ui/RemoteSelectField.tsx";
 import { ExporterSealField, type ExporterSealType } from "../master-data/ExporterSealField.tsx";
@@ -76,6 +76,7 @@ export function InvoicePartiesPanel({
       customerId: customer.id,
       customerNameEN: customer.customerNameEN,
       customerAddressEN: customer.addressEN ?? "",
+      notifyPartyMode: customer.notifyPartyMode,
       notifyPartyName: customer.notifyPartyName ?? "",
       notifyPartyAddress: customer.notifyPartyAddress ?? "",
     });
@@ -163,19 +164,35 @@ export function InvoicePartiesPanel({
           <PartyGroupHeading
             icon={BellRing}
             title="通知人信息"
-            description="仅在通知对象与客户不同时填写"
-            status={invoice.notifyPartyName || invoice.notifyPartyAddress ? "已填写" : "可选"}
-            connected={Boolean(invoice.notifyPartyName || invoice.notifyPartyAddress)}
+            description="明确选择无通知人、同收货人或独立通知人"
+            status={invoice.notifyPartyMode === "SameAsConsignee" ? "同收货人" : invoice.notifyPartyMode === "Separate" ? "独立通知人" : "无"}
+            connected={invoice.notifyPartyMode !== "None"}
           />
           <div className="field-grid">
-            <TextField className="field-grid-span-all" label="通知人" value={invoice.notifyPartyName ?? ""} disabled={!isEditable} onChange={(value) => onChange({ notifyPartyName: value })} />
-            <TextAreaField
+            <SelectField
+              className="field-grid-span-all"
+              label="通知人方式"
+              value={invoice.notifyPartyMode}
+              disabled={!isEditable}
+              includeEmptyOption={false}
+              options={[
+                { value: "None", label: "无通知人" },
+                { value: "SameAsConsignee", label: "同收货人" },
+                { value: "Separate", label: "独立通知人" },
+              ]}
+              onChange={(value) => onChange({
+                notifyPartyMode: value as ApiInvoiceDetailDto["notifyPartyMode"],
+                ...(value === "Separate" ? {} : { notifyPartyName: "", notifyPartyAddress: "" }),
+              })}
+            />
+            {invoice.notifyPartyMode === "Separate" ? <TextField className="field-grid-span-all" label="通知人" value={invoice.notifyPartyName ?? ""} disabled={!isEditable} onChange={(value) => onChange({ notifyPartyName: value })} /> : null}
+            {invoice.notifyPartyMode === "Separate" ? <TextAreaField
               className="field-grid-span-all invoice-party-address-field"
               label="通知人英文地址"
               value={invoice.notifyPartyAddress ?? ""}
               disabled={!isEditable}
               onChange={(value) => onChange({ notifyPartyAddress: value })}
-            />
+            /> : null}
           </div>
         </section>
 

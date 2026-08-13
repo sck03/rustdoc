@@ -711,8 +711,8 @@ namespace ExportDocManager.Api.Hosting
                     file.Name,
                     ApiResponsePathPolicy.Reveal(file.FullName, revealPaths),
                     file.Length,
-                    file.CreationTime,
-                    file.LastWriteTime))
+                    new DateTimeOffset(file.CreationTime),
+                    new DateTimeOffset(file.LastWriteTime)))
                 .ToArray();
         }
 

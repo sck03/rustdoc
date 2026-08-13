@@ -226,7 +226,7 @@ function StationSubmitPackageImportPanel({ client, canOperate }: { client: Expor
       ) : <InlineNotice tone="warning">请先在上方创建并启用公司与操作卡档案。</InlineNotice>}
       <PathField label="提交包文件" value={packagePath} disabled={!canOperate || mutation.isPending} actions={<DesktopIconButton title="选择提交包" disabled={!canOperate || mutation.isPending} onClick={() => void choosePackage()}><FileInput size={17} aria-hidden="true" /></DesktopIconButton>} onChange={(value) => { setPackagePath(value); setMessage(null); }} />
       {message ? <InlineNotice tone={mutation.isError ? "error" : "success"}>{message}</InlineNotice> : null}
-      {result ? <div className="single-window-import-summary"><strong>{result.manifest.invoiceNo || result.manifest.batchReference}</strong><span>{formatBusinessType(String(result.manifest.businessType === 0 ? "CustomsCoo" : "AgentConsignment"))}</span><span>{result.manifest.companyScope}</span></div> : null}
+      {result ? <div className="single-window-import-summary"><strong>{result.manifest.invoiceNo || result.manifest.batchReference}</strong><span>{formatBusinessType(result.manifest.businessType)}</span><span>{result.manifest.companyScope}</span></div> : null}
     </section>
   );
 }

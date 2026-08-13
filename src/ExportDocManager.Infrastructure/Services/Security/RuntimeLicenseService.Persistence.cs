@@ -142,7 +142,7 @@ namespace ExportDocManager.Services.Security
             public int DaysRemaining { get; set; }
             public string MachineId { get; set; } = string.Empty;
             public string Message { get; set; } = string.Empty;
-            public DateTime ExpireDate { get; set; }
+            public DateOnly ExpireDate { get; set; }
         }
 
         private sealed record RuntimeLicenseIdentity(
@@ -152,11 +152,11 @@ namespace ExportDocManager.Services.Security
 
         private sealed class RuntimeLicenseData
         {
-            public DateTime InstallDate { get; set; }
-            public DateTime LastRunDate { get; set; }
+            public DateOnly InstallDate { get; set; }
+            public DateOnly LastRunDate { get; set; }
             public bool IsRegistered { get; set; }
             public string LicenseKey { get; set; } = string.Empty;
-            public DateTime ExpireDate { get; set; }
+            public DateOnly ExpireDate { get; set; }
             public string MachineId { get; set; } = string.Empty;
             public int DeviceBindingVersion { get; set; }
             public string DeviceFingerprintHash { get; set; } = string.Empty;

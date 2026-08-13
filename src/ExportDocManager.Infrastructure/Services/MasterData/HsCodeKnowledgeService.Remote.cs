@@ -108,7 +108,7 @@ namespace ExportDocManager.Services.MasterData
                 .ToList();
             var existingCandidates = await LoadRemoteCandidatesByFingerprintsAsync(context, fingerprints, cancellationToken);
             var candidatesByFingerprint = existingCandidates.ToDictionary(item => item.Fingerprint, StringComparer.OrdinalIgnoreCase);
-            DateTime now = DateTime.UtcNow;
+            DateTimeOffset now = DateTimeOffset.UtcNow;
             int added = 0;
             foreach (var record in examples)
             {
@@ -253,7 +253,7 @@ namespace ExportDocManager.Services.MasterData
         {
             var candidate = await context.HsCodeRemoteCandidates.FirstOrDefaultAsync(item => item.Id == input.Id, cancellationToken);
             if (candidate == null || candidate.ReviewStatus != "Pending") return false;
-            DateTime now = DateTime.UtcNow;
+            DateTimeOffset now = DateTimeOffset.UtcNow;
             if (!input.Confirmed)
             {
                 candidate.ReviewStatus = "Ignored";
@@ -327,7 +327,7 @@ namespace ExportDocManager.Services.MasterData
         {
             if (preview == null) return;
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            DateTime now = DateTime.UtcNow;
+            DateTimeOffset now = DateTimeOffset.UtcNow;
             foreach (var item in preview.Items.Where(item => item.ChangeType == "SuspectedObsolete"))
             {
                 string oldCode = HsCodeTextHelper.NormalizeCode(item.Item?.Code);

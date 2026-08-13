@@ -13,10 +13,8 @@ namespace ExportDocManager.Models.Entities
         public string DepartmentId { get; set; } = string.Empty;
         public string CompanyScope { get; set; } = string.Empty;
         public string? CustomerNameEN { get; set; }
-        public string DisplayName =>
-            string.IsNullOrWhiteSpace(NotifyPartyName)
-                ? CustomerNameEN ?? string.Empty
-                : $"{CustomerNameEN} ({NotifyPartyName})";
+        public string DisplayName => CustomerNameEN ?? string.Empty;
+        public NotifyPartyMode NotifyPartyMode { get; set; }
         public string? NotifyPartyName { get; set; } // 通知人名称，原 CustomerNameCN
         public string? AddressEN { get; set; }
         public string? NotifyPartyAddress { get; set; } // 通知人地址，原 AddressCN

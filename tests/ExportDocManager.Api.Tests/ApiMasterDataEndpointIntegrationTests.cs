@@ -205,8 +205,8 @@ namespace ExportDocManager.Api.Tests
         private static ApiInvoiceDetailDto CreateInvoice(string invoiceNo, int customerId, int exporterId) => new()
         {
             InvoiceNo = invoiceNo,
-            InvoiceDate = new DateTime(2026, 8, 5),
-            ShipmentDate = new DateTime(2026, 8, 5),
+            InvoiceDate = new DateOnly(2026, 8, 5),
+            ShipmentDate = new DateOnly(2026, 8, 5),
             CustomerId = customerId,
             ExporterId = exporterId,
             CustomerNameEN = "Selected Customer",

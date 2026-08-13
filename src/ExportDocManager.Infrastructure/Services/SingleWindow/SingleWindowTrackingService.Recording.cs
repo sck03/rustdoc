@@ -54,7 +54,7 @@ namespace ExportDocManager.Services.SingleWindow
                     batch.ClientProfileName = manifest.ClientProfileName ?? string.Empty;
                     batch.ProtectedAssignmentSecret = _secretProtector.Protect(authenticationSecret);
                     batch.LastError = string.Empty;
-                    batch.UpdatedAt = DateTime.UtcNow;
+                    batch.UpdatedAt = DateTimeOffset.UtcNow;
                     await StoreSubmitPackageArchiveAsync(context, batch, archive, cancellationToken)
                         .ConfigureAwait(false);
 
@@ -100,7 +100,7 @@ namespace ExportDocManager.Services.SingleWindow
                         stationBinding.Profile.CardIdentifier);
 
                     batch.Status = SingleWindowBatchStatusCatalog.SubmitPackageImported;
-                    batch.UpdatedAt = DateTime.Now;
+                    batch.UpdatedAt = DateTimeOffset.UtcNow;
                     batch.SubmissionVersion = batch.SubmissionVersion > 0 ? batch.SubmissionVersion : imported.Manifest.SubmissionVersion;
                     batch.DraftRevision = Math.Max(batch.DraftRevision, imported.Manifest.DraftRevision);
                     batch.SourceBaselineHash = string.IsNullOrWhiteSpace(batch.SourceBaselineHash)
@@ -156,7 +156,7 @@ namespace ExportDocManager.Services.SingleWindow
                         ? SingleWindowBatchStatusCatalog.ReceiptPackageExported
                         : batch.Status;
                     batch.LastReceiptPackagePath = packagePath ?? string.Empty;
-                    batch.UpdatedAt = DateTime.Now;
+                    batch.UpdatedAt = DateTimeOffset.UtcNow;
 
                     context.SwHandoffPackageRecords.Add(BuildPackageRecord(
                         batchId: batch.Id,
@@ -220,7 +220,7 @@ namespace ExportDocManager.Services.SingleWindow
                             ReceiptMessage = receipt.ReceiptMessage ?? string.Empty,
                             BusinessStatus = receipt.BusinessStatus.ToString(),
                             SourceFileName = NormalizeReceiptKeyPart(receipt.SourceFileName),
-                            ImportedAt = DateTime.UtcNow,
+                            ImportedAt = DateTimeOffset.UtcNow,
                             OccurredAt = receipt.OccurredAt,
                             RawContent = entry.RawContent,
                             ContentSha256 = entry.ContentSha256
@@ -246,10 +246,10 @@ namespace ExportDocManager.Services.SingleWindow
                         batch.LastReceiptKind = primaryReceipt?.ReceiptKind.ToString() ?? string.Empty;
                         batch.LastReceiptCode = primaryReceipt?.ReceiptCode ?? string.Empty;
                         batch.LastReceiptMessage = primaryReceipt?.ReceiptMessage ?? string.Empty;
-                        batch.LastReceiptAt = primaryReceipt?.OccurredAt ?? DateTime.UtcNow;
+                        batch.LastReceiptAt = primaryReceipt?.OccurredAt ?? DateTimeOffset.UtcNow;
                     }
                     batch.LastReceiptPackagePath = packagePath ?? string.Empty;
-                    batch.UpdatedAt = DateTime.UtcNow;
+                    batch.UpdatedAt = DateTimeOffset.UtcNow;
 
                     context.SwHandoffPackageRecords.Add(BuildPackageRecord(
                         batchId: batch.Id,
@@ -484,7 +484,7 @@ namespace ExportDocManager.Services.SingleWindow
                     SizeBytes = archive.Content.LongLength,
                     Sha256 = archive.Sha256,
                     Content = archive.Content,
-                    CreatedAtUtc = DateTime.UtcNow
+                    CreatedAt = DateTimeOffset.UtcNow
                 }, cancellationToken).ConfigureAwait(false);
             }
 

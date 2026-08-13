@@ -43,7 +43,7 @@ namespace ExportDocManager.Api.Hosting
             ArgumentNullException.ThrowIfNull(context);
             ArgumentNullException.ThrowIfNull(currentUserResolver);
 
-            if (!RequiresAuthentication(context.Request.Path))
+            if (!RequiresAuthentication(context))
             {
                 await _next(context);
                 return;
@@ -58,15 +58,10 @@ namespace ExportDocManager.Api.Hosting
             await _next(context);
         }
 
-        public static bool RequiresAuthentication(PathString path)
+        public static bool RequiresAuthentication(HttpContext context)
         {
-            if (!path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            return !path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase) &&
-                !path.Equals("/api/system/shutdown-maintenance", StringComparison.OrdinalIgnoreCase);
+            var endpoint = context.GetEndpoint();
+            return endpoint?.GetApiAccessMetadata()?.RequiresAuthentication ?? false;
         }
     }
 
@@ -84,7 +79,7 @@ namespace ExportDocManager.Api.Hosting
             ArgumentNullException.ThrowIfNull(context);
             ArgumentNullException.ThrowIfNull(options);
 
-            if (!options.IsEnabled || !RequiresDesktopAccess(context.Request.Path))
+            if (!options.IsEnabled || !RequiresDesktopAccess(context))
             {
                 await _next(context);
                 return;
@@ -100,9 +95,10 @@ namespace ExportDocManager.Api.Hosting
             await _next(context);
         }
 
-        public static bool RequiresDesktopAccess(PathString path)
+        public static bool RequiresDesktopAccess(HttpContext context)
         {
-            return path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase);
+            var endpoint = context.GetEndpoint();
+            return endpoint?.GetApiAccessMetadata()?.RequiresDesktopAccess ?? false;
         }
     }
 
@@ -120,7 +116,7 @@ namespace ExportDocManager.Api.Hosting
             ArgumentNullException.ThrowIfNull(context);
             ArgumentNullException.ThrowIfNull(licenseService);
 
-            if (!RequiresValidLicense(context.Request.Path))
+            if (!RequiresValidLicense(context))
             {
                 await _next(context);
                 return;
@@ -142,17 +138,10 @@ namespace ExportDocManager.Api.Hosting
                 .ConfigureAwait(false);
         }
 
-        public static bool RequiresValidLicense(PathString path)
+        public static bool RequiresValidLicense(HttpContext context)
         {
-            if (!path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            return !path.StartsWithSegments("/api/auth", StringComparison.OrdinalIgnoreCase) &&
-                !path.Equals("/api/system/license", StringComparison.OrdinalIgnoreCase) &&
-                !path.Equals("/api/system/license/register", StringComparison.OrdinalIgnoreCase) &&
-                !path.Equals("/api/system/shutdown-maintenance", StringComparison.OrdinalIgnoreCase);
+            var endpoint = context.GetEndpoint();
+            return endpoint?.GetApiAccessMetadata()?.RequiresLicense ?? false;
         }
     }
 

@@ -23,9 +23,9 @@ namespace ExportDocManager.Models.DTOs
 
     public sealed record QueryPageQuery : SharedDatabasePagedQuery
     {
-        public DateTime? StartDate { get; init; }
+        public DateOnly? StartDate { get; init; }
 
-        public DateTime? EndDateExclusive { get; init; }
+        public DateOnly? EndDateExclusive { get; init; }
 
         public int? CustomerId { get; init; }
 
@@ -54,9 +54,9 @@ namespace ExportDocManager.Models.DTOs
 
         public string UserId { get; init; } = string.Empty;
 
-        public DateTime? StartTime { get; init; }
+        public DateTimeOffset? StartTime { get; init; }
 
-        public DateTime? EndTime { get; init; }
+        public DateTimeOffset? EndTime { get; init; }
 
         public string Keyword { get; init; } = string.Empty;
     }

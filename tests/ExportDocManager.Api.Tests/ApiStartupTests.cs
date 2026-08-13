@@ -9,6 +9,7 @@ using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Core;
+using ExportDocManager.Services.BrowserRuntime;
 using ExportDocManager.Services.Data;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
@@ -147,7 +148,6 @@ namespace ExportDocManager.Api.Tests
             try
             {
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
-                DbHelper.ConfigurePathProvider(pathProvider);
 
                 var databaseSettings = new DatabaseConnectionSettings
                 {
@@ -166,7 +166,7 @@ namespace ExportDocManager.Api.Tests
                     });
 
                 string expectedDatabaseRoot = Path.Combine(dataRoot, "Database");
-                string databasePath = DbHelper.GetDatabasePath(databaseSettings.SqliteDatabaseFileName);
+                string databasePath = DbHelper.GetDatabasePath(pathProvider, databaseSettings.SqliteDatabaseFileName);
 
                 Assert.True(Directory.Exists(expectedDatabaseRoot));
                 Assert.True(Directory.Exists(Path.Combine(dataRoot, "SingleWindow")));
@@ -187,7 +187,6 @@ namespace ExportDocManager.Api.Tests
             try
             {
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
-                DbHelper.ConfigurePathProvider(pathProvider);
                 var runtimeOptions = new ApiRuntimeOptions
                 {
                     AppRoot = appRoot,
@@ -747,7 +746,7 @@ namespace ExportDocManager.Api.Tests
                 "INV-2026-01",
                 "Acme Buyer",
                 12,
-                new DateTime(2026, 6, 24),
+                new DateOnly(2026, 6, 24),
                 Array.Empty<string>(),
                 Array.Empty<ApiEndpointRouteBuilderExtensions.ApiInvoiceGeneratedDocumentEntry>());
             var config = new EmailConfig
@@ -924,7 +923,7 @@ namespace ExportDocManager.Api.Tests
                     "PATTERN-001",
                     "Pattern Customer",
                     7,
-                    new DateTime(2026, 6, 24),
+                    new DateOnly(2026, 6, 24),
                     [invoicePath, packingPath],
                     [
                         new ApiEndpointRouteBuilderExtensions.ApiInvoiceGeneratedDocumentEntry(invoicePath, "invoice.pdf"),
@@ -2137,7 +2136,14 @@ namespace ExportDocManager.Api.Tests
                     pathProvider,
                     new DatabaseConnectionSettings(),
                     Path.Combine(pathProvider.DatabaseRoot, "exportdoc.db"),
-                    new RuntimeDependencyDiagnosticsService(pathProvider).Inspect());
+                    new RuntimeDependencyDiagnosticsService(
+                        pathProvider,
+                        [
+                            new BrowserRuntimeDiagnosticContributor(
+                                pathProvider,
+                                new BrowserExecutableResolver(pathProvider)),
+                            new OcrRuntimeDiagnosticContributor(pathProvider)
+                        ]).Inspect());
                 var publicResponse = ApiHealthResponseFactory.CreatePublic(new DatabaseConnectionSettings());
 
                 Assert.Equal("ok", response.Status);

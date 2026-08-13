@@ -33,7 +33,7 @@ namespace ExportDocManager.Api.Tests
             var paymentResponse = await adminClient.PostAsJsonAsync("/api/payments", new ApiPaymentDto
             {
                 InvoiceNo = "QUERY-INV-001",
-                ShipmentDate = new DateTime(2026, 6, 20),
+                ShipmentDate = new DateOnly(2026, 6, 20),
                 Department = "Query Department",
                 Project = "PaymentOnlyMarker",
                 USDAmount = 12.34m,
@@ -41,11 +41,11 @@ namespace ExportDocManager.Api.Tests
                 PaymentMethod = "Wire",
                 PayeeName = "PaymentOnlyMarker Payee",
                 PayerName = "PaymentOnlyMarker Payer",
-                PaymentDate = new DateTime(2026, 6, 22),
+                PaymentDate = new DateOnly(2026, 6, 22),
                 GoodsName = "PaymentOnlyMarker Goods",
                 Quantity = "1",
                 ShipmentCountry = "Neverland",
-                ReceiptDate = new DateTime(2026, 6, 23)
+                ReceiptDate = new DateOnly(2026, 6, 23)
             });
             Assert.Equal(HttpStatusCode.Created, paymentResponse.StatusCode);
 
@@ -86,8 +86,8 @@ namespace ExportDocManager.Api.Tests
 
             var exportResponse = await adminClient.PostAsJsonAsync("/api/query/invoices/download", new
             {
-                startDate = new DateTime(2026, 6, 1),
-                endDateExclusive = new DateTime(2026, 7, 1),
+                startDate = new DateOnly(2026, 6, 1),
+                endDateExclusive = new DateOnly(2026, 7, 1),
                 keyword = "Q-STYLE-001"
             });
             Assert.Equal(HttpStatusCode.Accepted, exportResponse.StatusCode);
@@ -128,7 +128,7 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
-        public async Task QueryEndpoint_ShouldTreatEndDateExclusiveAsAPreciseExclusiveBoundary()
+        public async Task QueryEndpoint_ShouldTreatEndDateExclusiveAsAnExclusiveBusinessDate()
         {
             await using var harness = await ApiIntegrationTestHarness.StartAsync(
                 "edm-api-query-exclusive-end",
@@ -138,13 +138,13 @@ namespace ExportDocManager.Api.Tests
             var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
             using var adminClient = harness.CreateClient(adminLogin.AccessToken);
 
-            DateTime boundary = new(2026, 7, 1, 0, 0, 0, 500);
+            DateOnly boundary = new(2026, 7, 1);
             var includedResponse = await adminClient.PostAsJsonAsync(
                 "/api/invoices",
                 CreateInvoiceRequest(
                     "QUERY-BOUNDARY-INCLUDED",
                     "实际数据",
-                    shipmentDate: boundary.AddMilliseconds(-1)));
+                    shipmentDate: boundary.AddDays(-1)));
             Assert.Equal(HttpStatusCode.Created, includedResponse.StatusCode);
 
             var excludedResponse = await adminClient.PostAsJsonAsync(
@@ -155,9 +155,8 @@ namespace ExportDocManager.Api.Tests
                     shipmentDate: boundary));
             Assert.Equal(HttpStatusCode.Created, excludedResponse.StatusCode);
 
-            string encodedBoundary = Uri.EscapeDataString(boundary.ToString("O"));
             var queryResponse = await adminClient.GetAsync(
-                $"/api/query/invoices?startDate=2026-07-01T00:00:00&endDateExclusive={encodedBoundary}&keyword=QUERY-BOUNDARY&pageNumber=1&pageSize=10");
+                $"/api/query/invoices?startDate=2026-06-30&endDateExclusive={boundary:yyyy-MM-dd}&keyword=QUERY-BOUNDARY&pageNumber=1&pageSize=10");
             Assert.Equal(HttpStatusCode.OK, queryResponse.StatusCode);
 
             var page = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPagedResponse<ApiQueryInvoiceRowDto>>(queryResponse);
@@ -289,8 +288,8 @@ namespace ExportDocManager.Api.Tests
             string styleNo = "Q-STYLE-001",
             string styleName = "Query Jacket",
             decimal totalAmount = 120m,
-            DateTime? invoiceDate = null,
-            DateTime? shipmentDate = null)
+            DateOnly? invoiceDate = null,
+            DateOnly? shipmentDate = null)
         {
             contractNo = string.IsNullOrWhiteSpace(contractNo)
                 ? $"{invoiceNo}-CON"
@@ -301,8 +300,8 @@ namespace ExportDocManager.Api.Tests
                 Id = id,
                 InvoiceNo = invoiceNo,
                 ContractNo = contractNo,
-                InvoiceDate = invoiceDate ?? new DateTime(2026, 6, 1),
-                ShipmentDate = shipmentDate ?? new DateTime(2026, 6, 20),
+                InvoiceDate = invoiceDate ?? new DateOnly(2026, 6, 1),
+                ShipmentDate = shipmentDate ?? new DateOnly(2026, 6, 20),
                 CustomerNameEN = "Query Buyer",
                 CustomerAddressEN = "1 Query Road",
                 ExporterNameEN = "Query Exporter",

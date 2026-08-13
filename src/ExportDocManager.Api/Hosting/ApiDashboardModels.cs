@@ -51,7 +51,7 @@ namespace ExportDocManager.Api.Hosting
 
         public string Type { get; init; } = string.Empty;
 
-        public DateTime InvoiceDate { get; init; }
+        public DateOnly InvoiceDate { get; init; }
 
         public decimal TotalAmount { get; init; }
 

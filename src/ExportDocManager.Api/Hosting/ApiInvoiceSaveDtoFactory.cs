@@ -53,6 +53,7 @@ namespace ExportDocManager.Api.Hosting
                 SupervisionMode = request.SupervisionMode,
                 CustomerNameEN = request.CustomerNameEN,
                 CustomerAddressEN = request.CustomerAddressEN,
+                NotifyPartyMode = request.NotifyPartyMode,
                 NotifyPartyName = request.NotifyPartyName,
                 NotifyPartyAddress = request.NotifyPartyAddress,
                 ExporterNameEN = request.ExporterNameEN,

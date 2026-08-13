@@ -17,7 +17,8 @@ const runtimeDiagnosticsPath = path.join(repoRoot, "apps", "export-doc-web", "sr
 const runtimeDependencyDiagnosticsPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "settings", "runtimeDependencyDiagnosticsModel.ts").replaceAll("\\", "/");
 const documentTemplateSettingsPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "settings", "DocumentTemplateSettingsPanels.tsx").replaceAll("\\", "/");
 const updaterEndpointModelPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "system", "updaterEndpointModel.ts").replaceAll("\\", "/");
-fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as navigation from ${JSON.stringify(navigationPath)}; import * as categoryCatalog from ${JSON.stringify(categoryCatalogPath)}; import * as runtimeDiagnostics from ${JSON.stringify(runtimeDiagnosticsPath)}; import * as runtimeDependencyDiagnostics from ${JSON.stringify(runtimeDependencyDiagnosticsPath)}; import * as documentTemplateSettings from ${JSON.stringify(documentTemplateSettingsPath)}; import * as updaterEndpointModel from ${JSON.stringify(updaterEndpointModelPath)}; globalThis.__model = model; globalThis.__navigation = navigation; globalThis.__categoryCatalog = categoryCatalog; globalThis.__runtimeDiagnostics = runtimeDiagnostics; globalThis.__runtimeDependencyDiagnostics = runtimeDependencyDiagnostics; globalThis.__documentTemplateSettings = documentTemplateSettings; globalThis.__updaterEndpointModel = updaterEndpointModel;`, "utf8");
+const masterDataModelPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "master-data", "masterDataModel.ts").replaceAll("\\", "/");
+fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as navigation from ${JSON.stringify(navigationPath)}; import * as categoryCatalog from ${JSON.stringify(categoryCatalogPath)}; import * as runtimeDiagnostics from ${JSON.stringify(runtimeDiagnosticsPath)}; import * as runtimeDependencyDiagnostics from ${JSON.stringify(runtimeDependencyDiagnosticsPath)}; import * as documentTemplateSettings from ${JSON.stringify(documentTemplateSettingsPath)}; import * as updaterEndpointModel from ${JSON.stringify(updaterEndpointModelPath)}; import * as masterDataModel from ${JSON.stringify(masterDataModelPath)}; globalThis.__model = model; globalThis.__navigation = navigation; globalThis.__categoryCatalog = categoryCatalog; globalThis.__runtimeDiagnostics = runtimeDiagnostics; globalThis.__runtimeDependencyDiagnostics = runtimeDependencyDiagnostics; globalThis.__documentTemplateSettings = documentTemplateSettings; globalThis.__updaterEndpointModel = updaterEndpointModel; globalThis.__masterDataModel = masterDataModel;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -28,6 +29,7 @@ const runtimeDiagnostics = globalThis.__runtimeDiagnostics;
 const runtimeDependencyDiagnostics = globalThis.__runtimeDependencyDiagnostics;
 const documentTemplateSettings = globalThis.__documentTemplateSettings;
 const updaterEndpointModel = globalThis.__updaterEndpointModel;
+const masterDataModel = globalThis.__masterDataModel;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 
 const normalized = m.normalizeExcelImportSettings({ SchemeName: "Legacy", ItemsStartRow: "25", invoiceNoCell: null });
@@ -64,6 +66,29 @@ assert(documentEditionCategories.some((item) => item.key === "document-templates
 assert(!documentEditionCategories.some((item) => item.key === "users"), "single-role edition hides user management");
 assert(navigation.readSettingsCategoryFromSearch("?section=singleWindow", salesEditionCategories.map((item) => item.key)) === "runtime", "sales edition deep link falls back from document settings");
 assert(updaterEndpointModel.readUpdaterEndpoint({ system: { updaterEndpoint: " http://updates.internal/latest.json " } }) === "http://updates.internal/latest.json", "updater endpoint normalization");
+
+const separateNotifyParty = masterDataModel.normalizeCustomerRecord({
+  id: 7,
+  notifyPartyMode: "Separate",
+  notifyPartyName: " Notify Ltd. ",
+  notifyPartyAddress: " 1 Notify Road ",
+}, 7);
+assert(separateNotifyParty.notifyPartyMode === "Separate" && separateNotifyParty.notifyPartyName === "Notify Ltd." && separateNotifyParty.notifyPartyAddress === "1 Notify Road", "separate notify party normalization");
+const sameAsConsignee = masterDataModel.normalizeCustomerRecord({
+  id: 8,
+  notifyPartyMode: "SameAsConsignee",
+  notifyPartyName: "stale name",
+  notifyPartyAddress: "stale address",
+}, 8);
+assert(sameAsConsignee.notifyPartyMode === "SameAsConsignee" && sameAsConsignee.notifyPartyName === "" && sameAsConsignee.notifyPartyAddress === "", "same-as-consignee stores no notify copy");
+const clearedNotifyParty = masterDataModel.applyCustomerFieldChange({
+  id: 9,
+  notifyPartyMode: "Separate",
+  notifyPartyName: "Notify Ltd.",
+  notifyPartyAddress: "1 Notify Road",
+}, "notifyPartyMode", "None");
+assert(clearedNotifyParty.notifyPartyName === "" && clearedNotifyParty.notifyPartyAddress === "", "notify mode change clears separate fields");
+assert(masterDataModel.normalizeCustomerRecord({ id: 10, notifyPartyMode: "Legacy" }, 10).notifyPartyMode === "None", "unknown notify mode is rejected at the UI boundary");
 
 const exportTemplateItems = documentTemplateSettings.readBatchExportItemsForSettings({
   batchExport: { items: [{ name: "Export", templatePath: "invoice.html", reportType: "ExportDocument", showSeal: true }] },

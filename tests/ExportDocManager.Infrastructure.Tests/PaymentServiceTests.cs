@@ -45,8 +45,8 @@ namespace ExportDocManager.Infrastructure.Tests
             using (var seedContext = factory.CreateDbContext())
             {
                 seedContext.Payments.AddRange(
-                    new Payment { InvoiceNo = "OWN-PAY", OwnerUserId = 7, PaymentDate = new DateTime(2026, 6, 22) },
-                    new Payment { InvoiceNo = "FOREIGN-PAY", OwnerUserId = 8, PaymentDate = new DateTime(2026, 6, 22) });
+                    new Payment { InvoiceNo = "OWN-PAY", OwnerUserId = 7, PaymentDate = new DateOnly(2026, 6, 22) },
+                    new Payment { InvoiceNo = "FOREIGN-PAY", OwnerUserId = 8, PaymentDate = new DateOnly(2026, 6, 22) });
                 await seedContext.SaveChangesAsync();
             }
 
@@ -94,7 +94,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 Id = id,
                 OwnerUserId = ownerUserId,
                 InvoiceNo = invoiceNo,
-                PaymentDate = new DateTime(2026, 6, 22),
+                PaymentDate = new DateOnly(2026, 6, 22),
                 PayeeName = "测试收款方",
                 PayerName = "测试付款方",
                 CNYAmount = 100m

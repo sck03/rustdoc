@@ -58,7 +58,7 @@ namespace ExportDocManager.Api.Hosting
         string Description,
         bool IsSystem,
         bool IsActive,
-        DateTime UpdatedAt,
+        DateTimeOffset UpdatedAt,
         IReadOnlyList<ApiPermissionTemplateModuleDto> Modules);
 
     public sealed record ApiPermissionTemplateCatalogResponse(

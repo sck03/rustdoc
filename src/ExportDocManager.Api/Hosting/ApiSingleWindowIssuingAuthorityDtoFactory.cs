@@ -11,13 +11,15 @@ namespace ExportDocManager.Api.Hosting
         public const string CustomsCooEditorOptionsStoragePolicy =
             "COO 编辑候选来自 Application 内置 catalog；API 只返回证型、申报、贸易、包装、原产标准等只读候选，不写数据库、配置文件、缓存目录或默认导出目录。";
 
-        public static ApiSingleWindowIssuingAuthorityCatalogResponse FromIssuingAuthorityCatalog()
+        public static ApiSingleWindowIssuingAuthorityCatalogResponse FromIssuingAuthorityCatalog(
+            CustomsCooIssuingAuthorityCatalog catalog)
         {
-            var options = CustomsCooIssuingAuthorityCatalog.GetOptions()
+            ArgumentNullException.ThrowIfNull(catalog);
+            var options = catalog.GetOptions()
                 .Select(option => new ApiSingleWindowIssuingAuthorityOptionDto(
                     option.Value ?? string.Empty,
                     string.IsNullOrWhiteSpace(option.Text) ? option.Value ?? string.Empty : option.Text,
-                    CustomsCooIssuingAuthorityCatalog.ResolveApplicationAddress(option.Value ?? string.Empty)))
+                    catalog.ResolveApplicationAddress(option.Value ?? string.Empty)))
                 .ToArray();
 
             return new ApiSingleWindowIssuingAuthorityCatalogResponse(

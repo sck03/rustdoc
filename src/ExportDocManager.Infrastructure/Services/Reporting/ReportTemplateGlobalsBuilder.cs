@@ -73,7 +73,7 @@ namespace ExportDocManager.Services.Reporting
         {
             scriptObject.Import("convert_to_words", new Func<decimal, string>(ConvertNumberToWords));
             scriptObject.Import("convert_to_chinese_upper", new Func<decimal, string>(ConvertNumberToChineseUpper));
-            scriptObject.Import("format_date", new Func<DateTime, string, string>((date, format) => date.ToString(format)));
+            scriptObject.Import("format_date", new Func<object?, string, string>(FormatDate));
             scriptObject.Import("format_number", new Func<decimal, string, string>((number, format) => number.ToString(format)));
             scriptObject.Import("format_currency", new Func<decimal, string, string>((number, currency) => $"{currency} {number:N2}"));
             scriptObject.Import("format_unit_price", new Func<decimal, string>(ItemPricePrecisionPolicy.Format));
@@ -84,6 +84,18 @@ namespace ExportDocManager.Services.Reporting
         private static string ConvertNumberToWords(decimal number) => NumberHelper.ToEnglishWords(number) + " ONLY";
 
         private static string ConvertNumberToChineseUpper(decimal number) => NumberHelper.ToChineseMoney(number);
+
+        private static string FormatDate(object? value, string format)
+        {
+            string normalizedFormat = string.IsNullOrWhiteSpace(format) ? "yyyy-MM-dd" : format;
+            return value switch
+            {
+                DateOnly date => date.ToString(normalizedFormat),
+                DateTimeOffset timestamp => timestamp.ToString(normalizedFormat),
+                DateTime dateTime => dateTime.ToString(normalizedFormat),
+                _ => string.Empty
+            };
+        }
     }
 
     internal static class ReportImageDataUriHelper

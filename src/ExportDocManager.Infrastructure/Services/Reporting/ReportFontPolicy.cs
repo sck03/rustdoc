@@ -4,7 +4,7 @@ using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Reporting
 {
-    internal static class ReportFontPolicy
+    public static class ReportFontPolicy
     {
         public const string FontDirectoryRelativePath = "Fonts/OpenSource";
         public const string SansRegularFileName = "NotoSansCJKsc-Regular.otf";
@@ -38,7 +38,7 @@ namespace ExportDocManager.Services.Reporting
             return css.ToString();
         }
 
-        public static ReportFontAvailability Inspect(IAppPathProvider pathProvider)
+        internal static ReportFontAvailability Inspect(IAppPathProvider pathProvider)
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
             string fontRoot = Path.Combine(pathProvider.ResourceRoot, "Fonts", "OpenSource");

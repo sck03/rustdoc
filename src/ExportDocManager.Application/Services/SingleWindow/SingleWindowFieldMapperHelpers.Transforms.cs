@@ -3,13 +3,13 @@ using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.SingleWindow
 {
-    public static partial class SingleWindowFieldMapperHelpers
+    public sealed partial class SingleWindowFieldMapperHelpers
     {
         public static string NormalizeText(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
 
         public static string NormalizeUpperText(string? value) => NormalizeText(value).ToUpperInvariant();
 
-        public static string NormalizeCountryCode(string? value)
+        public string NormalizeCountryCode(string? value)
         {
             if (TryResolveCountry(value, out var entry))
             {
@@ -22,7 +22,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : string.Empty;
         }
 
-        public static string NormalizeAcdOriginCountryCode(string? value)
+        public string NormalizeAcdOriginCountryCode(string? value)
         {
             var normalized = NormalizeText(value);
             if (string.IsNullOrWhiteSpace(normalized))
@@ -52,26 +52,26 @@ namespace ExportDocManager.Services.SingleWindow
             return "142";
         }
 
-        public static string ResolveAcdOriginCountryCode(string? value)
+        public string ResolveAcdOriginCountryCode(string? value)
         {
             return NormalizeAcdOriginCountryCode(value);
         }
 
-        public static string NormalizeCountryNameEnglish(string? value)
+        public string NormalizeCountryNameEnglish(string? value)
         {
             return TryResolveCountry(value, out var entry)
                 ? entry.EnglishName
                 : NormalizeUpperText(value);
         }
 
-        public static string NormalizeCountryNameChinese(string? value)
+        public string NormalizeCountryNameChinese(string? value)
         {
             return TryResolveCountry(value, out var entry)
                 ? entry.ChineseName
                 : NormalizeText(value);
         }
 
-        public static string NormalizeCurrencyText(string? value)
+        public string NormalizeCurrencyText(string? value)
         {
             if (TryResolveCurrencyByText(value, out var entry))
             {
@@ -122,7 +122,7 @@ namespace ExportDocManager.Services.SingleWindow
             return normalized;
         }
 
-        public static string NormalizeCurrencyCode(string? value)
+        public string NormalizeCurrencyCode(string? value)
         {
             string normalized = NormalizeText(value);
             if (TryResolveCurrencyByAcdCode(normalized, out var acdEntry))
@@ -183,7 +183,7 @@ namespace ExportDocManager.Services.SingleWindow
             return CustomsCooGoodsDescriptionTemplateCatalog.BuildPackingSummary(packQty, packUnit);
         }
 
-        public static string NormalizeTransportMode(string? value)
+        public string NormalizeTransportMode(string? value)
         {
             string normalized = NormalizeLookupKey(value);
             if (string.IsNullOrWhiteSpace(normalized))
@@ -200,7 +200,7 @@ namespace ExportDocManager.Services.SingleWindow
             return NormalizeUpperText(value);
         }
 
-        public static string NormalizePort(string? value)
+        public string NormalizePort(string? value)
         {
             string normalized = NormalizeLookupKey(value);
             if (string.IsNullOrWhiteSpace(normalized))
@@ -226,7 +226,7 @@ namespace ExportDocManager.Services.SingleWindow
             return new string(chars);
         }
 
-        public static string NormalizeTradeModeCode(string? value)
+        public string NormalizeTradeModeCode(string? value)
         {
             var normalized = NormalizeText(value);
             if (normalized.Length == 4 && normalized.All(char.IsDigit))
@@ -239,7 +239,7 @@ namespace ExportDocManager.Services.SingleWindow
                 : string.Empty;
         }
 
-        public static string NormalizeAcdTradeModeDisplayText(string? value)
+        public string NormalizeAcdTradeModeDisplayText(string? value)
         {
             if (!TryResolveAcdTradeMode(value, out var entry))
             {
@@ -261,7 +261,7 @@ namespace ExportDocManager.Services.SingleWindow
             return CustomsCooTradeModeCatalog.PreferCode(preferredValue, fallbackValue);
         }
 
-        public static string BuildCooTransportDetails(
+        public string BuildCooTransportDetails(
             string? loadPort,
             string? unloadPort,
             string? transPort,
@@ -311,35 +311,35 @@ namespace ExportDocManager.Services.SingleWindow
             return string.Empty;
         }
 
-        public static bool TryResolveCountry(
+        public bool TryResolveCountry(
             string? value,
             [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out CountryCatalogEntry? entry)
         {
             return CurrentReferenceCatalogState.CountryLookup.TryGetValue(NormalizeLookupKey(value), out entry);
         }
 
-        private static bool TryResolveAcdCountry(
+        private bool TryResolveAcdCountry(
             string? value,
             [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out AcdCountryCatalogEntry? entry)
         {
             return CurrentReferenceCatalogState.AcdCountryLookup.TryGetValue(NormalizeLookupKey(value), out entry);
         }
 
-        private static bool TryResolveCurrencyByText(
+        private bool TryResolveCurrencyByText(
             string? value,
             [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out CurrencyCatalogEntry? entry)
         {
             return CurrentReferenceCatalogState.CurrencyTextLookup.TryGetValue(NormalizeLookupKey(value), out entry);
         }
 
-        private static bool TryResolveCurrencyByAcdCode(
+        private bool TryResolveCurrencyByAcdCode(
             string? value,
             [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out CurrencyCatalogEntry? entry)
         {
             return CurrentReferenceCatalogState.CurrencyAcdCodeLookup.TryGetValue(NormalizeLookupKey(value), out entry);
         }
 
-        private static bool TryResolveAcdTradeMode(
+        private bool TryResolveAcdTradeMode(
             string? value,
             [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out AcdTradeModeCatalogEntry? entry)
         {

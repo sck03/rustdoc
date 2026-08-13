@@ -76,8 +76,8 @@ namespace ExportDocManager.Services.MasterData
             UseCount = source?.UseCount ?? 0,
             RejectedCount = source?.RejectedCount ?? 0,
             LastUsedAt = source?.LastUsedAt,
-            CreatedAt = source?.CreatedAt ?? DateTime.UtcNow,
-            UpdatedAt = source?.UpdatedAt ?? DateTime.UtcNow
+            CreatedAt = source?.CreatedAt ?? DateTimeOffset.UtcNow,
+            UpdatedAt = source?.UpdatedAt ?? DateTimeOffset.UtcNow
         };
 
         private static HsCodeReplacementRelation CloneHsCodeReplacementRelation(HsCodeReplacementRelation? source) => new()
@@ -89,8 +89,8 @@ namespace ExportDocManager.Services.MasterData
             Source = source?.Source ?? string.Empty,
             Confidence = source?.Confidence ?? 0,
             IsManuallyVerified = source?.IsManuallyVerified ?? false,
-            CreatedAt = source?.CreatedAt ?? DateTime.UtcNow,
-            UpdatedAt = source?.UpdatedAt ?? DateTime.UtcNow
+            CreatedAt = source?.CreatedAt ?? DateTimeOffset.UtcNow,
+            UpdatedAt = source?.UpdatedAt ?? DateTimeOffset.UtcNow
         };
 
         private static HsCodeSearchFeedback CloneHsCodeSearchFeedback(HsCodeSearchFeedback? source) => new()
@@ -104,7 +104,7 @@ namespace ExportDocManager.Services.MasterData
             AcceptedCount = source?.AcceptedCount ?? 0,
             RejectedCount = source?.RejectedCount ?? 0,
             LastConfirmedAt = source?.LastConfirmedAt,
-            UpdatedAt = source?.UpdatedAt ?? DateTime.UtcNow
+            UpdatedAt = source?.UpdatedAt ?? DateTimeOffset.UtcNow
         };
 
         private static string Prefer(string? primary, string? fallback) =>
@@ -131,8 +131,8 @@ namespace ExportDocManager.Services.MasterData
             values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!.Trim()));
 
         private static int? Max(int? left, int? right) => !left.HasValue ? right : !right.HasValue ? left : Math.Max(left.Value, right.Value);
-        private static DateTime? Max(DateTime? left, DateTime? right) => !left.HasValue ? right : !right.HasValue ? left : left > right ? left : right;
-        private static DateTime Max(DateTime left, DateTime right) => left > right ? left : right;
+        private static DateTimeOffset? Max(DateTimeOffset? left, DateTimeOffset? right) => !left.HasValue ? right : !right.HasValue ? left : left > right ? left : right;
+        private static DateTimeOffset Max(DateTimeOffset left, DateTimeOffset right) => left > right ? left : right;
 
         private static ZipArchiveEntry GetRequiredKnowledgeEntry(ZipArchive archive, string name)
         {

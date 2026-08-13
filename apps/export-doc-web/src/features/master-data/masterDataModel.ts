@@ -423,6 +423,38 @@ export function normalizeTextFields(record: MasterDataRecord, id: number, fields
   return next;
 }
 
+export function isSeparateNotifyParty(record: MasterDataRecord) {
+  return readString(record, "notifyPartyMode") === "Separate";
+}
+
+export function applyCustomerFieldChange(
+  record: MasterDataRecord,
+  name: string,
+  value: string | number,
+) {
+  const next = { ...record, [name]: value };
+  if (name === "notifyPartyMode" && value !== "Separate") {
+    next.notifyPartyName = "";
+    next.notifyPartyAddress = "";
+  }
+
+  return next;
+}
+
+export function normalizeCustomerRecord(record: MasterDataRecord, id: number) {
+  const next = normalizeTextFields(record, id, customerTextFields);
+  const requestedMode = readString(record, "notifyPartyMode");
+  next.notifyPartyMode = requestedMode === "SameAsConsignee" || requestedMode === "Separate"
+    ? requestedMode
+    : "None";
+  if (next.notifyPartyMode !== "Separate") {
+    next.notifyPartyName = "";
+    next.notifyPartyAddress = "";
+  }
+
+  return next;
+}
+
 export function normalizeMixedFields(
   record: MasterDataRecord,
   id: number,

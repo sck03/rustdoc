@@ -93,7 +93,7 @@ namespace ExportDocManager.Services.SingleWindow
                                     token)
                                 .ConfigureAwait(false);
                             string batchReference = BuildBatchReference(businessType, submissionVersion);
-                            DateTime nowUtc = DateTime.UtcNow;
+                            DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
                             var batch = new SwSubmissionBatch
                             {
                                 BatchReference = batchReference,
@@ -157,7 +157,7 @@ namespace ExportDocManager.Services.SingleWindow
 
             batch.Status = SingleWindowBatchStatusCatalog.Failed;
             batch.LastError = Truncate(errorMessage, 2000);
-            batch.UpdatedAt = DateTime.UtcNow;
+            batch.UpdatedAt = DateTimeOffset.UtcNow;
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
 

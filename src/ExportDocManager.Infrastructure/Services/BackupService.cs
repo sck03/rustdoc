@@ -35,14 +35,6 @@ namespace ExportDocManager.Services.Infrastructure
 
         public BackupService(
             DatabaseConnectionSettings databaseSettings,
-            string? backupDirectory = null,
-            string? databasePath = null)
-            : this(databaseSettings, new RuntimeAppPathProvider(), backupDirectory, databasePath)
-        {
-        }
-
-        public BackupService(
-            DatabaseConnectionSettings databaseSettings,
             IAppPathProvider pathProvider,
             string? backupDirectory = null,
             string? databasePath = null)

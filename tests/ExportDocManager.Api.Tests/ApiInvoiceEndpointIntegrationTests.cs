@@ -202,6 +202,62 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public async Task InvoiceEndpoints_ShouldKeepSameAsConsigneeAsModeOnlyAcrossSaveAndClone()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-notify-mode",
+                "api-notify-mode.db");
+            using var anonymousClient = harness.CreateClient();
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+
+            var request = CreateInvoiceRequest(
+                "INV-NOTIFY-MODE",
+                notifyPartyMode: NotifyPartyMode.SameAsConsignee,
+                notifyPartyName: "stale copy",
+                notifyPartyAddress: "stale address");
+
+            var createResponse = await adminClient.PostAsJsonAsync("/api/invoices", request);
+            Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+            var created = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(createResponse);
+            Assert.Equal(NotifyPartyMode.SameAsConsignee, created.Invoice.NotifyPartyMode);
+            Assert.Equal(string.Empty, created.Invoice.NotifyPartyName);
+            Assert.Equal(string.Empty, created.Invoice.NotifyPartyAddress);
+
+            var cloneResponse = await adminClient.PostAsJsonAsync(
+                $"/api/invoices/{created.Id}/clone",
+                new ApiInvoiceCloneRequest(
+                    "INV-NOTIFY-MODE-COPY",
+                    new InvoiceCloneOptions
+                    {
+                        CopyHeader = true,
+                        CopyItems = true,
+                        ResetDates = false,
+                        ClearAmounts = false
+                    }));
+            Assert.Equal(HttpStatusCode.OK, cloneResponse.StatusCode);
+            var clone = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceCloneResponse>(cloneResponse);
+            Assert.Equal(NotifyPartyMode.SameAsConsignee, clone.Invoice.NotifyPartyMode);
+            Assert.Equal(string.Empty, clone.Invoice.NotifyPartyName);
+            Assert.Equal(string.Empty, clone.Invoice.NotifyPartyAddress);
+
+            await using var connection = new SqliteConnection($"Data Source={harness.DatabasePath}");
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT NotifyPartyMode, NotifyPartyName, NotifyPartyAddress
+                FROM Invoices
+                WHERE Id = $id;
+                """;
+            command.Parameters.AddWithValue("$id", created.Id);
+            await using var reader = await command.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal(nameof(NotifyPartyMode.SameAsConsignee), reader.GetString(0));
+            Assert.True(reader.IsDBNull(1) || reader.GetString(1).Length == 0);
+            Assert.True(reader.IsDBNull(2) || reader.GetString(2).Length == 0);
+        }
+
+        [Fact]
         public async Task ShippingMarkImageEndpoints_ShouldSaveRuntimeDataRootImageAndRejectOutsidePreviewPath()
         {
             await using var harness = await ApiIntegrationTestHarness.StartAsync(
@@ -850,17 +906,23 @@ namespace ExportDocManager.Api.Tests
             decimal quantity = 10m,
             decimal? unitPrice = null,
             decimal? lineAmount = null,
-            string priceCalculationMode = ItemPriceCalculationModeCatalog.UnitPriceDriven)
+            string priceCalculationMode = ItemPriceCalculationModeCatalog.UnitPriceDriven,
+            NotifyPartyMode notifyPartyMode = NotifyPartyMode.None,
+            string notifyPartyName = "",
+            string notifyPartyAddress = "")
         {
             return new ApiInvoiceDetailDto
             {
                 Id = id,
                 InvoiceNo = invoiceNo,
                 ContractNo = $"{invoiceNo}-CON",
-                InvoiceDate = new DateTime(2026, 6, 1),
-                ShipmentDate = new DateTime(2026, 6, 20),
+                InvoiceDate = new DateOnly(2026, 6, 1),
+                ShipmentDate = new DateOnly(2026, 6, 20),
                 CustomerNameEN = customerName,
                 CustomerAddressEN = "1 API Road",
+                NotifyPartyMode = notifyPartyMode,
+                NotifyPartyName = notifyPartyName,
+                NotifyPartyAddress = notifyPartyAddress,
                 ExporterNameEN = "API Exporter",
                 ExporterNameCN = "API 出口商",
                 ExporterAddressCN = "CN Exporter Address",

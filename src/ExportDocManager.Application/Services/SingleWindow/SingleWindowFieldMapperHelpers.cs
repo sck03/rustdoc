@@ -2,7 +2,7 @@ using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.SingleWindow
 {
-    public static partial class SingleWindowFieldMapperHelpers
+    public sealed partial class SingleWindowFieldMapperHelpers
     {
         public sealed record CountryCatalogEntry(string Code, string EnglishName, string ChineseName, params string[] Aliases);
 
@@ -428,9 +428,5 @@ namespace ExportDocManager.Services.SingleWindow
             new("HAIPHONG", "海防", "HAI PHONG")
         ];
 
-        static SingleWindowFieldMapperHelpers()
-        {
-            ReloadReferenceCatalog();
-        }
     }
 }

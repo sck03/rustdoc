@@ -61,7 +61,7 @@ namespace ExportDocManager.Services.SingleWindow
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
             var normalized = NormalizeInput(input);
             var existing = await FindExistingAsync(context, normalized, cancellationToken).ConfigureAwait(false);
-            var now = DateTime.Now;
+            var now = DateTimeOffset.UtcNow;
 
             if (existing == null)
             {
@@ -87,7 +87,7 @@ namespace ExportDocManager.Services.SingleWindow
 
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
             var normalized = NormalizeInput(input);
-            var now = DateTime.Now;
+            var now = DateTimeOffset.UtcNow;
 
             CustomsCooProducerProfile? entity = null;
             if (profileId.GetValueOrDefault() > 0)
@@ -169,7 +169,7 @@ namespace ExportDocManager.Services.SingleWindow
                 }
             }
 
-            DateTime now = DateTime.Now;
+            DateTimeOffset now = DateTimeOffset.UtcNow;
             foreach (CustomsCooProducerProfileInput input in normalizedInputs)
             {
                 CustomsCooProducerProfile? entity = ResolveExisting(input, byCode, byName);
@@ -268,7 +268,7 @@ namespace ExportDocManager.Services.SingleWindow
             return null;
         }
 
-        private static void ApplyValues(CustomsCooProducerProfile target, CustomsCooProducerProfileInput source, DateTime now)
+        private static void ApplyValues(CustomsCooProducerProfile target, CustomsCooProducerProfileInput source, DateTimeOffset now)
         {
             target.CiqRegNo = NormalizeUpperValue(source.CiqRegNo);
             target.PrdcEtpsName = NormalizeText(source.PrdcEtpsName);

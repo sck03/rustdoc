@@ -18,7 +18,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             using var factory = new SqliteTestDbContextFactory();
             var repository = new LocalMasterDataReadRepository(factory);
-            var service = new HsCodeService(factory, repository);
+            var service = CreateHsCodeService(factory, repository);
             await using (var context = factory.CreateDbContext())
             {
                 context.HsCodes.Add(new HsCode
@@ -88,7 +88,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             using var factory = new SqliteTestDbContextFactory();
             var repository = new LocalMasterDataReadRepository(factory);
-            var service = new HsCodeService(factory, repository);
+            var service = CreateHsCodeService(factory, repository);
             await service.SaveAsync(new HsCode { Code = "6109100000", Name = "棉制针织T恤衫" });
             await service.SaveAsync(new HsCode { Code = "2846109010", Name = "其他稀土化合物" });
 
@@ -103,7 +103,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             using var factory = new SqliteTestDbContextFactory();
             var repository = new LocalMasterDataReadRepository(factory);
-            var service = new HsCodeService(factory, repository);
+            var service = CreateHsCodeService(factory, repository);
             await service.SaveAsync(new HsCode
             {
                 Code = "6205200090",
@@ -151,7 +151,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             using var factory = new SqliteTestDbContextFactory();
             var repository = new LocalMasterDataReadRepository(factory);
-            var service = new HsCodeService(factory, repository);
+            var service = CreateHsCodeService(factory, repository);
             await service.SaveAsync(new HsCode { Code = "8517000000", Name = "旧通信设备", Unit = "台" });
             string path = CreateHsCodeWorkbook(workbook =>
             {
@@ -181,7 +181,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task HsCodeImport_ShouldCommitMoreThanOneDatabaseBatch()
         {
             using var factory = new SqliteTestDbContextFactory();
-            var service = new HsCodeService(factory, new LocalMasterDataReadRepository(factory));
+            var service = CreateHsCodeService(factory, new LocalMasterDataReadRepository(factory));
             string path = CreateHsCodeWorkbook(workbook =>
             {
                 var sheet = workbook.AddWorksheet("大批量税则");
@@ -220,7 +220,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             using var factory = new SqliteTestDbContextFactory();
             var repository = new LocalMasterDataReadRepository(factory);
-            var service = new HsCodeService(factory, repository);
+            var service = CreateHsCodeService(factory, repository);
             string path = CreateHsCodeWorkbook(workbook =>
             {
                 var sheet = workbook.AddWorksheet("完整税则");
@@ -265,6 +265,11 @@ namespace ExportDocManager.Infrastructure.Tests
             }
         }
 
+        private static HsCodeService CreateHsCodeService(
+            IDbContextFactory<AppDbContext> factory,
+            IHsCodeReadRepository repository) =>
+            new(factory, repository, [], new HsCodeImportService(factory));
+
         private static string CreateHsCodeWorkbook(Action<XLWorkbook> build)
         {
             string directory = Path.Combine(AppContext.BaseDirectory, "HsCodeImportTests");
@@ -285,6 +290,7 @@ namespace ExportDocManager.Infrastructure.Tests
             await service.SaveCustomerAsync(new Customer
             {
                 CustomerNameEN = "  Alpha Trading  ",
+                NotifyPartyMode = NotifyPartyMode.Separate,
                 NotifyPartyName = "  Alpha Notify  ",
                 TaxId = "  91310000ALPHA  "
             });

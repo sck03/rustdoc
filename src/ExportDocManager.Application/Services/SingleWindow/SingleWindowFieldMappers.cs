@@ -7,9 +7,24 @@ namespace ExportDocManager.Services.SingleWindow
 {
     public sealed class CustomsCooFieldMapper : ICustomsCooFieldMapper
     {
+        private readonly ISingleWindowReferenceCatalogSnapshotProvider _catalogProvider;
+
+        public CustomsCooFieldMapper(ISingleWindowReferenceCatalogSnapshotProvider catalogProvider)
+        {
+            _catalogProvider = catalogProvider ?? throw new ArgumentNullException(nameof(catalogProvider));
+        }
+
+        public CustomsCooFieldMapper()
+            : this(new SingleWindowReferenceCatalogSnapshotStore())
+        {
+        }
+
         public CooMappedDocument Map(CooSourceSnapshot snapshot)
         {
             ArgumentNullException.ThrowIfNull(snapshot);
+            var catalogSnapshot = _catalogProvider.Current;
+            var mapper = catalogSnapshot.FieldMapper;
+            var issuingAuthorities = catalogSnapshot.IssuingAuthorities;
 
             var invoice = snapshot.Invoice ?? new Invoice();
             var exporter = snapshot.Exporter;
@@ -25,18 +40,18 @@ namespace ExportDocManager.Services.SingleWindow
             string existingOrgCode = NormalizeText(existing?.OrgCode);
             string existingFetchPlace = NormalizeText(existing?.FetchPlace);
             string derivedApplicationAddress = FirstNonEmpty(
-                CustomsCooIssuingAuthorityCatalog.ResolveApplicationAddress(existingOrgCode),
-                CustomsCooIssuingAuthorityCatalog.ResolveApplicationAddress(existingFetchPlace));
+                issuingAuthorities.ResolveApplicationAddress(existingOrgCode),
+                issuingAuthorities.ResolveApplicationAddress(existingFetchPlace));
 
-            var goods = BuildGoodsItems(snapshot, invoice);
+            var goods = BuildGoodsItems(mapper, snapshot, invoice);
 
             if (goods.Count == 0)
             {
                 warnings.Add("当前发票没有商品明细，导出的海关原产地证 XML 仅为骨架。");
             }
 
-            string mappedOriginCountryCode = NormalizeRecognizedCountryCode(firstOrigin);
-            string mappedOriginCountryName = NormalizeRecognizedCountryNameEnglish(firstOrigin);
+            string mappedOriginCountryCode = NormalizeRecognizedCountryCode(mapper, firstOrigin);
+            string mappedOriginCountryName = NormalizeRecognizedCountryNameEnglish(mapper, firstOrigin);
 
             var document = new CooMappedDocument
             {
@@ -56,12 +71,12 @@ namespace ExportDocManager.Services.SingleWindow
                 AplAdd = PreferValue(existing?.AplAdd, derivedApplicationAddress),
                 InvDate = PreferValue(
                     existing?.InvDate,
-                    invoice.InvoiceDate > DateTime.MinValue ? invoice.InvoiceDate.ToString("yyyy-MM-dd") : string.Empty),
+                    invoice.InvoiceDate != default ? invoice.InvoiceDate.ToString("yyyy-MM-dd") : string.Empty),
                 InvNo = PreferValue(existing?.InvNo, NormalizeText(invoice.InvoiceNo)),
                 AplDate = PreferValue(existing?.AplDate, DateTime.Today.ToString("yyyy-MM-dd")),
-                DestCountry = PreferValue(existing?.DestCountry, NormalizeCountryNameEnglish(invoice.DestinationCountry)),
-                DestCountryCode = PreferValue(existing?.DestCountryCode, NormalizeCountryCode(invoice.DestinationCountry)),
-                DestCountryName = PreferValue(existing?.DestCountryName, NormalizeCountryNameChinese(invoice.DestinationCountry)),
+                DestCountry = PreferValue(existing?.DestCountry, mapper.NormalizeCountryNameEnglish(invoice.DestinationCountry)),
+                DestCountryCode = PreferValue(existing?.DestCountryCode, mapper.NormalizeCountryCode(invoice.DestinationCountry)),
+                DestCountryName = PreferValue(existing?.DestCountryName, mapper.NormalizeCountryNameChinese(invoice.DestinationCountry)),
                 Exporter = PreferPartyBlock(
                     existing?.Exporter,
                     CustomsCooTextFormatter.BuildPartyBlock(exporterNameEnglish, exporterAddressEnglish)),
@@ -70,22 +85,22 @@ namespace ExportDocManager.Services.SingleWindow
                     CustomsCooTextFormatter.BuildPartyBlock(customerNameEnglish, customerAddressEnglish)),
                 GoodsSpecClause = PreferValue(existing?.GoodsSpecClause, NormalizeText(invoice.SpecialTerms)),
                 Mark = PreferValue(existing?.Mark, string.IsNullOrWhiteSpace(invoice.ShippingMarks) ? "N/M" : invoice.ShippingMarks.Trim()),
-                LoadPort = PreferValue(existing?.LoadPort, NormalizePort(invoice.PortOfLoading)),
-                UnloadPort = PreferValue(existing?.UnloadPort, NormalizePort(invoice.PortOfDestination)),
-                TransMeans = PreferValue(existing?.TransMeans, NormalizeTransportMode(invoice.TransportMode)),
+                LoadPort = PreferValue(existing?.LoadPort, mapper.NormalizePort(invoice.PortOfLoading)),
+                UnloadPort = PreferValue(existing?.UnloadPort, mapper.NormalizePort(invoice.PortOfDestination)),
+                TransMeans = PreferValue(existing?.TransMeans, mapper.NormalizeTransportMode(invoice.TransportMode)),
                 TransName = PreferValue(existing?.TransName, string.Empty),
-                TransCountryCode = PreferValue(existing?.TransCountryCode, NormalizeCountryCode(existing?.TransCountryName)),
-                TransCountryName = PreferValue(existing?.TransCountryName, NormalizeCountryNameChinese(existing?.TransCountryCode)),
-                TransPort = PreferValue(existing?.TransPort, NormalizePort(existing?.TransPort)),
-                DestPort = PreferValue(existing?.DestPort, NormalizePort(invoice.PortOfDestination)),
+                TransCountryCode = PreferValue(existing?.TransCountryCode, mapper.NormalizeCountryCode(existing?.TransCountryName)),
+                TransCountryName = PreferValue(existing?.TransCountryName, mapper.NormalizeCountryNameChinese(existing?.TransCountryCode)),
+                TransPort = PreferValue(existing?.TransPort, mapper.NormalizePort(existing?.TransPort)),
+                DestPort = PreferValue(existing?.DestPort, mapper.NormalizePort(invoice.PortOfDestination)),
                 TransDetails = PreferValue(
                     existing?.TransDetails,
-                    BuildCooTransportDetails(
+                    mapper.BuildCooTransportDetails(
                         invoice.PortOfLoading,
                         invoice.PortOfDestination,
                         existing?.TransPort,
                         invoice.TransportMode)),
-                IntendExpDate = PreferValue(existing?.IntendExpDate, invoice.ShipmentDate > DateTime.MinValue ? invoice.ShipmentDate.ToString("yyyy-MM-dd") : string.Empty),
+                IntendExpDate = PreferValue(existing?.IntendExpDate, invoice.ShipmentDate != default ? invoice.ShipmentDate.ToString("yyyy-MM-dd") : string.Empty),
                 TradeModeCode = PreferCooTradeModeCode(existing?.TradeModeCode, invoice.SupervisionMode),
                 FobValue = PreferValue(existing?.FobValue, FormatDecimal(invoice.TotalAmount, 2)),
                 TotalAmt = PreferValue(existing?.TotalAmt, FormatDecimal(invoice.TotalAmount, 2)),
@@ -94,7 +109,7 @@ namespace ExportDocManager.Services.SingleWindow
                 LcNo = PreferValue(existing?.LcNo, NormalizeText(invoice.LetterOfCreditNo)),
                 SpecInvTerms = PreferValue(existing?.SpecInvTerms, NormalizeText(invoice.SpecialTerms)),
                 PriceTerms = PreferValue(NormalizePriceTerms(existing?.PriceTerms), NormalizePriceTerms(invoice.TradeTerms)),
-                Curr = PreferValue(existing?.Curr, NormalizeCurrencyText(invoice.Currency)),
+                Curr = PreferValue(existing?.Curr, mapper.NormalizeCurrencyText(invoice.Currency)),
                 Remark = PreferValue(existing?.Remark, NormalizeText(invoice.SpecialTerms)),
                 Producer = PreferValue(existing?.Producer, string.Empty),
                 ProducerSertFlag = PreferValue(existing?.ProducerSertFlag, string.Empty),
@@ -109,7 +124,7 @@ namespace ExportDocManager.Services.SingleWindow
                 PredictFlag = PreferValue(existing?.PredictFlag, string.Empty),
                 ExpDeclDate = PreferValue(existing?.ExpDeclDate, string.Empty),
                 OriCountryCode = PreferValue(existing?.OriCountryCode, mappedOriginCountryCode),
-                OriCountry = PreferRecognizedCountryNameEnglish(existing?.OriCountry, mappedOriginCountryName, firstOrigin),
+                OriCountry = PreferRecognizedCountryNameEnglish(mapper, existing?.OriCountry, mappedOriginCountryName, firstOrigin),
                 ChkValidDate = PreferValue(existing?.ChkValidDate, string.Empty),
                 EtpsConcEr = PreferValue(existing?.EtpsConcEr, NormalizeText(exporter?.ContactPerson)),
                 EtpsTel = PreferValue(existing?.EtpsTel, NormalizePhone(exporter?.Phone)),
@@ -167,7 +182,10 @@ namespace ExportDocManager.Services.SingleWindow
             return document;
         }
 
-        private static IReadOnlyList<CooMappedGoodsItem> BuildGoodsItems(CooSourceSnapshot snapshot, Invoice invoice)
+        private static IReadOnlyList<CooMappedGoodsItem> BuildGoodsItems(
+            SingleWindowFieldMapperHelpers mapper,
+            CooSourceSnapshot snapshot,
+            Invoice invoice)
         {
             var sourceItems = snapshot.Items?.Where(item => item != null).ToList() ?? [];
             var existingItems = snapshot.ExistingDocument?.Items?
@@ -190,8 +208,8 @@ namespace ExportDocManager.Services.SingleWindow
                     var existing = existingIndex.Find(item, index + 1);
 
                     var mappedItem = existing == null
-                        ? MapGoodsItem(item, invoice, snapshot.Exporter, index + 1)
-                        : MergeGoodsItem(item, invoice, snapshot.Exporter, existing, index + 1);
+                        ? MapGoodsItem(mapper, item, invoice, snapshot.Exporter, index + 1)
+                        : MergeGoodsItem(mapper, item, invoice, snapshot.Exporter, existing, index + 1);
 
                     return NormalizeGoodsItem(
                         mappedItem,
@@ -200,7 +218,12 @@ namespace ExportDocManager.Services.SingleWindow
                 .ToList();
         }
 
-        private static CooMappedGoodsItem MapGoodsItem(Item item, Invoice invoice, Exporter? exporter, int lineNo)
+        private static CooMappedGoodsItem MapGoodsItem(
+            SingleWindowFieldMapperHelpers mapper,
+            Item item,
+            Invoice invoice,
+            Exporter? exporter,
+            int lineNo)
         {
             return new CooMappedGoodsItem
             {
@@ -227,8 +250,8 @@ namespace ExportDocManager.Services.SingleWindow
                 FobValue = FormatDecimal(item.TotalPrice, 2),
                 ICompPrpr = string.Empty,
                 GoodsDesc = string.Empty,
-                GoodsOriginCountry = NormalizeRecognizedCountryCode(item.Origin),
-                GoodsOriginCountryEn = NormalizeRecognizedCountryNameEnglish(item.Origin),
+                GoodsOriginCountry = NormalizeRecognizedCountryCode(mapper, item.Origin),
+                GoodsOriginCountryEn = NormalizeRecognizedCountryNameEnglish(mapper, item.Origin),
                 Producer = string.Empty,
                 ProducerTel = string.Empty,
                 ProducerFax = string.Empty,
@@ -244,9 +267,15 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        private static CooMappedGoodsItem MergeGoodsItem(Item item, Invoice invoice, Exporter? exporter, CustomsCooItem existing, int lineNo)
+        private static CooMappedGoodsItem MergeGoodsItem(
+            SingleWindowFieldMapperHelpers mapper,
+            Item item,
+            Invoice invoice,
+            Exporter? exporter,
+            CustomsCooItem existing,
+            int lineNo)
         {
-            var fallback = MapGoodsItem(item, invoice, exporter, lineNo);
+            var fallback = MapGoodsItem(mapper, item, invoice, exporter, lineNo);
             fallback.GNo = lineNo;
             fallback.GoodsItemFlag = CustomsCooGoodsItemFlagCatalog.NormalizeOrDefault(PreferValue(existing.GoodsItemFlag, fallback.GoodsItemFlag));
             fallback.HSCode = PreferValue(existing.HSCode, fallback.HSCode);
@@ -272,7 +301,11 @@ namespace ExportDocManager.Services.SingleWindow
             fallback.OriCriteria = PreferValue(existing.OriCriteria, fallback.OriCriteria);
             fallback.OriCriteriaRef = PreferValue(existing.OriCriteriaRef, fallback.OriCriteriaRef);
             fallback.GoodsOriginCountry = PreferValue(existing.GoodsOriginCountry, fallback.GoodsOriginCountry);
-            fallback.GoodsOriginCountryEn = PreferRecognizedCountryNameEnglish(existing.GoodsOriginCountryEn, fallback.GoodsOriginCountryEn, item?.Origin);
+            fallback.GoodsOriginCountryEn = PreferRecognizedCountryNameEnglish(
+                mapper,
+                existing.GoodsOriginCountryEn,
+                fallback.GoodsOriginCountryEn,
+                item?.Origin);
             fallback.Producer = PreferValue(existing.Producer, fallback.Producer);
             fallback.ProducerTel = PreferValue(existing.ProducerTel, fallback.ProducerTel);
             fallback.ProducerFax = PreferValue(existing.ProducerFax, fallback.ProducerFax);
@@ -423,7 +456,11 @@ namespace ExportDocManager.Services.SingleWindow
                 : normalizedExisting;
         }
 
-        private static string PreferRecognizedCountryNameEnglish(string? existingValue, string? fallbackValue, string? rawOriginValue)
+        private static string PreferRecognizedCountryNameEnglish(
+            SingleWindowFieldMapperHelpers mapper,
+            string? existingValue,
+            string? fallbackValue,
+            string? rawOriginValue)
         {
             string normalizedExisting = NormalizeText(existingValue);
             if (string.IsNullOrWhiteSpace(normalizedExisting))
@@ -431,7 +468,7 @@ namespace ExportDocManager.Services.SingleWindow
                 return fallbackValue ?? string.Empty;
             }
 
-            if (string.IsNullOrWhiteSpace(fallbackValue) && !TryResolveCountry(rawOriginValue, out _))
+            if (string.IsNullOrWhiteSpace(fallbackValue) && !mapper.TryResolveCountry(rawOriginValue, out _))
             {
                 string rawText = NormalizeText(rawOriginValue);
                 string rawUpperText = NormalizeUpperText(rawOriginValue);
@@ -445,16 +482,20 @@ namespace ExportDocManager.Services.SingleWindow
             return normalizedExisting;
         }
 
-        private static string NormalizeRecognizedCountryCode(string? value)
+        private static string NormalizeRecognizedCountryCode(
+            SingleWindowFieldMapperHelpers mapper,
+            string? value)
         {
-            return TryResolveCountry(value, out var entry)
+            return mapper.TryResolveCountry(value, out var entry)
                 ? entry.Code
                 : string.Empty;
         }
 
-        private static string NormalizeRecognizedCountryNameEnglish(string? value)
+        private static string NormalizeRecognizedCountryNameEnglish(
+            SingleWindowFieldMapperHelpers mapper,
+            string? value)
         {
-            return TryResolveCountry(value, out var entry)
+            return mapper.TryResolveCountry(value, out var entry)
                 ? entry.EnglishName
                 : string.Empty;
         }
@@ -462,9 +503,22 @@ namespace ExportDocManager.Services.SingleWindow
 
     public sealed class AgentConsignmentFieldMapper : IAgentConsignmentFieldMapper
     {
+        private readonly ISingleWindowReferenceCatalogSnapshotProvider _catalogProvider;
+
+        public AgentConsignmentFieldMapper(ISingleWindowReferenceCatalogSnapshotProvider catalogProvider)
+        {
+            _catalogProvider = catalogProvider ?? throw new ArgumentNullException(nameof(catalogProvider));
+        }
+
+        public AgentConsignmentFieldMapper()
+            : this(new SingleWindowReferenceCatalogSnapshotStore())
+        {
+        }
+
         public AcdMappedDocument Map(AcdSourceSnapshot snapshot)
         {
             ArgumentNullException.ThrowIfNull(snapshot);
+            var mapper = _catalogProvider.Current.FieldMapper;
 
             var invoice = snapshot.Invoice ?? new Invoice();
             var exporter = snapshot.Exporter;
@@ -484,11 +538,11 @@ namespace ExportDocManager.Services.SingleWindow
                 DeclTotal = PreferValue(existing?.DeclTotal, FormatDecimal(invoice.TotalAmount, 4)),
                 IEDate = PreferValue(existing?.IEDate, ResolveAcdDate(invoice)),
                 ListNo = PreferValue(existing?.ListNo, string.Empty),
-                TradeMode = PreferValue(existing?.TradeMode, NormalizeTradeModeCode(invoice.SupervisionMode)),
-                OriCountry = PreferValue(existing?.OriCountry, ResolveAcdOriginCountryCode(firstItem?.Origin)),
+                TradeMode = PreferValue(existing?.TradeMode, mapper.NormalizeTradeModeCode(invoice.SupervisionMode)),
+                OriCountry = PreferValue(existing?.OriCountry, mapper.ResolveAcdOriginCountryCode(firstItem?.Origin)),
                 TradeCode = PreferValue(existing?.TradeCode, enterpriseCustomsCode),
                 AgentCode = PreferValue(existing?.AgentCode, agentCustomsCode),
-                Curr = PreferValue(existing?.Curr, NormalizeCurrencyCode(invoice.Currency)),
+                Curr = PreferValue(existing?.Curr, mapper.NormalizeCurrencyCode(invoice.Currency)),
                 QtyOrWeight = PreferValue(existing?.QtyOrWeight, FormatDecimal(invoice.TotalGrossWeight > 0 ? invoice.TotalGrossWeight : invoice.TotalQuantity, 2)),
                 PackingCondition = PreferValue(existing?.PackingCondition, NormalizeText(invoice.SpecialTerms)),
                 OtherNote = PreferValue(existing?.OtherNote, NormalizeText(invoice.SpecialTerms)),
@@ -519,15 +573,14 @@ namespace ExportDocManager.Services.SingleWindow
 
         private static string ResolveAcdDate(Invoice invoice)
         {
-            if (invoice.ShipmentDate > DateTime.MinValue)
+            if (invoice.ShipmentDate != default)
             {
                 return invoice.ShipmentDate.ToString("yyyyMMdd");
             }
 
-            return invoice.InvoiceDate > DateTime.MinValue
+            return invoice.InvoiceDate != default
                 ? invoice.InvoiceDate.ToString("yyyyMMdd")
                 : string.Empty;
         }
     }
 }
-

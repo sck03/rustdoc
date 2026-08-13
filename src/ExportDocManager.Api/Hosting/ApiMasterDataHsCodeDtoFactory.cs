@@ -66,7 +66,7 @@ namespace ExportDocManager.Api.Hosting
                 InstanceCount = record.InstanceCount,
                 SummaryUrl = record.SummaryUrl ?? string.Empty,
                 EvidenceUrl = record.EvidenceUrl ?? string.Empty,
-                ObservedAt = record.ObservedAt.LocalDateTime
+                ObservedAt = record.ObservedAt
             };
         }
 
@@ -80,7 +80,7 @@ namespace ExportDocManager.Api.Hosting
                 InstanceCount = bundle.InstanceCount,
                 SummaryUrl = string.IsNullOrWhiteSpace(bundle.EvidenceUrl) ? bundle.Item.DetailUrl ?? string.Empty : bundle.EvidenceUrl,
                 EvidenceUrl = bundle.EvidenceUrl ?? string.Empty,
-                ObservedAt = bundle.ObservedAt.LocalDateTime,
+                ObservedAt = bundle.ObservedAt,
                 RecommendedKeywords = bundle.RecommendedKeywords.ToList(),
                 PersonalPostalTaxCode = bundle.PersonalPostalTaxCode ?? string.Empty,
                 CiqEntries = bundle.CiqEntries.Select(item => new ApiHsCodeRemoteReferenceEntry(item.Code, item.Name)).ToList(),

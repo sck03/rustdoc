@@ -101,7 +101,7 @@ namespace ExportDocManager.Api.Hosting
                     })
                     .Where(path => !string.IsNullOrWhiteSpace(path))
                     .ToHashSet(PathBoundaryHelper.PathComparer);
-                DateTime cutoffUtc = DateTime.UtcNow.AddDays(-_retentionOptions.RetentionDays);
+                DateTimeOffset cutoffUtc = DateTimeOffset.UtcNow.AddDays(-_retentionOptions.RetentionDays);
 
                 foreach (string kindDirectory in Directory.EnumerateDirectories(browserRoot))
                 {

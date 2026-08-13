@@ -28,9 +28,10 @@ namespace ExportDocManager.Services.SingleWindow
             {
                 Id = customer.Id,
                 CustomerNameEN = customer.CustomerNameEN,
-                NotifyPartyName = customer.NotifyPartyName,
+                NotifyPartyMode = customer.NotifyPartyMode,
+                NotifyPartyName = customer.NotifyPartyMode == NotifyPartyMode.Separate ? customer.NotifyPartyName : string.Empty,
                 AddressEN = customer.AddressEN,
-                NotifyPartyAddress = customer.NotifyPartyAddress,
+                NotifyPartyAddress = customer.NotifyPartyMode == NotifyPartyMode.Separate ? customer.NotifyPartyAddress : string.Empty,
                 ContactPerson = customer.ContactPerson,
                 Phone = customer.Phone,
                 Email = customer.Email,

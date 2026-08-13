@@ -18,6 +18,10 @@ namespace ExportDocManager.Infrastructure.Tests
                 string.Join(' ', Enumerable.Repeat("ADDRESS", 10_000))));
             Assert.True(ExcelImportPartyTextClassifier.LooksLikePostalAddress(
                 "3 WEST 35TH STREET 10th FL., New York, NY 10001"));
+            Assert.False(ExcelImportPartyTextClassifier.IsPlausiblePartyName("4"));
+            Assert.False(ExcelImportPartyTextClassifier.IsPlausiblePartyAddress("5"));
+            Assert.Equal(0m, ExcelImportPartyTextClassifier.GetFieldQuality("NotifyPartyName", "4"));
+            Assert.Equal(0m, ExcelImportPartyTextClassifier.GetFieldQuality("NotifyPartyAddress", "5"));
         }
 
         [Fact]

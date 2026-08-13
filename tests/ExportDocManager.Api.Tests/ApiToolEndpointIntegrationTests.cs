@@ -435,9 +435,7 @@ namespace ExportDocManager.Api.Tests
                 string responseBody = await response.Content.ReadAsStringAsync();
                 Assert.True(response.StatusCode == HttpStatusCode.OK, responseBody);
 
-                var result = JsonSerializer.Deserialize<ApiExcelImportPreviewResponse>(
-                    responseBody,
-                    new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                var result = await ApiIntegrationTestHarness.ReadJsonAsync<ApiExcelImportPreviewResponse>(response);
                 Assert.NotNull(result);
                 Assert.Equal("browser-invoice.xlsx", result.SourcePath);
                 Assert.NotNull(result.Invoice);
@@ -600,8 +598,8 @@ namespace ExportDocManager.Api.Tests
                         id = 0,
                         invoiceNo = "INV-AI-REVIEW-001",
                         contractNo = "CON-AI-REVIEW",
-                        invoiceDate = DateTime.Today,
-                        shipmentDate = DateTime.Today,
+                        invoiceDate = DateOnly.FromDateTime(DateTime.Today),
+                        shipmentDate = DateOnly.FromDateTime(DateTime.Today),
                         type = "实际数据",
                         letterOfCreditNo = "LC-AI-REVIEW-001",
                         letterOfCreditSourcePath = Path.Combine(harness.DataRoot, "lc-source.txt"),

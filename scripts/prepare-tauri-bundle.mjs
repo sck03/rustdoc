@@ -101,6 +101,9 @@ const args = [
   `/p:ExportDocIncludeBundledBrowser=${resourceProfile.browserRenderer}`,
   `/p:ExportDocIncludeOcrRuntime=${resourceProfile.ocr}`,
   `/p:ExportDocIncludePlaywrightRuntime=${resourceProfile.browserRenderer}`,
+  `/p:ExportDocIncludeExcelModule=${resourceProfile.excelAnalyzer}`,
+  `/p:ExportDocIncludeBrowserModule=${resourceProfile.browserRenderer}`,
+  `/p:ExportDocIncludePdfOcrModule=${resourceProfile.ocr}`,
 ];
 
 console.log(`Publishing API sidecar for Tauri bundle (${rid}, self-contained=${selfContained})...`);
@@ -543,6 +546,7 @@ async function findExcelAnalyzerBinary() {
   const targetRoots = [
     process.env.EXPORTDOCMANAGER_EXCEL_ANALYZER_TARGET_DIR,
     process.env.CARGO_TARGET_DIR,
+    env.CARGO_TARGET_DIR,
     path.join(repoRoot, "artifacts", "cargo-target-excel-analyzer"),
     path.join(repoRoot, "tools", "excel-analyzer-rs", "target"),
   ].filter(Boolean);

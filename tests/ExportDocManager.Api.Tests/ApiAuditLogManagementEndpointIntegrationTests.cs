@@ -199,7 +199,7 @@ namespace ExportDocManager.Api.Tests
                 "Added",
                 "INV-AUDIT-1",
                 "audit-admin",
-                DateTime.UtcNow.AddDays(-3),
+                DateTimeOffset.UtcNow.AddDays(-3),
                 "{\"InvoiceNo\":\"INV-AUDIT-1\"}");
             await InsertAuditLogAsync(
                 connection,
@@ -207,7 +207,7 @@ namespace ExportDocManager.Api.Tests
                 "Modified",
                 "INV-AUDIT-2",
                 "audit-admin",
-                DateTime.UtcNow.AddDays(-2),
+                DateTimeOffset.UtcNow.AddDays(-2),
                 "{\"InvoiceNo\":\"INV-AUDIT-2\"}");
             await InsertAuditLogAsync(
                 connection,
@@ -215,7 +215,7 @@ namespace ExportDocManager.Api.Tests
                 "Added",
                 "PAY-AUDIT-1",
                 "audit-admin",
-                DateTime.UtcNow.AddDays(-1),
+                DateTimeOffset.UtcNow.AddDays(-1),
                 "{\"PaymentNo\":\"PAY-AUDIT-1\"}");
             await InsertAuditLogAsync(
                 connection,
@@ -223,7 +223,7 @@ namespace ExportDocManager.Api.Tests
                 "Added",
                 "OLD-AUDIT-1",
                 "cleanup-user",
-                DateTime.UtcNow.AddDays(-300),
+                DateTimeOffset.UtcNow.AddDays(-300),
                 "{}");
             await InsertAuditLogAsync(
                 connection,
@@ -231,7 +231,7 @@ namespace ExportDocManager.Api.Tests
                 "Added",
                 "RECENT-AUDIT-1",
                 "cleanup-user",
-                DateTime.UtcNow.AddDays(-2),
+                DateTimeOffset.UtcNow.AddDays(-2),
                 "{}");
         }
 
@@ -241,7 +241,7 @@ namespace ExportDocManager.Api.Tests
             string action,
             string entityId,
             string userId,
-            DateTime timestamp,
+            DateTimeOffset timestamp,
             string newValues)
         {
             await using var command = connection.CreateCommand();
@@ -255,7 +255,7 @@ namespace ExportDocManager.Api.Tests
             command.Parameters.AddWithValue("$oldValues", string.Empty);
             command.Parameters.AddWithValue("$newValues", newValues);
             command.Parameters.AddWithValue("$userId", userId);
-            command.Parameters.AddWithValue("$timestamp", timestamp);
+            command.Parameters.AddWithValue("$timestamp", timestamp.UtcTicks);
             await command.ExecuteNonQueryAsync();
         }
     }

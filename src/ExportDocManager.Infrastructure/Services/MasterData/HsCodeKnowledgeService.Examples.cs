@@ -46,7 +46,7 @@ namespace ExportDocManager.Services.MasterData
             var entity = input.Id > 0
                 ? await context.HsCodeDeclarationExamples.FirstOrDefaultAsync(item => item.Id == input.Id, cancellationToken)
                 : await context.HsCodeDeclarationExamples.FirstOrDefaultAsync(item => item.Fingerprint == fingerprint, cancellationToken);
-            DateTime now = DateTime.UtcNow;
+            DateTimeOffset now = DateTimeOffset.UtcNow;
             if (entity == null)
             {
                 entity = new HsCodeDeclarationExample { CreatedAt = now };

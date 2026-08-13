@@ -1,27 +1,17 @@
-using System.Threading;
 using ExportDocManager.Models.DTOs.SingleWindow;
 
 namespace ExportDocManager.Services.SingleWindow
 {
-    public static partial class SingleWindowFieldMapperHelpers
+    public sealed partial class SingleWindowFieldMapperHelpers
     {
-        private static Func<SingleWindowReferenceCatalogModel>? _referenceCatalogSnapshotLoader;
-        private static ReferenceCatalogState _referenceCatalogState = ReferenceCatalogState.Empty;
+        private readonly ReferenceCatalogState _referenceCatalogState;
 
-        public static void ConfigureReferenceCatalogSnapshotLoader(Func<SingleWindowReferenceCatalogModel> loader)
+        public SingleWindowFieldMapperHelpers(SingleWindowReferenceCatalogModel? catalog = null)
         {
-            ArgumentNullException.ThrowIfNull(loader);
-            Volatile.Write(ref _referenceCatalogSnapshotLoader, loader);
-            ReloadReferenceCatalog();
+            _referenceCatalogState = BuildReferenceCatalogState(LoadReferenceCatalog(catalog));
         }
 
-        public static void ReloadReferenceCatalog()
-        {
-            var payload = LoadReferenceCatalog();
-            Volatile.Write(ref _referenceCatalogState, BuildReferenceCatalogState(payload));
-        }
-
-        private static ReferenceCatalogState CurrentReferenceCatalogState => Volatile.Read(ref _referenceCatalogState);
+        private ReferenceCatalogState CurrentReferenceCatalogState => _referenceCatalogState;
 
         private static ReferenceCatalogState BuildReferenceCatalogState(ReferenceCatalogPayload payload)
         {
@@ -145,12 +135,10 @@ namespace ExportDocManager.Services.SingleWindow
             return lookup;
         }
 
-        private static ReferenceCatalogPayload LoadReferenceCatalog()
+        private static ReferenceCatalogPayload LoadReferenceCatalog(SingleWindowReferenceCatalogModel? catalog)
         {
             try
             {
-                var loader = Volatile.Read(ref _referenceCatalogSnapshotLoader);
-                var catalog = loader?.Invoke();
                 if (catalog == null)
                 {
                     return BuildFallbackReferenceCatalog();

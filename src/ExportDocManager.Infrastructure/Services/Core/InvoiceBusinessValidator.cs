@@ -115,6 +115,16 @@ namespace ExportDocManager.Services.Core
             invoice.CustomerAddressEN = NormalizeText(invoice.CustomerAddressEN, 2000, "客户英文地址");
             invoice.NotifyPartyName = NormalizeText(invoice.NotifyPartyName, 500, "通知方名称");
             invoice.NotifyPartyAddress = NormalizeText(invoice.NotifyPartyAddress, 2000, "通知方地址");
+            if (!Enum.IsDefined(invoice.NotifyPartyMode))
+            {
+                throw new InvoiceValidationException("通知人模式无效。");
+            }
+            NotifyPartyModePolicy.Normalize(invoice);
+            if (invoice.NotifyPartyMode == NotifyPartyMode.Separate &&
+                string.IsNullOrWhiteSpace(invoice.NotifyPartyName))
+            {
+                throw new InvoiceValidationException("独立通知人必须填写名称。");
+            }
             invoice.ExporterNameEN = NormalizeText(invoice.ExporterNameEN, 500, "出口商英文名称");
             invoice.ExporterNameCN = NormalizeText(invoice.ExporterNameCN, 500, "出口商中文名称");
             invoice.ExporterAddressEN = NormalizeText(invoice.ExporterAddressEN, 2000, "出口商英文地址");

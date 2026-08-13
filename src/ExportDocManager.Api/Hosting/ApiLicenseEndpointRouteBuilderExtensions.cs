@@ -26,6 +26,7 @@ namespace ExportDocManager.Api.Hosting
                     status,
                     ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
             })
+            .WithApiAccess(true, true, false)
             .WithName("GetLicenseStatus");
 
             endpoints.MapPost("/api/system/license/register", async Task<Results<
@@ -69,6 +70,7 @@ namespace ExportDocManager.Api.Hosting
                     result,
                     ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
             })
+            .WithApiAccess(true, true, false)
             .WithName("RegisterLicense")
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
         }

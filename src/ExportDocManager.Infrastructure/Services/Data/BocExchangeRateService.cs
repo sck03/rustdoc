@@ -28,7 +28,7 @@ namespace ExportDocManager.Services.Data
         // 缓存结果以避免频繁请求
         private List<ExchangeRateInfo>? _cachedRates;
         private string _cachedRatesSignature = string.Empty;
-        private DateTime _lastFetchTime = DateTime.MinValue;
+        private DateTimeOffset _lastFetchTime = DateTimeOffset.MinValue;
         private readonly Func<string, CancellationToken, Task<IPAddress[]>> _resolveHostAsync;
         private readonly TimeSpan _requestTimeout;
 
@@ -57,7 +57,7 @@ namespace ExportDocManager.Services.Data
             {
                 _cachedRates = null;
                 _cachedRatesSignature = string.Empty;
-                _lastFetchTime = DateTime.MinValue;
+                _lastFetchTime = DateTimeOffset.MinValue;
             }
         }
 
@@ -146,7 +146,7 @@ namespace ExportDocManager.Services.Data
                         SellingRate = ParseRate(cells[3].InnerText),
                         CashSellingRate = ParseRate(cells[4].InnerText),
                         MiddleRate = ParseRate(cells[5].InnerText),
-                        PublishTime = cells.Count > 6 ? cells[6].InnerText.Trim() : DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                        PublishTime = cells.Count > 6 ? cells[6].InnerText.Trim() : DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss")
                     };
                     if (rate.BuyingRate.HasValue ||
                         rate.CashBuyingRate.HasValue ||
@@ -306,7 +306,7 @@ namespace ExportDocManager.Services.Data
             {
                 if (_cachedRates == null ||
                     !string.Equals(_cachedRatesSignature, cacheSignature, StringComparison.Ordinal) ||
-                    (DateTime.UtcNow - _lastFetchTime).TotalMinutes >= cacheDurationMinutes)
+                    (DateTimeOffset.UtcNow - _lastFetchTime).TotalMinutes >= cacheDurationMinutes)
                 {
                     rates = null;
                     return false;
@@ -323,7 +323,7 @@ namespace ExportDocManager.Services.Data
             {
                 _cachedRates = CloneRates(rates);
                 _cachedRatesSignature = cacheSignature;
-                _lastFetchTime = DateTime.UtcNow;
+                _lastFetchTime = DateTimeOffset.UtcNow;
             }
         }
 

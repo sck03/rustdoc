@@ -29,7 +29,7 @@ namespace ExportDocManager.Services.Dashboard
         string InvoiceNo,
         string Status,
         string Type,
-        DateTime InvoiceDate,
+        DateOnly InvoiceDate,
         decimal TotalAmount,
         string CustomerNameEN);
 

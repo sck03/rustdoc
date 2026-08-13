@@ -19,9 +19,9 @@ namespace ExportDocManager.Models.Entities
         public bool IsManuallyVerified { get; set; }
         public int UseCount { get; set; }
         public int RejectedCount { get; set; }
-        public DateTime? LastUsedAt { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTimeOffset? LastUsedAt { get; set; }
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
     [Table("HsCodeReplacementRelations")]
@@ -34,8 +34,8 @@ namespace ExportDocManager.Models.Entities
         [Required, MaxLength(100)] public string Source { get; set; } = string.Empty;
         public int Confidence { get; set; }
         public bool IsManuallyVerified { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
     [Table("HsCodeSearchFeedback")]
@@ -49,8 +49,8 @@ namespace ExportDocManager.Models.Entities
         [Required, MaxLength(20)] public string CandidateCode { get; set; } = string.Empty;
         public int AcceptedCount { get; set; }
         public int RejectedCount { get; set; }
-        public DateTime? LastConfirmedAt { get; set; }
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTimeOffset? LastConfirmedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
     [Table("HsCodeRemoteCandidates")]
@@ -68,8 +68,8 @@ namespace ExportDocManager.Models.Entities
         [Required, MaxLength(30)] public string ReviewStatus { get; set; } = "Pending";
         [Required, MaxLength(30)] public string ResolutionStatus { get; set; } = "Unresolved";
         public int SeenCount { get; set; } = 1;
-        public DateTime FirstSeenAt { get; set; } = DateTime.UtcNow;
-        public DateTime LastSeenAt { get; set; } = DateTime.UtcNow;
-        public DateTime? ReviewedAt { get; set; }
+        public DateTimeOffset FirstSeenAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset LastSeenAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset? ReviewedAt { get; set; }
     }
 }

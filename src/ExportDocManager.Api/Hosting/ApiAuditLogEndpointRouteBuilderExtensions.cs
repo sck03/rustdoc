@@ -25,8 +25,8 @@ namespace ExportDocManager.Api.Hosting
                 string? entityName,
                 string? action,
                 string? userId,
-                DateTime? startTime,
-                DateTime? endTime,
+                DateTimeOffset? startTime,
+                DateTimeOffset? endTime,
                 string? keyword,
                 CancellationToken cancellationToken) =>
             {
@@ -258,7 +258,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("清理审计日志前必须明确确认操作。"));
                 }
 
-                var cutoffUtc = DateTime.UtcNow.AddDays(-request.DaysToKeep);
+                var cutoffUtc = DateTimeOffset.UtcNow.AddDays(-request.DaysToKeep);
                 int deletedCount = await auditLogService.DeleteOlderThanAsync(
                     cutoffUtc,
                     NormalizeMaxCount(request.MaxCount, AuditLogCleanupMaxCount),

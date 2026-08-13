@@ -1,5 +1,6 @@
 using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs;
+using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Data;
 using ExportDocManager.Services.Infrastructure;
 using NPOI.HSSF.UserModel;
@@ -16,7 +17,6 @@ namespace ExportDocManager.Infrastructure.Tests
             var service = new ExcelImportService(new StubSettingsService());
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
-
             await Assert.ThrowsAnyAsync<OperationCanceledException>(
                 () => service.ImportFromExcelAsync("missing.xlsx", cancellation.Token));
         }
@@ -29,24 +29,20 @@ namespace ExportDocManager.Infrastructure.Tests
                 "ExcelImportXlsTests",
                 Guid.NewGuid().ToString("N"));
             string filePath = Path.Combine(directory, "invoice.xls");
-
             Directory.CreateDirectory(directory);
             try
             {
                 await WriteLegacyXlsWorkbookAsync(filePath);
-
                 var settings = new StubSettingsService();
                 settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
                 var service = new ExcelImportService(settings);
                 var result = await service.ImportFromExcelAsync(filePath);
-
                 Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
                 Assert.NotNull(result.Invoice);
                 Assert.Equal("INV-XLS-001", result.Invoice.InvoiceNo);
                 Assert.Equal("CONTRACT-XLS-001", result.Invoice.ContractNo);
                 Assert.Equal("TEST CUSTOMER LTD.", result.Invoice.CustomerNameEN);
                 Assert.Equal("NINGBO TEST EXPORT CO., LTD.", result.Invoice.ExporterNameEN);
-
                 var item = Assert.Single(result.Invoice.Items);
                 Assert.Equal("ST-XLS-001", item.StyleNo);
                 Assert.Equal("T SHIRT", item.StyleName);
@@ -72,17 +68,14 @@ namespace ExportDocManager.Infrastructure.Tests
                 "ExcelImportXlsTests",
                 Guid.NewGuid().ToString("N"));
             string filePath = Path.Combine(directory, "formatted-empty-cells.xls");
-
             Directory.CreateDirectory(directory);
             try
             {
                 await WriteFormattedEmptyLegacyWorkbookAsync(filePath);
-
                 var settings = new StubSettingsService();
                 settings.Settings.System.DefaultTemplateExporterNameCn = "宁波测试出口有限公司";
                 var service = new ExcelImportService(settings);
                 var result = await service.ImportFromExcelAsync(filePath);
-
                 Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
                 Assert.NotNull(result.Invoice);
                 Assert.Equal("INV-FORMAT-001", result.Invoice.InvoiceNo);
@@ -105,17 +98,14 @@ namespace ExportDocManager.Infrastructure.Tests
                 "ExcelImportXlsTests",
                 Guid.NewGuid().ToString("N"));
             string filePath = Path.Combine(directory, "invoice-country-and-item-language.xls");
-
             Directory.CreateDirectory(directory);
             try
             {
                 await WriteDestinationCountryRegressionWorkbookAsync(filePath);
-
                 var settings = new StubSettingsService();
                 settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
                 var service = new ExcelImportService(settings);
                 var result = await service.ImportFromExcelAsync(filePath);
-
                 Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
                 Assert.NotNull(result.Invoice);
                 Assert.Equal("AUSTRALIA", result.Invoice.DestinationCountry);
@@ -142,17 +132,14 @@ namespace ExportDocManager.Infrastructure.Tests
                 "ExcelImportFormatTests",
                 Guid.NewGuid().ToString("N"));
             string filePath = Path.Combine(directory, "invoice.xlsx");
-
             Directory.CreateDirectory(directory);
             try
             {
                 await WriteOpenXmlXlsxWorkbookAsync(filePath);
-
                 var settings = new StubSettingsService();
                 settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
                 var service = new ExcelImportService(settings);
                 var result = await service.ImportFromExcelAsync(filePath);
-
                 Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
                 Assert.NotNull(result.Invoice);
                 Assert.NotNull(result.AnalysisReport);
@@ -210,17 +197,14 @@ namespace ExportDocManager.Infrastructure.Tests
                 "ExcelImportFormatTests",
                 Guid.NewGuid().ToString("N"));
             string filePath = Path.Combine(directory, "default-template-party-regression.xlsx");
-
             Directory.CreateDirectory(directory);
             try
             {
                 await WriteDefaultTemplatePartyRegressionWorkbookAsync(filePath);
-
                 var settings = new StubSettingsService();
                 settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
                 var service = new ExcelImportService(settings, new StalePartyFieldAnalyzer());
                 var result = await service.ImportFromExcelAsync(filePath);
-
                 Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
                 Assert.NotNull(result.Invoice);
                 Assert.Equal("2024AA001", result.Invoice.InvoiceNo);
@@ -249,17 +233,14 @@ namespace ExportDocManager.Infrastructure.Tests
                 "ExcelImportFormatTests",
                 Guid.NewGuid().ToString("N"));
             string filePath = Path.Combine(directory, "below-label-fields.xlsx");
-
             Directory.CreateDirectory(directory);
             try
             {
                 await WriteBelowLabelFieldsWorkbookAsync(filePath);
-
                 var settings = new StubSettingsService();
                 settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
                 var service = new ExcelImportService(settings);
                 var result = await service.ImportFromExcelAsync(filePath);
-
                 Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
                 Assert.NotNull(result.Invoice);
                 Assert.NotNull(result.AnalysisReport);
@@ -305,7 +286,6 @@ namespace ExportDocManager.Infrastructure.Tests
                 "ExcelImportXlsTests",
                 Guid.NewGuid().ToString("N"));
             string filePath = Path.Combine(directory, "shipping-advice.xls");
-
             Directory.CreateDirectory(directory);
             try
             {
@@ -449,8 +429,9 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.Equal(
                     string.Join(Environment.NewLine, "De Wetering 119, 4906 CT, Oosterhout,", "The Netherlands"),
                     result.Invoice.CustomerAddressEN);
-                Assert.Equal("SAME AS CONSIGNEE", result.Invoice.NotifyPartyName);
-                Assert.Equal(result.Invoice.CustomerAddressEN, result.Invoice.NotifyPartyAddress);
+                Assert.Equal(NotifyPartyMode.SameAsConsignee, result.Invoice.NotifyPartyMode);
+                Assert.True(string.IsNullOrEmpty(result.Invoice.NotifyPartyName));
+                Assert.True(string.IsNullOrEmpty(result.Invoice.NotifyPartyAddress));
                 Assert.Equal("NINGBO,CHINA", result.Invoice.PortOfLoading);
                 Assert.Equal("ROTTERDAM, THE NETHERLANDS", result.Invoice.PortOfDestination);
                 Assert.Equal(
@@ -603,15 +584,16 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 var settings = new StubSettingsService();
                 settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings);
+                var service = new ExcelImportService(settings, new NumericNotifyCandidateAnalyzer());
                 var result = await service.ImportFromExcelAsync(filePath);
 
                 Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
                 Assert.NotNull(result.Invoice);
                 Assert.Equal("26GFR-038", result.Invoice.InvoiceNo);
                 Assert.Equal("GLOBAL FASHION RESOURCE INC", result.Invoice.CustomerNameEN);
-                Assert.Equal("SAME AS CONSIGNEE", result.Invoice.NotifyPartyName);
-                Assert.Equal(result.Invoice.CustomerAddressEN, result.Invoice.NotifyPartyAddress);
+                Assert.Equal(NotifyPartyMode.SameAsConsignee, result.Invoice.NotifyPartyMode);
+                Assert.True(string.IsNullOrEmpty(result.Invoice.NotifyPartyName));
+                Assert.True(string.IsNullOrEmpty(result.Invoice.NotifyPartyAddress));
                 Assert.Equal("NINGBO BRIDGE IMP. & EXP. CO. LTD.", result.Invoice.ExporterNameEN);
                 Assert.Equal("宁波布利杰进出口有限公司", result.Invoice.ExporterNameCN);
                 Assert.NotEqual(result.Invoice.ExporterNameEN, result.Invoice.ExporterNameCN);
@@ -1449,9 +1431,9 @@ namespace ExportDocManager.Infrastructure.Tests
             WriteCell(sheet, "B1", "NINGBO BRIDGE IMP. & EXP. CO. LTD. NO.668 BAIZHANG EAST ROAD. NINGBO 315040 CHINA");
             WriteCell(sheet, "R2", "发票号");
             WriteCell(sheet, "S2", "26GFR-038");
-            WriteCell(sheet, "A3", "收货人");
+            WriteCell(sheet, "A3", "收货人   CONSIGNEE");
             WriteCell(sheet, "B3", "GLOBAL FASHION RESOURCE INC                                                                                                                                                                                                                       3315 S.BROADWAY                                                                                                                                                                                                                       LOS ANGELES CA 90007, USA                                                                                                                                                                                                                       TEL:(213)973-5941");
-            WriteCell(sheet, "A5", "通知人");
+            WriteCell(sheet, "A5", "通知人     NOTIFY PARTY");
             WriteCell(sheet, "B5", "Same as Consignee");
             WriteCell(sheet, "R3", "监管方式");
             WriteCell(sheet, "S3", "一般贸易");
@@ -1479,11 +1461,15 @@ namespace ExportDocManager.Infrastructure.Tests
             WriteCell(sheet, "Q9", "合计毛重");
             WriteCell(sheet, "S9", "工厂信息");
 
-            WriteGfrItemRow(sheet, 10, "GFR", 1, "60188JFT0660-GP1326-SMS7039", "60% Cotton 40% Polyeter  Lady's KNIT PANTS", "棉制针织女式起绒长裤     品牌名：LAZY SUNDAY", 6000d, 5.60d, 33600d, 1000d, 20.520d, 38d, 30d, 18d, 3300d, 3500d);
-            WriteGfrItemRow(sheet, 11, "", 2, "60188JFT0660-GP1326-SMS7052", "60% Cotton 40% Polyeter  Lady's KNIT PANTS", "棉制针织女式起绒长裤     品牌名：LAZY SUNDAY", 30d, 5.60d, 168d, 1d, 0.101d, 60d, 40d, 42d, 15d, 16d);
-            WriteGfrItemRow(sheet, 12, "", 3, "60278JFT0927-SMS7039", "57% Cotton 37% Modal 6% Spandex Lady's KNIT Shorts", "棉制针织女式短裤         品牌名：LAZY SUNDAY", 11880d, 5.45d, 64746d, 1485d, 17.963d, 36d, 28d, 12d, 3415.50d, 3862d);
-            WriteGfrItemRow(sheet, 13, "", 4, "60278JFT0927-SMS7054", "57% Cotton 37% Modal 6% Spandex Lady's KNIT Shorts", "棉制针织女式短裤         品牌名：LAZY SUNDAY", 304d, 5.45d, 1656.80d, 16d, 0.419d, 36d, 28d, 26d, 68.80d, 84.80d);
-            WriteGfrItemRow(sheet, 14, "", 5, "60278JFT0927-SMS7053", "57% Cotton 37% Modal 6% Spandex Lady's KNIT Shorts", "棉制针织女式短裤         品牌名：LAZY SUNDAY", 60d, 5.45d, 327d, 4d, 0.108d, 60d, 30d, 15d, 14d, 16d);
+            string pantsName = "60% Cotton 40% Polyeter  Lady's KNIT PANTS";
+            string pantsDescription = "棉制针织女式起绒长裤     品牌名：LAZY SUNDAY";
+            string shortsName = "57% Cotton 37% Modal 6% Spandex Lady's KNIT Shorts";
+            string shortsDescription = "棉制针织女式短裤         品牌名：LAZY SUNDAY";
+            WriteGfrItemRow(sheet, 10, "GFR", 1, "60188JFT0660-GP1326-SMS7039", pantsName, pantsDescription, 6000d, 5.60d, 33600d, 1000d, 20.520d, 38d, 30d, 18d, 3300d, 3500d);
+            WriteGfrItemRow(sheet, 11, "", 2, "60188JFT0660-GP1326-SMS7052", pantsName, pantsDescription, 30d, 5.60d, 168d, 1d, 0.101d, 60d, 40d, 42d, 15d, 16d);
+            WriteGfrItemRow(sheet, 12, "", 3, "60278JFT0927-SMS7039", shortsName, shortsDescription, 11880d, 5.45d, 64746d, 1485d, 17.963d, 36d, 28d, 12d, 3415.50d, 3862d);
+            WriteGfrItemRow(sheet, 13, "", 4, "60278JFT0927-SMS7054", shortsName, shortsDescription, 304d, 5.45d, 1656.80d, 16d, 0.419d, 36d, 28d, 26d, 68.80d, 84.80d);
+            WriteGfrItemRow(sheet, 14, "", 5, "60278JFT0927-SMS7053", shortsName, shortsDescription, 60d, 5.45d, 327d, 4d, 0.108d, 60d, 30d, 15d, 14d, 16d);
             WriteGfrItemRow(sheet, 15, "", 6, "21310JFT0888-GP1327-SMS7039", "60% Cotton 40% Polyeter  Lady's KNIT Top", "棉制针织女式起绒套头衫   品牌名：LAZY SUNDAY", 6000d, 6.20d, 37200d, 1000d, 22.800d, 38d, 30d, 20d, 3200d, 3500d);
             WriteCell(sheet, 16, 1, "总计:");
             WriteCell(sheet, 16, 6, 24274d);
@@ -1863,6 +1849,31 @@ namespace ExportDocManager.Infrastructure.Tests
                 };
 
                 return Task.FromResult(report);
+            }
+        }
+
+        private sealed class NumericNotifyCandidateAnalyzer : IExcelImportAnalyzer
+        {
+            public async Task<ExcelImportAnalysisReport> AnalyzeAsync(
+                string filePath,
+                ExcelImportSettings settings,
+                CancellationToken cancellationToken = default)
+            {
+                var report = await new BuiltInExcelImportAnalyzer().AnalyzeAsync(filePath, settings, cancellationToken);
+                report.Fields.RemoveAll(field => field.FieldKey is "NotifyPartyName" or "NotifyPartyAddress");
+                report.Fields.AddRange([Candidate("NotifyPartyName", "4", 13), Candidate("NotifyPartyAddress", "5", 14)]);
+                return report;
+
+                ExcelImportFieldAnalysis Candidate(string key, string value, int row) => new()
+                {
+                    FieldKey = key,
+                    Value = value,
+                    WorksheetName = report.SelectedWorksheetName,
+                    Row = row,
+                    Column = 2,
+                    Confidence = 0.99m,
+                    Source = "Regression"
+                };
             }
         }
 

@@ -20,17 +20,34 @@ namespace ExportDocManager.Domain.Tests
                         "src/ExportDocManager.Application/ExportDocManager.Application.csproj",
                         "src/ExportDocManager.Domain/ExportDocManager.Domain.csproj"
                     },
+                ["src/ExportDocManager.Infrastructure.Excel/ExportDocManager.Infrastructure.Excel.csproj"] =
+                    ModuleReferences(),
+                ["src/ExportDocManager.Infrastructure.Browser/ExportDocManager.Infrastructure.Browser.csproj"] =
+                    ModuleReferences(),
+                ["src/ExportDocManager.Infrastructure.PdfOcr/ExportDocManager.Infrastructure.PdfOcr.csproj"] =
+                    ModuleReferences(),
                 ["src/ExportDocManager.Api/ExportDocManager.Api.csproj"] =
                     new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                     {
                         "src/ExportDocManager.Application/ExportDocManager.Application.csproj",
-                        "src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj"
+                        "src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj",
+                        "src/ExportDocManager.Infrastructure.Excel/ExportDocManager.Infrastructure.Excel.csproj",
+                        "src/ExportDocManager.Infrastructure.Browser/ExportDocManager.Infrastructure.Browser.csproj",
+                        "src/ExportDocManager.Infrastructure.PdfOcr/ExportDocManager.Infrastructure.PdfOcr.csproj"
                     },
                 ["tools/ExportDocManager.ApiClientGenerator/ExportDocManager.ApiClientGenerator.csproj"] =
                     new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                     {
                         "src/ExportDocManager.Api/ExportDocManager.Api.csproj"
                     }
+            };
+
+        private static IReadOnlySet<string> ModuleReferences() =>
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "src/ExportDocManager.Application/ExportDocManager.Application.csproj",
+                "src/ExportDocManager.Domain/ExportDocManager.Domain.csproj",
+                "src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj"
             };
 
         [Fact]

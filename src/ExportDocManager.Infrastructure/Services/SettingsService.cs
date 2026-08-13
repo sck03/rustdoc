@@ -17,16 +17,6 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly SemaphoreSlim _saveLock = new(1, 1);
         public AppSettings Settings { get; private set; } = new AppSettings();
 
-        public SettingsService()
-            : this(new RuntimeAppPathProvider())
-        {
-        }
-
-        public SettingsService(string filePath)
-            : this(new RuntimeAppPathProvider(), filePath)
-        {
-        }
-
         public SettingsService(IAppPathProvider pathProvider)
             : this(pathProvider, null)
         {

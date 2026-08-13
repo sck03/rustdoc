@@ -1,4 +1,4 @@
-import type { ApiExcelImportPreviewResponse, ApiInvoiceListItemDto, ApiInvoiceTransferPreviewResponse, SingleWindowExportReview } from "../../api/index.ts";
+import type { ApiExcelImportPreviewResponse, ApiInvoiceListItemDto, ApiInvoiceTransferPreviewResponse, SingleWindowExportIssueSeverity, SingleWindowExportReview } from "../../api/index.ts";
 import type { SingleWindowBusinessType } from "./invoiceListFileNames.ts";
 
 export type InvoiceCopyDraft = { source: ApiInvoiceListItemDto; newInvoiceNo: string; copyHeader: boolean; copyItems: boolean; resetDates: boolean; clearAmounts: boolean };
@@ -92,10 +92,10 @@ export function formatSingleWindowNavigationTarget(target?: { goodsLineNo: numbe
   return target.goodsLineNo > 0 ? `第 ${target.goodsLineNo} 行 · ${field}` : field || "-";
 }
 
-export function formatReviewSeverity(severity: number) {
-  return severity >= 2 ? "错误" : severity === 1 ? "警告" : "提示";
+export function formatReviewSeverity(severity: SingleWindowExportIssueSeverity) {
+  return severity === "Error" ? "错误" : severity === "Warning" ? "警告" : "提示";
 }
 
-export function formatReviewSeverityKey(severity: number) {
-  return severity >= 2 ? "error" : severity === 1 ? "warning" : "info";
+export function formatReviewSeverityKey(severity: SingleWindowExportIssueSeverity) {
+  return severity === "Error" ? "error" : severity === "Warning" ? "warning" : "info";
 }
