@@ -15,6 +15,7 @@ on:
       - "scripts/compare-report-pdf-metrics.mjs"
       - "scripts/extract-report-pdf-layout.py"
       - "scripts/provision-chrome-for-testing.ps1"
+      - "scripts/run-report-pdf-tests-with-timeout.ps1"
       - "scripts/report-layout-requirements.txt"
       - "scripts/test_frontend_scale_contracts.mjs"
       - "scripts/check_frontend_style_governance.mjs"
@@ -28,8 +29,9 @@ on:
       - "scripts/test_report_template_visual_regression.mjs"
       - "scripts/lib/**"
       - "tests/ReportTemplateFixtures/**"
-      - "src/ExportDocManager.Infrastructure/Services/BrowserRuntime/**"
       - "src/ExportDocManager.Infrastructure/Services/Reporting/**"
+      - "src/ExportDocManager.Infrastructure.Browser/Services/BrowserRuntime/**"
+      - "src/ExportDocManager.Infrastructure.Browser/Services/Reporting/**"
       - "tests/ExportDocManager.Infrastructure.Tests/ReportHtmlServiceInfrastructureTests.cs"
       - ".github/workflows/cross-platform-typography.yml"
   pull_request:
@@ -44,6 +46,7 @@ on:
       - "scripts/compare-report-pdf-metrics.mjs"
       - "scripts/extract-report-pdf-layout.py"
       - "scripts/provision-chrome-for-testing.ps1"
+      - "scripts/run-report-pdf-tests-with-timeout.ps1"
       - "scripts/report-layout-requirements.txt"
       - "scripts/test_frontend_scale_contracts.mjs"
       - "scripts/check_frontend_style_governance.mjs"
@@ -57,8 +60,9 @@ on:
       - "scripts/test_report_template_visual_regression.mjs"
       - "scripts/lib/**"
       - "tests/ReportTemplateFixtures/**"
-      - "src/ExportDocManager.Infrastructure/Services/BrowserRuntime/**"
       - "src/ExportDocManager.Infrastructure/Services/Reporting/**"
+      - "src/ExportDocManager.Infrastructure.Browser/Services/BrowserRuntime/**"
+      - "src/ExportDocManager.Infrastructure.Browser/Services/Reporting/**"
       - "tests/ExportDocManager.Infrastructure.Tests/ReportHtmlServiceInfrastructureTests.cs"
       - ".github/workflows/cross-platform-typography.yml"
 
@@ -199,29 +203,21 @@ jobs:
           --no-restore
 
       - name: Render long multilingual built-in reports to PDF
-        timeout-minutes: 10
+        timeout-minutes: 8
         shell: pwsh
         env:
           EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX: ${{ runner.os == 'Linux' && '1' || '0' }}
           EXPORTDOCMANAGER_BROWSER_AUTOMATION_RECYCLE_USES: ${{ runner.os == 'macOS' && '4' || '100' }}
-        run: |
-          $tests = @(
-            "ExportDocManager.Infrastructure.Tests.ReportHtmlServiceInfrastructureTests.RenderBuiltInProgramTemplatesToPdf_ShouldUseProgramRootBrowserAndRuntimeDataRoot",
-            "ExportDocManager.Infrastructure.Tests.ReportHtmlServiceInfrastructureTests.RenderBuiltInProgramTemplatesWithMultiItemBusinessDataToPdf_ShouldPreservePaginationAndDomainIsolation"
-          )
-          foreach ($test in $tests) {
-            dotnet test tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj `
-              -c Release `
-              -m:1 `
-              -p:BuildInParallel=false `
-              --no-build `
-              --blame-hang `
-              --blame-hang-timeout 4m `
-              --blame-hang-dump-type none `
-              --logger "console;verbosity=normal" `
-              --filter "FullyQualifiedName=$test"
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
+        run: ./scripts/run-report-pdf-tests-with-timeout.ps1 -PerTestTimeoutSeconds 180 -HeartbeatSeconds 15
+
+      - name: Upload report render watchdog diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: report-render-watchdog-${{ matrix.slug }}
+          path: .codex-runtime/report-pdf-test-watchdog
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Verify PDF wrapping and reject overlapping text
         run: python scripts/extract-report-pdf-layout.py .codex-runtime/ExportDocManager.Infrastructure.Tests

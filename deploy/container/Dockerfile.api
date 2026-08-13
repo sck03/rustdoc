@@ -27,12 +27,16 @@ COPY global.json Directory.Build.props Directory.Packages.props NuGet.Config ver
 COPY src/ExportDocManager.Domain/ExportDocManager.Domain.csproj src/ExportDocManager.Domain/
 COPY src/ExportDocManager.Application/ExportDocManager.Application.csproj src/ExportDocManager.Application/
 COPY src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj src/ExportDocManager.Infrastructure/
+COPY src/ExportDocManager.Infrastructure.Excel/ExportDocManager.Infrastructure.Excel.csproj src/ExportDocManager.Infrastructure.Excel/
+COPY src/ExportDocManager.Infrastructure.Browser/ExportDocManager.Infrastructure.Browser.csproj src/ExportDocManager.Infrastructure.Browser/
+COPY src/ExportDocManager.Infrastructure.PdfOcr/ExportDocManager.Infrastructure.PdfOcr.csproj src/ExportDocManager.Infrastructure.PdfOcr/
 COPY src/ExportDocManager.Api/ExportDocManager.Api.csproj src/ExportDocManager.Api/
 RUN --mount=type=cache,id=exportdoc-nuget-${TARGETARCH},target=/root/.nuget/packages,sharing=locked \
     runtime_identifier="$(cat /tmp/exportdoc-runtime-id)" \
     && dotnet restore src/ExportDocManager.Api/ExportDocManager.Api.csproj \
         --runtime "$runtime_identifier" \
-        --configfile NuGet.Config
+        --configfile NuGet.Config \
+        /p:ExportDocPackageProfile=Container
 
 COPY src/ src/
 COPY Shared/ Shared/

@@ -367,7 +367,7 @@ namespace ExportDocManager.Api.Tests
 
                 INSERT INTO "Invoices" (
                     "CompanyScope", "DepartmentId", "InvoiceNo", "Type", "Status", "InvoiceDate",
-                    "ShipmentDate", "ShippingMarksType", "ExporterId", "CustomerId", "TotalCartons", "TotalQuantity",
+                    "ShipmentDate", "ShippingMarksType", "NotifyPartyMode", "ExporterId", "CustomerId", "TotalCartons", "TotalQuantity",
                     "TotalGrossWeight", "TotalNetWeight", "TotalVolume", "TotalAmount",
                     "TotalPurchaseAmount", "TotalTaxRefundAmount", "TotalProfit")
                 SELECT
@@ -379,6 +379,7 @@ namespace ExportDocManager.Api.Tests
                     DATE '2026-07-27' - ((value % 365)::integer),
                     DATE '2026-07-27',
                     'Text',
+                    'None',
                     0,
                     0,
                     1,

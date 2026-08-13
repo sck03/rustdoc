@@ -74,6 +74,20 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("setup-windows.cmd", serverWorkflow, StringComparison.Ordinal);
         Assert.Contains("version.json", serverWorkflow, StringComparison.Ordinal);
         Assert.Contains("ExportDocPackageProfile=Container", dockerfile, StringComparison.Ordinal);
+        Assert.Contains(
+            "COPY src/ExportDocManager.Infrastructure.Excel/ExportDocManager.Infrastructure.Excel.csproj src/ExportDocManager.Infrastructure.Excel/",
+            dockerfile,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "COPY src/ExportDocManager.Infrastructure.Browser/ExportDocManager.Infrastructure.Browser.csproj src/ExportDocManager.Infrastructure.Browser/",
+            dockerfile,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "COPY src/ExportDocManager.Infrastructure.PdfOcr/ExportDocManager.Infrastructure.PdfOcr.csproj src/ExportDocManager.Infrastructure.PdfOcr/",
+            dockerfile,
+            StringComparison.Ordinal);
+        int containerProfileCount = dockerfile.Split("/p:ExportDocPackageProfile=Container", StringSplitOptions.None).Length - 1;
+        Assert.Equal(2, containerProfileCount);
         Assert.Contains("mcr.microsoft.com/dotnet/sdk:10.0.302-noble AS build", dockerfile, StringComparison.Ordinal);
         Assert.Contains("FROM debian:trixie-slim AS runtime", dockerfile, StringComparison.Ordinal);
         Assert.DoesNotContain("        chromium \\", dockerfile, StringComparison.Ordinal);
@@ -190,6 +204,7 @@ public sealed class PackagePayloadContractTests
     {
         string root = FindWorkspaceRoot();
         string workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "cross-platform-typography.yml"));
+        string reportWatchdog = File.ReadAllText(Path.Combine(root, "scripts", "run-report-pdf-tests-with-timeout.ps1"));
         string extractor = File.ReadAllText(Path.Combine(root, "scripts", "extract-report-pdf-layout.py"));
         string comparer = File.ReadAllText(Path.Combine(root, "scripts", "compare-report-pdf-metrics.mjs"));
 
@@ -200,9 +215,18 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("extract-report-pdf-layout.py", workflow, StringComparison.Ordinal);
         Assert.Contains("*.layout.json", workflow, StringComparison.Ordinal);
         Assert.Contains("EXPORTDOCMANAGER_BROWSER_AUTOMATION_RECYCLE_USES", workflow, StringComparison.Ordinal);
-        Assert.Contains("--blame-hang-timeout 4m", workflow, StringComparison.Ordinal);
-        Assert.Contains("src/ExportDocManager.Infrastructure/Services/BrowserRuntime/**", workflow, StringComparison.Ordinal);
-        Assert.Contains("--filter \"FullyQualifiedName=$test\"", workflow, StringComparison.Ordinal);
+        Assert.Contains("scripts/run-report-pdf-tests-with-timeout.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("src/ExportDocManager.Infrastructure.Browser/Services/BrowserRuntime/**", workflow, StringComparison.Ordinal);
+        Assert.Contains("src/ExportDocManager.Infrastructure.Browser/Services/Reporting/**", workflow, StringComparison.Ordinal);
+        Assert.Contains("Upload report render watchdog diagnostics", workflow, StringComparison.Ordinal);
+        Assert.Contains("$Process.Kill($true)", reportWatchdog, StringComparison.Ordinal);
+        Assert.Contains("Resolve-DotnetExecutable", reportWatchdog, StringComparison.Ordinal);
+        Assert.Contains("No native dotnet executable on PATH can load the required SDK", reportWatchdog, StringComparison.Ordinal);
+        Assert.Contains("$process.WaitForExit($waitMilliseconds)", reportWatchdog, StringComparison.Ordinal);
+        Assert.Contains("exit 124", reportWatchdog, StringComparison.Ordinal);
+        Assert.Contains("--filter", reportWatchdog, StringComparison.Ordinal);
+        Assert.Contains("FullyQualifiedName=$test", reportWatchdog, StringComparison.Ordinal);
+        Assert.DoesNotContain("--blame-hang", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain(
             "FullyQualifiedName~RenderBuiltInProgramTemplatesToPdf|FullyQualifiedName~RenderBuiltInProgramTemplatesWithMultiItemBusinessDataToPdf",
             workflow,
@@ -224,6 +248,7 @@ public sealed class PackagePayloadContractTests
         string crossPlatformWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "cross-platform-validation.yml"));
         string macOsWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "macos-desktop-package.yml"));
         string typographyWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "cross-platform-typography.yml"));
+        string reportWatchdog = File.ReadAllText(Path.Combine(root, "scripts", "run-report-pdf-tests-with-timeout.ps1"));
         string chromeProvisioning = File.ReadAllText(Path.Combine(root, "scripts", "provision-chrome-for-testing.ps1"));
         string packageVersions = File.ReadAllText(Path.Combine(root, "Directory.Packages.props"));
         string ocrManifest = File.ReadAllText(Path.Combine(root, "apps", "exportdoc-ocr-rs", "Cargo.toml"));
@@ -259,8 +284,10 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("FileVersionInfo", chromeProvisioning, StringComparison.Ordinal);
         Assert.Contains("ExpectedVersion", chromeProvisioning, StringComparison.Ordinal);
         Assert.Contains("$Product -eq \"ChromeHeadlessShell\" -and", chromeProvisioning, StringComparison.Ordinal);
-        Assert.Contains("timeout-minutes: 10", typographyWorkflow, StringComparison.Ordinal);
-        Assert.Contains("--logger \"console;verbosity=normal\"", typographyWorkflow, StringComparison.Ordinal);
+        Assert.Contains("timeout-minutes: 8", typographyWorkflow, StringComparison.Ordinal);
+        Assert.Contains("run-report-pdf-tests-with-timeout.ps1", typographyWorkflow, StringComparison.Ordinal);
+        Assert.Contains("--logger", reportWatchdog, StringComparison.Ordinal);
+        Assert.Contains("console;verbosity=normal", reportWatchdog, StringComparison.Ordinal);
         Assert.Contains("scripts/test_report_template_pdf_regression.mjs", typographyWorkflow, StringComparison.Ordinal);
         Assert.Contains("scripts/test_report_template_print_pixel_regression.mjs", typographyWorkflow, StringComparison.Ordinal);
         Assert.Contains("scripts/test_report_template_visual_regression.mjs", typographyWorkflow, StringComparison.Ordinal);
