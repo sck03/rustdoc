@@ -20,6 +20,8 @@ if [ -z "$image_id" ]; then
   exit 1
 fi
 
+# This is a database-free payload probe. Override the image's production
+# network settings so startup validation cannot require PostgreSQL here.
 if timeout --signal=TERM --kill-after=15s 240s \
   docker run --rm \
     --name "$container_name" \
@@ -33,6 +35,8 @@ if timeout --signal=TERM --kill-after=15s 240s \
     ExportDocManager.Api.dll \
     --app-root /app \
     --data-root /runtime-data \
+    --urls http://127.0.0.1:5188 \
+    --network-mode false \
     --verify-ocr-runtime \
     2>&1 | tee "$ocr_log"; then
   exit 0

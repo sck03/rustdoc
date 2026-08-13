@@ -56,6 +56,8 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("--network none", containerOcrVerifier, StringComparison.Ordinal);
             Assert.Contains("--read-only", containerOcrVerifier, StringComparison.Ordinal);
             Assert.Contains("docker rm --force", containerOcrVerifier, StringComparison.Ordinal);
+            Assert.Contains("--urls http://127.0.0.1:5188", containerOcrVerifier, StringComparison.Ordinal);
+            Assert.Contains("--network-mode false", containerOcrVerifier, StringComparison.Ordinal);
             Assert.Contains("--verify-ocr-runtime", containerOcrVerifier, StringComparison.Ordinal);
             Assert.Contains("--verify-ocr-runtime", startScript, StringComparison.Ordinal);
             Assert.True(File.Exists(notices));
