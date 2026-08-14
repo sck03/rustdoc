@@ -128,6 +128,11 @@ namespace ExportDocManager.Services.Data
                     rowCount++;
                 }
 
+                EnrichItemsFromSupplementaryTable(
+                    worksheet,
+                    invoice.Items,
+                    currentRow + 1,
+                    cancellationToken);
                 CalculateInvoiceTotals(invoice);
             }
             catch (Exception ex)

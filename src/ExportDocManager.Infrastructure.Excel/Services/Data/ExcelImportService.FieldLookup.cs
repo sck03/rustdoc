@@ -410,7 +410,42 @@ namespace ExportDocManager.Services.Data
 
         private static bool IsHeader(string value, params string[] candidates)
         {
-            return candidates.Any(candidate => value == NormalizeHeader(candidate));
+            var segments = GetHeaderSegments(value);
+            return candidates
+                .Select(NormalizeHeader)
+                .Any(candidate => segments.Contains(candidate, StringComparer.Ordinal));
+        }
+
+        private static IReadOnlyList<string> GetHeaderSegments(string value)
+        {
+            string normalized = NormalizeHeader(value);
+            if (string.IsNullOrEmpty(normalized))
+            {
+                return [];
+            }
+
+            var segments = new List<string> { normalized };
+            var builder = new StringBuilder(normalized.Length);
+            bool currentIsCjk = IsCjk(normalized[0]);
+            foreach (char character in normalized)
+            {
+                bool isCjk = IsCjk(character);
+                if (builder.Length > 0 && isCjk != currentIsCjk)
+                {
+                    segments.Add(builder.ToString());
+                    builder.Clear();
+                }
+
+                builder.Append(character);
+                currentIsCjk = isCjk;
+            }
+
+            if (builder.Length > 0)
+            {
+                segments.Add(builder.ToString());
+            }
+
+            return segments;
         }
 
         private static bool ContainsDigit(string value)

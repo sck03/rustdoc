@@ -26,7 +26,8 @@ jobs:
   package:
     if: ${{ !inputs.publish_release }}
     permissions:
-      contents: read
+      actions: read
+      contents: write
     uses: ./.github/workflows/desktop-package-reusable.yml
     with:
       platform: windows

@@ -108,50 +108,63 @@ pub(super) fn detect_used_range(cells: &[Vec<String>]) -> UsedRange {
 
 pub(super) fn detect_table(cells: &[Vec<String>]) -> Option<TableAnalysis> {
     let mut best: Option<TableAnalysis> = None;
+    let mut best_quality = f32::MIN;
 
     for header_row in 0..cells.len().min(80) {
-        let header_depth = 3usize.min(cells.len().saturating_sub(header_row));
-        if header_depth == 0 {
+        if count_detected_fields_in_row(cells, header_row) == 0 {
             continue;
         }
 
-        if count_detected_fields_in_row(cells, header_row) < 3 {
-            continue;
-        }
+        let max_depth = 3usize.min(cells.len().saturating_sub(header_row));
+        for header_depth in 1..=max_depth {
+            let columns = build_field_candidates(cells, header_row, header_depth);
+            let mut unique_fields = std::collections::BTreeMap::new();
+            for field in &columns {
+                unique_fields
+                    .entry(field.canonical_field.as_str())
+                    .and_modify(|confidence: &mut f32| {
+                        *confidence = confidence.max(field.confidence)
+                    })
+                    .or_insert(field.confidence);
+            }
 
-        let columns = build_field_candidates(cells, header_row, header_depth);
-        let score: f32 = columns.iter().map(|field| field.confidence).sum();
-        let has_quantity = columns
-            .iter()
-            .any(|field| field.canonical_field == "Quantity");
-        let has_style = columns.iter().any(|field| {
-            field.canonical_field == "StyleNo" || field.canonical_field == "StyleName"
-        });
+            let has_quantity = unique_fields.contains_key("Quantity");
+            let has_style =
+                unique_fields.contains_key("StyleNo") || unique_fields.contains_key("StyleName");
+            let score: f32 = unique_fields.values().sum();
+            if unique_fields.len() < 3 || !has_quantity || !has_style || score < 2.5 {
+                continue;
+            }
 
-        if !has_quantity || !has_style || score < 2.5 {
-            continue;
-        }
+            let search_start_row = header_row + header_depth;
+            let Some(data_start_row) = find_first_data_row(cells, search_start_row, &columns)
+            else {
+                continue;
+            };
 
-        let Some(data_start_row) = find_first_data_row(cells, header_row + 1, &columns) else {
-            continue;
-        };
+            let duplicate_count = columns.len().saturating_sub(unique_fields.len()) as f32;
+            let data_gap = data_start_row.saturating_sub(search_start_row) as f32;
+            let quality = score - duplicate_count * 0.75 - data_gap * 0.10;
+            let sample_rows = collect_sample_rows(cells, data_start_row, &columns);
+            let candidate = TableAnalysis {
+                header_start_row: header_row + 1,
+                header_depth,
+                data_start_row: data_start_row + 1,
+                confidence: (score / 8.0).min(1.0),
+                fields: columns,
+                sample_rows,
+            };
 
-        let sample_rows = collect_sample_rows(cells, data_start_row, &columns);
-        let candidate = TableAnalysis {
-            header_start_row: header_row + 1,
-            header_depth,
-            data_start_row: data_start_row + 1,
-            confidence: (score / 8.0).min(1.0),
-            fields: columns,
-            sample_rows,
-        };
-
-        if best
-            .as_ref()
-            .map(|current| candidate.confidence > current.confidence)
-            .unwrap_or(true)
-        {
-            best = Some(candidate);
+            let should_replace = quality > best_quality
+                || ((quality - best_quality).abs() < f32::EPSILON
+                    && best
+                        .as_ref()
+                        .map(|current| candidate.data_start_row < current.data_start_row)
+                        .unwrap_or(true));
+            if should_replace {
+                best_quality = quality;
+                best = Some(candidate);
+            }
         }
     }
 

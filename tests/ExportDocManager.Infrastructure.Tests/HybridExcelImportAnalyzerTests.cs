@@ -61,6 +61,59 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal("rust-calamine+dotnet-fusion", merged.AnalyzerId);
         }
 
+        [Fact]
+        public void MergeReports_KeepsExternalTableAndOnlyAddsNonConflictingFallbackColumns()
+        {
+            var external = CreateCompleteReport("Reason Brand Inc", "3 WEST 35TH STREET");
+            external.ItemTable = new ExcelImportItemTableAnalysis
+            {
+                WorksheetName = "金海江数据页",
+                HeaderRow = 21,
+                HeaderDepth = 2,
+                DataStartRow = 23,
+                Confidence = 0.9m,
+                Columns = new ExcelImportItemColumnAnalysis
+                {
+                    PoNumberCol = 3,
+                    StyleNoCol = 4,
+                    StyleNameCol = 5,
+                    QuantityCol = 6,
+                    CartonsCol = 7
+                }
+            };
+            var builtIn = new ExcelImportAnalysisReport
+            {
+                ItemTable = new ExcelImportItemTableAnalysis
+                {
+                    WorksheetName = "金海江数据页",
+                    HeaderRow = 19,
+                    HeaderDepth = 3,
+                    DataStartRow = 23,
+                    Confidence = 0.95m,
+                    Columns = new ExcelImportItemColumnAnalysis
+                    {
+                        PoNumberCol = 3,
+                        StyleNoCol = 4,
+                        StyleNameCol = 5,
+                        QuantityCol = 6,
+                        CartonsCol = 7,
+                        HSCodeCol = 3,
+                        UnitPriceCol = 11,
+                        TotalPriceCol = 12
+                    }
+                }
+            };
+
+            var merged = HybridExcelImportAnalyzer.MergeReports(external, builtIn);
+
+            Assert.NotNull(merged.ItemTable);
+            Assert.Equal(21, merged.ItemTable.HeaderRow);
+            Assert.Equal(2, merged.ItemTable.HeaderDepth);
+            Assert.Equal(0, merged.ItemTable.Columns.HSCodeCol);
+            Assert.Equal(11, merged.ItemTable.Columns.UnitPriceCol);
+            Assert.Equal(12, merged.ItemTable.Columns.TotalPriceCol);
+        }
+
         private static ExcelImportAnalysisReport CreateCompleteReport(
             string customerName,
             string customerAddress)

@@ -190,6 +190,59 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task ImportFromExcelAsync_ShouldRepairCompoundHeadersAndMergeSupplementaryItemDetails()
+        {
+            string directory = Path.Combine(
+                AppContext.BaseDirectory,
+                "ExcelImportFormatTests",
+                Guid.NewGuid().ToString("N"));
+            string filePath = Path.Combine(directory, "compound-headers-with-supplement.xlsx");
+            Directory.CreateDirectory(directory);
+            try
+            {
+                await WriteCompoundHeaderSupplementWorkbookAsync(filePath);
+                var settings = new StubSettingsService();
+                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
+                var service = new ExcelImportService(settings, new CompoundHeaderLegacyAnalyzer());
+
+                var result = await service.ImportFromExcelAsync(filePath);
+
+                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+                Assert.NotNull(result.Invoice);
+                Assert.NotNull(result.AnalysisReport.ItemTable);
+                Assert.Equal(3, result.AnalysisReport.ItemTable.Columns.PoNumberCol);
+                Assert.Equal(4, result.AnalysisReport.ItemTable.Columns.StyleNoCol);
+                Assert.Equal(5, result.AnalysisReport.ItemTable.Columns.StyleNameCol);
+                Assert.Equal(6, result.AnalysisReport.ItemTable.Columns.QuantityCol);
+                Assert.Equal(7, result.AnalysisReport.ItemTable.Columns.CartonsCol);
+
+                Assert.Equal(2, result.Invoice.Items.Count);
+                var item = result.Invoice.Items[0];
+                Assert.Equal("APO2245", item.PoNumber);
+                Assert.Equal("EA211395", item.StyleNo);
+                Assert.Equal("women's knitted sweatshirts", item.StyleName);
+                Assert.Equal("51%Polyester44%modal5%elastane", item.FabricComposition);
+                Assert.Equal("化纤制针织女式非起绒套头衫", item.StyleNameCN);
+                Assert.Equal("ATHLECIA", item.Brand);
+                Assert.Equal("6110300090", item.HSCode);
+                Assert.Equal(505m, item.Quantity);
+                Assert.Equal(17m, item.Cartons);
+                Assert.Equal(1.252m, item.Volume);
+                Assert.Equal(250m, item.GWTotal);
+                Assert.Equal(233m, item.NWTotal);
+                Assert.Equal(8.22m, item.UnitPrice);
+                Assert.Equal(4151.10m, item.TotalPrice);
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                {
+                    Directory.Delete(directory, recursive: true);
+                }
+            }
+        }
+
+        [Fact]
         public async Task ImportFromExcelAsync_ShouldCorrectStaleAnalyzerPartyLabelsAndKeepExplicitContractNo()
         {
             string directory = Path.Combine(
@@ -797,6 +850,89 @@ namespace ExportDocManager.Infrastructure.Tests
                     Directory.Delete(directory, recursive: true);
                 }
             }
+        }
+
+        private static async Task WriteCompoundHeaderSupplementWorkbookAsync(string filePath)
+        {
+            var workbook = new XSSFWorkbook();
+            ISheet sheet = workbook.CreateSheet("金海江数据页");
+
+            WriteCell(sheet, "A1", "NINGBO BRIDGE IMP&EXP CO.,LTD");
+            WriteCell(sheet, "A4", "Buyer");
+            WriteCell(sheet, "D4", "SPORTS GROUP DENMARK A/S");
+            WriteCell(sheet, "I6", "发票号");
+            WriteCell(sheet, "J6", "2026JHJ011");
+            WriteCell(sheet, "A8", "CONSIGNEE");
+            WriteCell(sheet, "D8", "Sports Group Denmark(SGD)");
+
+            WriteCell(sheet, "A21", "Marking 唛头");
+            WriteCell(sheet, "C21", "PO number");
+            WriteCell(sheet, "D21", "Style N 款号");
+            WriteCell(sheet, "E21", "Style name 款名");
+            WriteCell(sheet, "F21", "Quantity 数量");
+            WriteCell(sheet, "G21", "CARTON QTY箱数");
+            WriteCell(sheet, "H21", "体积（总）cbm");
+            WriteCell(sheet, "I21", "毛重(总)");
+            WriteCell(sheet, "J21", "净重（总）");
+            WriteCell(sheet, "K21", "单价");
+            WriteCell(sheet, "L21", "总价");
+            WriteCell(sheet, "I22", "(KG)");
+            WriteCell(sheet, "J22", "(KG)");
+            WriteCell(sheet, "K22", "(USD)");
+            WriteCell(sheet, "L22", "(USD)");
+
+            WriteCell(sheet, "A23", "CUSTOMER / ORDER NUMBER / STYLE NO./NAME / QUANTITY");
+            WriteCell(sheet, "B23", 1d);
+            WriteCell(sheet, "C23", "APO2245");
+            WriteCell(sheet, "D23", "EA211395");
+            WriteCell(sheet, "E23", "Namier W Hoody");
+            WriteCell(sheet, "F23", 505d);
+            WriteCell(sheet, "G23", 17d);
+            WriteCell(sheet, "H23", 1.252d);
+            WriteCell(sheet, "I23", 250d);
+            WriteCell(sheet, "J23", 233d);
+            WriteCell(sheet, "K23", 8.22d);
+            WriteCell(sheet, "L23", 4151.10d);
+
+            WriteCell(sheet, "B24", 2d);
+            WriteCell(sheet, "C24", "APO2245");
+            WriteCell(sheet, "D24", "EA221355");
+            WriteCell(sheet, "E24", "Jacey W Crew Neck");
+            WriteCell(sheet, "F24", 1010d);
+            WriteCell(sheet, "G24", 34d);
+            WriteCell(sheet, "H24", 2.347d);
+            WriteCell(sheet, "I24", 510d);
+            WriteCell(sheet, "J24", 476d);
+            WriteCell(sheet, "K24", 8.22d);
+            WriteCell(sheet, "L24", 8302.20d);
+
+            WriteCell(sheet, "A114", "NAME/COMPO");
+            WriteCell(sheet, "D114", "成分及英文名");
+            WriteCell(sheet, "I114", "报关中文名");
+            WriteCell(sheet, "L114", "提单HS编码");
+            WriteCell(sheet, "M114", "品牌");
+            WriteCell(sheet, "N114", "报关HS编码");
+
+            WriteCell(sheet, "A115", "APO2245");
+            WriteCell(sheet, "B115", 1d);
+            WriteCell(sheet, "C115", "EA211395");
+            WriteCell(sheet, "D115", "51%Polyester44%modal5%elastane women's knitted sweatshirts");
+            WriteCell(sheet, "I115", "化纤制针织女式非起绒套头衫");
+            WriteCell(sheet, "L115", "61103000");
+            WriteCell(sheet, "M115", "ATHLECIA");
+            WriteCell(sheet, "N115", "6110300090");
+
+            WriteCell(sheet, "A116", "APO2245");
+            WriteCell(sheet, "B116", 2d);
+            WriteCell(sheet, "C116", "EA221355");
+            WriteCell(sheet, "D116", "51%Polyester44%modal5%elastane women's knitted sweatshirts");
+            WriteCell(sheet, "I116", "化纤制针织女式非起绒套头衫");
+            WriteCell(sheet, "L116", "61103000");
+            WriteCell(sheet, "M116", "ATHLECIA");
+            WriteCell(sheet, "N116", "6110300090");
+
+            await using var output = File.Create(filePath);
+            workbook.Write(output);
         }
 
         private static async Task WriteLegacyXlsWorkbookAsync(string filePath)
@@ -1697,6 +1833,12 @@ namespace ExportDocManager.Infrastructure.Tests
             GetOrCreateRow(sheet, row).CreateCell(column - 1).SetCellValue(value);
         }
 
+        private static void WriteCell(ISheet sheet, string cellReference, double value)
+        {
+            var (row, column) = ParseCellReference(cellReference);
+            WriteCell(sheet, row, column, value);
+        }
+
         private static void WriteCell(ISheet sheet, int row, int column, string value)
         {
             GetOrCreateRow(sheet, row).CreateCell(column - 1).SetCellValue(value);
@@ -1733,6 +1875,42 @@ namespace ExportDocManager.Infrastructure.Tests
             public Task LoadAsync() => Task.CompletedTask;
 
             public Task SaveAsync() => Task.CompletedTask;
+        }
+
+        private sealed class CompoundHeaderLegacyAnalyzer : IExcelImportAnalyzer
+        {
+            public Task<ExcelImportAnalysisReport> AnalyzeAsync(
+                string filePath,
+                ExcelImportSettings settings,
+                CancellationToken cancellationToken = default)
+            {
+                return Task.FromResult(new ExcelImportAnalysisReport
+                {
+                    AnalyzerId = "legacy-compound-header-test",
+                    SourcePath = filePath,
+                    SelectedWorksheetName = "金海江数据页",
+                    Confidence = 0.9m,
+                    ItemTable = new ExcelImportItemTableAnalysis
+                    {
+                        WorksheetName = "金海江数据页",
+                        HeaderRow = 21,
+                        HeaderDepth = 3,
+                        DataStartRow = 23,
+                        Confidence = 0.9m,
+                        Columns = new ExcelImportItemColumnAnalysis
+                        {
+                            StyleNoCol = 1,
+                            StyleNameCol = 2,
+                            QuantityCol = 6,
+                            VolumeCol = 8,
+                            GWTotalCol = 9,
+                            NWTotalCol = 10,
+                            UnitPriceCol = 11,
+                            TotalPriceCol = 12
+                        }
+                    }
+                });
+            }
         }
 
         private sealed class StalePartyFieldAnalyzer : IExcelImportAnalyzer

@@ -259,24 +259,51 @@ jobs:
       - name: Validate Linux package on Debian 13
         if: inputs.platform == 'linux'
         shell: bash
+        timeout-minutes: 20
         run: |
           package_root="$GITHUB_WORKSPACE/artifacts/browser-server/package"
-          docker run --rm \
+          timeout --signal=TERM --kill-after=30s 18m docker run --rm --init \
+            --env EXPORTDOCMANAGER_OCR_RUNTIME=enabled \
             --volume "$package_root:/package:ro" \
             debian:13-slim \
             sh -ec '
-              apt-get update
-              apt-get install -y --no-install-recommends ca-certificates chromium fonts-noto-cjk
-              /package/ExportDocManager.Api \
+              run_probe() {
+                label="$1"
+                duration="$2"
+                shift 2
+                echo "::group::$label"
+                set +e
+                timeout --signal=TERM --kill-after=10s "$duration" "$@"
+                status=$?
+                set -e
+                echo "::endgroup::"
+                if [ "$status" -ne 0 ]; then
+                  echo "Probe failed: $label (exit $status)" >&2
+                  exit "$status"
+                fi
+              }
+
+              export DEBIAN_FRONTEND=noninteractive
+              run_probe "Refresh Debian package metadata" 3m apt-get update
+              run_probe "Install package validation dependencies" 8m \
+                apt-get install -y --no-install-recommends ca-certificates chromium fonts-noto-cjk
+              run_probe "Verify bundled OCR runtime" 2m /package/ExportDocManager.Api \
                 --app-root /package \
                 --data-root /tmp/exportdoc-data \
                 --verify-ocr-runtime
-              /package/Tools/PostgreSQL/bin/pg_dump --version
-              /package/Tools/PostgreSQL/bin/pg_restore --version
-              /package/Tools/PostgreSQL/bin/psql --version
+              run_probe "Probe pg_dump" 30s /package/Tools/PostgreSQL/bin/pg_dump --version
+              run_probe "Probe pg_restore" 30s /package/Tools/PostgreSQL/bin/pg_restore --version
+              run_probe "Probe psql" 30s /package/Tools/PostgreSQL/bin/psql --version
               browser="$(find /package/Browsers -type f \( -name chrome-headless-shell -o -name chrome \) -print -quit)"
               test -n "$browser"
-              "$browser" --version
+              test -x "$browser"
+              mkdir -p /tmp/exportdoc-browser-profile
+              run_probe "Probe bundled browser" 30s "$browser" \
+                --no-sandbox \
+                --disable-logging \
+                --disable-breakpad \
+                --user-data-dir=/tmp/exportdoc-browser-profile \
+                --version
             '
 
       - name: Create downloadable archive

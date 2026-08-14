@@ -37,6 +37,10 @@ public sealed class ChromiumArm64PackagingContractTests
         Assert.Contains("verify-bundled-browser-pdf.ps1", reusableServer);
         Assert.Contains("Validate Linux package on Debian 13", reusableServer);
         Assert.Contains("debian:13-slim", reusableServer);
+        Assert.Contains("timeout-minutes: 20", reusableServer);
+        Assert.Contains("run_probe", reusableServer);
+        Assert.Contains("--no-sandbox", reusableServer);
+        Assert.Contains("--user-data-dir=/tmp/exportdoc-browser-profile", reusableServer);
     }
 
     [Fact]

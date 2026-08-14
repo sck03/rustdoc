@@ -91,44 +91,49 @@ namespace ExportDocManager.Services.Data
                     continue;
                 }
 
-                if (HeaderPathContains(headers, "客人款号", "款号", "货号", "产品编号", "styleno", "style no", "style no.", "style code", "sku"))
+                if (HeaderPathContains(headers, "客人订单号", "客户订单号", "订单号", "采购订单号", "销售订单号", "po number", "po no", "pono", "ponumber", "po", "po#", "purchaseorder", "orderno"))
                 {
-                    layout.Columns.StyleNoCol = column;
+                    SetExplicitItemColumn(layout.Columns, ItemColumnKind.PoNumber, column);
                 }
 
-                if (HeaderPathContains(headers, "英文品名", "英文名称", "货物英文品名", "货物名称", "商品名称", "产品名称", "stylename", "description", "product description"))
+                if (HeaderPathContains(headers, "客人款号", "款号", "货号", "产品编号", "styleno", "style no", "style no.", "style code", "sku"))
                 {
-                    layout.Columns.StyleNameCol = column;
+                    SetExplicitItemColumn(layout.Columns, ItemColumnKind.StyleNo, column);
+                }
+
+                if (HeaderPathContains(headers, "英文品名", "英文名称", "款名", "货物英文品名", "货物名称", "商品名称", "产品名称", "stylename", "description", "product description"))
+                {
+                    SetExplicitItemColumn(layout.Columns, ItemColumnKind.StyleName, column);
                 }
 
                 if (HeaderPathContains(headers, "面料", "面料成分", "成份", "成分", "材质", "fabric", "composition", "material"))
                 {
-                    layout.Columns.FabricCompositionCol = column;
+                    SetExplicitItemColumn(layout.Columns, ItemColumnKind.FabricComposition, column);
                 }
 
                 if (HeaderPathContains(headers, "中文品名", "中文名称", "品名中文", "款式描述", "中文描述", "报关品名", "货物中文名称"))
                 {
-                    layout.Columns.StyleNameCNCol = column;
+                    SetExplicitItemColumn(layout.Columns, ItemColumnKind.StyleNameCN, column);
                 }
 
                 if (HeaderPathContains(headers, "品牌", "品牌名", "商标", "brand", "label"))
                 {
-                    layout.Columns.BrandCol = column;
+                    SetExplicitItemColumn(layout.Columns, ItemColumnKind.Brand, column);
                     hasExplicitBrandHeader = true;
                 }
 
                 if (HeaderPathContains(headers, "数量", "总数量", "quantity", "qty", "pcs"))
                 {
-                    layout.Columns.QuantityCol = column;
+                    SetExplicitItemColumn(layout.Columns, ItemColumnKind.Quantity, column);
                 }
 
                 if (HeaderPathContains(headers, "箱子尺寸", "箱规", "外箱尺寸", "包装尺寸", "尺寸", "长宽高", "carton size", "ctn size", "cartonsize", "dimension", "dimensions"))
                 {
-                    layout.Columns.DimensionCol = column;
+                    SetExplicitItemColumn(layout.Columns, ItemColumnKind.Dimension, column);
                 }
                 else if (HeaderPathContains(headers, "箱数", "总箱数", "箱量", "包装件数", "carton", "cartons", "ctns", "ctn"))
                 {
-                    layout.Columns.CartonsCol = column;
+                    SetExplicitItemColumn(layout.Columns, ItemColumnKind.Cartons, column);
                 }
             }
 
@@ -159,11 +164,78 @@ namespace ExportDocManager.Services.Data
 
         private static bool HeaderPathContains(IReadOnlyList<string> headers, params string[] aliases)
         {
-            return headers.Any(header =>
+            return headers.Any(header => IsHeader(NormalizeHeader(header), aliases));
+        }
+
+        private static void SetExplicitItemColumn(
+            DetectedItemColumns columns,
+            ItemColumnKind kind,
+            int column)
+        {
+            ClearItemColumnAssignments(columns, column);
+            switch (kind)
             {
-                string normalizedHeader = NormalizeHeader(header);
-                return aliases.Any(alias => normalizedHeader == NormalizeHeader(alias));
-            });
+                case ItemColumnKind.PoNumber:
+                    columns.PoNumberCol = column;
+                    break;
+                case ItemColumnKind.StyleNo:
+                    columns.StyleNoCol = column;
+                    break;
+                case ItemColumnKind.StyleName:
+                    columns.StyleNameCol = column;
+                    break;
+                case ItemColumnKind.FabricComposition:
+                    columns.FabricCompositionCol = column;
+                    break;
+                case ItemColumnKind.StyleNameCN:
+                    columns.StyleNameCNCol = column;
+                    break;
+                case ItemColumnKind.Brand:
+                    columns.BrandCol = column;
+                    break;
+                case ItemColumnKind.Quantity:
+                    columns.QuantityCol = column;
+                    break;
+                case ItemColumnKind.Cartons:
+                    columns.CartonsCol = column;
+                    break;
+                case ItemColumnKind.Dimension:
+                    columns.DimensionCol = column;
+                    break;
+            }
+        }
+
+        private static void ClearItemColumnAssignments(DetectedItemColumns columns, int column)
+        {
+            if (column <= 0)
+            {
+                return;
+            }
+
+            if (columns.PoNumberCol == column) columns.PoNumberCol = 0;
+            if (columns.StyleNoCol == column) columns.StyleNoCol = 0;
+            if (columns.StyleNameCol == column) columns.StyleNameCol = 0;
+            if (columns.FabricCompositionCol == column) columns.FabricCompositionCol = 0;
+            if (columns.StyleNameCNCol == column) columns.StyleNameCNCol = 0;
+            if (columns.BrandCol == column) columns.BrandCol = 0;
+            if (columns.HSCodeCol == column) columns.HSCodeCol = 0;
+            if (columns.OriginCol == column) columns.OriginCol = 0;
+            if (columns.QuantityCol == column) columns.QuantityCol = 0;
+            if (columns.UnitENCol == column) columns.UnitENCol = 0;
+            if (columns.UnitCNCol == column) columns.UnitCNCol = 0;
+            if (columns.CartonsCol == column) columns.CartonsCol = 0;
+            if (columns.CtnUnitENCol == column) columns.CtnUnitENCol = 0;
+            if (columns.LengthCol == column) columns.LengthCol = 0;
+            if (columns.WidthCol == column) columns.WidthCol = 0;
+            if (columns.HeightCol == column) columns.HeightCol = 0;
+            if (columns.DimensionCol == column) columns.DimensionCol = 0;
+            if (columns.VolumeCol == column) columns.VolumeCol = 0;
+            if (columns.GWPerCtnCol == column) columns.GWPerCtnCol = 0;
+            if (columns.GWTotalCol == column) columns.GWTotalCol = 0;
+            if (columns.NWPerCtnCol == column) columns.NWPerCtnCol = 0;
+            if (columns.NWTotalCol == column) columns.NWTotalCol = 0;
+            if (columns.UnitPriceCol == column) columns.UnitPriceCol = 0;
+            if (columns.TotalPriceCol == column) columns.TotalPriceCol = 0;
         }
 
         private static void ApplyDetectedLayoutToAnalysisReport(
@@ -257,6 +329,19 @@ namespace ExportDocManager.Services.Data
             public DetectedItemColumns Columns { get; set; } = new();
         }
 
+        private enum ItemColumnKind
+        {
+            PoNumber,
+            StyleNo,
+            StyleName,
+            FabricComposition,
+            StyleNameCN,
+            Brand,
+            Quantity,
+            Cartons,
+            Dimension
+        }
+
         private sealed class BookingSheetGoodsTable
         {
             public int HeaderRow { get; set; }
@@ -323,5 +408,6 @@ namespace ExportDocManager.Services.Data
             public int UnitPriceCol { get; set; }
 
             public int TotalPriceCol { get; set; }
-        }    }
+        }
+    }
 }

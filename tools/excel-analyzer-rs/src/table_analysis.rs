@@ -246,7 +246,10 @@ pub(super) fn detect_field(header: &str) -> Option<(String, f32)> {
                 "订单号",
                 "采购订单号",
                 "销售订单号",
+                "po number",
+                "po no",
                 "pono",
+                "ponumber",
                 "po",
                 "po#",
                 "purchaseorder",
@@ -340,6 +343,7 @@ pub(super) fn detect_field(header: &str) -> Option<(String, f32)> {
                 "商品描述",
                 "产品名称",
                 "产品描述",
+                "款名",
                 "物料名称",
                 "物料描述",
                 "零件名称",
@@ -596,6 +600,7 @@ pub(super) fn detect_field(header: &str) -> Option<(String, f32)> {
             0.95,
             [
                 "总毛重",
+                "毛重总",
                 "合计毛重",
                 "毛重合计",
                 "总重量",
@@ -649,6 +654,7 @@ pub(super) fn detect_field(header: &str) -> Option<(String, f32)> {
             0.95,
             [
                 "总净重",
+                "净重总",
                 "合计净重",
                 "净重合计",
                 "净重kg",
@@ -733,29 +739,45 @@ pub(super) fn detect_field(header: &str) -> Option<(String, f32)> {
         ),
     ];
 
-    for (field, confidence, aliases) in candidates {
-        if aliases
-            .iter()
-            .any(|alias| header_matches_alias(header, alias))
-        {
-            return Some((field.to_string(), confidence));
-        }
-    }
-
-    None
+    candidates
+        .into_iter()
+        .filter_map(|(field, confidence, aliases)| {
+            aliases
+                .iter()
+                .filter_map(|alias| header_alias_match_score(header, alias))
+                .max()
+                .map(|score| (field.to_string(), confidence as f32, score))
+        })
+        .max_by(|left, right| {
+            left.2
+                .cmp(&right.2)
+                .then_with(|| left.1.total_cmp(&right.1))
+        })
+        .map(|(field, confidence, _)| (field, confidence))
 }
 
-pub(super) fn header_matches_alias(header: &str, alias: &str) -> bool {
+pub(super) fn header_alias_match_score(header: &str, alias: &str) -> Option<usize> {
     let normalized_alias = normalize_text(alias);
     if normalized_alias.is_empty() {
-        return false;
+        return None;
     }
 
-    if normalized_alias.len() <= 2 || alias_requires_exact_match(&normalized_alias) {
-        return header == normalized_alias;
+    if header == normalized_alias {
+        return Some(10_000 + normalized_alias.chars().count());
     }
 
-    header.contains(&normalized_alias)
+    let contains_cjk = normalized_alias.chars().any(is_cjk);
+    let latin_length = normalized_alias
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric())
+        .count();
+    if (!contains_cjk && latin_length <= 3) || alias_requires_exact_match(&normalized_alias) {
+        return None;
+    }
+
+    header
+        .contains(&normalized_alias)
+        .then_some(normalized_alias.chars().count())
 }
 
 pub(super) fn alias_requires_exact_match(alias: &str) -> bool {

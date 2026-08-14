@@ -164,6 +164,12 @@ namespace ExportDocManager.Infrastructure.Tests
 
             Assert.Contains(".codex-runtime/browser-pdf-check", browserPdfScript, StringComparison.Ordinal);
             Assert.Contains("Assert-RepositoryChildPath", browserPdfScript, StringComparison.Ordinal);
+            Assert.Contains("--user-data-dir=$profile", browserPdfScript, StringComparison.Ordinal);
+            Assert.Contains("CHROME_LOG_FILE", browserPdfScript, StringComparison.Ordinal);
+            Assert.Contains("--disable-logging", browserPdfScript, StringComparison.Ordinal);
+            Assert.Contains("WaitForExit(60000)", browserPdfScript, StringComparison.Ordinal);
+            Assert.Contains("chrome_debug.log", browserPdfScript, StringComparison.Ordinal);
+            Assert.Contains("$existingTransientLogs", browserPdfScript, StringComparison.Ordinal);
             Assert.DoesNotContain("Path]::GetTempPath", browserPdfScript, StringComparison.Ordinal);
         }
 

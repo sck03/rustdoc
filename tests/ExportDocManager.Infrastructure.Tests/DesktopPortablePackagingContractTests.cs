@@ -164,6 +164,28 @@ public sealed class DesktopPortablePackagingContractTests
     }
 
     [Fact]
+    public void DesktopWorkflowCallers_ShouldGrantTheReusableWorkflowDeclaredPermissions()
+    {
+        string root = FindRepositoryRoot();
+        foreach (string workflowName in new[]
+                 {
+                     "windows-desktop-package.yml",
+                     "linux-desktop-package.yml",
+                     "macos-desktop-package.yml"
+                 })
+        {
+            string workflow = Read(root, ".github", "workflows", workflowName)
+                .Replace("\r\n", "\n", StringComparison.Ordinal);
+            string packageJob = workflow[..workflow.IndexOf("\n  release:", StringComparison.Ordinal)];
+
+            Assert.Contains(
+                "permissions:\n      actions: read\n      contents: write",
+                packageJob,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void DesktopLaunchSmoke_ShouldProbeAnEndpointAllowedByTheProductEdition()
     {
         string root = FindRepositoryRoot();

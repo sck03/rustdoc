@@ -294,7 +294,7 @@ namespace ExportDocManager.Services.Data
 
         private static int TrySetItemColumn(ExcelImportItemColumnAnalysis columns, string header, int column)
         {
-            if (IsHeader(header, "客人订单号", "客户订单号", "订单号", "采购订单号", "销售订单号", "pono", "po", "po#", "purchaseorder", "orderno", "order"))
+            if (IsHeader(header, "客人订单号", "客户订单号", "订单号", "采购订单号", "销售订单号", "po number", "po no", "pono", "ponumber", "po", "po#", "purchaseorder", "orderno", "order"))
             {
                 columns.PoNumberCol = column;
                 return 1;
@@ -306,7 +306,7 @@ namespace ExportDocManager.Services.Data
                 return 1;
             }
 
-            if (IsHeader(header, "英文品名", "英文名称", "品名", "名称", "货物英文品名", "货物名称", "货物描述", "商品名称", "商品描述", "产品名称", "产品描述", "物料名称", "物料描述", "零件名称", "零件描述", "部件名称", "部件描述", "品名规格", "规格描述", "stylename", "description", "desc", "name", "product", "productname", "productdescription", "goods", "goodsname", "goodsdescription", "itemname", "itemdescription", "descriptionofgoods", "commodity", "commodityname", "commoditydescription", "materialname", "materialdescription", "partname", "partdescription", "componentname", "componentdescription"))
+            if (IsHeader(header, "英文品名", "英文名称", "品名", "名称", "款名", "货物英文品名", "货物名称", "货物描述", "商品名称", "商品描述", "产品名称", "产品描述", "物料名称", "物料描述", "零件名称", "零件描述", "部件名称", "部件描述", "品名规格", "规格描述", "stylename", "description", "desc", "name", "product", "productname", "productdescription", "goods", "goodsname", "goodsdescription", "itemname", "itemdescription", "descriptionofgoods", "commodity", "commodityname", "commoditydescription", "materialname", "materialdescription", "partname", "partdescription", "componentname", "componentdescription"))
             {
                 columns.StyleNameCol = column;
                 return 1;
@@ -402,7 +402,7 @@ namespace ExportDocManager.Services.Data
                 return 1;
             }
 
-            if (IsHeader(header, "总毛重", "合计毛重", "毛重合计", "总重量", "毛重kg", "totalgw", "gwt", "grosskg", "grosskgs", "gwkg", "gwkgs", "totalgrossweight", "grossweighttotal", "grossweightkg", "grossweightkgs", "grosswt", "totalgross", "totalgrosskg", "totalgrosskgs", "totalgwkg", "totalgwkgs", "totalgweight"))
+            if (IsHeader(header, "总毛重", "毛重总", "合计毛重", "毛重合计", "总重量", "毛重kg", "totalgw", "gwt", "grosskg", "grosskgs", "gwkg", "gwkgs", "totalgrossweight", "grossweighttotal", "grossweightkg", "grossweightkgs", "grosswt", "totalgross", "totalgrosskg", "totalgrosskgs", "totalgwkg", "totalgwkgs", "totalgweight"))
             {
                 if (columns.GWTotalCol > 0 && columns.GWPerCtnCol == 0)
                 {
@@ -433,7 +433,7 @@ namespace ExportDocManager.Services.Data
                 return 1;
             }
 
-            if (IsHeader(header, "总净重", "合计净重", "净重合计", "净重kg", "totalnw", "nwt", "netkg", "netkgs", "nwkg", "nwkgs", "totalnetweight", "netweighttotal", "netweightkg", "netweightkgs", "netwt", "totalnet", "totalnetkg", "totalnetkgs", "totalnwkg", "totalnwkgs", "totalnweight"))
+            if (IsHeader(header, "总净重", "净重总", "合计净重", "净重合计", "净重kg", "totalnw", "nwt", "netkg", "netkgs", "nwkg", "nwkgs", "totalnetweight", "netweighttotal", "netweightkg", "netweightkgs", "netwt", "totalnet", "totalnetkg", "totalnetkgs", "totalnwkg", "totalnwkgs", "totalnweight"))
             {
                 if (columns.NWTotalCol > 0 && columns.NWPerCtnCol == 0)
                 {

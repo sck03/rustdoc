@@ -414,10 +414,7 @@ namespace ExportDocManager.Services.Data
                 .ThenBy(field => field.FieldKey, StringComparer.Ordinal)
                 .ToList();
 
-            if (ShouldPreferFallbackTable(primary.ItemTable, fallback.ItemTable))
-            {
-                primary.ItemTable = fallback.ItemTable;
-            }
+            primary.ItemTable = MergeItemTables(primary.ItemTable, fallback.ItemTable);
 
             if (string.IsNullOrWhiteSpace(primary.SelectedWorksheetName))
             {
@@ -490,34 +487,97 @@ namespace ExportDocManager.Services.Data
                 && fallback.Confidence + 0.05m >= current.Confidence;
         }
 
-        private static bool ShouldPreferFallbackTable(
+        private static ExcelImportItemTableAnalysis? MergeItemTables(
             ExcelImportItemTableAnalysis? current,
             ExcelImportItemTableAnalysis? fallback)
         {
             if (fallback == null)
             {
-                return false;
+                return current;
             }
 
             if (current == null)
             {
-                return true;
+                return fallback;
             }
 
-            int currentCount = CountMappedColumns(current.Columns);
-            int fallbackCount = CountMappedColumns(fallback.Columns);
-            return fallbackCount > currentCount
-                || (fallbackCount == currentCount && fallback.Confidence > current.Confidence + 0.05m);
+            if (!HasRequiredItemColumns(current.Columns) && HasRequiredItemColumns(fallback.Columns))
+            {
+                return fallback;
+            }
+
+            if (!string.IsNullOrWhiteSpace(current.WorksheetName)
+                && !string.IsNullOrWhiteSpace(fallback.WorksheetName)
+                && !string.Equals(current.WorksheetName, fallback.WorksheetName, StringComparison.OrdinalIgnoreCase))
+            {
+                return current;
+            }
+
+            current.Columns ??= new ExcelImportItemColumnAnalysis();
+            if (fallback.Columns != null)
+            {
+                FillMissingItemColumns(current.Columns, fallback.Columns);
+            }
+
+            current.WorksheetName = string.IsNullOrWhiteSpace(current.WorksheetName)
+                ? fallback.WorksheetName
+                : current.WorksheetName;
+            current.HeaderRow = current.HeaderRow > 0 ? current.HeaderRow : fallback.HeaderRow;
+            current.HeaderDepth = current.HeaderDepth > 0 ? current.HeaderDepth : fallback.HeaderDepth;
+            current.DataStartRow = current.DataStartRow > 0 ? current.DataStartRow : fallback.DataStartRow;
+            current.Confidence = Math.Max(current.Confidence, fallback.Confidence);
+            return current;
         }
 
-        private static int CountMappedColumns(ExcelImportItemColumnAnalysis columns)
+        private static bool HasRequiredItemColumns(ExcelImportItemColumnAnalysis? columns)
         {
-            if (columns == null)
-            {
-                return 0;
-            }
+            return columns?.QuantityCol > 0
+                && (columns.StyleNoCol > 0 || columns.StyleNameCol > 0);
+        }
 
-            return new[]
+        private static void FillMissingItemColumns(
+            ExcelImportItemColumnAnalysis target,
+            ExcelImportItemColumnAnalysis source)
+        {
+            target.PoNumberCol = PickMissingColumn(target, target.PoNumberCol, source.PoNumberCol);
+            target.StyleNoCol = PickMissingColumn(target, target.StyleNoCol, source.StyleNoCol);
+            target.StyleNameCol = PickMissingColumn(target, target.StyleNameCol, source.StyleNameCol);
+            target.FabricCompositionCol = PickMissingColumn(target, target.FabricCompositionCol, source.FabricCompositionCol);
+            target.StyleNameCNCol = PickMissingColumn(target, target.StyleNameCNCol, source.StyleNameCNCol);
+            target.BrandCol = PickMissingColumn(target, target.BrandCol, source.BrandCol);
+            target.HSCodeCol = PickMissingColumn(target, target.HSCodeCol, source.HSCodeCol);
+            target.OriginCol = PickMissingColumn(target, target.OriginCol, source.OriginCol);
+            target.QuantityCol = PickMissingColumn(target, target.QuantityCol, source.QuantityCol);
+            target.UnitENCol = PickMissingColumn(target, target.UnitENCol, source.UnitENCol);
+            target.UnitCNCol = PickMissingColumn(target, target.UnitCNCol, source.UnitCNCol);
+            target.CartonsCol = PickMissingColumn(target, target.CartonsCol, source.CartonsCol);
+            target.CtnUnitENCol = PickMissingColumn(target, target.CtnUnitENCol, source.CtnUnitENCol);
+            target.LengthCol = PickMissingColumn(target, target.LengthCol, source.LengthCol);
+            target.WidthCol = PickMissingColumn(target, target.WidthCol, source.WidthCol);
+            target.HeightCol = PickMissingColumn(target, target.HeightCol, source.HeightCol);
+            target.DimensionCol = PickMissingColumn(target, target.DimensionCol, source.DimensionCol);
+            target.VolumeCol = PickMissingColumn(target, target.VolumeCol, source.VolumeCol);
+            target.GWPerCtnCol = PickMissingColumn(target, target.GWPerCtnCol, source.GWPerCtnCol);
+            target.GWTotalCol = PickMissingColumn(target, target.GWTotalCol, source.GWTotalCol);
+            target.NWPerCtnCol = PickMissingColumn(target, target.NWPerCtnCol, source.NWPerCtnCol);
+            target.NWTotalCol = PickMissingColumn(target, target.NWTotalCol, source.NWTotalCol);
+            target.UnitPriceCol = PickMissingColumn(target, target.UnitPriceCol, source.UnitPriceCol);
+            target.TotalPriceCol = PickMissingColumn(target, target.TotalPriceCol, source.TotalPriceCol);
+        }
+
+        private static int PickMissingColumn(
+            ExcelImportItemColumnAnalysis columns,
+            int current,
+            int fallback)
+        {
+            return current > 0 || fallback <= 0 || IsMappedColumn(columns, fallback)
+                ? current
+                : fallback;
+        }
+
+        private static bool IsMappedColumn(ExcelImportItemColumnAnalysis columns, int column)
+        {
+            return column > 0 && new[]
             {
                 columns.PoNumberCol,
                 columns.StyleNoCol,
@@ -543,7 +603,7 @@ namespace ExportDocManager.Services.Data
                 columns.NWTotalCol,
                 columns.UnitPriceCol,
                 columns.TotalPriceCol
-            }.Count(column => column > 0);
+            }.Contains(column);
         }
 
         private static bool IsMoreCompleteMultilineValue(string candidate, string current)

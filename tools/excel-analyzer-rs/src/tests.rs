@@ -227,6 +227,87 @@ fn table_detection_accepts_generic_industry_aliases() {
 }
 
 #[test]
+fn table_detection_handles_bilingual_compound_headers_without_consuming_data() {
+    let cells = vec![
+        vec!["Invoice details".to_string()],
+        vec![
+            "Marking 唛头".to_string(),
+            "".to_string(),
+            "PO number".to_string(),
+            "Style N 款号".to_string(),
+            "Style name 款名".to_string(),
+            "Quantity 数量".to_string(),
+            "CARTON QTY箱数".to_string(),
+            "体积（总）cbm".to_string(),
+            "毛重(总)".to_string(),
+            "净重（总）".to_string(),
+            "单价".to_string(),
+            "总价".to_string(),
+        ],
+        vec![
+            "".to_string(),
+            "".to_string(),
+            "".to_string(),
+            "".to_string(),
+            "".to_string(),
+            "".to_string(),
+            "".to_string(),
+            "".to_string(),
+            "(KG)".to_string(),
+            "(KG)".to_string(),
+            "(USD)".to_string(),
+            "(USD)".to_string(),
+        ],
+        vec![
+            "CUSTOMER / ORDER NUMBER / STYLE NO./NAME / QUANTITY".to_string(),
+            "1".to_string(),
+            "APO2245".to_string(),
+            "EA211395".to_string(),
+            "Namier W Hoody".to_string(),
+            "505".to_string(),
+            "17".to_string(),
+            "1.252".to_string(),
+            "250".to_string(),
+            "233".to_string(),
+            "8.22".to_string(),
+            "4151.10".to_string(),
+        ],
+        vec![
+            "".to_string(),
+            "2".to_string(),
+            "APO2245".to_string(),
+            "EA221355".to_string(),
+            "Jacey W Crew Neck".to_string(),
+            "1010".to_string(),
+            "34".to_string(),
+            "2.347".to_string(),
+            "510".to_string(),
+            "476".to_string(),
+            "8.22".to_string(),
+            "8302.20".to_string(),
+        ],
+    ];
+
+    let table = detect_table(&cells).expect("compound bilingual item table should be detected");
+
+    assert_eq!(table.header_start_row, 2);
+    assert_eq!(table.header_depth, 2);
+    assert_eq!(table.data_start_row, 4);
+    assert_table_field(&table, "PoNumber", 3);
+    assert_table_field(&table, "StyleNo", 4);
+    assert_table_field(&table, "StyleName", 5);
+    assert_table_field(&table, "Quantity", 6);
+    assert_table_field(&table, "Cartons", 7);
+    assert_table_field(&table, "Volume", 8);
+    assert_table_field(&table, "GWTotal", 9);
+    assert_table_field(&table, "NWTotal", 10);
+    assert!(!table.fields.iter().any(|field| {
+        (field.canonical_field == "StyleNo" && field.column == 1)
+            || (field.canonical_field == "StyleName" && field.column == 2)
+    }));
+}
+
+#[test]
 fn table_detection_uses_parent_header_context_for_bilingual_booking_sheet() {
     let cells = vec![
         vec![
