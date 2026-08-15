@@ -72,53 +72,54 @@ namespace ExportDocManager.Models.DTOs
 
     public sealed class ExcelImportItemColumnAnalysis
     {
-        public int PoNumberCol { get; set; }
+        private readonly int[] _columns = new int[24];
 
-        public int StyleNoCol { get; set; }
+        public int PoNumberCol { get => _columns[0]; set => _columns[0] = value; }
+        public int StyleNoCol { get => _columns[1]; set => _columns[1] = value; }
+        public int StyleNameCol { get => _columns[2]; set => _columns[2] = value; }
+        public int FabricCompositionCol { get => _columns[3]; set => _columns[3] = value; }
+        public int StyleNameCNCol { get => _columns[4]; set => _columns[4] = value; }
+        public int BrandCol { get => _columns[5]; set => _columns[5] = value; }
+        public int HSCodeCol { get => _columns[6]; set => _columns[6] = value; }
+        public int OriginCol { get => _columns[7]; set => _columns[7] = value; }
+        public int QuantityCol { get => _columns[8]; set => _columns[8] = value; }
+        public int UnitENCol { get => _columns[9]; set => _columns[9] = value; }
+        public int UnitCNCol { get => _columns[10]; set => _columns[10] = value; }
+        public int CartonsCol { get => _columns[11]; set => _columns[11] = value; }
+        public int CtnUnitENCol { get => _columns[12]; set => _columns[12] = value; }
+        public int LengthCol { get => _columns[13]; set => _columns[13] = value; }
+        public int WidthCol { get => _columns[14]; set => _columns[14] = value; }
+        public int HeightCol { get => _columns[15]; set => _columns[15] = value; }
+        public int DimensionCol { get => _columns[16]; set => _columns[16] = value; }
+        public int VolumeCol { get => _columns[17]; set => _columns[17] = value; }
+        public int GWPerCtnCol { get => _columns[18]; set => _columns[18] = value; }
+        public int GWTotalCol { get => _columns[19]; set => _columns[19] = value; }
+        public int NWPerCtnCol { get => _columns[20]; set => _columns[20] = value; }
+        public int NWTotalCol { get => _columns[21]; set => _columns[21] = value; }
+        public int UnitPriceCol { get => _columns[22]; set => _columns[22] = value; }
+        public int TotalPriceCol { get => _columns[23]; set => _columns[23] = value; }
 
-        public int StyleNameCol { get; set; }
+        public void ClearColumn(int column)
+        {
+            if (column <= 0) return;
+            for (int index = 0; index < _columns.Length; index++)
+            {
+                if (_columns[index] == column) _columns[index] = 0;
+            }
+        }
 
-        public int FabricCompositionCol { get; set; }
-
-        public int StyleNameCNCol { get; set; }
-
-        public int BrandCol { get; set; }
-
-        public int HSCodeCol { get; set; }
-
-        public int OriginCol { get; set; }
-
-        public int QuantityCol { get; set; }
-
-        public int UnitENCol { get; set; }
-
-        public int UnitCNCol { get; set; }
-
-        public int CartonsCol { get; set; }
-
-        public int CtnUnitENCol { get; set; }
-
-        public int LengthCol { get; set; }
-
-        public int WidthCol { get; set; }
-
-        public int HeightCol { get; set; }
-
-        public int DimensionCol { get; set; }
-
-        public int VolumeCol { get; set; }
-
-        public int GWPerCtnCol { get; set; }
-
-        public int GWTotalCol { get; set; }
-
-        public int NWPerCtnCol { get; set; }
-
-        public int NWTotalCol { get; set; }
-
-        public int UnitPriceCol { get; set; }
-
-        public int TotalPriceCol { get; set; }
+        public void MergeMissingNonConflictingFrom(ExcelImportItemColumnAnalysis source)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            for (int index = 0; index < _columns.Length; index++)
+            {
+                int candidate = source._columns[index];
+                if (_columns[index] <= 0 && candidate > 0 && Array.IndexOf(_columns, candidate) < 0)
+                {
+                    _columns[index] = candidate;
+                }
+            }
+        }
     }
 
     public sealed class ExcelImportAnalysisIssue

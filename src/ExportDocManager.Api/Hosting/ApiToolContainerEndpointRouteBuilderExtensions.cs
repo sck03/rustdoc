@@ -17,10 +17,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiContainerPackingAnalyzeRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 var validation = ValidateContainerPackingAnalyzeRequest(request, out var packingRequest);
                 if (validation != null)
@@ -63,10 +59,6 @@ namespace ExportDocManager.Api.Hosting
                 int? limit,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 var projects = await containerLoadingService.GetRecentProjectsAsync(
                     limit ?? 100,
@@ -86,10 +78,6 @@ namespace ExportDocManager.Api.Hosting
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -120,10 +108,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiContainerPackingProjectSaveRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 var validation = ValidateContainerPackingProjectSaveRequest(request);
                 if (validation != null)
@@ -163,10 +147,6 @@ namespace ExportDocManager.Api.Hosting
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -194,10 +174,6 @@ namespace ExportDocManager.Api.Hosting
                 IContainerLoadingService containerLoadingService,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 var containerTypes = await containerLoadingService.GetContainerTypesAsync(cancellationToken);
                 return Results.Ok(new ApiContainerTypeListResponse(
@@ -215,10 +191,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiContainerTypeSaveRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 var validation = ValidateContainerTypeSaveRequest(request);
                 if (validation != null)
@@ -243,6 +215,9 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("SaveContainerPackingContainerType")
+            .WithApiPermission(
+                PermissionModuleCatalog.DocumentContainerPacking,
+                writeAccessLevel: PermissionAccessLevel.Manage)
             .Produces<ApiContainerTypeSaveResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -255,10 +230,6 @@ namespace ExportDocManager.Api.Hosting
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -281,6 +252,9 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Ok(new ApiCommandResponse(true, "柜型已删除。"));
             })
             .WithName("DeleteContainerPackingContainerType")
+            .WithApiPermission(
+                PermissionModuleCatalog.DocumentContainerPacking,
+                writeAccessLevel: PermissionAccessLevel.Manage)
             .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)

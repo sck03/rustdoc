@@ -5,15 +5,6 @@ namespace ExportDocManager.Api.Hosting
         public string FilePath { get; set; } = string.Empty;
     }
 
-    public sealed class ApiOcrRecognizeImageContentRequest
-    {
-        public string ImageContentBase64 { get; set; } = string.Empty;
-
-        public string SourceName { get; set; } = string.Empty;
-
-        public string SourceMimeType { get; set; } = string.Empty;
-    }
-
     public sealed class ApiOcrRecognizeImageResponse
     {
         public string SourcePath { get; set; } = string.Empty;

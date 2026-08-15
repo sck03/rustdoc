@@ -253,7 +253,10 @@ internal static partial class TypeScriptClientGenerator
         builder.AppendLine("    const response = await this.fetchImpl(url, requestInit);");
         builder.AppendLine("    const contentType = response.headers.get(\"content-type\") ?? \"\";");
         builder.AppendLine("    const contentDisposition = response.headers.get(\"content-disposition\") ?? \"\";");
-        builder.AppendLine("    if (contentType.includes(\"application/octet-stream\") || contentDisposition.toLowerCase().includes(\"attachment\")) {");
+        builder.AppendLine("    const isBinaryResponse = contentType.startsWith(\"image/\") || contentType.startsWith(\"audio/\") ||");
+        builder.AppendLine("      contentType.startsWith(\"video/\") || contentType.includes(\"application/pdf\") ||");
+        builder.AppendLine("      contentType.includes(\"application/octet-stream\") || contentDisposition.toLowerCase().includes(\"attachment\");");
+        builder.AppendLine("    if (isBinaryResponse) {");
         builder.AppendLine("      if (!response.ok) {");
         builder.AppendLine("        throw new ApiError(response.status, response.statusText, await response.text());");
         builder.AppendLine("      }");

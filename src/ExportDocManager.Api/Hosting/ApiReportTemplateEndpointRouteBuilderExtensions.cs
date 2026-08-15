@@ -1,6 +1,7 @@
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -11,15 +12,10 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/reports/templates", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IReportHtmlService reportHtmlService,
                 string? reportType,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!TryParseReportDocumentType(reportType, out var parsedReportType))
                 {
@@ -34,23 +30,21 @@ namespace ExportDocManager.Api.Hosting
                     template.WithSealDefault)));
             })
             .WithName("ListReportTemplates")
+            .WithApiPermission(
+                PermissionModuleCatalog.DocumentReports,
+                selector: ApiPermissionSelector.ReportType)
             .Produces<IReadOnlyList<ApiReportTemplateDto>>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized);
 
             endpoints.MapPost("/api/reports/templates", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IReportTemplateService reportTemplateService,
                 ApiReportTemplateCreateRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
                 {
@@ -102,17 +96,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/templates/storage-check", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IReportTemplateStorageDiagnosticsService diagnosticsService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
                 {
@@ -136,14 +125,9 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/reports/templates/fields", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IReportTemplateFieldCatalogService fieldCatalogService,
                 string? reportType) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!TryParseReportDocumentType(reportType, out var parsedReportType))
                 {
@@ -160,16 +144,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/reports/templates/content", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IReportTemplateService reportTemplateService,
                 string? reportType,
                 string? templatePath,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!TryParseReportDocumentType(reportType, out var parsedReportType))
                 {
@@ -211,17 +190,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPut("/api/reports/templates/content", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IReportTemplateService reportTemplateService,
                 ApiReportTemplateSaveRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
                 {
@@ -278,17 +252,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/templates/rename", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IReportTemplateService reportTemplateService,
                 ApiReportTemplateRenameRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
                 {
@@ -345,18 +314,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapDelete("/api/reports/templates/content", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IReportTemplateService reportTemplateService,
                 string? reportType,
                 string? templatePath,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
                 {
@@ -407,18 +371,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/templates/package/save-to-path", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IReportTemplatePackageService packageService,
                 ApiReportTemplatePackageExportRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
                 {
@@ -465,17 +424,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/templates/package/download", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IReportTemplatePackageService packageService,
                 IAppPathProvider pathProvider,
+                IBusinessClock clock,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
                 {
@@ -486,7 +441,7 @@ namespace ExportDocManager.Api.Hosting
                     pathProvider,
                     "TemplatePackages",
                     "edtpl-download");
-                string packagePath = Path.Combine(tempRoot, BuildReportTemplatePackageFileName());
+                string packagePath = Path.Combine(tempRoot, BuildReportTemplatePackageFileName(clock.Now));
                 bool cleanupRegistered = false;
 
                 try
@@ -530,18 +485,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/templates/package/import", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IReportTemplatePackageService packageService,
                 ApiReportTemplatePackageImportRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
                 {
@@ -609,7 +559,6 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/templates/package/upload", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IReportTemplatePackageService packageService,
                 IAppPathProvider pathProvider,
@@ -617,11 +566,7 @@ namespace ExportDocManager.Api.Hosting
                 string? fileName,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
                 {
@@ -703,15 +648,10 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/templates/preview", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IReportTemplateService reportTemplateService,
                 ApiReportTemplatePreviewRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 request ??= new ApiReportTemplatePreviewRequest();
                 if (!TryParseReportDocumentType(request.ReportType, out var parsedReportType))
@@ -793,9 +733,9 @@ namespace ExportDocManager.Api.Hosting
             return Enum.TryParse(rawStrategy, ignoreCase: true, out strategy);
         }
 
-        private static string BuildReportTemplatePackageFileName()
+        private static string BuildReportTemplatePackageFileName(DateTimeOffset now)
         {
-            return $"templates_{DateTime.Now:yyyyMMddHHmmss}.edtpl";
+            return $"templates_{now:yyyyMMddHHmmss}.edtpl";
         }
 
         private static string NormalizeUploadedReportTemplatePackageFileName(string fileName)

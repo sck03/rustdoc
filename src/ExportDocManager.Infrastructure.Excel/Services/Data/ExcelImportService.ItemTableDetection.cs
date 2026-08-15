@@ -20,7 +20,7 @@ namespace ExportDocManager.Services.Data
 
             for (int row = 1; row <= 80; row++)
             {
-                var columns = new DetectedItemColumns();
+                var columns = new ExcelImportItemColumnAnalysis();
                 int score = 0;
 
                 for (int headerRow = row; headerRow <= Math.Min(row + 2, 80); headerRow++)
@@ -63,7 +63,7 @@ namespace ExportDocManager.Services.Data
             return bestScore >= 3 ? bestLayout : null;
         }
 
-        private int FindFirstDetectedItemDataRow(IExcelImportWorksheet worksheet, int startRow, DetectedItemColumns columns)
+        private int FindFirstDetectedItemDataRow(IExcelImportWorksheet worksheet, int startRow, ExcelImportItemColumnAnalysis columns)
         {
             for (int row = startRow; row <= Math.Min(startRow + 30, 120); row++)
             {
@@ -76,7 +76,7 @@ namespace ExportDocManager.Services.Data
             return 0;
         }
 
-        private static int TrySetItemColumn(DetectedItemColumns columns, string header, int column)
+        private static int TrySetItemColumn(ExcelImportItemColumnAnalysis columns, string header, int column)
         {
             if (IsHeader(header, "客人订单号", "客户订单号", "订单号", "采购订单号", "销售订单号", "po number", "po no", "pono", "ponumber", "po", "po#", "purchaseorder", "orderno", "order"))
             {
@@ -251,7 +251,7 @@ namespace ExportDocManager.Services.Data
             return 0;
         }
 
-        private bool IsItemDataRow(IExcelImportWorksheet worksheet, int row, DetectedItemColumns columns)
+        private bool IsItemDataRow(IExcelImportWorksheet worksheet, int row, ExcelImportItemColumnAnalysis columns)
         {
             string quantity = GetItemCellValue(worksheet, row, columns.QuantityCol);
             string styleNo = GetItemCellValue(worksheet, row, columns.StyleNoCol);

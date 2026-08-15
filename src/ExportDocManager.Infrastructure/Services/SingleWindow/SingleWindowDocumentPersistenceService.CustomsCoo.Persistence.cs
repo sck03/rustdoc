@@ -163,7 +163,7 @@ namespace ExportDocManager.Services.SingleWindow
             target.WarningSummary = BuildWarningSummary(source.Warnings);
         }
 
-        private static void EnsureGeneratedCustomsCooBaseline(
+        private void EnsureGeneratedCustomsCooBaseline(
             CustomsCooDocument entity,
             Invoice invoice,
             IReadOnlyList<Item> invoiceItems,
@@ -184,7 +184,7 @@ namespace ExportDocManager.Services.SingleWindow
             entity.SourceBaselineJson = SingleWindowDraftStateHelper.BuildCustomsCooSourceBaselineJson(baselineDocument);
         }
 
-        private static CustomsCooDocument CreateCustomsCooDocumentFromMapped(
+        private CustomsCooDocument CreateCustomsCooDocumentFromMapped(
             int invoiceId,
             Invoice invoice,
             IReadOnlyList<Item> invoiceItems,
@@ -208,7 +208,8 @@ namespace ExportDocManager.Services.SingleWindow
                 document.CertType,
                 document.CiqRegNo,
                 document.AplRegNo,
-                document.AplDate);
+                document.AplDate,
+                _clock.Today);
             document.NonpartyCorps = (baseDocument?.NonpartyCorps ?? [])
                 .OrderBy(item => item.SortNo)
                 .Select(item => new CustomsCooNonpartyCorp

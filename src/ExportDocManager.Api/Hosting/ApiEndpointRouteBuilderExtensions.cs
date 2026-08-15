@@ -1,4 +1,5 @@
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Security;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -23,23 +24,24 @@ namespace ExportDocManager.Api.Hosting
             api.MapBackupEndpoints();
             api.MapSharedDatabaseMaintenanceEndpoints();
             api.MapServerMigrationEndpoints();
-            api.MapInvoiceDataMaintenanceEndpoints();
-            api.MapDashboardEndpoints();
-            api.MapInvoiceEndpoints();
-            api.MapInvoiceShippingMarkEndpoints();
-            api.MapInvoiceTransferEndpoints();
-            api.MapQueryEndpoints();
-            api.MapPaymentEndpoints();
+            api.MapPermissionGroup(PermissionModuleCatalog.DocumentInvoices).MapInvoiceDataMaintenanceEndpoints();
+            api.MapPermissionGroup(PermissionModuleCatalog.DocumentDashboard).MapDashboardEndpoints();
+            var invoices = api.MapPermissionGroup(PermissionModuleCatalog.DocumentInvoices);
+            invoices.MapInvoiceEndpoints();
+            invoices.MapInvoiceShippingMarkEndpoints();
+            invoices.MapInvoiceTransferEndpoints();
+            api.MapPermissionGroup(PermissionModuleCatalog.DocumentQuery).MapQueryEndpoints();
+            api.MapPermissionGroup(PermissionModuleCatalog.DocumentPayments).MapPaymentEndpoints();
             api.MapAuditLogEndpoints();
-            api.MapJobEndpoints();
-            api.MapCustomOptionEndpoints();
+            api.MapPermissionGroup(PermissionModuleCatalog.DocumentJobs).MapJobEndpoints();
+            api.MapPermissionGroup(PermissionModuleCatalog.DocumentCustomOptions).MapCustomOptionEndpoints();
             api.MapToolEndpoints();
             api.MapReportEndpoints();
             api.MapMasterDataEndpoints();
-            api.MapCrmEndpoints();
-            api.MapSupplierEndpoints();
-            api.MapEmailTemplateEndpoints();
-            api.MapSalesOpportunityEndpoints();
+            api.MapPermissionGroup(PermissionModuleCatalog.SalesCrm).MapCrmEndpoints();
+            api.MapPermissionGroup(PermissionModuleCatalog.SalesSuppliers).MapSupplierEndpoints();
+            api.MapPermissionGroup(PermissionModuleCatalog.SalesEmailTemplates).MapEmailTemplateEndpoints();
+            api.MapPermissionGroup(PermissionModuleCatalog.SalesOpportunities).MapSalesOpportunityEndpoints();
             api.MapSingleWindowEndpoints();
 
             return endpoints;

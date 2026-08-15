@@ -1,5 +1,6 @@
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Time;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
@@ -15,7 +16,6 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiPagedResponse<ApiQueryInvoiceRowDto>>,
                 UnauthorizedHttpResult>>(
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IQueryReadRepository queryReadRepository,
                 DateOnly? startDate,
                 DateOnly? endDateExclusive,
@@ -31,10 +31,6 @@ namespace ExportDocManager.Api.Hosting
                 int? pageSize,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 var result = await queryReadRepository.QueryPageAsync(
                     new QueryPageQuery
@@ -60,16 +56,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/query/invoices/save-to-path", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ApiBackgroundJobRunner jobRunner,
                 ApiQueryInvoiceExportRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -101,16 +92,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/query/invoices/download", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IAppPathProvider pathProvider,
                 ApiBackgroundJobRunner jobRunner,
+                IBusinessClock clock,
                 ApiQueryInvoiceFilterRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (request == null)
                 {
@@ -120,7 +107,7 @@ namespace ExportDocManager.Api.Hosting
                 string destinationPath = CreateBrowserDownloadPath(
                     pathProvider,
                     "QueryExport",
-                    $"QueryResults_{DateTime.Now:yyyyMMdd-HHmmss}.xlsx");
+                    $"QueryResults_{clock.Now:yyyyMMdd-HHmmss}.xlsx");
                 return AcceptedBackgroundJob(EnqueueQueryInvoiceExportJob(
                     jobRunner,
                     user.Username,

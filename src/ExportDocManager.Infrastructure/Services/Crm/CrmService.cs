@@ -3,6 +3,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,11 +14,16 @@ namespace ExportDocManager.Services.Crm
         private const int MaximumContactsPerCustomer = 500;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
+        private readonly IBusinessClock _clock;
 
-        public CrmService(IDbContextFactory<AppDbContext> contextFactory, BusinessDataAccessScope accessScope)
+        public CrmService(
+            IDbContextFactory<AppDbContext> contextFactory,
+            BusinessDataAccessScope accessScope,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<PagedResult<CrmCustomerRecord>> QueryCustomersAsync(
@@ -166,7 +172,7 @@ namespace ExportDocManager.Services.Crm
                 ["ProductName"] = string.Empty,
                 ["QuotationNo"] = string.Empty,
                 ["SenderName"] = user?.Username ?? string.Empty,
-                ["Today"] = DateTimeOffset.Now.ToString("yyyy-MM-dd")
+                ["Today"] = _clock.Today.ToString("yyyy-MM-dd")
             };
             return new CrmEmailVariableDraft(customer.Id, contact?.Id, contact?.Email ?? string.Empty, variables);
         }

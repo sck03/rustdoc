@@ -13,7 +13,11 @@ public sealed class ApiServiceExceptionMapperTests
         (int status, string message) = ApiServiceExceptionMapper.Map(exception, "correlation-test");
 
         Assert.Equal(expectedStatus, status);
-        Assert.Equal(exception.Message, message);
+        Assert.Equal(
+            exception is InfrastructureServiceException
+                ? "依赖服务暂时不可用，请稍后重试。"
+                : exception.Message,
+            message);
     }
 
     [Fact]
@@ -107,31 +111,38 @@ public sealed class ApiServiceExceptionMapperTests
             "correlation-test");
 
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, status);
-        Assert.Equal("file dependency failed", message);
+        Assert.Equal("依赖服务暂时不可用，请稍后重试。", message);
+        Assert.DoesNotContain("file dependency", message, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public void Map_ShouldHideUnknownFailureAndReturnCorrelationId()
+    [Theory]
+    [MemberData(nameof(UnclassifiedInternalFailures))]
+    public void Map_ShouldHideUnclassifiedInternalFailure(Exception exception, string correlationId)
     {
-        (int status, string message) = ApiServiceExceptionMapper.Map(
-            new Exception("sensitive internal details"),
-            "correlation-test");
+        ApiServiceError error = ApiServiceExceptionMapper.Map(exception, correlationId);
 
-        Assert.Equal(StatusCodes.Status500InternalServerError, status);
-        Assert.Contains("correlation-test", message, StringComparison.Ordinal);
-        Assert.DoesNotContain("sensitive", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(StatusCodes.Status500InternalServerError, error.StatusCode);
+        Assert.Equal("internal_error", error.Code);
+        Assert.Equal(correlationId, error.CorrelationId);
+        Assert.DoesNotContain("sensitive", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public void Map_ShouldTreatUnclassifiedInvalidOperationAsInternalFailure()
+    public static TheoryData<Exception, string> UnclassifiedInternalFailures => new()
     {
-        (int status, string message) = ApiServiceExceptionMapper.Map(
-            new InvalidOperationException("sensitive internal state"),
-            "correlation-invalid-operation");
+        { new Exception("sensitive internal details"), "correlation-test" },
+        { new InvalidOperationException("sensitive internal state"), "correlation-invalid-operation" }
+    };
 
-        Assert.Equal(StatusCodes.Status500InternalServerError, status);
-        Assert.Contains("correlation-invalid-operation", message, StringComparison.Ordinal);
-        Assert.DoesNotContain("sensitive", message, StringComparison.OrdinalIgnoreCase);
+    [Fact]
+    public void Map_ShouldPreserveExplicitlyUserVisibleInfrastructureMessage()
+    {
+        ApiServiceError error = ApiServiceExceptionMapper.Map(
+            new UserVisibleInfrastructureException("请安装可选模块。"),
+            "correlation-visible");
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, error.StatusCode);
+        Assert.Equal("infrastructure_unavailable", error.Code);
+        Assert.Equal("请安装可选模块。", error.Message);
     }
 
     public static TheoryData<Exception, int> ClassifiedExceptions => new()

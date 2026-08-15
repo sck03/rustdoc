@@ -6,37 +6,135 @@ function Resolve-ExportDocPowerShellExecutable {
         return $currentProcess.Path
     }
 
-    foreach ($commandName in @("pwsh.exe", "powershell.exe")) {
-        $command = Get-Command $commandName -ErrorAction SilentlyContinue
-        if ($null -ne $command) {
-            return $command.Source
+    $command = Get-Command "pwsh.exe" -ErrorAction SilentlyContinue
+    if ($null -ne $command) {
+        return $command.Source
+    }
+
+    throw "PowerShell 7 executable (pwsh) was not found."
+}
+
+function New-ExportDocProcessStartInfo {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$Arguments = @(),
+        [string]$WorkingDirectory,
+        [hashtable]$Environment = @{},
+        [switch]$CaptureOutput
+    )
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $FilePath
+    $startInfo.UseShellExecute = $false
+    # Commands that are not captured must inherit the current console so CI and
+    # local users see their native progress and failure output in real time.
+    $startInfo.CreateNoWindow = $CaptureOutput
+    $startInfo.RedirectStandardOutput = $CaptureOutput
+    $startInfo.RedirectStandardError = $CaptureOutput
+    $workingDirectoryPath = if ([string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+        "."
+    } else {
+        $WorkingDirectory
+    }
+    # ProcessStartInfo otherwise inherits the process-wide native directory,
+    # which PowerShell does not update when Push-Location changes its provider
+    # location. Resolve through PowerShell so existing location scopes and
+    # relative -WorkingDirectory values retain their expected semantics.
+    $startInfo.WorkingDirectory = [System.IO.Path]::GetFullPath(
+        $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($workingDirectoryPath))
+
+    foreach ($argument in $Arguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+
+    foreach ($entry in $Environment.GetEnumerator()) {
+        $name = [string]$entry.Key
+        $value = [string]$entry.Value
+        if ($null -ne $startInfo.PSObject.Properties['Environment']) {
+            $startInfo.Environment[$name] = $value
+        } else {
+            $startInfo.EnvironmentVariables[$name] = $value
         }
     }
 
-    throw "PowerShell executable was not found. Install PowerShell 7 or enable Windows PowerShell."
+    return $startInfo
+}
+
+function Wait-ExportDocExternalProcess {
+    param(
+        [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
+        [Parameter(Mandatory = $true)][string]$DisplayName,
+        [ValidateRange(1, 86400)][int]$TimeoutSeconds,
+        [ValidateRange(1, 3600)][int]$HeartbeatSeconds
+    )
+
+    $startedAt = [DateTimeOffset]::UtcNow
+    $nextHeartbeatAt = $startedAt.AddSeconds($HeartbeatSeconds)
+    while (-not $Process.WaitForExit(1000)) {
+        $now = [DateTimeOffset]::UtcNow
+        if ($now - $startedAt -ge [TimeSpan]::FromSeconds($TimeoutSeconds)) {
+            try {
+                $Process.Kill($true)
+                [void]$Process.WaitForExit(5000)
+            } catch {
+                Write-Warning "Could not terminate timed-out process '$DisplayName': $($_.Exception.Message)"
+            }
+            throw "External command timed out after $TimeoutSeconds seconds: $DisplayName"
+        }
+
+        if ($now -ge $nextHeartbeatAt) {
+            $elapsed = [Math]::Floor(($now - $startedAt).TotalSeconds)
+            Write-Host "External command is still running (${elapsed}s): $DisplayName"
+            $nextHeartbeatAt = $now.AddSeconds($HeartbeatSeconds)
+        }
+    }
 }
 
 function Invoke-ExportDocExternal {
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
         [string[]]$Arguments = @(),
-        [string]$WorkingDirectory
+        [string]$WorkingDirectory,
+        [ValidateRange(1, 86400)][int]$TimeoutSeconds = 7200,
+        [ValidateRange(1, 3600)][int]$HeartbeatSeconds = 60,
+        [hashtable]$Environment = @{},
+        [switch]$CaptureOutput
     )
 
-    if ([string]::IsNullOrWhiteSpace($WorkingDirectory)) {
-        & $FilePath @Arguments
-    } else {
-        Push-Location $WorkingDirectory
-        try {
-            & $FilePath @Arguments
-        } finally {
-            Pop-Location
-        }
+    $displayName = "$FilePath $($Arguments -join ' ')".Trim()
+    $startInfo = New-ExportDocProcessStartInfo `
+        -FilePath $FilePath `
+        -Arguments $Arguments `
+        -WorkingDirectory $WorkingDirectory `
+        -Environment $Environment `
+        -CaptureOutput:$CaptureOutput
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    if ($null -eq $process) {
+        throw "Could not start external command: $displayName"
     }
 
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ne 0) {
-        throw "$FilePath $($Arguments -join ' ') failed with exit code $exitCode."
+    try {
+        if ($CaptureOutput) {
+            $standardOutput = $process.StandardOutput.ReadToEndAsync()
+            $standardError = $process.StandardError.ReadToEndAsync()
+        }
+        Wait-ExportDocExternalProcess `
+            -Process $process `
+            -DisplayName $displayName `
+            -TimeoutSeconds $TimeoutSeconds `
+            -HeartbeatSeconds $HeartbeatSeconds
+        $output = if ($CaptureOutput) { $standardOutput.GetAwaiter().GetResult() } else { "" }
+        $errorOutput = if ($CaptureOutput) { $standardError.GetAwaiter().GetResult() } else { "" }
+        if ($process.ExitCode -ne 0) {
+            $diagnostic = if ([string]::IsNullOrWhiteSpace($errorOutput)) { $output } else { $errorOutput }
+            $suffix = if ([string]::IsNullOrWhiteSpace($diagnostic)) { "." } else { ": $($diagnostic.Trim())" }
+            throw "$displayName failed with exit code $($process.ExitCode)$suffix"
+        }
+        if ($CaptureOutput) {
+            return [pscustomobject]@{ Output = $output; Error = $errorOutput; ExitCode = $process.ExitCode }
+        }
+    } finally {
+        $process.Dispose()
     }
 }
 

@@ -8,6 +8,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.MasterData;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -19,19 +20,22 @@ namespace ExportDocManager.Services.Core
         private readonly IItemService _itemService;
         private readonly IInvoicePartyResolver _invoicePartyResolver;
         private readonly BusinessDataAccessScope _businessDataAccessScope;
+        private readonly IBusinessClock _clock;
 
         public InvoiceService(
             IDbContextFactory<AppDbContext> contextFactory,
             IItemService itemService,
             IInvoicePartyResolver invoicePartyResolver,
             DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope? businessDataAccessScope = null)
+            BusinessDataAccessScope? businessDataAccessScope = null,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _itemService = itemService ?? throw new ArgumentNullException(nameof(itemService));
             _invoicePartyResolver = invoicePartyResolver ?? throw new ArgumentNullException(nameof(invoicePartyResolver));
             var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
             _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(normalizedSettings);
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<SaveResult> SaveInvoiceWithAutoCreationAsync(

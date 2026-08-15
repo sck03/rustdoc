@@ -41,10 +41,12 @@ fn main() {
 
 mod document_fields;
 mod table_analysis;
+mod table_values;
 mod workbook_analysis;
 
 use document_fields::*;
 use table_analysis::*;
+use table_values::*;
 use workbook_analysis::*;
 #[derive(Serialize)]
 struct AnalysisReport {

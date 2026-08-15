@@ -24,832 +24,516 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task ImportFromExcelAsync_ShouldReadLegacyXlsWorkbook()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportXlsTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "invoice.xls");
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteLegacyXlsWorkbookAsync(filePath);
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings);
-                var result = await service.ImportFromExcelAsync(filePath);
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.Equal("INV-XLS-001", result.Invoice.InvoiceNo);
-                Assert.Equal("CONTRACT-XLS-001", result.Invoice.ContractNo);
-                Assert.Equal("TEST CUSTOMER LTD.", result.Invoice.CustomerNameEN);
-                Assert.Equal("NINGBO TEST EXPORT CO., LTD.", result.Invoice.ExporterNameEN);
-                var item = Assert.Single(result.Invoice.Items);
-                Assert.Equal("ST-XLS-001", item.StyleNo);
-                Assert.Equal("T SHIRT", item.StyleName);
-                Assert.Equal("61091000", item.HSCode);
-                Assert.Equal(120m, item.Quantity);
-                Assert.Equal(2.5m, item.UnitPrice);
-                Assert.Equal(300m, item.TotalPrice);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            using var testFile = new TemporaryTestFile("ExcelImportXlsTests", "invoice.xls");
+            await WriteLegacyXlsWorkbookAsync(testFile.Path);
+            var result = await CreateService().ImportFromExcelAsync(testFile.Path);
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.Equal("INV-XLS-001", result.Invoice.InvoiceNo);
+            Assert.Equal("CONTRACT-XLS-001", result.Invoice.ContractNo);
+            Assert.Equal("TEST CUSTOMER LTD.", result.Invoice.CustomerNameEN);
+            Assert.Equal("NINGBO TEST EXPORT CO., LTD.", result.Invoice.ExporterNameEN);
+            var item = Assert.Single(result.Invoice.Items);
+            Assert.Equal("ST-XLS-001", item.StyleNo);
+            Assert.Equal("T SHIRT", item.StyleName);
+            Assert.Equal("61091000", item.HSCode);
+            Assert.Equal(120m, item.Quantity);
+            Assert.Equal(2.5m, item.UnitPrice);
+            Assert.Equal(300m, item.TotalPrice);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldIgnoreFormattedEmptyLegacyCellsInResourceBudget()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportXlsTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "formatted-empty-cells.xls");
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteFormattedEmptyLegacyWorkbookAsync(filePath);
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波测试出口有限公司";
-                var service = new ExcelImportService(settings);
-                var result = await service.ImportFromExcelAsync(filePath);
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.Equal("INV-FORMAT-001", result.Invoice.InvoiceNo);
-                Assert.Equal("FORMATTED EMPTY CELLS BUYER", result.Invoice.CustomerNameEN);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            using var testFile = new TemporaryTestFile("ExcelImportXlsTests", "formatted-empty-cells.xls");
+            await WriteFormattedEmptyLegacyWorkbookAsync(testFile.Path);
+            var result = await CreateService(exporterName: "宁波测试出口有限公司")
+                .ImportFromExcelAsync(testFile.Path);
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.Equal("INV-FORMAT-001", result.Invoice.InvoiceNo);
+            Assert.Equal("FORMATTED EMPTY CELLS BUYER", result.Invoice.CustomerNameEN);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldRejectAmountAsDestinationCountryAndRepairSwappedItemNames()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportXlsTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "invoice-country-and-item-language.xls");
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteDestinationCountryRegressionWorkbookAsync(filePath);
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings);
-                var result = await service.ImportFromExcelAsync(filePath);
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.Equal("AUSTRALIA", result.Invoice.DestinationCountry);
-                var item = Assert.Single(result.Invoice.Items);
-                Assert.Equal("bottle opener tee", item.StyleName);
-                Assert.Equal("男式棉制针织圆领衫", item.StyleNameCN);
-                Assert.Equal(5797.62m, item.TotalPrice);
-                Assert.DoesNotContain(result.AnalysisReport.Fields, field => field.FieldKey == "DestinationCountry");
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            using var testFile = new TemporaryTestFile("ExcelImportXlsTests", "invoice-country-and-item-language.xls");
+            await WriteDestinationCountryRegressionWorkbookAsync(testFile.Path);
+            var result = await CreateService().ImportFromExcelAsync(testFile.Path);
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.Equal("AUSTRALIA", result.Invoice.DestinationCountry);
+            var item = Assert.Single(result.Invoice.Items);
+            Assert.Equal("bottle opener tee", item.StyleName);
+            Assert.Equal("男式棉制针织圆领衫", item.StyleNameCN);
+            Assert.Equal(5797.62m, item.TotalPrice);
+            Assert.DoesNotContain(result.AnalysisReport.Fields, field => field.FieldKey == "DestinationCountry");
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldReadOpenXmlXlsxWorkbook()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportFormatTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "invoice.xlsx");
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteOpenXmlXlsxWorkbookAsync(filePath);
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings);
-                var result = await service.ImportFromExcelAsync(filePath);
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.NotNull(result.AnalysisReport);
-                Assert.Equal("builtin-dotnet", result.AnalysisReport.AnalyzerId);
-                Assert.Equal("OpenXML导入", result.AnalysisReport.SelectedWorksheetName);
-                Assert.Contains(result.AnalysisReport.Fields, field => field.FieldKey == "InvoiceNo" && field.Value == "INV-XLSX-001");
-                Assert.NotNull(result.AnalysisReport.ItemTable);
-                Assert.Equal(9, result.AnalysisReport.ItemTable.DataStartRow);
-                Assert.Equal(1, result.AnalysisReport.ItemTable.Columns.StyleNoCol);
-                Assert.Equal(3, result.AnalysisReport.ItemTable.Columns.QuantityCol);
-                Assert.Equal(5, result.AnalysisReport.ItemTable.Columns.DimensionCol);
-                Assert.Equal(6, result.AnalysisReport.ItemTable.Columns.VolumeCol);
-                Assert.Equal(13, result.AnalysisReport.ItemTable.Columns.HSCodeCol);
-
-                Assert.Equal("INV-XLSX-001", result.Invoice.InvoiceNo);
-                Assert.Equal("CONTRACT-XLSX-001", result.Invoice.ContractNo);
-                Assert.Equal("OPENXML BUYER LTD.", result.Invoice.CustomerNameEN);
-                Assert.Equal("NINGBO XLSX EXPORT CO., LTD.", result.Invoice.ExporterNameEN);
-                Assert.Equal("HAMBURG", result.Invoice.PortOfDestination);
-                Assert.Equal("FOB SHANGHAI", result.Invoice.TradeTerms);
-
-                Assert.Equal(2, result.Invoice.Items.Count);
-                var item = result.Invoice.Items[0];
-                Assert.Equal("XLSX-TEE-001", item.StyleNo);
-                Assert.Equal("OPENXML T SHIRT", item.StyleName);
-                Assert.Equal("6109100021", item.HSCode);
-                Assert.Equal("宁波", item.Origin);
-                Assert.Equal(120m, item.Quantity);
-                Assert.Equal(12m, item.Cartons);
-                Assert.Equal(50m, item.Length);
-                Assert.Equal(40m, item.Width);
-                Assert.Equal(30m, item.Height);
-                Assert.Equal(0.72m, item.Volume);
-                Assert.Equal(8.5m, item.GWPerCtn);
-                Assert.Equal(102m, item.GWTotal);
-                Assert.Equal(7.5m, item.NWPerCtn);
-                Assert.Equal(90m, item.NWTotal);
-                Assert.Equal(3.2m, item.UnitPrice);
-                Assert.Equal(384m, item.TotalPrice);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            using var testFile = new TemporaryTestFile("ExcelImportFormatTests", "invoice.xlsx");
+            await WriteOpenXmlXlsxWorkbookAsync(testFile.Path);
+            var result = await CreateService().ImportFromExcelAsync(testFile.Path);
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.NotNull(result.AnalysisReport);
+            Assert.Equal("builtin-dotnet", result.AnalysisReport.AnalyzerId);
+            Assert.Equal("OpenXML导入", result.AnalysisReport.SelectedWorksheetName);
+            Assert.Contains(result.AnalysisReport.Fields, field => field.FieldKey == "InvoiceNo" && field.Value == "INV-XLSX-001");
+            Assert.NotNull(result.AnalysisReport.ItemTable);
+            Assert.Equal(9, result.AnalysisReport.ItemTable.DataStartRow);
+            Assert.Equal(1, result.AnalysisReport.ItemTable.Columns.StyleNoCol);
+            Assert.Equal(3, result.AnalysisReport.ItemTable.Columns.QuantityCol);
+            Assert.Equal(5, result.AnalysisReport.ItemTable.Columns.DimensionCol);
+            Assert.Equal(6, result.AnalysisReport.ItemTable.Columns.VolumeCol);
+            Assert.Equal(13, result.AnalysisReport.ItemTable.Columns.HSCodeCol);
+            Assert.Equal("INV-XLSX-001", result.Invoice.InvoiceNo);
+            Assert.Equal("CONTRACT-XLSX-001", result.Invoice.ContractNo);
+            Assert.Equal("OPENXML BUYER LTD.", result.Invoice.CustomerNameEN);
+            Assert.Equal("NINGBO XLSX EXPORT CO., LTD.", result.Invoice.ExporterNameEN);
+            Assert.Equal("HAMBURG", result.Invoice.PortOfDestination);
+            Assert.Equal("FOB SHANGHAI", result.Invoice.TradeTerms);
+            Assert.Equal(2, result.Invoice.Items.Count);
+            var item = result.Invoice.Items[0];
+            Assert.Equal("XLSX-TEE-001", item.StyleNo);
+            Assert.Equal("OPENXML T SHIRT", item.StyleName);
+            Assert.Equal("6109100021", item.HSCode);
+            Assert.Equal("宁波", item.Origin);
+            Assert.Equal(120m, item.Quantity);
+            Assert.Equal(12m, item.Cartons);
+            Assert.Equal(50m, item.Length);
+            Assert.Equal(40m, item.Width);
+            Assert.Equal(30m, item.Height);
+            Assert.Equal(0.72m, item.Volume);
+            Assert.Equal(8.5m, item.GWPerCtn);
+            Assert.Equal(102m, item.GWTotal);
+            Assert.Equal(7.5m, item.NWPerCtn);
+            Assert.Equal(90m, item.NWTotal);
+            Assert.Equal(3.2m, item.UnitPrice);
+            Assert.Equal(384m, item.TotalPrice);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldRepairCompoundHeadersAndMergeSupplementaryItemDetails()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportFormatTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "compound-headers-with-supplement.xlsx");
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteCompoundHeaderSupplementWorkbookAsync(filePath);
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings, new CompoundHeaderLegacyAnalyzer());
+            using var testFile = new TemporaryTestFile("ExcelImportFormatTests", "compound-headers-with-supplement.xlsx");
+            await WriteCompoundHeaderSupplementWorkbookAsync(testFile.Path);
+            var result = await CreateService(new CompoundHeaderLegacyAnalyzer()).ImportFromExcelAsync(testFile.Path);
 
-                var result = await service.ImportFromExcelAsync(filePath);
-
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.NotNull(result.AnalysisReport.ItemTable);
-                Assert.Equal(3, result.AnalysisReport.ItemTable.Columns.PoNumberCol);
-                Assert.Equal(4, result.AnalysisReport.ItemTable.Columns.StyleNoCol);
-                Assert.Equal(5, result.AnalysisReport.ItemTable.Columns.StyleNameCol);
-                Assert.Equal(6, result.AnalysisReport.ItemTable.Columns.QuantityCol);
-                Assert.Equal(7, result.AnalysisReport.ItemTable.Columns.CartonsCol);
-
-                Assert.Equal(2, result.Invoice.Items.Count);
-                var item = result.Invoice.Items[0];
-                Assert.Equal("APO2245", item.PoNumber);
-                Assert.Equal("EA211395", item.StyleNo);
-                Assert.Equal("women's knitted sweatshirts", item.StyleName);
-                Assert.Equal("51%Polyester44%modal5%elastane", item.FabricComposition);
-                Assert.Equal("化纤制针织女式非起绒套头衫", item.StyleNameCN);
-                Assert.Equal("ATHLECIA", item.Brand);
-                Assert.Equal("6110300090", item.HSCode);
-                Assert.Equal(505m, item.Quantity);
-                Assert.Equal(17m, item.Cartons);
-                Assert.Equal(1.252m, item.Volume);
-                Assert.Equal(250m, item.GWTotal);
-                Assert.Equal(233m, item.NWTotal);
-                Assert.Equal(8.22m, item.UnitPrice);
-                Assert.Equal(4151.10m, item.TotalPrice);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.NotNull(result.AnalysisReport.ItemTable);
+            Assert.Equal(3, result.AnalysisReport.ItemTable.Columns.PoNumberCol);
+            Assert.Equal(4, result.AnalysisReport.ItemTable.Columns.StyleNoCol);
+            Assert.Equal(5, result.AnalysisReport.ItemTable.Columns.StyleNameCol);
+            Assert.Equal(6, result.AnalysisReport.ItemTable.Columns.QuantityCol);
+            Assert.Equal(7, result.AnalysisReport.ItemTable.Columns.CartonsCol);
+            Assert.Equal(2, result.Invoice.Items.Count);
+            var item = result.Invoice.Items[0];
+            Assert.Equal("APO2245", item.PoNumber);
+            Assert.Equal("EA211395", item.StyleNo);
+            Assert.Equal("women's knitted sweatshirts", item.StyleName);
+            Assert.Equal("51%Polyester44%modal5%elastane", item.FabricComposition);
+            Assert.Equal("化纤制针织女式非起绒套头衫", item.StyleNameCN);
+            Assert.Equal("ATHLECIA", item.Brand);
+            Assert.Equal("6110300090", item.HSCode);
+            Assert.Equal(505m, item.Quantity);
+            Assert.Equal(17m, item.Cartons);
+            Assert.Equal(1.252m, item.Volume);
+            Assert.Equal(250m, item.GWTotal);
+            Assert.Equal(233m, item.NWTotal);
+            Assert.Equal(8.22m, item.UnitPrice);
+            Assert.Equal(4151.10m, item.TotalPrice);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldCorrectStaleAnalyzerPartyLabelsAndKeepExplicitContractNo()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportFormatTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "default-template-party-regression.xlsx");
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteDefaultTemplatePartyRegressionWorkbookAsync(filePath);
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings, new StalePartyFieldAnalyzer());
-                var result = await service.ImportFromExcelAsync(filePath);
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.Equal("2024AA001", result.Invoice.InvoiceNo);
-                Assert.Equal("2024AA001", result.Invoice.ContractNo);
-                Assert.Equal("ONIA LLC.", result.Invoice.CustomerNameEN);
-                Assert.Equal("10 EAST 40TH STREET, 37TH FL, NEW YORK, NY, 10017,USA", result.Invoice.CustomerAddressEN);
-                Assert.Equal("ONIA LLC.", result.Invoice.NotifyPartyName);
-                Assert.Equal("10 EAST 40TH STREET, 37TH FL, NEW YORK, NY, 10017,USA", result.Invoice.NotifyPartyAddress);
-                Assert.Equal("NINGBO BRIDGE IMP. & EXP. CO., LTD.", result.Invoice.ExporterNameEN);
-                Assert.Equal("N0.668, EAST BAIZHANG ROAD, NINGBO, 315040, CHINA", result.Invoice.ExporterAddressEN);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            using var testFile = new TemporaryTestFile("ExcelImportFormatTests", "default-template-party-regression.xlsx");
+            await WriteDefaultTemplatePartyRegressionWorkbookAsync(testFile.Path);
+            var result = await CreateService(new StalePartyFieldAnalyzer()).ImportFromExcelAsync(testFile.Path);
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.Equal("2024AA001", result.Invoice.InvoiceNo);
+            Assert.Equal("2024AA001", result.Invoice.ContractNo);
+            Assert.Equal("ONIA LLC.", result.Invoice.CustomerNameEN);
+            Assert.Equal("10 EAST 40TH STREET, 37TH FL, NEW YORK, NY, 10017,USA", result.Invoice.CustomerAddressEN);
+            Assert.Equal("ONIA LLC.", result.Invoice.NotifyPartyName);
+            Assert.Equal("10 EAST 40TH STREET, 37TH FL, NEW YORK, NY, 10017,USA", result.Invoice.NotifyPartyAddress);
+            Assert.Equal("NINGBO BRIDGE IMP. & EXP. CO., LTD.", result.Invoice.ExporterNameEN);
+            Assert.Equal("N0.668, EAST BAIZHANG ROAD, NINGBO, 315040, CHINA", result.Invoice.ExporterAddressEN);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldDetectSingleValueFieldsBelowLabels()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportFormatTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "below-label-fields.xlsx");
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteBelowLabelFieldsWorkbookAsync(filePath);
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings);
-                var result = await service.ImportFromExcelAsync(filePath);
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.NotNull(result.AnalysisReport);
-                Assert.Equal("builtin-dotnet", result.AnalysisReport.AnalyzerId);
-                Assert.Contains(result.AnalysisReport.Fields, field =>
-                    field.FieldKey == "InvoiceNo"
-                    && field.Value == "INV-BELOW-001"
-                    && field.Row == 2
-                    && field.Column == 5);
-                Assert.Contains(result.AnalysisReport.Fields, field =>
-                    field.FieldKey == "CustomerNameEN"
-                    && field.Value == "BELOW LABEL BUYER LLC"
-                    && field.Row == 2
-                    && field.Column == 3);
-
-                Assert.Equal("INV-BELOW-001", result.Invoice.InvoiceNo);
-                Assert.Equal("BELOW LABEL BUYER LLC", result.Invoice.CustomerNameEN);
-                Assert.Equal("NINGBO BELOW EXPORT CO., LTD.", result.Invoice.ExporterNameEN);
-                Assert.Equal("NINGBO", result.Invoice.PortOfLoading);
-                Assert.Equal("ROTTERDAM", result.Invoice.PortOfDestination);
-                Assert.Equal("FOB NINGBO", result.Invoice.TradeTerms);
-
-                var item = Assert.Single(result.Invoice.Items);
-                Assert.Equal("BL-TEE-001", item.StyleNo);
-                Assert.Equal("BELOW LABEL TEE", item.StyleName);
-                Assert.Equal(100m, item.Quantity);
-                Assert.Equal(250m, item.TotalPrice);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            using var testFile = new TemporaryTestFile("ExcelImportFormatTests", "below-label-fields.xlsx");
+            await WriteBelowLabelFieldsWorkbookAsync(testFile.Path);
+            var result = await CreateService().ImportFromExcelAsync(testFile.Path);
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.NotNull(result.AnalysisReport);
+            Assert.Equal("builtin-dotnet", result.AnalysisReport.AnalyzerId);
+            Assert.Contains(result.AnalysisReport.Fields, field =>
+                field.FieldKey == "InvoiceNo"
+                && field.Value == "INV-BELOW-001"
+                && field.Row == 2
+                && field.Column == 5);
+            Assert.Contains(result.AnalysisReport.Fields, field =>
+                field.FieldKey == "CustomerNameEN"
+                && field.Value == "BELOW LABEL BUYER LLC"
+                && field.Row == 2
+                && field.Column == 3);
+            Assert.Equal("INV-BELOW-001", result.Invoice.InvoiceNo);
+            Assert.Equal("BELOW LABEL BUYER LLC", result.Invoice.CustomerNameEN);
+            Assert.Equal("NINGBO BELOW EXPORT CO., LTD.", result.Invoice.ExporterNameEN);
+            Assert.Equal("NINGBO", result.Invoice.PortOfLoading);
+            Assert.Equal("ROTTERDAM", result.Invoice.PortOfDestination);
+            Assert.Equal("FOB NINGBO", result.Invoice.TradeTerms);
+            var item = Assert.Single(result.Invoice.Items);
+            Assert.Equal("BL-TEE-001", item.StyleNo);
+            Assert.Equal("BELOW LABEL TEE", item.StyleName);
+            Assert.Equal(100m, item.Quantity);
+            Assert.Equal(250m, item.TotalPrice);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldDetectShippingAdviceTableLayout()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportXlsTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "shipping-advice.xls");
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteShippingAdviceWorkbookAsync(filePath);
+            using var testFile = new TemporaryTestFile("ExcelImportXlsTests", "shipping-advice.xls");
+            await WriteShippingAdviceWorkbookAsync(testFile.Path);
+            var result = await CreateService().ImportFromExcelAsync(testFile.Path);
 
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings);
-                var result = await service.ImportFromExcelAsync(filePath);
-
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.NotNull(result.AnalysisReport);
-                Assert.Equal("builtin-dotnet", result.AnalysisReport.AnalyzerId);
-                Assert.Equal("报关和清关", result.AnalysisReport.SelectedWorksheetName);
-                Assert.Contains(result.AnalysisReport.Fields, field => field.FieldKey == "InvoiceNo" && field.Value == "2026YH013");
-                Assert.Contains(result.AnalysisReport.Fields, field => field.FieldKey == "ExporterNameEN" && field.Value.Contains("NINGBO BRIDGE"));
-                Assert.Contains(result.AnalysisReport.Fields, field => field.FieldKey == "CustomerNameEN" && field.Value == "RDP Ltd");
-                Assert.Contains(result.AnalysisReport.Fields, field => field.FieldKey == "PortOfLoading" && field.Value == "ningbo");
-                Assert.Contains(result.AnalysisReport.Fields, field => field.FieldKey == "PortOfDestination" && field.Value == "hongkong");
-                Assert.NotNull(result.AnalysisReport.ItemTable);
-                Assert.Equal(19, result.AnalysisReport.ItemTable.DataStartRow);
-                Assert.Equal("2026YH013", result.Invoice.InvoiceNo);
-                Assert.Equal("RDP Ltd", result.Invoice.CustomerNameEN);
-                Assert.Equal("DDP Hongkong", result.Invoice.TradeTerms);
-                Assert.Equal("hongkong", result.Invoice.PortOfDestination);
-
-                var item = Assert.Single(result.Invoice.Items);
-                Assert.Equal("633133", item.PoNumber);
-                Assert.Equal("116094-116097", item.StyleNo);
-                Assert.Equal("toy story 5 kids hoodie", item.StyleName);
-                Assert.Equal("棉制针织男童戴帽衫", item.StyleNameCN);
-                Assert.Equal(611m, item.Quantity);
-                Assert.Equal(30m, item.Cartons);
-                Assert.Equal(30m, item.Length);
-                Assert.Equal(28m, item.Width);
-                Assert.Equal(30m, item.Height);
-                Assert.Equal(0.756m, item.Volume);
-                Assert.Equal(315m, item.GWTotal);
-                Assert.Equal(264m, item.NWTotal);
-                Assert.Equal(7701.45m, item.TotalPrice);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.NotNull(result.AnalysisReport);
+            Assert.Equal("builtin-dotnet", result.AnalysisReport.AnalyzerId);
+            Assert.Equal("报关和清关", result.AnalysisReport.SelectedWorksheetName);
+            Assert.Contains(result.AnalysisReport.Fields, field => field.FieldKey == "InvoiceNo" && field.Value == "2026YH013");
+            Assert.Contains(result.AnalysisReport.Fields, field => field.FieldKey == "ExporterNameEN" && field.Value.Contains("NINGBO BRIDGE"));
+            Assert.Contains(result.AnalysisReport.Fields, field => field.FieldKey == "CustomerNameEN" && field.Value == "RDP Ltd");
+            Assert.Contains(result.AnalysisReport.Fields, field => field.FieldKey == "PortOfLoading" && field.Value == "ningbo");
+            Assert.Contains(result.AnalysisReport.Fields, field => field.FieldKey == "PortOfDestination" && field.Value == "hongkong");
+            Assert.NotNull(result.AnalysisReport.ItemTable);
+            Assert.Equal(19, result.AnalysisReport.ItemTable.DataStartRow);
+            Assert.Equal("2026YH013", result.Invoice.InvoiceNo);
+            Assert.Equal("RDP Ltd", result.Invoice.CustomerNameEN);
+            Assert.Equal("DDP Hongkong", result.Invoice.TradeTerms);
+            Assert.Equal("hongkong", result.Invoice.PortOfDestination);
+            var item = Assert.Single(result.Invoice.Items);
+            Assert.Equal("633133", item.PoNumber);
+            Assert.Equal("116094-116097", item.StyleNo);
+            Assert.Equal("toy story 5 kids hoodie", item.StyleName);
+            Assert.Equal("棉制针织男童戴帽衫", item.StyleNameCN);
+            Assert.Equal(611m, item.Quantity);
+            Assert.Equal(30m, item.Cartons);
+            Assert.Equal(30m, item.Length);
+            Assert.Equal(28m, item.Width);
+            Assert.Equal(30m, item.Height);
+            Assert.Equal(0.756m, item.Volume);
+            Assert.Equal(315m, item.GWTotal);
+            Assert.Equal(264m, item.NWTotal);
+            Assert.Equal(7701.45m, item.TotalPrice);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldDetectMultiRowBookingSheetLayout()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportXlsTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "booking-sheet.xls");
+            using var testFile = new TemporaryTestFile("ExcelImportXlsTests", "booking-sheet.xls");
+            await WriteMultiRowBookingSheetWorkbookAsync(testFile.Path);
+            var result = await CreateService().ImportFromExcelAsync(testFile.Path);
 
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteMultiRowBookingSheetWorkbookAsync(filePath);
-
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings);
-                var result = await service.ImportFromExcelAsync(filePath);
-
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.Equal("2025ATX004", result.Invoice.InvoiceNo);
-                Assert.Equal("2024ATX-2,3,7,8", result.Invoice.ContractNo);
-                Assert.Equal("T/T", result.Invoice.PaymentTerms);
-                Assert.Equal("DDP LA ( OR LB)", result.Invoice.TradeTerms);
-                Assert.Equal("LOS ANGELES ( OR LONG BEACH), USA", result.Invoice.PortOfDestination);
-                Assert.Equal("FAME FASHION HOUSE LLC", result.Invoice.CustomerNameEN);
-                Assert.Equal(
-                    string.Join(Environment.NewLine, "1735 Jersey Ave, North Brunswick NJ 08902 ，UNITED STATES OF AMERICA", "Tel# 212-287-9023", "sallyyang@jnmworldwide.com&imports@tfxny.com"),
-                    result.Invoice.CustomerAddressEN);
-                Assert.Equal("NINGBO BRIDGE IMP. & EXP. CO. LTD.", result.Invoice.ExporterNameEN);
-                Assert.Equal("宁波布利杰进出口有限公司", result.Invoice.ExporterNameCN);
-                Assert.Equal(
-                    string.Join(Environment.NewLine, "NO.668 BAIZHANG EAST ROAD.", "NINGBO 315040 CHINA"),
-                    result.Invoice.ExporterAddressEN);
-                Assert.Equal(
-                    string.Join(Environment.NewLine, "SHIP TO: ROSS STORES, INC", "3404 INDIAN AVENUE", "PERRIS, CA 92572", "FROM: FAME FASHION HOUSE"),
-                    result.Invoice.ShippingMarks);
-
-                Assert.Equal(3, result.Invoice.Items.Count);
-                var item = result.Invoice.Items[0];
-                Assert.Equal("无门襟无扣的T恤衫， HS.6109100021", item.StyleName);
-                Assert.Equal(26712m, item.Quantity);
-                Assert.Equal(1113m, item.Cartons);
-                Assert.Equal(5.4m, item.GWPerCtn);
-                Assert.Equal(6010.2m, item.GWTotal);
-                Assert.Equal(4.4m, item.NWPerCtn);
-                Assert.Equal(4897.2m, item.NWTotal);
-                Assert.Equal(53m, item.Length);
-                Assert.Equal(31m, item.Width);
-                Assert.Equal(14m, item.Height);
-                Assert.Equal(25.6m, item.Volume);
-                Assert.Equal(109592.88m, item.TotalPrice);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.Equal("2025ATX004", result.Invoice.InvoiceNo);
+            Assert.Equal("2024ATX-2,3,7,8", result.Invoice.ContractNo);
+            Assert.Equal("T/T", result.Invoice.PaymentTerms);
+            Assert.Equal("DDP LA ( OR LB)", result.Invoice.TradeTerms);
+            Assert.Equal("LOS ANGELES ( OR LONG BEACH), USA", result.Invoice.PortOfDestination);
+            Assert.Equal("FAME FASHION HOUSE LLC", result.Invoice.CustomerNameEN);
+            Assert.Equal(
+                string.Join(Environment.NewLine, "1735 Jersey Ave, North Brunswick NJ 08902 ，UNITED STATES OF AMERICA", "Tel# 212-287-9023", "sallyyang@jnmworldwide.com&imports@tfxny.com"),
+                result.Invoice.CustomerAddressEN);
+            Assert.Equal("NINGBO BRIDGE IMP. & EXP. CO. LTD.", result.Invoice.ExporterNameEN);
+            Assert.Equal("宁波布利杰进出口有限公司", result.Invoice.ExporterNameCN);
+            Assert.Equal(
+                string.Join(Environment.NewLine, "NO.668 BAIZHANG EAST ROAD.", "NINGBO 315040 CHINA"),
+                result.Invoice.ExporterAddressEN);
+            Assert.Equal(
+                string.Join(Environment.NewLine, "SHIP TO: ROSS STORES, INC", "3404 INDIAN AVENUE", "PERRIS, CA 92572", "FROM: FAME FASHION HOUSE"),
+                result.Invoice.ShippingMarks);
+            Assert.Equal(3, result.Invoice.Items.Count);
+            var item = result.Invoice.Items[0];
+            Assert.Equal("无门襟无扣的T恤衫， HS.6109100021", item.StyleName);
+            Assert.Equal(26712m, item.Quantity);
+            Assert.Equal(1113m, item.Cartons);
+            Assert.Equal(5.4m, item.GWPerCtn);
+            Assert.Equal(6010.2m, item.GWTotal);
+            Assert.Equal(4.4m, item.NWPerCtn);
+            Assert.Equal(4897.2m, item.NWTotal);
+            Assert.Equal(53m, item.Length);
+            Assert.Equal(31m, item.Width);
+            Assert.Equal(14m, item.Height);
+            Assert.Equal(25.6m, item.Volume);
+            Assert.Equal(109592.88m, item.TotalPrice);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldParseAelNingboBookingForm()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportFormatTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "ael-ningbo-booking-form.xlsx");
+            using var testFile = new TemporaryTestFile("ExcelImportFormatTests", "ael-ningbo-booking-form.xlsx");
+            await WriteAelNingboBookingFormWorkbookAsync(testFile.Path);
+            var result = await CreateService(new BookingFormWrongNeighborAnalyzer()).ImportFromExcelAsync(testFile.Path);
 
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteAelNingboBookingFormWorkbookAsync(filePath);
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.Equal("NINGBO BRIDGE IMP. & EXP. CO. LTD.", result.Invoice.ExporterNameEN);
+            Assert.Equal(
+                string.Join(Environment.NewLine, "NO.668 BAIZHANG EAST ROAD,", "NINGBO 315040 CHINA"),
+                result.Invoice.ExporterAddressEN);
+            Assert.Equal("Sensation Events", result.Invoice.CustomerNameEN);
+            Assert.Equal(
+                string.Join(Environment.NewLine, "De Wetering 119, 4906 CT, Oosterhout,", "The Netherlands"),
+                result.Invoice.CustomerAddressEN);
+            Assert.Equal(NotifyPartyMode.SameAsConsignee, result.Invoice.NotifyPartyMode);
+            Assert.True(string.IsNullOrEmpty(result.Invoice.NotifyPartyName));
+            Assert.True(string.IsNullOrEmpty(result.Invoice.NotifyPartyAddress));
+            Assert.Equal("NINGBO,CHINA", result.Invoice.PortOfLoading);
+            Assert.Equal("ROTTERDAM, THE NETHERLANDS", result.Invoice.PortOfDestination);
+            Assert.Equal(
+                string.Join(Environment.NewLine, "SENSATION EVENTS", "C/NO. 1 OF 8", "PO-NO: PW26-TEXH"),
+                result.Invoice.ShippingMarks);
 
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings, new BookingFormWrongNeighborAnalyzer());
-                var result = await service.ImportFromExcelAsync(filePath);
-
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.Equal("NINGBO BRIDGE IMP. & EXP. CO. LTD.", result.Invoice.ExporterNameEN);
-                Assert.Equal(
-                    string.Join(Environment.NewLine, "NO.668 BAIZHANG EAST ROAD,", "NINGBO 315040 CHINA"),
-                    result.Invoice.ExporterAddressEN);
-                Assert.Equal("Sensation Events", result.Invoice.CustomerNameEN);
-                Assert.Equal(
-                    string.Join(Environment.NewLine, "De Wetering 119, 4906 CT, Oosterhout,", "The Netherlands"),
-                    result.Invoice.CustomerAddressEN);
-                Assert.Equal(NotifyPartyMode.SameAsConsignee, result.Invoice.NotifyPartyMode);
-                Assert.True(string.IsNullOrEmpty(result.Invoice.NotifyPartyName));
-                Assert.True(string.IsNullOrEmpty(result.Invoice.NotifyPartyAddress));
-                Assert.Equal("NINGBO,CHINA", result.Invoice.PortOfLoading);
-                Assert.Equal("ROTTERDAM, THE NETHERLANDS", result.Invoice.PortOfDestination);
-                Assert.Equal(
-                    string.Join(Environment.NewLine, "SENSATION EVENTS", "C/NO. 1 OF 8", "PO-NO: PW26-TEXH"),
-                    result.Invoice.ShippingMarks);
-
-                var item = Assert.Single(result.Invoice.Items);
-                Assert.Equal("WOMEN T-SHIRT 100% COTTON", item.StyleName);
-                Assert.Equal("棉制针织女式T恤衫", item.StyleNameCN);
-                Assert.Equal("6109100000", item.HSCode);
-                Assert.Equal(8m, item.Cartons);
-                Assert.Equal("CTNS", item.CtnUnitEN);
-                Assert.Equal(152m, item.GWTotal);
-                Assert.Equal(0.564m, item.Volume);
-                Assert.NotNull(result.AnalysisReport?.ItemTable);
-                Assert.Equal(30, result.AnalysisReport.ItemTable.HeaderRow);
-                Assert.Equal(32, result.AnalysisReport.ItemTable.DataStartRow);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            var item = Assert.Single(result.Invoice.Items);
+            Assert.Equal("WOMEN T-SHIRT 100% COTTON", item.StyleName);
+            Assert.Equal("棉制针织女式T恤衫", item.StyleNameCN);
+            Assert.Equal("6109100000", item.HSCode);
+            Assert.Equal(8m, item.Cartons);
+            Assert.Equal("CTNS", item.CtnUnitEN);
+            Assert.Equal(152m, item.GWTotal);
+            Assert.Equal(0.564m, item.Volume);
+            Assert.NotNull(result.AnalysisReport?.ItemTable);
+            Assert.Equal(30, result.AnalysisReport.ItemTable.HeaderRow);
+            Assert.Equal(32, result.AnalysisReport.ItemTable.DataStartRow);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldDetectShippingAdviceRowsWithSideLabels()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportXlsTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "shipping-advice-italy.xls");
-
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteShippingAdviceWithSideLabelsWorkbookAsync(filePath);
-
-                var service = new ExcelImportService(new StubSettingsService());
-                var result = await service.ImportFromExcelAsync(filePath);
-
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.Equal("2026YH018", result.Invoice.InvoiceNo);
-                Assert.Equal(string.Empty, result.Invoice.ContractNo);
-                Assert.Equal(string.Empty, result.Invoice.LetterOfCreditNo);
-                Assert.Equal("ONIA LLC", result.Invoice.CustomerNameEN);
-                Assert.Equal("10 EAST 40TH STREET, 37TH FL, NEW YORK, NY, 10017,USA", result.Invoice.CustomerAddressEN);
-                Assert.Equal("NINGBO BRIDGE IMP. & EXP. CO., LTD.", result.Invoice.ExporterNameEN);
-                Assert.Equal("宁波布利杰进出口有限公司", result.Invoice.ExporterNameCN);
-                Assert.Equal("N0.668, EAST BAIZHANG ROAD, NINGBO, 315040, CHINA", result.Invoice.ExporterAddressEN);
-                Assert.Equal("shanghai", result.Invoice.PortOfLoading);
-                Assert.Equal("USA", result.Invoice.PortOfDestination);
-                Assert.Contains("CLIENT", result.Invoice.ShippingMarks);
-                Assert.Contains("STYLE# & DESCRIPTION", result.Invoice.ShippingMarks);
-                Assert.Contains("UPC", result.Invoice.ShippingMarks);
-                Assert.Equal(2, result.Invoice.Items.Count);
-
-                Assert.NotNull(result.AnalysisReport?.ItemTable);
-                Assert.Equal(3, result.AnalysisReport.ItemTable.Columns.StyleNoCol);
-                Assert.Equal(4, result.AnalysisReport.ItemTable.Columns.StyleNameCol);
-                Assert.Equal(6, result.AnalysisReport.ItemTable.Columns.StyleNameCNCol);
-                Assert.Equal(0, result.AnalysisReport.ItemTable.Columns.BrandCol);
-
-                Assert.Equal("300000024", result.Invoice.Items[0].PoNumber);
-                Assert.Equal("HAM01", result.Invoice.Items[0].StyleNo);
-                Assert.Equal("EVERYDAY TEE", result.Invoice.Items[0].StyleName);
-                Assert.Equal("男式短袖圆领衫", result.Invoice.Items[0].StyleNameCN);
-                Assert.Equal(string.Empty, result.Invoice.Items[0].Brand);
-                Assert.Equal(130m, result.Invoice.Items[0].Quantity);
-                Assert.Equal(60m, result.Invoice.Items[0].Length);
-                Assert.Equal(38m, result.Invoice.Items[0].Width);
-                Assert.Equal(24m, result.Invoice.Items[0].Height);
-                Assert.Equal(11m, result.Invoice.Items[0].GWPerCtn);
-                Assert.Equal(22m, result.Invoice.Items[0].GWTotal);
-                Assert.Equal(10m, result.Invoice.Items[0].NWPerCtn);
-                Assert.Equal(20m, result.Invoice.Items[0].NWTotal);
-                Assert.Equal(369.2m, result.Invoice.Items[0].TotalPrice);
-                Assert.Equal(260m, result.Invoice.TotalQuantity);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            using var testFile = new TemporaryTestFile("ExcelImportXlsTests", "shipping-advice-italy.xls");
+            await WriteShippingAdviceWithSideLabelsWorkbookAsync(testFile.Path);
+            var service = new ExcelImportService(new StubSettingsService());
+            var result = await service.ImportFromExcelAsync(testFile.Path);
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.Equal("2026YH018", result.Invoice.InvoiceNo);
+            Assert.Equal(string.Empty, result.Invoice.ContractNo);
+            Assert.Equal(string.Empty, result.Invoice.LetterOfCreditNo);
+            Assert.Equal("ONIA LLC", result.Invoice.CustomerNameEN);
+            Assert.Equal("10 EAST 40TH STREET, 37TH FL, NEW YORK, NY, 10017,USA", result.Invoice.CustomerAddressEN);
+            Assert.Equal("NINGBO BRIDGE IMP. & EXP. CO., LTD.", result.Invoice.ExporterNameEN);
+            Assert.Equal("宁波布利杰进出口有限公司", result.Invoice.ExporterNameCN);
+            Assert.Equal("N0.668, EAST BAIZHANG ROAD, NINGBO, 315040, CHINA", result.Invoice.ExporterAddressEN);
+            Assert.Equal("shanghai", result.Invoice.PortOfLoading);
+            Assert.Equal("USA", result.Invoice.PortOfDestination);
+            Assert.Contains("CLIENT", result.Invoice.ShippingMarks);
+            Assert.Contains("STYLE# & DESCRIPTION", result.Invoice.ShippingMarks);
+            Assert.Contains("UPC", result.Invoice.ShippingMarks);
+            Assert.Equal(2, result.Invoice.Items.Count);
+            Assert.NotNull(result.AnalysisReport?.ItemTable);
+            Assert.Equal(3, result.AnalysisReport.ItemTable.Columns.StyleNoCol);
+            Assert.Equal(4, result.AnalysisReport.ItemTable.Columns.StyleNameCol);
+            Assert.Equal(6, result.AnalysisReport.ItemTable.Columns.StyleNameCNCol);
+            Assert.Equal(0, result.AnalysisReport.ItemTable.Columns.BrandCol);
+            Assert.Equal("300000024", result.Invoice.Items[0].PoNumber);
+            Assert.Equal("HAM01", result.Invoice.Items[0].StyleNo);
+            Assert.Equal("EVERYDAY TEE", result.Invoice.Items[0].StyleName);
+            Assert.Equal("男式短袖圆领衫", result.Invoice.Items[0].StyleNameCN);
+            Assert.Equal(string.Empty, result.Invoice.Items[0].Brand);
+            Assert.Equal(130m, result.Invoice.Items[0].Quantity);
+            Assert.Equal(60m, result.Invoice.Items[0].Length);
+            Assert.Equal(38m, result.Invoice.Items[0].Width);
+            Assert.Equal(24m, result.Invoice.Items[0].Height);
+            Assert.Equal(11m, result.Invoice.Items[0].GWPerCtn);
+            Assert.Equal(22m, result.Invoice.Items[0].GWTotal);
+            Assert.Equal(10m, result.Invoice.Items[0].NWPerCtn);
+            Assert.Equal(20m, result.Invoice.Items[0].NWTotal);
+            Assert.Equal(369.2m, result.Invoice.Items[0].TotalPrice);
+            Assert.Equal(260m, result.Invoice.TotalQuantity);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldRepairMisclassifiedSideLabelItemColumns()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportXlsTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "shipping-advice-misclassified.xls");
-
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteShippingAdviceWithSideLabelsWorkbookAsync(filePath);
-
-                var service = new ExcelImportService(new StubSettingsService(), new MisclassifiedSideLabelAnalyzer());
-                var result = await service.ImportFromExcelAsync(filePath);
-
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.NotNull(result.AnalysisReport?.ItemTable);
-                Assert.Equal(3, result.AnalysisReport.ItemTable.Columns.StyleNoCol);
-                Assert.Equal(4, result.AnalysisReport.ItemTable.Columns.StyleNameCol);
-                Assert.Equal(6, result.AnalysisReport.ItemTable.Columns.StyleNameCNCol);
-                Assert.Equal(0, result.AnalysisReport.ItemTable.Columns.BrandCol);
-                Assert.Equal(9, result.AnalysisReport.ItemTable.Columns.DimensionCol);
-
-                var item = result.Invoice.Items[0];
-                Assert.Equal("HAM01", item.StyleNo);
-                Assert.Equal("EVERYDAY TEE", item.StyleName);
-                Assert.Equal("男式短袖圆领衫", item.StyleNameCN);
-                Assert.Equal(string.Empty, item.Brand);
-                Assert.Equal(60m, item.Length);
-                Assert.Equal(38m, item.Width);
-                Assert.Equal(24m, item.Height);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            using var testFile = new TemporaryTestFile("ExcelImportXlsTests", "shipping-advice-misclassified.xls");
+            await WriteShippingAdviceWithSideLabelsWorkbookAsync(testFile.Path);
+            var service = new ExcelImportService(new StubSettingsService(), new MisclassifiedSideLabelAnalyzer());
+            var result = await service.ImportFromExcelAsync(testFile.Path);
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.NotNull(result.AnalysisReport?.ItemTable);
+            Assert.Equal(3, result.AnalysisReport.ItemTable.Columns.StyleNoCol);
+            Assert.Equal(4, result.AnalysisReport.ItemTable.Columns.StyleNameCol);
+            Assert.Equal(6, result.AnalysisReport.ItemTable.Columns.StyleNameCNCol);
+            Assert.Equal(0, result.AnalysisReport.ItemTable.Columns.BrandCol);
+            Assert.Equal(9, result.AnalysisReport.ItemTable.Columns.DimensionCol);
+            var item = result.Invoice.Items[0];
+            Assert.Equal("HAM01", item.StyleNo);
+            Assert.Equal("EVERYDAY TEE", item.StyleName);
+            Assert.Equal("男式短袖圆领衫", item.StyleNameCN);
+            Assert.Equal(string.Empty, item.Brand);
+            Assert.Equal(60m, item.Length);
+            Assert.Equal(38m, item.Width);
+            Assert.Equal(24m, item.Height);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldUseDefaultExporterCnAndDetectGfrDetailTable()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportXlsTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "gfr-customs-data.xls");
+            using var testFile = new TemporaryTestFile("ExcelImportXlsTests", "gfr-customs-data.xls");
+            await WriteGfrCustomsDataWorkbookAsync(testFile.Path);
+            var result = await CreateService(new NumericNotifyCandidateAnalyzer()).ImportFromExcelAsync(testFile.Path);
 
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteGfrCustomsDataWorkbookAsync(filePath);
-
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings, new NumericNotifyCandidateAnalyzer());
-                var result = await service.ImportFromExcelAsync(filePath);
-
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.Equal("26GFR-038", result.Invoice.InvoiceNo);
-                Assert.Equal("GLOBAL FASHION RESOURCE INC", result.Invoice.CustomerNameEN);
-                Assert.Equal(NotifyPartyMode.SameAsConsignee, result.Invoice.NotifyPartyMode);
-                Assert.True(string.IsNullOrEmpty(result.Invoice.NotifyPartyName));
-                Assert.True(string.IsNullOrEmpty(result.Invoice.NotifyPartyAddress));
-                Assert.Equal("NINGBO BRIDGE IMP. & EXP. CO. LTD.", result.Invoice.ExporterNameEN);
-                Assert.Equal("宁波布利杰进出口有限公司", result.Invoice.ExporterNameCN);
-                Assert.NotEqual(result.Invoice.ExporterNameEN, result.Invoice.ExporterNameCN);
-                Assert.Equal("SHANGHAI", result.Invoice.PortOfLoading);
-                Assert.Equal("LOS ANGLES", result.Invoice.PortOfDestination);
-                Assert.Equal("FOB SHANGHAI", result.Invoice.TradeTerms);
-                Assert.Equal("BY SEA", result.Invoice.TransportMode);
-                Assert.Contains("GFR", result.Invoice.ShippingMarks);
-
-                Assert.Equal(6, result.Invoice.Items.Count);
-                var item = result.Invoice.Items[0];
-                Assert.Equal("60188JFT0660-GP1326-SMS7039", item.StyleNo);
-                Assert.Equal("60% Cotton 40% Polyeter  Lady's KNIT PANTS", item.StyleName);
-                Assert.Equal("棉制针织女式起绒长裤", item.StyleNameCN);
-                Assert.Equal("LAZY SUNDAY", item.Brand);
-                Assert.Equal(6000m, item.Quantity);
-                Assert.Equal(5.6m, item.UnitPrice);
-                Assert.Equal(33600m, item.TotalPrice);
-                Assert.Equal(1000m, item.Cartons);
-                Assert.Equal(20.520m, item.Volume);
-                Assert.Equal(38m, item.Length);
-                Assert.Equal(30m, item.Width);
-                Assert.Equal(18m, item.Height);
-                Assert.Equal(3300m, item.NWTotal);
-                Assert.Equal(3500m, item.GWTotal);
-                Assert.Equal(24274m, result.Invoice.TotalQuantity);
-                Assert.Equal(3506m, result.Invoice.TotalCartons);
-                Assert.Equal(10013.3m, result.Invoice.TotalNetWeight);
-                Assert.Equal(10978.8m, result.Invoice.TotalGrossWeight);
-                Assert.Equal(137697.8m, result.Invoice.TotalAmount);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.Equal("26GFR-038", result.Invoice.InvoiceNo);
+            Assert.Equal("GLOBAL FASHION RESOURCE INC", result.Invoice.CustomerNameEN);
+            Assert.Equal(NotifyPartyMode.SameAsConsignee, result.Invoice.NotifyPartyMode);
+            Assert.True(string.IsNullOrEmpty(result.Invoice.NotifyPartyName));
+            Assert.True(string.IsNullOrEmpty(result.Invoice.NotifyPartyAddress));
+            Assert.Equal("NINGBO BRIDGE IMP. & EXP. CO. LTD.", result.Invoice.ExporterNameEN);
+            Assert.Equal("宁波布利杰进出口有限公司", result.Invoice.ExporterNameCN);
+            Assert.NotEqual(result.Invoice.ExporterNameEN, result.Invoice.ExporterNameCN);
+            Assert.Equal("SHANGHAI", result.Invoice.PortOfLoading);
+            Assert.Equal("LOS ANGLES", result.Invoice.PortOfDestination);
+            Assert.Equal("FOB SHANGHAI", result.Invoice.TradeTerms);
+            Assert.Equal("BY SEA", result.Invoice.TransportMode);
+            Assert.Contains("GFR", result.Invoice.ShippingMarks);
+            Assert.Equal(6, result.Invoice.Items.Count);
+            var item = result.Invoice.Items[0];
+            Assert.Equal("60188JFT0660-GP1326-SMS7039", item.StyleNo);
+            Assert.Equal("60% Cotton 40% Polyeter  Lady's KNIT PANTS", item.StyleName);
+            Assert.Equal("棉制针织女式起绒长裤", item.StyleNameCN);
+            Assert.Equal("LAZY SUNDAY", item.Brand);
+            Assert.Equal(6000m, item.Quantity);
+            Assert.Equal(5.6m, item.UnitPrice);
+            Assert.Equal(33600m, item.TotalPrice);
+            Assert.Equal(1000m, item.Cartons);
+            Assert.Equal(20.520m, item.Volume);
+            Assert.Equal(38m, item.Length);
+            Assert.Equal(30m, item.Width);
+            Assert.Equal(18m, item.Height);
+            Assert.Equal(3300m, item.NWTotal);
+            Assert.Equal(3500m, item.GWTotal);
+            Assert.Equal(24274m, result.Invoice.TotalQuantity);
+            Assert.Equal(3506m, result.Invoice.TotalCartons);
+            Assert.Equal(10013.3m, result.Invoice.TotalNetWeight);
+            Assert.Equal(10978.8m, result.Invoice.TotalGrossWeight);
+            Assert.Equal(137697.8m, result.Invoice.TotalAmount);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldInferItemColumnsFromValueProfiles()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportXlsTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "value-profile-columns.xls");
+            using var testFile = new TemporaryTestFile("ExcelImportXlsTests", "value-profile-columns.xls");
+            await WriteValueProfileColumnsWorkbookAsync(testFile.Path);
+            var result = await CreateService().ImportFromExcelAsync(testFile.Path);
 
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteValueProfileColumnsWorkbookAsync(filePath);
-
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings);
-                var result = await service.ImportFromExcelAsync(filePath);
-
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.NotNull(result.AnalysisReport?.ItemTable);
-                Assert.Equal(4, result.AnalysisReport.ItemTable.Columns.HSCodeCol);
-                Assert.Equal(5, result.AnalysisReport.ItemTable.Columns.DimensionCol);
-                Assert.Equal(6, result.AnalysisReport.ItemTable.Columns.UnitPriceCol);
-                Assert.Equal(7, result.AnalysisReport.ItemTable.Columns.TotalPriceCol);
-
-                Assert.Equal(2, result.Invoice.Items.Count);
-                var item = result.Invoice.Items[0];
-                Assert.Equal("VP-TEE-001", item.StyleNo);
-                Assert.Equal("6109100021", item.HSCode);
-                Assert.Equal(100m, item.Quantity);
-                Assert.Equal(60m, item.Length);
-                Assert.Equal(40m, item.Width);
-                Assert.Equal(30m, item.Height);
-                Assert.Equal(2.5m, item.UnitPrice);
-                Assert.Equal(250m, item.TotalPrice);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.NotNull(result.AnalysisReport?.ItemTable);
+            Assert.Equal(4, result.AnalysisReport.ItemTable.Columns.HSCodeCol);
+            Assert.Equal(5, result.AnalysisReport.ItemTable.Columns.DimensionCol);
+            Assert.Equal(6, result.AnalysisReport.ItemTable.Columns.UnitPriceCol);
+            Assert.Equal(7, result.AnalysisReport.ItemTable.Columns.TotalPriceCol);
+            Assert.Equal(2, result.Invoice.Items.Count);
+            var item = result.Invoice.Items[0];
+            Assert.Equal("VP-TEE-001", item.StyleNo);
+            Assert.Equal("6109100021", item.HSCode);
+            Assert.Equal(100m, item.Quantity);
+            Assert.Equal(60m, item.Length);
+            Assert.Equal(40m, item.Width);
+            Assert.Equal(30m, item.Height);
+            Assert.Equal(2.5m, item.UnitPrice);
+            Assert.Equal(250m, item.TotalPrice);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldDetectGenericIndustryDetailHeaders()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportXlsTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "generic-industry-details.xls");
+            using var testFile = new TemporaryTestFile("ExcelImportXlsTests", "generic-industry-details.xls");
+            await WriteGenericIndustryWorkbookAsync(testFile.Path);
+            var result = await CreateService().ImportFromExcelAsync(testFile.Path);
 
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteGenericIndustryWorkbookAsync(filePath);
-
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings);
-                var result = await service.ImportFromExcelAsync(filePath);
-
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.NotNull(result.AnalysisReport?.ItemTable);
-                Assert.Equal(1, result.AnalysisReport.ItemTable.Columns.StyleNoCol);
-                Assert.Equal(2, result.AnalysisReport.ItemTable.Columns.StyleNameCol);
-                Assert.Equal(3, result.AnalysisReport.ItemTable.Columns.QuantityCol);
-                Assert.Equal(4, result.AnalysisReport.ItemTable.Columns.UnitENCol);
-                Assert.Equal(5, result.AnalysisReport.ItemTable.Columns.CartonsCol);
-                Assert.Equal(6, result.AnalysisReport.ItemTable.Columns.DimensionCol);
-                Assert.Equal(7, result.AnalysisReport.ItemTable.Columns.UnitPriceCol);
-                Assert.Equal(8, result.AnalysisReport.ItemTable.Columns.TotalPriceCol);
-                Assert.Equal(9, result.AnalysisReport.ItemTable.Columns.HSCodeCol);
-                Assert.Equal(10, result.AnalysisReport.ItemTable.Columns.OriginCol);
-                Assert.Equal(11, result.AnalysisReport.ItemTable.Columns.GWTotalCol);
-                Assert.Equal(12, result.AnalysisReport.ItemTable.Columns.NWTotalCol);
-
-                Assert.Equal("GEN-INV-001", result.Invoice.InvoiceNo);
-                Assert.Equal("GENERIC BUYER LLC", result.Invoice.CustomerNameEN);
-                Assert.Equal(2, result.Invoice.Items.Count);
-
-                var item = result.Invoice.Items[0];
-                Assert.Equal("BRG-6201", item.StyleNo);
-                Assert.Equal("BALL BEARING 6201", item.StyleName);
-                Assert.Equal("8482102000", item.HSCode);
-                Assert.Equal("CHINA", item.Origin);
-                Assert.Equal(500m, item.Quantity);
-                Assert.Equal("PCS", item.UnitEN);
-                Assert.Equal(25m, item.Cartons);
-                Assert.Equal(40m, item.Length);
-                Assert.Equal(30m, item.Width);
-                Assert.Equal(20m, item.Height);
-                Assert.Equal(1.2m, item.UnitPrice);
-                Assert.Equal(600m, item.TotalPrice);
-                Assert.Equal(350m, item.GWTotal);
-                Assert.Equal(320m, item.NWTotal);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.NotNull(result.AnalysisReport?.ItemTable);
+            Assert.Equal(1, result.AnalysisReport.ItemTable.Columns.StyleNoCol);
+            Assert.Equal(2, result.AnalysisReport.ItemTable.Columns.StyleNameCol);
+            Assert.Equal(3, result.AnalysisReport.ItemTable.Columns.QuantityCol);
+            Assert.Equal(4, result.AnalysisReport.ItemTable.Columns.UnitENCol);
+            Assert.Equal(5, result.AnalysisReport.ItemTable.Columns.CartonsCol);
+            Assert.Equal(6, result.AnalysisReport.ItemTable.Columns.DimensionCol);
+            Assert.Equal(7, result.AnalysisReport.ItemTable.Columns.UnitPriceCol);
+            Assert.Equal(8, result.AnalysisReport.ItemTable.Columns.TotalPriceCol);
+            Assert.Equal(9, result.AnalysisReport.ItemTable.Columns.HSCodeCol);
+            Assert.Equal(10, result.AnalysisReport.ItemTable.Columns.OriginCol);
+            Assert.Equal(11, result.AnalysisReport.ItemTable.Columns.GWTotalCol);
+            Assert.Equal(12, result.AnalysisReport.ItemTable.Columns.NWTotalCol);
+            Assert.Equal("GEN-INV-001", result.Invoice.InvoiceNo);
+            Assert.Equal("GENERIC BUYER LLC", result.Invoice.CustomerNameEN);
+            Assert.Equal(2, result.Invoice.Items.Count);
+            var item = result.Invoice.Items[0];
+            Assert.Equal("BRG-6201", item.StyleNo);
+            Assert.Equal("BALL BEARING 6201", item.StyleName);
+            Assert.Equal("8482102000", item.HSCode);
+            Assert.Equal("CHINA", item.Origin);
+            Assert.Equal(500m, item.Quantity);
+            Assert.Equal("PCS", item.UnitEN);
+            Assert.Equal(25m, item.Cartons);
+            Assert.Equal(40m, item.Length);
+            Assert.Equal(30m, item.Width);
+            Assert.Equal(20m, item.Height);
+            Assert.Equal(1.2m, item.UnitPrice);
+            Assert.Equal(600m, item.TotalPrice);
+            Assert.Equal(350m, item.GWTotal);
+            Assert.Equal(320m, item.NWTotal);
         }
 
         [Fact]
         public async Task ImportFromExcelAsync_ShouldInferWeightsAndVolumeFromColumnRelationships()
         {
-            string directory = Path.Combine(
-                AppContext.BaseDirectory,
-                "ExcelImportXlsTests",
-                Guid.NewGuid().ToString("N"));
-            string filePath = Path.Combine(directory, "relationship-profile-columns.xls");
+            using var testFile = new TemporaryTestFile("ExcelImportXlsTests", "relationship-profile-columns.xls");
+            await WriteRelationshipProfileColumnsWorkbookAsync(testFile.Path);
+            var result = await CreateService().ImportFromExcelAsync(testFile.Path);
 
-            Directory.CreateDirectory(directory);
-            try
-            {
-                await WriteRelationshipProfileColumnsWorkbookAsync(filePath);
-
-                var settings = new StubSettingsService();
-                settings.Settings.System.DefaultTemplateExporterNameCn = "宁波布利杰进出口有限公司";
-                var service = new ExcelImportService(settings);
-                var result = await service.ImportFromExcelAsync(filePath);
-
-                Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
-                Assert.NotNull(result.Invoice);
-                Assert.NotNull(result.AnalysisReport?.ItemTable);
-                Assert.Equal(11, result.AnalysisReport.ItemTable.Columns.GWPerCtnCol);
-                Assert.Equal(12, result.AnalysisReport.ItemTable.Columns.GWTotalCol);
-                Assert.Equal(13, result.AnalysisReport.ItemTable.Columns.NWPerCtnCol);
-                Assert.Equal(14, result.AnalysisReport.ItemTable.Columns.NWTotalCol);
-                Assert.Equal(15, result.AnalysisReport.ItemTable.Columns.VolumeCol);
-
-                Assert.Equal(2, result.Invoice.Items.Count);
-                var item = result.Invoice.Items[0];
-                Assert.Equal("REL-TEE-001", item.StyleNo);
-                Assert.Equal("KNIT TEE", item.StyleName);
-                Assert.Equal(100m, item.Quantity);
-                Assert.Equal(10m, item.Cartons);
-                Assert.Equal(50m, item.Length);
-                Assert.Equal(40m, item.Width);
-                Assert.Equal(30m, item.Height);
-                Assert.Equal(0.6m, item.Volume);
-                Assert.Equal(11m, item.GWPerCtn);
-                Assert.Equal(110m, item.GWTotal);
-                Assert.Equal(10m, item.NWPerCtn);
-                Assert.Equal(100m, item.NWTotal);
-                Assert.Equal(2.5m, item.UnitPrice);
-                Assert.Equal(250m, item.TotalPrice);
-            }
-            finally
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, recursive: true);
-                }
-            }
+            Assert.True(result.Success, string.Join(Environment.NewLine, result.Errors));
+            Assert.NotNull(result.Invoice);
+            Assert.NotNull(result.AnalysisReport?.ItemTable);
+            Assert.Equal(11, result.AnalysisReport.ItemTable.Columns.GWPerCtnCol);
+            Assert.Equal(12, result.AnalysisReport.ItemTable.Columns.GWTotalCol);
+            Assert.Equal(13, result.AnalysisReport.ItemTable.Columns.NWPerCtnCol);
+            Assert.Equal(14, result.AnalysisReport.ItemTable.Columns.NWTotalCol);
+            Assert.Equal(15, result.AnalysisReport.ItemTable.Columns.VolumeCol);
+            Assert.Equal(2, result.Invoice.Items.Count);
+            var item = result.Invoice.Items[0];
+            Assert.Equal("REL-TEE-001", item.StyleNo);
+            Assert.Equal("KNIT TEE", item.StyleName);
+            Assert.Equal(100m, item.Quantity);
+            Assert.Equal(10m, item.Cartons);
+            Assert.Equal(50m, item.Length);
+            Assert.Equal(40m, item.Width);
+            Assert.Equal(30m, item.Height);
+            Assert.Equal(0.6m, item.Volume);
+            Assert.Equal(11m, item.GWPerCtn);
+            Assert.Equal(110m, item.GWTotal);
+            Assert.Equal(10m, item.NWPerCtn);
+            Assert.Equal(100m, item.NWTotal);
+            Assert.Equal(2.5m, item.UnitPrice);
+            Assert.Equal(250m, item.TotalPrice);
         }
 
         private static async Task WriteCompoundHeaderSupplementWorkbookAsync(string filePath)
@@ -1875,6 +1559,36 @@ namespace ExportDocManager.Infrastructure.Tests
             public Task LoadAsync() => Task.CompletedTask;
 
             public Task SaveAsync() => Task.CompletedTask;
+        }
+
+        private static ExcelImportService CreateService(
+            IExcelImportAnalyzer? analyzer = null,
+            string exporterName = "宁波布利杰进出口有限公司")
+        {
+            var settings = new StubSettingsService();
+            settings.Settings.System.DefaultTemplateExporterNameCn = exporterName;
+            return analyzer == null
+                ? new ExcelImportService(settings)
+                : new ExcelImportService(settings, analyzer);
+        }
+
+        private sealed class TemporaryTestFile : IDisposable
+        {
+            private readonly string _directory;
+
+            public TemporaryTestFile(string category, string fileName)
+            {
+                _directory = System.IO.Path.Combine(AppContext.BaseDirectory, category, Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(_directory);
+                Path = System.IO.Path.Combine(_directory, fileName);
+            }
+
+            public string Path { get; }
+
+            public void Dispose()
+            {
+                if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
+            }
         }
 
         private sealed class CompoundHeaderLegacyAnalyzer : IExcelImportAnalyzer

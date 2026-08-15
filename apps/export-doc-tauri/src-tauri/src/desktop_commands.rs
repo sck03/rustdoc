@@ -112,10 +112,6 @@ mod tests {
         MAX_EXPORTER_SEAL_IMAGE_BYTES,
     };
     use crate::desktop_open_commands::{build_open_command, open_path, resolve_open_path_target};
-    use crate::desktop_pdf_commands::{
-        create_pdf_temp_file_with, is_pdf_base64_length_allowed, write_pdf_file,
-        MAX_PDF_EXPORT_BASE64_BYTES,
-    };
     use base64::{engine::general_purpose::STANDARD, Engine as _};
     use std::ffi::OsString;
     use std::path::PathBuf;
@@ -237,73 +233,6 @@ mod tests {
         assert!(!is_existing_directory_candidate(Some("   ".to_owned())));
         assert!(!is_existing_directory_candidate(None));
 
-        let _ = fs::remove_dir_all(data_root);
-    }
-
-    #[test]
-    fn write_pdf_file_accepts_valid_pdf_in_selected_directory() {
-        let data_root = fresh_desktop_command_test_dir("save-pdf");
-        let output_path = data_root.join("container-loading-plan.pdf");
-
-        write_pdf_file(&output_path, b"%PDF-1.4\n%%EOF").unwrap();
-
-        assert_eq!(fs::read(&output_path).unwrap(), b"%PDF-1.4\n%%EOF");
-        assert!(!fs::read_dir(&data_root).unwrap().any(|entry| {
-            entry
-                .unwrap()
-                .file_name()
-                .to_string_lossy()
-                .ends_with(".tmp")
-        }));
-        let _ = fs::remove_dir_all(data_root);
-    }
-
-    #[test]
-    fn pdf_base64_length_is_rejected_before_an_oversized_decode() {
-        assert!(is_pdf_base64_length_allowed(MAX_PDF_EXPORT_BASE64_BYTES));
-        assert!(!is_pdf_base64_length_allowed(0));
-        assert!(!is_pdf_base64_length_allowed(
-            MAX_PDF_EXPORT_BASE64_BYTES + 1
-        ));
-    }
-
-    #[test]
-    fn write_pdf_file_atomically_replaces_existing_file_and_preserves_it_on_validation_failure() {
-        let data_root = fresh_desktop_command_test_dir("replace-pdf");
-        let output_path = data_root.join("report.pdf");
-        fs::write(&output_path, b"%PDF-1.4\nold").unwrap();
-
-        write_pdf_file(&output_path, b"%PDF-1.7\nnew").unwrap();
-        assert_eq!(fs::read(&output_path).unwrap(), b"%PDF-1.7\nnew");
-
-        assert!(write_pdf_file(&output_path, b"invalid").is_err());
-        assert_eq!(fs::read(&output_path).unwrap(), b"%PDF-1.7\nnew");
-        let _ = fs::remove_dir_all(data_root);
-    }
-
-    #[test]
-    fn write_pdf_file_rejects_non_pdf_content_and_extension() {
-        let data_root = fresh_desktop_command_test_dir("reject-invalid-pdf");
-
-        assert!(write_pdf_file(&data_root.join("plan.txt"), b"%PDF-1.4").is_err());
-        assert!(write_pdf_file(&data_root.join("plan.pdf"), b"not a pdf").is_err());
-        let _ = fs::remove_dir_all(data_root);
-    }
-
-    #[test]
-    fn pdf_temp_file_creation_retries_after_a_stale_name_collision() {
-        let data_root = fresh_desktop_command_test_dir("pdf-temp-collision");
-        let collision_path = data_root.join(".report.pdf.collision.tmp");
-        let available_path = data_root.join(".report.pdf.available.tmp");
-        fs::write(&collision_path, "stale").unwrap();
-        let mut candidates = vec![collision_path.clone(), available_path.clone()].into_iter();
-
-        let (selected_path, file) =
-            create_pdf_temp_file_with(|| candidates.next().unwrap()).unwrap();
-        drop(file);
-
-        assert_eq!(selected_path, available_path);
-        assert_eq!(fs::read_to_string(collision_path).unwrap(), "stale");
         let _ = fs::remove_dir_all(data_root);
     }
 

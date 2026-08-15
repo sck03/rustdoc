@@ -3,6 +3,7 @@ import type {
   ApiContainerPackingAnalysisDto,
   ApiContainerPackingProjectSummaryDto,
   ApiContainerTypeDto,
+  ExportDocManagerApiClient,
 } from "../../../api/index.ts";
 import { InlineNotice, PermissionNotice } from "../../../ui/PageState.tsx";
 import type {
@@ -20,6 +21,7 @@ import { ContainerPackingToolbar } from "./ContainerPackingToolbar.tsx";
 import { useContainerPackingPdfExport } from "./useContainerPackingPdfExport.ts";
 
 type Props = {
+  client: ExportDocManagerApiClient;
   analysis: ApiContainerPackingAnalysisDto | null;
   autoRefreshEnabled: boolean;
   autoRefreshState: string;
@@ -76,7 +78,7 @@ type Props = {
 };
 
 export function ContainerPackingWorkspace(props: Props) {
-  const pdfExport = useContainerPackingPdfExport(props.projectName, props.container.containerType);
+  const pdfExport = useContainerPackingPdfExport(props.client, props.projectName, props.container, props.analysis);
 
   return (
     <form className="job-tool-panel" aria-label="装箱分析" onSubmit={props.onSubmit}>
@@ -97,7 +99,7 @@ export function ContainerPackingWorkspace(props: Props) {
         onClearCargo={props.onClearCargo}
         onExportPdf={() => void pdfExport.exportPdf()}
         onRenderModeChange={props.onRenderModeChange}
-        onScrollToResults={() => pdfExport.pdfRootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        onScrollToResults={() => pdfExport.resultsRootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
       />
 
       {props.visibleMessage ? (
@@ -170,9 +172,8 @@ export function ContainerPackingWorkspace(props: Props) {
       <ContainerPackingResults
         analysis={props.analysis}
         canAnalyze={props.canAnalyze}
-        cargoRows={props.cargoRows}
         isAnalyzing={props.isAnalyzing}
-        pdfRootRef={pdfExport.pdfRootRef}
+        resultsRootRef={pdfExport.resultsRootRef}
         renderMode={props.renderMode}
         visualizationDimensions={props.visualizationDimensions}
         onAnalyze={props.onAnalyze}

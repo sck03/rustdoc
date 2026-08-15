@@ -6,10 +6,14 @@ namespace ExportDocManager.Api.Hosting;
 internal sealed class ApiOpenApiDocumentTransformer : IOpenApiDocumentTransformer, IOpenApiOperationTransformer
 {
     private readonly ApiDesktopAccessOptions _desktopAccessOptions;
+    private readonly ApiRuntimeOptions _runtimeOptions;
 
-    public ApiOpenApiDocumentTransformer(ApiDesktopAccessOptions desktopAccessOptions)
+    public ApiOpenApiDocumentTransformer(
+        ApiDesktopAccessOptions desktopAccessOptions,
+        ApiRuntimeOptions runtimeOptions)
     {
         _desktopAccessOptions = desktopAccessOptions ?? throw new ArgumentNullException(nameof(desktopAccessOptions));
+        _runtimeOptions = runtimeOptions ?? throw new ArgumentNullException(nameof(runtimeOptions));
     }
 
     public Task TransformAsync(
@@ -23,7 +27,10 @@ internal sealed class ApiOpenApiDocumentTransformer : IOpenApiDocumentTransforme
         document.Info.Title = "ExportDocManager API";
         document.Info.Version = ProductVersionProvider.ProductVersion;
         document.Info.Description = "Local sidecar API for ExportDocManager desktop and browser clients.";
-        document.Servers = [new OpenApiServer { Url = "/" }];
+        document.Servers = [new OpenApiServer
+        {
+            Url = string.IsNullOrEmpty(_runtimeOptions.PathBase) ? "/" : _runtimeOptions.PathBase
+        }];
 
         document.Components ??= new OpenApiComponents();
         document.Components.SecuritySchemes ??=

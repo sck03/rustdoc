@@ -28,7 +28,7 @@ namespace ExportDocManager.Api.Hosting
             string previewRoot = Path.GetDirectoryName(path)!;
             Directory.CreateDirectory(previewRoot);
             foreach (string staleFile in Directory.EnumerateFiles(previewRoot, "*.json")
-                         .Where(file => File.GetLastWriteTimeUtc(file) < DateTime.UtcNow.AddHours(-24)))
+                         .Where(file => File.GetLastWriteTimeUtc(file) < DateTimeOffset.UtcNow.AddHours(-24)))
             {
                 AtomicFileHelper.TryDeleteFile(staleFile);
             }

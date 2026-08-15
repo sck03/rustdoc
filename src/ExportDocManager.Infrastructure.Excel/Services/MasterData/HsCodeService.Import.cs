@@ -2,6 +2,7 @@ using ClosedXML.Excel;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Data;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,6 +12,7 @@ namespace ExportDocManager.Services.MasterData
     {
         private const int ImportInClauseBatchSize = 400;
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
+        private readonly IBusinessClock _clock;
 
         private static readonly IReadOnlyDictionary<string, string> CustomsUnitMap =
             new Dictionary<string, string>(StringComparer.Ordinal)
@@ -33,9 +35,12 @@ namespace ExportDocManager.Services.MasterData
                 ["147"] = "升", ["148"] = "毫升", ["149"] = "微升", ["163"] = "克拉"
             };
 
-        public HsCodeImportService(IDbContextFactory<AppDbContext> dbContextFactory)
+        public HsCodeImportService(
+            IDbContextFactory<AppDbContext> dbContextFactory,
+            IBusinessClock? clock = null)
         {
             _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         private static readonly IReadOnlyDictionary<string, string[]> ImportHeaderAliases =
@@ -98,7 +103,7 @@ namespace ExportDocManager.Services.MasterData
                 : sourceName.Trim();
             int normalizedEffectiveYear = effectiveYear is >= 2000 and <= 2100
                 ? effectiveYear.Value
-                : DateOnly.FromDateTime(DateTime.Now).Year;
+                : _clock.Today.Year;
             var warnings = new List<string>();
             if (detected.Confidence < 75)
             {

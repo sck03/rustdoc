@@ -18,11 +18,7 @@ namespace ExportDocManager.Api.Hosting
                 IPermissionTemplateService service,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user is null)
-                {
-                    return TypedResults.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageUsers(user))
                 {
@@ -101,11 +97,7 @@ namespace ExportDocManager.Api.Hosting
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user is null)
-                {
-                    return TypedResults.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageUsers(user))
                 {
@@ -143,11 +135,7 @@ namespace ExportDocManager.Api.Hosting
             int? id,
             CancellationToken cancellationToken)
         {
-            var user = ApiEndpointAuth.RequireUser(context, tokenService);
-            if (user is null)
-            {
-                return TypedResults.Unauthorized();
-            }
+            var user = ApiEndpointAuth.GetRequiredUser(context);
 
             if (!authorizationService.CanManageUsers(user))
             {

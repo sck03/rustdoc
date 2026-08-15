@@ -22,10 +22,6 @@ namespace ExportDocManager.Api.Hosting
                 int? pageSize,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 var result = await repository.QueryPageAsync(
                     new ProductReadQuery
@@ -58,10 +54,6 @@ namespace ExportDocManager.Api.Hosting
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -85,10 +77,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiProductDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (request == null)
                 {
@@ -133,10 +121,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiProductDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -193,10 +177,6 @@ namespace ExportDocManager.Api.Hosting
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (id <= 0)
                 {

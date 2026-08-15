@@ -448,7 +448,7 @@ public static partial class ServerMigrationRecoveryStateMachine
         ServerMigrationManager.WriteStatus(pathProvider, marker, marker.LastError, string.Empty);
         string failedPath = Path.Combine(
             Path.GetDirectoryName(markerPath)!,
-            $"invalid-marker-{DateTime.UtcNow:yyyyMMddHHmmss}.json");
+            $"invalid-marker-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}.json");
         try
         {
             File.Move(markerPath, failedPath, overwrite: false);

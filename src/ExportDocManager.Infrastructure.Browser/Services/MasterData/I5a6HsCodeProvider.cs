@@ -117,7 +117,7 @@ namespace ExportDocManager.Services.MasterData
 
         public async Task<HsCodeRemoteSourceHealth> CheckHealthAsync(CancellationToken cancellationToken = default)
         {
-            DateTimeOffset checkedAt = DateTimeOffset.Now;
+            DateTimeOffset checkedAt = DateTimeOffset.UtcNow;
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/hscode/");

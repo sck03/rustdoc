@@ -20,10 +20,6 @@ namespace ExportDocManager.Api.Hosting
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -58,10 +54,6 @@ namespace ExportDocManager.Api.Hosting
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -91,10 +83,6 @@ namespace ExportDocManager.Api.Hosting
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -126,10 +114,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiSingleWindowRepairGroupsRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {

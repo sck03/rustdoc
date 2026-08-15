@@ -4,6 +4,8 @@ using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Utils;
 
+using ExportDocManager.Services.Time;
+
 namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiEndpointRouteBuilderExtensions
@@ -15,17 +17,12 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapPost("/api/reports/invoices/{invoiceId:int}/document-package/save-to-path", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ApiBackgroundJobRunner jobRunner,
                 int invoiceId,
                 ApiInvoiceDocumentPackageRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -61,24 +58,20 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/invoices/{invoiceId:int}/document-package/download", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IAppPathProvider pathProvider,
                 ApiBackgroundJobRunner jobRunner,
+                IBusinessClock clock,
                 int invoiceId,
                 ApiInvoiceDocumentPackageRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 request ??= new ApiInvoiceDocumentPackageRequest();
                 request.CreateZip = true;
                 request.DestinationPath = CreateBrowserDownloadPath(
                     pathProvider,
                     "InvoiceDocumentPackage",
-                    $"Invoice-{invoiceId}-Documents-{DateTime.Now:yyyyMMdd-HHmmss}.zip");
+                    $"Invoice-{invoiceId}-Documents-{clock.Now:yyyyMMdd-HHmmss}.zip");
                 var validation = ValidateInvoiceDocumentPackageRequest(
                     invoiceId,
                     request,

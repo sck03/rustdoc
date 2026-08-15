@@ -20,10 +20,6 @@ namespace ExportDocManager.Api.Hosting
                 string? keyword,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 var rows = await repository.QueryAsync(
                     new PortReadQuery { Keyword = keyword ?? string.Empty },
@@ -44,7 +40,6 @@ namespace ExportDocManager.Api.Hosting
                 string? keyword,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return TypedResults.Unauthorized();
                 var page = await repository.QueryPageAsync(new PortReadQuery
                 {
                     PageNumber = pageNumber,
@@ -66,10 +61,6 @@ namespace ExportDocManager.Api.Hosting
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -93,10 +84,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiPortDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (request == null)
                 {
@@ -141,10 +128,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiPortDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -196,10 +179,6 @@ namespace ExportDocManager.Api.Hosting
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (id <= 0)
                 {

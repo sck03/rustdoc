@@ -38,10 +38,6 @@ namespace ExportDocManager.Api.Hosting
                 ICustomOptionService customOptionService,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (!TryGetCustomOptionDefinition(optionType, out var definition, out var error))
                 {
@@ -66,10 +62,6 @@ namespace ExportDocManager.Api.Hosting
                 ICustomOptionService customOptionService,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (!TryGetCustomOptionDefinition(optionType, out var definition, out var error))
                 {

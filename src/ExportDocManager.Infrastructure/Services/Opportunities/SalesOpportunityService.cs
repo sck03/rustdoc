@@ -3,6 +3,7 @@ using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Opportunities
@@ -12,11 +13,16 @@ namespace ExportDocManager.Services.Opportunities
         private static readonly string[] AllowedStages = ["线索", "需求确认", "已报价", "谈判中", "已成交", "已失单"];
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
+        private readonly IBusinessClock _clock;
 
-        public SalesOpportunityService(IDbContextFactory<AppDbContext> contextFactory, BusinessDataAccessScope accessScope)
+        public SalesOpportunityService(
+            IDbContextFactory<AppDbContext> contextFactory,
+            BusinessDataAccessScope accessScope,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<PagedResult<SalesOpportunityRecord>> QueryAsync(
@@ -208,7 +214,7 @@ namespace ExportDocManager.Services.Opportunities
                     item.Value.EstimatedAmount,
                     item.Value.WeightedAmount))
                 .OrderBy(item => item.Currency).ToArray();
-            var today = DateOnly.FromDateTime(DateTime.Today);
+            var today = _clock.Today;
             var upcoming = await (from opportunity in active
                 where opportunity.ExpectedCloseDate.HasValue &&
                     opportunity.ExpectedCloseDate.Value >= today &&

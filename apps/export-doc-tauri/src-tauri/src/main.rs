@@ -12,7 +12,6 @@ use tauri::{Emitter, Manager};
 mod desktop_commands;
 mod desktop_file_dialog_commands;
 mod desktop_open_commands;
-mod desktop_pdf_commands;
 mod log_rotation;
 mod runtime_data_root_migration;
 mod runtime_data_root_storage;
@@ -80,7 +79,6 @@ fn run_tauri_app() -> tauri::Result<()> {
             desktop_file_dialog_commands::select_ocr_image_file,
             desktop_file_dialog_commands::select_exporter_seal_image_file,
             desktop_file_dialog_commands::read_exporter_seal_image_file_as_data_url,
-            desktop_file_dialog_commands::read_ocr_image_file_as_data_url,
             desktop_file_dialog_commands::select_excel_file,
             desktop_file_dialog_commands::select_directory,
             desktop_file_dialog_commands::select_report_template_package_file,
@@ -90,7 +88,6 @@ fn run_tauri_app() -> tauri::Result<()> {
             desktop_file_dialog_commands::select_save_pdf_path,
             desktop_file_dialog_commands::select_save_zip_path,
             desktop_file_dialog_commands::select_save_excel_path,
-            desktop_pdf_commands::save_pdf_file,
             desktop_open_commands::open_path,
             desktop_commands::get_runtime_storage_context,
             desktop_commands::schedule_data_root_migration,

@@ -10,6 +10,7 @@ using HtmlAgilityPack;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Data
@@ -31,12 +32,14 @@ namespace ExportDocManager.Services.Data
         private DateTimeOffset _lastFetchTime = DateTimeOffset.MinValue;
         private readonly Func<string, CancellationToken, Task<IPAddress[]>> _resolveHostAsync;
         private readonly TimeSpan _requestTimeout;
+        private readonly IBusinessClock _clock;
 
         public BocExchangeRateService(
             ISettingsService settingsService,
             HttpClient httpClient,
             Func<string, CancellationToken, Task<IPAddress[]>>? resolveHostAsync = null,
-            TimeSpan? requestTimeout = null)
+            TimeSpan? requestTimeout = null,
+            IBusinessClock? clock = null)
         {
             ArgumentNullException.ThrowIfNull(settingsService);
             ArgumentNullException.ThrowIfNull(httpClient);
@@ -45,6 +48,7 @@ namespace ExportDocManager.Services.Data
             _httpClient = httpClient;
             _resolveHostAsync = resolveHostAsync ?? ((host, token) => Dns.GetHostAddressesAsync(host, token));
             _requestTimeout = requestTimeout ?? DefaultRequestTimeout;
+            _clock = clock ?? BusinessClock.CreateSystem();
             if (_requestTimeout <= TimeSpan.Zero)
             {
                 throw new ArgumentOutOfRangeException(nameof(requestTimeout));
@@ -146,7 +150,7 @@ namespace ExportDocManager.Services.Data
                         SellingRate = ParseRate(cells[3].InnerText),
                         CashSellingRate = ParseRate(cells[4].InnerText),
                         MiddleRate = ParseRate(cells[5].InnerText),
-                        PublishTime = cells.Count > 6 ? cells[6].InnerText.Trim() : DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                        PublishTime = cells.Count > 6 ? cells[6].InnerText.Trim() : _clock.Now.ToString("yyyy-MM-dd HH:mm:ss")
                     };
                     if (rate.BuyingRate.HasValue ||
                         rate.CashBuyingRate.HasValue ||

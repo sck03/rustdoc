@@ -123,7 +123,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (!HasSalesAccess(c, t, a, out var denied)) return denied;
                 byte[] content = await files.ExportAsync(keyword, status, ct);
-                return Results.File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"suppliers-{DateTime.UtcNow:yyyyMMdd-HHmmss}.xlsx");
+                return Results.File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"suppliers-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.xlsx");
             }).WithName("ExportSuppliers")
             .Produces<byte[]>(StatusCodes.Status200OK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             .Produces(StatusCodes.Status401Unauthorized)

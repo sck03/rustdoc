@@ -24,10 +24,6 @@ namespace ExportDocManager.Api.Hosting
                 int? pageSize,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 var result = await operationCenterService.QueryPageAsync(
                     new SingleWindowOperationCenterPageQuery
@@ -55,10 +51,6 @@ namespace ExportDocManager.Api.Hosting
                 int batchId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (batchId <= 0)
                 {

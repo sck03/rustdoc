@@ -24,10 +24,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiReportHtmlPreviewRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -87,10 +83,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiInvoiceDraftReportHtmlPreviewRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (request == null)
                 {
@@ -160,10 +152,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiInvoiceDocumentPackagePreviewRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -237,10 +225,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiPaymentDraftReportHtmlPreviewRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (request == null)
                 {
@@ -298,10 +282,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiPaymentReportHtmlPreviewRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (paymentId <= 0)
                 {

@@ -6,13 +6,18 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::runtime_paths::{ensure_directory, ensure_runtime_data_directories};
+use crate::runtime_paths::{
+    ensure_directory, ensure_runtime_data_directories, RUNTIME_DATA_DIRECTORIES,
+};
 
 pub(crate) fn ensure_runtime_data_root_is_usable(data_root: &Path) -> Result<(), Box<dyn Error>> {
     validate_migration_root_shape(data_root, "dataRoot")?;
     reject_link_like_path(data_root)?;
     ensure_runtime_data_directories(data_root)?;
     reject_link_like_path(data_root)?;
+    for directory_name in RUNTIME_DATA_DIRECTORIES {
+        reject_link_like_path(&data_root.join(directory_name))?;
+    }
     probe_writable_directory(data_root)
 }
 
@@ -69,19 +74,7 @@ pub(crate) fn validate_distinct_migration_roots(
 }
 
 pub(crate) fn ensure_expected_runtime_data_root(data_root: &Path) -> Result<(), Box<dyn Error>> {
-    for directory_name in [
-        "Database",
-        "Templates",
-        "Files",
-        "Exports",
-        "SingleWindow",
-        "Backups",
-        "Cache",
-        "Config",
-        "Security",
-        "WebView",
-        "Logs",
-    ] {
+    for directory_name in RUNTIME_DATA_DIRECTORIES {
         if !data_root.join(directory_name).is_dir() {
             return Err(format!(
                 "Data root '{}' is missing required runtime directory '{}'.",

@@ -1,6 +1,7 @@
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Utils;
+using ExportDocManager.Services.Time;
 using static ExportDocManager.Services.SingleWindow.SingleWindowFieldMapperHelpers;
 
 namespace ExportDocManager.Services.SingleWindow
@@ -8,14 +9,18 @@ namespace ExportDocManager.Services.SingleWindow
     public sealed class CustomsCooFieldMapper : ICustomsCooFieldMapper
     {
         private readonly ISingleWindowReferenceCatalogSnapshotProvider _catalogProvider;
+        private readonly IBusinessClock _clock;
 
-        public CustomsCooFieldMapper(ISingleWindowReferenceCatalogSnapshotProvider catalogProvider)
+        public CustomsCooFieldMapper(
+            ISingleWindowReferenceCatalogSnapshotProvider catalogProvider,
+            IBusinessClock? clock = null)
         {
             _catalogProvider = catalogProvider ?? throw new ArgumentNullException(nameof(catalogProvider));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public CustomsCooFieldMapper()
-            : this(new SingleWindowReferenceCatalogSnapshotStore())
+            : this(new SingleWindowReferenceCatalogSnapshotStore(), BusinessClock.CreateSystem())
         {
         }
 
@@ -73,7 +78,7 @@ namespace ExportDocManager.Services.SingleWindow
                     existing?.InvDate,
                     invoice.InvoiceDate != default ? invoice.InvoiceDate.ToString("yyyy-MM-dd") : string.Empty),
                 InvNo = PreferValue(existing?.InvNo, NormalizeText(invoice.InvoiceNo)),
-                AplDate = PreferValue(existing?.AplDate, DateTime.Today.ToString("yyyy-MM-dd")),
+                AplDate = PreferValue(existing?.AplDate, _clock.Today.ToString("yyyy-MM-dd")),
                 DestCountry = PreferValue(existing?.DestCountry, mapper.NormalizeCountryNameEnglish(invoice.DestinationCountry)),
                 DestCountryCode = PreferValue(existing?.DestCountryCode, mapper.NormalizeCountryCode(invoice.DestinationCountry)),
                 DestCountryName = PreferValue(existing?.DestCountryName, mapper.NormalizeCountryNameChinese(invoice.DestinationCountry)),
@@ -159,7 +164,8 @@ namespace ExportDocManager.Services.SingleWindow
                 document.CertType,
                 document.CiqRegNo,
                 document.AplRegNo,
-                document.AplDate);
+                document.AplDate,
+                _clock.Today);
 
             AddIfMissing(document.CiqRegNo, "出口商代码(CiqRegNo)缺失。", warnings);
             AddIfMissing(document.EtpsName, "企业名称(EtpsName)缺失。", warnings);
@@ -504,14 +510,18 @@ namespace ExportDocManager.Services.SingleWindow
     public sealed class AgentConsignmentFieldMapper : IAgentConsignmentFieldMapper
     {
         private readonly ISingleWindowReferenceCatalogSnapshotProvider _catalogProvider;
+        private readonly IBusinessClock _clock;
 
-        public AgentConsignmentFieldMapper(ISingleWindowReferenceCatalogSnapshotProvider catalogProvider)
+        public AgentConsignmentFieldMapper(
+            ISingleWindowReferenceCatalogSnapshotProvider catalogProvider,
+            IBusinessClock? clock = null)
         {
             _catalogProvider = catalogProvider ?? throw new ArgumentNullException(nameof(catalogProvider));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public AgentConsignmentFieldMapper()
-            : this(new SingleWindowReferenceCatalogSnapshotStore())
+            : this(new SingleWindowReferenceCatalogSnapshotStore(), BusinessClock.CreateSystem())
         {
         }
 
@@ -548,7 +558,7 @@ namespace ExportDocManager.Services.SingleWindow
                 OtherNote = PreferValue(existing?.OtherNote, NormalizeText(invoice.SpecialTerms)),
                 ConsignTele = PreferValue(existing?.ConsignTele, NormalizePhone(exporter?.Phone)),
                 EntryId = PreferValue(existing?.EntryId, string.Empty),
-                ReceiveDate = PreferValue(existing?.ReceiveDate, DateTime.Today.ToString("yyyyMMdd")),
+                ReceiveDate = PreferValue(existing?.ReceiveDate, _clock.Today.ToString("yyyyMMdd")),
                 PaperInfo = PreferValue(existing?.PaperInfo, string.Empty),
                 OtherRecInfo = PreferValue(existing?.OtherRecInfo, string.Empty),
                 DeclarePrice = PreferValue(existing?.DeclarePrice, string.Empty),

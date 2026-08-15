@@ -50,7 +50,8 @@ namespace ExportDocManager.Api.Tests
             string? desktopAccessToken = null,
             string? productEdition = null,
             ILicenseSignatureVerifier? licenseSignatureVerifier = null,
-            Action<IServiceCollection>? configureServices = null)
+            Action<IServiceCollection>? configureServices = null,
+            string? pathBase = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
             ArgumentException.ThrowIfNullOrWhiteSpace(databaseFileName);
@@ -65,6 +66,7 @@ namespace ExportDocManager.Api.Tests
                 productEdition,
                 licenseSignatureVerifier,
                 configureServices,
+                pathBase,
                 cleanupOnFailure: true);
         }
 
@@ -75,7 +77,8 @@ namespace ExportDocManager.Api.Tests
             string? desktopAccessToken = null,
             string? productEdition = null,
             ILicenseSignatureVerifier? licenseSignatureVerifier = null,
-            Action<IServiceCollection>? configureServices = null)
+            Action<IServiceCollection>? configureServices = null,
+            string? pathBase = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(appRoot);
             ArgumentException.ThrowIfNullOrWhiteSpace(dataRoot);
@@ -89,6 +92,7 @@ namespace ExportDocManager.Api.Tests
                 productEdition,
                 licenseSignatureVerifier,
                 configureServices,
+                pathBase,
                 cleanupOnFailure: false);
         }
 
@@ -100,6 +104,7 @@ namespace ExportDocManager.Api.Tests
             string? productEdition,
             ILicenseSignatureVerifier? licenseSignatureVerifier,
             Action<IServiceCollection>? configureServices,
+            string? pathBase,
             bool cleanupOnFailure)
         {
             string databasePath = Path.Combine(dataRoot, "Database", databaseFileName);
@@ -120,7 +125,8 @@ namespace ExportDocManager.Api.Tests
                     DataRoot = dataRoot,
                     ListenUrls = baseUrl,
                     DesktopAccessToken = desktopAccessToken ?? string.Empty,
-                    ProductEdition = ProductEditionCatalog.Normalize(productEdition ?? string.Empty)
+                    ProductEdition = ProductEditionCatalog.Normalize(productEdition ?? string.Empty),
+                    PathBase = pathBase ?? string.Empty
                 };
 
                 ApiStartupValidator.Validate(pathProvider, databaseSettings, runtimeOptions);
@@ -149,6 +155,7 @@ namespace ExportDocManager.Api.Tests
                 app.UseExportDocManagerApiSafety();
                 app.UseCors(ApiCorsPolicy.LocalFrontendPolicyName);
                 app.UseExportDocManagerReadiness(databaseSettings, runtimeOptions);
+                app.UsePathBase(runtimeOptions.PathBase);
                 app.UseRouting();
                 app.UseExportDocManagerDesktopAccess();
                 app.UseExportDocManagerApiAuthentication();

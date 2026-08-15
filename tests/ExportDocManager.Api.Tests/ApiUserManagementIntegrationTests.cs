@@ -180,19 +180,19 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, (await financeClient.GetAsync("/api/reports/templates?reportType=PaymentVoucher")).StatusCode);
             Assert.Equal(HttpStatusCode.OK, (await financeClient.PostAsync("/api/reports/templates/storage-check", null)).StatusCode);
 
-            string[] forbiddenPaths =
+            (HttpMethod Method, string Path)[] forbiddenRequests =
             [
-                "/api/dashboard",
-                "/api/invoices",
-                "/api/single-window/operation-center",
-                "/api/tools/excel/template/download",
-                "/api/tools/container-packing/projects",
-                "/api/crm/dashboard"
+                (HttpMethod.Get, "/api/dashboard"),
+                (HttpMethod.Get, "/api/invoices"),
+                (HttpMethod.Get, "/api/single-window/operation-center"),
+                (HttpMethod.Post, "/api/tools/excel/template/download"),
+                (HttpMethod.Get, "/api/tools/container-packing/projects"),
+                (HttpMethod.Get, "/api/crm/dashboard")
             ];
-            foreach (string path in forbiddenPaths)
+            foreach (var request in forbiddenRequests)
             {
-                var response = await financeClient.GetAsync(path);
-                Assert.True(response.StatusCode == HttpStatusCode.Forbidden, $"{path} returned {response.StatusCode}.");
+                using var response = await financeClient.SendAsync(new HttpRequestMessage(request.Method, request.Path));
+                Assert.True(response.StatusCode == HttpStatusCode.Forbidden, $"{request.Path} returned {response.StatusCode}.");
             }
         }
 

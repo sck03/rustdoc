@@ -3,6 +3,7 @@ using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
+using ExportDocManager.Services.Time;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -18,10 +19,6 @@ namespace ExportDocManager.Api.Hosting
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -52,10 +49,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiCustomsCooDocumentDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -85,10 +78,6 @@ namespace ExportDocManager.Api.Hosting
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -118,10 +107,6 @@ namespace ExportDocManager.Api.Hosting
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -151,10 +136,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiSingleWindowUnlockFieldsRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -183,13 +164,10 @@ namespace ExportDocManager.Api.Hosting
                 ISingleWindowHandoffPackageService handoffPackageService,
                 ISettingsService settingsService,
                 IAppPathProvider pathProvider,
+                IBusinessClock clock,
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -215,6 +193,7 @@ namespace ExportDocManager.Api.Hosting
                     handoffPackageService,
                     settingsService,
                     pathProvider,
+                    clock,
                     SingleWindowBusinessType.CustomsCoo,
                     invoiceId,
                     request,
@@ -235,13 +214,10 @@ namespace ExportDocManager.Api.Hosting
                 ISingleWindowHandoffPackageService handoffPackageService,
                 ISettingsService settingsService,
                 IAppPathProvider pathProvider,
+                IBusinessClock clock,
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 ApiSingleWindowSubmitPackageRequest request;
                 try
@@ -258,6 +234,7 @@ namespace ExportDocManager.Api.Hosting
                     handoffPackageService,
                     settingsService,
                     pathProvider,
+                    clock,
                     SingleWindowBusinessType.CustomsCoo,
                     invoiceId,
                     request,
@@ -280,10 +257,6 @@ namespace ExportDocManager.Api.Hosting
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -314,10 +287,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiAgentConsignmentDocumentDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -347,10 +316,6 @@ namespace ExportDocManager.Api.Hosting
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -380,10 +345,6 @@ namespace ExportDocManager.Api.Hosting
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -413,10 +374,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiSingleWindowUnlockFieldsRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (invoiceId <= 0)
                 {
@@ -445,13 +402,10 @@ namespace ExportDocManager.Api.Hosting
                 ISingleWindowHandoffPackageService handoffPackageService,
                 ISettingsService settingsService,
                 IAppPathProvider pathProvider,
+                IBusinessClock clock,
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -477,6 +431,7 @@ namespace ExportDocManager.Api.Hosting
                     handoffPackageService,
                     settingsService,
                     pathProvider,
+                    clock,
                     SingleWindowBusinessType.AgentConsignment,
                     invoiceId,
                     request,
@@ -497,13 +452,10 @@ namespace ExportDocManager.Api.Hosting
                 ISingleWindowHandoffPackageService handoffPackageService,
                 ISettingsService settingsService,
                 IAppPathProvider pathProvider,
+                IBusinessClock clock,
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 ApiSingleWindowSubmitPackageRequest request;
                 try
@@ -520,6 +472,7 @@ namespace ExportDocManager.Api.Hosting
                     handoffPackageService,
                     settingsService,
                     pathProvider,
+                    clock,
                     SingleWindowBusinessType.AgentConsignment,
                     invoiceId,
                     request,

@@ -6,6 +6,7 @@ using ExportDocManager.Models.SingleWindow;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.SingleWindow
@@ -21,6 +22,7 @@ namespace ExportDocManager.Services.SingleWindow
         private readonly ISettingsService _settingsService;
         private readonly ICustomsCooProducerProfileService _producerProfileService;
         private readonly BusinessDataAccessScope _businessDataAccessScope;
+        private readonly IBusinessClock _clock;
         private sealed record EditorSourceContext(
             Invoice Invoice,
             IReadOnlyList<Item> InvoiceItems,
@@ -34,7 +36,8 @@ namespace ExportDocManager.Services.SingleWindow
             ISettingsService settingsService,
             ICustomsCooProducerProfileService producerProfileService,
             DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope? businessDataAccessScope = null)
+            BusinessDataAccessScope? businessDataAccessScope = null,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _customsCooFieldMapper = customsCooFieldMapper ?? throw new ArgumentNullException(nameof(customsCooFieldMapper));
@@ -43,6 +46,7 @@ namespace ExportDocManager.Services.SingleWindow
             _producerProfileService = producerProfileService ?? throw new ArgumentNullException(nameof(producerProfileService));
             var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
             _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(normalizedSettings);
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         async Task<CustomsCooDocument> ICustomsCooDocumentService.GetOrCreateAsync(int invoiceId, CancellationToken cancellationToken)
@@ -115,4 +119,3 @@ namespace ExportDocManager.Services.SingleWindow
         }
     }
 }
-

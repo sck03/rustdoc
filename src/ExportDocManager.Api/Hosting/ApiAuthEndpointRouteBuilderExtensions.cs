@@ -45,7 +45,8 @@ namespace ExportDocManager.Api.Hosting
                 var initializationResult = await databaseInitializationService.InitializeAsync(
                     username,
                     password,
-                    bootstrapToken ?? string.Empty);
+                    bootstrapToken ?? string.Empty,
+                    context.RequestAborted);
                 if (!initializationResult.IsSuccess)
                 {
                     if (initializationResult.IsAuthenticationFailure)

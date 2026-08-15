@@ -24,7 +24,7 @@ namespace ExportDocManager.Services.Core
         {
             byte[] bytes = DecodePngDataUrl(imageDataUrl);
             string marksRoot = GetMarksRoot();
-            string fileName = $"Mark_{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.png";
+            string fileName = $"Mark_{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.png";
             string imagePath = Path.Combine(marksRoot, fileName);
 
             await AtomicFileHelper.WriteFileAtomicAsync(

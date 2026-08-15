@@ -53,7 +53,7 @@ if ($NoRestore) {
 }
 if (-not $hasBrowserPdfRenderer) {
     $browserPdfFilter = @(
-        "FullyQualifiedName!~RenderBuiltInProgramTemplatesToPdf_ShouldUseProgramRootBrowserAndRuntimeDataRoot",
+        "FullyQualifiedName!~RenderBuiltInProgramTemplatesToPdf_ShouldUseConfiguredRendererAndRuntimeDataRoot",
         "FullyQualifiedName!~RenderBuiltInProgramTemplatesWithMultiItemBusinessDataToPdf_ShouldPreservePaginationAndDomainIsolation"
     ) -join "&"
     $arguments += @("--filter", $browserPdfFilter)

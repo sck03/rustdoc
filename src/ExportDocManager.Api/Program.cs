@@ -28,6 +28,10 @@ var databaseSettings = DbHelper.LoadDatabaseSettings(pathProvider);
 ApiStartupValidator.Validate(pathProvider, databaseSettings, runtimeOptions);
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.ClearProviders();
+builder.Logging.AddSimpleConsole(options => options.SingleLine = true);
+builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
 builder.WebHost.UseUrls(runtimeOptions.ListenUrls);
 builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxRequestBodySize = ApiUploadLimits.MaximumRequestBodyBytes);
@@ -56,6 +60,7 @@ if (args.Any(value => string.Equals(value, "--verify-browser-runtime", StringCom
 }
 
 app.UseExportDocManagerForwardedHeaders(runtimeOptions);
+app.UsePathBase(runtimeOptions.PathBase);
 app.UseExportDocManagerApiSafety();
 app.UseCors(ApiCorsPolicy.LocalFrontendPolicyName);
 app.UseExportDocManagerReadiness(databaseSettings, runtimeOptions);
@@ -75,7 +80,7 @@ try
 {
     var server = app.Services.GetRequiredService<IServer>();
     var addresses = server.Features.Get<IServerAddressesFeature>()?.Addresses ?? app.Urls;
-    ApiEndpointPublication.Publish(runtimeOptions.EndpointFile, addresses);
+    ApiEndpointPublication.Publish(runtimeOptions.EndpointFile, addresses, runtimeOptions.PathBase);
     await app.WaitForShutdownAsync();
 }
 finally

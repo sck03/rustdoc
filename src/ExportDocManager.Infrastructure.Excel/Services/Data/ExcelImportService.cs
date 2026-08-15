@@ -5,6 +5,7 @@ using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using System.Globalization;
 using System.Text;
@@ -38,16 +39,26 @@ namespace ExportDocManager.Services.Data
 
         private readonly ISettingsService _settingsService;
         private readonly IExcelImportAnalyzer _analyzer;
+        private readonly IBusinessClock _clock;
 
         public ExcelImportService(ISettingsService settingsService)
-            : this(settingsService, new BuiltInExcelImportAnalyzer())
+            : this(settingsService, new BuiltInExcelImportAnalyzer(), BusinessClock.CreateSystem())
         {
         }
 
         public ExcelImportService(ISettingsService settingsService, IExcelImportAnalyzer analyzer)
+            : this(settingsService, analyzer, BusinessClock.CreateSystem())
         {
-            _settingsService = settingsService;
-            _analyzer = analyzer;
+        }
+
+        public ExcelImportService(
+            ISettingsService settingsService,
+            IExcelImportAnalyzer analyzer,
+            IBusinessClock clock)
+        {
+            _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+            _analyzer = analyzer ?? throw new ArgumentNullException(nameof(analyzer));
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         }
 
         public async Task<ImportResult> ImportFromExcelAsync(string filePath, CancellationToken cancellationToken = default)

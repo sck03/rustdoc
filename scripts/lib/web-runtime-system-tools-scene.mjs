@@ -377,14 +377,13 @@ export function createSystemToolsSmokeScene(runtime) {
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let response;
     try {
-      response = await fetch(new URL("/api/tools/ocr/recognize-image-content", ensureTrailingSlash(options.apiBaseUrl)), {
+      const recognizeUrl = new URL("/api/tools/ocr/recognize-image-upload", ensureTrailingSlash(options.apiBaseUrl));
+      recognizeUrl.searchParams.set("sourceName", sample.sourceName);
+      recognizeUrl.searchParams.set("sourceMimeType", sample.sourceMimeType);
+      response = await fetch(recognizeUrl, {
         method: "POST",
-        headers: authorizedJsonHeaders(options, accessToken, tokenType),
-        body: JSON.stringify({
-          imageContentBase64: sample.imageContentBase64,
-          sourceName: sample.sourceName,
-          sourceMimeType: sample.sourceMimeType,
-        }),
+        headers: { ...authorizedJsonHeaders(options, accessToken, tokenType), "Content-Type": "application/octet-stream" },
+        body: Buffer.from(sample.imageContentBase64, "base64"),
         signal: controller.signal,
       });
     } catch (error) {

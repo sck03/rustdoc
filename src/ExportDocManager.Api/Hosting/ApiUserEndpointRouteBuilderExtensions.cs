@@ -19,11 +19,7 @@ namespace ExportDocManager.Api.Hosting
                 IPermissionTemplateService permissionTemplateService,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user is null)
-                {
-                    return TypedResults.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageUsers(user))
                 {
@@ -61,11 +57,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiUserSaveRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user is null)
-                {
-                    return TypedResults.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageUsers(user))
                 {
@@ -130,11 +122,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiUserSaveRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user is null)
-                {
-                    return TypedResults.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageUsers(user))
                 {
@@ -203,11 +191,7 @@ namespace ExportDocManager.Api.Hosting
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user is null)
-                {
-                    return TypedResults.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageUsers(user))
                 {

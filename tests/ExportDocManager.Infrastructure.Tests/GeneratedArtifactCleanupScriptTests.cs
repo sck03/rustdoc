@@ -167,7 +167,8 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("--user-data-dir=$profile", browserPdfScript, StringComparison.Ordinal);
             Assert.Contains("CHROME_LOG_FILE", browserPdfScript, StringComparison.Ordinal);
             Assert.Contains("--disable-logging", browserPdfScript, StringComparison.Ordinal);
-            Assert.Contains("WaitForExit(60000)", browserPdfScript, StringComparison.Ordinal);
+            Assert.Contains("-TimeoutSeconds 60", browserPdfScript, StringComparison.Ordinal);
+            Assert.Contains("Invoke-ExportDocExternal", browserPdfScript, StringComparison.Ordinal);
             Assert.Contains("chrome_debug.log", browserPdfScript, StringComparison.Ordinal);
             Assert.Contains("$existingTransientLogs", browserPdfScript, StringComparison.Ordinal);
             Assert.DoesNotContain("Path]::GetTempPath", browserPdfScript, StringComparison.Ordinal);
@@ -178,6 +179,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             string verifier = File.ReadAllText(ResolveWorkspacePath("scripts", "verify-script-suite.ps1"));
             string apiClientGenerator = File.ReadAllText(ResolveWorkspacePath("scripts", "generate-api-client.ps1"));
+            string apiClientGeneratorSource = File.ReadAllText(ResolveWorkspacePath("tools", "ExportDocManager.ApiClientGenerator", "Program.cs"));
             string testRunner = File.ReadAllText(ResolveWorkspacePath("scripts", "run-tests.ps1"));
 
             Assert.Contains("Get-ChildItem -LiteralPath $scriptRoot -Recurse -File", verifier, StringComparison.Ordinal);
@@ -189,6 +191,8 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("run-powershell-entry.cmd", verifier, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Invoke-ExportDocExternal -FilePath \"dotnet\"", apiClientGenerator, StringComparison.Ordinal);
             Assert.DoesNotContain("dotnet run --project", apiClientGenerator, StringComparison.Ordinal);
+            Assert.Contains("-p:NuGetAudit=false", apiClientGenerator, StringComparison.Ordinal);
+            Assert.Contains("contentType.startsWith(\\\"image/\\\")", apiClientGeneratorSource, StringComparison.Ordinal);
             Assert.Contains("verify-script-suite.ps1", testRunner, StringComparison.Ordinal);
             Assert.Contains("RequireBrowserPdfTests", testRunner, StringComparison.Ordinal);
             Assert.Contains("EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE", testRunner, StringComparison.Ordinal);
@@ -228,7 +232,7 @@ namespace ExportDocManager.Infrastructure.Tests
             string sharedHost = File.ReadAllText(ResolveWorkspacePath("scripts", "lib", "run-powershell-entry.cmd"));
             string powerShellSupport = File.ReadAllText(ResolveWorkspacePath("scripts", "lib", "build-script-support.ps1"));
             Assert.Contains("where pwsh.exe", sharedHost, StringComparison.OrdinalIgnoreCase);
-            Assert.Contains("where powershell.exe", sharedHost, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("where powershell.exe", sharedHost, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("-ExecutionPolicy Bypass", sharedHost, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("set \"EXPORTDOCMANAGER_NO_PAUSE=1\"", sharedHost, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("\"%%~A\"==\"-NoPause\"", sharedHost, StringComparison.OrdinalIgnoreCase);
@@ -241,6 +245,9 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("Generated cleanup source must stay below", powerShellSupport, StringComparison.Ordinal);
             Assert.Contains("AllowedRoot and QuarantineRoot must be provided together", powerShellSupport, StringComparison.Ordinal);
             Assert.Contains("WebView2 can keep BrowserMetrics files open briefly", powerShellSupport, StringComparison.Ordinal);
+            Assert.All(["function Wait-ExportDocExternalProcess", "$Process.Kill($true)", "HeartbeatSeconds", "ReadToEndAsync",
+                "CreateNoWindow = $CaptureOutput", "GetUnresolvedProviderPathFromPSPath"],
+                expected => Assert.Contains(expected, powerShellSupport, StringComparison.Ordinal));
 
             (string CommandFile, string PowerShellFile)[] entryPoints =
             {

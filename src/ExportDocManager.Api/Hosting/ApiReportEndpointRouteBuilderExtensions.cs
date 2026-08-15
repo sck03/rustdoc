@@ -1,20 +1,28 @@
+using ExportDocManager.Services.Security;
+
 namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiEndpointRouteBuilderExtensions
     {
         private static void MapReportEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapReportTemplateEndpoints();
-            endpoints.MapUserReportTemplateEndpoints();
-            endpoints.MapInvoiceReportHtmlPreviewEndpoints();
-            endpoints.MapInvoiceDocumentPackageHtmlPreviewEndpoints();
-            endpoints.MapPaymentDraftReportHtmlPreviewEndpoints();
-            endpoints.MapPaymentReportHtmlPreviewEndpoints();
-            endpoints.MapInvoiceReportPdfEndpoint();
-            endpoints.MapPaymentReportPdfEndpoint();
-            endpoints.MapInvoiceReportPdfZipEndpoint();
-            endpoints.MapInvoiceDocumentPackageEndpoint();
-            endpoints.MapInvoiceDocumentEmailEndpoint();
+            endpoints.MapPermissionGroup(PermissionModuleCatalog.DocumentReports)
+                .MapReportTemplateEndpoints();
+            endpoints.MapPermissionGroup(PermissionModuleCatalog.DocumentReports)
+                .MapUserReportTemplateEndpoints();
+            var invoiceReports = endpoints.MapPermissionGroup(
+                PermissionModuleCatalog.DocumentInvoiceReports);
+            invoiceReports.MapInvoiceReportHtmlPreviewEndpoints();
+            invoiceReports.MapInvoiceDocumentPackageHtmlPreviewEndpoints();
+            invoiceReports.MapInvoiceReportPdfEndpoint();
+            invoiceReports.MapInvoiceReportPdfZipEndpoint();
+            invoiceReports.MapInvoiceDocumentPackageEndpoint();
+            invoiceReports.MapInvoiceDocumentEmailEndpoint();
+            var paymentReports = endpoints.MapPermissionGroup(
+                PermissionModuleCatalog.DocumentPaymentReports);
+            paymentReports.MapPaymentDraftReportHtmlPreviewEndpoints();
+            paymentReports.MapPaymentReportHtmlPreviewEndpoints();
+            paymentReports.MapPaymentReportPdfEndpoint();
         }
     }
 }

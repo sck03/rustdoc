@@ -19,6 +19,7 @@ if ([System.IO.Path]::IsPathRooted($OutputPath)) {
 Invoke-ExportDocExternal -FilePath "dotnet" -Arguments @(
     "run",
     "--project", $toolProject,
+    "-p:NuGetAudit=false",
     "--",
     "--output", $resolvedOutput,
     "--base-url", $BaseUrl

@@ -7,8 +7,8 @@ namespace ExportDocManager.Api.Hosting
         public const string FilePathStoragePolicy =
             "智能 OCR 只读取用户显式选择或输入的图片路径，识别文本随响应返回；不会复制源图片、写入默认输出目录或创建系统 C 盘落点。OCR 模型仍随程序放在 OcrModels/ 下。";
 
-        public const string InMemoryStoragePolicy =
-            "智能 OCR 剪贴板等无路径图片只通过请求体内存传递，识别文本随响应返回；不会把图片落地为临时文件、写入数据库、创建默认输出目录或创建系统 C 盘落点。OCR 模型仍随程序放在 OcrModels/ 下。";
+        public const string UploadStoragePolicy =
+            "智能 OCR 剪贴板等无路径图片只通过二进制请求体在内存中传递，识别文本随响应返回；不会把图片落地为临时文件、写入数据库、创建默认输出目录或创建系统 C 盘落点。OCR 模型仍随程序放在 OcrModels/ 下。";
 
         public static ApiOcrRecognizeImageResponse FromResult(
             OcrResult result,

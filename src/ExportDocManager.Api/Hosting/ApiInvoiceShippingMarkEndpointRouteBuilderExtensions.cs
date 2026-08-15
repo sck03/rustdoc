@@ -14,10 +14,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiShippingMarkImageSaveRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (request == null || string.IsNullOrWhiteSpace(request.ImageDataUrl))
                 {
@@ -55,10 +51,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiShippingMarkImagePreviewRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (request == null || string.IsNullOrWhiteSpace(request.ImagePath))
                 {

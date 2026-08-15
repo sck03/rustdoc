@@ -362,7 +362,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public async Task RenderBuiltInProgramTemplatesToPdf_ShouldUseProgramRootBrowserAndRuntimeDataRoot()
+        public async Task RenderBuiltInProgramTemplatesToPdf_ShouldUseConfiguredRendererAndRuntimeDataRoot()
         {
             string repositoryRoot = FindRepositoryRoot();
             string appRoot = repositoryRoot;
@@ -373,7 +373,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
                 Assert.True(ReportFontPolicy.Inspect(pathProvider).Complete, "Pinned Noto CJK report fonts must be provisioned before formal PDF validation.");
                 string rendererPath = new ChromiumHtmlToPdfService(pathProvider).ResolveRendererExecutablePath();
-                Assert.StartsWith(Path.Combine(appRoot, "Browsers"), rendererPath, StringComparison.OrdinalIgnoreCase);
+                AssertRendererPath(rendererPath, appRoot);
                 await using var browserRuntime = new BrowserRuntimeManager();
                 await using var browserHost = new ManagedPlaywrightPdfBrowserHost(
                     browserRuntime,
@@ -1356,7 +1356,7 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal(testCase.TemplatePath, result.TemplatePath);
             Assert.StartsWith(Path.Combine(appRoot, "Templates"), result.TemplatePath, StringComparison.OrdinalIgnoreCase);
             Assert.StartsWith(Path.GetFullPath(dataRoot), result.DestinationPath, StringComparison.OrdinalIgnoreCase);
-            Assert.StartsWith(Path.Combine(appRoot, "Browsers"), result.RendererPath, StringComparison.OrdinalIgnoreCase);
+            AssertRendererPath(result.RendererPath, appRoot);
             Assert.True(File.Exists(result.DestinationPath), $"PDF was not created: {result.DestinationPath}");
             AssertTemplatePageOrientation(testCase);
 
@@ -1387,6 +1387,20 @@ namespace ExportDocManager.Infrastructure.Tests
                         },
                         new JsonSerializerOptions { WriteIndented = true }));
             }
+        }
+
+        private static void AssertRendererPath(string rendererPath, string appRoot)
+        {
+            string? configuredPath = Environment.GetEnvironmentVariable(
+                ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable);
+            if (string.IsNullOrWhiteSpace(configuredPath))
+            {
+                Assert.StartsWith(Path.Combine(appRoot, "Browsers"), rendererPath, StringComparison.OrdinalIgnoreCase);
+                return;
+            }
+
+            string expectedPath = Path.GetFullPath(configuredPath.Trim().Trim('"'));
+            Assert.Equal(expectedPath, rendererPath, ignoreCase: OperatingSystem.IsWindows());
         }
 
         private static void AssertTemplatePageOrientation(BuiltInPdfCase testCase)

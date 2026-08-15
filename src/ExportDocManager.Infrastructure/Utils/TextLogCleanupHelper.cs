@@ -24,11 +24,11 @@ namespace ExportDocManager.Utils
             var files = Directory.EnumerateFiles(logsPath, "*", SearchOption.TopDirectoryOnly)
                 .Where(path => IsTextLogExtension(Path.GetExtension(path)))
                 .Select(path => new FileInfo(path))
-                .OrderByDescending(file => file.LastWriteTime)
+                .OrderByDescending(file => file.LastWriteTimeUtc)
                 .ToList();
             return CleanEntries(
                 files,
-                file => file.LastWriteTime,
+                file => file.LastWriteTimeUtc,
                 file => TryDeleteFile(file.FullName),
                 retentionDays,
                 retainedFileCount);
@@ -44,12 +44,12 @@ namespace ExportDocManager.Utils
             string pattern = string.IsNullOrWhiteSpace(searchPattern) ? "*" : searchPattern.Trim();
             var files = Directory.GetFiles(directoryPath, pattern, SearchOption.TopDirectoryOnly)
                 .Select(path => new FileInfo(path))
-                .OrderByDescending(file => file.LastWriteTime)
+                .OrderByDescending(file => file.LastWriteTimeUtc)
                 .ToList();
 
             return CleanEntries(
                 files,
-                file => file.LastWriteTime,
+                file => file.LastWriteTimeUtc,
                 file => TryDeleteFile(file.FullName),
                 retentionDays,
                 retainedFileCount);
@@ -64,12 +64,12 @@ namespace ExportDocManager.Utils
 
             var directories = Directory.GetDirectories(rootPath, "*", SearchOption.TopDirectoryOnly)
                 .Select(path => new DirectoryInfo(path))
-                .OrderByDescending(directory => directory.LastWriteTime)
+                .OrderByDescending(directory => directory.LastWriteTimeUtc)
                 .ToList();
 
             return CleanEntries(
                 directories,
-                directory => directory.LastWriteTime,
+                directory => directory.LastWriteTimeUtc,
                 directory => TryDeleteDirectory(directory.FullName),
                 retentionDays,
                 retainedDirectoryCount);
@@ -77,7 +77,7 @@ namespace ExportDocManager.Utils
 
         private static TextLogCleanupSummary CleanEntries<T>(
             List<T> entries,
-            Func<T, DateTime> getLastWriteTime,
+            Func<T, DateTimeOffset> getLastWriteTime,
             Func<T, bool> tryDelete,
             int retentionDays,
             int retainedCount)
@@ -87,7 +87,7 @@ namespace ExportDocManager.Utils
 
             if (retentionDays > 0)
             {
-                var cutoff = DateTime.Now.AddDays(-retentionDays);
+                var cutoff = DateTimeOffset.UtcNow.AddDays(-retentionDays);
                 foreach (var entry in entries.Where(entry => getLastWriteTime(entry) < cutoff).ToList())
                 {
                     if (tryDelete(entry))

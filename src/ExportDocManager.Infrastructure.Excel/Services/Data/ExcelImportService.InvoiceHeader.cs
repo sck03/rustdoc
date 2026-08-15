@@ -35,7 +35,7 @@ namespace ExportDocManager.Services.Data
                 }
                 catch
                 {
-                    invoice.InvoiceDate = DateOnly.FromDateTime(DateTime.Today);
+                    invoice.InvoiceDate = _clock.Today;
                 }
 
                 invoice.ShipmentDate = invoice.InvoiceDate;

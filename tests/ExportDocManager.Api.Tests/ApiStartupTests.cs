@@ -18,10 +18,10 @@ using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Services.Tools;
+using ExportDocManager.Services.Time;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Primitives;
 
 namespace ExportDocManager.Api.Tests
 {
@@ -43,6 +43,8 @@ namespace ExportDocManager.Api.Tests
                 "--urls", "http://127.0.0.1:5199",
                 "--endpoint-file", endpointFile,
                 "--network-mode", "true",
+                "--path-base", "/exportdoc/",
+                "--business-time-zone", "Asia/Shanghai",
                 "--allowed-origins", "https://erp.example.com;http://192.168.1.20:8080",
                 "--trusted-proxies", "172.30.238.10;::1"
             ]);
@@ -52,6 +54,8 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("http://127.0.0.1:5199", options.ListenUrls);
             Assert.Equal(Path.GetFullPath(endpointFile), options.EndpointFile);
             Assert.True(options.NetworkMode);
+            Assert.Equal("/exportdoc", options.PathBase);
+            Assert.Equal("Asia/Shanghai", options.BusinessTimeZoneId);
             Assert.Equal(2, options.AllowedOrigins.Count);
             Assert.Equal(2, options.TrustedProxies.Count);
             Assert.Contains(IPAddress.Parse("172.30.238.10"), options.TrustedProxies);
@@ -96,6 +100,17 @@ namespace ExportDocManager.Api.Tests
                 }
                 ApiEndpointPublication.Remove(endpointFile);
                 Assert.False(File.Exists(endpointFile));
+                ApiEndpointPublication.Publish(
+                    endpointFile,
+                    ["http://127.0.0.1:5199"],
+                    "/exportdoc");
+                using (JsonDocument publication = JsonDocument.Parse(File.ReadAllBytes(endpointFile)))
+                {
+                    Assert.Equal(
+                        "http://127.0.0.1:5199/exportdoc",
+                        publication.RootElement.GetProperty("apiBaseUrl").GetString());
+                }
+                ApiEndpointPublication.Remove(endpointFile);
                 Assert.Throws<InvalidOperationException>(() => ApiEndpointPublication.ResolveApiBaseUrl(
                     ["http://127.0.0.1:5199", "http://127.0.0.1:5200"]));
                 Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.ValidateEndpointPublication(
@@ -120,6 +135,17 @@ namespace ExportDocManager.Api.Tests
                 DeleteDirectoryIfExists(appRoot);
                 DeleteDirectoryIfExists(dataRoot);
             }
+        }
+
+        [Theory]
+        [InlineData("exportdoc")]
+        [InlineData("/exportdoc/../admin")]
+        [InlineData("/exportdoc?debug=true")]
+        [InlineData("/exportdoc%2Fadmin")]
+        public void Parse_ShouldRejectUnsafePathBase(string value)
+        {
+            Assert.Throws<InvalidOperationException>(() =>
+                ApiRuntimeOptions.Parse(["--path-base", value]));
         }
 
         [Fact]
@@ -610,115 +636,53 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Theory]
-        [InlineData("/api/crm/customers", ProductEditionCatalog.Sales)]
-        [InlineData("/api/email-templates", ProductEditionCatalog.Sales)]
-        [InlineData("/api/invoices", ProductEditionCatalog.Document)]
-        [InlineData("/api/dashboard", ProductEditionCatalog.Document)]
-        [InlineData("/api/master-data/customers", ProductEditionCatalog.Document)]
-        [InlineData("/api/custom-options/Currency", ProductEditionCatalog.Document)]
-        [InlineData("/api/reports/templates", ProductEditionCatalog.Document)]
-        public void ApiWorkspaceAccessMiddleware_ShouldClassifyWorkspaceRoutes(string path, string expected)
+        [InlineData("GET", PermissionModuleCatalog.DocumentReferenceData, PermissionAccessLevel.View)]
+        [InlineData("POST", PermissionModuleCatalog.DocumentMasterData, PermissionAccessLevel.Operate)]
+        [InlineData("DELETE", PermissionModuleCatalog.DocumentMasterData, PermissionAccessLevel.Manage)]
+        public void EndpointPermissionMetadata_ShouldResolveMethodPolicy(
+            string method,
+            string expectedModule,
+            string expectedAccess)
         {
-            Assert.Equal(expected, ApiWorkspaceAccessMiddleware.GetRequiredWorkspace(path));
+            var context = new DefaultHttpContext();
+            context.Request.Method = method;
+            var metadata = new ApiEndpointPermissionMetadata(
+                PermissionModuleCatalog.DocumentReferenceData,
+                PermissionModuleCatalog.DocumentMasterData);
+
+            var requirement = metadata.Resolve(context);
+
+            Assert.Equal(expectedModule, requirement.Module);
+            Assert.Equal(expectedAccess, requirement.AccessLevel);
+        }
+
+        [Theory]
+        [InlineData("ExportDocument", PermissionModuleCatalog.DocumentInvoiceReports)]
+        [InlineData("PaymentVoucher", PermissionModuleCatalog.DocumentPaymentReports)]
+        [InlineData("Unknown", PermissionModuleCatalog.DocumentReports)]
+        public void EndpointPermissionMetadata_ShouldResolveReportType(
+            string reportType,
+            string expectedModule)
+        {
+            var context = new DefaultHttpContext();
+            context.Request.Method = HttpMethods.Get;
+            context.Request.QueryString = new QueryString($"?reportType={reportType}");
+            var metadata = new ApiEndpointPermissionMetadata(
+                PermissionModuleCatalog.DocumentReports,
+                Selector: ApiPermissionSelector.ReportType);
+
+            Assert.Equal(expectedModule, metadata.Resolve(context).Module);
         }
 
         [Fact]
-        public void ApiWorkspaceAccessMiddleware_ShouldClassifyModuleAndActionAccess()
+        public async Task UnknownBusinessApiRoute_ShouldRemainNotFound()
         {
-            Assert.Equal(
-                PermissionModuleCatalog.DocumentReferenceData,
-                ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/master-data/payees", HttpMethods.Get));
-            Assert.Equal(
-                PermissionModuleCatalog.DocumentMasterData,
-                ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/master-data/payees", HttpMethods.Post));
-            Assert.Equal(
-                PermissionModuleCatalog.DocumentReferenceData,
-                ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/master-data/units", HttpMethods.Get));
-            Assert.Equal(
-                PermissionModuleCatalog.CommonProductReference,
-                ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/master-data/products", HttpMethods.Get));
-            Assert.Equal(
-                PermissionModuleCatalog.DocumentMasterData,
-                ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/master-data/products", HttpMethods.Post));
-            Assert.Equal(
-                PermissionModuleCatalog.DocumentMasterData,
-                ApiWorkspaceAccessMiddleware.GetRequiredModule(
-                    "/api/master-data/exporters/1/seals/document/upload",
-                    HttpMethods.Post));
-            Assert.Equal(
-                PermissionModuleCatalog.DocumentHsKnowledge,
-                ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/master-data/hs-codes", HttpMethods.Get));
-            Assert.Equal(
-                PermissionModuleCatalog.DocumentHsKnowledge,
-                ApiWorkspaceAccessMiddleware.GetRequiredModule(
-                    "/api/master-data/hs-knowledge/export",
-                    HttpMethods.Get));
-            Assert.Equal(
-                PermissionAccessLevel.Operate,
-                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
-                    "/api/master-data/exporters/1/seals/document/upload",
-                    HttpMethods.Post));
-            Assert.Equal(
-                PermissionModuleCatalog.DocumentInvoices,
-                ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/invoices/hs-knowledge/search", HttpMethods.Get));
-            Assert.Equal(
-                PermissionModuleCatalog.DocumentInvoices,
-                ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/invoices/hs-knowledge/feedback", HttpMethods.Post));
-            Assert.Equal(
-                PermissionModuleCatalog.DocumentPaymentReports,
-                ApiWorkspaceAccessMiddleware.GetRequiredModule("/api/reports/payments/5/pdf", HttpMethods.Post));
-            Assert.Equal(
-                PermissionModuleCatalog.DocumentInvoiceReports,
-                ApiWorkspaceAccessMiddleware.GetRequiredModule(
-                    "/api/reports/templates",
-                    HttpMethods.Get,
-                    new QueryCollection(new Dictionary<string, StringValues>
-                    {
-                        ["reportType"] = "ExportDocument"
-                    })));
-            Assert.Equal(PermissionAccessLevel.View, ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(HttpMethods.Get));
-            Assert.Equal(PermissionAccessLevel.Operate, ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(HttpMethods.Post));
-            Assert.Equal(PermissionAccessLevel.Manage, ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(HttpMethods.Delete));
-            Assert.Equal(
-                PermissionAccessLevel.Operate,
-                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
-                    "/api/reports/user-templates/42",
-                    HttpMethods.Delete));
-            Assert.Equal(
-                PermissionAccessLevel.Manage,
-                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
-                    "/api/reports/templates/example.html",
-                    HttpMethods.Delete));
-            Assert.Equal(
-                PermissionAccessLevel.Manage,
-                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
-                    "/api/master-data/hs-knowledge/examples",
-                    HttpMethods.Post));
-            Assert.Equal(
-                PermissionAccessLevel.Manage,
-                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
-                    "/api/master-data/hs-knowledge/remote-candidates/review-batch",
-                    HttpMethods.Post));
-            Assert.Equal(
-                PermissionAccessLevel.Manage,
-                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
-                    "/api/master-data/hs-codes/import-upload",
-                    HttpMethods.Post));
-            Assert.Equal(
-                PermissionAccessLevel.Manage,
-                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
-                    "/api/master-data/hs-codes",
-                    HttpMethods.Post));
-            Assert.Equal(
-                PermissionAccessLevel.Manage,
-                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
-                    "/api/tools/container-packing/container-types",
-                    HttpMethods.Post));
-            Assert.Equal(
-                PermissionAccessLevel.View,
-                ApiWorkspaceAccessMiddleware.GetRequiredAccessLevel(
-                    "/api/tools/container-packing/container-types",
-                    HttpMethods.Get));
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-unknown-route",
+                "unknown-route.db");
+            using var response = await harness.CreateClient().GetAsync("/api/invoices/not-exist");
+
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         }
 
         [Theory]
@@ -803,6 +767,7 @@ namespace ExportDocManager.Api.Tests
                 services.AddSingleton<IInvoiceService>(new PatternInvoiceService());
                 services.AddSingleton<IReportPdfRenderService, TestReportPdfRenderService>();
                 services.AddSingleton<IPdfMergeService, TestPdfMergeService>();
+                services.AddSingleton<IBusinessClock>(BusinessClock.CreateSystem());
                 services.AddSingleton<ISettingsService>(new TestSettingsService(new AppSettings
                 {
                     BatchExport = new BatchExportSettings
@@ -2181,11 +2146,26 @@ namespace ExportDocManager.Api.Tests
                     item.StorageClass == "database-file" &&
                     item.Requirement == ApiRuntimePathRequirement.Core &&
                     item.Path == Path.Combine(dataRoot, "Database", "exportdoc.db"));
-                Assert.Contains(response.RuntimeDependencies, item =>
-                    item.Key == "report-renderer" &&
-                    item.Requirement == ApiRuntimePathRequirement.Feature &&
-                    item.Status == "missing" &&
-                    !item.Ready);
+                var reportRenderer = Assert.Single(
+                    response.RuntimeDependencies,
+                    item => item.Key == "report-renderer");
+                Assert.Equal(ApiRuntimePathRequirement.Feature, reportRenderer.Requirement);
+                string? configuredRenderer = Environment.GetEnvironmentVariable(
+                    BrowserExecutableResolver.ChromiumExecutableEnvironmentVariable);
+                if (string.IsNullOrWhiteSpace(configuredRenderer))
+                {
+                    Assert.Equal("missing", reportRenderer.Status);
+                    Assert.False(reportRenderer.Ready);
+                }
+                else
+                {
+                    Assert.Equal("ready", reportRenderer.Status);
+                    Assert.True(reportRenderer.Ready);
+                    Assert.Equal(
+                        Path.GetFullPath(configuredRenderer.Trim().Trim('"')),
+                        reportRenderer.ResolvedPath,
+                        ignoreCase: OperatingSystem.IsWindows());
+                }
                 Assert.Equal(string.Empty, publicResponse.AppRoot);
                 Assert.Equal(string.Empty, publicResponse.DataRoot);
                 Assert.Empty(publicResponse.RuntimePaths);

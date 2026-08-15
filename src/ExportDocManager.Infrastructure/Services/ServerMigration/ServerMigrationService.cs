@@ -4,6 +4,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Infrastructure;
@@ -23,14 +24,17 @@ public sealed class ServerMigrationService : IServerMigrationService
     private readonly DatabaseConnectionSettings _databaseSettings;
     private readonly IAppPathProvider _pathProvider;
     private readonly ServerMigrationPackageGenerator _packageGenerator;
+    private readonly IBusinessClock _clock;
 
     public ServerMigrationService(
         DatabaseConnectionSettings databaseSettings,
         IAppPathProvider pathProvider,
-        ISharedDatabaseMaintenanceService databaseMaintenance)
+        ISharedDatabaseMaintenanceService databaseMaintenance,
+        IBusinessClock? clock = null)
     {
         _databaseSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
         _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+        _clock = clock ?? BusinessClock.CreateSystem();
         _packageGenerator = new ServerMigrationPackageGenerator(
             pathProvider,
             databaseMaintenance ?? throw new ArgumentNullException(nameof(databaseMaintenance)),
@@ -106,7 +110,7 @@ public sealed class ServerMigrationService : IServerMigrationService
             payloadPath = Path.Combine(workingRoot, "payload.zip");
             packagePath = Path.Combine(
                 PackageRoot,
-                $"server-migration-{DateTime.Now:yyyyMMdd-HHmmss}-{packageId[..8]}{ServerMigrationLayout.PackageExtension}");
+                $"server-migration-{_clock.Now:yyyyMMdd-HHmmss}-{packageId[..8]}{ServerMigrationLayout.PackageExtension}");
             Directory.CreateDirectory(workingRoot);
             RuntimeFilePermissionHelper.RestrictDirectory(workingRoot);
             ServerMigrationSecurityAudit.Write(

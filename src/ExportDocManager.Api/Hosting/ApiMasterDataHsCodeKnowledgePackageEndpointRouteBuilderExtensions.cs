@@ -1,6 +1,7 @@
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -11,18 +12,14 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/master-data/hs-knowledge/export", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IHsCodeKnowledgeService service,
                 IAppPathProvider pathProvider,
+                IBusinessClock clock,
                 DateTimeOffset? since,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(
                         user,
@@ -36,7 +33,7 @@ namespace ExportDocManager.Api.Hosting
                     pathProvider,
                     "HsKnowledgeExports",
                     "knowledge-export");
-                string fileName = $"ExportDocManager-HsLibrary-{DateTime.Now:yyyyMMdd}.edmhs";
+                string fileName = $"ExportDocManager-HsLibrary-{clock.Now:yyyyMMdd}.edmhs";
                 string outputPath = Path.Combine(exportDirectory, fileName);
                 try
                 {
@@ -69,21 +66,19 @@ namespace ExportDocManager.Api.Hosting
                     return WriteServiceException(ex);
                 }
             }).WithName("ExportHsCodeKnowledge")
+            .WithApiPermission(
+                PermissionModuleCatalog.DocumentHsKnowledge,
+                readAccessLevel: PermissionAccessLevel.Manage)
             .Produces<byte[]>(StatusCodes.Status200OK, "application/vnd.exportdocmanager.hs-knowledge+zip")
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/master-data/hs-knowledge/import", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IHsCodeKnowledgeService service,
                 IAppPathProvider pathProvider,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 string tempRoot = RuntimeCachePathHelper.CreateUniqueDirectory(
                     pathProvider,

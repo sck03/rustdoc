@@ -21,10 +21,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiLetterOfCreditImportRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -92,10 +88,6 @@ namespace ExportDocManager.Api.Hosting
                 string? fileName,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 string uploadRoot = Path.Combine(
                     pathProvider.CacheRoot,
@@ -174,10 +166,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiLetterOfCreditReviewRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (request?.Invoice == null)
                 {

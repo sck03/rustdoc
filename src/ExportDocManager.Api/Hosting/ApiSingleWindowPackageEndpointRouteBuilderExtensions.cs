@@ -3,6 +3,7 @@ using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
+using ExportDocManager.Services.Time;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -20,10 +21,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiSingleWindowImportPackageRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -59,10 +56,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiSingleWindowImportPackageRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -96,10 +89,6 @@ namespace ExportDocManager.Api.Hosting
                 bool? keepWorkingDirectory,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -140,10 +129,6 @@ namespace ExportDocManager.Api.Hosting
                 bool? keepWorkingDirectory,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 return await ImportSingleWindowUploadedPackageAsync(
                     context,
@@ -169,13 +154,10 @@ namespace ExportDocManager.Api.Hosting
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ISingleWindowHandoffPackageService handoffPackageService,
                 IAppPathProvider pathProvider,
+                IBusinessClock clock,
                 ApiSingleWindowReceiptPackageExportRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -185,6 +167,7 @@ namespace ExportDocManager.Api.Hosting
                 return await ExportSingleWindowReceiptPackageAsync(
                     handoffPackageService,
                     pathProvider,
+                    clock,
                     request,
                     cancellationToken);
             })
@@ -201,13 +184,10 @@ namespace ExportDocManager.Api.Hosting
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ISingleWindowHandoffPackageService handoffPackageService,
                 IAppPathProvider pathProvider,
+                IBusinessClock clock,
                 ApiSingleWindowReceiptPackageExportRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -218,6 +198,7 @@ namespace ExportDocManager.Api.Hosting
                     context,
                     handoffPackageService,
                     pathProvider,
+                    clock,
                     request,
                     cancellationToken);
             })

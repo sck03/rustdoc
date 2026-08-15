@@ -378,7 +378,7 @@ namespace ExportDocManager.Services.Data
 
         private static bool LooksLikeItemHeader(string value)
         {
-            var columns = new DetectedItemColumns();
+            var columns = new ExcelImportItemColumnAnalysis();
             return TrySetItemColumn(columns, NormalizeHeader(value), 1) > 0;
         }
 
@@ -507,7 +507,7 @@ namespace ExportDocManager.Services.Data
                         return new DateOnly(y, m, d);
                 }
             }
-            return DateOnly.FromDateTime(DateTime.Today);
+            return _clock.Today;
         }
     }
 }

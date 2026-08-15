@@ -1,22 +1,14 @@
-using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Errors;
 
 namespace ExportDocManager.Services.Tools
 {
     public sealed class UnsupportedOcrService : IOcrService
     {
-        private readonly IAppPathProvider _pathProvider;
-
-        public UnsupportedOcrService(IAppPathProvider pathProvider)
-        {
-            _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
-        }
-
         public Task<OcrResult> RecognizeAsync(Stream imageStream, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            throw new InfrastructureServiceException(
-                $"当前 sidecar 未启用 OCR 运行时。OCR 模型仍应随程序放在 OcrModels/ 下，当前程序根 OCR 目录为：{_pathProvider.OcrModelRoot}。请启用 OCR 可选运行包后再导入扫描图片或扫描版 PDF。");
+            throw new UserVisibleInfrastructureException(
+                "当前安装未启用 OCR 能力，请安装或启用 OCR 可选模块后重试。");
         }
     }
 }

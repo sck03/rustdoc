@@ -16,7 +16,6 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/audit-logs", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IAuditLogReadRepository auditLogReadRepository,
                 int? pageNumber,
@@ -30,11 +29,7 @@ namespace ExportDocManager.Api.Hosting
                 string? keyword,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageAuditLogs(user))
                 {
@@ -64,18 +59,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/audit-logs/save-to-path", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IAuditLogService auditLogService,
                 ApiAuditLogPathExportRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageAuditLogs(user))
                 {
@@ -119,18 +109,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/audit-logs/download", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IAuditLogService auditLogService,
                 IAppPathProvider pathProvider,
                 ApiAuditLogFilterRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageAuditLogs(user))
                 {
@@ -147,7 +132,7 @@ namespace ExportDocManager.Api.Hosting
                     "AuditExports",
                     Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(exportDirectory);
-                string fileName = $"AuditLogs_{DateTime.UtcNow:yyyyMMdd-HHmmss}.xlsx";
+                string fileName = $"AuditLogs_{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.xlsx";
                 string outputPath = Path.Combine(exportDirectory, fileName);
                 try
                 {
@@ -183,17 +168,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/audit-logs/delete", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IAuditLogService auditLogService,
                 ApiAuditLogDeleteRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageAuditLogs(user))
                 {
@@ -226,17 +206,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/audit-logs/cleanup", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IAuditLogService auditLogService,
                 ApiAuditLogCleanupRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageAuditLogs(user))
                 {

@@ -10,11 +10,10 @@ namespace ExportDocManager.Api.Hosting
         private static void MapSalesOpportunityEndpoints(this IEndpointRouteBuilder endpoints)
         {
             endpoints.MapGet("/api/crm/opportunities", async Task<Results<Ok<ApiPagedResponse<ApiSalesOpportunityDto>>, UnauthorizedHttpResult, ForbidHttpResult>>(
-                HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a, ISalesOpportunityService service,
+                HttpContext c, ApiAuthorizationService a, ISalesOpportunityService service,
                 string? keyword, string? stage, int? pageNumber, int? pageSize, CancellationToken ct) =>
             {
-                var user = ApiEndpointAuth.RequireUser(c, t);
-                if (user is null) return TypedResults.Unauthorized();
+                var user = ApiEndpointAuth.GetRequiredUser(c);
                 if (!a.CanUseSalesWorkspace(user)) return TypedResults.Forbid();
                 var page = await service.QueryAsync(keyword, stage,
                     pageNumber is > 0 ? pageNumber.Value : 1,
@@ -24,11 +23,10 @@ namespace ExportDocManager.Api.Hosting
             }).WithName("QuerySalesOpportunities");
 
             endpoints.MapPost("/api/crm/opportunities", async Task<Results<Created<ApiSalesOpportunityDto>, BadRequest<ApiErrorResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>>(
-                HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
+                HttpContext c, ApiAuthorizationService a,
                 ISalesOpportunityService service, ApiSalesOpportunitySaveRequest request, CancellationToken ct) =>
             {
-                var user = ApiEndpointAuth.RequireUser(c, t);
-                if (user is null) return TypedResults.Unauthorized();
+                var user = ApiEndpointAuth.GetRequiredUser(c);
                 if (!a.CanUseSalesWorkspace(user)) return TypedResults.Forbid();
                 if (request is null || request.Id > 0)
                     return TypedResults.BadRequest(new ApiErrorResponse("新增商机不能包含已有ID。"));
@@ -43,11 +41,10 @@ namespace ExportDocManager.Api.Hosting
             }).WithName("CreateSalesOpportunity");
 
             endpoints.MapGet("/api/crm/opportunities/{id:int}/history", async Task<Results<Ok<IReadOnlyList<ApiSalesOpportunityHistoryDto>>, UnauthorizedHttpResult, ForbidHttpResult, NotFound>>(
-                HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
+                HttpContext c, ApiAuthorizationService a,
                 ISalesOpportunityService service, int id, CancellationToken ct) =>
             {
-                var user = ApiEndpointAuth.RequireUser(c, t);
-                if (user is null) return TypedResults.Unauthorized();
+                var user = ApiEndpointAuth.GetRequiredUser(c);
                 if (!a.CanUseSalesWorkspace(user)) return TypedResults.Forbid();
                 var rows = await service.ListHistoryAsync(id, ct);
                 return rows.Count == 0
@@ -56,11 +53,10 @@ namespace ExportDocManager.Api.Hosting
             }).WithName("ListSalesOpportunityHistory");
 
             endpoints.MapPut("/api/crm/opportunities/{id:int}", async Task<Results<Ok<ApiSalesOpportunityDto>, BadRequest<ApiErrorResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>>(
-                HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a, ISalesOpportunityService service,
+                HttpContext c, ApiAuthorizationService a, ISalesOpportunityService service,
                 int id, ApiSalesOpportunitySaveRequest request, CancellationToken ct) =>
             {
-                var user = ApiEndpointAuth.RequireUser(c, t);
-                if (user is null) return TypedResults.Unauthorized();
+                var user = ApiEndpointAuth.GetRequiredUser(c);
                 if (!a.CanUseSalesWorkspace(user)) return TypedResults.Forbid();
                 if (request is null || id <= 0)
                     return TypedResults.BadRequest(new ApiErrorResponse("商机ID无效。"));
@@ -71,11 +67,10 @@ namespace ExportDocManager.Api.Hosting
             }).WithName("UpdateSalesOpportunity");
 
             endpoints.MapDelete("/api/crm/opportunities/{id:int}", async Task<Results<Ok<ApiCommandResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>>(
-                HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
+                HttpContext c, ApiAuthorizationService a,
                 ISalesOpportunityService service, int id, CancellationToken ct) =>
             {
-                var user = ApiEndpointAuth.RequireUser(c, t);
-                if (user is null) return TypedResults.Unauthorized();
+                var user = ApiEndpointAuth.GetRequiredUser(c);
                 if (!a.CanUseSalesWorkspace(user)) return TypedResults.Forbid();
                 try
                 {

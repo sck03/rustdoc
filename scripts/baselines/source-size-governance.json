@@ -170,9 +170,9 @@
     {
       "name": "Excel analyzer Rust modules",
       "directory": "tools/excel-analyzer-rs/src",
-      "filePattern": "^(?:main|workbook_analysis|document_fields|table_analysis|tests)\\.rs$",
+      "filePattern": "^(?:main|workbook_analysis|document_fields|table_analysis|table_values|tests)\\.rs$",
       "maximumLines": 1000,
-      "maximumAggregateLines": 3100
+      "maximumAggregateLines": 3150
     },
     {
       "name": "official OpenAPI infrastructure",

@@ -225,6 +225,25 @@ fn accepts_writable_data_root_without_requiring_a_secondary_volume() {
 }
 
 #[test]
+fn rejects_linked_runtime_subdirectory() {
+    let root = fresh_test_dir("linked-runtime-subdirectory");
+    let data_root = root.join("data");
+    let external_cache = root.join("external-cache");
+    ensure_runtime_data_directories(&data_root).unwrap();
+    fs::create_dir_all(&external_cache).unwrap();
+    fs::remove_dir(data_root.join("Cache")).unwrap();
+    create_directory_link(&external_cache, &data_root.join("Cache"));
+
+    let error = ensure_runtime_data_root_is_usable(&data_root)
+        .unwrap_err()
+        .to_string();
+
+    assert!(error.contains("符号链接") || error.contains("重解析点"));
+    remove_directory_link(&data_root.join("Cache"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn schedules_and_applies_data_root_migration_before_runtime_start() {
     let root = fresh_test_dir("data-root-migration");
     let app_root = root.join("app");
@@ -298,4 +317,30 @@ fn absolute_test_data_root(name: &str) -> PathBuf {
         .join("runtime-path-tests")
         .join("external-data")
         .join(name)
+}
+
+#[cfg(unix)]
+fn create_directory_link(target: &Path, link: &Path) {
+    std::os::unix::fs::symlink(target, link).unwrap();
+}
+
+#[cfg(windows)]
+fn create_directory_link(target: &Path, link: &Path) {
+    let status = std::process::Command::new("cmd")
+        .args(["/d", "/c", "mklink", "/J"])
+        .arg(link)
+        .arg(target)
+        .status()
+        .unwrap();
+    assert!(status.success());
+}
+
+#[cfg(unix)]
+fn remove_directory_link(link: &Path) {
+    fs::remove_file(link).unwrap();
+}
+
+#[cfg(windows)]
+fn remove_directory_link(link: &Path) {
+    fs::remove_dir(link).unwrap();
 }

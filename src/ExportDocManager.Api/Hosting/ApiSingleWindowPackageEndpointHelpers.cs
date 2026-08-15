@@ -3,6 +3,7 @@ using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.SingleWindow;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -13,13 +14,14 @@ namespace ExportDocManager.Api.Hosting
             ISingleWindowHandoffPackageService handoffPackageService,
             ISettingsService settingsService,
             IAppPathProvider pathProvider,
+            IBusinessClock clock,
             SingleWindowBusinessType businessType,
             int invoiceId,
             ApiSingleWindowSubmitPackageRequest request,
             CancellationToken cancellationToken)
         {
             string packagePath = string.IsNullOrWhiteSpace(request?.PackagePath)
-                ? BuildDefaultSingleWindowSubmitPackagePath(pathProvider, businessType, invoiceId)
+                ? BuildDefaultSingleWindowSubmitPackagePath(pathProvider, clock, businessType, invoiceId)
                 : request.PackagePath.Trim();
 
             try
@@ -56,6 +58,7 @@ namespace ExportDocManager.Api.Hosting
             ISingleWindowHandoffPackageService handoffPackageService,
             ISettingsService settingsService,
             IAppPathProvider pathProvider,
+            IBusinessClock clock,
             SingleWindowBusinessType businessType,
             int invoiceId,
             ApiSingleWindowSubmitPackageRequest request,
@@ -70,7 +73,7 @@ namespace ExportDocManager.Api.Hosting
             string packagePath = CreateBrowserDownloadPath(
                 pathProvider,
                 "SingleWindowSubmitPackage",
-                $"{prefix}-{invoiceId}-{DateTime.Now:yyyyMMdd-HHmmss}.swpkg");
+                $"{prefix}-{invoiceId}-{clock.Now:yyyyMMdd-HHmmss}.swpkg");
             string packageDirectory = Path.GetDirectoryName(packagePath) ?? string.Empty;
             bool cleanupRegistered = false;
             try
@@ -111,6 +114,7 @@ namespace ExportDocManager.Api.Hosting
         private static async Task<IResult> ExportSingleWindowReceiptPackageAsync(
             ISingleWindowHandoffPackageService handoffPackageService,
             IAppPathProvider pathProvider,
+            IBusinessClock clock,
             ApiSingleWindowReceiptPackageExportRequest request,
             CancellationToken cancellationToken)
         {
@@ -137,6 +141,7 @@ namespace ExportDocManager.Api.Hosting
             string packagePath = string.IsNullOrWhiteSpace(request.PackagePath)
                 ? BuildDefaultSingleWindowReceiptPackagePath(
                     pathProvider,
+                    clock,
                     businessType,
                     request.BatchReference,
                     request.InvoiceNo)
@@ -171,6 +176,7 @@ namespace ExportDocManager.Api.Hosting
             HttpContext context,
             ISingleWindowHandoffPackageService handoffPackageService,
             IAppPathProvider pathProvider,
+            IBusinessClock clock,
             ApiSingleWindowReceiptPackageExportRequest request,
             CancellationToken cancellationToken)
         {
@@ -198,7 +204,7 @@ namespace ExportDocManager.Api.Hosting
             string packagePath = CreateBrowserDownloadPath(
                 pathProvider,
                 "SingleWindowReceiptPackage",
-                $"Receipt-{prefix}-{DateTime.Now:yyyyMMdd-HHmmss}.swpkg");
+                $"Receipt-{prefix}-{clock.Now:yyyyMMdd-HHmmss}.swpkg");
             string packageDirectory = Path.GetDirectoryName(packagePath) ?? string.Empty;
             bool cleanupRegistered = false;
             try

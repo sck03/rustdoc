@@ -9,18 +9,13 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/reports/user-templates", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IUserReportTemplateService service,
                 string? reportType,
                 bool? includeInactive,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(
                         user,
@@ -46,18 +41,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/user-templates", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IUserReportTemplateService service,
                 IReportTemplateService fileTemplateService,
                 ApiUserReportTemplateSaveRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(
                         user,
@@ -111,18 +101,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPut("/api/reports/user-templates/{id:int}", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IUserReportTemplateService service,
                 int id,
                 ApiUserReportTemplateSaveRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(
                         user,
@@ -164,17 +149,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapDelete("/api/reports/user-templates/{id:int}", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IUserReportTemplateService service,
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(
                         user,
@@ -196,6 +176,9 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("DeleteUserReportTemplate")
+            .WithApiPermission(
+                PermissionModuleCatalog.DocumentReports,
+                writeAccessLevel: PermissionAccessLevel.Operate)
             .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
@@ -203,14 +186,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/reports/user-templates/{id:int}/versions", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IUserReportTemplateService service,
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null) return Results.Unauthorized();
+                var user = ApiEndpointAuth.GetRequiredUser(context);
                 if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.View))
                     return WriteForbidden("当前权限模板不允许查看模板历史。");
                 if (id <= 0) return Results.BadRequest(new ApiErrorResponse("报表模板 ID 无效。"));
@@ -224,15 +205,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/user-templates/{id:int}/versions/{versionNumber:int}/restore", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IUserReportTemplateService service,
                 int id,
                 int versionNumber,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null) return Results.Unauthorized();
+                var user = ApiEndpointAuth.GetRequiredUser(context);
                 if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Operate))
                     return WriteForbidden("当前权限模板不允许恢复历史版本。");
                 if (id <= 0 || versionNumber <= 0)

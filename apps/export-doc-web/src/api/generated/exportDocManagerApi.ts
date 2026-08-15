@@ -259,6 +259,21 @@ export interface ApiContainerPackingCargoInputDto {
   width?: number;
 }
 
+export interface ApiContainerPackingPdfRequest {
+  analysis?: ApiContainerPackingAnalysisDto;
+  container?: ApiContainerDimensionsDto;
+  containerType?: string;
+  destinationPath?: string;
+  projectName?: string;
+}
+
+export interface ApiContainerPackingPdfSaveResponse {
+  filePath: string;
+  message: string;
+  sizeBytes: number;
+  success: boolean;
+}
+
 export interface ApiContainerPackingProjectDto {
   cargoItems: ApiContainerPackingCargoInputDto[];
   container: ApiContainerDimensionsDto;
@@ -978,6 +993,8 @@ export interface ApiEmailTestResponse {
 }
 
 export interface ApiErrorResponse {
+  code?: string | null;
+  correlationId?: string | null;
   message: string;
 }
 
@@ -1748,12 +1765,6 @@ export interface ApiOcrLineDto {
   width: number;
   x: number;
   y: number;
-}
-
-export interface ApiOcrRecognizeImageContentRequest {
-  imageContentBase64?: string;
-  sourceMimeType?: string;
-  sourceName?: string;
 }
 
 export interface ApiOcrRecognizeImageRequest {
@@ -3970,6 +3981,10 @@ export interface DownloadCloudDatabaseBackupRequest {
   body: ApiCloudBackupDownloadRequest;
 }
 
+export interface DownloadContainerPackingPdfRequest {
+  body: ApiContainerPackingPdfRequest;
+}
+
 export interface DownloadCustomsCooSubmitPackageRequest {
   invoiceId: number;
   body: ApiSingleWindowSubmitPackageRequest;
@@ -4410,6 +4425,10 @@ export interface PreviewInvoiceTransferPackageRequest {
   body: ApiInvoiceTransferPathRequest;
 }
 
+export interface PreviewOcrImageRequest {
+  filePath?: string;
+}
+
 export interface PreviewPaymentVoucherDraftHtmlRequest {
   body: ApiPaymentDraftReportHtmlPreviewRequest;
 }
@@ -4497,10 +4516,6 @@ export interface RecognizeOcrImageRequest {
   body: ApiOcrRecognizeImageRequest;
 }
 
-export interface RecognizeOcrImageContentRequest {
-  body: ApiOcrRecognizeImageContentRequest;
-}
-
 export interface RecordHsCodeKnowledgeFeedbackRequest {
   body: HsCodeKnowledgeFeedbackInput;
 }
@@ -4585,6 +4600,10 @@ export interface SaveAuditLogsToPathRequest {
 
 export interface SaveContainerPackingContainerTypeRequest {
   body: ApiContainerTypeSaveRequest;
+}
+
+export interface SaveContainerPackingPdfToPathRequest {
+  body: ApiContainerPackingPdfRequest;
 }
 
 export interface SaveContainerPackingProjectRequest {
@@ -4923,6 +4942,12 @@ export interface UploadHsCodesImportFileRequest {
 
 export interface UploadLetterOfCreditDocumentRequest {
   fileName?: string;
+  body: Blob;
+}
+
+export interface UploadOcrImageRequest {
+  sourceName?: string;
+  sourceMimeType?: string;
   body: Blob;
 }
 
@@ -5569,6 +5594,14 @@ export class ExportDocManagerApiClient {
   public downloadCloudDatabaseBackup(request: DownloadCloudDatabaseBackupRequest, init?: RequestInit): Promise<ApiCloudBackupCommandResponse> {
     const path = "/api/backup/cloud/download";
     return this.request<ApiCloudBackupCommandResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public downloadContainerPackingPdf(request: DownloadContainerPackingPdfRequest, init?: RequestInit): Promise<Blob> {
+    const path = "/api/tools/container-packing/pdf/download";
+    return this.request<Blob>("POST", path, {
       body: request.body,
       init,
     });
@@ -6480,6 +6513,16 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public previewOcrImage(request: PreviewOcrImageRequest = {}, init?: RequestInit): Promise<Blob> {
+    const path = "/api/tools/ocr/preview-image";
+    return this.request<Blob>("GET", path, {
+      query: {
+        "filePath": request.filePath,
+      },
+      init,
+    });
+  }
+
   public previewPaymentVoucherDraftHtml(request: PreviewPaymentVoucherDraftHtmlRequest, init?: RequestInit): Promise<ApiPaymentReportHtmlPreviewResponse> {
     const path = "/api/reports/payments/draft/html-preview";
     return this.request<ApiPaymentReportHtmlPreviewResponse>("POST", path, {
@@ -6631,14 +6674,6 @@ export class ExportDocManagerApiClient {
 
   public recognizeOcrImage(request: RecognizeOcrImageRequest, init?: RequestInit): Promise<ApiOcrRecognizeImageResponse> {
     const path = "/api/tools/ocr/recognize-image";
-    return this.request<ApiOcrRecognizeImageResponse>("POST", path, {
-      body: request.body,
-      init,
-    });
-  }
-
-  public recognizeOcrImageContent(request: RecognizeOcrImageContentRequest, init?: RequestInit): Promise<ApiOcrRecognizeImageResponse> {
-    const path = "/api/tools/ocr/recognize-image-content";
     return this.request<ApiOcrRecognizeImageResponse>("POST", path, {
       body: request.body,
       init,
@@ -6806,6 +6841,14 @@ export class ExportDocManagerApiClient {
   public saveContainerPackingContainerType(request: SaveContainerPackingContainerTypeRequest, init?: RequestInit): Promise<ApiContainerTypeSaveResponse> {
     const path = "/api/tools/container-packing/container-types";
     return this.request<ApiContainerTypeSaveResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public saveContainerPackingPdfToPath(request: SaveContainerPackingPdfToPathRequest, init?: RequestInit): Promise<ApiContainerPackingPdfSaveResponse> {
+    const path = "/api/tools/container-packing/pdf/save-to-path";
+    return this.request<ApiContainerPackingPdfSaveResponse>("POST", path, {
       body: request.body,
       init,
     });
@@ -7438,6 +7481,18 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public uploadOcrImage(request: UploadOcrImageRequest, init?: RequestInit): Promise<ApiOcrRecognizeImageResponse> {
+    const path = "/api/tools/ocr/recognize-image-upload";
+    return this.request<ApiOcrRecognizeImageResponse>("POST", path, {
+      query: {
+        "sourceName": request.sourceName,
+        "sourceMimeType": request.sourceMimeType,
+      },
+      body: request.body,
+      init,
+    });
+  }
+
   public uploadReportTemplatePackage(request: UploadReportTemplatePackageRequest, init?: RequestInit): Promise<ApiReportTemplatePackageImportResponse> {
     const path = "/api/reports/templates/package/upload";
     return this.request<ApiReportTemplatePackageImportResponse>("POST", path, {
@@ -7582,7 +7637,10 @@ export class ExportDocManagerApiClient {
     const response = await this.fetchImpl(url, requestInit);
     const contentType = response.headers.get("content-type") ?? "";
     const contentDisposition = response.headers.get("content-disposition") ?? "";
-    if (contentType.includes("application/octet-stream") || contentDisposition.toLowerCase().includes("attachment")) {
+    const isBinaryResponse = contentType.startsWith("image/") || contentType.startsWith("audio/") ||
+      contentType.startsWith("video/") || contentType.includes("application/pdf") ||
+      contentType.includes("application/octet-stream") || contentDisposition.toLowerCase().includes("attachment");
+    if (isBinaryResponse) {
       if (!response.ok) {
         throw new ApiError(response.status, response.statusText, await response.text());
       }

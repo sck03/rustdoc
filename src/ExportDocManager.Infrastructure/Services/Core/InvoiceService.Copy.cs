@@ -147,7 +147,7 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        private static Invoice CreateInvoiceClone(
+        private Invoice CreateInvoiceClone(
             Invoice originalInvoice,
             string newInvoiceNo,
             InvoiceCloneOptions options)
@@ -163,7 +163,7 @@ namespace ExportDocManager.Services.Core
 
             if (options.ResetDates || !options.CopyHeader)
             {
-                var today = DateOnly.FromDateTime(DateTime.Today);
+                var today = _clock.Today;
                 newInvoice.InvoiceDate = today;
                 newInvoice.ShipmentDate = today;
             }

@@ -17,13 +17,8 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/tools/email/status", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ISettingsService settingsService) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 await settingsService.LoadAsync();
                 var email = settingsService.Settings?.Email ?? new EmailConfig();
@@ -47,13 +42,8 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/tools/email/server-suggestion", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiEmailServerSuggestionRequest request) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (request == null)
                 {
@@ -90,17 +80,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/tools/email/send", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IEmailService emailService,
                 ISettingsService settingsService,
                 ApiEmailSendRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 bool allowAttachmentPaths = ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions);
                 var validation = ValidateEmailSendRequest(request, allowAttachmentPaths, out var normalizedRequest);
@@ -163,17 +148,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/tools/email/test-connection", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IEmailService emailService,
                 ISettingsService settingsService,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {

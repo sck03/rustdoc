@@ -195,12 +195,9 @@ for (const file of walk(root)) {
     failures.push(`${sourceRelativePath}: PDF 导出状态与异步路径选择不得重新回流装柜展示组件`);
   }
 
-  if (sourceRelativePath === "features/tools/container-packing/containerPackingPdfExport.ts") {
-    for (const pdfSnapshotContract of ["captureContainerPackingSceneSnapshot", "container-packing-pseudo3d-svg", "container-packing-pdf-scene-snapshot", 'querySelector(".container-packing-3d-section")?.remove()']) {
-      if (!sourceText.includes(pdfSnapshotContract)) {
-        failures.push(`${sourceRelativePath}: 装柜 PDF 必须嵌入真实三维截帧并移除隐藏交互画布：${pdfSnapshotContract}`);
-      }
-    }
+  if (sourceRelativePath === "features/tools/container-packing/useContainerPackingPdfExport.ts"
+    && (!sourceText.includes("downloadContainerPackingPdf") || !sourceText.includes("saveContainerPackingPdfToPath"))) {
+    failures.push(`${sourceRelativePath}: 装柜 PDF 必须由后端受控模板渲染并保持浏览器下载/桌面保存双路径`);
   }
 
   const coordinatorContracts = {

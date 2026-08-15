@@ -2,6 +2,7 @@ using ExportDocManager.Models.DTOs;
 using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -22,10 +23,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiInvoiceTransferPathRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -78,13 +75,10 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 IAppPathProvider pathProvider,
                 IInvoiceTransferService transferService,
+                IBusinessClock clock,
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -94,7 +88,7 @@ namespace ExportDocManager.Api.Hosting
                 string packagePath = CreateBrowserDownloadPath(
                     pathProvider,
                     "InvoiceTransfer",
-                    $"Invoice-{id}-{DateTime.Now:yyyyMMdd-HHmmss}.edpkg");
+                    $"Invoice-{id}-{clock.Now:yyyyMMdd-HHmmss}.edpkg");
                 string packageDirectory = Path.GetDirectoryName(packagePath) ?? string.Empty;
                 bool cleanupRegistered = false;
                 try
@@ -140,10 +134,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiInvoiceTransferPathRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -193,10 +183,6 @@ namespace ExportDocManager.Api.Hosting
                 string? fileName,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 return await ProcessUploadedInvoiceTransferPackageAsync(
                     context,
@@ -229,10 +215,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiInvoiceTransferImportRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -298,10 +280,6 @@ namespace ExportDocManager.Api.Hosting
                 string? newInvoiceNo,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!TryParseInvoiceTransferConflictAction(conflictAction, out var action))
                 {

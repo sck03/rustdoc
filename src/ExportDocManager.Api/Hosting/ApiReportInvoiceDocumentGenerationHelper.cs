@@ -1,6 +1,7 @@
 using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -38,7 +39,7 @@ namespace ExportDocManager.Api.Hosting
 
             string invoiceNo = invoice.InvoiceNo ?? $"Invoice_{invoiceId}";
             string customerName = invoice.CustomerNameEN ?? string.Empty;
-            var exportDate = DateOnly.FromDateTime(DateTime.Today);
+            var exportDate = provider.GetRequiredService<IBusinessClock>().Today;
             var generatedFiles = new List<string>();
             var entries = new List<ApiInvoiceGeneratedDocumentEntry>();
             int renderProgressRange = Math.Max(1, endProgress - startProgress - 12);

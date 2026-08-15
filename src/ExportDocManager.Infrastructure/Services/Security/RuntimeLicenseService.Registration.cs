@@ -22,7 +22,7 @@ namespace ExportDocManager.Services.Security
                 LicenseRegistrationResult result = await RegisterCoreAsync(licenseKey, cancellationToken).ConfigureAwait(false);
                 if (result.Success)
                 {
-                    CacheStatus(result.Status, DateTimeOffset.UtcNow.UtcTicks);
+                    CacheStatus(result.Status, _clock.UtcNow.UtcTicks);
                 }
                 else
                 {
@@ -52,7 +52,7 @@ namespace ExportDocManager.Services.Security
                 };
             }
 
-            var now = DateOnly.FromDateTime(DateTime.Today);
+            var now = _clock.Today;
             var anchor = await ReadOrCreateMachineAnchorAsync(now, cancellationToken).ConfigureAwait(false);
             var identity = await GetLicenseIdentityAsync(anchor, cancellationToken).ConfigureAwait(false);
             var machineId = identity.MachineId;

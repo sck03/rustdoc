@@ -219,10 +219,7 @@ export function createJobCenterSmokeScene(runtime) {
           const panel = document.querySelector('[aria-label="装箱分析"]');
           const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
           const exportButton = buttons.find((element) => (element.innerText || '').includes('导出 PDF'));
-          const exportRoot = panel ? panel.querySelector('[data-container-packing-pdf]') : null;
-          const cargoTable = exportRoot ? exportRoot.querySelector('.container-packing-pdf-cargo table') : null;
-          if (!exportRoot) return false;
-          return Boolean(exportButton && !exportButton.disabled && cargoTable);
+          return Boolean(exportButton && !exportButton.disabled);
         })()`,
         timeoutMs,
         "Timed out waiting for the container packing PDF export entry.",
@@ -237,54 +234,27 @@ export function createJobCenterSmokeScene(runtime) {
           window.__containerPackingPdfSmoke = {
             tauri: window.__TAURI__,
             invoke: window.__TAURI__?.core?.invoke,
-            createObjectURL: URL.createObjectURL,
-            revokeObjectURL: URL.revokeObjectURL,
-            anchorClick: HTMLAnchorElement.prototype.click,
-            canvasToDataURL: HTMLCanvasElement.prototype.toDataURL,
-            downloads: [],
-            savedPdf: null,
-            sceneSnapshotCalls: 0,
-            sceneSnapshotEmbedded: false,
+            fetch: window.fetch,
+            request: null,
           };
           if (!window.__containerPackingPdfSmoke.invoke) throw new Error('Mock Tauri invoke is unavailable.');
           window.__TAURI__.core.invoke = async (command, args) => {
             if (command === 'select_save_pdf_path') return 'E:/Smoke/container-packing.pdf';
-            if (command === 'save_pdf_file') {
-              const binary = atob(args.base64Data || '');
-              window.__containerPackingPdfSmoke.savedPdf = {
-                path: args.path || '',
-                type: 'application/pdf',
-                size: binary.length,
-                header: binary.slice(0, 5),
-                pageCount: (binary.match(/\\/Type\\s*\\/Page\\b/g) || []).length,
-              };
-              return null;
-            }
             return window.__containerPackingPdfSmoke.invoke(command, args);
           };
-          URL.createObjectURL = (blob) => {
-            window.__containerPackingPdfSmoke.downloads.push({ type: blob.type, size: blob.size, href: 'blob:container-packing-pdf-smoke' });
-            return 'blob:container-packing-pdf-smoke';
-          };
-          URL.revokeObjectURL = () => {};
-          HTMLAnchorElement.prototype.click = function () {
-            const current = window.__containerPackingPdfSmoke.downloads.at(-1);
-            if (current) current.fileName = this.download || '';
-          };
-          HTMLCanvasElement.prototype.toDataURL = function (...args) {
-            if (this.classList?.contains('container-packing-3d-canvas')) {
-              window.__containerPackingPdfSmoke.sceneSnapshotCalls += 1;
+          window.fetch = async (input, init) => {
+            if (String(input).includes('/api/tools/container-packing/pdf/save-to-path')) {
+              const body = JSON.parse(String(init?.body || '{}'));
+              window.__containerPackingPdfSmoke.request = body;
+              return new Response(JSON.stringify({
+                success: true,
+                filePath: body.destinationPath,
+                sizeBytes: 4096,
+                message: '装柜现场 PDF 已保存。',
+              }), { status: 200, headers: { 'Content-Type': 'application/json' } });
             }
-            return window.__containerPackingPdfSmoke.canvasToDataURL.apply(this, args);
+            return window.__containerPackingPdfSmoke.fetch(input, init);
           };
-          window.__containerPackingPdfSmoke.observer = new MutationObserver(() => {
-            const exportRoot = document.querySelector('.container-packing-pdf-export');
-            if (exportRoot?.querySelector('img.container-packing-pdf-scene-snapshot') &&
-                !exportRoot.querySelector('.container-packing-3d-section')) {
-              window.__containerPackingPdfSmoke.sceneSnapshotEmbedded = true;
-            }
-          });
-          window.__containerPackingPdfSmoke.observer.observe(document.body, { childList: true });
           exportButton.click();
           return true;
         })()`,
@@ -294,19 +264,13 @@ export function createJobCenterSmokeScene(runtime) {
         page,
         `(() => {
           const smoke = window.__containerPackingPdfSmoke;
-          const savedPdf = smoke?.savedPdf;
+          const request = smoke?.request;
           const panel = document.querySelector('[aria-label="装箱分析"]');
           const text = panel?.innerText || '';
-          return Boolean(savedPdf &&
-            savedPdf.type === 'application/pdf' &&
-            savedPdf.header === '%PDF-' &&
-            savedPdf.size > 1000 &&
-            savedPdf.size < 10 * 1024 * 1024 &&
-            savedPdf.path.endsWith('.pdf') &&
-            savedPdf.pageCount === 1 &&
-            smoke.sceneSnapshotCalls >= 1 &&
-            smoke.sceneSnapshotEmbedded === true &&
-            smoke.downloads.length === 0 &&
+          return Boolean(request &&
+            request.destinationPath === 'E:/Smoke/container-packing.pdf' &&
+            request.container?.length > 0 &&
+            request.analysis?.packedItems?.length > 0 &&
             text.includes('PDF 已保存到'));
         })()`,
         timeoutMs,
@@ -315,15 +279,12 @@ export function createJobCenterSmokeScene(runtime) {
       const containerPdfGenerationDetailsResult = await evaluate(
         page,
         `(() => {
-          const savedPdf = window.__containerPackingPdfSmoke?.savedPdf;
           const smoke = window.__containerPackingPdfSmoke;
-          return savedPdf ? {
-            type: savedPdf.type,
-            size: savedPdf.size,
-            fileName: savedPdf.path,
-            pageCount: savedPdf.pageCount,
-            sceneSnapshotCalls: smoke.sceneSnapshotCalls,
-            sceneSnapshotEmbedded: smoke.sceneSnapshotEmbedded,
+          const request = smoke?.request;
+          return request ? {
+            fileName: request.destinationPath,
+            packedItemCount: request.analysis?.packedItems?.length || 0,
+            projectName: request.projectName || '',
           } : null;
         })()`,
         true,
@@ -336,11 +297,7 @@ export function createJobCenterSmokeScene(runtime) {
           if (!smoke) return false;
           window.__TAURI__ = smoke.tauri;
           window.__TAURI__.core.invoke = smoke.invoke;
-          URL.createObjectURL = smoke.createObjectURL;
-          URL.revokeObjectURL = smoke.revokeObjectURL;
-          HTMLAnchorElement.prototype.click = smoke.anchorClick;
-          HTMLCanvasElement.prototype.toDataURL = smoke.canvasToDataURL;
-          smoke.observer?.disconnect();
+          window.fetch = smoke.fetch;
           delete window.__containerPackingPdfSmoke;
           return true;
         })()`,

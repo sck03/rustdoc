@@ -11,16 +11,11 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapPost("/api/tools/excel/template/save-to-path", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ApiBackgroundJobRunner jobRunner,
                 ApiExcelOutputRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -46,15 +41,10 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/tools/excel/template/download", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IAppPathProvider pathProvider,
                 ApiBackgroundJobRunner jobRunner) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 string destinationPath = CreateBrowserDownloadPath(
                     pathProvider,

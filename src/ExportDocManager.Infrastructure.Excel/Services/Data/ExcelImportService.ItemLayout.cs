@@ -31,7 +31,7 @@ namespace ExportDocManager.Services.Data
             {
                 HeaderRow = table.HeaderRow,
                 DataStartRow = table.DataStartRow,
-                Columns = new DetectedItemColumns
+                Columns = new ExcelImportItemColumnAnalysis
                 {
                     PoNumberCol = table.Columns.PoNumberCol,
                     StyleNoCol = table.Columns.StyleNoCol,
@@ -63,13 +63,11 @@ namespace ExportDocManager.Services.Data
 
         private void InferMissingColumnsFromValues(IExcelImportWorksheet worksheet, DetectedItemTableLayout layout)
         {
-            var columns = ToAnalysisColumns(layout.Columns);
             ExcelImportColumnValueInference.InferMissingColumns(
-                columns,
+                layout.Columns,
                 layout.DataStartRow,
                 60,
                 (row, column) => GetCellValue(worksheet.Cell(row, column)));
-            ApplyAnalysisColumns(layout.Columns, columns);
         }
 
         private void RepairDetectedLayoutFromWorksheetHeaders(
@@ -168,74 +166,23 @@ namespace ExportDocManager.Services.Data
         }
 
         private static void SetExplicitItemColumn(
-            DetectedItemColumns columns,
+            ExcelImportItemColumnAnalysis columns,
             ItemColumnKind kind,
             int column)
         {
-            ClearItemColumnAssignments(columns, column);
+            columns.ClearColumn(column);
             switch (kind)
             {
-                case ItemColumnKind.PoNumber:
-                    columns.PoNumberCol = column;
-                    break;
-                case ItemColumnKind.StyleNo:
-                    columns.StyleNoCol = column;
-                    break;
-                case ItemColumnKind.StyleName:
-                    columns.StyleNameCol = column;
-                    break;
-                case ItemColumnKind.FabricComposition:
-                    columns.FabricCompositionCol = column;
-                    break;
-                case ItemColumnKind.StyleNameCN:
-                    columns.StyleNameCNCol = column;
-                    break;
-                case ItemColumnKind.Brand:
-                    columns.BrandCol = column;
-                    break;
-                case ItemColumnKind.Quantity:
-                    columns.QuantityCol = column;
-                    break;
-                case ItemColumnKind.Cartons:
-                    columns.CartonsCol = column;
-                    break;
-                case ItemColumnKind.Dimension:
-                    columns.DimensionCol = column;
-                    break;
+                case ItemColumnKind.PoNumber: columns.PoNumberCol = column; break;
+                case ItemColumnKind.StyleNo: columns.StyleNoCol = column; break;
+                case ItemColumnKind.StyleName: columns.StyleNameCol = column; break;
+                case ItemColumnKind.FabricComposition: columns.FabricCompositionCol = column; break;
+                case ItemColumnKind.StyleNameCN: columns.StyleNameCNCol = column; break;
+                case ItemColumnKind.Brand: columns.BrandCol = column; break;
+                case ItemColumnKind.Quantity: columns.QuantityCol = column; break;
+                case ItemColumnKind.Cartons: columns.CartonsCol = column; break;
+                case ItemColumnKind.Dimension: columns.DimensionCol = column; break;
             }
-        }
-
-        private static void ClearItemColumnAssignments(DetectedItemColumns columns, int column)
-        {
-            if (column <= 0)
-            {
-                return;
-            }
-
-            if (columns.PoNumberCol == column) columns.PoNumberCol = 0;
-            if (columns.StyleNoCol == column) columns.StyleNoCol = 0;
-            if (columns.StyleNameCol == column) columns.StyleNameCol = 0;
-            if (columns.FabricCompositionCol == column) columns.FabricCompositionCol = 0;
-            if (columns.StyleNameCNCol == column) columns.StyleNameCNCol = 0;
-            if (columns.BrandCol == column) columns.BrandCol = 0;
-            if (columns.HSCodeCol == column) columns.HSCodeCol = 0;
-            if (columns.OriginCol == column) columns.OriginCol = 0;
-            if (columns.QuantityCol == column) columns.QuantityCol = 0;
-            if (columns.UnitENCol == column) columns.UnitENCol = 0;
-            if (columns.UnitCNCol == column) columns.UnitCNCol = 0;
-            if (columns.CartonsCol == column) columns.CartonsCol = 0;
-            if (columns.CtnUnitENCol == column) columns.CtnUnitENCol = 0;
-            if (columns.LengthCol == column) columns.LengthCol = 0;
-            if (columns.WidthCol == column) columns.WidthCol = 0;
-            if (columns.HeightCol == column) columns.HeightCol = 0;
-            if (columns.DimensionCol == column) columns.DimensionCol = 0;
-            if (columns.VolumeCol == column) columns.VolumeCol = 0;
-            if (columns.GWPerCtnCol == column) columns.GWPerCtnCol = 0;
-            if (columns.GWTotalCol == column) columns.GWTotalCol = 0;
-            if (columns.NWPerCtnCol == column) columns.NWPerCtnCol = 0;
-            if (columns.NWTotalCol == column) columns.NWTotalCol = 0;
-            if (columns.UnitPriceCol == column) columns.UnitPriceCol = 0;
-            if (columns.TotalPriceCol == column) columns.TotalPriceCol = 0;
         }
 
         private static void ApplyDetectedLayoutToAnalysisReport(
@@ -257,66 +204,7 @@ namespace ExportDocManager.Services.Data
                 Confidence = 0.65m
             };
 
-            analysisReport.ItemTable.Columns = ToAnalysisColumns(layout.Columns);
-        }
-
-        private static ExcelImportItemColumnAnalysis ToAnalysisColumns(DetectedItemColumns columns)
-        {
-            return new ExcelImportItemColumnAnalysis
-            {
-                PoNumberCol = columns.PoNumberCol,
-                StyleNoCol = columns.StyleNoCol,
-                StyleNameCol = columns.StyleNameCol,
-                FabricCompositionCol = columns.FabricCompositionCol,
-                StyleNameCNCol = columns.StyleNameCNCol,
-                BrandCol = columns.BrandCol,
-                HSCodeCol = columns.HSCodeCol,
-                OriginCol = columns.OriginCol,
-                QuantityCol = columns.QuantityCol,
-                UnitENCol = columns.UnitENCol,
-                UnitCNCol = columns.UnitCNCol,
-                CartonsCol = columns.CartonsCol,
-                CtnUnitENCol = columns.CtnUnitENCol,
-                LengthCol = columns.LengthCol,
-                WidthCol = columns.WidthCol,
-                HeightCol = columns.HeightCol,
-                DimensionCol = columns.DimensionCol,
-                VolumeCol = columns.VolumeCol,
-                GWPerCtnCol = columns.GWPerCtnCol,
-                GWTotalCol = columns.GWTotalCol,
-                NWPerCtnCol = columns.NWPerCtnCol,
-                NWTotalCol = columns.NWTotalCol,
-                UnitPriceCol = columns.UnitPriceCol,
-                TotalPriceCol = columns.TotalPriceCol
-            };
-        }
-
-        private static void ApplyAnalysisColumns(DetectedItemColumns target, ExcelImportItemColumnAnalysis source)
-        {
-            target.PoNumberCol = source.PoNumberCol;
-            target.StyleNoCol = source.StyleNoCol;
-            target.StyleNameCol = source.StyleNameCol;
-            target.FabricCompositionCol = source.FabricCompositionCol;
-            target.StyleNameCNCol = source.StyleNameCNCol;
-            target.BrandCol = source.BrandCol;
-            target.HSCodeCol = source.HSCodeCol;
-            target.OriginCol = source.OriginCol;
-            target.QuantityCol = source.QuantityCol;
-            target.UnitENCol = source.UnitENCol;
-            target.UnitCNCol = source.UnitCNCol;
-            target.CartonsCol = source.CartonsCol;
-            target.CtnUnitENCol = source.CtnUnitENCol;
-            target.LengthCol = source.LengthCol;
-            target.WidthCol = source.WidthCol;
-            target.HeightCol = source.HeightCol;
-            target.DimensionCol = source.DimensionCol;
-            target.VolumeCol = source.VolumeCol;
-            target.GWPerCtnCol = source.GWPerCtnCol;
-            target.GWTotalCol = source.GWTotalCol;
-            target.NWPerCtnCol = source.NWPerCtnCol;
-            target.NWTotalCol = source.NWTotalCol;
-            target.UnitPriceCol = source.UnitPriceCol;
-            target.TotalPriceCol = source.TotalPriceCol;
+            analysisReport.ItemTable.Columns = layout.Columns;
         }
 
 
@@ -326,7 +214,7 @@ namespace ExportDocManager.Services.Data
 
             public int DataStartRow { get; set; }
 
-            public DetectedItemColumns Columns { get; set; } = new();
+            public ExcelImportItemColumnAnalysis Columns { get; set; } = new();
         }
 
         private enum ItemColumnKind
@@ -359,55 +247,5 @@ namespace ExportDocManager.Services.Data
             public int MeasurementCol { get; set; }
         }
 
-        private sealed class DetectedItemColumns
-        {
-            public int PoNumberCol { get; set; }
-
-            public int StyleNoCol { get; set; }
-
-            public int StyleNameCol { get; set; }
-
-            public int FabricCompositionCol { get; set; }
-
-            public int StyleNameCNCol { get; set; }
-
-            public int BrandCol { get; set; }
-
-            public int HSCodeCol { get; set; }
-
-            public int OriginCol { get; set; }
-
-            public int QuantityCol { get; set; }
-
-            public int UnitENCol { get; set; }
-
-            public int UnitCNCol { get; set; }
-
-            public int CartonsCol { get; set; }
-
-            public int CtnUnitENCol { get; set; }
-
-            public int LengthCol { get; set; }
-
-            public int WidthCol { get; set; }
-
-            public int HeightCol { get; set; }
-
-            public int DimensionCol { get; set; }
-
-            public int VolumeCol { get; set; }
-
-            public int GWPerCtnCol { get; set; }
-
-            public int GWTotalCol { get; set; }
-
-            public int NWPerCtnCol { get; set; }
-
-            public int NWTotalCol { get; set; }
-
-            public int UnitPriceCol { get; set; }
-
-            public int TotalPriceCol { get; set; }
-        }
     }
 }

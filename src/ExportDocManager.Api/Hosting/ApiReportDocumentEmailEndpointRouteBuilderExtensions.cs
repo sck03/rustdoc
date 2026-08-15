@@ -16,17 +16,12 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapPost("/api/reports/invoices/{invoiceId:int}/document-email", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ISettingsService settingsService,
                 ApiBackgroundJobRunner jobRunner,
                 int invoiceId,
                 ApiInvoiceDocumentEmailRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 var validation = ValidateInvoiceDocumentEmailRequest(
                     invoiceId,
@@ -281,9 +276,9 @@ namespace ExportDocManager.Api.Hosting
             string template = string.IsNullOrWhiteSpace(configuredTemplate)
                 ? fallbackTemplate
                 : configuredTemplate;
-            string invoiceNo = documentSet?.InvoiceNo ?? string.Empty;
-            string customerName = documentSet?.CustomerName ?? string.Empty;
-            string dateText = (documentSet?.ExportDate ?? DateOnly.FromDateTime(DateTime.Today)).ToString("yyyyMMdd");
+            string invoiceNo = documentSet.InvoiceNo ?? string.Empty;
+            string customerName = documentSet.CustomerName ?? string.Empty;
+            string dateText = documentSet.ExportDate.ToString("yyyyMMdd");
 
             return template
                 .Replace("{InvoiceNo}", invoiceNo, StringComparison.OrdinalIgnoreCase)

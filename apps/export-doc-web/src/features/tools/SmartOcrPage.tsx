@@ -4,7 +4,7 @@ import { ClipboardPaste, Copy, FileImage, Play, RotateCcw, ZoomIn, ZoomOut } fro
 import { type ApiOcrRecognizeImageResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
-import { isDesktopBridgeAvailable, readOcrImageFileAsDataUrl, selectOcrImageFile } from "../../desktop/desktopBridge.ts";
+import { isDesktopBridgeAvailable, selectOcrImageFile } from "../../desktop/desktopBridge.ts";
 import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -19,7 +19,7 @@ type OcrImageSource =
     }
   | {
       kind: "content";
-      imageContentBase64: string;
+      blob: Blob;
       sourceName: string;
       sourceMimeType: string;
     };
@@ -55,6 +55,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
   const canUseOcr = ocrPermission.canOperate && ocrRuntimeReady;
   const previewViewportRef = useRef<HTMLDivElement | null>(null);
   const previewDragRef = useRef<PreviewDragState | null>(null);
+  const previewObjectUrlRef = useRef<string | null>(null);
   const [imagePath, setImagePath] = useState("");
   const [imageSource, setImageSource] = useState<OcrImageSource | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
@@ -68,12 +69,10 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
   const recognizeMutation = useMutation({
     mutationFn: () => runAbortableOperation((signal) => {
       if (imageSource?.kind === "content") {
-        return client.recognizeOcrImageContent({
-          body: {
-            imageContentBase64: imageSource.imageContentBase64,
-            sourceName: imageSource.sourceName,
-            sourceMimeType: imageSource.sourceMimeType,
-          },
+        return client.uploadOcrImage({
+          body: imageSource.blob,
+          sourceName: imageSource.sourceName,
+          sourceMimeType: imageSource.sourceMimeType,
         }, { signal });
       }
 
@@ -130,6 +129,12 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
     return () => window.removeEventListener("paste", handlePaste);
   }, [canUseOcr]);
 
+  useEffect(() => () => {
+    if (previewObjectUrlRef.current) {
+      window.URL.revokeObjectURL(previewObjectUrlRef.current);
+    }
+  }, []);
+
   const isBusy = recognizeMutation.isPending;
   const canRecognize = canUseOcr && Boolean(imageSource?.kind === "content" || imagePath.trim()) && !isBusy;
   const canCopy = Boolean(recognizedText.trim());
@@ -158,17 +163,14 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
     setImageSource(trimmed ? { kind: "path", filePath: trimmed } : null);
     setResult(null);
     setMessage(null);
-    resetPreview(null);
+    replacePreview(null);
 
     if (!trimmed || !loadPreview || !desktopAvailable) {
       return;
     }
 
     try {
-      const dataUrl = await readOcrImageFileAsDataUrl(trimmed);
-      if (dataUrl) {
-        resetPreview(dataUrl);
-      }
+      replacePreview(await client.previewOcrImage({ filePath: trimmed }));
     } catch (error) {
       showError(`图片已选择，但预览加载失败：${readDesktopError(error)}`);
     }
@@ -210,17 +212,15 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
     }
 
     try {
-      const dataUrl = await blobToDataUrl(blob);
-      const imageContentBase64 = extractBase64Payload(dataUrl);
       setImagePath(sourceName);
       setImageSource({
         kind: "content",
-        imageContentBase64,
+        blob,
         sourceName,
         sourceMimeType: blob.type,
       });
       setResult(null);
-      resetPreview(dataUrl);
+      replacePreview(blob);
       setMessage("图片已载入。");
       setMessageType("success");
     } catch (error) {
@@ -235,10 +235,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
 
     if (imageSource?.kind === "path" && desktopAvailable && !imagePreviewUrl) {
       try {
-        const dataUrl = await readOcrImageFileAsDataUrl(imageSource.filePath);
-        if (dataUrl) {
-          resetPreview(dataUrl);
-        }
+        replacePreview(await client.previewOcrImage({ filePath: imageSource.filePath }));
       } catch {
         // Preview is helpful but not required for path-based OCR recognition.
       }
@@ -260,8 +257,13 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
     }
   }
 
-  function resetPreview(dataUrl: string | null) {
-    setImagePreviewUrl(dataUrl);
+  function replacePreview(blob: Blob | null) {
+    if (previewObjectUrlRef.current) {
+      window.URL.revokeObjectURL(previewObjectUrlRef.current);
+    }
+    const objectUrl = blob ? window.URL.createObjectURL(blob) : null;
+    previewObjectUrlRef.current = objectUrl;
+    setImagePreviewUrl(objectUrl);
     setPreviewSize(null);
     setZoom(1);
     window.requestAnimationFrame(() => {
@@ -483,24 +485,6 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
 
 function clampZoom(value: number) {
   return Math.min(MaxZoom, Math.max(MinZoom, Number(value.toFixed(3))));
-}
-
-function blobToDataUrl(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(reader.error ?? new Error("图片读取失败。"));
-    reader.readAsDataURL(blob);
-  });
-}
-
-function extractBase64Payload(dataUrl: string) {
-  const separatorIndex = dataUrl.indexOf(",");
-  if (separatorIndex < 0) {
-    throw new Error("图片内容不是有效的 data URL。");
-  }
-
-  return dataUrl.slice(separatorIndex + 1);
 }
 
 function readOcrRuntimeUnavailableMessage(status?: string) {

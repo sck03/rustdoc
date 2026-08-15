@@ -18,10 +18,6 @@ namespace ExportDocManager.Api.Hosting
                 string? keyword,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 var profiles = await producerProfileService
                     .SearchAsync(keyword ?? string.Empty, cancellationToken)
@@ -42,10 +38,6 @@ namespace ExportDocManager.Api.Hosting
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -69,10 +61,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiCustomsCooProducerProfileSaveRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 ApiCustomsCooProducerProfileInputDto? profile = request?.Profile;
                 var validationErrors = ValidateCustomsCooProducerProfile(profile);
@@ -109,10 +97,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiCustomsCooProducerProfileSaveRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -166,10 +150,6 @@ namespace ExportDocManager.Api.Hosting
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (id <= 0)
                 {

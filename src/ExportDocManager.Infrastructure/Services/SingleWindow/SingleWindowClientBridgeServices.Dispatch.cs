@@ -527,7 +527,7 @@ namespace ExportDocManager.Services.SingleWindow
             string baseName = Path.GetFileNameWithoutExtension(originalFileName);
             string extension = Path.GetExtension(originalFileName);
             string safeBatchReference = string.IsNullOrWhiteSpace(batchReference)
-                ? DateTime.Now.ToString("yyyyMMddHHmmssfff")
+                ? Guid.NewGuid().ToString("N")[..17]
                 : batchReference.Trim();
             candidate = Path.Combine(outBoxDirectory, $"{baseName}_{safeBatchReference}{extension}");
             int suffix = 2;

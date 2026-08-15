@@ -16,21 +16,25 @@ namespace ExportDocManager.Services.Infrastructure
         internal const int CurrentVersion = 8;
         internal const string MetadataTableName = "__ExportDocManagerSchema";
 
-        public static async Task EnsureCurrentAsync(AppDbContext context, bool usesPostgreSql)
+        public static async Task EnsureCurrentAsync(
+            AppDbContext context,
+            bool usesPostgreSql,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(context);
 
             if (!context.Database.IsRelational())
             {
-                await context.Database.EnsureCreatedAsync().ConfigureAwait(false);
+                await context.Database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
                 return;
             }
 
-            int tableCount = await CountApplicationTablesAsync(context, usesPostgreSql).ConfigureAwait(false);
+            int tableCount = await CountApplicationTablesAsync(context, usesPostgreSql, cancellationToken)
+                .ConfigureAwait(false);
             if (tableCount == 0)
             {
                 await using var transaction = await context.Database
-                    .BeginTransactionAsync()
+                    .BeginTransactionAsync(cancellationToken)
                     .ConfigureAwait(false);
                 try
                 {
@@ -41,25 +45,26 @@ namespace ExportDocManager.Services.Infrastructure
                             $"无法生成 ExportDocManager v{CurrentVersion} 数据库基线脚本。");
                     }
 
-                    await context.Database.ExecuteSqlRawAsync(createScript).ConfigureAwait(false);
-                    await CreateCorePerformanceIndexesAsync(context, usesPostgreSql).ConfigureAwait(false);
-                    await WriteVersionAsync(context, usesPostgreSql).ConfigureAwait(false);
-                    await transaction.CommitAsync().ConfigureAwait(false);
+                    await context.Database.ExecuteSqlRawAsync(createScript, cancellationToken).ConfigureAwait(false);
+                    await CreateCorePerformanceIndexesAsync(context, usesPostgreSql, cancellationToken).ConfigureAwait(false);
+                    await WriteVersionAsync(context, usesPostgreSql, cancellationToken).ConfigureAwait(false);
+                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
                 }
                 catch
                 {
-                    await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                    using var rollbackTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    await transaction.RollbackAsync(rollbackTimeout.Token).ConfigureAwait(false);
                     throw;
                 }
 
                 if (usesPostgreSql)
                 {
-                    await CreatePostgreSqlTrigramIndexesAsync(context).ConfigureAwait(false);
+                    await CreatePostgreSqlTrigramIndexesAsync(context, cancellationToken).ConfigureAwait(false);
                 }
                 return;
             }
 
-            int? version = await ReadVersionAsync(context, usesPostgreSql).ConfigureAwait(false);
+            int? version = await ReadVersionAsync(context, usesPostgreSql, cancellationToken).ConfigureAwait(false);
             if (version != CurrentVersion)
             {
                 string detected = version.HasValue ? $"v{version.Value}" : "无版本标记";
@@ -69,31 +74,38 @@ namespace ExportDocManager.Services.Infrastructure
 
             if (usesPostgreSql)
             {
-                await CreatePostgreSqlTrigramIndexesAsync(context).ConfigureAwait(false);
+                await CreatePostgreSqlTrigramIndexesAsync(context, cancellationToken).ConfigureAwait(false);
             }
         }
 
         internal static async Task<bool> IsDatabaseEmptyAsync(
             AppDbContext context,
-            bool usesPostgreSql) =>
-            await CountApplicationTablesAsync(context, usesPostgreSql).ConfigureAwait(false) == 0;
+            bool usesPostgreSql,
+            CancellationToken cancellationToken = default) =>
+            await CountApplicationTablesAsync(context, usesPostgreSql, cancellationToken).ConfigureAwait(false) == 0;
 
-        private static async Task<int> CountApplicationTablesAsync(AppDbContext context, bool usesPostgreSql)
+        private static async Task<int> CountApplicationTablesAsync(
+            AppDbContext context,
+            bool usesPostgreSql,
+            CancellationToken cancellationToken)
         {
             string sql = usesPostgreSql
                 ? "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'"
                 : "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'";
-            object? value = await ExecuteScalarAsync(context, sql).ConfigureAwait(false);
+            object? value = await ExecuteScalarAsync(context, sql, cancellationToken).ConfigureAwait(false);
             return Convert.ToInt32(value ?? 0);
         }
 
-        private static async Task<int?> ReadVersionAsync(AppDbContext context, bool usesPostgreSql)
+        private static async Task<int?> ReadVersionAsync(
+            AppDbContext context,
+            bool usesPostgreSql,
+            CancellationToken cancellationToken)
         {
             string tableExistsSql = usesPostgreSql
                 ? $"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = '{MetadataTableName}'"
                 : $"SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '{MetadataTableName}'";
             int tableExists = Convert.ToInt32(
-                await ExecuteScalarAsync(context, tableExistsSql).ConfigureAwait(false) ?? 0);
+                await ExecuteScalarAsync(context, tableExistsSql, cancellationToken).ConfigureAwait(false) ?? 0);
             if (tableExists == 0)
             {
                 return null;
@@ -101,11 +113,15 @@ namespace ExportDocManager.Services.Infrastructure
 
             object? version = await ExecuteScalarAsync(
                 context,
-                $"SELECT \"Version\" FROM \"{MetadataTableName}\" WHERE \"Id\" = 1").ConfigureAwait(false);
+                $"SELECT \"Version\" FROM \"{MetadataTableName}\" WHERE \"Id\" = 1",
+                cancellationToken).ConfigureAwait(false);
             return version == null || version == DBNull.Value ? null : Convert.ToInt32(version);
         }
 
-        private static async Task WriteVersionAsync(AppDbContext context, bool usesPostgreSql)
+        private static async Task WriteVersionAsync(
+            AppDbContext context,
+            bool usesPostgreSql,
+            CancellationToken cancellationToken)
         {
             string sql = usesPostgreSql
                 ? $$"""
@@ -126,23 +142,27 @@ namespace ExportDocManager.Services.Infrastructure
                     INSERT INTO "{{MetadataTableName}}" ("Id", "Version", "AppliedAtUtc")
                     VALUES (1, {{CurrentVersion}}, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
                     """;
-            await context.Database.ExecuteSqlRawAsync(sql).ConfigureAwait(false);
+            await context.Database.ExecuteSqlRawAsync(sql, cancellationToken).ConfigureAwait(false);
         }
 
-        private static async Task<object?> ExecuteScalarAsync(AppDbContext context, string commandText)
+        private static async Task<object?> ExecuteScalarAsync(
+            AppDbContext context,
+            string commandText,
+            CancellationToken cancellationToken)
         {
             DbConnection connection = context.Database.GetDbConnection();
             bool shouldClose = connection.State != ConnectionState.Open;
             if (shouldClose)
             {
-                await connection.OpenAsync().ConfigureAwait(false);
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             }
 
             try
             {
                 await using DbCommand command = connection.CreateCommand();
                 command.CommandText = commandText;
-                return await command.ExecuteScalarAsync().ConfigureAwait(false);
+                command.CommandTimeout = 10;
+                return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
             }
             finally
             {
@@ -153,7 +173,10 @@ namespace ExportDocManager.Services.Infrastructure
             }
         }
 
-        private static async Task CreateCorePerformanceIndexesAsync(AppDbContext context, bool usesPostgreSql)
+        private static async Task CreateCorePerformanceIndexesAsync(
+            AppDbContext context,
+            bool usesPostgreSql,
+            CancellationToken cancellationToken)
         {
             await context.Database.ExecuteSqlRawAsync(
                 """
@@ -189,7 +212,8 @@ namespace ExportDocManager.Services.Infrastructure
                     ON "CustomsCooItems" ("HSCode");
                 CREATE INDEX IF NOT EXISTS "IX_HsCodeDeclarationExamples_IsManuallyVerified_UpdatedAt"
                     ON "HsCodeDeclarationExamples" ("IsManuallyVerified", "UpdatedAt");
-                """).ConfigureAwait(false);
+                """,
+                cancellationToken).ConfigureAwait(false);
 
             if (!usesPostgreSql)
             {
@@ -214,15 +238,20 @@ namespace ExportDocManager.Services.Infrastructure
                     ON "Items" ("HSCode" text_pattern_ops);
                 CREATE INDEX IF NOT EXISTS "IX_CustomsCooItems_HSCode_Prefix"
                     ON "CustomsCooItems" ("HSCode" text_pattern_ops);
-                """).ConfigureAwait(false);
+                """,
+                cancellationToken).ConfigureAwait(false);
 
         }
 
-        private static async Task CreatePostgreSqlTrigramIndexesAsync(AppDbContext context)
+        private static async Task CreatePostgreSqlTrigramIndexesAsync(
+            AppDbContext context,
+            CancellationToken cancellationToken)
         {
             try
             {
-                await context.Database.ExecuteSqlRawAsync("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+                await context.Database.ExecuteSqlRawAsync(
+                        "CREATE EXTENSION IF NOT EXISTS pg_trgm;",
+                        cancellationToken)
                     .ConfigureAwait(false);
                 await context.Database.ExecuteSqlRawAsync(
                     """
@@ -342,7 +371,8 @@ namespace ExportDocManager.Services.Infrastructure
                             upper("ProducerEmail") gin_trgm_ops,
                             upper("LastInvoiceNo") gin_trgm_ops,
                             upper("LastSourceStyleNo") gin_trgm_ops);
-                    """).ConfigureAwait(false);
+                    """,
+                    cancellationToken).ConfigureAwait(false);
             }
             catch (PostgresException ex) when (ex.SqlState is "42501" or "0A000" or "58P01")
             {

@@ -4,6 +4,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Time;
 
 namespace ExportDocManager.Services.SingleWindow
 {
@@ -23,6 +24,7 @@ namespace ExportDocManager.Services.SingleWindow
         private readonly ISingleWindowTrackingService _singleWindowTrackingService;
         private readonly ISettingsService _settingsService;
         private readonly IAppPathProvider _pathProvider;
+        private readonly IBusinessClock _clock;
 
         public SingleWindowHandoffPackageService(
             ICustomsCooSourceAssembler customsCooSourceAssembler,
@@ -36,7 +38,8 @@ namespace ExportDocManager.Services.SingleWindow
             ISingleWindowDocumentPersistenceService singleWindowDocumentPersistenceService,
             ISingleWindowTrackingService singleWindowTrackingService,
             ISettingsService settingsService,
-            IAppPathProvider pathProvider)
+            IAppPathProvider pathProvider,
+            IBusinessClock? clock = null)
         {
             _customsCooSourceAssembler = customsCooSourceAssembler ?? throw new ArgumentNullException(nameof(customsCooSourceAssembler));
             _agentConsignmentSourceAssembler = agentConsignmentSourceAssembler ?? throw new ArgumentNullException(nameof(agentConsignmentSourceAssembler));
@@ -50,6 +53,7 @@ namespace ExportDocManager.Services.SingleWindow
             _singleWindowTrackingService = singleWindowTrackingService ?? throw new ArgumentNullException(nameof(singleWindowTrackingService));
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<SingleWindowHandoffPackageResult> ExportSubmitPackageAsync(

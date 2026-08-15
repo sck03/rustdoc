@@ -123,12 +123,12 @@ namespace ExportDocManager.Services.SingleWindow
             return candidate;
         }
 
-        private static string BuildBatchReference(SingleWindowBusinessType businessType, int submissionVersion)
+        private string BuildBatchReference(SingleWindowBusinessType businessType, int submissionVersion)
         {
             string prefix = businessType == SingleWindowBusinessType.CustomsCoo ? "COO" : "ACD";
             string versionText = $"V{Math.Max(1, submissionVersion):000}";
             string guidPart = Guid.NewGuid().ToString("N")[..12].ToUpperInvariant();
-            string batchReference = $"{prefix}-{versionText}-{DateTime.Now:yyyyMMddHHmmss}-{guidPart}".ToUpperInvariant();
+            string batchReference = $"{prefix}-{versionText}-{_clock.Now:yyyyMMddHHmmss}-{guidPart}".ToUpperInvariant();
             return batchReference.Length <= 40
                 ? batchReference
                 : batchReference[..40];

@@ -2,6 +2,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Dashboard;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -10,20 +11,23 @@ namespace ExportDocManager.Services.Infrastructure
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _businessDataAccessScope;
+        private readonly IBusinessClock _clock;
 
         public DashboardService(
             IDbContextFactory<AppDbContext> contextFactory,
-            BusinessDataAccessScope businessDataAccessScope)
+            BusinessDataAccessScope businessDataAccessScope,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _businessDataAccessScope = businessDataAccessScope ?? throw new ArgumentNullException(nameof(businessDataAccessScope));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<DashboardSnapshot> GetDashboardAsync(CancellationToken cancellationToken = default)
         {
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            var localNow = DateTime.Now;
-            var startOfMonth = new DateOnly(localNow.Year, localNow.Month, 1);
+            var today = _clock.Today;
+            var startOfMonth = new DateOnly(today.Year, today.Month, 1);
             var endOfMonth = startOfMonth.AddMonths(1);
             var previousStartOfMonth = startOfMonth.AddMonths(-1);
             var scopedInvoices = _businessDataAccessScope.ApplyInvoiceScope(context.Invoices.AsNoTracking());
@@ -78,7 +82,7 @@ namespace ExportDocManager.Services.Infrastructure
                 singleWindowStatusSummary,
                 recentInvoices,
                 todoItems,
-                $"{localNow:yyyy年M月}",
+                $"{_clock.Now:yyyy年M月}",
                 previousPeriod.TotalAmount,
                 previousPeriod.TotalProfit,
                 previousPeriod.TotalTaxRefundAmount,

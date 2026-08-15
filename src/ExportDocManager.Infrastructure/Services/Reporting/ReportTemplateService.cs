@@ -4,6 +4,7 @@ using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Reporting
@@ -16,16 +17,19 @@ namespace ExportDocManager.Services.Reporting
         private readonly ReportTemplatePathResolver _pathResolver;
         private readonly ReportTemplateCatalogLoader _catalogLoader;
         private readonly ISettingsService _settingsService;
+        private readonly IBusinessClock _clock;
 
         public ReportTemplateService(
             IAppPathProvider pathProvider,
-            ISettingsService settingsService)
+            ISettingsService settingsService,
+            IBusinessClock? clock = null)
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
             ArgumentNullException.ThrowIfNull(settingsService);
             _pathResolver = new ReportTemplatePathResolver(pathProvider);
             _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver);
             _settingsService = settingsService;
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<ReportTemplateContentResult> CreateTemplateAsync(
@@ -465,12 +469,12 @@ namespace ExportDocManager.Services.Reporting
                 : ReportTemplateCatalogLoader.ExportTemplateCatalogType;
         }
 
-        private static string BuildDefaultTemplateFileName(ReportDocumentType reportType)
+        private string BuildDefaultTemplateFileName(ReportDocumentType reportType)
         {
             string prefix = reportType == ReportDocumentType.PaymentVoucher
                 ? "internal_template"
                 : "export_template";
-            return $"{prefix}_{DateTime.Now:yyyyMMddHHmmss}.html";
+            return $"{prefix}_{_clock.Now:yyyyMMddHHmmss}.html";
         }
 
         private static string RenderInvoicePreview(string templateContent, bool withSeal)
@@ -491,6 +495,7 @@ namespace ExportDocManager.Services.Reporting
 
         private static string RenderPaymentVoucherPreview(string templateContent)
         {
+            var sampleDate = new DateOnly(2026, 6, 15);
             var payee = new Payee
             {
                 Name = "Sample Payee",
@@ -502,8 +507,8 @@ namespace ExportDocManager.Services.Reporting
             {
                 Id = 1001,
                 InvoiceNo = "PREVIEW-INTERNAL-001",
-                PaymentDate = DateOnly.FromDateTime(DateTime.Today),
-                ShipmentDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-3)),
+                PaymentDate = sampleDate,
+                ShipmentDate = sampleDate.AddDays(-3),
                 PayerName = "示例付款单位",
                 PayeeName = payee.Name,
                 PaymentMethod = "Bank Transfer",
@@ -520,12 +525,13 @@ namespace ExportDocManager.Services.Reporting
 
         private static Invoice BuildSampleInvoice()
         {
+            var sampleDate = new DateOnly(2026, 6, 15);
             var invoice = new Invoice
             {
                 InvoiceNo = "PREVIEW-EXPORT-001",
                 ContractNo = "CN-2026-001",
-                InvoiceDate = DateOnly.FromDateTime(DateTime.Today),
-                ShipmentDate = DateOnly.FromDateTime(DateTime.Today.AddDays(10)),
+                InvoiceDate = sampleDate,
+                ShipmentDate = sampleDate.AddDays(10),
                 CustomerNameEN = "SAMPLE CUSTOMER LTD.",
                 ExporterNameEN = "SAMPLE EXPORTER CO., LTD.",
                 PortOfLoading = "NINGBO",

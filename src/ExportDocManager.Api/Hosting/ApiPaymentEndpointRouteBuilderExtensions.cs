@@ -22,10 +22,6 @@ namespace ExportDocManager.Api.Hosting
                 string? keyword,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 var result = await paymentReadRepository.QueryPageAsync(
                     new PaymentPageQuery
@@ -51,10 +47,6 @@ namespace ExportDocManager.Api.Hosting
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -79,10 +71,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiPaymentDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (request is null)
                 {
@@ -126,10 +114,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiPaymentDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -182,10 +166,6 @@ namespace ExportDocManager.Api.Hosting
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 if (id <= 0)
                 {

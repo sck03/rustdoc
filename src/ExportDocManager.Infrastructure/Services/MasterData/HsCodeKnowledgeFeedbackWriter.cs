@@ -16,6 +16,8 @@ namespace ExportDocManager.Services.MasterData
             AppDbContext context,
             IReadOnlyList<Item> invoiceItems,
             IReadOnlyList<HsCodeKnowledgeFeedbackInput>? inputs,
+            DateTimeOffset now,
+            int currentYear,
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(context);
@@ -56,6 +58,8 @@ namespace ExportDocManager.Services.MasterData
                         Specification = specification,
                         CandidateCode = code
                     },
+                    now,
+                    currentYear,
                     cancellationToken).ConfigureAwait(false);
             }
 
@@ -65,6 +69,8 @@ namespace ExportDocManager.Services.MasterData
         public static async Task RecordInContextAsync(
             AppDbContext context,
             HsCodeKnowledgeFeedbackInput input,
+            DateTimeOffset now,
+            int currentYear,
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(context);
@@ -97,7 +103,6 @@ namespace ExportDocManager.Services.MasterData
             var entity = await context.HsCodeSearchFeedback
                 .FirstOrDefaultAsync(item => item.Fingerprint == fingerprint, cancellationToken)
                 .ConfigureAwait(false);
-            DateTimeOffset now = DateTimeOffset.UtcNow;
             if (entity == null)
             {
                 entity = new HsCodeSearchFeedback { Fingerprint = fingerprint };
@@ -130,7 +135,7 @@ namespace ExportDocManager.Services.MasterData
                         string.IsNullOrWhiteSpace(productName) ? queryText : productName,
                         specification,
                         "ConsensusConfirmed",
-                        DateOnly.FromDateTime(DateTime.Today).Year,
+                        currentYear,
                         "ManuallyVerified",
                         true),
                     now,

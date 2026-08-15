@@ -129,7 +129,7 @@ namespace ExportDocManager.Services.MasterData
                 return new HsCodeRemoteSourceHealth(
                     "未配置",
                     false,
-                    DateTimeOffset.Now,
+                    DateTimeOffset.UtcNow,
                     "未配置 HS 编码联网数据源 Provider。");
             }
 
@@ -140,7 +140,7 @@ namespace ExportDocManager.Services.MasterData
             return new HsCodeRemoteSourceHealth(
                 string.Join(", ", results.Select(result => result.Source)),
                 available,
-                DateTimeOffset.Now,
+                DateTimeOffset.UtcNow,
                 string.Join("；", results.Select(result => result.Message)));
         }
 

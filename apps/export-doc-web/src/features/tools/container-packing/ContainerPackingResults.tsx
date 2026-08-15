@@ -3,9 +3,7 @@ import type { ApiContainerPackingAnalysisDto } from "../../../api/index.ts";
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
 import { PageState } from "../../../ui/PageState.tsx";
 import {
-  containerPackingZoneOptions,
   formatPackingPercent,
-  type ContainerPackingCargoRow,
   type ContainerPackingRenderModeValue,
 } from "./containerPackingModel.ts";
 import {
@@ -18,9 +16,8 @@ const ContainerPackingScene3d = lazy(() => import("./ContainerPackingScene3d.tsx
 type Props = {
   analysis: ApiContainerPackingAnalysisDto | null;
   canAnalyze: boolean;
-  cargoRows: ContainerPackingCargoRow[];
   isAnalyzing: boolean;
-  pdfRootRef: MutableRefObject<HTMLDivElement | null>;
+  resultsRootRef: MutableRefObject<HTMLDivElement | null>;
   renderMode: ContainerPackingRenderModeValue;
   visualizationDimensions: ContainerPackingVisualizationDimensions | null;
   onAnalyze(): void;
@@ -29,9 +26,8 @@ type Props = {
 export function ContainerPackingResults({
   analysis,
   canAnalyze,
-  cargoRows,
   isAnalyzing,
-  pdfRootRef,
+  resultsRootRef,
   renderMode,
   visualizationDimensions,
   onAnalyze,
@@ -55,12 +51,9 @@ export function ContainerPackingResults({
   return (
     <div
       className="container-packing-result"
-      ref={(element) => { pdfRootRef.current = element; }}
-      data-container-packing-pdf
+      ref={(element) => { resultsRootRef.current = element; }}
     >
-      <PackingCargoSnapshot cargoRows={cargoRows} />
       <PackingSummary analysis={analysis} />
-      <PackingInstructions analysis={analysis} />
       {visualizationDimensions ? (
         <>
           <Suspense fallback={<SceneLoadingState />}>
@@ -77,31 +70,6 @@ export function ContainerPackingResults({
           />
         </>
       ) : null}
-    </div>
-  );
-}
-
-function PackingCargoSnapshot({ cargoRows }: { cargoRows: ContainerPackingCargoRow[] }) {
-  return (
-    <div className="container-packing-pdf-cargo" aria-hidden="true">
-      <h2>货物清单</h2>
-      <table>
-        <thead>
-          <tr><th>货物</th><th>尺寸（cm）</th><th>单件重量</th><th>数量</th><th>装载区域</th><th>托盘</th></tr>
-        </thead>
-        <tbody>
-          {cargoRows.map((row) => (
-            <tr key={`pdf-${row.id}`}>
-              <td>{row.name || "未命名货物"}</td>
-              <td>{row.length} × {row.width} × {row.height}</td>
-              <td>{row.weight || "-"}</td>
-              <td>{row.quantity || "-"}</td>
-              <td>{containerPackingZoneOptions.find((option) => option.value === row.preferredZone)?.label || "自动"}</td>
-              <td>{row.usePallet ? `是（每托 ${row.unitsPerPallet || "-"}）` : "否"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
@@ -126,20 +94,6 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
     <div className="detail-item">
       <span>{label}</span>
       <strong>{value}</strong>
-    </div>
-  );
-}
-
-function PackingInstructions({ analysis }: { analysis: ApiContainerPackingAnalysisDto }) {
-  return (
-    <div className="container-packing-pdf-instructions" aria-hidden="true">
-      <h2>现场装柜提示</h2>
-      <ol>
-        <li>先确认实际柜型和内尺寸与作业单一致，再从柜头向柜门方向装载。</li>
-        <li>按效果图颜色核对货物，结合俯视、侧视和柜门图确认每批货物位置。</li>
-        <li>{analysis.unpackedPackages > 0 ? `当前仍有 ${formatPlainNumber(analysis.unpackedPackages)} 件未装入，请另行安排。` : "本方案货物已全部装入。"}</li>
-        <li>{analysis.isCenterOfGravityWithinTolerance ? "装载重心在设定范围内。" : "装载重心超出设定范围，现场装柜前请复核配重和固定方式。"}</li>
-      </ol>
     </div>
   );
 }

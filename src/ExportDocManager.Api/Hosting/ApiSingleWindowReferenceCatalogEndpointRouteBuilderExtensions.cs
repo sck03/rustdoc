@@ -18,14 +18,9 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/single-window/reference-catalog", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ISingleWindowReferenceCatalogService referenceCatalogService,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 var catalog = await referenceCatalogService.LoadEffectiveCatalogAsync(cancellationToken);
                 return Results.Ok(ApiSingleWindowDtoFactory.FromReferenceCatalog(catalog));
@@ -36,16 +31,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPut("/api/single-window/reference-catalog", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ISingleWindowReferenceCatalogService referenceCatalogService,
                 ApiSingleWindowReferenceCatalogSaveRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (request?.Catalog == null)
                 {
@@ -74,15 +64,10 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/single-window/reference-catalog/import-json", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ISingleWindowReferenceCatalogService referenceCatalogService,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 try
                 {
@@ -123,7 +108,6 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/single-window/reference-catalog/excel/preview", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ISingleWindowReferenceCatalogExcelImportService excelImportService,
                 string? fileName,
                 string? catalogKey,
@@ -141,11 +125,7 @@ namespace ExportDocManager.Api.Hosting
                 int? aliasesColumn,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 fileName ??= string.Empty;
                 if (!IsSupportedReferenceCatalogExcelFileName(fileName))
@@ -216,15 +196,10 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapDelete("/api/single-window/reference-catalog", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ISingleWindowReferenceCatalogService referenceCatalogService,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 await referenceCatalogService.ResetToBundledCatalogAsync(cancellationToken);
                 var catalog = await referenceCatalogService.LoadEffectiveCatalogAsync(cancellationToken);

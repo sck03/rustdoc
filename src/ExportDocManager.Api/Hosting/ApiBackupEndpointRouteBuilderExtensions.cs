@@ -18,17 +18,12 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/backup", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IBackupService backupService,
                 IAppPathProvider pathProvider,
                 ApiDesktopAccessOptions desktopAccessOptions) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -47,17 +42,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/backup", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IBackupService backupService,
                 IAppPathProvider pathProvider,
                 ApiDesktopAccessOptions desktopAccessOptions) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -88,18 +78,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/backup/cleanup", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IBackupService backupService,
                 IAppPathProvider pathProvider,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ApiBackupCleanupRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -136,16 +121,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/backup/restore", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IBackupService backupService,
                 ApiBackupRestoreRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -190,16 +170,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/backup/disaster-recovery/status", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISingleWindowDisasterRecoveryService recoveryService,
                 ApiDesktopAccessOptions desktopAccessOptions) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -224,17 +199,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/backup/disaster-recovery/create", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ISingleWindowDisasterRecoveryService recoveryService,
                 ApiDisasterRecoveryCreateRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -283,17 +253,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/backup/disaster-recovery/restore", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ISingleWindowDisasterRecoveryService recoveryService,
                 ApiDisasterRecoveryRestoreRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -355,18 +320,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/backup/cloud/status", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
                 IBackupService backupService,
                 IAppPathProvider pathProvider,
                 ApiDesktopAccessOptions desktopAccessOptions) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -395,17 +355,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/backup/cloud/test-connection", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
                 ICloudSyncService cloudSyncService,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -445,7 +400,6 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/backup/cloud/upload-latest", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
                 IBackupService backupService,
@@ -454,11 +408,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiDesktopAccessOptions desktopAccessOptions,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -518,7 +468,6 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/backup/cloud/backups", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
                 ICloudSyncService cloudSyncService,
@@ -527,11 +476,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiDesktopAccessOptions desktopAccessOptions,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -579,7 +524,6 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/backup/cloud/download", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
                 ICloudSyncService cloudSyncService,
@@ -589,11 +533,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiCloudBackupDownloadRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {

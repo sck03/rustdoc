@@ -17,10 +17,6 @@ namespace ExportDocManager.Api.Hosting
                 IDashboardService dashboardService,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 var dashboard = await dashboardService.GetDashboardAsync(cancellationToken);
                 return TypedResults.Ok(ToDashboardResponse(dashboard));

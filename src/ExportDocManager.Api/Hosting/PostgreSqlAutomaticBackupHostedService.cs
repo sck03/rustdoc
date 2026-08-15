@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -17,15 +18,18 @@ namespace ExportDocManager.Api.Hosting
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IAppPathProvider _pathProvider;
         private readonly ILogger<PostgreSqlAutomaticBackupHostedService> _logger;
+        private readonly IBusinessClock _clock;
 
         public PostgreSqlAutomaticBackupHostedService(
             IServiceScopeFactory scopeFactory,
             IAppPathProvider pathProvider,
-            ILogger<PostgreSqlAutomaticBackupHostedService> logger)
+            ILogger<PostgreSqlAutomaticBackupHostedService> logger,
+            IBusinessClock clock)
         {
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -52,7 +56,7 @@ namespace ExportDocManager.Api.Hosting
                     return;
                 }
 
-                var now = DateTimeOffset.Now;
+                var now = _clock.Now;
                 if (!ShouldRun(settings, now, await ReadStateAsync(cancellationToken).ConfigureAwait(false)))
                 {
                     return;

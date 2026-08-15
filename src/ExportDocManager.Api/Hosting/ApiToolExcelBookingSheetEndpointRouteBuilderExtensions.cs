@@ -14,16 +14,11 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapPost("/api/tools/excel/booking-sheet/blank/save-to-path", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ApiBackgroundJobRunner jobRunner,
                 ApiExcelOutputRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -49,15 +44,10 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/tools/excel/booking-sheet/blank/download", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IAppPathProvider pathProvider,
                 ApiBackgroundJobRunner jobRunner) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 string destinationPath = CreateBrowserDownloadPath(
                     pathProvider,
@@ -74,16 +64,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/tools/excel/booking-sheet/convert/save-to-path", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ApiBackgroundJobRunner jobRunner,
                 ApiExcelConvertBookingSheetRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -127,17 +112,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/tools/excel/booking-sheet/convert/upload", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IAppPathProvider pathProvider,
                 ApiBackgroundJobRunner jobRunner,
                 string? fileName,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 string safeFileName = Path.GetFileName(fileName?.Trim() ?? string.Empty);
                 if (!IsSupportedExcelSourceExtension(safeFileName))
@@ -196,18 +176,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/tools/excel/booking-sheet/from-invoice/save-to-path", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IInvoiceService invoiceService,
                 ApiBackgroundJobRunner jobRunner,
                 ApiInvoiceBookingSheetRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -257,18 +232,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/tools/excel/booking-sheet/from-invoice/{invoiceId:int}/download", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
                 IAppPathProvider pathProvider,
                 ApiBackgroundJobRunner jobRunner,
                 int invoiceId,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (invoiceId <= 0)
                 {

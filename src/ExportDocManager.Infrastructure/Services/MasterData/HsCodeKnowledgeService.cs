@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.MasterData
@@ -23,13 +24,16 @@ namespace ExportDocManager.Services.MasterData
 
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
         private readonly BusinessDataAccessScope _businessDataAccessScope;
+        private readonly IBusinessClock _clock;
 
         public HsCodeKnowledgeService(
             IDbContextFactory<AppDbContext> dbContextFactory,
-            BusinessDataAccessScope? businessDataAccessScope = null)
+            BusinessDataAccessScope? businessDataAccessScope = null,
+            IBusinessClock? clock = null)
         {
             _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
             _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
     }

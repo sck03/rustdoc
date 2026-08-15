@@ -137,15 +137,6 @@ export async function readExporterSealImageFileAsDataUrl(path: string) {
   return invoke<string>("read_exporter_seal_image_file_as_data_url", { path });
 }
 
-export async function readOcrImageFileAsDataUrl(path: string) {
-  const invoke = getInvoke();
-  if (!invoke || !path.trim()) {
-    return null;
-  }
-
-  return invoke<string>("read_ocr_image_file_as_data_url", { path });
-}
-
 export async function selectExcelFile() {
   return invokeOptionalPath("select_excel_file");
 }
@@ -211,16 +202,6 @@ export async function selectSavePdfPath(defaultFileName?: string, defaultDirecto
     defaultFileName: normalizeOptionalPath(defaultFileName),
     defaultDirectory: normalizeOptionalPath(defaultDirectory),
   });
-}
-
-export async function savePdfFile(path: string, base64Data: string) {
-  const invoke = getInvoke();
-  if (!invoke || !path.trim() || !base64Data) {
-    return false;
-  }
-
-  await invoke<void>("save_pdf_file", { path, base64Data });
-  return true;
 }
 
 export async function selectSaveZipPath(defaultFileName?: string, defaultDirectory?: string) {

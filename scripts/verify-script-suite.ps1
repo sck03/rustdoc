@@ -67,7 +67,6 @@ $hostPath = Join-Path $scriptRoot "lib\run-powershell-entry.cmd"
 $hostContent = Get-Content -LiteralPath $hostPath -Raw -Encoding UTF8
 foreach ($requiredPattern in @(
     'where pwsh\.exe',
-    'where powershell\.exe',
     'set "EXIT_CODE=%ERRORLEVEL%"',
     'pause >nul',
     'endlocal & exit /b %EXIT_CODE%'

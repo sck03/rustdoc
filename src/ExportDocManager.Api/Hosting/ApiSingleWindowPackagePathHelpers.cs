@@ -1,6 +1,7 @@
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.SingleWindow;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -9,16 +10,18 @@ namespace ExportDocManager.Api.Hosting
     {
         private static string BuildDefaultSingleWindowSubmitPackagePath(
             IAppPathProvider pathProvider,
+            IBusinessClock clock,
             SingleWindowBusinessType businessType,
             int invoiceId)
         {
             string prefix = businessType == SingleWindowBusinessType.CustomsCoo ? "coo" : "acd";
-            string fileName = $"{prefix}-{invoiceId}-{DateTime.Now:yyyyMMddHHmmss}.swpkg";
+            string fileName = $"{prefix}-{invoiceId}-{clock.Now:yyyyMMddHHmmss}.swpkg";
             return Path.Combine(pathProvider.SingleWindowRoot, "Outbox", fileName);
         }
 
         private static string BuildDefaultSingleWindowReceiptPackagePath(
             IAppPathProvider pathProvider,
+            IBusinessClock clock,
             SingleWindowBusinessType businessType,
             string batchReference,
             string invoiceNo)
@@ -26,7 +29,7 @@ namespace ExportDocManager.Api.Hosting
             string prefix = businessType == SingleWindowBusinessType.CustomsCoo ? "coo" : "acd";
             string token = BuildSafeSingleWindowFileToken(
                 string.IsNullOrWhiteSpace(batchReference) ? invoiceNo : batchReference);
-            string fileName = $"receipt-{prefix}-{token}-{DateTime.Now:yyyyMMddHHmmss}.swpkg";
+            string fileName = $"receipt-{prefix}-{token}-{clock.Now:yyyyMMddHHmmss}.swpkg";
             return Path.Combine(pathProvider.SingleWindowRoot, "Outbox", fileName);
         }
 

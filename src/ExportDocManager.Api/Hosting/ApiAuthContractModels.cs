@@ -32,7 +32,10 @@ namespace ExportDocManager.Api.Hosting
         string ModuleKey,
         string AccessLevel);
 
-    public sealed record ApiErrorResponse(string Message);
+    public sealed record ApiErrorResponse(
+        string Message,
+        string? Code = null,
+        string? CorrelationId = null);
 
     public sealed record ApiLogoutResponse(bool Success);
 }

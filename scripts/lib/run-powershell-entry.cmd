@@ -27,13 +27,7 @@ if not errorlevel 1 (
   goto run_script
 )
 
-where powershell.exe >nul 2>nul
-if not errorlevel 1 (
-  set "PS_EXE=powershell.exe"
-  goto run_script
-)
-
-echo PowerShell was not found. Install PowerShell 7 or enable Windows PowerShell.
+echo PowerShell 7 was not found. Install the free cross-platform pwsh runtime.
 set "EXIT_CODE=1"
 goto finish
 

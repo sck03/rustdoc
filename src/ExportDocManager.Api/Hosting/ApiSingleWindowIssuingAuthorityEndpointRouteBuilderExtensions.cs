@@ -15,10 +15,6 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ISingleWindowReferenceCatalogSnapshotProvider catalogProvider) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 return TypedResults.Ok(ApiSingleWindowDtoFactory.FromIssuingAuthorityCatalog(
                     catalogProvider.Current.IssuingAuthorities));
@@ -31,10 +27,6 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IApiSessionTokenService tokenService) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 return TypedResults.Ok(ApiSingleWindowDtoFactory.FromCustomsCooEditorOptions());
             })

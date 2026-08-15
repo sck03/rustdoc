@@ -1,6 +1,7 @@
 param([Parameter(Mandatory = $true)][string]$BrowserRoot)
 $ErrorActionPreference = "Stop"
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+. (Join-Path $PSScriptRoot "lib/build-script-support.ps1")
 $isWindowsPlatform = [Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
     [Runtime.InteropServices.OSPlatform]::Windows)
 $pathComparison = if ($isWindowsPlatform) {
@@ -50,7 +51,6 @@ if (-not $isWindowsPlatform) {
     }
 }
 New-Item -ItemType Directory -Path $work -Force | Out-Null
-$process = $null
 try {
     $html = Join-Path $work "print-test.html"
     $pdf = Join-Path $work "print-test.pdf"
@@ -59,14 +59,13 @@ try {
     New-Item -ItemType Directory -Path $profile -Force | Out-Null
     '<!doctype html><meta charset="utf-8"><style>@page{size:A4;margin:12mm}body{font-family:sans-serif}</style><h1>ExportDocManager PDF</h1><p>Bundled browser verification</p>' | Set-Content -LiteralPath $html -Encoding UTF8
     $uri = [Uri]::new($html).AbsoluteUri
-    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $startInfo.FileName = $browser.FullName
-    $startInfo.WorkingDirectory = $work
-    $startInfo.UseShellExecute = $false
-    $startInfo.RedirectStandardOutput = $true
-    $startInfo.RedirectStandardError = $true
-    $startInfo.Environment["CHROME_LOG_FILE"] = $log
-    @(
+    $result = Invoke-ExportDocExternal `
+        -FilePath $browser.FullName `
+        -WorkingDirectory $work `
+        -Environment @{ CHROME_LOG_FILE = $log } `
+        -TimeoutSeconds 60 `
+        -CaptureOutput `
+        -Arguments @(
         "--headless",
         "--no-sandbox",
         "--disable-gpu",
@@ -76,24 +75,8 @@ try {
         "--user-data-dir=$profile",
         "--print-to-pdf=$pdf",
         $uri
-    ) | ForEach-Object { [void]$startInfo.ArgumentList.Add($_) }
-
-    $process = [System.Diagnostics.Process]::new()
-    $process.StartInfo = $startInfo
-    [void]$process.Start()
-    $standardOutput = $process.StandardOutput.ReadToEndAsync()
-    $standardError = $process.StandardError.ReadToEndAsync()
-    if (-not $process.WaitForExit(60000)) {
-        try { $process.Kill($true) } catch { }
-        [void]$process.WaitForExit(5000)
-        throw "Bundled browser PDF verification timed out after 60 seconds."
-    }
-    $output = $standardOutput.GetAwaiter().GetResult()
-    $errorOutput = $standardError.GetAwaiter().GetResult()
-    if (-not [string]::IsNullOrWhiteSpace($output)) { Write-Host $output.Trim() }
-    if ($process.ExitCode -ne 0) {
-        throw "Bundled browser failed to generate a PDF (exit $($process.ExitCode)): $($errorOutput.Trim())"
-    }
+    )
+    if (-not [string]::IsNullOrWhiteSpace($result.Output)) { Write-Host $result.Output.Trim() }
     if (-not (Test-Path -LiteralPath $pdf -PathType Leaf) -or (Get-Item -LiteralPath $pdf).Length -lt 1000) {
         throw "Bundled browser failed to generate a valid-sized PDF."
     }
@@ -101,9 +84,6 @@ try {
     if ($signature -ne '%PDF-') { throw "Bundled browser output is not a valid PDF." }
     Write-Host "Bundled browser PDF verification passed: $($browser.FullName)"
 } finally {
-    if ($null -ne $process) {
-        $process.Dispose()
-    }
     Get-ChildItem -LiteralPath $root -File -Recurse -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -in $transientLogNames -and $_.FullName -notin $existingTransientLogs } |
         Remove-Item -Force -ErrorAction SilentlyContinue

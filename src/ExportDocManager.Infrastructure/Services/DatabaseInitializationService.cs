@@ -5,6 +5,7 @@ using ExportDocManager.DataAccess;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Serilog;
 
 namespace ExportDocManager.Services.Infrastructure
 {
@@ -15,6 +16,7 @@ namespace ExportDocManager.Services.Infrastructure
     public sealed class DatabaseInitializationService : IDatabaseInitializationService
     {
         private const long PostgreSqlInitializationLockId = 73190520260718;
+        private static readonly TimeSpan InitializationTimeout = TimeSpan.FromSeconds(60);
 
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
         private readonly DatabaseConnectionSettings _databaseSettings;
@@ -63,19 +65,33 @@ namespace ExportDocManager.Services.Infrastructure
             _pathProvider = pathProvider;
         }
 
-        public Task<DatabaseInitializationResult> InitializeAsync(
+        public async Task<DatabaseInitializationResult> InitializeAsync(
             string username,
             string password,
-            string? bootstrapToken = null)
+            string? bootstrapToken = null,
+            CancellationToken cancellationToken = default)
         {
-            return _coordinator.InitializeOnceAsync(() =>
-                InitializeCoreAsync(username, password, bootstrapToken));
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(InitializationTimeout);
+            try
+            {
+                return await _coordinator.InitializeOnceAsync(
+                    token => InitializeCoreAsync(username, password, bootstrapToken, token),
+                    timeout.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return DatabaseInitializationResult.Fail(
+                    "数据库初始化超时，请稍后重试或联系管理员检查数据库服务。",
+                    shouldResetPassword: false);
+            }
         }
 
         private async Task<DatabaseInitializationResult> InitializeCoreAsync(
             string username,
             string password,
-            string? bootstrapToken)
+            string? bootstrapToken,
+            CancellationToken cancellationToken)
         {
             bool usesPostgreSql = DatabaseModeHelper.UsesPostgreSql(_databaseSettings);
             bool advisoryLockAcquired = false;
@@ -95,23 +111,24 @@ namespace ExportDocManager.Services.Infrastructure
                     ? CreatePostgreSqlContext(
                         maintenanceProfile.ConnectionSettings,
                         _pathProvider ?? throw new InvalidOperationException("PostgreSQL 维护连接需要有效的运行路径提供器。"))
-                    : await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+                    : await _dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
                 if (usesPostgreSql)
                 {
-                    await context.Database.OpenConnectionAsync().ConfigureAwait(false);
+                    await context.Database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
                     if (maintenanceProfile?.UsesDedicatedCredentials == true)
                     {
                         await ExecutePostgreSqlCommandAsync(
                             context,
-                            $"SET ROLE {QuotePostgreSqlIdentifier(maintenanceProfile.OwnerRole)};")
+                            $"SET ROLE {QuotePostgreSqlIdentifier(maintenanceProfile.OwnerRole)};",
+                            cancellationToken)
                             .ConfigureAwait(false);
                     }
-                    await context.Database.ExecuteSqlRawAsync(
-                        $"SELECT pg_advisory_lock({PostgreSqlInitializationLockId});").ConfigureAwait(false);
+                    await AcquirePostgreSqlInitializationLockAsync(context, cancellationToken)
+                        .ConfigureAwait(false);
                     advisoryLockAcquired = true;
 
                     bool databaseIsEmpty = await DatabaseSchemaBaseline
-                        .IsDatabaseEmptyAsync(context, usesPostgreSql: true)
+                        .IsDatabaseEmptyAsync(context, usesPostgreSql: true, cancellationToken)
                         .ConfigureAwait(false);
                     if (databaseIsEmpty && _requireBootstrapToken &&
                         !FixedTimeEquals(_expectedBootstrapToken, bootstrapToken))
@@ -124,21 +141,23 @@ namespace ExportDocManager.Services.Infrastructure
                 }
                 else
                 {
-                    await ConfigureSingleProcessSqliteAsync(context).ConfigureAwait(false);
+                    await ConfigureSingleProcessSqliteAsync(context, cancellationToken).ConfigureAwait(false);
                 }
 
-                await DatabaseSchemaBaseline.EnsureCurrentAsync(context, usesPostgreSql).ConfigureAwait(false);
+                await DatabaseSchemaBaseline.EnsureCurrentAsync(context, usesPostgreSql, cancellationToken)
+                    .ConfigureAwait(false);
                 if (maintenanceProfile?.UsesDedicatedCredentials == true)
                 {
                     await GrantApplicationRolePrivilegesAsync(
                         context,
                         maintenanceProfile.OwnerRole,
                         _databaseSettings.PostgreSqlUsername,
-                        _databaseSettings.PostgreSqlDatabase).ConfigureAwait(false);
+                        _databaseSettings.PostgreSqlDatabase,
+                        cancellationToken).ConfigureAwait(false);
                 }
 
                 bool requiresInitialAdministrator = usesPostgreSql &&
-                    !await context.Users.AsNoTracking().AnyAsync().ConfigureAwait(false);
+                    !await context.Users.AsNoTracking().AnyAsync(cancellationToken).ConfigureAwait(false);
                 if (requiresInitialAdministrator && _requireBootstrapToken &&
                     !FixedTimeEquals(_expectedBootstrapToken, bootstrapToken))
                 {
@@ -152,29 +171,36 @@ namespace ExportDocManager.Services.Infrastructure
                     context,
                     _databaseSettings,
                     ResolveInitialAdminPassword(usesPostgreSql, username, password));
+                cancellationToken.ThrowIfCancellationRequested();
 
                 return DatabaseInitializationResult.Success();
             }
             catch (InvalidOperationException ex)
             {
-                return DatabaseInitializationResult.Fail(ex.Message, shouldResetPassword: false);
+                Log.Warning(ex, "Database initialization rejected the current schema or configuration.");
+                return DatabaseInitializationResult.Fail(
+                    "数据库结构或配置不符合当前版本要求。项目尚未投产，请备份需要保留的文件后使用空数据库重新初始化。",
+                    shouldResetPassword: false);
             }
             catch (SqliteException ex)
             {
+                Log.Error(ex, "SQLite database initialization failed.");
                 return DatabaseInitializationResult.Fail(
-                    "本地数据库初始化失败。请确认运行数据根可写；如这是预发布旧数据库，请备份后删除并重新初始化。\n\n" + ex.Message,
+                    "本地数据库初始化失败。请确认运行数据根可写；如这是预发布旧数据库，请备份后删除并重新初始化。",
                     shouldResetPassword: false);
             }
             catch (NpgsqlException ex) when (usesPostgreSql)
             {
+                Log.Error(ex, "PostgreSQL database initialization failed.");
                 return DatabaseInitializationResult.Fail(
-                    "连接或初始化共享数据库失败，请检查 PostgreSQL 地址、端口、数据库名、账号密码、网络和建表权限。\n\n" + ex.Message,
+                    "连接或初始化共享数据库失败，请检查 PostgreSQL 地址、端口、数据库名、账号密码、网络和建表权限。",
                     shouldResetPassword: false);
             }
             catch (DbException ex) when (usesPostgreSql)
             {
+                Log.Error(ex, "Shared database initialization failed.");
                 return DatabaseInitializationResult.Fail(
-                    "连接或初始化共享数据库失败，请检查数据库服务状态和连接配置。\n\n" + ex.Message,
+                    "连接或初始化共享数据库失败，请检查数据库服务状态和连接配置。",
                     shouldResetPassword: false);
             }
             finally
@@ -183,8 +209,11 @@ namespace ExportDocManager.Services.Infrastructure
                 {
                     try
                     {
-                        await context.Database.ExecuteSqlRawAsync(
-                            $"SELECT pg_advisory_unlock({PostgreSqlInitializationLockId});").ConfigureAwait(false);
+                        using var unlockTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                        await ExecutePostgreSqlCommandAsync(
+                            context,
+                            $"SELECT pg_advisory_unlock({PostgreSqlInitializationLockId});",
+                            unlockTimeout.Token).ConfigureAwait(false);
                     }
                     catch
                     {
@@ -198,12 +227,14 @@ namespace ExportDocManager.Services.Infrastructure
             }
         }
 
-        private static async Task ConfigureSingleProcessSqliteAsync(AppDbContext context)
+        private static async Task ConfigureSingleProcessSqliteAsync(
+            AppDbContext context,
+            CancellationToken cancellationToken)
         {
-            await context.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;").ConfigureAwait(false);
-            await context.Database.ExecuteSqlRawAsync("PRAGMA synchronous=NORMAL;").ConfigureAwait(false);
-            await context.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout=10000;").ConfigureAwait(false);
-            await context.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys=ON;").ConfigureAwait(false);
+            await context.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", cancellationToken).ConfigureAwait(false);
+            await context.Database.ExecuteSqlRawAsync("PRAGMA synchronous=NORMAL;", cancellationToken).ConfigureAwait(false);
+            await context.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout=10000;", cancellationToken).ConfigureAwait(false);
+            await context.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys=ON;", cancellationToken).ConfigureAwait(false);
         }
 
         private static AppDbContext CreatePostgreSqlContext(
@@ -219,7 +250,8 @@ namespace ExportDocManager.Services.Infrastructure
             AppDbContext context,
             string ownerRole,
             string applicationRole,
-            string databaseName)
+            string databaseName,
+            CancellationToken cancellationToken)
         {
             string owner = QuotePostgreSqlIdentifier(ownerRole);
             string app = QuotePostgreSqlIdentifier(applicationRole);
@@ -236,17 +268,39 @@ namespace ExportDocManager.Services.Infrastructure
                     GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO {{app}};
                 ALTER DEFAULT PRIVILEGES FOR ROLE {{owner}} IN SCHEMA public
                     GRANT EXECUTE ON ROUTINES TO {{app}};
-                """);
+                """,
+                cancellationToken);
         }
 
         private static async Task ExecutePostgreSqlCommandAsync(
             AppDbContext context,
-            string commandText)
+            string commandText,
+            CancellationToken cancellationToken)
         {
             DbConnection connection = context.Database.GetDbConnection();
             await using DbCommand command = connection.CreateCommand();
             command.CommandText = commandText;
-            await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+            command.CommandTimeout = 10;
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        private static async Task AcquirePostgreSqlInitializationLockAsync(
+            AppDbContext context,
+            CancellationToken cancellationToken)
+        {
+            DbConnection connection = context.Database.GetDbConnection();
+            while (true)
+            {
+                await using DbCommand command = connection.CreateCommand();
+                command.CommandText = $"SELECT pg_try_advisory_lock({PostgreSqlInitializationLockId});";
+                command.CommandTimeout = 10;
+                if (await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true)
+                {
+                    return;
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken).ConfigureAwait(false);
+            }
         }
 
         private static string QuotePostgreSqlIdentifier(string value)

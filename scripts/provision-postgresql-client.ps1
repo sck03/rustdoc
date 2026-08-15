@@ -35,45 +35,31 @@ function Assert-PostgreSqlClientVersion {
         [string]$LibraryRoot = ""
     )
 
-    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $startInfo.FileName = $Executable
-    $startInfo.UseShellExecute = $false
-    $startInfo.RedirectStandardOutput = $true
-    $startInfo.RedirectStandardError = $true
-    $startInfo.CreateNoWindow = $true
-    [void]$startInfo.ArgumentList.Add("--version")
+    $environment = @{}
     if (-not [string]::IsNullOrWhiteSpace($LibraryRoot)) {
         $existing = [Environment]::GetEnvironmentVariable("LD_LIBRARY_PATH")
-        $startInfo.Environment["LD_LIBRARY_PATH"] = if ([string]::IsNullOrWhiteSpace($existing)) {
+        $environment["LD_LIBRARY_PATH"] = if ([string]::IsNullOrWhiteSpace($existing)) {
             $LibraryRoot
         } else {
             "$LibraryRoot`:$existing"
         }
     }
 
-    $process = [System.Diagnostics.Process]::Start($startInfo)
-    if ($null -eq $process) {
-        throw "Could not start PostgreSQL client executable: $Executable"
-    }
-    try {
-        $output = $process.StandardOutput.ReadToEnd()
-        $errorOutput = $process.StandardError.ReadToEnd()
-        $process.WaitForExit()
-        if ($process.ExitCode -ne 0) {
-            throw "PostgreSQL client version check failed: $errorOutput"
-        }
-        if ($output -notmatch '^\S+ \(PostgreSQL\) 18\.') {
-            throw "Unexpected PostgreSQL client version: $output"
-        }
-    } finally {
-        $process.Dispose()
+    $result = Invoke-ExportDocExternal `
+        -FilePath $Executable `
+        -Arguments @("--version") `
+        -Environment $environment `
+        -TimeoutSeconds 60 `
+        -CaptureOutput
+    if ($result.Output -notmatch '^\S+ \(PostgreSQL\) 18\.') {
+        throw "Unexpected PostgreSQL client version: $($result.Output)"
     }
 }
 
 try {
     if ($Platform -eq "windows") {
         $archivePath = Join-Path $downloadRoot $windowsArchiveName
-        Invoke-WebRequest -Uri $windowsArchiveUri -OutFile $archivePath
+        Invoke-WebRequest -Uri $windowsArchiveUri -OutFile $archivePath -TimeoutSec 900
         $actualSha256 = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($actualSha256 -ne $windowsArchiveSha256) {
             throw "EnterpriseDB PostgreSQL archive checksum mismatch. Expected $windowsArchiveSha256, received $actualSha256."
@@ -118,7 +104,7 @@ fi
 chmod 0755 /out/bin/pg_dump /out/bin/pg_restore /out/bin/psql
 chmod 0644 /out/lib/* /out/POSTGRESQL_LICENSE.txt
 '@
-        Invoke-ExportDocExternal -FilePath "docker" -Arguments @(
+        Invoke-ExportDocExternal -FilePath "docker" -TimeoutSeconds 1200 -Arguments @(
             "run",
             "--rm",
             "--entrypoint", "sh",

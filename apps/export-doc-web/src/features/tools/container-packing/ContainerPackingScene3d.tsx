@@ -26,10 +26,6 @@ import {
 } from "three";
 import type { ApiContainerPackingAnalysisDto, ApiPackedCargoItemDto } from "../../../api/index.ts";
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
-import {
-  containerPackingSceneSnapshotEvent,
-  type ContainerPackingSceneSnapshotDetail,
-} from "./containerPackingSceneSnapshot.ts";
 
 type ContainerPackingSceneDimensions = {
   length: number;
@@ -287,17 +283,10 @@ export function ContainerPackingScene3d({
           }
         }, { threshold: 0.01 });
 
-    const handleSceneSnapshot = (event: Event) => {
-      const customEvent = event as CustomEvent<ContainerPackingSceneSnapshotDetail>;
-      renderScene();
-      customEvent.detail.dataUrl = renderer.domElement.toDataURL("image/png");
-    };
-
     renderer.domElement.addEventListener("pointerdown", handlePointerDown);
     renderer.domElement.addEventListener("pointermove", handlePointerMove);
     renderer.domElement.addEventListener("pointerup", handlePointerUp);
     renderer.domElement.addEventListener("pointercancel", handlePointerUp);
-    renderer.domElement.addEventListener(containerPackingSceneSnapshotEvent, handleSceneSnapshot);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     intersectionObserver?.observe(mount);
     renderer.domElement.dataset.autoRotate = String(autoRotateRef.current);
@@ -315,7 +304,6 @@ export function ContainerPackingScene3d({
       renderer.domElement.removeEventListener("pointermove", handlePointerMove);
       renderer.domElement.removeEventListener("pointerup", handlePointerUp);
       renderer.domElement.removeEventListener("pointercancel", handlePointerUp);
-      renderer.domElement.removeEventListener(containerPackingSceneSnapshotEvent, handleSceneSnapshot);
       controlApiRef.current = null;
       scene.traverse((object) => {
         const mesh = object as Mesh;

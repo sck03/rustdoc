@@ -11,16 +11,11 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiSettingsResponse>,
                 UnauthorizedHttpResult>>(
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ISettingsService settingsService) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 await settingsService.LoadAsync();
                 return TypedResults.Ok(ApiSettingsDtoFactory.FromSettingsForUser(
@@ -36,16 +31,11 @@ namespace ExportDocManager.Api.Hosting
                 UnauthorizedHttpResult,
                 JsonHttpResult<ApiErrorResponse>>>(
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
                 ApiSettingsValidationRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -75,17 +65,12 @@ namespace ExportDocManager.Api.Hosting
                 UnauthorizedHttpResult,
                 JsonHttpResult<ApiErrorResponse>>>(
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ISettingsService settingsService,
                 ApiSettingsSaveRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {

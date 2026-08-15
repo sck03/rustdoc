@@ -94,7 +94,12 @@ namespace ExportDocManager.Services.MasterData
         public async Task RecordFeedbackAsync(HsCodeKnowledgeFeedbackInput input, CancellationToken cancellationToken = default)
         {
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            await HsCodeKnowledgeFeedbackWriter.RecordInContextAsync(context, input, cancellationToken);
+            await HsCodeKnowledgeFeedbackWriter.RecordInContextAsync(
+                context,
+                input,
+                _clock.UtcNow,
+                _clock.Today.Year,
+                cancellationToken);
             await context.SaveChangesAsync(cancellationToken);
         }
     }

@@ -176,11 +176,10 @@ public sealed class DesktopPortablePackagingContractTests
         {
             string workflow = Read(root, ".github", "workflows", workflowName)
                 .Replace("\r\n", "\n", StringComparison.Ordinal);
-            string packageJob = workflow[..workflow.IndexOf("\n  release:", StringComparison.Ordinal)];
-
+            string releaseJob = workflow[workflow.IndexOf("\n  release:", StringComparison.Ordinal)..];
             Assert.Contains(
                 "permissions:\n      actions: read\n      contents: write",
-                packageJob,
+                releaseJob,
                 StringComparison.Ordinal);
         }
     }

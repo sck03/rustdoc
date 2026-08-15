@@ -91,6 +91,25 @@ namespace ExportDocManager.Api.Hosting
         public string StoragePolicy { get; }
     }
 
+    public sealed class ApiContainerPackingPdfRequest
+    {
+        public string ProjectName { get; set; } = string.Empty;
+
+        public string ContainerType { get; set; } = string.Empty;
+
+        public string DestinationPath { get; set; } = string.Empty;
+
+        public ApiContainerDimensionsDto Container { get; set; } = new();
+
+        public ApiContainerPackingAnalysisDto Analysis { get; set; } = new();
+    }
+
+    public sealed record ApiContainerPackingPdfSaveResponse(
+        bool Success,
+        string FilePath,
+        long SizeBytes,
+        string Message);
+
     public sealed class ApiContainerPackingProjectListResponse
     {
         public ApiContainerPackingProjectListResponse(

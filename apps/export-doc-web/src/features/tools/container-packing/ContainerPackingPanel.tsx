@@ -648,7 +648,7 @@ export function ContainerPackingPanel({
 
   return (
     <ContainerPackingWorkspace
-      analysis={analysis} autoRefreshEnabled={autoRefreshEnabled} autoRefreshState={autoRefreshState}
+      analysis={analysis} autoRefreshEnabled={autoRefreshEnabled} autoRefreshState={autoRefreshState} client={client}
       canAnalyze={canAnalyze} canDeleteContainerType={canDeleteContainerType} canLoadProject={canLoadProject}
       canManage={canManage} canOperate={canOperate}
       canSaveContainerType={canSaveContainerType} canSaveProject={canSaveProject} cargoRows={cargoRows}

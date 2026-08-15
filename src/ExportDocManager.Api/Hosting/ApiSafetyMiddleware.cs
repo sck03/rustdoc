@@ -41,17 +41,21 @@ namespace ExportDocManager.Api.Hosting
                 {
                     await WriteErrorAsync(
                         context,
-                        StatusCodes.Status413PayloadTooLarge,
-                        ex.Message,
-                        correlationId);
+                        new ApiServiceError(
+                            StatusCodes.Status413PayloadTooLarge,
+                            "payload_too_large",
+                            ex.Message,
+                            correlationId));
                 }
                 catch (BadHttpRequestException ex) when (ex.StatusCode == StatusCodes.Status413PayloadTooLarge)
                 {
                     await WriteErrorAsync(
                         context,
-                        StatusCodes.Status413PayloadTooLarge,
-                        "上传内容超过服务器允许的最大大小。",
-                        correlationId);
+                        new ApiServiceError(
+                            StatusCodes.Status413PayloadTooLarge,
+                            "payload_too_large",
+                            "上传内容超过服务器允许的最大大小。",
+                            correlationId));
                 }
                 catch (BadHttpRequestException ex)
                 {
@@ -60,40 +64,35 @@ namespace ExportDocManager.Api.Hosting
                         : StatusCodes.Status400BadRequest;
                     await WriteErrorAsync(
                         context,
-                        statusCode,
-                        "请求格式无效，请检查提交的数据后重试。",
-                        correlationId);
+                        new ApiServiceError(
+                            statusCode,
+                            "invalid_request",
+                            "请求格式无效，请检查提交的数据后重试。",
+                            correlationId));
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "API 请求发生未处理异常。CorrelationId={CorrelationId}", correlationId);
-                    (int statusCode, string message) = ApiServiceExceptionMapper.Map(ex, correlationId);
-                    await WriteErrorAsync(
-                        context,
-                        statusCode,
-                        message,
-                        correlationId);
+                    await WriteErrorAsync(context, ApiServiceExceptionMapper.Map(ex, correlationId));
                 }
             }
         }
 
         private static async Task WriteErrorAsync(
             HttpContext context,
-            int statusCode,
-            string message,
-            string correlationId)
+            ApiServiceError error)
         {
             if (context.Response.HasStarted)
             {
                 throw new InvalidOperationException(
-                    $"响应已开始，无法写入错误结果。CorrelationId={correlationId}");
+                    $"响应已开始，无法写入错误结果。CorrelationId={error.CorrelationId}");
             }
 
             context.Response.Clear();
-            context.Response.StatusCode = statusCode;
-            context.Response.Headers[CorrelationIdHeaderName] = correlationId;
+            context.Response.StatusCode = error.StatusCode;
+            context.Response.Headers[CorrelationIdHeaderName] = error.CorrelationId;
             await context.Response.WriteAsJsonAsync(
-                new ApiErrorResponse(message),
+                error.ToResponse(),
                 cancellationToken: context.RequestAborted);
         }
 

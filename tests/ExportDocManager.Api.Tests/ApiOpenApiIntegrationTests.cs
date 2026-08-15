@@ -114,6 +114,18 @@ public sealed class ApiOpenApiIntegrationTests
         AssertOperations(root, root.GetProperty("paths"), desktopAccessEnabled: true);
     }
 
+    [Fact]
+    public async Task OfficialOpenApiDocument_ShouldPublishConfiguredPathBase()
+    {
+        await using var harness = await ApiIntegrationTestHarness.StartAsync("api-openapi-path-base", "openapi-path-base.db", pathBase: "/exportdoc");
+        using var response = await harness.CreateClient().GetAsync("/exportdoc/openapi/v1.json");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
+        Assert.Equal("/exportdoc", Assert.Single(document.RootElement.GetProperty("servers").EnumerateArray())
+            .GetProperty("url").GetString());
+    }
+
     private static void AssertSecuritySchemes(JsonElement root)
     {
         JsonElement schemes = root.GetProperty("components").GetProperty("securitySchemes");

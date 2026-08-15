@@ -6,6 +6,7 @@ using System.Text.Json;
 using ExportDocManager.Shared.Security;
 using ExportDocManager.Utils;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Time;
 
 namespace ExportDocManager.Services.Security
 {
@@ -31,6 +32,7 @@ namespace ExportDocManager.Services.Security
         private readonly IRuntimeLicenseAnchorStore _anchorStore;
         private readonly ILicenseSignatureVerifier _signatureVerifier;
         private readonly LocalSecretProtector _secretProtector;
+        private readonly IBusinessClock _clock;
         private readonly SemaphoreSlim _stateGate = new(1, 1);
         private CachedLicenseStatus? _cachedStatus;
 
@@ -51,6 +53,15 @@ namespace ExportDocManager.Services.Security
             IRuntimeLicenseAnchorStore? anchorStore,
             ILicenseSignatureVerifier? signatureVerifier)
             : this(pathProvider, null, null, anchorStore, signatureVerifier)
+        {
+        }
+
+        public RuntimeLicenseService(
+            IAppPathProvider pathProvider,
+            IRuntimeLicenseAnchorStore anchorStore,
+            ILicenseSignatureVerifier signatureVerifier,
+            IBusinessClock clock)
+            : this(pathProvider, null, null, anchorStore, signatureVerifier, clock)
         {
         }
 
@@ -91,7 +102,8 @@ namespace ExportDocManager.Services.Security
             Func<string>? deviceFingerprintProvider,
             Func<string>? localBindingSecretProvider,
             IRuntimeLicenseAnchorStore? anchorStore,
-            ILicenseSignatureVerifier? signatureVerifier)
+            ILicenseSignatureVerifier? signatureVerifier,
+            IBusinessClock? clock = null)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _deviceFingerprintProvider = deviceFingerprintProvider ?? RuntimeLicenseDeviceFingerprint.Create;
@@ -99,6 +111,7 @@ namespace ExportDocManager.Services.Security
             _anchorStore = anchorStore ?? RuntimeLicenseAnchorStoreFactory.CreateDefault(pathProvider);
             _signatureVerifier = signatureVerifier ?? new EcdsaLicenseSignatureVerifier();
             _secretProtector = new LocalSecretProtector(pathProvider);
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
     }

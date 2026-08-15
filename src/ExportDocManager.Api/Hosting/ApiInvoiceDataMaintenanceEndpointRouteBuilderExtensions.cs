@@ -15,17 +15,12 @@ namespace ExportDocManager.Api.Hosting
                 JsonHttpResult<ApiErrorResponse>,
                 NotFound>>(
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IInvoiceDataMaintenanceService maintenanceService,
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user is null)
-                {
-                    return TypedResults.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -65,18 +60,13 @@ namespace ExportDocManager.Api.Hosting
                 NotFound,
                 Conflict<ApiErrorResponse>>>(
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IInvoiceDataMaintenanceService maintenanceService,
                 int id,
                 ApiInvoicePurgeRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user is null)
-                {
-                    return TypedResults.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {

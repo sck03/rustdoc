@@ -14,7 +14,7 @@ namespace ExportDocManager.Services.Security
         public async Task<LicenseStatus> GetStatusAsync(CancellationToken cancellationToken = default)
         {
             var cached = Volatile.Read(ref _cachedStatus);
-            long nowUtcTicks = DateTimeOffset.UtcNow.UtcTicks;
+            long nowUtcTicks = _clock.UtcNow.UtcTicks;
             if (cached != null && cached.ExpiresAtUtcTicks > nowUtcTicks)
             {
                 return cached.Status;
@@ -24,7 +24,7 @@ namespace ExportDocManager.Services.Security
             try
             {
                 cached = Volatile.Read(ref _cachedStatus);
-                nowUtcTicks = DateTimeOffset.UtcNow.UtcTicks;
+                nowUtcTicks = _clock.UtcNow.UtcTicks;
                 if (cached != null && cached.ExpiresAtUtcTicks > nowUtcTicks)
                 {
                     return cached.Status;
@@ -42,7 +42,7 @@ namespace ExportDocManager.Services.Security
 
         private async Task<LicenseStatus> GetStatusCoreAsync(CancellationToken cancellationToken)
         {
-            var now = DateOnly.FromDateTime(DateTime.Today);
+            var now = _clock.Today;
             var anchor = await ReadOrCreateMachineAnchorAsync(now, cancellationToken).ConfigureAwait(false);
             var identity = await GetLicenseIdentityAsync(anchor, cancellationToken).ConfigureAwait(false);
             var machineId = identity.MachineId;

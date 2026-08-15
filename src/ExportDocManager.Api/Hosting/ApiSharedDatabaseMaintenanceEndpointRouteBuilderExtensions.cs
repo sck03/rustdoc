@@ -13,16 +13,11 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/postgresql-maintenance/backups", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISharedDatabaseMaintenanceService maintenanceService,
                 ApiDesktopAccessOptions desktopAccessOptions) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -45,16 +40,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/postgresql-maintenance/backups", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISharedDatabaseMaintenanceService maintenanceService,
                 ApiBackgroundJobRunner jobRunner) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -103,18 +93,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/postgresql-maintenance/restore-plan", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISharedDatabaseMaintenanceService maintenanceService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ApiPostgreSqlRestorePlanRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -162,16 +147,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/shared-database/ownership", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISharedDatabaseMaintenanceService maintenanceService,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageUsers(user))
                 {
@@ -196,17 +176,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/shared-database/ownership/transfer", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ISharedDatabaseMaintenanceService maintenanceService,
                 ApiSharedDatabaseOwnershipTransferRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageUsers(user))
                 {
@@ -262,18 +237,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/support-package/save-to-runtime", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ISharedDatabaseMaintenanceService maintenanceService,
                 ApiSupportPackageRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
@@ -333,18 +303,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/support-package/download", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ApiBackgroundJobRunner jobRunner,
                 IAppPathProvider pathProvider,
                 ApiSupportPackageRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {

@@ -1,5 +1,6 @@
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using System.Net;
 
 namespace ExportDocManager.Api.Hosting
@@ -13,6 +14,8 @@ namespace ExportDocManager.Api.Hosting
         public const string AllowedOriginsEnvironmentVariable = "EXPORTDOCMANAGER_ALLOWED_ORIGINS";
         public const string TrustedProxiesEnvironmentVariable = "EXPORTDOCMANAGER_TRUSTED_PROXIES";
         public const string BootstrapTokenEnvironmentVariable = "EXPORTDOCMANAGER_BOOTSTRAP_TOKEN";
+        public const string PathBaseEnvironmentVariable = "EXPORTDOCMANAGER_PATH_BASE";
+        public const string BusinessTimeZoneEnvironmentVariable = "EXPORTDOCMANAGER_BUSINESS_TIME_ZONE";
         public const string BootstrapTokenHeaderName = "X-ExportDocManager-Bootstrap-Token";
 
         public string AppRoot { get; init; } = AppContext.BaseDirectory;
@@ -38,6 +41,10 @@ namespace ExportDocManager.Api.Hosting
         public IReadOnlyList<IPAddress> TrustedProxies { get; init; } = [];
 
         public string BootstrapToken { get; init; } = string.Empty;
+
+        public string PathBase { get; init; } = string.Empty;
+
+        public string BusinessTimeZoneId { get; init; } = BusinessClock.DefaultTimeZoneId;
 
         public static ApiRuntimeOptions Parse(string[] args)
         {
@@ -68,6 +75,12 @@ namespace ExportDocManager.Api.Hosting
                 string.Empty;
             string bootstrapToken = Environment.GetEnvironmentVariable(BootstrapTokenEnvironmentVariable) ??
                 string.Empty;
+            string pathBase = ReadOption(args, "--path-base") ??
+                Environment.GetEnvironmentVariable(PathBaseEnvironmentVariable) ??
+                string.Empty;
+            string businessTimeZoneId = ReadOption(args, "--business-time-zone") ??
+                Environment.GetEnvironmentVariable(BusinessTimeZoneEnvironmentVariable) ??
+                BusinessClock.DefaultTimeZoneId;
 
             return new ApiRuntimeOptions
             {
@@ -80,7 +93,9 @@ namespace ExportDocManager.Api.Hosting
                 NetworkMode = ParseBoolean(networkModeValue),
                 AllowedOrigins = NormalizeOrigins(allowedOriginsValue),
                 TrustedProxies = NormalizeTrustedProxies(trustedProxiesValue),
-                BootstrapToken = bootstrapToken.Trim()
+                BootstrapToken = bootstrapToken.Trim(),
+                PathBase = NormalizePathBase(pathBase),
+                BusinessTimeZoneId = NormalizeBusinessTimeZone(businessTimeZoneId)
             };
         }
 
@@ -121,8 +136,45 @@ namespace ExportDocManager.Api.Hosting
         private static string NormalizeOptionalPath(string path) =>
             string.IsNullOrWhiteSpace(path) ? string.Empty : Path.GetFullPath(path.Trim());
 
+        private static string NormalizePathBase(string value)
+        {
+            string pathBase = value?.Trim() ?? string.Empty;
+            if (pathBase.Length == 0 || pathBase == "/")
+            {
+                return string.Empty;
+            }
+
+            if (!pathBase.StartsWith('/') ||
+                pathBase.ContainsAny(['?', '#', '\\']) ||
+                pathBase.Contains("//", StringComparison.Ordinal) ||
+                pathBase.Contains("%2f", StringComparison.OrdinalIgnoreCase) ||
+                pathBase.Contains("%5c", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("API 路径前缀必须是单个绝对 URL 路径，例如 /exportdoc。");
+            }
+
+            pathBase = pathBase.TrimEnd('/');
+            if (pathBase.Split('/', StringSplitOptions.RemoveEmptyEntries)
+                .Select(Uri.UnescapeDataString)
+                .Any(segment => segment is "." or ".."))
+            {
+                throw new InvalidOperationException("API 路径前缀不能包含相对路径段。");
+            }
+
+            return pathBase;
+        }
+
         private static bool ParseBoolean(string value) =>
             bool.TryParse(value?.Trim(), out bool parsed) && parsed;
+
+        private static string NormalizeBusinessTimeZone(string value)
+        {
+            string normalized = string.IsNullOrWhiteSpace(value)
+                ? BusinessClock.DefaultTimeZoneId
+                : value.Trim();
+            _ = BusinessClock.ResolveTimeZone(normalized);
+            return normalized;
+        }
 
         private static IReadOnlyList<string> NormalizeOrigins(string value)
         {

@@ -496,10 +496,10 @@ namespace ExportDocManager.Api.Tests
         {
             var coordinator = new DatabaseInitializationCoordinator();
             int successfulCalls = 0;
-            var concurrent = Enumerable.Range(0, 8).Select(_ => coordinator.InitializeOnceAsync(async () =>
+            var concurrent = Enumerable.Range(0, 8).Select(_ => coordinator.InitializeOnceAsync(async cancellationToken =>
             {
                 Interlocked.Increment(ref successfulCalls);
-                await Task.Delay(25);
+                await Task.Delay(25, cancellationToken);
                 return DatabaseInitializationResult.Success();
             }));
 
@@ -509,12 +509,12 @@ namespace ExportDocManager.Api.Tests
 
             var retryCoordinator = new DatabaseInitializationCoordinator();
             int retryCalls = 0;
-            var failed = await retryCoordinator.InitializeOnceAsync(() =>
+            var failed = await retryCoordinator.InitializeOnceAsync(_ =>
             {
                 Interlocked.Increment(ref retryCalls);
                 return Task.FromResult(DatabaseInitializationResult.Fail("temporary", false));
             });
-            var succeeded = await retryCoordinator.InitializeOnceAsync(() =>
+            var succeeded = await retryCoordinator.InitializeOnceAsync(_ =>
             {
                 Interlocked.Increment(ref retryCalls);
                 return Task.FromResult(DatabaseInitializationResult.Success());

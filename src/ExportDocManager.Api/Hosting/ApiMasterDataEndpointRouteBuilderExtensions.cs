@@ -1,4 +1,5 @@
 using ExportDocManager.Models.DTOs;
+using ExportDocManager.Services.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
@@ -7,13 +8,20 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapMasterDataEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            MapCustomerMasterDataEndpoints(endpoints);
-            MapExporterMasterDataEndpoints(endpoints);
-            MapPayeeMasterDataEndpoints(endpoints);
-            MapProductMasterDataEndpoints(endpoints);
-            MapPortMasterDataEndpoints(endpoints);
-            MapUnitMasterDataEndpoints(endpoints);
-            MapHsCodeMasterDataEndpoints(endpoints);
+            var referenceData = endpoints.MapPermissionGroup(
+                PermissionModuleCatalog.DocumentReferenceData,
+                PermissionModuleCatalog.DocumentMasterData);
+            MapCustomerMasterDataEndpoints(referenceData);
+            MapExporterMasterDataEndpoints(referenceData);
+            MapPayeeMasterDataEndpoints(referenceData);
+            MapUnitMasterDataEndpoints(referenceData);
+            MapProductMasterDataEndpoints(endpoints.MapPermissionGroup(
+                PermissionModuleCatalog.CommonProductReference,
+                PermissionModuleCatalog.DocumentMasterData));
+            MapPortMasterDataEndpoints(endpoints.MapPermissionGroup(PermissionModuleCatalog.DocumentMasterData));
+            MapHsCodeMasterDataEndpoints(endpoints.MapPermissionGroup(
+                PermissionModuleCatalog.DocumentHsKnowledge,
+                writeAccessLevel: PermissionAccessLevel.Manage));
         }
 
         private static BadRequest<ApiErrorResponse> BadMasterDataId(string name)

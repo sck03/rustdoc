@@ -21,7 +21,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiHsCodeImportPreviewPathRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                     return WriteForbidden("该本机 Excel 预览仅支持桌面版；浏览器版请上传文件。");
                 if (request == null || string.IsNullOrWhiteSpace(request.FilePath))
@@ -66,7 +65,6 @@ namespace ExportDocManager.Api.Hosting
                 int? effectiveYear,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
                 string tempRoot = RuntimeCachePathHelper.CreateUniqueDirectory(pathProvider, "HsCodeImports", "hs-preview");
                 try
                 {
@@ -116,7 +114,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiHsCodeImportCommitRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
                 if (request == null || !Guid.TryParseExact(request.Token, "N", out _))
                     return Results.BadRequest(new ApiErrorResponse("HS编码导入预检令牌无效。"));
                 string previewPath = GetHsCodeImportPreviewPath(pathProvider, request.Token);
@@ -161,10 +158,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiHsCodeImportPathRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -226,10 +219,6 @@ namespace ExportDocManager.Api.Hosting
                 string? fileName,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 string tempRoot = RuntimeCachePathHelper.CreateUniqueDirectory(
                     pathProvider,

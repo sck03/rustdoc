@@ -217,6 +217,7 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("DownloadJobResultWithTicket")
             .WithApiAccess(false, true, false)
+            .AllowApiWithoutPermission()
             .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status426UpgradeRequired);

@@ -293,7 +293,7 @@ namespace ExportDocManager.Services.SingleWindow
             string prefix = businessType == SingleWindowBusinessType.CustomsCoo ? "COO" : "ACD";
             string versionText = $"V{Math.Max(1, submissionVersion):000}";
             string guidPart = Guid.NewGuid().ToString("N")[..12].ToUpperInvariant();
-            return $"{prefix}-{versionText}-{DateTime.UtcNow:yyyyMMddHHmmss}-{guidPart}".ToUpperInvariant();
+            return $"{prefix}-{versionText}-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{guidPart}".ToUpperInvariant();
         }
 
         private static bool IsReservationConcurrencyConflict(Exception exception)

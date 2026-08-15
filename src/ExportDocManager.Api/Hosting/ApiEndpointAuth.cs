@@ -13,6 +13,10 @@ namespace ExportDocManager.Api.Hosting
             return ApiCurrentUserResolver.ResolveCachedUser(context);
         }
 
+        public static User GetRequiredUser(HttpContext context) =>
+            ApiCurrentUserResolver.ResolveCachedUser(context)
+            ?? throw new InvalidOperationException("认证中间件未提供当前用户。");
+
         public static bool HasValidDesktopAccess(HttpContext context, ApiDesktopAccessOptions options)
         {
             ArgumentNullException.ThrowIfNull(context);
@@ -159,16 +163,19 @@ namespace ExportDocManager.Api.Hosting
             ApiCurrentUserResolver currentUserResolver,
             ApiAuthorizationService authorizationService)
         {
-            var requiredModule = GetRequiredModule(context.Request.Path, context.Request.Method, context.Request.Query);
-            if (requiredModule == null)
+            var permission = context.GetEndpoint()?.GetApiPermissionMetadata();
+            if (permission == null)
             {
                 await _next(context);
                 return;
             }
 
             var user = currentUserResolver.ResolveCached(context);
-            string requiredAccessLevel = GetRequiredAccessLevel(context.Request.Path, context.Request.Method);
-            if (user is null || !authorizationService.CanUseModule(user, requiredModule, requiredAccessLevel))
+            var requirement = permission.Resolve(context);
+            if (user is null || !authorizationService.CanUseModule(
+                    user,
+                    requirement.Module,
+                    requirement.AccessLevel))
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 return;
@@ -176,177 +183,6 @@ namespace ExportDocManager.Api.Hosting
 
             await _next(context);
         }
-
-        public static string? GetRequiredWorkspace(PathString path)
-        {
-            if (path.StartsWithSegments("/api/crm", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWithSegments("/api/suppliers", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWithSegments("/api/email-templates", StringComparison.OrdinalIgnoreCase))
-            {
-                return ProductEditionCatalog.Sales;
-            }
-
-            string[] documentPrefixes =
-            [
-                "/api/invoices",
-                "/api/dashboard",
-                "/api/query",
-                "/api/payments",
-                "/api/master-data",
-                "/api/custom-options",
-                "/api/single-window",
-                "/api/reports",
-                "/api/jobs",
-                "/api/tools/excel",
-                "/api/tools/ocr",
-                "/api/tools/container-packing",
-                "/api/tools/letter-of-credit",
-                "/api/tools/pdf"
-            ];
-
-            return documentPrefixes.Any(prefix => path.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase))
-                ? ProductEditionCatalog.Document
-                : null;
-        }
-
-        public static string? GetRequiredModule(PathString path)
-        {
-            return GetRequiredModule(path, HttpMethods.Get);
-        }
-
-        public static string? GetRequiredModule(PathString path, string method)
-        {
-            return GetRequiredModule(path, method, null);
-        }
-
-        public static string? GetRequiredModule(
-            PathString path,
-            string method,
-            IQueryCollection? query)
-        {
-            if (path.StartsWithSegments("/api/crm/opportunities", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.SalesOpportunities;
-            if (path.StartsWithSegments("/api/crm/dashboard", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.SalesDashboard;
-            if (path.StartsWithSegments("/api/crm", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.SalesCrm;
-            if (path.StartsWithSegments("/api/email-templates", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.SalesEmailTemplates;
-            if (path.StartsWithSegments("/api/suppliers", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.SalesSuppliers;
-            if (path.StartsWithSegments("/api/dashboard", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentDashboard;
-            if (path.StartsWithSegments("/api/invoices", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentInvoices;
-            if (path.StartsWithSegments("/api/query", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentQuery;
-            if (path.StartsWithSegments("/api/payments", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentPayments;
-            if (path.StartsWithSegments("/api/jobs", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentJobs;
-            if (path.StartsWithSegments("/api/master-data/hs-codes", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWithSegments("/api/master-data/hs-knowledge", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentHsKnowledge;
-            if ((path.StartsWithSegments("/api/master-data/customers", StringComparison.OrdinalIgnoreCase) ||
-                 path.StartsWithSegments("/api/master-data/payees", StringComparison.OrdinalIgnoreCase) ||
-                 path.StartsWithSegments("/api/master-data/exporters", StringComparison.OrdinalIgnoreCase) ||
-                 path.StartsWithSegments("/api/master-data/units", StringComparison.OrdinalIgnoreCase)) &&
-                (HttpMethods.IsGet(method) || HttpMethods.IsHead(method)))
-                return PermissionModuleCatalog.DocumentReferenceData;
-            if (path.StartsWithSegments("/api/master-data/products", StringComparison.OrdinalIgnoreCase) &&
-                (HttpMethods.IsGet(method) || HttpMethods.IsHead(method)))
-                return PermissionModuleCatalog.CommonProductReference;
-            if (path.StartsWithSegments("/api/master-data", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentMasterData;
-            if (path.StartsWithSegments("/api/custom-options", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentCustomOptions;
-            if (path.StartsWithSegments("/api/single-window/reference-catalog", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentDeclarationDictionary;
-            if (path.StartsWithSegments("/api/single-window", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentSingleWindow;
-            if (path.StartsWithSegments("/api/reports/payments", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentPaymentReports;
-            if (path.StartsWithSegments("/api/reports/invoices", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentInvoiceReports;
-            if (path.Equals("/api/reports/templates", StringComparison.OrdinalIgnoreCase) &&
-                (HttpMethods.IsGet(method) || HttpMethods.IsHead(method)) &&
-                IsPaymentReportType(query?["reportType"].ToString()))
-                return PermissionModuleCatalog.DocumentPaymentReports;
-            if (path.Equals("/api/reports/templates", StringComparison.OrdinalIgnoreCase) &&
-                (HttpMethods.IsGet(method) || HttpMethods.IsHead(method)) &&
-                IsInvoiceReportType(query?["reportType"].ToString()))
-                return PermissionModuleCatalog.DocumentInvoiceReports;
-            if (path.StartsWithSegments("/api/reports", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWithSegments("/api/tools/pdf", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWithSegments("/api/tools/letter-of-credit", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentReports;
-            if (path.StartsWithSegments("/api/tools/excel", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentExcel;
-            if (path.StartsWithSegments("/api/tools/ocr", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentOcr;
-            if (path.StartsWithSegments("/api/tools/container-packing", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.DocumentContainerPacking;
-            if (path.StartsWithSegments("/api/tools/exchange-rates", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.CommonExchangeRates;
-            if (path.StartsWithSegments("/api/tools/email", StringComparison.OrdinalIgnoreCase))
-                return PermissionModuleCatalog.CommonEmail;
-            return null;
-        }
-
-        private static bool IsPaymentReportType(string? reportType) =>
-            string.Equals(reportType, "PaymentVoucher", StringComparison.OrdinalIgnoreCase);
-
-        private static bool IsInvoiceReportType(string? reportType) =>
-            string.Equals(reportType, "ExportDocument", StringComparison.OrdinalIgnoreCase);
-
-        public static string GetRequiredAccessLevel(string method) =>
-            HttpMethods.IsDelete(method)
-                ? PermissionAccessLevel.Manage
-                : HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method)
-                    ? PermissionAccessLevel.View
-                    : PermissionAccessLevel.Operate;
-
-        public static string GetRequiredAccessLevel(PathString path, string method)
-        {
-            if (path.Equals("/api/master-data/hs-knowledge/export", StringComparison.OrdinalIgnoreCase))
-            {
-                return PermissionAccessLevel.Manage;
-            }
-
-            // HS knowledge, annual tax schedules, and container type
-            // definitions are company-shared reference data.  Everyone may
-            // query them, but only a data administrator should change the
-            // shared catalogue or approve remote candidates.
-            if ((path.StartsWithSegments("/api/master-data/hs-codes", StringComparison.OrdinalIgnoreCase) &&
-                 IsMutationMethod(method)) ||
-                path.Equals("/api/master-data/hs-knowledge/import", StringComparison.OrdinalIgnoreCase) ||
-                (path.StartsWithSegments("/api/master-data/hs-knowledge/examples", StringComparison.OrdinalIgnoreCase) &&
-                 IsMutationMethod(method)) ||
-                (path.StartsWithSegments("/api/master-data/hs-knowledge/remote-candidates", StringComparison.OrdinalIgnoreCase) &&
-                 IsMutationMethod(method)) ||
-                (path.StartsWithSegments("/api/tools/container-packing/container-types", StringComparison.OrdinalIgnoreCase) &&
-                 IsMutationMethod(method)))
-            {
-                return PermissionAccessLevel.Manage;
-            }
-
-            // User report templates are ownership-scoped by UserReportTemplateService.
-            // Operators may delete their own templates, while administrator-owned file
-            // templates and every other destructive endpoint still require manage.
-            if (HttpMethods.IsDelete(method) &&
-                path.StartsWithSegments("/api/reports/user-templates", StringComparison.OrdinalIgnoreCase))
-            {
-                return PermissionAccessLevel.Operate;
-            }
-
-            return GetRequiredAccessLevel(method);
-        }
-
-        private static bool IsMutationMethod(string method) =>
-            HttpMethods.IsPost(method) ||
-            HttpMethods.IsPut(method) ||
-            HttpMethods.IsPatch(method) ||
-            HttpMethods.IsDelete(method);
     }
 
     public static class ApiAuthenticationApplicationBuilderExtensions

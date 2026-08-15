@@ -6,37 +6,42 @@ namespace ExportDocManager.Api.Hosting;
 
 internal static class ExportDocCapabilityModuleLoader
 {
-    private const string AssemblyPrefix = "ExportDocManager.Infrastructure.";
+    private static readonly CapabilityDescriptor[] CapabilityDescriptors =
+    [
+        new("excel", "ExportDocManager.Infrastructure.Excel.dll", "ExportDocManager.Infrastructure.Excel.ExcelCapabilityModule"),
+        new("browser", "ExportDocManager.Infrastructure.Browser.dll", "ExportDocManager.Infrastructure.Browser.BrowserCapabilityModule"),
+        new("pdf-ocr", "ExportDocManager.Infrastructure.PdfOcr.dll", "ExportDocManager.Infrastructure.PdfOcr.PdfOcrCapabilityModule")
+    ];
 
-    public static IReadOnlyList<IExportDocCapabilityModule> Load()
+    public static IReadOnlyList<IExportDocCapabilityModule> Load(string hostAssemblyPath)
     {
-        string assemblyLocation = typeof(ExportDocCapabilityModuleLoader).Assembly.Location;
-        string baseDirectory = Path.GetDirectoryName(assemblyLocation)
-            ?? throw new InvalidOperationException("无法确定 API 程序集所在目录，不能加载可裁剪能力模块。");
+        string moduleRoot = Path.GetDirectoryName(Path.GetFullPath(hostAssemblyPath))
+            ?? throw new InvalidOperationException("无法解析能力模块目录。");
         var modules = new List<IExportDocCapabilityModule>();
-        foreach (string assemblyPath in Directory.EnumerateFiles(
-                     baseDirectory,
-                     $"{AssemblyPrefix}*.dll",
-                     SearchOption.TopDirectoryOnly))
+        foreach (CapabilityDescriptor descriptor in CapabilityDescriptors)
         {
-            Assembly assembly = AssemblyLoadContext.Default.Assemblies.FirstOrDefault(candidate =>
-                    string.Equals(candidate.Location, assemblyPath, StringComparison.OrdinalIgnoreCase))
-                ?? AssemblyLoadContext.Default.LoadFromAssemblyPath(assemblyPath);
-            foreach (Type type in assembly.GetTypes()
-                         .Where(type => !type.IsAbstract &&
-                             typeof(IExportDocCapabilityModule).IsAssignableFrom(type)))
+            string assemblyPath = Path.Combine(moduleRoot, descriptor.AssemblyFileName);
+            if (!File.Exists(assemblyPath))
             {
-                if (Activator.CreateInstance(type) is IExportDocCapabilityModule module)
-                {
-                    modules.Add(module);
-                }
+                continue;
             }
+
+            Assembly assembly = AssemblyLoadContext.Default.Assemblies.FirstOrDefault(candidate =>
+                    string.Equals(candidate.GetName().Name, Path.GetFileNameWithoutExtension(descriptor.AssemblyFileName), StringComparison.Ordinal))
+                ?? AssemblyLoadContext.Default.LoadFromAssemblyPath(assemblyPath);
+            Type moduleType = assembly.GetType(descriptor.TypeName, throwOnError: true, ignoreCase: false)
+                ?? throw new InvalidOperationException($"能力模块类型不存在：{descriptor.TypeName}");
+            if (Activator.CreateInstance(moduleType) is not IExportDocCapabilityModule module ||
+                !string.Equals(module.Key, descriptor.Key, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"能力模块契约无效：{descriptor.TypeName}");
+            }
+
+            modules.Add(module);
         }
 
-        return modules
-            .GroupBy(module => module.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.Single())
-            .OrderBy(module => module.Key, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        return modules;
     }
+
+    private sealed record CapabilityDescriptor(string Key, string AssemblyFileName, string TypeName);
 }

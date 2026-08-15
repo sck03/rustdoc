@@ -301,6 +301,11 @@ namespace ExportDocManager.Infrastructure.Tests
                 Name = "商业发票",
                 ContentHtml = new string('x', 3000)
             });
+            context.Payees.Add(new Payee
+            {
+                Category = "Supplier", Name = "Private Company", BankName = "Private Bank", RMBAccount = "6222000012345678",
+                Phone = "13800138000"
+            });
             context.SaveChanges();
 
             var userAudit = context.AuditLogs.Single(item => item.EntityName == nameof(User));
@@ -310,6 +315,12 @@ namespace ExportDocManager.Infrastructure.Tests
             var templateAudit = context.AuditLogs.Single(item => item.EntityName == nameof(UserReportTemplate));
             Assert.Contains("[TEXT length=3000 sha256=", templateAudit.NewValues, StringComparison.Ordinal);
             Assert.DoesNotContain(new string('x', 100), templateAudit.NewValues, StringComparison.Ordinal);
+
+            string values = Assert.Single(context.AuditLogs, item => item.EntityName == nameof(Payee)).NewValues!;
+            Assert.Contains("Supplier", values, StringComparison.Ordinal);
+            Assert.Contains("[TEXT length=", values, StringComparison.Ordinal);
+            Assert.All(["Private Company", "Private Bank", "6222000012345678", "13800138000"],
+                secret => Assert.DoesNotContain(secret, values, StringComparison.Ordinal));
         }
 
         [Fact]
@@ -491,7 +502,7 @@ namespace ExportDocManager.Infrastructure.Tests
             var result = await service.InitializeAsync("admin", string.Empty);
 
             Assert.False(result.IsSuccess);
-            Assert.Contains("无版本标记", result.ErrorMessage, StringComparison.Ordinal);
+            Assert.Contains("不符合当前版本要求", result.ErrorMessage, StringComparison.Ordinal);
             Assert.Contains("空数据库重新初始化", result.ErrorMessage, StringComparison.Ordinal);
         }
 

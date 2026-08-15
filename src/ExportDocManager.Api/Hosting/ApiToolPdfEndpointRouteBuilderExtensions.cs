@@ -3,6 +3,7 @@ using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Tools;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -13,16 +14,11 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapPost("/api/tools/pdf/merge/save-to-path", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ApiBackgroundJobRunner jobRunner,
                 ApiPdfMergeRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -45,16 +41,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/tools/pdf/merge/upload", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IAppPathProvider pathProvider,
                 ApiBackgroundJobRunner jobRunner,
+                IBusinessClock clock,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!context.Request.HasFormContentType)
                 {
@@ -111,7 +103,7 @@ namespace ExportDocManager.Api.Hosting
                         sourceFiles.Add(sourcePath);
                     }
 
-                    string destinationPath = CreateBrowserDownloadPath(pathProvider, "PdfMerge", $"merged-{DateTime.Now:yyyyMMdd-HHmmss}.pdf");
+                    string destinationPath = CreateBrowserDownloadPath(pathProvider, "PdfMerge", $"merged-{clock.Now:yyyyMMdd-HHmmss}.pdf");
                     return AcceptedBackgroundJob(EnqueuePdfMergeJob(
                         jobRunner,
                         user.Username,

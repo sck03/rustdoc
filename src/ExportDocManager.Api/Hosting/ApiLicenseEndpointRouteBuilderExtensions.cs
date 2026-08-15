@@ -11,15 +11,10 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiLicenseStatusResponse>,
                 UnauthorizedHttpResult>>(
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ILicenseService licenseService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
 
                 var status = await licenseService.GetStatusAsync(cancellationToken);
                 return TypedResults.Ok(ApiLicenseDtoFactory.FromStatus(
@@ -35,18 +30,13 @@ namespace ExportDocManager.Api.Hosting
                 UnauthorizedHttpResult,
                 JsonHttpResult<ApiErrorResponse>>>(
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 ILicenseService licenseService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ApiLicenseRegisterRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return TypedResults.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {

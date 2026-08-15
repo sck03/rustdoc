@@ -14,7 +14,6 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/invoices", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IInvoiceListReadRepository invoiceListReadRepository,
                 int? pageNumber,
                 int? pageSize,
@@ -23,10 +22,6 @@ namespace ExportDocManager.Api.Hosting
                 bool? ascending,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 var result = await invoiceListReadRepository.QueryPageAsync(
                     new InvoiceListPageQuery
@@ -47,15 +42,10 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/invoices/{id:int}", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -75,14 +65,9 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/invoices/profit-analysis", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IInvoiceProfitAnalysisService profitAnalysisService,
                 ApiInvoiceProfitAnalysisRequest request) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (request?.Invoice == null)
                 {
@@ -107,15 +92,10 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/invoices", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
                 ApiInvoiceDetailDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (request == null)
                 {
@@ -175,16 +155,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPut("/api/invoices/{id:int}", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
                 int id,
                 ApiInvoiceDetailDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -258,15 +233,10 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapDelete("/api/invoices/{id:int}", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -288,18 +258,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/invoices/{id:int}/status", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IInvoiceService invoiceService,
                 int id,
                 ApiInvoiceStatusTransitionRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (id <= 0)
                 {
@@ -361,18 +326,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/invoices/{id:int}/unverify", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IInvoiceService invoiceService,
                 int id,
                 ApiInvoiceUnverifyRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentInvoices, PermissionAccessLevel.Manage))
                 {
@@ -427,15 +387,10 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/invoices/{id:int}/status-history", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -461,16 +416,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/invoices/{id:int}/clone", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
                 int id,
                 ApiInvoiceCloneRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -504,16 +454,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/invoices/{id:int}/clone-type", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IInvoiceService invoiceService,
                 int id,
                 ApiInvoiceCloneTypeRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (id <= 0)
                 {

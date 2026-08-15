@@ -4,7 +4,7 @@ Generated from committed npm/Cargo lock files, Cargo package metadata, restored 
 
 Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `fonts-noto-cjk`, `ca-certificates`, `curl`, `tini`, and PostgreSQL client packages are OS-level image inputs rather than npm/NuGet/Cargo components. The Browser image retains their Debian copyright files under `/usr/share/doc`; API/Web images do not embed Chromium or duplicate its notices.
 
-## npm (176)
+## npm (154)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -24,7 +24,6 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | @babel/parser | 7.29.7 | MIT | web |
 | @babel/plugin-transform-react-jsx-self | 7.29.7 | MIT | web |
 | @babel/plugin-transform-react-jsx-source | 7.29.7 | MIT | web |
-| @babel/runtime | 7.29.7 | MIT | web |
 | @babel/template | 7.29.7 | MIT | web |
 | @babel/traverse | 7.29.7 | MIT | web |
 | @babel/types | 7.29.7 | MIT | web |
@@ -108,44 +107,32 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | @types/babel__traverse | 7.28.0 | MIT | web |
 | @types/estree | 1.0.9 | MIT | web |
 | @types/node | 20.19.43 | MIT | web |
-| @types/pako | 2.0.4 | MIT | web |
 | @types/pngjs | 6.0.5 | MIT | web |
 | @types/prop-types | 15.7.15 | MIT | web |
-| @types/raf | 3.4.3 | MIT | web |
 | @types/react | 18.3.31 | MIT | web |
 | @types/react-dom | 18.3.7 | MIT | web |
 | @types/stats.js | 0.17.4 | MIT | web |
 | @types/three | 0.184.1 | MIT | web |
-| @types/trusted-types | 2.0.7 | MIT | web |
 | @types/webxr | 0.5.24 | MIT | web |
 | @vitejs/plugin-react | 5.2.0 | MIT | web |
 | axe-core | 4.13.0 | MPL-2.0 | web |
-| base64-arraybuffer | 1.0.2 | MIT | web |
 | baseline-browser-mapping | 2.10.38 | Apache-2.0 | web |
 | browserslist | 4.28.4 | MIT | web |
 | caniuse-lite | 1.0.30001799 | CC-BY-4.0 | web |
-| canvg | 3.0.11 | MIT | web |
 | convert-source-map | 2.0.0 | MIT | web |
 | cookie | 1.1.1 | MIT | web |
-| core-js | 3.49.0 | MIT | web |
-| css-line-break | 2.1.0 | MIT | web |
 | csstype | 3.2.3 | MIT | web |
 | debug | 4.4.3 | MIT | web |
-| dompurify | 3.4.13 | (MPL-2.0 OR Apache-2.0) | web |
 | electron-to-chromium | 1.5.376 | ISC | web |
 | esbuild | 0.28.1 | MIT | web |
 | escalade | 3.2.0 | MIT | web |
-| fast-png | 6.4.0 | MIT | web |
 | fdir | 6.5.0 | MIT | web |
 | fflate | 0.8.3 | MIT | web |
 | fsevents | 2.3.3 | MIT | web |
 | gensync | 1.0.0-beta.2 | MIT | web |
-| html2canvas | 1.4.1 | MIT | web |
-| iobuffer | 5.4.0 | MIT | web |
 | js-tokens | 4.0.0 | MIT | web |
 | jsesc | 3.1.0 | MIT | web |
 | json5 | 2.2.3 | MIT | web |
-| jspdf | 4.2.1 | MIT | web |
 | loose-envify | 1.4.0 | MIT | web |
 | lru-cache | 5.1.1 | ISC | web |
 | lucide-react | 0.468.0 | ISC | web |
@@ -153,35 +140,26 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | ms | 2.1.3 | MIT | web |
 | nanoid | 3.3.15 | MIT | web |
 | node-releases | 2.0.48 | MIT | web |
-| pako | 2.2.0 | (MIT AND Zlib) | web |
-| performance-now | 2.1.0 | MIT | web |
 | picocolors | 1.1.1 | ISC | web |
 | picomatch | 4.0.5 | MIT | web |
 | pixelmatch | 7.2.0 | ISC | web |
 | pngjs | 7.0.0 | MIT | web |
 | postcss | 8.5.15 | MIT | web |
-| raf | 3.4.1 | MIT | web |
 | react | 18.3.1 | MIT | web |
 | react-dom | 18.3.1 | MIT | web |
 | react-refresh | 0.18.0 | MIT | web |
 | react-router | 7.18.2 | MIT | web |
 | react-router-dom | 7.18.2 | MIT | web |
-| regenerator-runtime | 0.13.11 | MIT | web |
-| rgbcolor | 1.0.1 | MIT | web |
 | rollup | 4.62.2 | MIT | web |
 | scheduler | 0.23.2 | MIT | web |
 | semver | 6.3.1 | ISC | web |
 | set-cookie-parser | 2.7.2 | MIT | web |
 | source-map-js | 1.2.1 | BSD-3-Clause | web |
-| stackblur-canvas | 2.7.0 | MIT | web |
-| svg-pathdata | 6.0.3 | MIT | web |
-| text-segmentation | 1.0.3 | MIT | web |
 | three | 0.184.0 | MIT | web |
 | tinyglobby | 0.2.17 | MIT | web |
 | typescript | 5.9.3 | Apache-2.0 | web |
 | undici-types | 6.21.0 | MIT | web |
 | update-browserslist-db | 1.2.3 | MIT | web |
-| utrie | 1.0.2 | MIT | web |
 | vite | 7.3.6 | MIT | web |
 | yallist | 3.1.1 | ISC | web |
 

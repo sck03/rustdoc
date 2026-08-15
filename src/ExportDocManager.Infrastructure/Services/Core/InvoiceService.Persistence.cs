@@ -316,6 +316,8 @@ namespace ExportDocManager.Services.Core
                         context,
                         items,
                         pendingHsFeedback,
+                        _clock.UtcNow,
+                        _clock.Today.Year,
                         cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
@@ -440,11 +442,11 @@ namespace ExportDocManager.Services.Core
             return string.IsNullOrWhiteSpace(currentValue) ? fallbackValue ?? string.Empty : currentValue;
         }
 
-        private static void NormalizeInvoiceDates(Invoice invoice)
+        private void NormalizeInvoiceDates(Invoice invoice)
         {
             if (invoice.InvoiceDate == default)
             {
-                invoice.InvoiceDate = DateOnly.FromDateTime(DateTime.Today);
+                invoice.InvoiceDate = _clock.Today;
             }
             if (invoice.ShipmentDate == default)
             {

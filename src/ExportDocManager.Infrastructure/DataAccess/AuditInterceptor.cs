@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -166,16 +165,16 @@ namespace ExportDocManager.DataAccess
                         switch (entry.State)
                         {
                             case EntityState.Added:
-                                newValues[propertyName] = SanitizeAuditValue(propertyName, property.CurrentValue);
+                                newValues[propertyName] = AuditValuePolicy.Sanitize(propertyName, property.CurrentValue);
                                 break;
                             case EntityState.Deleted:
-                                oldValues[propertyName] = SanitizeAuditValue(propertyName, property.OriginalValue);
+                                oldValues[propertyName] = AuditValuePolicy.Sanitize(propertyName, property.OriginalValue);
                                 break;
                             case EntityState.Modified:
                                 if (property.IsModified)
                                 {
-                                    oldValues[propertyName] = SanitizeAuditValue(propertyName, property.OriginalValue);
-                                    newValues[propertyName] = SanitizeAuditValue(propertyName, property.CurrentValue);
+                                    oldValues[propertyName] = AuditValuePolicy.Sanitize(propertyName, property.OriginalValue);
+                                    newValues[propertyName] = AuditValuePolicy.Sanitize(propertyName, property.CurrentValue);
                                 }
                                 break;
                         }
@@ -323,35 +322,6 @@ namespace ExportDocManager.DataAccess
             }
 
             return string.Join(",", primaryKeys.Select(property => property.CurrentValue?.ToString() ?? "Unknown"));
-        }
-
-        private static object? SanitizeAuditValue(string propertyName, object? value)
-        {
-            if (value == null)
-            {
-                return null;
-            }
-
-            string name = propertyName ?? string.Empty;
-            if (name.Contains("Password", StringComparison.OrdinalIgnoreCase) ||
-                name.Contains("Secret", StringComparison.OrdinalIgnoreCase) ||
-                name.Contains("ApiKey", StringComparison.OrdinalIgnoreCase) ||
-                name.Contains("Token", StringComparison.OrdinalIgnoreCase))
-            {
-                return "[REDACTED]";
-            }
-
-            if (value is string text &&
-                (name.Equals("ContentHtml", StringComparison.OrdinalIgnoreCase) ||
-                 name.Equals("BodyHtml", StringComparison.OrdinalIgnoreCase) ||
-                 text.Length > 2048))
-            {
-                using var sha = SHA256.Create();
-                string hash = Convert.ToHexString(sha.ComputeHash(Encoding.UTF8.GetBytes(text)))[..16];
-                return $"[TEXT length={text.Length} sha256={hash}]";
-            }
-
-            return value;
         }
 
         private sealed class PendingAuditState

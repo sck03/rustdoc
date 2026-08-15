@@ -61,12 +61,24 @@ public class InfrastructureServiceException : ServiceException
 }
 
 /// <summary>
+/// Infrastructure failures are hidden by default. Use this type only when the
+/// message is deliberately written for an end user and contains no diagnostics.
+/// </summary>
+public class UserVisibleInfrastructureException : InfrastructureServiceException
+{
+    public UserVisibleInfrastructureException(string message, Exception? innerException = null)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>
 /// Indicates that an interrupted server migration cannot be reconciled safely
 /// without an administrator restoring the retained safety backup. The API must
 /// fail closed instead of serving business requests against potentially mixed
 /// database and file state.
 /// </summary>
-public sealed class ManualRecoveryRequiredException : InfrastructureServiceException
+public sealed class ManualRecoveryRequiredException : UserVisibleInfrastructureException
 {
     public ManualRecoveryRequiredException(string message, Exception? innerException = null)
         : base(message, innerException)

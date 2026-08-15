@@ -15,14 +15,17 @@ internal static class ApiEndpointPublication
         WriteIndented = true
     };
 
-    public static void Publish(string endpointFile, IEnumerable<string> addresses)
+    public static void Publish(
+        string endpointFile,
+        IEnumerable<string> addresses,
+        string pathBase = "")
     {
         if (string.IsNullOrWhiteSpace(endpointFile))
         {
             return;
         }
 
-        string apiBaseUrl = ResolveApiBaseUrl(addresses);
+        string apiBaseUrl = ResolveApiBaseUrl(addresses) + pathBase;
         string directory = Path.GetDirectoryName(endpointFile)
             ?? throw new InvalidOperationException("动态端点文件缺少父目录。");
         Directory.CreateDirectory(directory);

@@ -1,15 +1,30 @@
 using System.ComponentModel;
 using System.Data.Common;
-using System.Threading;
-using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting;
 
+internal sealed record ApiServiceError(
+    int StatusCode,
+    string Code,
+    string Message,
+    string? CorrelationId)
+{
+    public ApiErrorResponse ToResponse() => new(Message, Code, CorrelationId);
+
+    public void Deconstruct(out int statusCode, out string message)
+    {
+        statusCode = StatusCode;
+        message = Message;
+    }
+}
+
 internal static class ApiServiceExceptionMapper
 {
+    private const string UnavailableMessage = "依赖服务暂时不可用，请稍后重试。";
     private static readonly AsyncLocal<string?> CurrentCorrelationId = new();
 
     internal static IDisposable PushCorrelationId(string correlationId)
@@ -21,160 +36,103 @@ internal static class ApiServiceExceptionMapper
 
     public static IResult ToResult(Exception exception)
     {
-        ArgumentNullException.ThrowIfNull(exception);
-        (int statusCode, string message) = Map(exception, CurrentCorrelationId.Value);
-        return Results.Json(new ApiErrorResponse(message), statusCode: statusCode);
+        ApiServiceError error = Map(exception, CurrentCorrelationId.Value);
+        return Results.Json(error.ToResponse(), statusCode: error.StatusCode);
     }
 
-    public static (int StatusCode, string Message) Map(Exception exception, string? correlationId)
+    public static ApiServiceError Map(Exception exception, string? correlationId)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        // Explicit application classifications always win over nested system
-        // exceptions. For example, a missing managed DLL wrapped in an
-        // InfrastructureServiceException is a 503, not a business-resource 404.
-        ServiceException? classified = Enumerate(exception)
-            .OfType<ServiceException>()
-            .FirstOrDefault();
+        ServiceException? classified = Enumerate(exception).OfType<ServiceException>().FirstOrDefault();
         if (classified != null)
         {
-            if (classified is ResourceConflictException && ContainsInfrastructureFailure(exception))
-            {
-                return (StatusCodes.Status503ServiceUnavailable, "依赖服务暂时不可用，请稍后重试。");
-            }
-            return MapServiceException(classified);
+            return classified is ResourceConflictException && ContainsInfrastructureFailure(exception)
+                ? Create(503, "infrastructure_unavailable", UnavailableMessage, correlationId)
+                : MapServiceException(classified, correlationId);
         }
 
-        if (ContainsNotFound(exception))
+        if (Enumerate(exception).FirstOrDefault(current =>
+                current is ResourceNotFoundException or KeyNotFoundException) is { } missing)
         {
-            return (StatusCodes.Status404NotFound, FindNotFoundMessage(exception));
+            return Create(404, "not_found", missing.Message, correlationId);
         }
 
         if (Enumerate(exception).Any(current => current is UnauthorizedAccessException))
         {
-            return (
-                StatusCodes.Status503ServiceUnavailable,
-                "运行目录或依赖资源暂时不可访问，请联系管理员检查权限。");
+            return Create(
+                503,
+                "infrastructure_unavailable",
+                "运行目录或依赖资源暂时不可访问，请联系管理员检查权限。",
+                correlationId);
         }
 
-        // An infrastructure failure can be wrapped by an outer service/operation
-        // exception. Preserve the transport contract (503) instead of allowing
-        // the outer InvalidOperation/Conflict category to misreport a database,
-        // filesystem, timeout, or HTTP dependency outage as a business conflict.
         if (ContainsInfrastructureFailure(exception))
         {
-            return (StatusCodes.Status503ServiceUnavailable, "依赖服务暂时不可用，请稍后重试。");
+            return Create(503, "infrastructure_unavailable", UnavailableMessage, correlationId);
         }
 
         return exception switch
         {
             PayloadLimitExceededException payload =>
-                (StatusCodes.Status413PayloadTooLarge, payload.Message),
-            UnauthorizedAccessException =>
-                (StatusCodes.Status503ServiceUnavailable, "运行目录或依赖资源暂时不可访问，请联系管理员检查权限。"),
-            FileNotFoundException or DirectoryNotFoundException =>
-                (StatusCodes.Status503ServiceUnavailable, "运行依赖或受管文件暂时不可用，请联系管理员检查安装包与运行目录。"),
-            KeyNotFoundException missing =>
-                (StatusCodes.Status404NotFound, missing.Message),
-            ArgumentException or FormatException or InvalidDataException or NotSupportedException =>
-                (StatusCodes.Status400BadRequest, exception.Message),
-            IOException or DbException or TimeoutException or HttpRequestException =>
-                (StatusCodes.Status503ServiceUnavailable, "依赖服务暂时不可用，请稍后重试。"),
-            // Internal operation timeouts use cancellation tokens as well, but
-            // are not client disconnects (those are handled by the middleware
-            // first). They are dependency availability failures, not conflicts.
+                Create(413, "payload_too_large", payload.Message, correlationId),
+            KeyNotFoundException notFound => Create(404, "not_found", notFound.Message, correlationId),
+            ArgumentException or FormatException or InvalidDataException =>
+                Create(400, "validation_error", exception.Message, correlationId),
+            NotSupportedException =>
+                Create(400, "unsupported_request", "当前请求不受支持。", correlationId),
             OperationCanceledException =>
-                (StatusCodes.Status503ServiceUnavailable, "依赖服务暂时不可用，请稍后重试。"),
-            _ =>
-                (StatusCodes.Status500InternalServerError,
-                    string.IsNullOrWhiteSpace(correlationId)
-                        ? "服务器处理请求时发生错误，请稍后重试。"
-                        : $"服务器处理请求时发生错误，请联系管理员并提供关联编号 {correlationId}。")
+                Create(503, "infrastructure_unavailable", UnavailableMessage, correlationId),
+            _ => Create(
+                500,
+                "internal_error",
+                "服务器处理请求时发生错误，请稍后重试。",
+                correlationId)
         };
     }
 
-    private static (int StatusCode, string Message) MapServiceException(
-        ServiceException exception) => exception switch
+    private static ApiServiceError MapServiceException(
+        ServiceException exception,
+        string? correlationId) => exception switch
         {
-            ServiceValidationException validation =>
-                (StatusCodes.Status400BadRequest, validation.Message),
-            ResourceNotFoundException notFound =>
-                (StatusCodes.Status404NotFound, notFound.Message),
-            PermissionDeniedException permission =>
-                (StatusCodes.Status403Forbidden, permission.Message),
-            InsufficientStorageException storage =>
-                (StatusCodes.Status507InsufficientStorage, storage.Message),
-            ServiceBusyException busy =>
-                (StatusCodes.Status429TooManyRequests, busy.Message),
-            ServiceTimeoutException timeout =>
-                (StatusCodes.Status504GatewayTimeout, timeout.Message),
-            ServiceConcurrencyException concurrency =>
-                (StatusCodes.Status409Conflict, concurrency.Message),
-            ResourceConflictException conflict =>
-                (StatusCodes.Status409Conflict, conflict.Message),
-            InfrastructureServiceException infrastructure =>
-                (StatusCodes.Status503ServiceUnavailable, infrastructure.Message),
-            _ =>
-                (StatusCodes.Status500InternalServerError, "服务器处理请求时发生错误，请稍后重试。")
+            ServiceValidationException value => Create(400, "validation_error", value.Message, correlationId),
+            ResourceNotFoundException value => Create(404, "not_found", value.Message, correlationId),
+            PermissionDeniedException value => Create(403, "forbidden", value.Message, correlationId),
+            InsufficientStorageException value => Create(507, "insufficient_storage", value.Message, correlationId),
+            ServiceBusyException value => Create(429, "service_busy", value.Message, correlationId),
+            ServiceTimeoutException value => Create(504, "service_timeout", value.Message, correlationId),
+            ServiceConcurrencyException value => Create(409, "conflict", value.Message, correlationId),
+            ResourceConflictException value => Create(409, "conflict", value.Message, correlationId),
+            UserVisibleInfrastructureException value =>
+                Create(503, "infrastructure_unavailable", value.Message, correlationId),
+            InfrastructureServiceException =>
+                Create(503, "infrastructure_unavailable", UnavailableMessage, correlationId),
+            _ => Create(500, "internal_error", "服务器处理请求时发生错误，请稍后重试。", correlationId)
         };
 
-    private static bool ContainsInfrastructureFailure(Exception exception)
-    {
-        foreach (Exception current in Enumerate(exception))
-        {
-            if (current is DbException or TimeoutException or HttpRequestException or
-                SocketException or Win32Exception or UnauthorizedAccessException or
-                IOException)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
+    private static ApiServiceError Create(
+        int statusCode,
+        string code,
+        string message,
+        string? correlationId) =>
+        new(statusCode, code, message, string.IsNullOrWhiteSpace(correlationId) ? null : correlationId);
 
-    private static bool ContainsNotFound(Exception exception)
-    {
-        foreach (Exception current in Enumerate(exception))
-        {
-            if (current is ResourceNotFoundException or KeyNotFoundException)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static string FindNotFoundMessage(Exception exception)
-    {
-        foreach (Exception current in Enumerate(exception))
-        {
-            if (current is ResourceNotFoundException or KeyNotFoundException)
-            {
-                return current.Message;
-            }
-        }
-        return "未找到请求的资源。";
-    }
+    private static bool ContainsInfrastructureFailure(Exception exception) =>
+        Enumerate(exception).Any(current => current is
+            DbException or TimeoutException or HttpRequestException or SocketException or
+            Win32Exception or UnauthorizedAccessException or IOException);
 
     private static IEnumerable<Exception> Enumerate(Exception root)
     {
         var pending = new Stack<Exception>();
         var visited = new HashSet<Exception>(ReferenceEqualityComparer.Instance);
         pending.Push(root);
-        while (pending.Count > 0)
+        while (pending.TryPop(out Exception? current))
         {
-            Exception current = pending.Pop();
-            if (!visited.Add(current))
-            {
-                continue;
-            }
-
+            if (!visited.Add(current)) continue;
             yield return current;
             if (current is AggregateException aggregate)
             {
-                for (int index = aggregate.InnerExceptions.Count - 1; index >= 0; index--)
-                {
-                    pending.Push(aggregate.InnerExceptions[index]);
-                }
+                foreach (Exception inner in aggregate.InnerExceptions.Reverse()) pending.Push(inner);
             }
             else if (current.InnerException != null)
             {
@@ -183,25 +141,15 @@ internal static class ApiServiceExceptionMapper
         }
     }
 
-    private sealed class CorrelationScope : IDisposable
+    private sealed class CorrelationScope(string? previous) : IDisposable
     {
-        private readonly string? _previous;
         private bool _disposed;
-
-        public CorrelationScope(string? previous)
-        {
-            _previous = previous;
-        }
 
         public void Dispose()
         {
-            if (_disposed)
-            {
-                return;
-            }
-
+            if (_disposed) return;
             _disposed = true;
-            CurrentCorrelationId.Value = _previous;
+            CurrentCorrelationId.Value = previous;
         }
     }
 }

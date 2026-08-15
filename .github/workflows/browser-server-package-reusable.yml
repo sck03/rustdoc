@@ -35,6 +35,7 @@ permissions:
 jobs:
   package:
     runs-on: ${{ inputs.runner }}
+    timeout-minutes: 120
     env:
       DOTNET_CLI_HOME: ${{ github.workspace }}/.codex-runtime/dotnet-cli
       NUGET_PACKAGES: ${{ github.workspace }}/.codex-runtime/nuget-packages
@@ -253,7 +254,6 @@ jobs:
           $packageRoot = Join-Path $env:GITHUB_WORKSPACE "artifacts/browser-server/package"
           $dataRoot = Join-Path $packageRoot "App_Data/OcrBuildCheck"
           & (Join-Path $packageRoot "ExportDocManager.Api") --app-root $packageRoot --data-root $dataRoot --verify-ocr-runtime
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Remove-Item -LiteralPath $dataRoot -Recurse -Force -ErrorAction SilentlyContinue
 
       - name: Validate Linux package on Debian 13
@@ -268,21 +268,16 @@ jobs:
             debian:13-slim \
             sh -ec '
               run_probe() {
-                label="$1"
-                duration="$2"
+                local label="$1" duration="$2" status=0
                 shift 2
                 echo "::group::$label"
-                set +e
-                timeout --signal=TERM --kill-after=10s "$duration" "$@"
-                status=$?
-                set -e
+                timeout --signal=TERM --kill-after=10s "$duration" "$@" || status=$?
                 echo "::endgroup::"
                 if [ "$status" -ne 0 ]; then
                   echo "Probe failed: $label (exit $status)" >&2
                   exit "$status"
                 fi
               }
-
               export DEBIAN_FRONTEND=noninteractive
               run_probe "Refresh Debian package metadata" 3m apt-get update
               run_probe "Install package validation dependencies" 8m \
@@ -295,8 +290,7 @@ jobs:
               run_probe "Probe pg_restore" 30s /package/Tools/PostgreSQL/bin/pg_restore --version
               run_probe "Probe psql" 30s /package/Tools/PostgreSQL/bin/psql --version
               browser="$(find /package/Browsers -type f \( -name chrome-headless-shell -o -name chrome \) -print -quit)"
-              test -n "$browser"
-              test -x "$browser"
+              [ -n "$browser" ] && [ -x "$browser" ]
               mkdir -p /tmp/exportdoc-browser-profile
               run_probe "Probe bundled browser" 30s "$browser" \
                 --no-sandbox \

@@ -18,7 +18,6 @@ namespace ExportDocManager.Api.Hosting
                 IHsCodeService hsCodeService,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
                 var health = await hsCodeService.GetRemoteSourceHealthAsync(cancellationToken);
                 return Results.Ok(new ApiHsCodeRemoteHealthResponse(health.Source, health.Available, health.CheckedAt, health.Message));
             }).WithName("GetHsCodeRemoteHealth")
@@ -32,10 +31,6 @@ namespace ExportDocManager.Api.Hosting
                 string? keyword,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (string.IsNullOrWhiteSpace(keyword))
                 {
@@ -82,10 +77,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiHsCodeRemoteSearchRequest request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (request == null || string.IsNullOrWhiteSpace(request.Keyword))
                 {
@@ -133,10 +124,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiHsCodeDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (request == null)
                 {
@@ -182,10 +169,6 @@ namespace ExportDocManager.Api.Hosting
                 ApiHsCodeDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (request == null)
                 {

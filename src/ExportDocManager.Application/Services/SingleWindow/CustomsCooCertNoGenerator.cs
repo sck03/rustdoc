@@ -15,26 +15,27 @@ namespace ExportDocManager.Services.SingleWindow
             string? primaryEnterpriseCode,
             string? secondaryEnterpriseCode,
             string? aplDate,
+            DateOnly fallbackDate,
             bool generateWhenBlank = true)
         {
             string normalizedCurrent = NormalizeText(currentValue);
 
             if (string.IsNullOrWhiteSpace(normalizedCurrent))
             {
-                return generateWhenBlank && TryBuildPrefix(certType, primaryEnterpriseCode, secondaryEnterpriseCode, aplDate, out string prefix)
+                return generateWhenBlank && TryBuildPrefix(certType, primaryEnterpriseCode, secondaryEnterpriseCode, aplDate, fallbackDate, out string prefix)
                     ? prefix + "0001"
                     : string.Empty;
             }
 
             if (normalizedCurrent.Length == 4 && IsDigits(normalizedCurrent))
             {
-                return TryBuildPrefix(certType, primaryEnterpriseCode, secondaryEnterpriseCode, aplDate, out string prefix)
+                return TryBuildPrefix(certType, primaryEnterpriseCode, secondaryEnterpriseCode, aplDate, fallbackDate, out string prefix)
                     ? prefix + normalizedCurrent
                     : normalizedCurrent;
             }
 
             if (TryGetStructuredSequence(normalizedCurrent, out string sequence) &&
-                TryBuildPrefix(certType, primaryEnterpriseCode, secondaryEnterpriseCode, aplDate, out string structuredPrefix))
+                TryBuildPrefix(certType, primaryEnterpriseCode, secondaryEnterpriseCode, aplDate, fallbackDate, out string structuredPrefix))
             {
                 return structuredPrefix + sequence;
             }
@@ -47,6 +48,7 @@ namespace ExportDocManager.Services.SingleWindow
             string? primaryEnterpriseCode,
             string? secondaryEnterpriseCode,
             string? aplDate,
+            DateOnly fallbackDate,
             out string prefix)
         {
             prefix = string.Empty;
@@ -58,7 +60,7 @@ namespace ExportDocManager.Services.SingleWindow
                 return false;
             }
 
-            prefix = normalizedType + ResolveYear(aplDate) + normalizedOrgCode;
+            prefix = normalizedType + ResolveYear(aplDate, fallbackDate) + normalizedOrgCode;
             return true;
         }
 
@@ -81,7 +83,7 @@ namespace ExportDocManager.Services.SingleWindow
             return true;
         }
 
-        private static string ResolveYear(string? aplDate)
+        private static string ResolveYear(string? aplDate, DateOnly fallbackDate)
         {
             if (DateOnly.TryParseExact(
                     NormalizeText(aplDate),
@@ -98,7 +100,7 @@ namespace ExportDocManager.Services.SingleWindow
                 return parsedDate.ToString("yy", CultureInfo.InvariantCulture);
             }
 
-            return DateOnly.FromDateTime(DateTime.Today).ToString("yy", CultureInfo.InvariantCulture);
+            return fallbackDate.ToString("yy", CultureInfo.InvariantCulture);
         }
 
         private static string NormalizeCertType(string? certType)

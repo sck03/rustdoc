@@ -78,7 +78,8 @@ namespace ExportDocManager.DataAccess
             }
             if (!File.Exists(path))
             {
-                throw new ResourceNotFoundException($"PostgreSQL 密码文件不存在：{path}");
+                throw new UserVisibleInfrastructureException(
+                    "配置的 PostgreSQL 密码文件不存在，请检查运行目录中的安全配置。");
             }
 
             var info = new FileInfo(path);
@@ -97,7 +98,7 @@ namespace ExportDocManager.DataAccess
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                throw new InfrastructureServiceException($"PostgreSQL 密码文件无法读取：{path}", ex);
+                throw new InfrastructureServiceException("PostgreSQL 密码文件无法读取。", ex);
             }
         }
     }

@@ -117,10 +117,12 @@ namespace ExportDocManager.Services.Tools
                         await StopAsync();
                         if (IsTransportFailure(ex))
                         {
-                            string detail = string.IsNullOrWhiteSpace(stderr) ? string.Empty : $" Sidecar 诊断：{stderr}";
+                            Exception diagnostic = string.IsNullOrWhiteSpace(stderr)
+                                ? ex
+                                : new InvalidDataException($"Rust OCR Sidecar stderr: {stderr}", ex);
                             throw new InfrastructureServiceException(
-                                $"Rust OCR Sidecar 通信失败或返回了无效响应。{detail}",
-                                ex);
+                                "Rust OCR Sidecar 通信失败或返回了无效响应。",
+                                diagnostic);
                         }
 
                         throw;

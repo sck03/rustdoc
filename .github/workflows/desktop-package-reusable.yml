@@ -58,6 +58,7 @@ jobs:
   package:
     name: ${{ inputs.platform }} ${{ inputs.architecture }} package
     runs-on: ${{ inputs.runner }}
+    timeout-minutes: 120
     outputs:
       version: ${{ steps.version.outputs.value }}
     permissions:
@@ -334,6 +335,7 @@ jobs:
     if: inputs.publish_release
     needs: package
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       actions: read
       contents: write

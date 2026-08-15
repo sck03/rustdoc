@@ -6,7 +6,8 @@ namespace ExportDocManager.Services.Infrastructure
         private bool _initialized;
 
         public async Task<DatabaseInitializationResult> InitializeOnceAsync(
-            Func<Task<DatabaseInitializationResult>> initializeAsync)
+            Func<CancellationToken, Task<DatabaseInitializationResult>> initializeAsync,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(initializeAsync);
             if (Volatile.Read(ref _initialized))
@@ -14,7 +15,7 @@ namespace ExportDocManager.Services.Infrastructure
                 return DatabaseInitializationResult.Success();
             }
 
-            await _gate.WaitAsync().ConfigureAwait(false);
+            await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
                 if (_initialized)
@@ -22,7 +23,7 @@ namespace ExportDocManager.Services.Infrastructure
                     return DatabaseInitializationResult.Success();
                 }
 
-                var result = await initializeAsync().ConfigureAwait(false);
+                var result = await initializeAsync(cancellationToken).ConfigureAwait(false);
                 if (result.IsSuccess)
                 {
                     Volatile.Write(ref _initialized, true);

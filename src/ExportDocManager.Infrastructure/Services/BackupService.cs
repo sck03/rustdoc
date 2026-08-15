@@ -12,6 +12,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using Microsoft.Data.Sqlite;
 using Serilog;
@@ -32,16 +33,19 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly bool _usesSqlite;
         private readonly IAppPathProvider _pathProvider;
         private readonly Regex? _managedBackupNamePattern;
+        private readonly IBusinessClock _clock;
 
         public BackupService(
             DatabaseConnectionSettings databaseSettings,
             IAppPathProvider pathProvider,
             string? backupDirectory = null,
-            string? databasePath = null)
+            string? databasePath = null,
+            IBusinessClock? clock = null)
         {
             ArgumentNullException.ThrowIfNull(databaseSettings);
             ArgumentNullException.ThrowIfNull(pathProvider);
             _pathProvider = pathProvider;
+            _clock = clock ?? BusinessClock.CreateSystem();
             _usesSqlite = !DatabaseModeHelper.UsesPostgreSql(databaseSettings);
 
             if (_usesSqlite)
@@ -205,7 +209,7 @@ namespace ExportDocManager.Services.Infrastructure
 
             try
             {
-                var cutoffDate = DateTime.UtcNow.AddDays(-daysToKeep);
+                var cutoffDate = DateTimeOffset.UtcNow.AddDays(-daysToKeep);
 
                 foreach (var file in GetCandidateBackupFiles())
                 {
@@ -327,7 +331,7 @@ namespace ExportDocManager.Services.Infrastructure
             string namePrefix,
             CancellationToken cancellationToken)
         {
-            string timestamp = DateTimeOffset.Now.ToString("yyyyMMdd_HHmmss_fff");
+            string timestamp = _clock.Now.ToString("yyyyMMdd_HHmmss_fff");
             string prefix = string.IsNullOrWhiteSpace(namePrefix) ? string.Empty : $"{namePrefix.Trim()}_";
             string backupFileName = $"{timestamp}_{prefix}{BuildBackupNameToken(_databaseFileName)}_{Guid.NewGuid():N}.zip";
             string backupPath = Path.Combine(_backupDirectory, backupFileName);
@@ -530,7 +534,7 @@ namespace ExportDocManager.Services.Infrastructure
                 }
             }
 
-            return $"{DateTimeOffset.Now:yyyyMMdd_HHmmss_fff}_imported_{BuildBackupNameToken(_databaseFileName)}_{Guid.NewGuid():N}.zip";
+            return $"{_clock.Now:yyyyMMdd_HHmmss_fff}_imported_{BuildBackupNameToken(_databaseFileName)}_{Guid.NewGuid():N}.zip";
         }
 
         private static string BuildBackupNameToken(string databaseFileName)

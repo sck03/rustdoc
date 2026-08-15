@@ -3,6 +3,7 @@ using ExportDocManager.Services.Data;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -18,13 +19,10 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ISettingsService settingsService,
                 IExchangeRateService exchangeRateService,
+                IBusinessClock clock,
                 bool? forceRefresh,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 try
                 {
@@ -42,7 +40,7 @@ namespace ExportDocManager.Api.Hosting
                     var rateDtos = rates
                         .Select(ToApiDto)
                         .ToList();
-                    var fetchedAt = DateTimeOffset.Now;
+                    var fetchedAt = clock.Now;
 
                     return Results.Ok(new ApiExchangeRateListResponse
                     {
@@ -80,12 +78,9 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 ISettingsService settingsService,
                 IExchangeRateService exchangeRateService,
+                IBusinessClock clock,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 try
                 {
@@ -102,7 +97,7 @@ namespace ExportDocManager.Api.Hosting
                             .OrderBy(currency => currency, StringComparer.CurrentCulture)
                             .ToList(),
                         SourceUrl = ResolveExchangeRateSourceUrl(EnsureExchangeRateSettings(settingsService.Settings)),
-                        FetchedAt = DateTimeOffset.Now,
+                        FetchedAt = clock.Now,
                         StoragePolicy = ExchangeRateStoragePolicy
                     });
                 }

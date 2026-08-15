@@ -5,7 +5,6 @@ use std::{
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 
-const MAX_OCR_PREVIEW_IMAGE_BYTES: u64 = 25 * 1024 * 1024;
 pub(crate) const MAX_EXPORTER_SEAL_IMAGE_BYTES: u64 = 5 * 1024 * 1024;
 
 #[tauri::command]
@@ -165,36 +164,6 @@ pub(crate) fn read_exporter_seal_image_file_as_data_url(path: String) -> Result<
     let bytes = fs::read(&input)
         .map_err(|error| format!("无法读取印章图片 '{}': {error}", input.display()))?;
     let mime_type = exporter_seal_image_mime_type(&input, &bytes)?;
-    Ok(format!(
-        "data:{mime_type};base64,{}",
-        STANDARD.encode(bytes)
-    ))
-}
-
-#[tauri::command]
-pub(crate) fn read_ocr_image_file_as_data_url(path: String) -> Result<String, String> {
-    let trimmed = path.trim();
-    if trimmed.is_empty() {
-        return Err("OCR 图片路径不能为空。".to_owned());
-    }
-
-    let input = PathBuf::from(trimmed);
-    let metadata = fs::metadata(&input)
-        .map_err(|error| format!("无法读取 OCR 图片 '{}': {error}", input.display()))?;
-    if !metadata.is_file() {
-        return Err("OCR 预览只能读取图片文件。".to_owned());
-    }
-
-    if metadata.len() > MAX_OCR_PREVIEW_IMAGE_BYTES {
-        return Err("OCR 图片超过 25 MB 预览限制。".to_owned());
-    }
-
-    let Some(mime_type) = ocr_image_mime_type(&input) else {
-        return Err("OCR 预览仅支持 PNG、JPG、BMP、TIFF 图片。".to_owned());
-    };
-
-    let bytes = fs::read(&input)
-        .map_err(|error| format!("无法读取 OCR 图片 '{}': {error}", input.display()))?;
     Ok(format!(
         "data:{mime_type};base64,{}",
         STANDARD.encode(bytes)
@@ -396,17 +365,6 @@ pub(crate) fn is_existing_directory_candidate(default_directory: Option<String>)
 
 fn path_to_string(path: PathBuf) -> String {
     path.to_string_lossy().into_owned()
-}
-
-fn ocr_image_mime_type(path: &Path) -> Option<&'static str> {
-    let extension = path.extension()?.to_string_lossy().to_ascii_lowercase();
-    match extension.as_str() {
-        "png" => Some("image/png"),
-        "jpg" | "jpeg" => Some("image/jpeg"),
-        "bmp" => Some("image/bmp"),
-        "tif" | "tiff" => Some("image/tiff"),
-        _ => None,
-    }
 }
 
 fn exporter_seal_image_mime_type(path: &Path, bytes: &[u8]) -> Result<&'static str, String> {

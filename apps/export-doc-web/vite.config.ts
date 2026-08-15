@@ -22,23 +22,6 @@ export default defineConfig({
             return "vendor-three";
           }
 
-          if (id.includes("html2canvas")) {
-            return undefined;
-          }
-
-          if (
-            id.includes("jspdf") ||
-            id.includes("canvg") ||
-            id.includes("dompurify") ||
-            id.includes("fflate") ||
-            id.includes("fast-png") ||
-            id.includes("rgbcolor") ||
-            id.includes("svg-pathdata") ||
-            id.includes("stackblur-canvas")
-          ) {
-            return undefined;
-          }
-
           if (id.includes("lucide-react")) {
             return "vendor-icons";
           }

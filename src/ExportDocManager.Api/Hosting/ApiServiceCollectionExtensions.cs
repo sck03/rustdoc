@@ -12,6 +12,7 @@ using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Services.Suppliers;
 using ExportDocManager.Services.Tools;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Text.Json.Serialization;
@@ -37,6 +38,8 @@ namespace ExportDocManager.Api.Hosting
             services.AddSingleton(pathProvider);
             services.AddSingleton(databaseSettings);
             services.AddSingleton(runtimeOptions);
+            services.AddSingleton<IBusinessClock>(
+                new BusinessClock(TimeProvider.System, runtimeOptions.BusinessTimeZoneId));
             services.ConfigureHttpJsonOptions(options =>
             {
                 options.SerializerOptions.RespectNullableAnnotations = true;
@@ -94,7 +97,10 @@ namespace ExportDocManager.Api.Hosting
                 RuntimeLicenseAnchorStoreFactory.CreateDefault(pathProvider));
             services.TryAddSingleton<ILicenseSignatureVerifier, EcdsaLicenseSignatureVerifier>();
             services.AddSingleton<ILicenseService, RuntimeLicenseService>();
-            services.AddScoped<IBackupService>(_ => new BackupService(databaseSettings, pathProvider));
+            services.AddScoped<IBackupService>(provider => new BackupService(
+                databaseSettings,
+                pathProvider,
+                clock: provider.GetRequiredService<IBusinessClock>()));
             services.AddScoped<ICloudSyncService, WebDavCloudSyncService>();
             services.AddScoped<ISharedDatabaseMaintenanceService, SharedDatabaseMaintenanceService>();
             services.AddScoped<IServerMigrationService, ServerMigrationService>();
@@ -118,7 +124,8 @@ namespace ExportDocManager.Api.Hosting
             services.AddSingleton<IExchangeRateService>(provider =>
                 new BocExchangeRateService(
                     provider.GetRequiredService<ISettingsService>(),
-                    provider.GetRequiredService<IHttpClientFactory>().CreateClient("ExchangeRates")));
+                    provider.GetRequiredService<IHttpClientFactory>().CreateClient("ExchangeRates"),
+                    clock: provider.GetRequiredService<IBusinessClock>()));
             services.AddSingleton<DatabaseInitializationCoordinator>();
             services.AddScoped<IDatabaseInitializationService>(provider =>
                 new DatabaseInitializationService(
@@ -219,7 +226,7 @@ namespace ExportDocManager.Api.Hosting
                 new SingleWindowReferenceCatalogService(pathProvider, singleWindowCatalogStore));
             services.AddMasterDataReadRepositories();
             services.AddSharedReadRepositories();
-            foreach (var module in ExportDocCapabilityModuleLoader.Load())
+            foreach (var module in ExportDocCapabilityModuleLoader.Load(typeof(ApiServiceCollectionExtensions).Assembly.Location))
             {
                 module.RegisterServices(services, pathProvider);
             }

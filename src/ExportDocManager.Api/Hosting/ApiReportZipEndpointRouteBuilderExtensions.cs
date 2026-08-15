@@ -4,6 +4,8 @@ using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
+using ExportDocManager.Services.Time;
+
 namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiEndpointRouteBuilderExtensions
@@ -12,16 +14,11 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapPost("/api/reports/invoices/pdf-zip/save-to-path", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ApiBackgroundJobRunner jobRunner,
                 ApiInvoiceReportZipRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -57,22 +54,18 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/invoices/pdf-zip/download", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IAppPathProvider pathProvider,
                 ApiBackgroundJobRunner jobRunner,
+                IBusinessClock clock,
                 ApiInvoiceReportZipRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 request ??= new ApiInvoiceReportZipRequest();
                 request.DestinationPath = CreateBrowserDownloadPath(
                     pathProvider,
                     "InvoicePdfZip",
-                    $"InvoiceReports-{DateTime.Now:yyyyMMdd-HHmmss}.zip");
+                    $"InvoiceReports-{clock.Now:yyyyMMdd-HHmmss}.zip");
                 var validation = ValidateInvoiceReportZipRequest(
                     request,
                     out var invoiceIds,

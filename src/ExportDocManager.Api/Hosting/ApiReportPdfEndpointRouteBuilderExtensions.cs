@@ -3,6 +3,8 @@ using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
 
+using ExportDocManager.Services.Time;
+
 namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiEndpointRouteBuilderExtensions
@@ -11,17 +13,12 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapPost("/api/reports/invoices/{invoiceId:int}/pdf/save-to-path", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 ApiBackgroundJobRunner jobRunner,
                 int invoiceId,
                 ApiReportPdfRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -57,23 +54,19 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/invoices/{invoiceId:int}/pdf/download", (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IAppPathProvider pathProvider,
                 ApiBackgroundJobRunner jobRunner,
+                IBusinessClock clock,
                 int invoiceId,
                 ApiReportPdfRequest request) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 request ??= new ApiReportPdfRequest();
                 request.DestinationPath = CreateBrowserDownloadPath(
                     pathProvider,
                     "InvoicePdf",
-                    $"Invoice-{invoiceId}-{DateTime.Now:yyyyMMdd-HHmmss}.pdf");
+                    $"Invoice-{invoiceId}-{clock.Now:yyyyMMdd-HHmmss}.pdf");
                 var validation = ValidateReportPdfRequest(
                     invoiceId,
                     request,

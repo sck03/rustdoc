@@ -516,7 +516,7 @@ namespace ExportDocManager.Services.Data
             current.Columns ??= new ExcelImportItemColumnAnalysis();
             if (fallback.Columns != null)
             {
-                FillMissingItemColumns(current.Columns, fallback.Columns);
+                current.Columns.MergeMissingNonConflictingFrom(fallback.Columns);
             }
 
             current.WorksheetName = string.IsNullOrWhiteSpace(current.WorksheetName)
@@ -533,77 +533,6 @@ namespace ExportDocManager.Services.Data
         {
             return columns?.QuantityCol > 0
                 && (columns.StyleNoCol > 0 || columns.StyleNameCol > 0);
-        }
-
-        private static void FillMissingItemColumns(
-            ExcelImportItemColumnAnalysis target,
-            ExcelImportItemColumnAnalysis source)
-        {
-            target.PoNumberCol = PickMissingColumn(target, target.PoNumberCol, source.PoNumberCol);
-            target.StyleNoCol = PickMissingColumn(target, target.StyleNoCol, source.StyleNoCol);
-            target.StyleNameCol = PickMissingColumn(target, target.StyleNameCol, source.StyleNameCol);
-            target.FabricCompositionCol = PickMissingColumn(target, target.FabricCompositionCol, source.FabricCompositionCol);
-            target.StyleNameCNCol = PickMissingColumn(target, target.StyleNameCNCol, source.StyleNameCNCol);
-            target.BrandCol = PickMissingColumn(target, target.BrandCol, source.BrandCol);
-            target.HSCodeCol = PickMissingColumn(target, target.HSCodeCol, source.HSCodeCol);
-            target.OriginCol = PickMissingColumn(target, target.OriginCol, source.OriginCol);
-            target.QuantityCol = PickMissingColumn(target, target.QuantityCol, source.QuantityCol);
-            target.UnitENCol = PickMissingColumn(target, target.UnitENCol, source.UnitENCol);
-            target.UnitCNCol = PickMissingColumn(target, target.UnitCNCol, source.UnitCNCol);
-            target.CartonsCol = PickMissingColumn(target, target.CartonsCol, source.CartonsCol);
-            target.CtnUnitENCol = PickMissingColumn(target, target.CtnUnitENCol, source.CtnUnitENCol);
-            target.LengthCol = PickMissingColumn(target, target.LengthCol, source.LengthCol);
-            target.WidthCol = PickMissingColumn(target, target.WidthCol, source.WidthCol);
-            target.HeightCol = PickMissingColumn(target, target.HeightCol, source.HeightCol);
-            target.DimensionCol = PickMissingColumn(target, target.DimensionCol, source.DimensionCol);
-            target.VolumeCol = PickMissingColumn(target, target.VolumeCol, source.VolumeCol);
-            target.GWPerCtnCol = PickMissingColumn(target, target.GWPerCtnCol, source.GWPerCtnCol);
-            target.GWTotalCol = PickMissingColumn(target, target.GWTotalCol, source.GWTotalCol);
-            target.NWPerCtnCol = PickMissingColumn(target, target.NWPerCtnCol, source.NWPerCtnCol);
-            target.NWTotalCol = PickMissingColumn(target, target.NWTotalCol, source.NWTotalCol);
-            target.UnitPriceCol = PickMissingColumn(target, target.UnitPriceCol, source.UnitPriceCol);
-            target.TotalPriceCol = PickMissingColumn(target, target.TotalPriceCol, source.TotalPriceCol);
-        }
-
-        private static int PickMissingColumn(
-            ExcelImportItemColumnAnalysis columns,
-            int current,
-            int fallback)
-        {
-            return current > 0 || fallback <= 0 || IsMappedColumn(columns, fallback)
-                ? current
-                : fallback;
-        }
-
-        private static bool IsMappedColumn(ExcelImportItemColumnAnalysis columns, int column)
-        {
-            return column > 0 && new[]
-            {
-                columns.PoNumberCol,
-                columns.StyleNoCol,
-                columns.StyleNameCol,
-                columns.FabricCompositionCol,
-                columns.StyleNameCNCol,
-                columns.BrandCol,
-                columns.HSCodeCol,
-                columns.OriginCol,
-                columns.QuantityCol,
-                columns.UnitENCol,
-                columns.UnitCNCol,
-                columns.CartonsCol,
-                columns.CtnUnitENCol,
-                columns.LengthCol,
-                columns.WidthCol,
-                columns.HeightCol,
-                columns.DimensionCol,
-                columns.VolumeCol,
-                columns.GWPerCtnCol,
-                columns.GWTotalCol,
-                columns.NWPerCtnCol,
-                columns.NWTotalCol,
-                columns.UnitPriceCol,
-                columns.TotalPriceCol
-            }.Contains(column);
         }
 
         private static bool IsMoreCompleteMultilineValue(string candidate, string current)

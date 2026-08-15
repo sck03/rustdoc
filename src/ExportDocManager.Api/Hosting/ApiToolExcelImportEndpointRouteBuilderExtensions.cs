@@ -17,10 +17,6 @@ namespace ExportDocManager.Api.Hosting
                 IExcelImportService excelImportService,
                 ApiExcelImportPreviewRequest request) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
@@ -71,10 +67,6 @@ namespace ExportDocManager.Api.Hosting
                 string? fileName,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 string portableFileName = (fileName ?? string.Empty).Trim().Replace('\\', '/');
                 string safeFileName = Path.GetFileName(portableFileName).Trim();

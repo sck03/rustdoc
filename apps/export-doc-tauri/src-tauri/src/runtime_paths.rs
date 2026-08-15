@@ -31,6 +31,19 @@ use crate::runtime_sidecar_path::sidecar_file_name;
 use std::fs;
 
 const RUNTIME_CONFIG_ROOT_ENVIRONMENT_VARIABLE: &str = "EXPORTDOCMANAGER_RUNTIME_CONFIG_ROOT";
+pub(crate) const RUNTIME_DATA_DIRECTORIES: [&str; 11] = [
+    "Database",
+    "Templates",
+    "Files",
+    "Exports",
+    "SingleWindow",
+    "Backups",
+    "Cache",
+    "Config",
+    "Security",
+    "WebView",
+    "Logs",
+];
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -208,19 +221,7 @@ fn prompt_for_runtime_data_root(
 
 pub(crate) fn ensure_runtime_data_directories(data_root: &Path) -> Result<(), Box<dyn Error>> {
     ensure_directory(data_root)?;
-    for directory_name in [
-        "Database",
-        "Templates",
-        "Files",
-        "Exports",
-        "SingleWindow",
-        "Backups",
-        "Cache",
-        "Config",
-        "Security",
-        "WebView",
-        "Logs",
-    ] {
+    for directory_name in RUNTIME_DATA_DIRECTORIES {
         ensure_directory(&data_root.join(directory_name))?;
     }
     Ok(())

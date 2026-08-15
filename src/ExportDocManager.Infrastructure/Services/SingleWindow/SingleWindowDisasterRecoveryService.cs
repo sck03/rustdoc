@@ -6,6 +6,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using Microsoft.Data.Sqlite;
 
@@ -30,15 +31,18 @@ namespace ExportDocManager.Services.SingleWindow
         private readonly bool _usesSqlite;
         private readonly string _databaseFileName;
         private readonly string _databasePath;
+        private readonly IBusinessClock _clock;
 
         public SingleWindowDisasterRecoveryService(
             DatabaseConnectionSettings databaseSettings,
             IAppPathProvider pathProvider,
-            ISingleWindowStationIdentityService stationIdentityService)
+            ISingleWindowStationIdentityService stationIdentityService,
+            IBusinessClock? clock = null)
         {
             _databaseSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _stationIdentityService = stationIdentityService ?? throw new ArgumentNullException(nameof(stationIdentityService));
+            _clock = clock ?? BusinessClock.CreateSystem();
             _usesSqlite = !DatabaseModeHelper.UsesPostgreSql(databaseSettings);
             _databasePath = _usesSqlite
                 ? DbHelper.ResolveRuntimeSqliteDatabasePath(pathProvider, databaseSettings.SqliteDatabaseFileName)
@@ -106,7 +110,7 @@ namespace ExportDocManager.Services.SingleWindow
             string snapshotPath = Path.Combine(workingRoot, _databaseFileName);
             string manifestPath = Path.Combine(workingRoot, "manifest.json");
             string innerZipPath = Path.Combine(workingRoot, "payload.zip");
-            string fileName = $"holding-station-recovery-{DateTime.Now:yyyyMMdd-HHmmss}-{packageId[..8]}{SingleWindowDisasterRecoveryLayout.PackageExtension}";
+            string fileName = $"holding-station-recovery-{_clock.Now:yyyyMMdd-HHmmss}-{packageId[..8]}{SingleWindowDisasterRecoveryLayout.PackageExtension}";
             string packagePath = Path.Combine(recoveryRoot, fileName);
             try
             {

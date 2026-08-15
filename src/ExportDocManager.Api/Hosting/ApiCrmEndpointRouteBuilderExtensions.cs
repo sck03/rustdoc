@@ -15,6 +15,7 @@ namespace ExportDocManager.Api.Hosting
                 HasSalesAccess(context, tokens, auth, out var denied)
                     ? Results.Ok(ToApiDto(await service.GetDashboardAsync(ct), await opportunities.GetDashboardAsync(ct)))
                     : denied).WithName("GetCrmDashboard")
+            .WithApiPermission(PermissionModuleCatalog.SalesDashboard)
             .Produces<ApiCrmDashboardDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
@@ -55,7 +56,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (!HasSalesAccess(context, tokens, auth, out var denied)) return denied;
                 byte[] content = await exportService.ExportAsync(keyword, status, ct);
-                return Results.File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"crm-customers-{DateTime.UtcNow:yyyyMMdd-HHmmss}.xlsx");
+                return Results.File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"crm-customers-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.xlsx");
             }).WithName("ExportCrmCustomers")
             .Produces<byte[]>(StatusCodes.Status200OK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             .Produces(StatusCodes.Status401Unauthorized)

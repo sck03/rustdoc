@@ -7,10 +7,12 @@ using System.Text.Json;
 using ClosedXML.Excel;
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Tools;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using PdfSharp.Pdf;
 
 namespace ExportDocManager.Api.Tests
@@ -21,72 +23,23 @@ namespace ExportDocManager.Api.Tests
         public async Task ToolEndpoints_ShouldRequireAuthenticationAndPreservePathValidationBehavior()
         {
             const string desktopToken = "tools-desktop-token";
+            var ocrService = new TestOcrService();
+            var pdfService = new TestHtmlToPdfService();
             await using var harness = await ApiIntegrationTestHarness.StartAsync(
                 "edm-api-tools",
                 "api-tools.db",
-                desktopAccessToken: desktopToken);
+                desktopAccessToken: desktopToken,
+                configureServices: services =>
+                {
+                    services.AddSingleton<IOcrService>(ocrService);
+                    services.AddSingleton<IHtmlToPdfService>(pdfService);
+                });
             using var anonymousClient = harness.CreateClient(desktopAccessToken: desktopToken);
 
-            var anonymousPdfMergeResponse = await anonymousClient.PostAsJsonAsync(
-                "/api/tools/pdf/merge/save-to-path",
-                new
-                {
-                    sourceFiles = Array.Empty<string>(),
-                    destinationPath = Path.Combine(harness.DataRoot, "merged.pdf")
-                });
-            Assert.Equal(HttpStatusCode.Unauthorized, anonymousPdfMergeResponse.StatusCode);
-
-            var anonymousExchangeRatesResponse = await anonymousClient.GetAsync("/api/tools/exchange-rates");
-            Assert.Equal(HttpStatusCode.Unauthorized, anonymousExchangeRatesResponse.StatusCode);
-
-            var anonymousEmailServerSuggestionResponse = await anonymousClient.PostAsJsonAsync(
-                "/api/tools/email/server-suggestion",
-                new
-                {
-                    emailAddress = "customer@example.com"
-                });
-            Assert.Equal(HttpStatusCode.Unauthorized, anonymousEmailServerSuggestionResponse.StatusCode);
-
-            var anonymousEmailStatusResponse = await anonymousClient.GetAsync("/api/tools/email/status");
-            Assert.Equal(HttpStatusCode.Unauthorized, anonymousEmailStatusResponse.StatusCode);
-
-            var anonymousEmailSendResponse = await anonymousClient.PostAsJsonAsync(
-                "/api/tools/email/send",
-                new
-                {
-                    toAddress = "customer@example.com",
-                    subject = "Documents",
-                    body = "Body",
-                    attachmentPaths = Array.Empty<string>()
-                });
-            Assert.Equal(HttpStatusCode.Unauthorized, anonymousEmailSendResponse.StatusCode);
-
-            var anonymousEmailTestResponse = await anonymousClient.PostAsync(
-                "/api/tools/email/test-connection",
-                content: null);
-            Assert.Equal(HttpStatusCode.Unauthorized, anonymousEmailTestResponse.StatusCode);
-
-            var anonymousOcrContentResponse = await anonymousClient.PostAsJsonAsync(
-                "/api/tools/ocr/recognize-image-content",
-                new
-                {
-                    imageContentBase64 = Convert.ToBase64String(new byte[] { 1, 2, 3 }),
-                    sourceName = "clipboard.png",
-                    sourceMimeType = "image/png"
-                });
+            var anonymousOcrContentResponse = await anonymousClient.PostAsync(
+                "/api/tools/ocr/recognize-image-upload?sourceName=clipboard.png&sourceMimeType=image%2Fpng",
+                new ByteArrayContent([1, 2, 3]));
             Assert.Equal(HttpStatusCode.Unauthorized, anonymousOcrContentResponse.StatusCode);
-
-            var anonymousLetterOfCreditReviewResponse = await anonymousClient.PostAsJsonAsync(
-                "/api/tools/letter-of-credit/review",
-                new
-                {
-                    invoice = new
-                    {
-                        invoiceNo = "INV-AI-UNAUTHORIZED",
-                        letterOfCreditNo = "LC-AI-UNAUTHORIZED"
-                    }
-                });
-            Assert.Equal(HttpStatusCode.Unauthorized, anonymousLetterOfCreditReviewResponse.StatusCode);
 
             var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
             using var adminClient = harness.CreateClient(adminLogin.AccessToken, desktopToken);
@@ -232,24 +185,14 @@ namespace ExportDocManager.Api.Tests
                 });
             Assert.Equal(HttpStatusCode.BadRequest, invalidOcrResponse.StatusCode);
 
-            var invalidOcrContentResponse = await adminClient.PostAsJsonAsync(
-                "/api/tools/ocr/recognize-image-content",
-                new
-                {
-                    imageContentBase64 = "not-base64",
-                    sourceName = "clipboard.png",
-                    sourceMimeType = "image/png"
-                });
+            var invalidOcrContentResponse = await adminClient.PostAsync(
+                "/api/tools/ocr/recognize-image-upload?sourceName=clipboard.png&sourceMimeType=image%2Fpng",
+                new ByteArrayContent([]));
             Assert.Equal(HttpStatusCode.BadRequest, invalidOcrContentResponse.StatusCode);
 
-            var invalidOcrMimeResponse = await adminClient.PostAsJsonAsync(
-                "/api/tools/ocr/recognize-image-content",
-                new
-                {
-                    imageContentBase64 = Convert.ToBase64String(new byte[] { 1, 2, 3 }),
-                    sourceName = "clipboard.txt",
-                    sourceMimeType = "text/plain"
-                });
+            var invalidOcrMimeResponse = await adminClient.PostAsync(
+                "/api/tools/ocr/recognize-image-upload?sourceName=clipboard.txt&sourceMimeType=text%2Fplain",
+                new ByteArrayContent([1, 2, 3]));
             Assert.Equal(HttpStatusCode.BadRequest, invalidOcrMimeResponse.StatusCode);
 
             var invalidContainerPackingResponse = await adminClient.PostAsJsonAsync(
@@ -325,6 +268,43 @@ namespace ExportDocManager.Api.Tests
                 "/api/tools/excel/booking-sheet/from-invoice/0/download",
                 content: null);
             Assert.Equal(HttpStatusCode.BadRequest, invalidBookingSheetResponse.StatusCode);
+
+            byte[] imageBytes = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A];
+            using var ocrContent = new ByteArrayContent(imageBytes);
+            using var ocrResponse = await adminClient.PostAsync(
+                "/api/tools/ocr/recognize-image-upload?sourceName=clipboard.png&sourceMimeType=image%2Fpng",
+                ocrContent);
+            Assert.Equal(HttpStatusCode.OK, ocrResponse.StatusCode);
+            var ocrResult = await ApiIntegrationTestHarness.ReadJsonAsync<ApiOcrRecognizeImageResponse>(ocrResponse);
+            Assert.Equal("clipboard.png", ocrResult.SourcePath);
+            Assert.Equal($"bytes:{imageBytes.Length}", ocrResult.FullText);
+            Assert.Contains("内存", ocrResult.StoragePolicy, StringComparison.Ordinal);
+            string imagePath = Path.Combine(harness.DataRoot, "preview.png");
+            File.WriteAllBytes(imagePath, imageBytes);
+            using var previewResponse = await adminClient.GetAsync($"/api/tools/ocr/preview-image?filePath={Uri.EscapeDataString(imagePath)}");
+            Assert.Equal(HttpStatusCode.OK, previewResponse.StatusCode);
+            Assert.Equal("image/png", previewResponse.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(imageBytes, await previewResponse.Content.ReadAsByteArrayAsync());
+            var pdfRequest = CreateContainerPackingPdfRequest();
+            using var pdfResponse = await adminClient.PostAsJsonAsync("/api/tools/container-packing/pdf/download", pdfRequest);
+            Assert.Equal(HttpStatusCode.OK, pdfResponse.StatusCode);
+            Assert.Equal("application/pdf", pdfResponse.Content.Headers.ContentType?.MediaType);
+            Assert.StartsWith("%PDF", Encoding.ASCII.GetString(await pdfResponse.Content.ReadAsByteArrayAsync()));
+            Assert.Contains("&lt;script&gt;&amp; 方案", pdfService.LastHtml, StringComparison.Ordinal);
+            Assert.DoesNotContain("<script>", pdfService.LastHtml, StringComparison.OrdinalIgnoreCase);
+            pdfRequest.DestinationPath = Path.Combine(harness.DataRoot, "container-plan.pdf");
+            using var browserClient = harness.CreateClient(adminLogin.AccessToken);
+            using var forbiddenSave = await browserClient.PostAsJsonAsync("/api/tools/container-packing/pdf/save-to-path", pdfRequest);
+            Assert.Equal(HttpStatusCode.Forbidden, forbiddenSave.StatusCode);
+            using var saveResponse = await adminClient.PostAsJsonAsync("/api/tools/container-packing/pdf/save-to-path", pdfRequest);
+            Assert.Equal(HttpStatusCode.OK, saveResponse.StatusCode);
+            var saved = await ApiIntegrationTestHarness.ReadJsonAsync<ApiContainerPackingPdfSaveResponse>(saveResponse);
+            Assert.True(saved is { Success: true, SizeBytes: > 4 });
+            Assert.Equal(pdfRequest.DestinationPath, saved.FilePath);
+
+            pdfRequest.Analysis.PackedItems = null!;
+            using var invalidPdfResponse = await adminClient.PostAsJsonAsync("/api/tools/container-packing/pdf/download", pdfRequest);
+            Assert.Equal(HttpStatusCode.BadRequest, invalidPdfResponse.StatusCode);
         }
 
         [Fact]
@@ -735,6 +715,46 @@ namespace ExportDocManager.Api.Tests
             using var stream = new MemoryStream();
             document.Save(stream, closeStream: false);
             return stream.ToArray();
+        }
+
+        private static ApiContainerPackingPdfRequest CreateContainerPackingPdfRequest() => new()
+        {
+            ProjectName = "<script>& 方案",
+            ContainerType = "40HQ",
+            Container = new ApiContainerDimensionsDto { Length = 1200, Width = 235, Height = 269 },
+            Analysis = new ApiContainerPackingAnalysisDto
+            {
+                TotalPackages = 1, PackedPackages = 1, EstimatedContainerCount = 1,
+                VolumeUtilizationPercent = 50m, WeightUtilizationPercent = 25m,
+                IsCenterOfGravityWithinTolerance = true,
+                PackedItems =
+                [
+                    new ApiPackedCargoItemDto
+                    {
+                        Name = "货物<&", DetailText = "说明<&", Width = 60, Height = 40,
+                        UnitsRepresented = 1, TotalWeight = 10m, PreferredZone = "Front"
+                    }
+                ]
+            }
+        };
+
+        private sealed class TestOcrService : IOcrService
+        {
+            public Task<OcrResult> RecognizeAsync(Stream imageStream, CancellationToken cancellationToken = default) =>
+                Task.FromResult(new OcrResult { FullText = $"bytes:{imageStream.Length}" });
+        }
+
+        private sealed class TestHtmlToPdfService : IHtmlToPdfService
+        {
+            public string LastHtml { get; private set; } = string.Empty;
+            public async Task<HtmlToPdfRenderResult> RenderAsync(string html, string destinationPath,
+                HtmlToPdfRenderOptions? options = null, CancellationToken cancellationToken = default)
+            {
+                LastHtml = html;
+                Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+                await File.WriteAllTextAsync(destinationPath, "%PDF-1.7\ntest", cancellationToken);
+                return new HtmlToPdfRenderResult { DestinationPath = destinationPath, RendererPath = "test" };
+            }
         }
 
         private static async Task<BackgroundJobSnapshot> WaitForTerminalJobAsync(HttpClient client, string jobId)

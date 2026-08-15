@@ -14,17 +14,12 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/master-data/hs-codes", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IHsCodeReadRepository repository,
                 int? pageNumber,
                 int? pageSize,
                 string? keyword,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
                 var result = await repository.QueryPageAsync(
                     new HsCodeReadQuery
                     {
@@ -42,16 +37,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/master-data/hs-codes", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IHsCodeService hsCodeService,
                 IHsCodeReadRepository repository,
                 ApiHsCodeDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (request == null)
                 {
@@ -95,15 +85,10 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/master-data/hs-codes/{code}", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IHsCodeReadRepository repository,
                 string code,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (string.IsNullOrWhiteSpace(code))
                 {
@@ -123,17 +108,16 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/invoices/hs-codes/{code}", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IHsCodeReadRepository repository,
                 string code,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null) return Results.Unauthorized();
                 if (string.IsNullOrWhiteSpace(code))
                     return Results.BadRequest(new ApiErrorResponse("HS编码不能为空。"));
                 var row = await repository.GetByCodeAsync(code, cancellationToken);
                 return row == null ? Results.NotFound() : Results.Ok(ApiMasterDataDtoFactory.FromHsCode(row));
             }).WithName("GetInvoiceHsCode")
+            .WithApiPermission(PermissionModuleCatalog.DocumentInvoices)
             .Produces<ApiHsCodeDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -141,17 +125,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPut("/api/master-data/hs-codes/{code}", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IHsCodeService hsCodeService,
                 IHsCodeReadRepository repository,
                 string code,
                 ApiHsCodeDto request,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (string.IsNullOrWhiteSpace(code))
                 {
@@ -203,16 +182,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapDelete("/api/master-data/hs-codes/by-id/{id:int}", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 IHsCodeService hsCodeService,
                 IHsCodeReadRepository repository,
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                if (ApiEndpointAuth.RequireUser(context, tokenService) == null)
-                {
-                    return Results.Unauthorized();
-                }
 
                 if (id <= 0)
                 {
@@ -237,18 +211,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/master-data/hs-codes/delete-batch", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IHsCodeService hsCodeService,
                 IHsCodeReadRepository repository,
                 ApiHsCodeBatchDeleteRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanUseModule(
                         user,
@@ -294,18 +263,13 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/master-data/hs-codes/clear-all", async (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
                 IHsCodeService hsCodeService,
                 IHsCodeReadRepository repository,
                 ApiHsCodeClearAllRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.RequireUser(context, tokenService);
-                if (user == null)
-                {
-                    return Results.Unauthorized();
-                }
+                var user = ApiEndpointAuth.GetRequiredUser(context);
 
                 if (!authorizationService.CanManageSettings(user))
                 {
